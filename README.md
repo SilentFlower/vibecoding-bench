@@ -1,6 +1,6 @@
 # vibecoding-bench
 
-把 [`topics.md`](./topics.md) 里的 100 道题（源自 [vibecoding-100](https://github.com/silentflower/vibecoding-100)）作为题库，让真实的 **Claude Code** 在容器里跑，按账号隔离、按账号并发限流、全程透明代理 + TLS MITM 抓 Anthropic API 原文。
+把 [`topics.md`](./topics.md) 里的 100 道题作为题库，让真实的 **Claude Code** 在容器里跑，按账号隔离、按账号并发限流、全程透明代理 + TLS MITM 抓 Anthropic API 原文。
 
 ## 架构
 
