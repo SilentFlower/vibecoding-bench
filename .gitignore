@@ -15,8 +15,9 @@ venv/
 .vscode/
 *.swp
 
-# Local AI tooling (Trellis / Codex stubs)
+# Local AI tooling (Trellis / Codex / Claude Code stubs)
 AGENTS.md
 .trellis/
 .agents/
 .codex/
+.claude/
