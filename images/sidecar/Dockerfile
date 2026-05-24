@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir mitmproxy==11.1.3
 
 # hev-socks5-tunnel：tun → socks5 client 转发器
-ARG HEV_VERSION=2.7.6
+ARG HEV_VERSION=2.15.0
 RUN set -eux; \
     arch="$(uname -m)"; \
     case "$arch" in \
