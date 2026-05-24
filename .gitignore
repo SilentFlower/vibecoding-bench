@@ -1,0 +1,16 @@
+.env
+data/
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,44 @@
+# =======================================================================
+# vibecoding-100 bench
+# 使用：
+#   1. cp .env.example .env && 编辑 HOST_BENCH_DATA 为本目录 data/ 的绝对路径
+#   2. docker compose --profile build build          构建三个镜像
+#   3. ./scripts/init-account.sh <name>              OAuth 登录至少一个账号
+#   4. docker compose up -d orchestrator             启动后端
+#   5. 浏览器打开 http://localhost:${BENCH_PORT:-8000}
+# =======================================================================
+services:
+  orchestrator:
+    build: ./orchestrator
+    image: vibebench-orchestrator:latest
+    container_name: vibebench-orchestrator
+    ports:
+      - "${BENCH_PORT:-8000}:8000"
+    environment:
+      BENCH_DATA: /data
+      HOST_BENCH_DATA: ${HOST_BENCH_DATA:?HOST_BENCH_DATA must be set in .env (absolute path to ./data on host)}
+      TOPICS_FILE: /repo/topics.md
+      WEBUI_DIR: /webui
+      WORKER_IMAGE: vibebench-worker:latest
+      SIDECAR_IMAGE: vibebench-sidecar:latest
+      PER_ACCOUNT_CONCURRENCY: 2
+      SIDECAR_BOOT_WAIT: "4"
+    volumes:
+      - ./data:/data
+      - ./topics.md:/repo/topics.md:ro
+      - ./webui:/webui:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  # 以下两个仅用于 build 镜像（profile=build 时才生效，不会被默认 up）
+  worker-image:
+    build: ./images/worker
+    image: vibebench-worker:latest
+    profiles: ["build"]
+    command: ["true"]
+
+  sidecar-image:
+    build: ./images/sidecar
+    image: vibebench-sidecar:latest
+    profiles: ["build"]
+    command: ["true"]

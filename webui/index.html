@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>vibecoding-100 bench</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="brand">vibecoding-100 <span class="muted">bench</span></h1>
+    <nav class="tabs">
+      <a href="#accounts" data-tab="accounts">账号</a>
+      <a href="#topics"   data-tab="topics">题库</a>
+      <a href="#tasks"    data-tab="tasks">任务</a>
+      <a href="#runs"     data-tab="runs">运行</a>
+    </nav>
+  </header>
+
+  <main id="view"></main>
+
+  <!-- ====== 各视图模板 ====== -->
+  <template id="tpl-accounts">
+    <section class="view">
+      <div class="row-between">
+        <h2>账号</h2>
+        <button class="btn btn-primary" id="add-account">+ 添加账号</button>
+      </div>
+      <p class="hint">先用 <code>scripts/init-account.sh &lt;name&gt;</code> 完成 OAuth 登录，再在这里添加同名账号。</p>
+      <table class="data">
+        <thead><tr>
+          <th>ID</th><th>名称</th><th>profile</th>
+          <th>上游 SOCKS5</th><th>启用</th><th>操作</th>
+        </tr></thead>
+        <tbody id="accounts-body"></tbody>
+      </table>
+    </section>
+  </template>
+
+  <template id="tpl-topics">
+    <section class="view">
+      <div class="row-between">
+        <h2>题库 <span class="muted" id="topics-count"></span></h2>
+        <input type="search" id="topic-filter" placeholder="按标题/分类过滤…" />
+      </div>
+      <div id="topics-list" class="topics-grid"></div>
+    </section>
+  </template>
+
+  <template id="tpl-tasks">
+    <section class="view">
+      <h2>任务</h2>
+      <table class="data">
+        <thead><tr>
+          <th>ID</th><th>题号</th><th>标题</th><th>账号</th>
+          <th>重复</th><th>超时</th><th>操作</th>
+        </tr></thead>
+        <tbody id="tasks-body"></tbody>
+      </table>
+    </section>
+  </template>
+
+  <template id="tpl-runs">
+    <section class="view">
+      <div class="row-between">
+        <h2>运行</h2>
+        <div class="legend">
+          <span class="pill pill-queued">queued</span>
+          <span class="pill pill-running">running</span>
+          <span class="pill pill-success">success</span>
+          <span class="pill pill-failed">failed</span>
+          <span class="pill pill-timeout">timeout</span>
+        </div>
+      </div>
+      <table class="data">
+        <thead><tr>
+          <th>ID</th><th>任务</th><th>账号</th><th>状态</th>
+          <th>耗时</th><th>退出码</th><th>操作</th>
+        </tr></thead>
+        <tbody id="runs-body"></tbody>
+      </table>
+    </section>
+  </template>
+
+  <!-- 详情弹窗 -->
+  <div class="modal hidden" id="modal">
+    <div class="modal-card">
+      <button class="modal-close" id="modal-close">×</button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <!-- 添加账号弹窗 -->
+  <div class="modal hidden" id="acc-modal">
+    <div class="modal-card">
+      <button class="modal-close" data-close="#acc-modal">×</button>
+      <h3>添加账号</h3>
+      <form id="acc-form" class="form">
+        <label>名称（须与 init-account.sh 时一致）
+          <input name="name" required pattern="[a-zA-Z0-9_-]+" />
+        </label>
+        <label>上游 SOCKS5 host <input name="upstream_socks5_host" placeholder="例如 host.docker.internal" /></label>
+        <label>上游 SOCKS5 port <input name="upstream_socks5_port" type="number" min="1" max="65535" placeholder="1080" /></label>
+        <label>SOCKS5 用户名 <input name="upstream_socks5_user" /></label>
+        <label>SOCKS5 密码 <input name="upstream_socks5_pass" type="password" /></label>
+        <div class="row-end">
+          <button type="button" class="btn" data-close="#acc-modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 创建任务弹窗 -->
+  <div class="modal hidden" id="task-modal">
+    <div class="modal-card">
+      <button class="modal-close" data-close="#task-modal">×</button>
+      <h3>创建任务 <span class="muted" id="task-modal-title"></span></h3>
+      <form id="task-form" class="form">
+        <input type="hidden" name="topic_no" />
+        <label>派发账号
+          <select name="account_id" required></select>
+        </label>
+        <label>Prompt（留空使用题目标题+描述自动生成）
+          <textarea name="prompt" rows="6"></textarea>
+        </label>
+        <div class="row">
+          <label>超时(秒) <input name="timeout_sec" type="number" min="60" value="1800" /></label>
+          <label>重复次数 <input name="repeat_n" type="number" min="1" value="1" /></label>
+        </div>
+        <div class="row-end">
+          <button type="button" class="btn" data-close="#task-modal">取消</button>
+          <button type="submit" class="btn btn-primary">创建</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
