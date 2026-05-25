@@ -10,10 +10,12 @@ vibecoding-100 bench · Orchestrator
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import json
 import os
 import re
+import secrets
 import shutil
 import sqlite3
 import threading
@@ -26,7 +28,7 @@ from typing import Optional
 import docker
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
@@ -51,6 +53,13 @@ WORKER_IMAGE = os.environ.get("WORKER_IMAGE", "vibebench-worker:latest")
 SIDECAR_IMAGE = os.environ.get("SIDECAR_IMAGE", "vibebench-sidecar:latest")
 PER_ACCOUNT_CONCURRENCY = int(os.environ.get("PER_ACCOUNT_CONCURRENCY", "2"))
 SIDECAR_BOOT_WAIT = float(os.environ.get("SIDECAR_BOOT_WAIT", "4"))
+
+# HTTP Basic Auth(可选):两者都填才启用,任一为空则跳过(向下兼容本地开发)
+# WebSocket 路由由 sid(uuid4 12 hex ≈ 48 位熵)间接保护:sid 仅由已通过
+# 鉴权的 POST /login/start 生成,直接访问 WS 拿不到合法 sid
+WEBUI_USER = os.environ.get("WEBUI_USER", "")
+WEBUI_PASS = os.environ.get("WEBUI_PASS", "")
+_AUTH_ENABLED = bool(WEBUI_USER and WEBUI_PASS)
 
 
 # ============== DB ==============
@@ -585,6 +594,37 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def basic_auth_middleware(request, call_next):
+    """
+    HTTP Basic Auth 网关。
+    - 仅在 WEBUI_USER + WEBUI_PASS 都设置时启用,留空则放行所有请求(本地开发兼容)
+    - 使用 secrets.compare_digest 防 timing attack
+    - 仅作用于 HTTP 请求;WebSocket(/api/accounts/login/ws/{sid})不经此中间件,
+      但 sid 必须先通过鉴权的 login_start 才能拿到,间接受保护
+    - 401 响应带 WWW-Authenticate 头,触发浏览器原生密码弹窗
+    """
+    if not _AUTH_ENABLED:
+        return await call_next(request)
+    auth = request.headers.get("authorization", "")
+    if auth.startswith("Basic "):
+        try:
+            decoded = base64.b64decode(auth[6:].strip()).decode("utf-8", "ignore")
+            user, _, pwd = decoded.partition(":")
+            if (
+                secrets.compare_digest(user, WEBUI_USER)
+                and secrets.compare_digest(pwd, WEBUI_PASS)
+            ):
+                return await call_next(request)
+        except Exception:
+            pass
+    return Response(
+        status_code=401,
+        content="auth required",
+        headers={"WWW-Authenticate": 'Basic realm="vibebench"'},
+    )
 
 
 # ---------- accounts ----------

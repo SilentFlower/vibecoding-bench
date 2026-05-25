@@ -1,0 +1,42 @@
+# =======================================================================
+# vibecoding-bench · 远程部署 compose
+# 使用 DockerHub 上预构建镜像(huajiwuyan/vibebench-*),不本地 build。
+#
+# 部署清单(scp 到远程同一目录):
+#   docker-compose.remote.yml   ← 本文件
+#   .env                        ← 从 .env.example 复制并填值
+#   topics.md                   ← 题库
+#   webui/                      ← 静态前端(3 个文件)
+#
+# 远程启动:
+#   docker compose -f docker-compose.remote.yml --env-file .env up -d
+# 拉镜像(首次/升级):
+#   docker compose -f docker-compose.remote.yml --env-file .env pull
+# =======================================================================
+services:
+  orchestrator:
+    image: huajiwuyan/vibebench-orchestrator:${VIBEBENCH_TAG:-latest}
+    container_name: vibebench-orchestrator
+    ports:
+      - "${BENCH_PORT:-8000}:8000"
+    environment:
+      BENCH_DATA: /data
+      # 关键:HOST_BENCH_DATA 必须是远程宿主机上 data/ 的绝对路径
+      # orchestrator 用 docker.sock 起 sibling 容器,挂卷点用宿主路径
+      HOST_BENCH_DATA: ${HOST_BENCH_DATA:?HOST_BENCH_DATA must be set in .env (absolute path to ./data on remote host)}
+      TOPICS_FILE: /repo/topics.md
+      WEBUI_DIR: /webui
+      # 远程必须用 DockerHub 完整路径,否则 worker/sidecar 起不来
+      WORKER_IMAGE: huajiwuyan/vibebench-worker:${VIBEBENCH_TAG:-latest}
+      SIDECAR_IMAGE: huajiwuyan/vibebench-sidecar:${VIBEBENCH_TAG:-latest}
+      PER_ACCOUNT_CONCURRENCY: 2
+      SIDECAR_BOOT_WAIT: "4"
+      # HTTP Basic Auth:两者都填才启用;留空 = 任何人可访问(仅本地开发)
+      WEBUI_USER: ${WEBUI_USER:-}
+      WEBUI_PASS: ${WEBUI_PASS:-}
+    volumes:
+      - ./data:/data
+      - ./topics.md:/repo/topics.md:ro
+      - ./webui:/webui:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
