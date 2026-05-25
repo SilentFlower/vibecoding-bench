@@ -10,9 +10,11 @@ vibecoding-100 bench · Orchestrator
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import re
+import shutil
 import sqlite3
 import threading
 import time
@@ -144,6 +146,60 @@ def load_topics() -> list[dict]:
     return topics
 
 
+# ============== 账号指纹派生 ==============
+# 让 Anthropic 端遥测看到的设备画像满足:同账号跨 run 一致 / 跨账号不同。
+# 派生纯函数 stateless,同名输入必出同结果;输入由 _ACC_NAME_RE 收紧字符集
+# 后再传入,所以这里不再二次校验。
+#
+# 候选池规模(锁定):TZ 10 × LANG 5 = 50 组合,足够覆盖 <50 账号场景。
+# 刻意排除:
+#   - LANG: zh_CN.UTF-8 —— 出口 IP 已偏中文区,locale 再叠中文 = 关联信号放大
+#   - TZ:  Asia/Shanghai —— 同上,时区与 IP 相关性会让差异化失效
+# 详见 .trellis/tasks/05-25-account-env-fingerprint-isolation/design.md §2
+_TZ_POOL = [
+    "Asia/Tokyo", "Asia/Singapore", "Asia/Seoul",
+    "Australia/Sydney", "Europe/London", "Europe/Berlin", "Europe/Paris",
+    "America/Los_Angeles", "America/New_York", "America/Chicago",
+]
+_LANG_POOL = [
+    "en_US.UTF-8", "ja_JP.UTF-8", "ko_KR.UTF-8",
+    "de_DE.UTF-8", "fr_FR.UTF-8",
+]
+# Docker mem_limit 池(给 worker 容器),刻意避开 2g 防止 compile/test 重题 OOM
+# 走 cgroup 后 Node 的 process.constrainedMemory() / os.totalmem() 都会读到此值
+_MEM_POOL = ["4g", "8g", "16g", "32g"]
+
+
+def derive_fingerprint(account_name: str) -> dict[str, str]:
+    """
+    按账号名 sha256 派生稳定的环境指纹。
+
+    :param account_name: 账号名(调用前已被 _ACC_NAME_RE 校验)
+    :return: dict 包含 hostname / mac / tz / lang / machine_id / mem
+             - hostname: "vb-<8 hex>",11 字符,符合 Docker hostname / DNS label
+             - mac: "02:xx:xx:xx:xx:xx",高位 0x02 = 本地管理 + individual
+             - tz: IANA 时区名(_TZ_POOL 之一)
+             - lang: locale 字符串(_LANG_POOL 之一)
+             - machine_id: 32 位小写 hex,写入容器内 /etc/machine-id
+             - mem: Docker mem_limit 字符串("4g"/"8g"/"16g"/"32g"),让 cgroup
+                    层面 Node 读到的 totalmem / constrainedMemory 按账号差异化
+    """
+    digest = hashlib.sha256(account_name.encode("utf-8")).digest()
+    # hostname / MAC 用 seed[0:4] / seed[1:6] 故意 1 字节重叠 —— 视觉弱关联,
+    # 但不会造成熵冲突(两者各自取的独立字节组合空间仍 > 2^32)
+    hostname = "vb-" + digest[0:4].hex()
+    mac_bytes = bytes([0x02]) + digest[1:6]
+    mac = ":".join(f"{b:02x}" for b in mac_bytes)
+    return {
+        "hostname": hostname,
+        "mac": mac,
+        "tz": _TZ_POOL[digest[6] % len(_TZ_POOL)],
+        "lang": _LANG_POOL[digest[7] % len(_LANG_POOL)],
+        "machine_id": digest.hex()[:32],
+        "mem": _MEM_POOL[digest[8] % len(_MEM_POOL)],
+    }
+
+
 # ============== Docker 运行器 ==============
 class Runner:
     """封装 sidecar + worker 的生命周期"""
@@ -156,6 +212,9 @@ class Runner:
         sidecar_name = f"bench-sidecar-{run_id}"
         worker_name = f"bench-worker-{run_id}"
         acc_name = account["name"]
+        # 账号派生指纹:同账号每次 run 拿到一致的 hostname/MAC/TZ/LANG/machine-id,
+        # 跨账号则不同,避免 Anthropic 端把多账号识别为同台机器
+        fp = derive_fingerprint(acc_name)
 
         # 容器内创建运行目录（docker 会按宿主路径挂载到子容器）
         (BENCH_DATA / "workspaces" / run_id).mkdir(parents=True, exist_ok=True)
@@ -168,9 +227,12 @@ class Runner:
         host_ca = HOST_BENCH_DATA / "ca"
 
         # --- sidecar：透明代理 + MITM ---
+        # hostname + mac_address 由账号派生,worker 共享其 netns 后出口 MAC 即此值
         sidecar = self.client.containers.run(
             SIDECAR_IMAGE,
             name=sidecar_name,
+            hostname=fp["hostname"],
+            mac_address=fp["mac"],
             detach=True,
             auto_remove=False,
             cap_add=["NET_ADMIN"],
@@ -191,9 +253,19 @@ class Runner:
         time.sleep(SIDECAR_BOOT_WAIT)
 
         # --- worker：共享 sidecar 网络命名空间 ---
+        # 注意:network_mode=container:xxx 时 Docker 拒绝同时传 hostname,
+        # worker 会自动继承 sidecar 的 hostname —— 这正好是我们想要的语义,
+        # 所以不显式传 hostname,让 sidecar 的 fp["hostname"] 自然生效。
+        # ACC_NAME 注入用于 entrypoint 写 /etc/machine-id;TZ/LANG/LC_ALL 影响
+        # Claude Code 在 system prompt 与 telemetry 里上报的字面值
         worker = self.client.containers.run(
             WORKER_IMAGE,
             name=worker_name,
+            # mem_limit + memswap_limit 同值:走 cgroup,Node 的
+            # constrainedMemory 自动反映此值;同值禁止 swap,Node 撞上限直接
+            # 被 oom-killer 杀(明确失败 > 走 swap 死撑)
+            mem_limit=fp["mem"],
+            memswap_limit=fp["mem"],
             detach=True,
             auto_remove=False,
             network_mode=f"container:{sidecar_name}",
@@ -206,6 +278,10 @@ class Runner:
                 "TASK_PROMPT": task["prompt"],
                 "RUN_ID": run_id,
                 "TIMEOUT_SEC": str(task.get("timeout_sec", 1800)),
+                "ACC_NAME": acc_name,
+                "TZ": fp["tz"],
+                "LANG": fp["lang"],
+                "LC_ALL": fp["lang"],
             },
         )
 
@@ -301,12 +377,17 @@ class LoginManager:
             worker_name = f"bench-login-worker-{sid}"
             sidecar_id: Optional[str] = None
             worker_network: str = "bridge"
+            # login 模式与 task 模式共用同一派生指纹,确保 OAuth 时和后续 API
+            # 调用在 Anthropic 端看起来是同一台机器
+            fp = derive_fingerprint(name)
 
             # 有 SOCKS5 才起 sidecar；没填的话直走宿主默认网络（用户自担风险）
             if socks5.get("host"):
                 sidecar = self.client.containers.run(
                     SIDECAR_IMAGE,
                     name=sidecar_name,
+                    hostname=fp["hostname"],
+                    mac_address=fp["mac"],
                     detach=True,
                     auto_remove=False,
                     cap_add=["NET_ADMIN"],
@@ -326,20 +407,36 @@ class LoginManager:
                 worker_network = f"container:{sidecar_name}"
 
             # worker：login 模式，profile 目录直接 rw 挂到 /root/.claude
-            worker = self.client.containers.run(
-                WORKER_IMAGE,
-                name=worker_name,
-                detach=True,
-                auto_remove=False,
-                tty=True,
-                stdin_open=True,
-                network_mode=worker_network,
-                volumes={
+            # hostname 注入条件:network_mode=container:xxx 时 Docker 拒绝
+            # 同时传 hostname(会继承 sidecar 的);只在 bridge 模式自己设。
+            # MAC 同样:有 sidecar 时由 sidecar 决定,bridge 模式我们控不了。
+            # mem_limit 与 task 模式一致,确保 login 时 Anthropic 看到的
+            # constrainedMemory 跟后续 task 时是同一台机器。
+            worker_kwargs: dict = {
+                "name": worker_name,
+                "mem_limit": fp["mem"],
+                "memswap_limit": fp["mem"],
+                "detach": True,
+                "auto_remove": False,
+                "tty": True,
+                "stdin_open": True,
+                "network_mode": worker_network,
+                "volumes": {
                     str(host_profile): {"bind": "/root/.claude", "mode": "rw"},
                     str(host_ca): {"bind": "/etc/mitm", "mode": "ro"},
                 },
-                environment={"WORKER_MODE": "login"},
-            )
+                "environment": {
+                    "WORKER_MODE": "login",
+                    "ACC_NAME": name,
+                    "TZ": fp["tz"],
+                    "LANG": fp["lang"],
+                    "LC_ALL": fp["lang"],
+                },
+            }
+            if worker_network == "bridge":
+                # 走 bridge 才能自己设 hostname;共享 netns 时继承 sidecar 的
+                worker_kwargs["hostname"] = fp["hostname"]
+            worker = self.client.containers.run(WORKER_IMAGE, **worker_kwargs)
 
             session = LoginSession(
                 sid, name, sidecar_id, worker.id, socks5
@@ -724,6 +821,28 @@ def login_commit(sid: str, body: LoginStartIn):
         raise HTTPException(404, "session not found")
     if session.name != body.name:
         raise HTTPException(400, "name mismatch with session")
+
+    # 撞 in-flight run 直接拒绝:此时若 commit 继续往下走会清 telemetry/backups,
+    # 与正在跑的 run 复制 profile 的窗口发生竞态。让用户主动决定何时重登。
+    # 首次登录场景下 account 还没入库,COUNT 必为 0,自然通过。
+    name = session.name
+    conn = get_db()
+    try:
+        inflight = conn.execute(
+            "SELECT COUNT(*) AS n FROM runs r "
+            "JOIN accounts a ON r.account_id = a.id "
+            "WHERE a.name = ? AND r.status IN ('queued','running')",
+            (name,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if inflight and inflight["n"] > 0:
+        raise HTTPException(
+            409,
+            f"account '{name}' has {inflight['n']} in-flight run(s); "
+            f"wait for them to finish or cancel before re-login",
+        )
+
     try:
         status = login_manager.auth_status(sid)
     except KeyError:
@@ -734,7 +853,15 @@ def login_commit(sid: str, body: LoginStartIn):
         # 不清容器：让用户继续 retry。返回错误细节给前端展示。
         raise HTTPException(400, f"not logged in yet: {status}")
 
-    name = session.name
+    # 清理 profile 残留遥测痕迹:OAuth 启动那次 claude 写到 telemetry/ 和
+    # backups/ 的内容对后续 task run 无用,反而会被一路重放 → 入库前清掉。
+    # 路径只用 session.name(_ACC_NAME_RE 已校验),且必须用 BENCH_DATA
+    # (orchestrator 容器内路径),不能用 HOST_BENCH_DATA(那是给 docker daemon
+    # 报告挂载点的宿主路径,在 orchestrator 容器里访问不到)。
+    profile_dir = BENCH_DATA / "profiles" / name
+    shutil.rmtree(profile_dir / "telemetry", ignore_errors=True)
+    shutil.rmtree(profile_dir / "backups", ignore_errors=True)
+
     with _db_lock:
         conn = get_db()
         try:

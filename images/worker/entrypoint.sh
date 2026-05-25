@@ -27,6 +27,17 @@ set -euo pipefail
 WORKER_MODE="${WORKER_MODE:-task}"
 log() { echo "[entrypoint $(date +%H:%M:%S)] $*"; }
 
+# ---------- 0) /etc/machine-id 按账号名 hash 写入 ----------
+# 让 Claude Code / Node 通过系统接口读到的 machine-id 是按账号派生的稳定值:
+#   - 同账号每次 run → 同 machine-id(Anthropic 端看作同一台稳定设备)
+#   - 跨账号 → 不同 machine-id(避免被关联识别为同台机器开多份)
+# ACC_NAME 由 orchestrator 注入(task/login 模式都注入);未注入(如 legacy CLI
+# init-account.sh)时跳过,保持向下兼容,不影响功能。
+if [ -n "${ACC_NAME:-}" ]; then
+  printf %s "$ACC_NAME" | sha256sum | cut -c1-32 > /etc/machine-id
+  log "Wrote /etc/machine-id from ACC_NAME hash"
+fi
+
 # ---------- 1) MITM CA 注入 ----------
 CA_PEM=/etc/mitm/mitmproxy-ca-cert.pem
 if [ -f "$CA_PEM" ]; then
@@ -62,6 +73,13 @@ mkdir -p /root/.claude
 if [ -d /mnt/profile ]; then
   log "Copying account profile from /mnt/profile -> /root/.claude"
   cp -a /mnt/profile/. /root/.claude/
+  # 不让历史 telemetry / backups 在每次 run 重放:
+  # - telemetry/1p_failed_events.*.json 会被 Claude Code 启动时重试上传,等于
+  #   把上次没传上去的事件每次都重放;
+  # - backups/.claude.json.backup.* 是旧 config 备份,运行时无用,且每次重 login
+  #   都会累积。
+  # 这里只清运行时副本(/root/.claude),不动只读源(/mnt/profile),并发安全。
+  rm -rf /root/.claude/telemetry /root/.claude/backups
 else
   log "WARN: no profile mounted at /mnt/profile, claude likely not authenticated"
 fi
