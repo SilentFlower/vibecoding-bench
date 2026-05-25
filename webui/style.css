@@ -1066,3 +1066,151 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 /* 滚动条 thumb 在浅底要更暗才看得清 */
 [data-theme="light"] *::-webkit-scrollbar-thumb { background: var(--border-bright); }
 [data-theme="light"] *::-webkit-scrollbar-thumb:hover { background: var(--amber); }
+
+/* ============================================================
+   Auth · 登录模态框 + topbar 用户 pill
+   ============================================================ */
+.auth-card { max-width: 460px; }
+
+.auth-banner {
+  padding: 18px 22px 6px;
+  background: linear-gradient(180deg, rgba(255, 182, 73, 0.05), transparent 80%);
+  border-bottom: 1px dashed var(--border);
+  text-align: center;
+}
+.auth-ascii {
+  /* legacy:已被 .auth-prompt 替代,保留样式以兼容未刷新缓存的客户端 */
+  display: none;
+}
+
+/* shell prompt 风格 banner,与 topbar `~/vibebench_` 同语言 */
+.auth-prompt {
+  font-family: var(--mono);
+  font-size: 14px;
+  margin: 4px 0 14px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+.auth-prompt-host  { color: var(--amber); font-weight: 700; }
+.auth-prompt-sep   { color: var(--text-faint); }
+.auth-prompt-cwd   { color: var(--running); }
+.auth-prompt-sigil { color: var(--text); margin: 0 6px 0 4px; }
+.auth-prompt-cmd   { color: var(--text); font-style: italic; }
+.auth-prompt-caret {
+  color: var(--amber);
+  animation: caret-blink 1.05s steps(2, start) infinite;
+  margin-left: 1px;
+}
+@keyframes caret-blink {
+  to { visibility: hidden; }
+}
+
+.auth-banner-meta {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  letter-spacing: 0.3px;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  text-transform: lowercase;
+}
+.auth-banner-meta .muted { color: var(--text-faint); }
+
+#auth-form { padding: 18px 22px 20px; gap: 12px; }
+#auth-form .lbl { letter-spacing: 0.5px; }
+#auth-form .row-end { margin-top: 4px; }
+
+.auth-error {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--failed);
+  background: rgba(255, 107, 88, 0.08);
+  border: 1px solid rgba(255, 107, 88, 0.35);
+  padding: 6px 10px;
+  letter-spacing: 0.3px;
+  animation: auth-shake 220ms ease-out;
+}
+.auth-error.hidden { display: none; }
+
+@keyframes auth-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-3px); }
+  40%, 80% { transform: translateX(3px); }
+}
+
+/* topbar 用户 pill —— 紧凑 + 终端 prompt 风 */
+.auth-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--amber);
+  letter-spacing: 0.4px;
+  padding: 2px 4px 2px 6px;
+  border: 1px solid var(--border-amber);
+  background: rgba(255, 182, 73, 0.06);
+  text-transform: lowercase;
+}
+.auth-pill.hidden { display: none; }
+.auth-pill-sep.hidden { display: none; }
+.auth-pill-prefix { color: var(--text-dim); margin-right: 1px; }
+.auth-logout {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+  margin-left: 4px;
+  transition: color 100ms ease;
+}
+.auth-logout:hover { color: var(--failed); }
+
+/* ============================================================
+   Paste-helper · SOCKS5 URL 一键填入
+   ============================================================ */
+.paste-helper input {
+  border-color: var(--border-amber) !important;
+  background: rgba(255, 182, 73, 0.04) !important;
+  font-size: 12.5px;
+}
+.paste-helper input::placeholder { color: var(--text-faint); font-style: italic; }
+.paste-helper .lbl .muted {
+  color: var(--text-faint);
+  font-weight: 400;
+  letter-spacing: 0.3px;
+  font-size: 10.5px;
+  margin-left: 4px;
+}
+.paste-helper .hint code {
+  font-size: 10.5px;
+  background: var(--bg);
+  padding: 0 4px;
+  color: var(--amber);
+  border: 1px solid var(--border);
+}
+
+/* ============================================================
+   Light theme overrides
+   ============================================================ */
+[data-theme="light"] .auth-banner {
+  background: linear-gradient(180deg, rgba(255, 182, 73, 0.10), transparent 80%);
+}
+[data-theme="light"] .auth-ascii { text-shadow: none; }
+[data-theme="light"] .auth-error {
+  background: rgba(255, 107, 88, 0.10);
+  border-color: rgba(255, 107, 88, 0.45);
+}
+[data-theme="light"] .auth-pill {
+  background: rgba(255, 182, 73, 0.18);
+}
+[data-theme="light"] .paste-helper input {
+  background: rgba(255, 182, 73, 0.10) !important;
+}
+[data-theme="light"] .paste-helper .hint code {
+  background: #fbf7e9;
+  border-color: var(--border-bright);
+}

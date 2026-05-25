@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -26,9 +27,9 @@ from pathlib import Path
 from typing import Optional
 
 import docker
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
@@ -54,12 +55,18 @@ SIDECAR_IMAGE = os.environ.get("SIDECAR_IMAGE", "vibebench-sidecar:latest")
 PER_ACCOUNT_CONCURRENCY = int(os.environ.get("PER_ACCOUNT_CONCURRENCY", "2"))
 SIDECAR_BOOT_WAIT = float(os.environ.get("SIDECAR_BOOT_WAIT", "4"))
 
-# HTTP Basic Auth(可选):两者都填才启用,任一为空则跳过(向下兼容本地开发)
-# WebSocket 路由由 sid(uuid4 12 hex ≈ 48 位熵)间接保护:sid 仅由已通过
-# 鉴权的 POST /login/start 生成,直接访问 WS 拿不到合法 sid
+# Cookie-Session 鉴权(可选,替代 Basic Auth 给前端做风格统一的登录页):
+# - WEBUI_USER + WEBUI_PASS 都填才启用,任一为空则旁路放行(本地开发)
+# - WEBUI_SESSION_SECRET 用于 HMAC 签名 cookie;留空 = 进程启动随机生成
+#   (单进程可用,但 orchestrator 重启会注销所有会话 → 生产建议显式设置)
+# - WebSocket 路由由 sid(uuid4 12 hex ≈ 48 位熵)间接保护:sid 仅由已通过
+#   鉴权的 POST /login/start 生成,直接访问 WS 拿不到合法 sid
 WEBUI_USER = os.environ.get("WEBUI_USER", "")
 WEBUI_PASS = os.environ.get("WEBUI_PASS", "")
 _AUTH_ENABLED = bool(WEBUI_USER and WEBUI_PASS)
+_SESSION_SECRET = os.environ.get("WEBUI_SESSION_SECRET") or secrets.token_hex(32)
+_SESSION_TTL = 7 * 24 * 3600  # 7 天
+_SESSION_COOKIE = "vb_session"
 
 
 # ============== DB ==============
@@ -596,35 +603,117 @@ app.add_middleware(
 )
 
 
-@app.middleware("http")
-async def basic_auth_middleware(request, call_next):
+# ===== Cookie-Session 鉴权工具 + 中间件 =====
+def _make_session_token(user: str) -> str:
     """
-    HTTP Basic Auth 网关。
-    - 仅在 WEBUI_USER + WEBUI_PASS 都设置时启用,留空则放行所有请求(本地开发兼容)
-    - 使用 secrets.compare_digest 防 timing attack
-    - 仅作用于 HTTP 请求;WebSocket(/api/accounts/login/ws/{sid})不经此中间件,
-      但 sid 必须先通过鉴权的 login_start 才能拿到,间接受保护
-    - 401 响应带 WWW-Authenticate 头,触发浏览器原生密码弹窗
+    生成签名 session token: base64url("user|exp_ts|hmac_sha256(user|exp_ts)")
+    用 HMAC-SHA256 + _SESSION_SECRET 防伪造;不存 server 状态,scale 友好。
+    """
+    exp = int(time.time()) + _SESSION_TTL
+    payload = f"{user}|{exp}"
+    sig = hmac.new(
+        _SESSION_SECRET.encode(), payload.encode(), hashlib.sha256
+    ).hexdigest()
+    raw = f"{payload}|{sig}".encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _verify_session_token(token: str) -> Optional[str]:
+    """合法返回用户名,非法/过期返回 None"""
+    if not token:
+        return None
+    try:
+        # 补回 base64 padding
+        padded = token + "=" * (-len(token) % 4)
+        raw = base64.urlsafe_b64decode(padded).decode("utf-8")
+        user, exp_str, sig = raw.split("|")
+        if int(exp_str) < int(time.time()):
+            return None
+        expected = hmac.new(
+            _SESSION_SECRET.encode(),
+            f"{user}|{exp_str}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        if not secrets.compare_digest(sig, expected):
+            return None
+        # 进一步校验 user 与当前配置一致(env 改了密码后旧 token 立失效)
+        if not secrets.compare_digest(user, WEBUI_USER):
+            return None
+        return user
+    except Exception:
+        return None
+
+
+@app.middleware("http")
+async def session_auth_middleware(request, call_next):
+    """
+    Cookie-Session 鉴权中间件。
+    - WEBUI_USER/PASS 未设 → 完全旁路
+    - 鉴权范围:仅 /api/*,且豁免 /api/auth/*(login/logout/me 必须可达)
+    - 非 API 路径(静态 HTML/CSS/JS)放行 —— 否则首次访问连登录页都看不到
+    - WebSocket(starlette scope=websocket)不经此中间件,由路由 sid 间接保护
     """
     if not _AUTH_ENABLED:
         return await call_next(request)
-    auth = request.headers.get("authorization", "")
-    if auth.startswith("Basic "):
-        try:
-            decoded = base64.b64decode(auth[6:].strip()).decode("utf-8", "ignore")
-            user, _, pwd = decoded.partition(":")
-            if (
-                secrets.compare_digest(user, WEBUI_USER)
-                and secrets.compare_digest(pwd, WEBUI_PASS)
-            ):
-                return await call_next(request)
-        except Exception:
-            pass
-    return Response(
-        status_code=401,
-        content="auth required",
-        headers={"WWW-Authenticate": 'Basic realm="vibebench"'},
+    path = request.url.path
+    if not path.startswith("/api/") or path.startswith("/api/auth/"):
+        return await call_next(request)
+    token = request.cookies.get(_SESSION_COOKIE, "")
+    if not _verify_session_token(token):
+        return JSONResponse(status_code=401, content={"detail": "auth required"})
+    return await call_next(request)
+
+
+class AuthIn(BaseModel):
+    user: str
+    pwd: str
+
+
+@app.post("/api/auth/login")
+def auth_login(body: AuthIn, response: Response):
+    """校验账密 → 签发 session cookie(7 天)。auth 未启用时 400。"""
+    if not _AUTH_ENABLED:
+        raise HTTPException(400, "auth not configured on server")
+    u_ok = secrets.compare_digest(body.user, WEBUI_USER)
+    p_ok = secrets.compare_digest(body.pwd, WEBUI_PASS)
+    if not (u_ok and p_ok):
+        # 故意不细分用户名/密码错(防爆破做用户名枚举)
+        raise HTTPException(401, "invalid credentials")
+    token = _make_session_token(body.user)
+    response.set_cookie(
+        _SESSION_COOKIE,
+        token,
+        max_age=_SESSION_TTL,
+        httponly=True,
+        samesite="lax",
+        # Secure 在 HTTPS 部署时应开;HTTP 部署强制开会让浏览器丢弃 cookie
+        secure=False,
     )
+    return {"ok": True, "user": body.user}
+
+
+@app.post("/api/auth/logout")
+def auth_logout(response: Response):
+    """清 session cookie,幂等。"""
+    response.delete_cookie(_SESSION_COOKIE)
+    return {"ok": True}
+
+
+@app.get("/api/auth/me")
+def auth_me(request: Request):
+    """
+    返回当前鉴权状态。前端启动时调一次决定要不要弹登录框。
+    - auth 未启用: {authenticated: true, user: null, auth_required: false}
+    - 已登录:     {authenticated: true, user: "<name>", auth_required: true}
+    - 未登录:     401
+    """
+    if not _AUTH_ENABLED:
+        return {"authenticated": True, "user": None, "auth_required": False}
+    token = request.cookies.get(_SESSION_COOKIE, "")
+    user = _verify_session_token(token)
+    if not user:
+        raise HTTPException(401, "not authenticated")
+    return {"authenticated": True, "user": user, "auth_required": True}
 
 
 # ---------- accounts ----------

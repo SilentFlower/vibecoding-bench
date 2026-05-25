@@ -6,8 +6,14 @@
 const API = (path, opts = {}) =>
   fetch('/api' + path, {
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
     ...opts,
   }).then(async (r) => {
+    // 401:session 过期或未登录 → 全局弹登录框,中止当前调用
+    if (r.status === 401 && !path.startsWith('/auth/')) {
+      showAuthModal();
+      throw new Error('auth required');
+    }
     if (!r.ok) {
       let msg = `${r.status} ${r.statusText}`;
       try { const j = await r.json(); msg = j.detail || msg; } catch {}
@@ -93,9 +99,49 @@ async function renderAccounts() {
     for (const [k, v] of fd) if (v) body[k] = k.endsWith('_port') ? Number(v) : v;
     startAccLogin(body);
   };
+  // SOCKS5 URL 粘贴解析:输入即触发,实时回填下面 4 个字段
+  const urlInput = $('#acc-socks5-url');
+  if (urlInput) {
+    urlInput.addEventListener('input', () => applySocks5Url(urlInput.value));
+  }
   $('#acc-login-cancel').onclick = () => endAccLogin({ alsoCloseModal: true });
   $('#acc-login-commit').onclick = () => commitAccLogin();
   $('#acc-modal-close').onclick = () => endAccLogin({ alsoCloseModal: true });
+}
+
+/**
+ * 解析 socks5 / socks5h URL,成功则回填 acc-form 的 4 个字段。
+ * 支持格式:
+ *   socks5://user:pass@host:port
+ *   socks5h://user:pass@host:port
+ *   socks5://host:port            (无凭据)
+ *   socks5://user:pass@host       (省略端口 → 1080)
+ * 失败静默不动 — 让用户手填或继续粘贴。
+ */
+function parseSocks5Url(s) {
+  if (!s) return null;
+  const m = String(s).trim().match(
+    /^socks5h?:\/\/(?:([^:@\s]+)(?::([^@\s]+))?@)?([^:/\s@]+)(?::(\d+))?\/?$/i
+  );
+  if (!m) return null;
+  return {
+    user: m[1] ? decodeURIComponent(m[1]) : '',
+    pass: m[2] ? decodeURIComponent(m[2]) : '',
+    host: m[3],
+    port: m[4] ? Number(m[4]) : 1080,
+  };
+}
+
+function applySocks5Url(raw) {
+  const parsed = parseSocks5Url(raw);
+  if (!parsed) return false;
+  const form = $('#acc-form');
+  if (!form) return false;
+  form.elements['upstream_socks5_host'].value = parsed.host;
+  form.elements['upstream_socks5_port'].value = String(parsed.port);
+  form.elements['upstream_socks5_user'].value = parsed.user;
+  form.elements['upstream_socks5_pass'].value = parsed.pass;
+  return true;
 }
 
 // ============== OAuth 登录两步流（acc-modal） ==============
@@ -541,13 +587,19 @@ function bindShortcuts() {
   document.addEventListener('keydown', (e) => {
     const inField = /^(INPUT|TEXTAREA|SELECT)$/i.test(e.target.tagName);
 
-    // Esc: close any open modal
+    // Esc: close any open modal —— 但 data-no-esc 的模态框(如登录框)免疫
     if (e.key === 'Escape') {
-      $$('.modal:not(.hidden)').forEach((m) => closeModal('#' + m.id));
+      $$('.modal:not(.hidden)').forEach((m) => {
+        if (m.hasAttribute('data-no-esc')) return;
+        closeModal('#' + m.id);
+      });
       return;
     }
 
     if (inField) return;     // 后续快捷键在输入框中不响应
+
+    // 登录框未关之前 1-4/'/' 都不导航(防止键盘漏到底层 tab)
+    if ($('#auth-modal') && !$('#auth-modal').classList.contains('hidden')) return;
 
     // '/': focus topic filter (auto-switch to topics tab if not there)
     if (e.key === '/') {
@@ -565,8 +617,116 @@ function bindShortcuts() {
   });
 }
 
-// 启动
-navigate();
-setupTheme();
-startClock();
+// ===================== Auth (cookie session) =====================
+function showAuthModal() {
+  const m = $('#auth-modal');
+  if (!m) return;
+  m.classList.remove('hidden');
+  // 清错 + 聚焦,延后到 DOM 已 layout
+  $('#auth-error')?.classList.add('hidden');
+  setTimeout(() => $('#auth-modal input[name=user]')?.focus(), 30);
+}
+
+function hideAuthModal() {
+  $('#auth-modal')?.classList.add('hidden');
+}
+
+function showAuthUser(user) {
+  if (!user) return;
+  const pill = $('#auth-pill');
+  if (!pill) return;
+  $('#auth-user').textContent = user;
+  pill.classList.remove('hidden');
+  $('.auth-pill-sep')?.classList.remove('hidden');
+}
+
+function hideAuthUser() {
+  $('#auth-pill')?.classList.add('hidden');
+  $('.auth-pill-sep')?.classList.add('hidden');
+}
+
+/**
+ * 启动时探测鉴权状态:
+ *   - 后端 auth 未启用 → auth_required=false,无登录态概念,正常渲染
+ *   - 后端 auth 启用 + 已登录 → 显示用户 pill,正常渲染
+ *   - 后端 auth 启用 + 未登录 → 401,弹登录框
+ */
+async function bootstrapAuth() {
+  try {
+    const r = await fetch('/api/auth/me', { credentials: 'same-origin' });
+    if (r.status === 401) { showAuthModal(); return false; }
+    if (!r.ok) return true;   // 其他错(如后端没起)不阻塞 UI
+    const data = await r.json();
+    if (data.auth_required && data.user) showAuthUser(data.user);
+    return true;
+  } catch (e) {
+    return true;   // 网络层错不阻塞,后续 API 会再触发
+  }
+}
+
+function wireAuth() {
+  const form = $('#auth-form');
+  if (form) {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const errEl = $('#auth-error');
+      const btn = $('#auth-submit');
+      errEl?.classList.add('hidden');
+      btn.disabled = true;
+      try {
+        const r = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ user: fd.get('user'), pwd: fd.get('pwd') }),
+        });
+        if (!r.ok) {
+          let detail = `${r.status} ${r.statusText}`;
+          try { const j = await r.json(); detail = j.detail || detail; } catch {}
+          errEl.textContent = `! ${detail}`;
+          errEl.classList.remove('hidden');
+          $('#auth-modal input[name=pwd]').select();
+          return;
+        }
+        const data = await r.json();
+        hideAuthModal();
+        showAuthUser(data.user);
+        form.reset();
+        // 登录成功后重渲染当前页(拉真实数据)
+        navigate();
+      } catch (err) {
+        errEl.textContent = `! network: ${err.message}`;
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  }
+
+  const logoutBtn = $('#auth-logout');
+  if (logoutBtn) {
+    logoutBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm('退出登录?')) return;
+      try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+      } catch {}
+      hideAuthUser();
+      location.reload();
+    };
+  }
+}
+
+// ===================== 启动 =====================
+(async () => {
+  wireAuth();
+  setupTheme();
+  startClock();
+  bindShortcuts();
+  const ok = await bootstrapAuth();
+  // ok=true 时(已登录 或 后端未启用 auth)才渲染;未登录时只显示登录框,
+  // 避免立刻调 /api/accounts 拉数据触发一连串 401 + alert
+  if (ok) navigate();
+}) ();
 bindShortcuts();
