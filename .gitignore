@@ -17,7 +17,10 @@ venv/
 
 # Local AI tooling (Trellis / Codex / Claude Code stubs)
 AGENTS.md
-.trellis/
+# .trellis/spec/ 是项目共享的开发契约,要跟代码走;其他(tasks/journal/scripts
+# /config/hooks)是个人/本地状态,保持 ignore
+.trellis/*
+!.trellis/spec/
 .agents/
 .codex/
 .claude/
