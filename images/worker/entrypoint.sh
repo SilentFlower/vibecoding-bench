@@ -1,25 +1,30 @@
 #!/usr/bin/env bash
 # =======================================================================
 # Worker 入口脚本
-# 必备环境变量：
+# 模式：
+#   WORKER_MODE=task  （默认）跑题：注入 prompt → 等 Stop hook → 抓 transcript
+#   WORKER_MODE=login OAuth 引导：装 CA 后空转，等 orchestrator 用
+#                     docker exec 启动 `claude auth login` 走 PTY 桥到 WebUI
+# 必备环境变量（task 模式）：
 #   TASK_PROMPT     题目 prompt（字面文本）
 #   RUN_ID          本次运行的唯一 ID（用于会话名 / 日志归档）
 #   TIMEOUT_SEC     超时（秒），默认 1800
 # 挂载约定：
-#   /mnt/profile    账号 ~/.claude profile（OAuth token 等），只读复制到 /root/.claude
-#   /etc/mitm       MITM CA 目录，含 mitmproxy-ca-cert.pem
-#   /workspace      claude 工作目录（每个 run 独立）
-# 退出码：
+#   task 模式：
+#     /mnt/profile  账号 ~/.claude profile（只读复制到 /root/.claude）
+#     /etc/mitm     MITM CA 目录
+#     /workspace    claude 工作目录（每个 run 独立）
+#   login 模式：
+#     /root/.claude 直接挂宿主 data/profiles/<name>/（rw），claude auth login 直接落盘
+#     /etc/mitm     同上
+# 退出码（task 模式）：
 #   0    Stop hook 正常触发
 #   124  达到 TIMEOUT_SEC 超时
 #   其它 启动失败
 # =======================================================================
 set -euo pipefail
 
-: "${TASK_PROMPT:?TASK_PROMPT required}"
-: "${RUN_ID:?RUN_ID required}"
-TIMEOUT_SEC="${TIMEOUT_SEC:-1800}"
-
+WORKER_MODE="${WORKER_MODE:-task}"
 log() { echo "[entrypoint $(date +%H:%M:%S)] $*"; }
 
 # ---------- 1) MITM CA 注入 ----------
@@ -36,6 +41,21 @@ if [ -f "$CA_PEM" ]; then
 else
   log "WARN: no MITM CA at $CA_PEM, traffic will NOT be decrypted"
 fi
+
+# ---------- login 模式：CA 已装好，profile 目录直接挂在 /root/.claude，空转待 exec ----------
+if [ "$WORKER_MODE" = "login" ]; then
+  mkdir -p /root/.claude
+  log "Login mode: idling; orchestrator will docker exec 'claude auth login'."
+  log "  profile dir contents at start:"
+  ls -la /root/.claude 2>/dev/null | head -20
+  # 用 tail -f /dev/null 替代 sleep infinity（更可控，收到 SIGTERM 立刻退出）
+  exec tail -f /dev/null
+fi
+
+# ---------- 以下是 task 模式 ----------
+: "${TASK_PROMPT:?TASK_PROMPT required in task mode}"
+: "${RUN_ID:?RUN_ID required in task mode}"
+TIMEOUT_SEC="${TIMEOUT_SEC:-1800}"
 
 # ---------- 2) 复制账号 profile 到 /root/.claude ----------
 mkdir -p /root/.claude

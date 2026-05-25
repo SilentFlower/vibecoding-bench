@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # =======================================================================
-# OAuth profile 引导脚本
+# OAuth profile 引导脚本 (LEGACY · CLI fallback)
+# =======================================================================
+# 推荐：直接在 WebUI 「accounts」页点 [ + 添加账号 ]，里面有内嵌 PTY 终端，
+#       会自动起带 SOCKS5 sidecar 的 worker，OAuth 走代理，登完一键入库。
+#
+# 本脚本仅保留给「不想跑 orchestrator」的纯 CLI 场景。
+# ⚠ 已知限制：本脚本不走 sidecar，OAuth 流量直接走宿主默认网络，
+#   与后续 API 调用的出口 IP 不一致，可能被 Anthropic 风控。
+#
 # 用法：./scripts/init-account.sh <account_name>
 #
 # 在一个临时 worker 容器里启动交互式 claude，用户跟着 TUI 提示完成

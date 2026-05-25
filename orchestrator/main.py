@@ -22,12 +22,13 @@ from pathlib import Path
 from typing import Optional
 
 import docker
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
+from starlette.websockets import WebSocketState
 
 
 # ============== 配置 ==============
@@ -231,6 +232,168 @@ class Runner:
                 pass
 
 
+# ============== Login 会话管理 ==============
+# OAuth 必须走 PTY（`claude auth login` 拒绝非 TTY 输入），所以在 worker 容器里
+# `docker exec -it claude auth login`，把 PTY socket 桥到浏览器 xterm.js WebSocket。
+# OAuth 流量必须走 sidecar（账号绑 IP），否则后续 API 调用会因换 IP 被风控。
+_ACC_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
+
+
+class LoginSession:
+    """单个 OAuth 引导会话：一对 sidecar+worker + 元数据"""
+
+    __slots__ = ("sid", "name", "sidecar_id", "worker_id", "created_at",
+                 "socks5", "committed")
+
+    def __init__(self, sid: str, name: str, sidecar_id: Optional[str],
+                 worker_id: str, socks5: dict) -> None:
+        self.sid = sid
+        self.name = name
+        self.sidecar_id = sidecar_id
+        self.worker_id = worker_id
+        self.created_at = time.time()
+        self.socks5 = socks5
+        self.committed = False
+
+
+class LoginManager:
+    def __init__(self, client: "docker.DockerClient") -> None:
+        self.client = client
+        self.sessions: dict[str, LoginSession] = {}
+        # 同一个账号名同时只允许一个 login session（防并发覆盖 profile）
+        self._name_locks: dict[str, str] = {}
+        self._lock = threading.Lock()
+
+    def cleanup_stale(self) -> None:
+        """启动时调用：清掉上次 orchestrator 进程残留的 bench-login-* 容器"""
+        try:
+            for c in self.client.containers.list(
+                all=True, filters={"name": "bench-login-"}
+            ):
+                try:
+                    c.remove(force=True)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def start(self, name: str, socks5: dict) -> LoginSession:
+        if not _ACC_NAME_RE.match(name):
+            raise ValueError(
+                "invalid account name: must match [a-zA-Z0-9_-]+"
+            )
+        with self._lock:
+            if name in self._name_locks:
+                raise ValueError(
+                    f"login session already in progress for '{name}'; "
+                    f"cancel it first"
+                )
+            sid = uuid.uuid4().hex[:12]
+            self._name_locks[name] = sid
+
+        try:
+            host_profile = HOST_BENCH_DATA / "profiles" / name
+            (BENCH_DATA / "profiles" / name).mkdir(parents=True, exist_ok=True)
+            CA_DIR.mkdir(parents=True, exist_ok=True)
+            host_ca = HOST_BENCH_DATA / "ca"
+
+            sidecar_name = f"bench-login-sidecar-{sid}"
+            worker_name = f"bench-login-worker-{sid}"
+            sidecar_id: Optional[str] = None
+            worker_network: str = "bridge"
+
+            # 有 SOCKS5 才起 sidecar；没填的话直走宿主默认网络（用户自担风险）
+            if socks5.get("host"):
+                sidecar = self.client.containers.run(
+                    SIDECAR_IMAGE,
+                    name=sidecar_name,
+                    detach=True,
+                    auto_remove=False,
+                    cap_add=["NET_ADMIN"],
+                    devices=["/dev/net/tun:/dev/net/tun"],
+                    volumes={
+                        str(host_ca): {"bind": "/ca", "mode": "rw"},
+                    },
+                    environment={
+                        "UPSTREAM_SOCKS5_HOST": socks5.get("host") or "",
+                        "UPSTREAM_SOCKS5_PORT": str(socks5.get("port") or 1080),
+                        "UPSTREAM_SOCKS5_USER": socks5.get("user") or "",
+                        "UPSTREAM_SOCKS5_PASS": socks5.get("pass") or "",
+                    },
+                )
+                sidecar_id = sidecar.id
+                time.sleep(SIDECAR_BOOT_WAIT)
+                worker_network = f"container:{sidecar_name}"
+
+            # worker：login 模式，profile 目录直接 rw 挂到 /root/.claude
+            worker = self.client.containers.run(
+                WORKER_IMAGE,
+                name=worker_name,
+                detach=True,
+                auto_remove=False,
+                tty=True,
+                stdin_open=True,
+                network_mode=worker_network,
+                volumes={
+                    str(host_profile): {"bind": "/root/.claude", "mode": "rw"},
+                    str(host_ca): {"bind": "/etc/mitm", "mode": "ro"},
+                },
+                environment={"WORKER_MODE": "login"},
+            )
+
+            session = LoginSession(
+                sid, name, sidecar_id, worker.id, socks5
+            )
+            with self._lock:
+                self.sessions[sid] = session
+            return session
+        except Exception:
+            with self._lock:
+                self._name_locks.pop(name, None)
+            raise
+
+    def get(self, sid: str) -> Optional[LoginSession]:
+        return self.sessions.get(sid)
+
+    def auth_status(self, sid: str) -> dict:
+        s = self.get(sid)
+        if not s:
+            raise KeyError(sid)
+        api = self.client.api
+        ex = api.exec_create(
+            s.worker_id, ["claude", "auth", "status"],
+            stdout=True, stderr=True,
+        )
+        raw = api.exec_start(ex["Id"])
+        text = raw.decode("utf-8", errors="ignore").strip()
+        # claude auth status 返回 JSON
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return {"raw": text, "loggedIn": False}
+
+    def cleanup(self, sid: str) -> None:
+        with self._lock:
+            s = self.sessions.pop(sid, None)
+        if not s:
+            return
+        for cid in (s.worker_id, s.sidecar_id):
+            if not cid:
+                continue
+            try:
+                c = self.client.containers.get(cid)
+                try:
+                    c.stop(timeout=3)
+                except Exception:
+                    pass
+                c.remove(force=True)
+            except Exception:
+                pass
+        with self._lock:
+            if self._name_locks.get(s.name) == sid:
+                del self._name_locks[s.name]
+
+
 # ============== 调度器：每账号 Semaphore(2) ==============
 class Scheduler:
     def __init__(self, runner: Runner) -> None:
@@ -299,11 +462,12 @@ class Scheduler:
 # ============== FastAPI ==============
 runner: Optional[Runner] = None
 scheduler: Optional[Scheduler] = None
+login_manager: Optional[LoginManager] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global runner, scheduler
+    global runner, scheduler, login_manager
     init_db()
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     FLOWS_DIR.mkdir(parents=True, exist_ok=True)
@@ -311,6 +475,9 @@ async def lifespan(app: FastAPI):
     CA_DIR.mkdir(parents=True, exist_ok=True)
     runner = Runner()
     scheduler = Scheduler(runner)
+    login_manager = LoginManager(runner.client)
+    # 清掉上次进程残留的 login 容器，避免重启后僵尸容器堆积
+    login_manager.cleanup_stale()
     yield
 
 
@@ -387,6 +554,242 @@ def delete_account(aid: int):
                 conn.execute("DELETE FROM accounts WHERE id=?", (aid,))
         finally:
             conn.close()
+    return {"ok": True}
+
+
+# ---------- accounts: 内嵌 OAuth 登录（WebUI 用） ----------
+class LoginStartIn(BaseModel):
+    """添加账号第一步：起 login 会话，配置 SOCKS5 走代理做 OAuth"""
+
+    name: str
+    upstream_socks5_host: Optional[str] = None
+    upstream_socks5_port: Optional[int] = None
+    upstream_socks5_user: Optional[str] = None
+    upstream_socks5_pass: Optional[str] = None
+
+
+@app.post("/api/accounts/login/start")
+def login_start(body: LoginStartIn):
+    """启动一个 OAuth 引导会话；前端拿到 session_id 后开 WS 拿 PTY"""
+    if not login_manager:
+        raise HTTPException(500, "login manager not ready")
+    try:
+        session = login_manager.start(
+            body.name,
+            {
+                "host": body.upstream_socks5_host,
+                "port": body.upstream_socks5_port,
+                "user": body.upstream_socks5_user,
+                "pass": body.upstream_socks5_pass,
+            },
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"failed to start login session: {e}")
+    return {
+        "session_id": session.sid,
+        "ws_path": f"/api/accounts/login/ws/{session.sid}",
+        "has_sidecar": session.sidecar_id is not None,
+        "name": session.name,
+    }
+
+
+@app.websocket("/api/accounts/login/ws/{sid}")
+async def login_ws(websocket: WebSocket, sid: str):
+    """PTY 桥：把 worker 里 `claude auth login` 的 PTY 双向接到浏览器 xterm"""
+    await websocket.accept()
+    if not login_manager:
+        await websocket.close(code=4500)
+        return
+    session = login_manager.get(sid)
+    if not session:
+        await websocket.send_text(json.dumps(
+            {"type": "error", "msg": "session not found"}))
+        await websocket.close(code=4004)
+        return
+
+    api = login_manager.client.api
+    try:
+        exec_id = api.exec_create(
+            session.worker_id,
+            ["claude", "auth", "login"],
+            stdin=True,
+            tty=True,
+            environment={
+                "TERM": "xterm-256color",
+                "COLUMNS": "120",
+                "LINES": "36",
+            },
+        )["Id"]
+        sock = api.exec_start(
+            exec_id, detach=False, tty=True,
+            stream=False, socket=True, demux=False,
+        )
+    except Exception as e:
+        await websocket.send_text(json.dumps(
+            {"type": "error", "msg": f"exec failed: {e}"}))
+        await websocket.close(code=4500)
+        return
+
+    raw = getattr(sock, "_sock", None) or sock
+    try:
+        raw.setblocking(False)
+    except Exception:
+        pass
+
+    loop = asyncio.get_event_loop()
+    closed = asyncio.Event()
+
+    async def pump_container_to_ws():
+        """worker PTY → ws (binary)"""
+        try:
+            while not closed.is_set():
+                try:
+                    data = await asyncio.wait_for(
+                        loop.sock_recv(raw, 4096), timeout=1.0
+                    )
+                except asyncio.TimeoutError:
+                    continue
+                if not data:
+                    break
+                if websocket.client_state != WebSocketState.CONNECTED:
+                    break
+                await websocket.send_bytes(data)
+        except Exception:
+            pass
+        finally:
+            closed.set()
+
+    async def pump_ws_to_container():
+        """ws → worker PTY (text json msg or binary)"""
+        try:
+            while not closed.is_set():
+                msg = await websocket.receive()
+                if msg["type"] == "websocket.disconnect":
+                    break
+                if msg.get("bytes"):
+                    raw.send(msg["bytes"])
+                    continue
+                txt = msg.get("text")
+                if not txt:
+                    continue
+                # text 消息约定 JSON：{type:input|resize, ...}
+                try:
+                    ev = json.loads(txt)
+                except json.JSONDecodeError:
+                    raw.send(txt.encode())
+                    continue
+                if ev.get("type") == "resize":
+                    try:
+                        api.exec_resize(
+                            exec_id,
+                            height=int(ev.get("rows") or 36),
+                            width=int(ev.get("cols") or 120),
+                        )
+                    except Exception:
+                        pass
+                elif ev.get("type") == "input":
+                    raw.send((ev.get("data") or "").encode())
+        except WebSocketDisconnect:
+            pass
+        except Exception:
+            pass
+        finally:
+            closed.set()
+
+    try:
+        await asyncio.gather(
+            pump_container_to_ws(), pump_ws_to_container()
+        )
+    finally:
+        try:
+            raw.close()
+        except Exception:
+            pass
+        if websocket.client_state == WebSocketState.CONNECTED:
+            try:
+                await websocket.close()
+            except Exception:
+                pass
+
+
+@app.post("/api/accounts/login/{sid}/commit")
+def login_commit(sid: str, body: LoginStartIn):
+    """登录完成后调用：校验 `claude auth status`，落 accounts 表，清容器"""
+    if not login_manager:
+        raise HTTPException(500)
+    session = login_manager.get(sid)
+    if not session:
+        raise HTTPException(404, "session not found")
+    if session.name != body.name:
+        raise HTTPException(400, "name mismatch with session")
+    try:
+        status = login_manager.auth_status(sid)
+    except KeyError:
+        raise HTTPException(404, "session not found")
+    except Exception as e:
+        raise HTTPException(500, f"auth status check failed: {e}")
+    if not status.get("loggedIn"):
+        # 不清容器：让用户继续 retry。返回错误细节给前端展示。
+        raise HTTPException(400, f"not logged in yet: {status}")
+
+    name = session.name
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                try:
+                    cur = conn.execute(
+                        "INSERT INTO accounts(name, profile_path, "
+                        "upstream_socks5_host, upstream_socks5_port, "
+                        "upstream_socks5_user, upstream_socks5_pass, enabled) "
+                        "VALUES(?,?,?,?,?,?,?)",
+                        (
+                            name,
+                            f"profiles/{name}",
+                            body.upstream_socks5_host,
+                            body.upstream_socks5_port,
+                            body.upstream_socks5_user,
+                            body.upstream_socks5_pass,
+                            1,
+                        ),
+                    )
+                    account_id = cur.lastrowid
+                except sqlite3.IntegrityError:
+                    # 同名账号已存在 → 视为"重新登录"：只覆盖 socks5
+                    conn.execute(
+                        "UPDATE accounts SET upstream_socks5_host=?, "
+                        "upstream_socks5_port=?, upstream_socks5_user=?, "
+                        "upstream_socks5_pass=? WHERE name=?",
+                        (
+                            body.upstream_socks5_host,
+                            body.upstream_socks5_port,
+                            body.upstream_socks5_user,
+                            body.upstream_socks5_pass,
+                            name,
+                        ),
+                    )
+                    r = conn.execute(
+                        "SELECT id FROM accounts WHERE name=?", (name,)
+                    ).fetchone()
+                    account_id = r["id"]
+        finally:
+            conn.close()
+
+    login_manager.cleanup(sid)
+    return {
+        "id": account_id,
+        "name": name,
+        "auth_method": status.get("authMethod"),
+    }
+
+
+@app.delete("/api/accounts/login/{sid}")
+def login_cancel(sid: str):
+    """放弃登录：停容器 + 清状态。可重复调用幂等。"""
+    if login_manager:
+        login_manager.cleanup(sid)
     return {"ok": True}
 
 

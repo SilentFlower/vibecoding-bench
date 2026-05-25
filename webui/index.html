@@ -3,67 +3,127 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>vibecoding-100 bench</title>
+  <title>vibebench / terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;0,800;1,400&family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&display=swap" rel="stylesheet">
+  <!-- xterm.js: 浏览器端终端，渲染 worker 容器里 `claude auth login` 的 PTY -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
   <link rel="stylesheet" href="style.css" />
+  <script>
+    // 防 FOUC: 在 CSS 应用前确定主题
+    (function () {
+      try {
+        var t = localStorage.getItem('vibebench-theme');
+        if (!t) t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        document.documentElement.dataset.theme = t;
+      } catch (e) { document.documentElement.dataset.theme = 'dark'; }
+    })();
+  </script>
 </head>
 <body>
+  <div class="scanlines" aria-hidden="true"></div>
+
   <header class="topbar">
-    <h1 class="brand">vibecoding-100 <span class="muted">bench</span></h1>
-    <nav class="tabs">
-      <a href="#accounts" data-tab="accounts">账号</a>
-      <a href="#topics"   data-tab="topics">题库</a>
-      <a href="#tasks"    data-tab="tasks">任务</a>
-      <a href="#runs"     data-tab="runs">运行</a>
+    <div class="brand">
+      <span class="prompt">~/vibebench</span><span class="caret">_</span>
+      <span class="brand-sub">100·tasks · claude-code · mitm</span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <a href="#accounts" data-tab="accounts"><span class="tab-en">accounts</span><span class="tab-cn">账号</span></a>
+      <a href="#topics"   data-tab="topics"><span class="tab-en">topics</span><span class="tab-cn">题库</span></a>
+      <a href="#tasks"    data-tab="tasks"><span class="tab-en">tasks</span><span class="tab-cn">任务</span></a>
+      <a href="#runs"     data-tab="runs"><span class="tab-en">runs</span><span class="tab-cn">运行</span></a>
     </nav>
+    <div class="statline">
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="toggle theme" title="switch theme">☀</button>
+      <span class="statline-sep">·</span>
+      <span class="dot dot-live" title="websocket online"></span>
+      <span class="statline-text">READY</span>
+      <span class="statline-sep">·</span>
+      <span id="clock">00:00:00</span>
+    </div>
   </header>
 
   <main id="view"></main>
 
+  <footer class="hintbar" aria-hidden="true">
+    <span><kbd>esc</kbd> close modal</span>
+    <span class="hintbar-sep">│</span>
+    <span><kbd>/</kbd> focus filter</span>
+    <span class="hintbar-sep">│</span>
+    <span><kbd>1-4</kbd> switch tab</span>
+    <span class="hintbar-spacer"></span>
+    <span class="hintbar-build">build · <span id="build-tag">p1</span></span>
+  </footer>
+
   <!-- ====== 各视图模板 ====== -->
   <template id="tpl-accounts">
     <section class="view">
-      <div class="row-between">
-        <h2>账号</h2>
+      <header class="view-head">
+        <div>
+          <h2 class="view-title"><span class="bracket">▌</span>accounts <span class="muted">// oauth profiles</span></h2>
+          <p class="hint">先用 <code>scripts/init-account.sh &lt;name&gt;</code> 完成 OAuth 登录，再在这里登记同名账号。</p>
+        </div>
         <button class="btn btn-primary" id="add-account">+ 添加账号</button>
+      </header>
+      <div class="table-frame">
+        <table class="data">
+          <thead><tr>
+            <th>id</th><th>name</th><th>profile</th>
+            <th>upstream socks5</th><th>on</th><th>op</th>
+          </tr></thead>
+          <tbody id="accounts-body"></tbody>
+        </table>
       </div>
-      <p class="hint">先用 <code>scripts/init-account.sh &lt;name&gt;</code> 完成 OAuth 登录，再在这里添加同名账号。</p>
-      <table class="data">
-        <thead><tr>
-          <th>ID</th><th>名称</th><th>profile</th>
-          <th>上游 SOCKS5</th><th>启用</th><th>操作</th>
-        </tr></thead>
-        <tbody id="accounts-body"></tbody>
-      </table>
     </section>
   </template>
 
   <template id="tpl-topics">
     <section class="view">
-      <div class="row-between">
-        <h2>题库 <span class="muted" id="topics-count"></span></h2>
-        <input type="search" id="topic-filter" placeholder="按标题/分类过滤…" />
-      </div>
+      <header class="view-head">
+        <div>
+          <h2 class="view-title"><span class="bracket">▌</span>topics <span class="muted" id="topics-count"></span></h2>
+          <p class="hint">100 题题库。点击卡片创建一个分发给指定账号的任务。</p>
+        </div>
+        <div class="filter-wrap">
+          <span class="filter-prefix">filter&gt;</span>
+          <input type="search" id="topic-filter" placeholder="title / category / no" />
+        </div>
+      </header>
       <div id="topics-list" class="topics-grid"></div>
     </section>
   </template>
 
   <template id="tpl-tasks">
     <section class="view">
-      <h2>任务</h2>
-      <table class="data">
-        <thead><tr>
-          <th>ID</th><th>题号</th><th>标题</th><th>账号</th>
-          <th>重复</th><th>超时</th><th>操作</th>
-        </tr></thead>
-        <tbody id="tasks-body"></tbody>
-      </table>
+      <header class="view-head">
+        <div>
+          <h2 class="view-title"><span class="bracket">▌</span>tasks <span class="muted">// dispatched</span></h2>
+          <p class="hint">点 <code>▶ run</code> 按 <code>repeat_n</code> 提交多次运行，每账号同时最多 2 个。</p>
+        </div>
+      </header>
+      <div class="table-frame">
+        <table class="data">
+          <thead><tr>
+            <th>id</th><th>no</th><th>title</th><th>account</th>
+            <th class="right">repeat</th><th class="right">timeout</th><th>op</th>
+          </tr></thead>
+          <tbody id="tasks-body"></tbody>
+        </table>
+      </div>
     </section>
   </template>
 
   <template id="tpl-runs">
     <section class="view">
-      <div class="row-between">
-        <h2>运行</h2>
+      <header class="view-head">
+        <div>
+          <h2 class="view-title"><span class="bracket">▌</span>runs <span class="muted">// live · sse</span></h2>
+          <p class="hint">实时刷新。每行点 <code>detail</code> 看 transcript / 产物 / token 统计。</p>
+        </div>
         <div class="legend">
           <span class="pill pill-queued">queued</span>
           <span class="pill pill-running">running</span>
@@ -71,66 +131,127 @@
           <span class="pill pill-failed">failed</span>
           <span class="pill pill-timeout">timeout</span>
         </div>
+      </header>
+      <div class="table-frame">
+        <table class="data">
+          <thead><tr>
+            <th>id</th><th>task</th><th>account</th><th>status</th>
+            <th class="right">duration</th><th class="right">exit</th><th>op</th>
+          </tr></thead>
+          <tbody id="runs-body"></tbody>
+        </table>
       </div>
-      <table class="data">
-        <thead><tr>
-          <th>ID</th><th>任务</th><th>账号</th><th>状态</th>
-          <th>耗时</th><th>退出码</th><th>操作</th>
-        </tr></thead>
-        <tbody id="runs-body"></tbody>
-      </table>
     </section>
   </template>
 
   <!-- 详情弹窗 -->
   <div class="modal hidden" id="modal">
     <div class="modal-card">
-      <button class="modal-close" id="modal-close">×</button>
+      <div class="modal-frame" aria-hidden="true">
+        <span class="frame-tl">┌</span><span class="frame-tr">┐</span>
+        <span class="frame-bl">└</span><span class="frame-br">┘</span>
+      </div>
+      <div class="modal-titlebar">
+        <span class="modal-titlebar-name">run · detail</span>
+        <button class="modal-close" id="modal-close" aria-label="close">×</button>
+      </div>
       <div id="modal-content"></div>
     </div>
   </div>
 
-  <!-- 添加账号弹窗 -->
+  <!-- 添加账号弹窗：两步流，step 1=配置 / step 2=PTY 终端登录 -->
   <div class="modal hidden" id="acc-modal">
-    <div class="modal-card">
-      <button class="modal-close" data-close="#acc-modal">×</button>
-      <h3>添加账号</h3>
-      <form id="acc-form" class="form">
-        <label>名称（须与 init-account.sh 时一致）
-          <input name="name" required pattern="[a-zA-Z0-9_-]+" />
+    <div class="modal-card modal-card-md">
+      <div class="modal-frame" aria-hidden="true">
+        <span class="frame-tl">┌</span><span class="frame-tr">┐</span>
+        <span class="frame-bl">└</span><span class="frame-br">┘</span>
+      </div>
+      <div class="modal-titlebar">
+        <span class="modal-titlebar-name">acc / new <span class="muted" id="acc-modal-stage">step 1 · configure</span></span>
+        <button class="modal-close" id="acc-modal-close" aria-label="close">×</button>
+      </div>
+
+      <!-- Step 1: 配置 + 启动登录会话 -->
+      <form id="acc-form" class="form acc-step acc-step-config">
+        <label><span class="lbl">$ name</span>
+          <span class="hint inline">本地账号标签（独一无二即可）</span>
+          <input name="name" required pattern="[A-Za-z0-9_\-]+" placeholder="main" />
         </label>
-        <label>上游 SOCKS5 host <input name="upstream_socks5_host" placeholder="例如 host.docker.internal" /></label>
-        <label>上游 SOCKS5 port <input name="upstream_socks5_port" type="number" min="1" max="65535" placeholder="1080" /></label>
-        <label>SOCKS5 用户名 <input name="upstream_socks5_user" /></label>
-        <label>SOCKS5 密码 <input name="upstream_socks5_pass" type="password" /></label>
+        <label><span class="lbl">$ socks5_host</span>
+          <span class="hint inline">OAuth 必须走代理；空 = 直连宿主网络（不推荐）</span>
+          <input name="upstream_socks5_host" placeholder="host.docker.internal" />
+        </label>
+        <label><span class="lbl">$ socks5_port</span>
+          <input name="upstream_socks5_port" type="number" min="1" max="65535" placeholder="1080" />
+        </label>
+        <label><span class="lbl">$ socks5_user</span>
+          <input name="upstream_socks5_user" />
+        </label>
+        <label><span class="lbl">$ socks5_pass</span>
+          <input name="upstream_socks5_pass" type="password" />
+        </label>
         <div class="row-end">
-          <button type="button" class="btn" data-close="#acc-modal">取消</button>
-          <button type="submit" class="btn btn-primary">保存</button>
+          <button type="button" class="btn" data-close="#acc-modal">cancel</button>
+          <button type="submit" class="btn btn-primary">start login</button>
         </div>
       </form>
+
+      <!-- Step 2: 内嵌 PTY 终端 + 提交按钮 -->
+      <div class="acc-step acc-step-terminal hidden">
+        <div class="login-meta">
+          <span>session</span>
+          <code id="acc-login-sid">—</code>
+          <span class="muted">·</span>
+          <span>sidecar</span>
+          <span id="acc-login-sidecar">—</span>
+          <span class="muted">·</span>
+          <span>name</span>
+          <code id="acc-login-name">—</code>
+        </div>
+        <div class="login-hint">
+          <strong>下一步：</strong>在终端里看到 URL → 浏览器开它做 OAuth → 把授权码粘回终端 →
+          看到 <code>Successfully authenticated</code> 之后点 <code>[ commit &amp; save ]</code>。
+        </div>
+        <div class="xterm-host" id="acc-login-xterm"></div>
+        <div class="row-end">
+          <button type="button" class="btn btn-danger" id="acc-login-cancel">cancel</button>
+          <button type="button" class="btn btn-primary" id="acc-login-commit">commit &amp; save</button>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- 创建任务弹窗 -->
   <div class="modal hidden" id="task-modal">
-    <div class="modal-card">
-      <button class="modal-close" data-close="#task-modal">×</button>
-      <h3>创建任务 <span class="muted" id="task-modal-title"></span></h3>
+    <div class="modal-card modal-card-sm">
+      <div class="modal-frame" aria-hidden="true">
+        <span class="frame-tl">┌</span><span class="frame-tr">┐</span>
+        <span class="frame-bl">└</span><span class="frame-br">┘</span>
+      </div>
+      <div class="modal-titlebar">
+        <span class="modal-titlebar-name">task / new <span class="muted" id="task-modal-title"></span></span>
+        <button class="modal-close" data-close="#task-modal" aria-label="close">×</button>
+      </div>
       <form id="task-form" class="form">
         <input type="hidden" name="topic_no" />
-        <label>派发账号
+        <label><span class="lbl">$ account</span>
           <select name="account_id" required></select>
         </label>
-        <label>Prompt（留空使用题目标题+描述自动生成）
-          <textarea name="prompt" rows="6"></textarea>
+        <label><span class="lbl">$ prompt</span>
+          <span class="hint inline">留空则用题目标题 + 描述自动生成</span>
+          <textarea name="prompt" rows="6" placeholder="# 自由输入完整 prompt …"></textarea>
         </label>
         <div class="row">
-          <label>超时(秒) <input name="timeout_sec" type="number" min="60" value="1800" /></label>
-          <label>重复次数 <input name="repeat_n" type="number" min="1" value="1" /></label>
+          <label><span class="lbl">$ timeout_sec</span>
+            <input name="timeout_sec" type="number" min="60" value="1800" />
+          </label>
+          <label><span class="lbl">$ repeat_n</span>
+            <input name="repeat_n" type="number" min="1" value="1" />
+          </label>
         </div>
         <div class="row-end">
-          <button type="button" class="btn" data-close="#task-modal">取消</button>
-          <button type="submit" class="btn btn-primary">创建</button>
+          <button type="button" class="btn" data-close="#task-modal">cancel</button>
+          <button type="submit" class="btn btn-primary">create</button>
         </div>
       </form>
     </div>

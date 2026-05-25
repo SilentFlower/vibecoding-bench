@@ -85,19 +85,185 @@ async function renderAccounts() {
     }
   };
 
-  $('#add-account').onclick = () => openModal('#acc-modal');
-  $('#acc-form').onsubmit = async (e) => {
+  $('#add-account').onclick = () => openAccLoginModal();
+  $('#acc-form').onsubmit = (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const body = {};
     for (const [k, v] of fd) if (v) body[k] = k.endsWith('_port') ? Number(v) : v;
-    try {
-      await API('/accounts', { method: 'POST', body: JSON.stringify(body) });
-      closeModal('#acc-modal');
-      e.target.reset();
-      renderAccounts();
-    } catch (err) { alert('创建失败: ' + err.message); }
+    startAccLogin(body);
   };
+  $('#acc-login-cancel').onclick = () => endAccLogin({ alsoCloseModal: true });
+  $('#acc-login-commit').onclick = () => commitAccLogin();
+  $('#acc-modal-close').onclick = () => endAccLogin({ alsoCloseModal: true });
+}
+
+// ============== OAuth 登录两步流（acc-modal） ==============
+// 流程：
+//   step 1: 用户填 name + socks5 → POST /api/accounts/login/start → 拿 session_id
+//   step 2: 打开 WS PTY → 用户在 xterm 里走 claude auth login → 点 commit
+//   commit: POST /api/accounts/login/{sid}/commit → 校验 → 写库 → 关容器
+// 取消任意一步都 DELETE /api/accounts/login/{sid} 清场。
+function openAccLoginModal() {
+  // 重置到 step 1
+  showAccStep('config');
+  $('#acc-form').reset();
+  $('#acc-modal-stage').textContent = 'step 1 · configure';
+  openModal('#acc-modal');
+}
+
+function showAccStep(which) {
+  // which = 'config' | 'terminal'
+  $('.acc-step-config').classList.toggle('hidden', which !== 'config');
+  $('.acc-step-terminal').classList.toggle('hidden', which !== 'terminal');
+}
+
+async function startAccLogin(body) {
+  state.accLogin = state.accLogin || {};
+  let resp;
+  try {
+    resp = await API('/accounts/login/start', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    return alert('启动登录会话失败: ' + e.message);
+  }
+  // 保存 socks5/name 给 commit 用
+  state.accLogin.body = body;
+  state.accLogin.sid = resp.session_id;
+  state.accLogin.name = resp.name;
+
+  $('#acc-login-sid').textContent = resp.session_id;
+  $('#acc-login-sidecar').textContent = resp.has_sidecar ? 'yes' : 'no (direct)';
+  $('#acc-login-name').textContent = resp.name;
+  $('#acc-modal-stage').textContent = 'step 2 · terminal';
+
+  showAccStep('terminal');
+  await attachAccLoginTerminal(resp.ws_path);
+}
+
+async function attachAccLoginTerminal(wsPath) {
+  // 等 xterm.js 全部加载
+  if (typeof Terminal === 'undefined') {
+    await new Promise(r => {
+      const t = setInterval(() => {
+        if (typeof Terminal !== 'undefined' && typeof FitAddon !== 'undefined') {
+          clearInterval(t); r();
+        }
+      }, 50);
+    });
+  }
+
+  const host = $('#acc-login-xterm');
+  host.innerHTML = '';
+
+  const term = new Terminal({
+    fontFamily: '"JetBrains Mono", ui-monospace, Menlo, monospace',
+    fontSize: 13,
+    cursorBlink: true,
+    convertEol: true,
+    theme: {
+      background: '#0a0b09',
+      foreground: '#e8e1cf',
+      cursor: '#ffb649',
+      black: '#0a0b09', red: '#ff6b58', green: '#7cd97c', yellow: '#ffc164',
+      blue: '#5fa8d7', magenta: '#d77cd7', cyan: '#5fd7d7', white: '#e8e1cf',
+    },
+  });
+  const fit = new FitAddon.FitAddon();
+  term.loadAddon(fit);
+  term.open(host);
+  fit.fit();
+
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${proto}//${location.host}${wsPath}`);
+  ws.binaryType = 'arraybuffer';
+
+  state.accLogin.term = term;
+  state.accLogin.fit = fit;
+  state.accLogin.ws = ws;
+
+  ws.onopen = () => {
+    // 通知后端当前终端尺寸
+    ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    term.focus();
+  };
+  ws.onmessage = (e) => {
+    if (e.data instanceof ArrayBuffer) {
+      term.write(new Uint8Array(e.data));
+    } else if (typeof e.data === 'string') {
+      // 服务器偶尔发文本（错误信息），统一渲染
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'error') term.write(`\r\n\x1b[31m[orchestrator] ${msg.msg}\x1b[0m\r\n`);
+      } catch { term.write(e.data); }
+    }
+  };
+  ws.onclose = () => {
+    term.write('\r\n\x1b[90m[ws closed]\x1b[0m\r\n');
+  };
+  ws.onerror = (e) => {
+    term.write(`\r\n\x1b[31m[ws error]\x1b[0m\r\n`);
+  };
+
+  // 把用户键盘输入透传给后端
+  term.onData((data) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'input', data }));
+    }
+  });
+
+  // 窗口变化重新 fit + 通知后端
+  const onResize = () => {
+    try { fit.fit(); } catch {}
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    }
+  };
+  window.addEventListener('resize', onResize);
+  state.accLogin.onResize = onResize;
+}
+
+async function commitAccLogin() {
+  const al = state.accLogin;
+  if (!al || !al.sid) return;
+  const btn = $('#acc-login-commit');
+  btn.disabled = true;
+  try {
+    const r = await API(`/accounts/login/${al.sid}/commit`, {
+      method: 'POST',
+      body: JSON.stringify(al.body || { name: al.name }),
+    });
+    if (al.term) al.term.write(`\r\n\x1b[32m[ok] account saved (#${r.id}) · auth=${r.auth_method}\x1b[0m\r\n`);
+    // commit 成功后服务端已清容器；前端关 WS + 弹窗 + 刷列表
+    endAccLogin({ alsoCloseModal: true, skipServerCancel: true });
+    renderAccounts();
+  } catch (e) {
+    btn.disabled = false;
+    alert('提交失败: ' + e.message + '\n\n如果还没登录成功，请先在终端完成 OAuth。');
+  }
+}
+
+function endAccLogin({ alsoCloseModal = false, skipServerCancel = false } = {}) {
+  const al = state.accLogin || {};
+  // 1. 关闭 WS
+  if (al.ws && al.ws.readyState <= 1) {
+    try { al.ws.close(); } catch {}
+  }
+  // 2. 释放 xterm
+  if (al.term) { try { al.term.dispose(); } catch {} }
+  if (al.onResize) window.removeEventListener('resize', al.onResize);
+  // 3. 通知后端清容器（commit 路径已清，不重复）
+  if (al.sid && !skipServerCancel) {
+    API(`/accounts/login/${al.sid}`, { method: 'DELETE' }).catch(() => {});
+  }
+  state.accLogin = null;
+  if (alsoCloseModal) closeModal('#acc-modal');
+  // 重置 step
+  showAccStep('config');
+  $('#acc-modal-stage').textContent = 'step 1 · configure';
+  $('#acc-login-commit').disabled = false;
 }
 
 // ===================== Topics =====================
@@ -285,7 +451,7 @@ async function openRunDetail(rid) {
         <h4>产物文件 (${files.length})</h4>
         <div class="file-tree">
           ${files.length ? files.map(f => `
-            <div class="${f.type}">${f.type === 'dir' ? '📁' : '📄'} ${escapeHTML(f.path)}${f.size != null ? `<span class="size">${formatSize(f.size)}</span>` : ''}</div>
+            <div class="${f.type}">${escapeHTML(f.path)}${f.size != null ? `<span class="size">${formatSize(f.size)}</span>` : ''}</div>
           `).join('') : '<div class="muted">（空）</div>'}
         </div>
       </div>
@@ -309,10 +475,18 @@ function closeModal(sel) { $(sel).classList.add('hidden'); }
 document.addEventListener('click', (e) => {
   if (e.target.id === 'modal-close' || e.target.matches('[data-close]')) {
     const sel = e.target.dataset.close || '#modal';
+    // acc-modal 关闭走 endAccLogin（同时清服务端 session 容器；无 session 时幂等）
+    if (sel === '#acc-modal' && typeof endAccLogin === 'function') {
+      return endAccLogin({ alsoCloseModal: true });
+    }
     closeModal(sel);
   }
   if (e.target.classList && e.target.classList.contains('modal')) {
-    closeModal('#' + e.target.id);
+    const id = '#' + e.target.id;
+    if (id === '#acc-modal' && typeof endAccLogin === 'function') {
+      return endAccLogin({ alsoCloseModal: true });
+    }
+    closeModal(id);
   }
 });
 
@@ -330,5 +504,69 @@ function formatSize(n) {
   return (n / 1024 / 1024).toFixed(1) + ' MB';
 }
 
+// ===================== chrome (theme + clock + shortcuts) =====================
+function setupTheme() {
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  const root = document.documentElement;
+  const updateBtn = () => {
+    const cur = root.dataset.theme || 'dark';
+    btn.textContent = cur === 'light' ? '☾' : '☀';
+    btn.title = cur === 'light' ? 'switch to dark' : 'switch to light';
+  };
+  updateBtn();           // 初始图标（主题已在 <head> 防 FOUC 脚本里就位）
+  btn.onclick = () => {
+    const next = (root.dataset.theme === 'light') ? 'dark' : 'light';
+    root.dataset.theme = next;
+    try { localStorage.setItem('vibebench-theme', next); } catch {}
+    updateBtn();
+  };
+}
+
+
+function startClock() {
+  const el = document.getElementById('clock');
+  if (!el) return;
+  const pad = (n) => String(n).padStart(2, '0');
+  const tick = () => {
+    const d = new Date();
+    el.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+  tick();
+  setInterval(tick, 1000);
+}
+
+function bindShortcuts() {
+  const TAB_KEYS = { '1': 'accounts', '2': 'topics', '3': 'tasks', '4': 'runs' };
+  document.addEventListener('keydown', (e) => {
+    const inField = /^(INPUT|TEXTAREA|SELECT)$/i.test(e.target.tagName);
+
+    // Esc: close any open modal
+    if (e.key === 'Escape') {
+      $$('.modal:not(.hidden)').forEach((m) => closeModal('#' + m.id));
+      return;
+    }
+
+    if (inField) return;     // 后续快捷键在输入框中不响应
+
+    // '/': focus topic filter (auto-switch to topics tab if not there)
+    if (e.key === '/') {
+      e.preventDefault();
+      if (currentTab() !== 'topics') location.hash = '#topics';
+      setTimeout(() => { const f = $('#topic-filter'); if (f) f.focus(); }, 60);
+      return;
+    }
+
+    // 1..4: tabs
+    if (TAB_KEYS[e.key]) {
+      e.preventDefault();
+      location.hash = '#' + TAB_KEYS[e.key];
+    }
+  });
+}
+
 // 启动
 navigate();
+setupTheme();
+startClock();
+bindShortcuts();
