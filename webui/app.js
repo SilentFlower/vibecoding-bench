@@ -608,12 +608,25 @@ async function renderTasks() {
       <td>${b.concurrency}</td>
       <td>${b.interval_min_sec}-${b.interval_max_sec}s</td>
       <td>
+        ${b.status === 'active' ? `<button class="btn btn-sm btn-danger" data-stop-batch="${b.id}">停止</button>` : ''}
         <button class="btn btn-sm btn-danger" data-del-batch="${b.id}">删除</button>
       </td>
     </tr>
   `).join('') || '<tr><td colspan="7" class="muted empty-cell">暂无批次</td></tr>';
 
   body.onclick = async (e) => {
+    const stopBatchId = e.target.dataset.stopBatch;
+    if (stopBatchId && confirm(`停止批次 #${stopBatchId}?`)) {
+      e.target.disabled = true;
+      try {
+        await API(`/task-batches/${stopBatchId}/stop`, { method: 'POST' });
+        renderTasks();
+      } catch (err) {
+        alert('停止批次失败: ' + err.message);
+        e.target.disabled = false;
+      }
+      return;
+    }
     const batchId = e.target.dataset.delBatch;
     if (batchId && confirm(`删除批次 #${batchId}?`)) {
       try {

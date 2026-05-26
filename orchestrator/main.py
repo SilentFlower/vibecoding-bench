@@ -61,6 +61,8 @@ WORKER_HOME = "/home/node"
 WORKER_UID = 1000
 WORKER_GID = 1000
 CLAUDE_CODE_VERSION = os.environ.get("CLAUDE_CODE_VERSION", "2.1.150")
+SAVE_FULL_FLOWS = os.environ.get("SAVE_FULL_FLOWS", "0")
+CLEAN_WORKSPACE_DEPS = os.environ.get("CLEAN_WORKSPACE_DEPS", "1")
 
 # Cookie-Session 鉴权(可选,替代 Basic Auth 给前端做风格统一的登录页):
 # - WEBUI_USER + WEBUI_PASS 都填才启用,任一为空则旁路放行(本地开发)
@@ -109,6 +111,20 @@ _DEFAULT_CLAUDE_TOP_CONFIG: dict[str, object] = {
 }
 _PROFILE_SYNC_FILES = (".credentials.json", "settings.json", ".claude.json")
 _TERMINAL_RUN_STATUSES = {"success", "failed", "timeout", "stopped"}
+
+
+def _usage_input_tokens(usage: dict) -> int:
+    """
+    计算一次 Claude usage 的输入 token 总量。
+
+    :param usage: Claude usage 对象
+    :return: 普通输入 + cache 写入 + cache 读取 token
+    """
+    return (
+        int(usage.get("input_tokens") or 0)
+        + int(usage.get("cache_creation_input_tokens") or 0)
+        + int(usage.get("cache_read_input_tokens") or 0)
+    )
 
 
 def _merge_claude_settings(existing: object, defaults: dict[str, object]) -> dict[str, object]:
@@ -775,6 +791,7 @@ class Runner:
                     "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
                     "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
                     "DNS_READY_HOST": DNS_READY_HOST,
+                    "SAVE_FULL_FLOWS": SAVE_FULL_FLOWS,
                 },
             )
             sidecar_id = sidecar.id
@@ -810,6 +827,7 @@ class Runner:
                     "TIMEOUT_SEC": str(task.get("timeout_sec", 1800)),
                     "ACC_NAME": acc_name,
                     "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+                    "CLEAN_WORKSPACE_DEPS": CLEAN_WORKSPACE_DEPS,
                     "TZ": fp["tz"],
                     "LANG": fp["lang"],
                     "LC_ALL": fp["lang"],
@@ -923,6 +941,7 @@ class Runner:
                     "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
                     "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
                     "DNS_READY_HOST": DNS_READY_HOST,
+                    "SAVE_FULL_FLOWS": SAVE_FULL_FLOWS,
                 },
             )
             sidecar_id = sidecar.id
@@ -1651,6 +1670,54 @@ def _find_latest_claude_session_id(run_id: str) -> Optional[str]:
         return None
     latest = max(files, key=lambda p: p.stat().st_mtime)
     return latest.stem
+
+
+def _aggregate_claude_session_usage(run_id: str) -> dict[str, int | bool]:
+    """
+    从 Claude session JSONL 聚合 usage，作为 sidecar stats 缺失时的回退来源。
+
+    :param run_id: runs.id
+    :return: token / 请求数 / 可用性聚合结果
+    """
+    base = WORKSPACES_DIR / run_id / ".claude-home" / "projects"
+    if not base.exists():
+        return {
+            "tokens_in": 0,
+            "tokens_out": 0,
+            "requests": 0,
+            "usage_available": False,
+        }
+    tokens_in = tokens_out = requests = 0
+    seen_requests: set[str] = set()
+    for path in sorted((p for p in base.rglob("*.jsonl") if p.is_file()), key=lambda p: p.stat().st_mtime):
+        for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            message = rec.get("message")
+            if not isinstance(message, dict) or message.get("role") != "assistant":
+                continue
+            if rec.get("type") not in (None, "assistant"):
+                continue
+            usage = message.get("usage")
+            if not isinstance(usage, dict):
+                continue
+            request_key = rec.get("requestId")
+            if not isinstance(request_key, str) or not request_key:
+                request_key = json.dumps(usage, sort_keys=True, ensure_ascii=False)
+            if request_key in seen_requests:
+                continue
+            seen_requests.add(request_key)
+            tokens_in += _usage_input_tokens(usage)
+            tokens_out += int(usage.get("output_tokens") or 0)
+            requests += 1
+    return {
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "requests": requests,
+        "usage_available": requests > 0,
+    }
 
 
 # ============== 调度器：每账号 Semaphore(2) ==============
@@ -2762,6 +2829,83 @@ def delete_task_batch(batch_id: int):
     return {"ok": True}
 
 
+@app.post("/api/task-batches/{batch_id}/stop")
+def stop_task_batch(batch_id: int):
+    """停止批次调度，并停止已生成的 queued/running runs。"""
+    if not runner:
+        raise HTTPException(500, "runner not ready")
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                row = conn.execute(
+                    "SELECT id, status FROM task_batches WHERE id=? AND deleted_at IS NULL",
+                    (batch_id,),
+                ).fetchone()
+                if not row:
+                    raise HTTPException(404, "batch not found")
+                if row["status"] in ("done", "stopped", "deleted"):
+                    return {"ok": True, "stopped_runs": 0}
+                conn.execute(
+                    "UPDATE task_batches SET status='stopped', next_launch_at=NULL, "
+                    "updated_at=julianday('now') WHERE id=?",
+                    (batch_id,),
+                )
+                conn.execute(
+                    "UPDATE task_batch_items SET status='stopped', updated_at=julianday('now') "
+                    "WHERE batch_id=? AND status IN ('pending','queued') AND run_id IS NULL",
+                    (batch_id,),
+                )
+        finally:
+            conn.close()
+    conn = get_db()
+    try:
+        runs = conn.execute(
+            "SELECT * FROM runs WHERE batch_id=? AND deleted_at IS NULL "
+            "AND status IN ('queued','running')",
+            (batch_id,),
+        ).fetchall()
+        run_rows = [dict(r) for r in runs]
+    finally:
+        conn.close()
+    now = time.time()
+    for run in run_rows:
+        runner.persist_worker_profile(run.get("worker_container"))
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    conn.execute(
+                        "UPDATE runs SET status='stopping', stop_requested_at=? WHERE id=? "
+                        "AND status IN ('queued','running')",
+                        (now, run["id"]),
+                    )
+            finally:
+                conn.close()
+        runner.cleanup(run.get("sidecar_container"), run.get("worker_container"))
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    row = conn.execute(
+                        "SELECT status FROM runs WHERE id=?",
+                        (run["id"],),
+                    ).fetchone()
+                    if row and row["status"] == "stopping":
+                        conn.execute(
+                            "UPDATE runs SET status='stopped', ended_at=? WHERE id=?",
+                            (time.time(), run["id"]),
+                        )
+                    conn.execute(
+                        "UPDATE task_batch_items SET status='stopped', updated_at=julianday('now') "
+                        "WHERE run_id=?",
+                        (run["id"],),
+                    )
+            finally:
+                conn.close()
+    return {"ok": True, "stopped_runs": len(run_rows)}
+
+
 # ---------- runs ----------
 @app.post("/api/tasks/{tid}/run")
 def run_task(tid: int):
@@ -2880,7 +3024,7 @@ def list_workspace(rid: str):
 @app.get("/api/runs/{rid}/stats")
 def get_stats(rid: str):
     """
-    从 sidecar 写入的 stats.jsonl 聚合 token、请求数和采集可用性。
+    聚合 run 的 token、请求数和采集可用性。
 
     :param rid: runs.id
     :return: token / request 聚合结果及 available / usage_available 状态
@@ -2890,13 +3034,15 @@ def get_stats(rid: str):
     # flows 目录按 account/task/run 分层，扫描所有匹配
     matches = list(base.rglob(f"{rid}/stats.jsonl"))
     if not matches:
+        session_stats = _aggregate_claude_session_usage(rid)
         return {
-            "tokens_in": 0,
-            "tokens_out": 0,
-            "requests": 0,
+            "tokens_in": session_stats["tokens_in"],
+            "tokens_out": session_stats["tokens_out"],
+            "requests": session_stats["requests"],
             "errors": 0,
-            "available": False,
-            "usage_available": False,
+            "available": bool(session_stats["usage_available"]),
+            "usage_available": bool(session_stats["usage_available"]),
+            "source": "claude_session" if session_stats["usage_available"] else "none",
         }
     tokens_in = tokens_out = errors = 0
     request_ids: set[str] = set()
@@ -2931,9 +3077,17 @@ def get_stats(rid: str):
                 u = {}
             if isinstance(u, dict) and ("input_tokens" in u or "output_tokens" in u):
                 usage_available = True
-            tokens_in += int(u.get("input_tokens") or 0)
+            tokens_in += _usage_input_tokens(u)
             tokens_out += int(u.get("output_tokens") or 0)
     requests = len(request_ids | response_ids) + fallback_requests
+    source = "sidecar"
+    if not usage_available:
+        session_stats = _aggregate_claude_session_usage(rid)
+        if session_stats["usage_available"]:
+            tokens_in = int(session_stats["tokens_in"])
+            tokens_out = int(session_stats["tokens_out"])
+            usage_available = True
+            source = "claude_session"
     return {
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
@@ -2941,6 +3095,7 @@ def get_stats(rid: str):
         "errors": errors,
         "available": requests > 0 or usage_available,
         "usage_available": usage_available,
+        "source": source,
     }
 
 

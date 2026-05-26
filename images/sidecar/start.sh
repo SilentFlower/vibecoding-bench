@@ -57,12 +57,17 @@ fi
 # ---------- 3) 启动 mitmdump（先于 hev，避免 tun 转发到未就绪端口） ----------
 mkdir -p /flows
 FLOW_FILE="/flows/$(date +%Y%m%d-%H%M%S).flow"
+MITM_SAVE_ARGS=()
+if [ "${SAVE_FULL_FLOWS:-0}" = "1" ]; then
+  MITM_SAVE_ARGS=(--save-stream-file "$FLOW_FILE")
+  log "Full mitm flow capture enabled: $FLOW_FILE"
+fi
 log "Starting mitmdump (socks5 inbound :8080, upstream via proxychains -> ${UPSTREAM_SOCKS5_HOST}:${UPSTREAM_SOCKS5_PORT})"
 proxychains4 -q mitmdump \
   --mode socks5 \
   --listen-host 127.0.0.1 --listen-port 8080 \
   --ignore-hosts '^(platform\.claude\.com)$' \
-  --save-stream-file "$FLOW_FILE" \
+  "${MITM_SAVE_ARGS[@]}" \
   -s /sidecar/recorder.py \
   >/var/log/mitmdump.log 2>&1 &
 MITM_PID=$!
@@ -212,5 +217,5 @@ if [ ! -f /tmp/sidecar-ready ]; then
   exit 1
 fi
 
-log "Sidecar up: mitmproxy=$MITM_PID hev=$HEV_PID unbound=$UNBOUND_PID flow=$FLOW_FILE"
+log "Sidecar up: mitmproxy=$MITM_PID hev=$HEV_PID unbound=$UNBOUND_PID stats=/flows/stats.jsonl"
 wait

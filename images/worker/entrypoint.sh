@@ -333,6 +333,30 @@ persist_runtime_claude_state() {
     /mnt/profile/settings.json 2>/dev/null || true
 }
 
+cleanup_workspace_dependencies() {
+  # 运行产物要留给详情页查看，但依赖目录很容易吞掉磁盘，结束后默认清理。
+  if [ "${CLEAN_WORKSPACE_DEPS:-1}" != "1" ]; then
+    return 0
+  fi
+  find /workspace \
+    \( -path /workspace/.claude-home -o -path /workspace/.claude-home/\* \) -prune \
+    -o -type d \( \
+      -name node_modules \
+      -o -name .venv \
+      -o -name venv \
+      -o -name __pycache__ \
+      -o -name .pytest_cache \
+      -o -name .mypy_cache \
+      -o -name .ruff_cache \
+      -o -name .tox \
+      -o -name target \
+      -o -name dist \
+      -o -name build \
+      -o -name .next \
+      -o -name .cache \
+    \) -prune -exec rm -rf {} + 2>/dev/null || true
+}
+
 _CLEANUP_TASK_MODE_DONE=0
 cleanup_task_mode() {
   # 成功、失败、timeout、SIGTERM 都会走这里；Claude 刚好刷新 token 时也尽量落回账号 profile。
@@ -342,6 +366,7 @@ cleanup_task_mode() {
   _CLEANUP_TASK_MODE_DONE=1
   if [ "$WORKER_MODE" = "task" ]; then
     persist_runtime_claude_state || true
+    cleanup_workspace_dependencies || true
   fi
 }
 

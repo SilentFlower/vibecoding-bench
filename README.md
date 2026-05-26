@@ -89,7 +89,7 @@ bench/
 └── data/                运行时数据（已 gitignore）
     ├── profiles/<acc>/      每账号一份 ~/.claude 副本
     ├── ca/                  mitmproxy 持久 CA（首次启动自动生成）
-    ├── flows/<acc>/<task>/<run>/   .flow + stats.jsonl
+    ├── flows/<acc>/<task>/<run>/   stats.jsonl（SAVE_FULL_FLOWS=1 时额外保留 .flow）
     ├── workspaces/<run>/    claude 工作目录 + .bench-transcript.log
     └── db.sqlite
 ```
@@ -109,3 +109,4 @@ bench/
 - **首次 MITM CA 生成**：sidecar 启动时若 `data/ca/` 为空，会让 mitmproxy 自己生成；worker 启动时 CA 已经在卷里。若并发首次启动多个 run，有微小窗口期某些 run 拿不到 CA——P1 用 `SIDECAR_BOOT_WAIT=4` 兜底，足以；P2 改成显式等 CA 文件就绪。
 - **certificate pinning 风险**：claude-code 当前不 pin；后续升级若 pin，MITM 会失败，需补丁或回退到不解密模式。
 - **超时**：默认每 run 1800s，可在创建任务时调整。
+- **磁盘占用**：默认 `SAVE_FULL_FLOWS=0` 不再保存完整 MITM `.flow`，只保留 `stats.jsonl`；默认 `CLEAN_WORKSPACE_DEPS=1` 会在 run 结束后清理 workspace 里的 `node_modules`、`.venv` 等依赖目录。
