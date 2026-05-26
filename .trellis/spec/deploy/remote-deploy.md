@@ -1,6 +1,6 @@
 # Remote Deploy
 
-> AWS EC2 / 自建 VPS 上把 vibecoding-bench 真跑起来。参考实例: <http://ai.havefun.eu.cc:8080/>。
+> AWS EC2 / 自建 VPS 上把 vibecoding-bench 真跑起来。参考实例: <http://186.244.215.29:8080/>。
 
 ---
 
