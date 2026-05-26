@@ -54,7 +54,7 @@ write_default_settings() {
 }
 EOF
   if [ -f "$CLAUDE_DIR/settings.json" ]; then
-    jq -s '.[0] * .[1]' "$CLAUDE_DIR/settings.json" /tmp/default-settings.json > "$CLAUDE_DIR/settings.json.tmp" \
+    jq -s '(.[0] | del(.hooks, .statusLine)) * .[1]' "$CLAUDE_DIR/settings.json" /tmp/default-settings.json > "$CLAUDE_DIR/settings.json.tmp" \
       && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
   else
     cp /tmp/default-settings.json "$CLAUDE_DIR/settings.json"
@@ -163,6 +163,122 @@ check_claude_auth_status() {
   fi
 }
 
+refresh_oauth_credentials() {
+  # `claude auth status` 只验证本地 profile 形态，access token 失效时仍可能显示已登录。
+  # 跑题前先看 expiresAt；只有 token 缺失/已过期/快过期才 refresh，避免每次 run 都打 OAuth 端点。
+  local credentials_path="$CLAUDE_DIR/.credentials.json"
+  if [ ! -f "$credentials_path" ]; then
+    return 0
+  fi
+  set +e
+  runuser -u "$CLAUDE_USER" -- env \
+    HOME="$CLAUDE_HOME" \
+    SSL_CERT_FILE="${SSL_CERT_FILE:-}" \
+    REQUESTS_CA_BUNDLE="${REQUESTS_CA_BUNDLE:-}" \
+    python3 - "$credentials_path" <<'PY'
+import json
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+TOKEN_URL = "https://platform.claude.com/v1/oauth/token"
+CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+SCOPES = [
+    "user:profile",
+    "user:inference",
+    "user:sessions:claude_code",
+    "user:mcp_servers",
+    "user:file_upload",
+]
+
+path = Path(sys.argv[1])
+try:
+    data = json.loads(path.read_text(encoding="utf-8"))
+except Exception as exc:
+    print(f"读取 .credentials.json 失败: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+oauth = data.get("claudeAiOauth")
+if not isinstance(oauth, dict):
+    sys.exit(0)
+
+access_token = oauth.get("accessToken")
+expires_at = oauth.get("expiresAt")
+now_ms = int(time.time() * 1000)
+refresh_buffer_ms = 10 * 60 * 1000
+if (
+    isinstance(access_token, str)
+    and access_token
+    and isinstance(expires_at, (int, float))
+    and expires_at > now_ms + refresh_buffer_ms
+):
+    sys.exit(0)
+
+refresh_token = oauth.get("refreshToken")
+if not isinstance(refresh_token, str) or not refresh_token:
+    print("OAuth refreshToken 为空，access token 已缺失或接近过期，请重新登录账号", file=sys.stderr)
+    sys.exit(1)
+
+body = json.dumps({
+    "grant_type": "refresh_token",
+    "refresh_token": refresh_token,
+    "client_id": CLIENT_ID,
+    "scope": " ".join(SCOPES),
+}).encode("utf-8")
+request = urllib.request.Request(
+    TOKEN_URL,
+    data=body,
+    headers={
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    },
+    method="POST",
+)
+try:
+    with urllib.request.urlopen(request, timeout=30) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+except urllib.error.HTTPError as exc:
+    text = exc.read().decode("utf-8", errors="replace")
+    print(f"OAuth token 刷新失败: HTTP {exc.code} {text[:500]}", file=sys.stderr)
+    sys.exit(1)
+except Exception as exc:
+    print(f"OAuth token 刷新失败: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+access_token = payload.get("access_token")
+if not isinstance(access_token, str) or not access_token:
+    print("OAuth token 刷新响应缺少 access_token", file=sys.stderr)
+    sys.exit(1)
+
+oauth["accessToken"] = access_token
+new_refresh_token = payload.get("refresh_token")
+if isinstance(new_refresh_token, str) and new_refresh_token:
+    oauth["refreshToken"] = new_refresh_token
+expires_in = payload.get("expires_in")
+try:
+    expires_in_sec = int(expires_in)
+except (TypeError, ValueError):
+    expires_in_sec = 3600
+oauth["expiresAt"] = int(time.time() * 1000) + max(expires_in_sec, 60) * 1000
+
+tmp = path.with_suffix(path.suffix + ".tmp")
+tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+tmp.replace(path)
+PY
+  local refresh_code=$?
+  set -e
+  if [ "$refresh_code" -ne 0 ]; then
+    {
+      echo "[entrypoint] OAuth token 刷新失败，拒绝继续跑题以免 401 被误判成功"
+      echo "--- oauth refresh stderr 已见容器日志 ---"
+    } > /workspace/.bench-transcript.log
+    persist_runtime_claude_state
+    exit 1
+  fi
+}
+
 persist_runtime_claude_state() {
   # task 模式里 Claude 跑在 $HOME 的运行时副本中；这里只按白名单回写会影响
   # 下次启动/认证的文件，避免 sessions/telemetry/backups 被并发 run 污染。
@@ -203,7 +319,7 @@ terminate_task_mode() {
   exit "$code"
 }
 
-check_claude_completion() {
+classify_claude_completion() {
   # Stop hook 只能说明 Claude 结束了一次回合；真正成功必须看 session JSONL
   # 最后一条对话消息是否为稳定的纯文本 assistant 回复，不能停在 tool_use/tool_result。
   local idle_sec="$1"
@@ -295,6 +411,16 @@ if stop_reason == "tool_use":
 lines = [line.strip() for line in text.splitlines() if line.strip()]
 if not lines:
     sys.exit(1)
+
+auth_error_markers = [
+    "Please run /login",
+    "API Error: 401",
+    "Invalid authentication credentials",
+    "OAuth token has expired",
+]
+if any(marker in text for marker in auth_error_markers):
+    print("fatal_auth_error")
+    sys.exit(2)
 
 print("complete")
 PY
@@ -425,6 +551,7 @@ EOF
 chown -R "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME" /workspace || true
 rm -f /tmp/claude-done /tmp/claude-stop-seen
 rm -f /tmp/claude-exited /tmp/claude-exit-code
+rm -f /tmp/claude-fatal-error /tmp/claude-completion-state
 
 # ---------- 4) 启动 tmux + claude (node 用户 + bypassPermissions) ----------
 # Claude Code 的 bypassPermissions 不能以 root 跑，所以入口脚本只用 root
@@ -451,6 +578,7 @@ if ! getent hosts api.anthropic.com >/dev/null 2>&1; then
   log "WARN: DNS still not ready after 30s; claude may fail"
 fi
 
+refresh_oauth_credentials
 check_claude_auth_status
 
 SESSION="claude-${RUN_ID}"
@@ -487,14 +615,26 @@ fi
 COMPLETION_IDLE_SEC="${COMPLETION_IDLE_SEC:-10}"
 log "Waiting for final assistant message or timeout (${TIMEOUT_SEC}s)"
 deadline=$(( $(date +%s) + TIMEOUT_SEC ))
+completion_done=0
 while [ "$(date +%s)" -lt "$deadline" ]; do
-  if check_claude_completion "$COMPLETION_IDLE_SEC" >/dev/null 2>&1; then
-    touch /tmp/claude-done
+  completion_status=0
+  classify_claude_completion "$COMPLETION_IDLE_SEC" >/tmp/claude-completion-state 2>/dev/null || completion_status=$?
+  if [ "$completion_status" -eq 0 ]; then
+    completion_done=1
+    break
+  fi
+  if [ "$completion_status" -eq 2 ]; then
+    echo "auth_error" > /tmp/claude-fatal-error
     break
   fi
   if [ -f /tmp/claude-exited ]; then
-    if check_claude_completion 0 >/dev/null 2>&1; then
-      touch /tmp/claude-done
+    completion_status=0
+    classify_claude_completion 0 >/tmp/claude-completion-state 2>/dev/null || completion_status=$?
+    if [ "$completion_status" -eq 0 ]; then
+      completion_done=1
+    fi
+    if [ "$completion_status" -eq 2 ]; then
+      echo "auth_error" > /tmp/claude-fatal-error
     fi
     break
   fi
@@ -505,13 +645,22 @@ done
 tmux capture-pane -t "$SESSION" -p -S - > /workspace/.bench-transcript.log 2>/dev/null || true
 persist_runtime_claude_state
 tmux kill-session -t "$SESSION" 2>/dev/null || true
-if [ ! -f /tmp/claude-done ] && check_claude_completion 0 >/dev/null 2>&1; then
-  touch /tmp/claude-done
+if [ "$completion_done" -ne 1 ] && [ ! -f /tmp/claude-fatal-error ]; then
+  completion_status=0
+  classify_claude_completion 0 >/tmp/claude-completion-state 2>/dev/null || completion_status=$?
+  if [ "$completion_status" -eq 0 ]; then
+    completion_done=1
+  elif [ "$completion_status" -eq 2 ]; then
+    echo "auth_error" > /tmp/claude-fatal-error
+  fi
 fi
 
-if [ -f /tmp/claude-done ]; then
+if [ "$completion_done" -eq 1 ]; then
   log "Claude finished with final assistant message"
   exit 0
+elif [ -f /tmp/claude-fatal-error ]; then
+  log "Claude returned a fatal authentication error"
+  exit 1
 elif [ -f /tmp/claude-exited ]; then
   code=$(cat /tmp/claude-exit-code 2>/dev/null || echo 1)
   if [ "$code" = "0" ]; then

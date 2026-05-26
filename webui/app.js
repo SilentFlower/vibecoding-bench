@@ -130,14 +130,15 @@ function openQuotaDetail(accountId, quota) {
   const row = state.accounts.find(a => String(a.id) === String(accountId));
   const fmt = (v) => {
     if (!v) return '<span class="muted">暂无数据 / 需一次 API 响应后可用</span>';
+    const used = v.used_percentage ?? v.utilization ?? '-';
     return `
-      <div>used: <strong>${escapeHTML(v.used_percentage ?? '-')}%</strong></div>
+      <div>used: <strong>${escapeHTML(used)}%</strong></div>
       <div>reset: <code>${escapeHTML(v.resets_at || '-')}</code></div>
     `;
   };
   $('#modal-content').innerHTML = `
     <h3>Quota <code>${escapeHTML(row?.name || `acc#${accountId}`)}</code></h3>
-    ${quota.ok ? '' : `<div class="detail-section"><pre>${escapeHTML(quota.message || 'rate_limits 未返回')}</pre></div>`}
+    ${quota.ok ? '' : `<div class="detail-section"><pre>${escapeHTML(quota.message || 'usage API 未返回额度窗口')}</pre></div>`}
     <div class="stats-grid">
       <div class="stat-box"><div class="stat-label">5h</div><div class="stat-value-sm">${fmt(quota.five_hour)}</div></div>
       <div class="stat-box"><div class="stat-label">7d</div><div class="stat-value-sm">${fmt(quota.seven_day)}</div></div>

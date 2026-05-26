@@ -118,6 +118,10 @@ def _merge_claude_settings(existing: object, defaults: dict[str, object]) -> dic
     :return: 合并后的 settings 对象
     """
     merged = dict(existing) if isinstance(existing, dict) else {}
+    # hooks/statusLine 必须只存在于单次 run 的 workspace local settings。
+    # 早期 quota 探测把 statusLine 写进 profile 后，会污染后续 task 并制造错误完成信号。
+    merged.pop("hooks", None)
+    merged.pop("statusLine", None)
     for key, value in defaults.items():
         old_value = merged.get(key)
         if isinstance(old_value, dict) and isinstance(value, dict):
@@ -515,29 +519,47 @@ def build_topic_prompt(topic: dict) -> str:
 
 def _format_quota_result(raw: dict) -> dict:
     """
-    把 Claude Code statusLine 原始 JSON 转成前端稳定字段。
+    把 OAuth usage API 原始 JSON 转成前端稳定字段。
 
-    :param raw: statusLine 脚本收到的原始 JSON
+    :param raw: OAuth usage API 返回对象，或 worker 探测错误对象
     :return: 额度展示对象
     """
-    rate_limits = raw.get("rate_limits") if isinstance(raw, dict) else None
-    if not isinstance(rate_limits, dict):
+    if not isinstance(raw, dict):
         return {
             "ok": False,
-            "message": raw.get("error") if isinstance(raw, dict) else "rate limits unavailable",
+            "message": "usage unavailable",
             "five_hour": None,
             "seven_day": None,
             "seven_day_sonnet": None,
             "raw": raw,
         }
-    five_hour = rate_limits.get("five_hour") if isinstance(rate_limits.get("five_hour"), dict) else None
-    seven_day = rate_limits.get("seven_day") if isinstance(rate_limits.get("seven_day"), dict) else None
+    usage = raw.get("usage") if isinstance(raw.get("usage"), dict) else raw
+    if not isinstance(usage, dict):
+        return {
+            "ok": False,
+            "message": raw.get("error") if isinstance(raw, dict) else "usage unavailable",
+            "five_hour": None,
+            "seven_day": None,
+            "seven_day_sonnet": None,
+            "raw": raw,
+        }
+    if raw.get("error"):
+        return {
+            "ok": False,
+            "message": raw.get("error"),
+            "five_hour": None,
+            "seven_day": None,
+            "seven_day_sonnet": None,
+            "raw": raw,
+        }
+    five_hour = usage.get("five_hour") if isinstance(usage.get("five_hour"), dict) else None
+    seven_day = usage.get("seven_day") if isinstance(usage.get("seven_day"), dict) else None
     return {
-        "ok": True,
-        "message": "",
+        "ok": bool(five_hour or seven_day),
+        "message": "" if five_hour or seven_day else "usage API 未返回 5h/7d 额度窗口",
         "five_hour": five_hour,
         "seven_day": seven_day,
-        "seven_day_sonnet": None,
+        "seven_day_sonnet": usage.get("seven_day_sonnet") if isinstance(usage.get("seven_day_sonnet"), dict) else None,
         "raw": raw,
     }
 
@@ -836,7 +858,7 @@ class Runner:
 
     def query_quota(self, account: dict) -> dict:
         """
-        用账号 SOCKS5 启动临时 Claude 容器并读取 statusLine rate_limits。
+        用账号 SOCKS5 启动临时 worker，经 sidecar 网络查询 OAuth usage API。
 
         :param account: accounts 表行
         :return: 额度查询结果
@@ -919,54 +941,152 @@ class Runner:
 
     def _exec_quota_probe(self, worker_id: str) -> dict:
         """
-        在 quota worker 中运行短 Claude TUI 采集 statusLine JSON。
+        在 quota worker 中通过 OAuth usage API 读取额度。
 
         :param worker_id: quota worker 容器 ID
-        :return: statusLine 原始 JSON，失败时返回 raw/error
+        :return: usage API 原始 JSON，失败时返回 raw/error
         """
         script = r'''
 set -eu
-if [ -f /workspace/.claude.json ] && [ ! -f "$HOME/.claude.json" ]; then
+if [ -f /workspace/.claude.json ]; then
   cp /workspace/.claude.json "$HOME/.claude.json"
 fi
-STATUS=/workspace/.bench-quota-status.json
-STATUS_SH=/workspace/.bench-quota-status.sh
-cat > "$STATUS_SH" <<'EOF'
-#!/bin/sh
-cat > /workspace/.bench-quota-status.json
-exit 0
-EOF
-chmod +x "$STATUS_SH"
-mkdir -p "$HOME/.claude"
-if [ -f "$HOME/.claude/settings.json" ]; then
-  jq '.statusLine = {"type":"command","command":"/workspace/.bench-quota-status.sh"}' "$HOME/.claude/settings.json" > "$HOME/.claude/settings.json.tmp" && mv "$HOME/.claude/settings.json.tmp" "$HOME/.claude/settings.json"
-else
-  printf '{"statusLine":{"type":"command","command":"/workspace/.bench-quota-status.sh"}}\n' > "$HOME/.claude/settings.json"
-fi
-rm -f "$STATUS"
-tmux new-session -d -s quota -x 160 -y 45
-tmux send-keys -t quota "cd /workspace && env HOME='$HOME' NODE_EXTRA_CA_CERTS=/etc/mitm/mitmproxy-ca-cert.pem SSL_CERT_FILE=/etc/mitm/mitmproxy-ca-cert.pem REQUESTS_CA_BUNDLE=/etc/mitm/mitmproxy-ca-cert.pem CURL_CA_BUNDLE=/etc/mitm/mitmproxy-ca-cert.pem GIT_SSL_CAINFO=/etc/mitm/mitmproxy-ca-cert.pem claude" Enter
-sleep 8
-tmux send-keys -t quota "Reply with ok." Enter
-for i in $(seq 1 45); do
-  if [ -s "$STATUS" ] && grep -q "rate_limits" "$STATUS"; then
-    break
-  fi
-  sleep 1
-done
-tmux capture-pane -t quota -p -S - > /workspace/.bench-quota-transcript.log 2>/dev/null || true
-tmux kill-session -t quota 2>/dev/null || true
-if [ -s "$STATUS" ]; then
-  cat "$STATUS"
-else
-  printf '{"error":"statusLine did not return rate_limits","transcript":'
-  python3 - <<'PY'
+python3 - <<'PY'
 import json
+import ssl
+import sys
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
-print(json.dumps(Path("/workspace/.bench-quota-transcript.log").read_text(errors="ignore")[-4000:]))
+
+TOKEN_URL = "https://platform.claude.com/v1/oauth/token"
+USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
+CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+SCOPES = [
+    "user:profile",
+    "user:inference",
+    "user:sessions:claude_code",
+    "user:mcp_servers",
+    "user:file_upload",
+]
+CREDENTIALS_PATH = Path.home() / ".claude" / ".credentials.json"
+
+
+def emit(value: dict) -> None:
+    print(json.dumps(value, ensure_ascii=False))
+
+
+def load_credentials() -> dict:
+    if not CREDENTIALS_PATH.exists():
+        raise RuntimeError(".credentials.json 不存在，请先登录账号")
+    try:
+        return json.loads(CREDENTIALS_PATH.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise RuntimeError(f".credentials.json 解析失败: {exc}") from exc
+
+
+def save_credentials(data: dict) -> None:
+    tmp = CREDENTIALS_PATH.with_suffix(CREDENTIALS_PATH.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(CREDENTIALS_PATH)
+
+
+def oauth_section(data: dict) -> dict:
+    oauth = data.get("claudeAiOauth")
+    if not isinstance(oauth, dict):
+        raise RuntimeError(".credentials.json 缺少 claudeAiOauth，无法查询 OAuth usage")
+    return oauth
+
+
+def request_json(url: str, headers: dict[str, str], body: dict | None = None) -> dict:
+    data = None if body is None else json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=headers, method="GET" if body is None else "POST")
+    context = ssl.create_default_context()
+    try:
+        with urllib.request.urlopen(req, timeout=45, context=context) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        text = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"HTTP {exc.code}: {text[:1000]}") from exc
+
+
+def refresh_access_token(data: dict) -> str:
+    oauth = oauth_section(data)
+    refresh_token = oauth.get("refreshToken")
+    if not isinstance(refresh_token, str) or not refresh_token:
+        raise RuntimeError("OAuth refreshToken 为空，请重新登录账号")
+    payload = request_json(
+        TOKEN_URL,
+        {"Content-Type": "application/json", "Accept": "application/json"},
+        {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": CLIENT_ID,
+            "scope": " ".join(SCOPES),
+        },
+    )
+    access_token = payload.get("access_token")
+    if not isinstance(access_token, str) or not access_token:
+        raise RuntimeError("OAuth refresh 响应缺少 access_token")
+    oauth["accessToken"] = access_token
+    new_refresh_token = payload.get("refresh_token")
+    if isinstance(new_refresh_token, str) and new_refresh_token:
+        oauth["refreshToken"] = new_refresh_token
+    try:
+        expires_in = int(payload.get("expires_in"))
+    except (TypeError, ValueError):
+        expires_in = 3600
+    oauth["expiresAt"] = int(time.time() * 1000) + max(expires_in, 60) * 1000
+    save_credentials(data)
+    return access_token
+
+
+def current_access_token(data: dict) -> str:
+    oauth = oauth_section(data)
+    token = oauth.get("accessToken")
+    expires_at = oauth.get("expiresAt")
+    now_ms = int(time.time() * 1000)
+    refresh_buffer_ms = 10 * 60 * 1000
+    if isinstance(token, str) and token and isinstance(expires_at, (int, float)) and expires_at > now_ms + refresh_buffer_ms:
+        return token
+    return refresh_access_token(data)
+
+
+try:
+    credentials = load_credentials()
+    token = current_access_token(credentials)
+    try:
+        usage = request_json(
+            USAGE_URL,
+            {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "anthropic-beta": "oauth-2025-04-20",
+                "User-Agent": "claude-code/2.1.150",
+            },
+        )
+    except RuntimeError as exc:
+        # access token 被服务端拒绝时再强制刷新一次，避免本地 expiresAt 不可信。
+        if "HTTP 401" not in str(exc) and "HTTP 403" not in str(exc):
+            raise
+        token = refresh_access_token(credentials)
+        usage = request_json(
+            USAGE_URL,
+            {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "anthropic-beta": "oauth-2025-04-20",
+                "User-Agent": "claude-code/2.1.150",
+            },
+        )
+    emit(usage)
+except Exception as exc:
+    emit({"error": str(exc)})
+    sys.exit(1)
 PY
-  printf '}'
-fi
 '''
         api = self.client.api
         ex = api.exec_create(
@@ -975,15 +1095,19 @@ fi
             stdout=True,
             stderr=True,
             user=WORKER_USER,
-            environment=_claude_exec_env(True, {"TERM": "xterm-256color"}),
+            environment=_claude_exec_env(True),
             workdir=WORKER_HOME,
         )
         raw = api.exec_start(ex["Id"])
+        inspected = api.exec_inspect(ex["Id"])
         text = raw.decode("utf-8", errors="ignore").strip()
         try:
-            return json.loads(text)
+            parsed = json.loads(text)
         except json.JSONDecodeError:
             return {"error": "quota probe returned non-json output", "raw": text}
+        if inspected.get("ExitCode") not in (0, None) and not parsed.get("error"):
+            parsed["error"] = f"quota probe failed with exit {inspected.get('ExitCode')}"
+        return parsed
 
 
 # ============== Login 会话管理 ==============

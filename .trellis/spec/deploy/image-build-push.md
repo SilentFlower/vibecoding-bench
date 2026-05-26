@@ -99,6 +99,23 @@ Stop hook 只允许记录“Claude 停过一轮”的观测信号,不能直接 `
 4. assistant 文本至少有一条非空文本行。
 5. 最新 session JSONL 文件的 mtime 已稳定至少 `COMPLETION_IDLE_SEC` 秒。
 
+成功状态只能保存在当前 worker 进程内的变量里,不能通过 `/tmp/claude-done` 这类文件判定。原因是旧 profile/settings 或 hook 残留可能在 Claude Stop hook 中写同名文件,把停在 `user tool_result` 的中间态误判成 success。
+
+账号 profile 的 `settings.json` 只允许保存长期用户偏好和默认权限配置,禁止持久化 `hooks` / `statusLine`:
+
+- `hooks` 只允许写到单次 run 的 `/workspace/.claude/settings.local.json`。
+- `statusLine` 只允许用于临时调试,不能写回 `data/profiles/<account>/settings.json`。
+- orchestrator 和 worker 合并 settings 时都必须删除 profile 中已有的 `hooks` / `statusLine`。
+
+Claude 返回认证错误文本时必须失败,不能作为最终 assistant 回复标成功。至少识别:
+
+- `Please run /login`
+- `API Error: 401`
+- `Invalid authentication credentials`
+- `OAuth token has expired`
+
+task 启动前可以刷新 OAuth access token,但必须先读 `.credentials.json` 里的 `claudeAiOauth.expiresAt`:只有 access token 缺失、已过期或距离过期小于安全缓冲(当前 10 分钟)时才调用 refresh endpoint,避免每次 run 都刷新 token。
+
 worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 prompt；只能等待 JSONL 变化,直到完成、Claude 退出或 `TIMEOUT_SEC` 到期。
 
 ### 4. Validation & Error Matrix
@@ -107,6 +124,7 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
 |------|-------------|-------------------|
 | 最新对话消息是稳定的纯文本 assistant 回复 | `0` | `success` |
 | 最新对话消息是 user `tool_result` | 继续等到后续完成或超时 | 非 success |
+| 最新 assistant 文本包含 `/login` / 401 认证错误 | `1` | `failed` |
 | Claude 以 0 退出但没有最终 assistant 文本 | `1` | `failed` |
 | 达到 `TIMEOUT_SEC` 仍无最终 assistant 文本 | `124` | `timeout` |
 | 收到 `TERM/INT` | 先白名单回写 profile,再退出 | `stopped` 或 `failed` 由 orchestrator 状态决定 |
@@ -119,6 +137,10 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
 
 **Bad**:Stop hook 执行 `touch /tmp/claude-done`,worker 只看这个文件就退出 `0`。这会把“工具调用中间态”误判为成功。
 
+**Bad**:quota/statusLine 探测把 `statusLine` 写入账号 profile 的 `settings.json` 并回写。后续 task 会加载这段运行态配置,污染被测 run。
+
+**Bad**:access token 明明还有很久才过期,每次 task 启动都调用 OAuth refresh endpoint。这样会制造额外请求和不必要的凭据轮换。
+
 **Bad**:为了解决完成判定,把 `BENCH_DONE:<RUN_ID>` 之类的 bench sentinel 拼进题目 prompt。这样会污染被测任务的自然输出。
 
 ### 6. Tests Required
@@ -128,7 +150,9 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
   - 最新消息是 user `tool_result` 时判未完成。
   - 最新消息是 assistant `tool_use` 时判未完成。
   - 最新消息是稳定的 assistant 文本时判完成。
+  - 最新 assistant 文本包含 `Please run /login · API Error: 401 Invalid authentication credentials` 时判失败。
   - 最新 session JSONL mtime 未达到稳定窗口时判未完成。
+- 用 profile settings 样例断言:合并默认 settings 后 `hooks` / `statusLine` 被删除。
 - 远程发布后跑一个真实 task,检查 DB 里 `success` run 的 JSONL 最新对话消息是 assistant 文本,而不是 user `tool_result`。
 
 ### 7. Wrong vs Correct
@@ -158,6 +182,31 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
 ```
 
 成功文件只能由 JSONL 完成判定器在确认“稳定的最终 assistant 文本”后创建。
+
+更严格地说,新代码不应再依赖 `/tmp/claude-done` 作为成功来源;成功只应来自当前 worker 进程内对 JSONL 的即时判定结果。
+
+#### Wrong
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "/workspace/.bench-quota-status.sh"
+  }
+}
+```
+
+#### Correct
+
+```json
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  }
+}
+```
+
+profile settings 中不保存 `statusLine`;额度查询走 OAuth usage API 或临时容器内的一次性脚本。
 
 ---
 

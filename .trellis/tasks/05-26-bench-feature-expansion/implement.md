@@ -6,7 +6,7 @@
 - [ ] 实现 topics CRUD API，并把 `topics.md` seed 到 DB。
 - [ ] 改 topics UI：新增/删除/详情编辑；移除点击 topic 创建 task 的行为。
 - [ ] 实现账号 profile 白名单同步：task/继续对话成功、失败、异常、timeout、停止收口时回写 `.credentials.json`、`.claude.json`、`settings.json`，不回写 sessions/telemetry/backups。
-- [ ] 实现 accounts 额度查询后端：按账号 SOCKS5 启临时 worker/sidecar，采集 status line JSON。
+- [ ] 实现 accounts 额度查询后端：按账号 SOCKS5 启临时 worker/sidecar，通过 OAuth usage API 查询 5h / 7d usage。
 - [ ] 改 accounts UI：额度查询按钮、loading、结果/缺字段/失败态展示。
 - [ ] 设计并实现 batch scheduler：账号维度、多 topic、多并发、随机区间间隔投放。
 - [ ] 改 tasks UI：账号选择、多 topic 选择、全选、并发和随机区间间隔配置、批次启动、删除按钮。

@@ -69,13 +69,13 @@ MVP 可少建表：保留 `tasks` 兼容旧数据，新增 batch 表驱动新 UI
 
 1. 根据账号配置启动 `bench-quota-sidecar-*` 和 `bench-quota-worker-*`。
 2. 复制 profile 到 worker 的 `/home/node/.claude`。
-3. 写入临时 `statusLine` 配置：脚本把 stdin JSON 原样保存到 `/workspace/.bench-quota-status.json`。
-4. 启动交互 Claude，触发一次极短消息或 `/status`。
-5. 读取 `rate_limits` 字段，清理容器。
+3. 在 worker 容器内读取 `/home/node/.claude/.credentials.json` 的 `claudeAiOauth`。
+4. 只有 access token 缺失、已过期或距离过期小于 10 分钟时才通过 refresh token 刷新 OAuth 凭据，并把刷新后的白名单文件回写账号 profile。
+5. 在同一个 worker 内调用 `https://api.anthropic.com/api/oauth/usage`，读取 `five_hour` / `seven_day` usage 字段，清理容器。
 
 风险：
 
-* 如果没有首次 API 响应，`rate_limits` 可能缺失。
+* OAuth usage API 可能缺少某些窗口字段，前端必须显示明确空态，不能误报 0。
 * “7d Sonnet 单独额度”没有公开字段，MVP 不阻塞；前端显示“未返回/暂不支持”。
 
 ## Stats 修复方向

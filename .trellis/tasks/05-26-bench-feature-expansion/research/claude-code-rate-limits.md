@@ -14,7 +14,7 @@
 
 ## 对本项目的映射
 
-* 最稳的查询方式是为账号启动一次经过 sidecar SOCKS5 的轻量 Claude TUI 会话，注入临时 `statusLine` 脚本，把收到的 status JSON 写到 `/workspace/.bench-quota.json`，再读取该文件。
+* 当前实现改为在经过 sidecar SOCKS5 的临时 worker 内调用 OAuth usage API，避免把 `statusLine` 写入账号 profile，也避免为了查额度触发一次 Claude TUI 消息。
 * 该方式仍会经过账号 SOCKS5，因为 worker 共享 sidecar network namespace。
-* 该方式可能需要触发一次 API 响应，才能拿到 `rate_limits` 字段；可以用极短 prompt，但这会消耗少量额度。
+* usage API 返回的窗口字段使用 `utilization` / `resets_at`，字段缺失时前端展示空态。
 * 如果必须拿“7d Sonnet 单独额度”，需要另做实验：运行 `/status` 或切换模型后观察 TUI / transcript / status JSON 是否出现模型级字段。
