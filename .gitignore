@@ -24,6 +24,7 @@ AGENTS.md
 .agents/
 .codex/
 .claude/
+.deploy/
 
 # Local screenshots / playwright MCP dumps
 tlab-*.png

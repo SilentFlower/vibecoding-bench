@@ -282,6 +282,8 @@ code {
 }
 
 .muted { color: var(--text-faint); font-weight: 400; }
+.empty-cell { text-align: center; padding: 24px !important; }
+.empty-panel { padding: 24px; background: var(--surface-2); }
 
 .row-between {
   display: flex; justify-content: space-between; align-items: center;
@@ -290,6 +292,7 @@ code {
 .row { display: flex; gap: 12px; align-items: flex-end; }
 .row > label { flex: 1; }
 .row-end { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.view-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 
 /* ===== buttons (bracket-wrapped) ===== */
 .btn {
@@ -584,6 +587,10 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .pill-success { color: var(--success); }
 .pill-failed  { color: var(--failed);  }
 .pill-timeout { color: var(--timeout); }
+.pill-stopped { color: var(--failed); }
+.pill-done    { color: var(--success); }
+.pill-active  { color: var(--running); }
+.pill-deleted { color: var(--queued); }
 
 @keyframes pulse-cyan {
   0%, 100% { box-shadow: 0 0 12px var(--running-glow), inset 0 0 8px rgba(95,215,215,0.12); }
@@ -799,6 +806,56 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   color: var(--text);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.5px;
+}
+.stat-value-sm {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+/* ===== batch scheduler ===== */
+.batch-panel {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 16px;
+}
+.batch-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.batch-toolbar .btn-primary { margin-left: auto; }
+.batch-topic-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1px;
+  border: 1px solid var(--border);
+  background: var(--border);
+  max-height: 360px;
+  overflow: auto;
+}
+.batch-topic {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: start;
+  gap: 8px;
+  background: var(--surface-2);
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--text-dim);
+}
+.batch-topic:hover { background: var(--surface-3); }
+.batch-topic input { margin-top: 2px; accent-color: var(--amber); }
+.batch-topic-title {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.batch-topic .topic-cat {
+  grid-column: 3;
+  margin-top: 2px;
 }
 
 /* ===== hintbar (bottom tmux statusline) ===== */

@@ -70,6 +70,97 @@ worker 镜像 ~1.37 GB(node:22 基础大),首次推全量约 5–15 分钟视带
 
 ---
 
+## Worker 完成判定契约
+
+### 1. Scope / Trigger
+
+修改 `images/worker/entrypoint.sh` 的 Claude task 模式时必须遵守本契约。worker 是 run 终态的唯一来源:退出码 `0` 会被 orchestrator 映射成 `success`,退出码 `124` 映射成 `timeout`,其它非 0 映射成 `failed`。
+
+### 2. Signatures
+
+task 模式环境变量:
+
+| Env | 必填 | 含义 |
+|-----|------|------|
+| `TASK_PROMPT` | 是 | 原始题目 prompt |
+| `RUN_ID` | 是 | 当前 run id,用于 tmux session 与日志归档 |
+| `TIMEOUT_SEC` | 否 | worker 硬超时时间,默认 1800 |
+| `COMPLETION_IDLE_SEC` | 否 | JSONL 稳定窗口,默认 10 秒 |
+
+### 3. Contracts
+
+worker 注入 prompt 时必须保持 `TASK_PROMPT` 原样,不要把 bench 自己的完成协议、sentinel 或额外总结要求拼进题目 prompt。
+
+Stop hook 只允许记录“Claude 停过一轮”的观测信号,不能直接 `exit 0` 或直接 touch 成功文件。成功必须解析 `.claude/projects/**/*.jsonl`,并满足:
+
+1. 最新对话消息是 assistant。
+2. assistant 内容不包含 `tool_use`。
+3. `stop_reason` 不是 `tool_use`。
+4. assistant 文本至少有一条非空文本行。
+5. 最新 session JSONL 文件的 mtime 已稳定至少 `COMPLETION_IDLE_SEC` 秒。
+
+worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 prompt；只能等待 JSONL 变化,直到完成、Claude 退出或 `TIMEOUT_SEC` 到期。
+
+### 4. Validation & Error Matrix
+
+| 条件 | worker 退出 | orchestrator 终态 |
+|------|-------------|-------------------|
+| 最新对话消息是稳定的纯文本 assistant 回复 | `0` | `success` |
+| 最新对话消息是 user `tool_result` | 继续等到后续完成或超时 | 非 success |
+| Claude 以 0 退出但没有最终 assistant 文本 | `1` | `failed` |
+| 达到 `TIMEOUT_SEC` 仍无最终 assistant 文本 | `124` | `timeout` |
+| 收到 `TERM/INT` | 先白名单回写 profile,再退出 | `stopped` 或 `failed` 由 orchestrator 状态决定 |
+
+### 5. Good/Base/Bad Cases
+
+**Good**:Claude 写完文件、跑完检查,最终回复一段纯文本总结。JSONL 稳定窗口后,worker 退出 `0`。
+
+**Base**:Claude 停在工具结果后,TUI 回到输入框,但 JSONL 最新消息是 user `tool_result`。worker 继续等待,不会把该 run 标成 `success`。
+
+**Bad**:Stop hook 执行 `touch /tmp/claude-done`,worker 只看这个文件就退出 `0`。这会把“工具调用中间态”误判为成功。
+
+**Bad**:为了解决完成判定,把 `BENCH_DONE:<RUN_ID>` 之类的 bench sentinel 拼进题目 prompt。这样会污染被测任务的自然输出。
+
+### 6. Tests Required
+
+- `bash -n images/worker/entrypoint.sh`
+- 用本地 JSONL 样例断言:
+  - 最新消息是 user `tool_result` 时判未完成。
+  - 最新消息是 assistant `tool_use` 时判未完成。
+  - 最新消息是稳定的 assistant 文本时判完成。
+  - 最新 session JSONL mtime 未达到稳定窗口时判未完成。
+- 远程发布后跑一个真实 task,检查 DB 里 `success` run 的 JSONL 最新对话消息是 assistant 文本,而不是 user `tool_result`。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "touch /tmp/claude-done" }] }
+    ]
+  }
+}
+```
+
+#### Correct
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "date +%s >> /tmp/claude-stop-seen" }] }
+    ]
+  }
+}
+```
+
+成功文件只能由 JSONL 完成判定器在确认“稳定的最终 assistant 文本”后创建。
+
+---
+
 ## Recreate 协议(关键 ⚠)
 
 orchestrator 的 `main.py` 是 `COPY` 进镜像的(不是挂载),改了 main.py 后:

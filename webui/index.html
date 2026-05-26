@@ -69,7 +69,7 @@
       <header class="view-head">
         <div>
           <h2 class="view-title"><span class="bracket">▌</span>accounts <span class="muted">// oauth profiles</span></h2>
-          <p class="hint">先用 <code>scripts/init-account.sh &lt;name&gt;</code> 完成 OAuth 登录，再在这里登记同名账号。</p>
+          <p class="hint">添加账号后可查询 Claude Code 5h / 7d 额度；所有查询和运行都走该账号 SOCKS5。</p>
         </div>
         <button class="btn btn-primary" id="add-account">+ 添加账号</button>
       </header>
@@ -90,11 +90,14 @@
       <header class="view-head">
         <div>
           <h2 class="view-title"><span class="bracket">▌</span>topics <span class="muted" id="topics-count"></span></h2>
-          <p class="hint">100 题题库。点击卡片创建一个分发给指定账号的任务。</p>
+          <p class="hint">题库持久化在 SQLite。点击卡片查看 / 编辑，不再直接创建任务。</p>
         </div>
-        <div class="filter-wrap">
-          <span class="filter-prefix">filter&gt;</span>
-          <input type="search" id="topic-filter" placeholder="title / category / no" />
+        <div class="view-actions">
+          <button class="btn btn-primary" id="add-topic" type="button">+ 新增题目</button>
+          <div class="filter-wrap">
+            <span class="filter-prefix">filter&gt;</span>
+            <input type="search" id="topic-filter" placeholder="title / category / no" />
+          </div>
         </div>
       </header>
       <div id="topics-list" class="topics-grid"></div>
@@ -106,16 +109,49 @@
       <header class="view-head">
         <div>
           <h2 class="view-title"><span class="bracket">▌</span>tasks <span class="muted">// dispatched</span></h2>
-          <p class="hint">点 <code>▶ run</code> 按 <code>repeat_n</code> 提交多次运行，每账号同时最多 2 个。</p>
+          <p class="hint">先选账号，再多选 topic；批次按最多 2 并发和随机间隔投放。</p>
         </div>
       </header>
+      <form id="batch-form" class="form batch-panel">
+        <div class="row">
+          <label><span class="lbl">$ account</span>
+            <select name="account_id" required></select>
+          </label>
+          <label><span class="lbl">$ concurrency</span>
+            <input name="concurrency" type="number" min="1" max="2" value="2" />
+          </label>
+          <label><span class="lbl">$ timeout_sec</span>
+            <input name="timeout_sec" type="number" min="60" value="1800" />
+          </label>
+        </div>
+        <div class="row">
+          <label><span class="lbl">$ interval_min_sec</span>
+            <input name="interval_min_sec" type="number" min="0" value="0" />
+          </label>
+          <label><span class="lbl">$ interval_max_sec</span>
+            <input name="interval_max_sec" type="number" min="0" value="0" />
+          </label>
+        </div>
+        <label><span class="lbl">$ prompt_override</span>
+          <span class="hint inline">留空则每个 topic 使用标题 + 描述生成默认 prompt</span>
+          <textarea name="prompt" rows="4" placeholder="可选：给本批次所有 topic 使用同一段 prompt"></textarea>
+        </label>
+        <div class="batch-toolbar">
+          <button class="btn btn-sm" type="button" id="batch-select-all">全选</button>
+          <button class="btn btn-sm" type="button" id="batch-clear-all">清空</button>
+          <span class="hint" id="batch-selected-count">0 selected</span>
+          <span class="hint inline">默认并发上限固定为 2，避免单账号挤爆额度。</span>
+          <button class="btn btn-primary" type="submit">启动批次</button>
+        </div>
+        <div id="batch-topic-list" class="batch-topic-list"></div>
+      </form>
       <div class="table-frame">
         <table class="data">
           <thead><tr>
-            <th>id</th><th>no</th><th>title</th><th>account</th>
-            <th class="right">repeat</th><th class="right">timeout</th><th>op</th>
+            <th>id</th><th>account</th><th>status</th><th class="right">items</th>
+            <th class="right">concurrency</th><th class="right">interval</th><th>op</th>
           </tr></thead>
-          <tbody id="tasks-body"></tbody>
+          <tbody id="batches-body"></tbody>
         </table>
       </div>
     </section>
@@ -134,6 +170,7 @@
           <span class="pill pill-success">success</span>
           <span class="pill pill-failed">failed</span>
           <span class="pill pill-timeout">timeout</span>
+          <span class="pill pill-stopped">stopped</span>
         </div>
       </header>
       <div class="table-frame">
@@ -160,6 +197,40 @@
         <button class="modal-close" id="modal-close" aria-label="close">×</button>
       </div>
       <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <!-- Topic 查看 / 编辑弹窗 -->
+  <div class="modal hidden" id="topic-modal">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-frame" aria-hidden="true">
+        <span class="frame-tl">┌</span><span class="frame-tr">┐</span>
+        <span class="frame-bl">└</span><span class="frame-br">┘</span>
+      </div>
+      <div class="modal-titlebar">
+        <span class="modal-titlebar-name">topic / edit <span class="muted" id="topic-modal-title"></span></span>
+        <button class="modal-close" data-close="#topic-modal" aria-label="close">×</button>
+      </div>
+      <form id="topic-form" class="form">
+        <input type="hidden" name="topic_id" />
+        <label><span class="lbl">$ no</span>
+          <input name="no" type="number" min="1" required />
+        </label>
+        <label><span class="lbl">$ title</span>
+          <input name="title" required />
+        </label>
+        <label><span class="lbl">$ description</span>
+          <textarea name="description" rows="5"></textarea>
+        </label>
+        <label><span class="lbl">$ category</span>
+          <input name="category" />
+        </label>
+        <div class="row-end">
+          <button type="button" class="btn btn-danger" id="topic-delete">删除</button>
+          <button type="button" class="btn" data-close="#topic-modal">cancel</button>
+          <button type="submit" class="btn btn-primary">save</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -263,6 +334,28 @@
           <button type="submit" class="btn btn-primary">create</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- run 继续对话终端 -->
+  <div class="modal hidden" id="continue-modal">
+    <div class="modal-card modal-card-md">
+      <div class="modal-frame" aria-hidden="true">
+        <span class="frame-tl">┌</span><span class="frame-tr">┐</span>
+        <span class="frame-bl">└</span><span class="frame-br">┘</span>
+      </div>
+      <div class="modal-titlebar">
+        <span class="modal-titlebar-name">run / continue <span class="muted" id="continue-modal-title"></span></span>
+        <button class="modal-close" data-close="#continue-modal" aria-label="close">×</button>
+      </div>
+      <div class="acc-step-terminal">
+        <div class="login-meta">
+          <span>run</span><code id="continue-run-id">—</code>
+          <span class="muted">·</span>
+          <span>session</span><code id="continue-session-id">—</code>
+        </div>
+        <div class="xterm-host" id="continue-xterm"></div>
+      </div>
     </div>
   </div>
 

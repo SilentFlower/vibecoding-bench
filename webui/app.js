@@ -29,6 +29,7 @@ const state = {
   accounts: [],
   topics: [],
   tasks: [],
+  batches: [],
   runs: [],
   topicFilter: '',
   runsEventSource: null,
@@ -79,12 +80,28 @@ async function renderAccounts() {
       <td><code>${escapeHTML(a.profile_path)}</code></td>
       <td>${a.upstream_socks5_host ? `${escapeHTML(a.upstream_socks5_host)}:${a.upstream_socks5_port || ''}` : '<span class="muted">未配置</span>'}</td>
       <td>${a.enabled ? '✓' : '✗'}</td>
-      <td><button class="btn btn-sm btn-danger" data-del="${a.id}">删除</button></td>
+      <td>
+        <button class="btn btn-sm" data-quota="${a.id}">额度</button>
+        <button class="btn btn-sm btn-danger" data-del="${a.id}">删除</button>
+      </td>
     </tr>
-  `).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">暂无账号</td></tr>';
+  `).join('') || '<tr><td colspan="6" class="muted empty-cell">暂无账号</td></tr>';
 
   body.onclick = async (e) => {
     const id = e.target.dataset.del;
+    const quotaId = e.target.dataset.quota;
+    if (quotaId) {
+      e.target.disabled = true;
+      try {
+        const quota = await API(`/accounts/${quotaId}/quota`, { method: 'POST' });
+        openQuotaDetail(quotaId, quota);
+      } catch (err) {
+        alert('查询额度失败: ' + err.message);
+      } finally {
+        e.target.disabled = false;
+      }
+      return;
+    }
     if (id && confirm(`删除账号 #${id}?`)) {
       await API(`/accounts/${id}`, { method: 'DELETE' });
       renderAccounts();
@@ -107,6 +124,27 @@ async function renderAccounts() {
   $('#acc-login-cancel').onclick = () => endAccLogin({ alsoCloseModal: true });
   $('#acc-login-commit').onclick = () => commitAccLogin();
   $('#acc-modal-close').onclick = () => endAccLogin({ alsoCloseModal: true });
+}
+
+function openQuotaDetail(accountId, quota) {
+  const row = state.accounts.find(a => String(a.id) === String(accountId));
+  const fmt = (v) => {
+    if (!v) return '<span class="muted">暂无数据 / 需一次 API 响应后可用</span>';
+    return `
+      <div>used: <strong>${escapeHTML(v.used_percentage ?? '-')}%</strong></div>
+      <div>reset: <code>${escapeHTML(v.resets_at || '-')}</code></div>
+    `;
+  };
+  $('#modal-content').innerHTML = `
+    <h3>Quota <code>${escapeHTML(row?.name || `acc#${accountId}`)}</code></h3>
+    ${quota.ok ? '' : `<div class="detail-section"><pre>${escapeHTML(quota.message || 'rate_limits 未返回')}</pre></div>`}
+    <div class="stats-grid">
+      <div class="stat-box"><div class="stat-label">5h</div><div class="stat-value-sm">${fmt(quota.five_hour)}</div></div>
+      <div class="stat-box"><div class="stat-label">7d</div><div class="stat-value-sm">${fmt(quota.seven_day)}</div></div>
+      <div class="stat-box"><div class="stat-label">7d sonnet</div><div class="stat-value-sm"><span class="muted">未返回 / 暂不支持</span></div></div>
+    </div>
+  `;
+  openModal('#modal');
 }
 
 /**
@@ -190,7 +228,31 @@ async function startAccLogin(body) {
 }
 
 async function attachAccLoginTerminal(wsPath) {
-  // 等 xterm.js 全部加载
+  const termState = await attachTerminal('#acc-login-xterm', wsPath);
+
+  state.accLogin.term = termState.term;
+  state.accLogin.fit = termState.fit;
+  state.accLogin.ws = termState.ws;
+
+  // 粘贴本地回显:claude TUI 的 "Paste code here >" 默认不回显粘贴内容,
+  // 用户看不到自己粘了啥。在 xterm 内部 textarea 上挂 paste 监听,把文本以
+  // 暗色写到屏幕(本地回显);onData 仍把数据照常透传给后端 PTY,服务端不变。
+  const host = $('#acc-login-xterm');
+  const ta = host.querySelector('textarea.xterm-helper-textarea');
+  if (ta) {
+    ta.addEventListener('paste', (e) => {
+      const text = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+      if (text) {
+        // \x1b[2m = dim, \x1b[0m = reset; 粘贴文本可能含换行,统一成 CRLF
+        termState.term.write(`\x1b[2m${text.replace(/\r?\n/g, '\r\n')}\x1b[0m`);
+      }
+    });
+  }
+
+  state.accLogin.onResize = termState.onResize;
+}
+
+async function attachTerminal(hostSelector, wsPath) {
   if (typeof Terminal === 'undefined') {
     await new Promise(r => {
       const t = setInterval(() => {
@@ -201,7 +263,7 @@ async function attachAccLoginTerminal(wsPath) {
     });
   }
 
-  const host = $('#acc-login-xterm');
+  const host = $(hostSelector);
   host.innerHTML = '';
 
   const term = new Terminal({
@@ -226,12 +288,7 @@ async function attachAccLoginTerminal(wsPath) {
   const ws = new WebSocket(`${proto}//${location.host}${wsPath}`);
   ws.binaryType = 'arraybuffer';
 
-  state.accLogin.term = term;
-  state.accLogin.fit = fit;
-  state.accLogin.ws = ws;
-
   ws.onopen = () => {
-    // 通知后端当前终端尺寸
     ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
     term.focus();
   };
@@ -239,7 +296,6 @@ async function attachAccLoginTerminal(wsPath) {
     if (e.data instanceof ArrayBuffer) {
       term.write(new Uint8Array(e.data));
     } else if (typeof e.data === 'string') {
-      // 服务器偶尔发文本（错误信息），统一渲染
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === 'error') term.write(`\r\n\x1b[31m[orchestrator] ${msg.msg}\x1b[0m\r\n`);
@@ -249,32 +305,15 @@ async function attachAccLoginTerminal(wsPath) {
   ws.onclose = () => {
     term.write('\r\n\x1b[90m[ws closed]\x1b[0m\r\n');
   };
-  ws.onerror = (e) => {
+  ws.onerror = () => {
     term.write(`\r\n\x1b[31m[ws error]\x1b[0m\r\n`);
   };
-
-  // 把用户键盘输入透传给后端
   term.onData((data) => {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'input', data }));
     }
   });
 
-  // 粘贴本地回显:claude TUI 的 "Paste code here >" 默认不回显粘贴内容,
-  // 用户看不到自己粘了啥。在 xterm 内部 textarea 上挂 paste 监听,把文本以
-  // 暗色写到屏幕(本地回显);onData 仍把数据照常透传给后端 PTY,服务端不变。
-  const ta = host.querySelector('textarea.xterm-helper-textarea');
-  if (ta) {
-    ta.addEventListener('paste', (e) => {
-      const text = (e.clipboardData || window.clipboardData)?.getData('text') || '';
-      if (text) {
-        // \x1b[2m = dim, \x1b[0m = reset; 粘贴文本可能含换行,统一成 CRLF
-        term.write(`\x1b[2m${text.replace(/\r?\n/g, '\r\n')}\x1b[0m`);
-      }
-    });
-  }
-
-  // 窗口变化重新 fit + 通知后端
   const onResize = () => {
     try { fit.fit(); } catch {}
     if (ws.readyState === WebSocket.OPEN) {
@@ -282,7 +321,7 @@ async function attachAccLoginTerminal(wsPath) {
     }
   };
   window.addEventListener('resize', onResize);
-  state.accLogin.onResize = onResize;
+  return { term, fit, ws, onResize };
 }
 
 async function commitAccLogin() {
@@ -332,7 +371,6 @@ async function renderTopics() {
     try { state.topics = await API('/topics'); }
     catch (e) { return alert('加载题库失败: ' + e.message); }
   }
-  state.accounts = await API('/accounts');
 
   $('#topics-count').textContent = `(${state.topics.length})`;
   const list = $('#topics-list');
@@ -344,18 +382,18 @@ async function renderTopics() {
       t.category.toLowerCase().includes(filter) ||
       String(t.no).includes(filter))
     .map(t => `
-      <div class="topic-card" data-no="${t.no}">
+      <div class="topic-card" data-id="${t.id}">
         <div class="topic-no">#${t.no}</div>
         <div class="topic-title">${escapeHTML(t.title)}</div>
         <div class="topic-desc">${escapeHTML(t.description)}</div>
         <div class="topic-cat">${escapeHTML(t.category)}</div>
       </div>
-    `).join('');
+    `).join('') || '<div class="muted empty-panel">暂无 topic</div>';
 
   list.onclick = (e) => {
     const card = e.target.closest('.topic-card');
     if (!card) return;
-    openTaskModal(Number(card.dataset.no));
+    openTopicModal(Number(card.dataset.id));
   };
 
   $('#topic-filter').oninput = (e) => {
@@ -363,6 +401,61 @@ async function renderTopics() {
     renderTopics();
   };
   $('#topic-filter').value = state.topicFilter;
+  $('#add-topic').onclick = () => openTopicModal(null);
+}
+
+function openTopicModal(topicId) {
+  const topic = topicId ? state.topics.find(t => t.id === topicId) : null;
+  const form = $('#topic-form');
+  form.reset();
+  form.topic_id.value = topic ? topic.id : '';
+  form.no.value = topic ? topic.no : nextTopicNo();
+  form.title.value = topic ? topic.title : '';
+  form.description.value = topic ? topic.description : '';
+  form.category.value = topic ? topic.category : '';
+  $('#topic-modal-title').textContent = topic ? `#${topic.no}` : 'new';
+  $('#topic-delete').classList.toggle('hidden', !topic);
+  openModal('#topic-modal');
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const body = {
+      no: Number(fd.get('no')),
+      title: fd.get('title'),
+      description: fd.get('description') || '',
+      category: fd.get('category') || '',
+      enabled: true,
+    };
+    try {
+      if (topic) {
+        await API(`/topics/${topic.id}`, { method: 'PUT', body: JSON.stringify(body) });
+      } else {
+        await API('/topics', { method: 'POST', body: JSON.stringify(body) });
+      }
+      closeModal('#topic-modal');
+      state.topics = [];
+      await renderTopics();
+    } catch (err) {
+      alert('保存题目失败: ' + err.message);
+    }
+  };
+
+  $('#topic-delete').onclick = async () => {
+    if (!topic || !confirm(`删除 topic #${topic.no}?`)) return;
+    try {
+      await API(`/topics/${topic.id}`, { method: 'DELETE' });
+      closeModal('#topic-modal');
+      state.topics = [];
+      await renderTopics();
+    } catch (err) {
+      alert('删除题目失败: ' + err.message);
+    }
+  };
+}
+
+function nextTopicNo() {
+  return state.topics.reduce((m, t) => Math.max(m, Number(t.no) || 0), 0) + 1;
 }
 
 function openTaskModal(topicNo) {
@@ -399,47 +492,112 @@ function openTaskModal(topicNo) {
 // ===================== Tasks =====================
 async function renderTasks() {
   try {
-    state.tasks = await API('/tasks');
+    state.batches = await API('/task-batches');
     state.accounts = await API('/accounts');
+    state.topics = await API('/topics');
   } catch (e) { return alert('加载任务失败: ' + e.message); }
 
   const accMap = Object.fromEntries(state.accounts.map(a => [a.id, a.name]));
-  const body = $('#tasks-body');
-  body.innerHTML = state.tasks.map(t => `
+  const form = $('#batch-form');
+  if (state.accounts.length === 0) {
+    form.account_id.innerHTML = '';
+    $('#batch-topic-list').innerHTML = '<div class="muted">请先添加账号</div>';
+    $('#batches-body').innerHTML = '<tr><td colspan="7" class="muted empty-cell">暂无账号，无法启动批次</td></tr>';
+    return;
+  }
+  form.account_id.innerHTML = state.accounts
+    .map(a => `<option value="${a.id}">${escapeHTML(a.name)}</option>`).join('');
+  paintBatchTopics();
+
+  const body = $('#batches-body');
+  body.innerHTML = state.batches.map(b => `
     <tr>
-      <td>${t.id}</td>
-      <td>#${t.topic_no}</td>
-      <td>${escapeHTML(t.title)}</td>
-      <td>${escapeHTML(accMap[t.account_id] || `acc#${t.account_id}`)}</td>
-      <td>${t.repeat_n}</td>
-      <td>${t.timeout_sec}s</td>
+      <td>${b.id}</td>
+      <td>${escapeHTML(accMap[b.account_id] || `acc#${b.account_id}`)}</td>
+      <td><span class="pill pill-${b.status}">${escapeHTML(b.status)}</span></td>
+      <td>${b.done_count || 0}/${b.item_count || 0}</td>
+      <td>${b.concurrency}</td>
+      <td>${b.interval_min_sec}-${b.interval_max_sec}s</td>
       <td>
-        <button class="btn btn-sm btn-primary" data-run="${t.id}">▶ 运行</button>
+        <button class="btn btn-sm btn-danger" data-del-batch="${b.id}">删除</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">暂无任务，去 <a href="#topics">题库</a> 选题</td></tr>';
+  `).join('') || '<tr><td colspan="7" class="muted empty-cell">暂无批次</td></tr>';
 
   body.onclick = async (e) => {
-    const tid = e.target.dataset.run;
-    if (tid) {
-      e.target.disabled = true;
+    const batchId = e.target.dataset.delBatch;
+    if (batchId && confirm(`删除批次 #${batchId}?`)) {
       try {
-        const res = await API(`/tasks/${tid}/run`, { method: 'POST' });
-        alert(`已提交 ${res.run_ids.length} 次运行`);
-        location.hash = '#runs';
-      } catch (err) {
-        alert('提交失败: ' + err.message);
-        e.target.disabled = false;
-      }
+        await API(`/task-batches/${batchId}`, { method: 'DELETE' });
+        renderTasks();
+      } catch (err) { alert('删除批次失败: ' + err.message); }
+    }
+  };
+
+  $('#batch-select-all').onclick = () => {
+    $$('#batch-topic-list input[type=checkbox]').forEach(i => { i.checked = true; });
+    updateBatchSelectedCount();
+  };
+  $('#batch-clear-all').onclick = () => {
+    $$('#batch-topic-list input[type=checkbox]').forEach(i => { i.checked = false; });
+    updateBatchSelectedCount();
+  };
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const topicIds = $$('#batch-topic-list input[type=checkbox]:checked')
+      .map(i => Number(i.value));
+    if (topicIds.length === 0) return alert('请至少选择一个 topic');
+    const body = {
+      account_id: Number(fd.get('account_id')),
+      topic_ids: topicIds,
+      prompt: fd.get('prompt') || null,
+      concurrency: Number(fd.get('concurrency')),
+      interval_min_sec: Number(fd.get('interval_min_sec')),
+      interval_max_sec: Number(fd.get('interval_max_sec')),
+      timeout_sec: Number(fd.get('timeout_sec')),
+    };
+    try {
+      const res = await API('/task-batches', { method: 'POST', body: JSON.stringify(body) });
+      alert(`已启动批次 #${res.id}`);
+      location.hash = '#runs';
+    } catch (err) {
+      alert('启动批次失败: ' + err.message);
     }
   };
 }
 
+function paintBatchTopics() {
+  const list = $('#batch-topic-list');
+  list.innerHTML = state.topics.map(t => `
+    <label class="batch-topic">
+      <input type="checkbox" value="${t.id}" />
+      <span class="topic-no">#${t.no}</span>
+      <span class="batch-topic-title">${escapeHTML(t.title)}</span>
+      <span class="topic-cat">${escapeHTML(t.category)}</span>
+    </label>
+  `).join('') || '<div class="muted">暂无 topic</div>';
+  list.onchange = updateBatchSelectedCount;
+  updateBatchSelectedCount();
+}
+
+function updateBatchSelectedCount() {
+  const n = $$('#batch-topic-list input[type=checkbox]:checked').length;
+  const el = $('#batch-selected-count');
+  if (el) el.textContent = `${n} selected`;
+}
+
 // ===================== Runs (SSE 实时) =====================
-function renderRuns() {
+async function renderRuns() {
+  try {
+    state.accounts = await API('/accounts');
+    state.tasks = await API('/tasks');
+  } catch (e) {
+    return alert('加载运行依赖失败: ' + e.message);
+  }
   paintRuns(state.runs);
   if (state.runsEventSource) state.runsEventSource.close();
-  state.runsEventSource = new EventSource('/api/runs/stream');
+  state.runsEventSource = new EventSource('/api/runs-stream');
   state.runsEventSource.addEventListener('runs', (e) => {
     try {
       state.runs = JSON.parse(e.data);
@@ -465,17 +623,42 @@ function paintRuns(runs) {
         <td><code>${r.id}</code></td>
         <td>${tname}</td>
         <td>${escapeHTML(accMap[r.account_id] || `acc#${r.account_id}`)}</td>
-        <td><span class="pill pill-${r.status}">${r.status}</span></td>
+        <td><span class="pill pill-${r.status}">${escapeHTML(r.status)}</span></td>
         <td>${dur}</td>
         <td>${r.exit_code ?? '-'}</td>
-        <td><button class="btn btn-sm" data-detail="${r.id}">详情</button></td>
+        <td>
+          <button class="btn btn-sm" data-detail="${r.id}">详情</button>
+          ${['queued', 'running'].includes(r.status) ? `<button class="btn btn-sm btn-danger" data-stop="${r.id}">停止</button>` : ''}
+          ${['success', 'failed', 'timeout', 'stopped'].includes(r.status) ? `<button class="btn btn-sm btn-primary" data-continue="${r.id}">继续</button>` : ''}
+          <button class="btn btn-sm btn-danger" data-del-run="${r.id}">删除</button>
+        </td>
       </tr>
     `;
-  }).join('') || '<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">暂无运行</td></tr>';
+  }).join('') || '<tr><td colspan="7" class="muted empty-cell">暂无运行</td></tr>';
 
-  body.onclick = (e) => {
+  body.onclick = async (e) => {
     const rid = e.target.dataset.detail;
     if (rid) openRunDetail(rid);
+    const stopId = e.target.dataset.stop;
+    if (stopId && confirm(`停止 run ${stopId}?`)) {
+      e.target.disabled = true;
+      try { await API(`/runs/${stopId}/stop`, { method: 'POST' }); }
+      catch (err) { alert('停止失败: ' + err.message); e.target.disabled = false; }
+      return;
+    }
+    const contId = e.target.dataset.continue;
+    if (contId) {
+      e.target.disabled = true;
+      try { await startContinueRun(contId); }
+      catch (err) { alert('继续对话失败: ' + err.message); }
+      finally { e.target.disabled = false; }
+      return;
+    }
+    const delId = e.target.dataset.delRun;
+    if (delId && confirm(`删除 run ${delId}?`)) {
+      try { await API(`/runs/${delId}`, { method: 'DELETE' }); }
+      catch (err) { alert('删除运行失败: ' + err.message); }
+    }
   };
 }
 
@@ -495,7 +678,7 @@ async function openRunDetail(rid) {
     } catch {}
 
     $('#modal-content').innerHTML = `
-      <h3>Run <code>${rid}</code> <span class="pill pill-${run.status}">${run.status}</span></h3>
+      <h3>Run <code>${rid}</code> <span class="pill pill-${escapeHTML(run.status)}">${escapeHTML(run.status)}</span></h3>
 
       <div class="detail-section">
         <h4>统计</h4>
@@ -528,6 +711,37 @@ async function openRunDetail(rid) {
   }
 }
 
+async function startContinueRun(rid) {
+  const resp = await API(`/runs/${rid}/continue/start`, { method: 'POST' });
+  state.continueRun = {
+    sid: resp.session_id,
+    runId: rid,
+  };
+  $('#continue-run-id').textContent = rid;
+  $('#continue-session-id').textContent = resp.claude_session_id || '-';
+  $('#continue-modal-title').textContent = rid;
+  openModal('#continue-modal');
+  const termState = await attachTerminal('#continue-xterm', resp.ws_path);
+  state.continueRun.term = termState.term;
+  state.continueRun.fit = termState.fit;
+  state.continueRun.ws = termState.ws;
+  state.continueRun.onResize = termState.onResize;
+}
+
+function endContinueRun({ alsoCloseModal = false } = {}) {
+  const cr = state.continueRun || {};
+  if (cr.ws && cr.ws.readyState <= 1) {
+    try { cr.ws.close(); } catch {}
+  }
+  if (cr.term) { try { cr.term.dispose(); } catch {} }
+  if (cr.onResize) window.removeEventListener('resize', cr.onResize);
+  if (cr.sid) {
+    API(`/run-continue/${cr.sid}`, { method: 'DELETE' }).catch(() => {});
+  }
+  state.continueRun = null;
+  if (alsoCloseModal) closeModal('#continue-modal');
+}
+
 // ===================== Modal helpers =====================
 function openModal(sel) { $(sel).classList.remove('hidden'); }
 function closeModal(sel) { $(sel).classList.add('hidden'); }
@@ -539,12 +753,18 @@ document.addEventListener('click', (e) => {
     if (sel === '#acc-modal' && typeof endAccLogin === 'function') {
       return endAccLogin({ alsoCloseModal: true });
     }
+    if (sel === '#continue-modal' && typeof endContinueRun === 'function') {
+      return endContinueRun({ alsoCloseModal: true });
+    }
     closeModal(sel);
   }
   if (e.target.classList && e.target.classList.contains('modal')) {
     const id = '#' + e.target.id;
     if (id === '#acc-modal' && typeof endAccLogin === 'function') {
       return endAccLogin({ alsoCloseModal: true });
+    }
+    if (id === '#continue-modal' && typeof endContinueRun === 'function') {
+      return endContinueRun({ alsoCloseModal: true });
     }
     closeModal(id);
   }
@@ -605,7 +825,13 @@ function bindShortcuts() {
     if (e.key === 'Escape') {
       $$('.modal:not(.hidden)').forEach((m) => {
         if (m.hasAttribute('data-no-esc')) return;
-        closeModal('#' + m.id);
+        if (m.id === 'acc-modal' && typeof endAccLogin === 'function') {
+          endAccLogin({ alsoCloseModal: true });
+        } else if (m.id === 'continue-modal' && typeof endContinueRun === 'function') {
+          endContinueRun({ alsoCloseModal: true });
+        } else {
+          closeModal('#' + m.id);
+        }
       });
       return;
     }
@@ -743,4 +969,3 @@ function wireAuth() {
   // 避免立刻调 /api/accounts 拉数据触发一连串 401 + alert
   if (ok) navigate();
 }) ();
-bindShortcuts();

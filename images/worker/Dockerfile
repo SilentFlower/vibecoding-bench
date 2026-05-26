@@ -5,7 +5,7 @@
 # - 工具链：python / git / build-essential，覆盖大部分题目所需运行时
 # - MITM CA：由 entrypoint 在容器启动时注入到系统证书库 + 各语言运行时
 # - 驱动：tmux session 内启动 `claude`，通过粘贴缓冲注入题目 prompt
-# - 完成判定：~/.claude/settings.local.json 注册 Stop hook，回合结束 touch 文件
+# - 完成判定：Stop hook 只记录回合结束，最终以稳定的 JSONL assistant 文本为准
 # =======================================================================
 FROM node:22-bookworm-slim
 

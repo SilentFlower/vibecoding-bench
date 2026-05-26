@@ -38,6 +38,30 @@ def _extract_usage_from_sse(text: str) -> dict[str, Any] | None:
 
 
 class Recorder:
+    def requestheaders(self, flow: http.HTTPFlow) -> None:
+        """
+        在请求阶段先落一条记录。
+
+        响应解析失败或长流被中断时仍能统计请求数，避免 UI 永远显示 0。
+        """
+        host = flow.request.host or ""
+        if not any(k in host for k in TARGET_HOST_KEYWORDS):
+            return
+        try:
+            stat = {
+                "ts": time.time(),
+                "phase": "request",
+                "flow_id": flow.id,
+                "host": host,
+                "method": flow.request.method,
+                "path": flow.request.path,
+                "req_bytes": len(flow.request.raw_content or b""),
+            }
+            with open(STATS_FILE, "a") as f:
+                f.write(json.dumps(stat, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+
     def response(self, flow: http.HTTPFlow) -> None:
         host = flow.request.host or ""
         if not any(k in host for k in TARGET_HOST_KEYWORDS):
@@ -55,6 +79,8 @@ class Recorder:
 
             stat = {
                 "ts": time.time(),
+                "phase": "response",
+                "flow_id": flow.id,
                 "host": host,
                 "method": flow.request.method,
                 "path": flow.request.path,

@@ -15,6 +15,7 @@ import hashlib
 import hmac
 import json
 import os
+import random
 import re
 import secrets
 import shutil
@@ -104,6 +105,8 @@ _DEFAULT_CLAUDE_TOP_CONFIG: dict[str, object] = {
     "hasCompletedOnboarding": True,
     "bypassPermissionsModeAccepted": True,
 }
+_PROFILE_SYNC_FILES = (".credentials.json", "settings.json", ".claude.json")
+_TERMINAL_RUN_STATUSES = {"success", "failed", "timeout", "stopped"}
 
 
 def _merge_claude_settings(existing: object, defaults: dict[str, object]) -> dict[str, object]:
@@ -215,6 +218,48 @@ def _make_worker_owned(path: Path) -> None:
             pass
 
 
+def _copy_profile_whitelist_to_claude_home(profile_dir: Path, claude_home_dir: Path) -> None:
+    """
+    把账号 profile 的认证白名单复制到某个 Claude home 目录。
+
+    :param profile_dir: `data/profiles/<account>` 目录
+    :param claude_home_dir: run/continue 容器挂载的 `.claude` 目录
+    :return: None
+    """
+    claude_home_dir.mkdir(parents=True, exist_ok=True)
+    for name in _PROFILE_SYNC_FILES:
+        src = profile_dir / name
+        if not src.exists() or not src.is_file():
+            continue
+        dst = claude_home_dir / name
+        shutil.copy2(src, dst)
+        _make_worker_owned(dst)
+
+
+def _copy_claude_home_whitelist_to_profile(claude_home_dir: Path, profile_dir: Path) -> None:
+    """
+    把运行时 Claude home 中刷新的认证白名单回写到账号 profile。
+
+    :param claude_home_dir: run workspace 下的 `.claude-home` 目录
+    :param profile_dir: `data/profiles/<account>` 目录
+    :return: None
+    """
+    if not claude_home_dir.exists():
+        return
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    for name in _PROFILE_SYNC_FILES:
+        src = claude_home_dir / name
+        if not src.exists() or not src.is_file():
+            continue
+        dst = profile_dir / name
+        try:
+            shutil.copy2(src, dst)
+            _make_worker_owned(dst)
+        except OSError:
+            pass
+    _persist_default_claude_top_config(profile_dir)
+
+
 def _claude_exec_env(use_sidecar: bool, extra: Optional[dict[str, str]] = None) -> dict[str, str]:
     """
     生成 docker exec 启动 Claude 子命令时必须显式传入的环境变量。
@@ -251,22 +296,70 @@ CREATE TABLE IF NOT EXISTS accounts (
   created_at REAL DEFAULT (julianday('now'))
 );
 
+CREATE TABLE IF NOT EXISTS topics (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  no INTEGER UNIQUE NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  category TEXT NOT NULL DEFAULT '',
+  enabled INTEGER DEFAULT 1,
+  deleted_at REAL,
+  created_at REAL DEFAULT (julianday('now')),
+  updated_at REAL DEFAULT (julianday('now'))
+);
+
 CREATE TABLE IF NOT EXISTS tasks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   topic_no INTEGER NOT NULL,
   title TEXT NOT NULL,
   prompt TEXT NOT NULL,
   account_id INTEGER NOT NULL,
+  batch_id INTEGER,
+  topic_id INTEGER,
+  status TEXT DEFAULT 'active',
+  deleted_at REAL,
   timeout_sec INTEGER DEFAULT 1800,
   repeat_n INTEGER DEFAULT 1,
   created_at REAL DEFAULT (julianday('now')),
   FOREIGN KEY(account_id) REFERENCES accounts(id)
 );
 
+CREATE TABLE IF NOT EXISTS task_batches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  concurrency INTEGER DEFAULT 2,
+  interval_min_sec INTEGER DEFAULT 0,
+  interval_max_sec INTEGER DEFAULT 0,
+  timeout_sec INTEGER DEFAULT 1800,
+  status TEXT NOT NULL DEFAULT 'active',
+  next_launch_at REAL,
+  deleted_at REAL,
+  created_at REAL DEFAULT (julianday('now')),
+  updated_at REAL DEFAULT (julianday('now')),
+  FOREIGN KEY(account_id) REFERENCES accounts(id)
+);
+
+CREATE TABLE IF NOT EXISTS task_batch_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  batch_id INTEGER NOT NULL,
+  topic_id INTEGER NOT NULL,
+  task_id INTEGER,
+  run_id TEXT,
+  prompt TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at REAL DEFAULT (julianday('now')),
+  updated_at REAL DEFAULT (julianday('now')),
+  FOREIGN KEY(batch_id) REFERENCES task_batches(id),
+  FOREIGN KEY(topic_id) REFERENCES topics(id)
+);
+
 CREATE TABLE IF NOT EXISTS runs (
   id TEXT PRIMARY KEY,
   task_id INTEGER NOT NULL,
   account_id INTEGER NOT NULL,
+  batch_id INTEGER,
+  topic_id INTEGER,
   status TEXT NOT NULL DEFAULT 'queued',
   exit_code INTEGER,
   worker_container TEXT,
@@ -275,12 +368,18 @@ CREATE TABLE IF NOT EXISTS runs (
   flows_dir TEXT,
   started_at REAL,
   ended_at REAL,
+  stop_requested_at REAL,
+  deleted_at REAL,
   error TEXT,
   created_at REAL DEFAULT (julianday('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_runs_status  ON runs(status);
 CREATE INDEX IF NOT EXISTS idx_runs_account ON runs(account_id);
 CREATE INDEX IF NOT EXISTS idx_runs_task    ON runs(task_id);
+CREATE INDEX IF NOT EXISTS idx_runs_batch   ON runs(batch_id);
+CREATE INDEX IF NOT EXISTS idx_topics_no    ON topics(no);
+CREATE INDEX IF NOT EXISTS idx_batches_account ON task_batches(account_id);
+CREATE INDEX IF NOT EXISTS idx_batch_items_batch ON task_batch_items(batch_id);
 """
 
 _db_lock = threading.Lock()
@@ -298,17 +397,46 @@ def init_db() -> None:
     try:
         with conn:
             conn.executescript(_SCHEMA)
+            _ensure_column(conn, "tasks", "batch_id", "INTEGER")
+            _ensure_column(conn, "tasks", "topic_id", "INTEGER")
+            _ensure_column(conn, "tasks", "status", "TEXT DEFAULT 'active'")
+            _ensure_column(conn, "tasks", "deleted_at", "REAL")
+            _ensure_column(conn, "runs", "batch_id", "INTEGER")
+            _ensure_column(conn, "runs", "topic_id", "INTEGER")
+            _ensure_column(conn, "runs", "stop_requested_at", "REAL")
+            _ensure_column(conn, "runs", "deleted_at", "REAL")
+            _seed_topics_if_empty(conn)
     finally:
         conn.close()
 
 
-# ============== Topics（从 README.md 解析 100 题）==============
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
+    """
+    幂等补 SQLite 列，兼容已经存在的旧 `data/db.sqlite`。
+
+    :param conn: 当前数据库连接
+    :param table: 表名
+    :param column: 需要补齐的列名
+    :param ddl: `ALTER TABLE ADD COLUMN` 后的列定义
+    :return: None
+    """
+    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    if any(r["name"] == column for r in rows):
+        return
+    conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
+
+# ============== Topics（SQLite 为主，topics.md 首次 seed）==============
 _CAT_RE = re.compile(r"^##\s+[一二三四五六七八九十]+、(.+?)（")
 _ITEM_RE = re.compile(r"^-\s+\[[ x]\]\s+(\d+)\.\s+\*\*(.+?)\*\*[:：]?\s*(.*)$")
 
 
-def load_topics() -> list[dict]:
-    """从题库 markdown 解析题库列表"""
+def load_seed_topics() -> list[dict]:
+    """
+    从题库 markdown 解析首次 seed 数据。
+
+    :return: topic dict 列表，字段包含 no/category/title/description
+    """
     if not TOPICS_FILE.exists():
         return []
     topics: list[dict] = []
@@ -328,6 +456,90 @@ def load_topics() -> list[dict]:
                 "description": desc.strip(),
             })
     return topics
+
+
+def _seed_topics_if_empty(conn: sqlite3.Connection) -> None:
+    """
+    首次启动时把 `topics.md` 导入 SQLite。
+
+    :param conn: 当前数据库连接
+    :return: None
+    """
+    row = conn.execute("SELECT COUNT(*) AS n FROM topics").fetchone()
+    if row and row["n"] > 0:
+        return
+    for topic in load_seed_topics():
+        conn.execute(
+            "INSERT OR IGNORE INTO topics(no, title, description, category) "
+            "VALUES(?,?,?,?)",
+            (
+                topic["no"],
+                topic["title"],
+                topic.get("description") or "",
+                topic.get("category") or "",
+            ),
+        )
+
+
+def list_topic_rows(include_deleted: bool = False) -> list[dict]:
+    """
+    从 SQLite 读取 topic 列表。
+
+    :param include_deleted: 是否包含软删 topic
+    :return: topic dict 列表
+    """
+    conn = get_db()
+    try:
+        where = "" if include_deleted else "WHERE deleted_at IS NULL AND enabled=1"
+        rows = conn.execute(
+            f"SELECT * FROM topics {where} ORDER BY no"
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def build_topic_prompt(topic: dict) -> str:
+    """
+    按 topic 生成默认 Claude prompt。
+
+    :param topic: topic 行字典
+    :return: 默认 prompt 文本
+    """
+    return (
+        f"{topic['title']}：{topic.get('description') or ''}\n\n"
+        "请在当前目录下从 0 到 1 实现一个 MVP（功能跑通即可，先不追求架构完美）。"
+        "完成后简要总结你做了什么。"
+    )
+
+
+def _format_quota_result(raw: dict) -> dict:
+    """
+    把 Claude Code statusLine 原始 JSON 转成前端稳定字段。
+
+    :param raw: statusLine 脚本收到的原始 JSON
+    :return: 额度展示对象
+    """
+    rate_limits = raw.get("rate_limits") if isinstance(raw, dict) else None
+    if not isinstance(rate_limits, dict):
+        return {
+            "ok": False,
+            "message": raw.get("error") if isinstance(raw, dict) else "rate limits unavailable",
+            "five_hour": None,
+            "seven_day": None,
+            "seven_day_sonnet": None,
+            "raw": raw,
+        }
+    five_hour = rate_limits.get("five_hour") if isinstance(rate_limits.get("five_hour"), dict) else None
+    seven_day = rate_limits.get("seven_day") if isinstance(rate_limits.get("seven_day"), dict) else None
+    return {
+        "ok": True,
+        "message": "",
+        "five_hour": five_hour,
+        "seven_day": seven_day,
+        "seven_day_sonnet": None,
+        "raw": raw,
+    }
 
 
 # ============== 账号指纹派生 ==============
@@ -415,67 +627,109 @@ class Runner:
         host_profile = HOST_BENCH_DATA / "profiles" / acc_name
         host_ca = HOST_BENCH_DATA / "ca"
 
-        # --- sidecar：透明代理 + MITM ---
-        # hostname + mac_address 由账号派生,worker 共享其 netns 后出口 MAC 即此值
-        sidecar = self.client.containers.run(
-            SIDECAR_IMAGE,
-            name=sidecar_name,
-            hostname=fp["hostname"],
-            mac_address=fp["mac"],
-            detach=True,
-            auto_remove=False,
-            cap_add=["NET_ADMIN"],
-            devices=["/dev/net/tun:/dev/net/tun"],
-            volumes={
-                str(host_flows): {"bind": "/flows", "mode": "rw"},
-                str(host_ca): {"bind": "/ca", "mode": "rw"},
-            },
-            environment={
-                "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
-                "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
-                "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
-                "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
-            },
-        )
+        sidecar_id: Optional[str] = None
+        worker_id: Optional[str] = None
+        try:
+            # --- sidecar：透明代理 + MITM ---
+            # hostname + mac_address 由账号派生,worker 共享其 netns 后出口 MAC 即此值
+            sidecar = self.client.containers.run(
+                SIDECAR_IMAGE,
+                name=sidecar_name,
+                hostname=fp["hostname"],
+                mac_address=fp["mac"],
+                detach=True,
+                auto_remove=False,
+                cap_add=["NET_ADMIN"],
+                devices=["/dev/net/tun:/dev/net/tun"],
+                volumes={
+                    str(host_flows): {"bind": "/flows", "mode": "rw"},
+                    str(host_ca): {"bind": "/ca", "mode": "rw"},
+                },
+                environment={
+                    "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
+                    "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
+                    "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
+                    "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
+                },
+            )
+            sidecar_id = sidecar.id
 
-        # 等 sidecar 起：mitmdump 启动 + CA 落盘大约 2-4 秒
-        time.sleep(SIDECAR_BOOT_WAIT)
+            # 等 sidecar 起：mitmdump 启动 + CA 落盘大约 2-4 秒
+            time.sleep(SIDECAR_BOOT_WAIT)
 
-        # --- worker：共享 sidecar 网络命名空间 ---
-        # 注意:network_mode=container:xxx 时 Docker 拒绝同时传 hostname,
-        # worker 会自动继承 sidecar 的 hostname —— 这正好是我们想要的语义,
-        # 所以不显式传 hostname,让 sidecar 的 fp["hostname"] 自然生效。
-        # ACC_NAME 注入用于 entrypoint 写 /etc/machine-id;TZ/LANG/LC_ALL 影响
-        # Claude Code 在 system prompt 与 telemetry 里上报的字面值
-        worker = self.client.containers.run(
-            WORKER_IMAGE,
-            name=worker_name,
-            # mem_limit + memswap_limit 同值:走 cgroup,Node 的
-            # constrainedMemory 自动反映此值;同值禁止 swap,Node 撞上限直接
-            # 被 oom-killer 杀(明确失败 > 走 swap 死撑)
-            mem_limit=fp["mem"],
-            memswap_limit=fp["mem"],
-            detach=True,
-            auto_remove=False,
-            network_mode=f"container:{sidecar_name}",
-            volumes={
-                str(host_profile): {"bind": "/mnt/profile", "mode": "rw"},
-                str(host_workspace): {"bind": "/workspace", "mode": "rw"},
-                str(host_claude_home): {"bind": f"{WORKER_HOME}/.claude", "mode": "rw"},
-                str(host_ca): {"bind": "/etc/mitm", "mode": "ro"},
-            },
-            environment={
-                "TASK_PROMPT": task["prompt"],
-                "RUN_ID": run_id,
-                "TIMEOUT_SEC": str(task.get("timeout_sec", 1800)),
-                "ACC_NAME": acc_name,
-                "TZ": fp["tz"],
-                "LANG": fp["lang"],
-                "LC_ALL": fp["lang"],
-            },
-        )
+            # --- worker：共享 sidecar 网络命名空间 ---
+            # 注意:network_mode=container:xxx 时 Docker 拒绝同时传 hostname,
+            # worker 会自动继承 sidecar 的 hostname —— 这正好是我们想要的语义,
+            # 所以不显式传 hostname,让 sidecar 的 fp["hostname"] 自然生效。
+            # ACC_NAME 注入用于 entrypoint 写 /etc/machine-id;TZ/LANG/LC_ALL 影响
+            # Claude Code 在 system prompt 与 telemetry 里上报的字面值
+            worker = self.client.containers.run(
+                WORKER_IMAGE,
+                name=worker_name,
+                # mem_limit + memswap_limit 同值:走 cgroup,Node 的
+                # constrainedMemory 自动反映此值;同值禁止 swap,Node 撞上限直接
+                # 被 oom-killer 杀(明确失败 > 走 swap 死撑)
+                mem_limit=fp["mem"],
+                memswap_limit=fp["mem"],
+                detach=True,
+                auto_remove=False,
+                network_mode=f"container:{sidecar_name}",
+                volumes={
+                    str(host_profile): {"bind": "/mnt/profile", "mode": "rw"},
+                    str(host_workspace): {"bind": "/workspace", "mode": "rw"},
+                    str(host_claude_home): {"bind": f"{WORKER_HOME}/.claude", "mode": "rw"},
+                    str(host_ca): {"bind": "/etc/mitm", "mode": "ro"},
+                },
+                environment={
+                    "TASK_PROMPT": task["prompt"],
+                    "RUN_ID": run_id,
+                    "TIMEOUT_SEC": str(task.get("timeout_sec", 1800)),
+                    "ACC_NAME": acc_name,
+                    "TZ": fp["tz"],
+                    "LANG": fp["lang"],
+                    "LC_ALL": fp["lang"],
+                },
+            )
+            worker_id = worker.id
+            return sidecar_id, worker_id
+        except Exception:
+            # worker 创建失败时 sidecar 已经可能存在；外层拿不到 id，所以这里收口。
+            self.cleanup(sidecar_id, worker_id)
+            raise
 
-        return sidecar.id, worker.id
+    def persist_worker_profile(self, worker_id: Optional[str]) -> None:
+        """
+        在停止容器前尽量把运行时凭据回写 profile。
+
+        :param worker_id: worker 容器 ID
+        :return: None
+        """
+        if not worker_id:
+            return
+        try:
+            api = self.client.api
+            cmd = (
+                "mkdir -p \"$HOME/.claude\"; "
+                "cp \"$HOME/.claude.json\" \"$HOME/.claude/.claude.json\" 2>/dev/null || true; "
+                "if [ -d /mnt/profile ] && [ -w /mnt/profile ]; then "
+                "cp \"$HOME/.claude/.credentials.json\" /mnt/profile/.credentials.json 2>/dev/null || true; "
+                "cp \"$HOME/.claude/settings.json\" /mnt/profile/settings.json 2>/dev/null || true; "
+                "cp \"$HOME/.claude/.claude.json\" /mnt/profile/.claude.json 2>/dev/null || true; "
+                "chown node:node /mnt/profile/.credentials.json /mnt/profile/settings.json /mnt/profile/.claude.json 2>/dev/null || true; "
+                "fi"
+            )
+            ex = api.exec_create(
+                worker_id,
+                ["sh", "-lc", cmd],
+                stdout=True,
+                stderr=True,
+                environment={"HOME": WORKER_HOME},
+                workdir=WORKER_HOME,
+            )
+            api.exec_start(ex["Id"])
+        except Exception:
+            # 容器可能已经退出或被删除；停止路径不应被凭据兜底阻断。
+            pass
 
     def wait_worker(self, worker_id: str) -> int:
         worker = self.client.containers.get(worker_id)
@@ -496,6 +750,240 @@ class Runner:
             except Exception:
                 # 容器可能已经被 remove
                 pass
+
+    def start_continue(self, sid: str, run: dict, account: dict, session_id: str) -> tuple[str, str]:
+        """
+        启动一个继续对话容器。
+
+        :param sid: continue session id
+        :param run: runs 表行
+        :param account: accounts 表行
+        :param session_id: Claude session id
+        :return: (sidecar_id, worker_id)
+        """
+        sidecar_name = f"bench-continue-sidecar-{sid}"
+        worker_name = f"bench-continue-worker-{sid}"
+        acc_name = account["name"]
+        fp = derive_fingerprint(acc_name)
+        CA_DIR.mkdir(parents=True, exist_ok=True)
+        workspace_dir = WORKSPACES_DIR / run["id"]
+        claude_home_dir = workspace_dir / ".claude-home"
+        profile_dir = PROFILES_DIR / acc_name
+        _copy_profile_whitelist_to_claude_home(profile_dir, claude_home_dir)
+        top_config = claude_home_dir / ".claude.json"
+        if top_config.exists():
+            shutil.copy2(top_config, workspace_dir / ".claude.json")
+        _make_worker_owned(workspace_dir)
+
+        host_workspace = HOST_BENCH_DATA / "workspaces" / run["id"]
+        host_claude_home = HOST_BENCH_DATA / "workspaces" / run["id"] / ".claude-home"
+        host_ca = HOST_BENCH_DATA / "ca"
+
+        sidecar_id: Optional[str] = None
+        worker_id: Optional[str] = None
+        try:
+            sidecar = self.client.containers.run(
+                SIDECAR_IMAGE,
+                name=sidecar_name,
+                hostname=fp["hostname"],
+                mac_address=fp["mac"],
+                detach=True,
+                auto_remove=False,
+                cap_add=["NET_ADMIN"],
+                devices=["/dev/net/tun:/dev/net/tun"],
+                volumes={str(host_ca): {"bind": "/ca", "mode": "rw"}},
+                environment={
+                    "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
+                    "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
+                    "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
+                    "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
+                },
+            )
+            sidecar_id = sidecar.id
+            time.sleep(SIDECAR_BOOT_WAIT)
+            worker = self.client.containers.run(
+                WORKER_IMAGE,
+                name=worker_name,
+                mem_limit=fp["mem"],
+                memswap_limit=fp["mem"],
+                detach=True,
+                auto_remove=False,
+                tty=True,
+                stdin_open=True,
+                network_mode=f"container:{sidecar_name}",
+                volumes={
+                    str(host_workspace): {"bind": "/workspace", "mode": "rw"},
+                    str(host_claude_home): {"bind": f"{WORKER_HOME}/.claude", "mode": "rw"},
+                    str(host_ca): {"bind": "/etc/mitm", "mode": "ro"},
+                },
+                environment={
+                    "WORKER_MODE": "login",
+                    "USE_SIDECAR_DNS": "1",
+                    "HOME": WORKER_HOME,
+                    "ACC_NAME": acc_name,
+                    "TZ": fp["tz"],
+                    "LANG": fp["lang"],
+                    "LC_ALL": fp["lang"],
+                    "CONTINUE_SESSION_ID": session_id,
+                },
+            )
+            worker_id = worker.id
+            return sidecar_id, worker_id
+        except Exception:
+            # 继续对话启动失败也要清掉已经起好的半成品容器，避免 run lock 残留。
+            self.cleanup(sidecar_id, worker_id)
+            raise
+
+    def query_quota(self, account: dict) -> dict:
+        """
+        用账号 SOCKS5 启动临时 Claude 容器并读取 statusLine rate_limits。
+
+        :param account: accounts 表行
+        :return: 额度查询结果
+        """
+        if not account.get("upstream_socks5_host"):
+            raise ValueError("account has no upstream socks5 configured")
+        sid = uuid.uuid4().hex[:12]
+        sidecar_name = f"bench-quota-sidecar-{sid}"
+        worker_name = f"bench-quota-worker-{sid}"
+        acc_name = account["name"]
+        fp = derive_fingerprint(acc_name)
+        temp_run_id = f"quota-{sid}"
+        temp_workspace = WORKSPACES_DIR / temp_run_id
+        temp_home = temp_workspace / ".claude-home"
+        temp_workspace.mkdir(parents=True, exist_ok=True)
+        _copy_profile_whitelist_to_claude_home(PROFILES_DIR / acc_name, temp_home)
+        top_config = temp_home / ".claude.json"
+        if top_config.exists():
+            shutil.copy2(top_config, temp_workspace / ".claude.json")
+        _make_worker_owned(temp_workspace)
+        CA_DIR.mkdir(parents=True, exist_ok=True)
+
+        sidecar_id: Optional[str] = None
+        worker_id: Optional[str] = None
+        try:
+            sidecar = self.client.containers.run(
+                SIDECAR_IMAGE,
+                name=sidecar_name,
+                hostname=fp["hostname"],
+                mac_address=fp["mac"],
+                detach=True,
+                auto_remove=False,
+                cap_add=["NET_ADMIN"],
+                devices=["/dev/net/tun:/dev/net/tun"],
+                volumes={str(HOST_BENCH_DATA / "ca"): {"bind": "/ca", "mode": "rw"}},
+                environment={
+                    "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
+                    "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
+                    "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
+                    "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
+                },
+            )
+            sidecar_id = sidecar.id
+            time.sleep(SIDECAR_BOOT_WAIT)
+            worker = self.client.containers.run(
+                WORKER_IMAGE,
+                name=worker_name,
+                mem_limit=fp["mem"],
+                memswap_limit=fp["mem"],
+                detach=True,
+                auto_remove=False,
+                tty=True,
+                stdin_open=True,
+                network_mode=f"container:{sidecar_name}",
+                volumes={
+                    str(HOST_BENCH_DATA / "workspaces" / temp_run_id): {"bind": "/workspace", "mode": "rw"},
+                    str(HOST_BENCH_DATA / "workspaces" / temp_run_id / ".claude-home"): {"bind": f"{WORKER_HOME}/.claude", "mode": "rw"},
+                    str(HOST_BENCH_DATA / "ca"): {"bind": "/etc/mitm", "mode": "ro"},
+                },
+                environment={
+                    "WORKER_MODE": "login",
+                    "USE_SIDECAR_DNS": "1",
+                    "HOME": WORKER_HOME,
+                    "ACC_NAME": acc_name,
+                    "TZ": fp["tz"],
+                    "LANG": fp["lang"],
+                    "LC_ALL": fp["lang"],
+                },
+            )
+            worker_id = worker.id
+            raw = self._exec_quota_probe(worker_id)
+            workspace_top_config = temp_workspace / ".claude.json"
+            if workspace_top_config.exists():
+                shutil.copy2(workspace_top_config, temp_home / ".claude.json")
+            _copy_claude_home_whitelist_to_profile(temp_home, PROFILES_DIR / acc_name)
+            return _format_quota_result(raw)
+        finally:
+            self.cleanup(sidecar_id, worker_id)
+            shutil.rmtree(temp_workspace, ignore_errors=True)
+
+    def _exec_quota_probe(self, worker_id: str) -> dict:
+        """
+        在 quota worker 中运行短 Claude TUI 采集 statusLine JSON。
+
+        :param worker_id: quota worker 容器 ID
+        :return: statusLine 原始 JSON，失败时返回 raw/error
+        """
+        script = r'''
+set -eu
+if [ -f /workspace/.claude.json ] && [ ! -f "$HOME/.claude.json" ]; then
+  cp /workspace/.claude.json "$HOME/.claude.json"
+fi
+STATUS=/workspace/.bench-quota-status.json
+STATUS_SH=/workspace/.bench-quota-status.sh
+cat > "$STATUS_SH" <<'EOF'
+#!/bin/sh
+cat > /workspace/.bench-quota-status.json
+exit 0
+EOF
+chmod +x "$STATUS_SH"
+mkdir -p "$HOME/.claude"
+if [ -f "$HOME/.claude/settings.json" ]; then
+  jq '.statusLine = {"type":"command","command":"/workspace/.bench-quota-status.sh"}' "$HOME/.claude/settings.json" > "$HOME/.claude/settings.json.tmp" && mv "$HOME/.claude/settings.json.tmp" "$HOME/.claude/settings.json"
+else
+  printf '{"statusLine":{"type":"command","command":"/workspace/.bench-quota-status.sh"}}\n' > "$HOME/.claude/settings.json"
+fi
+rm -f "$STATUS"
+tmux new-session -d -s quota -x 160 -y 45
+tmux send-keys -t quota "cd /workspace && env HOME='$HOME' NODE_EXTRA_CA_CERTS=/etc/mitm/mitmproxy-ca-cert.pem SSL_CERT_FILE=/etc/mitm/mitmproxy-ca-cert.pem REQUESTS_CA_BUNDLE=/etc/mitm/mitmproxy-ca-cert.pem CURL_CA_BUNDLE=/etc/mitm/mitmproxy-ca-cert.pem GIT_SSL_CAINFO=/etc/mitm/mitmproxy-ca-cert.pem claude" Enter
+sleep 8
+tmux send-keys -t quota "Reply with ok." Enter
+for i in $(seq 1 45); do
+  if [ -s "$STATUS" ] && grep -q "rate_limits" "$STATUS"; then
+    break
+  fi
+  sleep 1
+done
+tmux capture-pane -t quota -p -S - > /workspace/.bench-quota-transcript.log 2>/dev/null || true
+tmux kill-session -t quota 2>/dev/null || true
+if [ -s "$STATUS" ]; then
+  cat "$STATUS"
+else
+  printf '{"error":"statusLine did not return rate_limits","transcript":'
+  python3 - <<'PY'
+import json
+from pathlib import Path
+print(json.dumps(Path("/workspace/.bench-quota-transcript.log").read_text(errors="ignore")[-4000:]))
+PY
+  printf '}'
+fi
+'''
+        api = self.client.api
+        ex = api.exec_create(
+            worker_id,
+            ["sh", "-lc", script],
+            stdout=True,
+            stderr=True,
+            user=WORKER_USER,
+            environment=_claude_exec_env(True, {"TERM": "xterm-256color"}),
+            workdir=WORKER_HOME,
+        )
+        raw = api.exec_start(ex["Id"])
+        text = raw.decode("utf-8", errors="ignore").strip()
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return {"error": "quota probe returned non-json output", "raw": text}
 
 
 # ============== Login 会话管理 ==============
@@ -520,6 +1008,30 @@ class LoginSession:
         self.created_at = time.time()
         self.socks5 = socks5
         self.committed = False
+
+
+class ContinueSession:
+    """单个 run 继续对话会话：一对 sidecar+worker + 元数据"""
+
+    __slots__ = ("sid", "run_id", "account_id", "sidecar_id", "worker_id",
+                 "session_id", "created_at")
+
+    def __init__(
+        self,
+        sid: str,
+        run_id: str,
+        account_id: int,
+        sidecar_id: str,
+        worker_id: str,
+        session_id: str,
+    ) -> None:
+        self.sid = sid
+        self.run_id = run_id
+        self.account_id = account_id
+        self.sidecar_id = sidecar_id
+        self.worker_id = worker_id
+        self.session_id = session_id
+        self.created_at = time.time()
 
 
 class LoginManager:
@@ -725,12 +1237,120 @@ class LoginManager:
                 del self._name_locks[s.name]
 
 
+class ContinueManager:
+    """管理 runs 的继续对话 PTY 会话"""
+
+    def __init__(self, runner: Runner) -> None:
+        self.runner = runner
+        self.sessions: dict[str, ContinueSession] = {}
+        self._run_locks: dict[str, str] = {}
+        self._lock = threading.Lock()
+
+    def cleanup_stale(self) -> None:
+        """启动时清掉上次残留的 bench-continue-* 容器"""
+        try:
+            for c in self.runner.client.containers.list(
+                all=True, filters={"name": "bench-continue-"}
+            ):
+                try:
+                    c.remove(force=True)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def start(self, run: dict, account: dict) -> ContinueSession:
+        """
+        为一个完成 run 启动继续对话会话。
+
+        :param run: runs 表行
+        :param account: accounts 表行
+        :return: ContinueSession
+        """
+        session_id = _find_latest_claude_session_id(run["id"])
+        if not session_id:
+            raise ValueError(f"run {run['id']} has no Claude session jsonl")
+        with self._lock:
+            if run["id"] in self._run_locks:
+                raise ValueError(f"continue session already active for run {run['id']}")
+            sid = uuid.uuid4().hex[:12]
+            self._run_locks[run["id"]] = sid
+        try:
+            sidecar_id, worker_id = self.runner.start_continue(sid, run, account, session_id)
+            session = ContinueSession(
+                sid, run["id"], int(account["id"]), sidecar_id, worker_id, session_id
+            )
+            with self._lock:
+                self.sessions[sid] = session
+            return session
+        except Exception:
+            with self._lock:
+                self._run_locks.pop(run["id"], None)
+            raise
+
+    def get(self, sid: str) -> Optional[ContinueSession]:
+        """按 sid 返回继续对话会话。"""
+        return self.sessions.get(sid)
+
+    def cleanup(self, sid: str) -> None:
+        """停止并清理继续对话容器，同时尽量回写账号凭据。"""
+        with self._lock:
+            s = self.sessions.pop(sid, None)
+        if not s:
+            return
+        self.runner.persist_worker_profile(s.worker_id)
+        self.runner.cleanup(s.sidecar_id, s.worker_id)
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT name FROM accounts WHERE id=?",
+                (s.account_id,),
+            ).fetchone()
+            if row:
+                _copy_claude_home_whitelist_to_profile(
+                    WORKSPACES_DIR / s.run_id / ".claude-home",
+                    PROFILES_DIR / row["name"],
+                )
+        finally:
+            conn.close()
+        workspace_top_config = WORKSPACES_DIR / s.run_id / ".claude.json"
+        claude_home_top_config = WORKSPACES_DIR / s.run_id / ".claude-home" / ".claude.json"
+        if claude_home_top_config.exists():
+            try:
+                shutil.copy2(claude_home_top_config, workspace_top_config)
+                _make_worker_owned(workspace_top_config)
+            except OSError:
+                pass
+        with self._lock:
+            if self._run_locks.get(s.run_id) == sid:
+                del self._run_locks[s.run_id]
+
+
+def _find_latest_claude_session_id(run_id: str) -> Optional[str]:
+    """
+    从 run workspace 中找到最近的 Claude session jsonl。
+
+    :param run_id: runs.id
+    :return: session id，找不到则 None
+    """
+    base = WORKSPACES_DIR / run_id / ".claude-home" / "projects"
+    if not base.exists():
+        return None
+    files = [p for p in base.rglob("*.jsonl") if p.is_file()]
+    if not files:
+        return None
+    latest = max(files, key=lambda p: p.stat().st_mtime)
+    return latest.stem
+
+
 # ============== 调度器：每账号 Semaphore(2) ==============
 class Scheduler:
     def __init__(self, runner: Runner) -> None:
         self.runner = runner
         self._sems: dict[int, threading.Semaphore] = {}
         self._sems_lock = threading.Lock()
+        self._batch_threads: dict[int, threading.Thread] = {}
+        self._batch_lock = threading.Lock()
 
     def _sem(self, account_id: int) -> threading.Semaphore:
         with self._sems_lock:
@@ -745,12 +1365,226 @@ class Scheduler:
             daemon=True,
         ).start()
 
+    def submit_batch(self, batch_id: int) -> None:
+        """
+        后台启动一个批次调度线程。
+
+        :param batch_id: task_batches.id
+        :return: None
+        """
+        with self._batch_lock:
+            t = self._batch_threads.get(batch_id)
+            if t and t.is_alive():
+                return
+            t = threading.Thread(target=self._execute_batch, args=(batch_id,), daemon=True)
+            self._batch_threads[batch_id] = t
+            t.start()
+
+    def _execute_batch(self, batch_id: int) -> None:
+        conn = get_db()
+        try:
+            batch_row = conn.execute(
+                "SELECT * FROM task_batches WHERE id=? AND deleted_at IS NULL",
+                (batch_id,),
+            ).fetchone()
+            if not batch_row:
+                return
+            account_row = conn.execute(
+                "SELECT * FROM accounts WHERE id=?",
+                (batch_row["account_id"],),
+            ).fetchone()
+            if not account_row:
+                return
+            items = conn.execute(
+                "SELECT bi.*, t.no AS topic_no, t.title, t.description "
+                "FROM task_batch_items bi JOIN topics t ON bi.topic_id=t.id "
+                "WHERE bi.batch_id=? ORDER BY bi.id",
+                (batch_id,),
+            ).fetchall()
+            batch = dict(batch_row)
+            account = dict(account_row)
+        finally:
+            conn.close()
+
+        active_runs: list[str] = []
+        for idx, item_row in enumerate(items):
+            current = self._get_batch_status(batch_id)
+            if current != "active":
+                break
+            # 先投满并发窗口；之后每次等一个 run 收口再按随机间隔投放下一项。
+            if len(active_runs) >= int(batch.get("concurrency") or 2):
+                self._wait_any_run_finished(active_runs)
+            if idx >= int(batch.get("concurrency") or 2):
+                delay = self._random_batch_delay(batch)
+                if delay > 0:
+                    self._set_batch_next_launch(batch_id, time.time() + delay)
+                    time.sleep(delay)
+                    if self._get_batch_status(batch_id) != "active":
+                        break
+            item = dict(item_row)
+            run_id = uuid.uuid4().hex[:12]
+            task_id = self._create_batch_task_and_run(batch, account, item, run_id)
+            task = {
+                "id": task_id,
+                "prompt": item["prompt"],
+                "timeout_sec": batch["timeout_sec"],
+                "batch_id": batch_id,
+                "topic_id": item["topic_id"],
+            }
+            self.submit(run_id, account, task)
+            active_runs.append(run_id)
+
+        self._wait_all_runs_finished(active_runs)
+        self._finish_batch_when_done(batch_id)
+
+    def _create_batch_task_and_run(
+        self, batch: dict, account: dict, item: dict, run_id: str
+    ) -> int:
+        """
+        为批次 item 创建兼容旧 runs 的 task + run。
+
+        :param batch: task_batches 行
+        :param account: accounts 行
+        :param item: task_batch_items 行
+        :param run_id: 新 run id
+        :return: task id
+        """
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    cur = conn.execute(
+                        "INSERT INTO tasks(topic_no, title, prompt, account_id, batch_id, "
+                        "topic_id, timeout_sec, repeat_n) VALUES(?,?,?,?,?,?,?,?)",
+                        (
+                            item["topic_no"],
+                            item["title"],
+                            item["prompt"],
+                            account["id"],
+                            batch["id"],
+                            item["topic_id"],
+                            batch["timeout_sec"],
+                            1,
+                        ),
+                    )
+                    task_id = int(cur.lastrowid)
+                    conn.execute(
+                        "INSERT INTO runs(id, task_id, account_id, batch_id, topic_id, status) "
+                        "VALUES(?,?,?,?,?,?)",
+                        (run_id, task_id, account["id"], batch["id"], item["topic_id"], "queued"),
+                    )
+                    conn.execute(
+                        "UPDATE task_batch_items SET task_id=?, run_id=?, status='queued', "
+                        "updated_at=julianday('now') WHERE id=?",
+                        (task_id, run_id, item["id"]),
+                    )
+                    return task_id
+            finally:
+                conn.close()
+
+    def _get_batch_status(self, batch_id: int) -> str:
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT status FROM task_batches WHERE id=?",
+                (batch_id,),
+            ).fetchone()
+            return row["status"] if row else "deleted"
+        finally:
+            conn.close()
+
+    def _random_batch_delay(self, batch: dict) -> int:
+        low = max(0, int(batch.get("interval_min_sec") or 0))
+        high = max(0, int(batch.get("interval_max_sec") or 0))
+        if high < low:
+            high = low
+        if high <= 0:
+            return 0
+        return random.randint(low, high)
+
+    def _set_batch_next_launch(self, batch_id: int, next_launch_at: float) -> None:
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    conn.execute(
+                        "UPDATE task_batches SET next_launch_at=?, updated_at=julianday('now') WHERE id=?",
+                        (next_launch_at, batch_id),
+                    )
+            finally:
+                conn.close()
+
+    def _finish_batch_when_done(self, batch_id: int) -> None:
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    row = conn.execute(
+                        "SELECT COUNT(*) AS n FROM task_batch_items "
+                        "WHERE batch_id=? AND status IN ('pending','queued','running')",
+                        (batch_id,),
+                    ).fetchone()
+                    status = "done" if row and row["n"] == 0 else "active"
+                    conn.execute(
+                        "UPDATE task_batches SET status=?, next_launch_at=NULL, "
+                        "updated_at=julianday('now') WHERE id=? AND status='active'",
+                        (status, batch_id),
+                    )
+            finally:
+                conn.close()
+
+    def _wait_any_run_finished(self, run_ids: list[str]) -> None:
+        """
+        等待活跃 run 列表里至少一个结束，并原地移除已结束项。
+
+        :param run_ids: 活跃 run id 列表
+        :return: None
+        """
+        while run_ids:
+            statuses = self._get_run_statuses(run_ids)
+            done = [rid for rid in run_ids if statuses.get(rid) in _TERMINAL_RUN_STATUSES]
+            if done:
+                for rid in done:
+                    run_ids.remove(rid)
+                return
+            time.sleep(2)
+
+    def _wait_all_runs_finished(self, run_ids: list[str]) -> None:
+        """
+        等待批次投放出的所有 run 结束。
+
+        :param run_ids: run id 列表
+        :return: None
+        """
+        while run_ids:
+            self._wait_any_run_finished(run_ids)
+
+    def _get_run_statuses(self, run_ids: list[str]) -> dict[str, str]:
+        if not run_ids:
+            return {}
+        placeholders = ",".join("?" for _ in run_ids)
+        conn = get_db()
+        try:
+            rows = conn.execute(
+                f"SELECT id, status FROM runs WHERE id IN ({placeholders})",
+                run_ids,
+            ).fetchall()
+            return {r["id"]: r["status"] for r in rows}
+        finally:
+            conn.close()
+
     def _execute(self, run_id: str, account: dict, task: dict) -> None:
         sem = self._sem(account["id"])
         sem.acquire()
         sid: Optional[str] = None
         wid: Optional[str] = None
         try:
+            initial_state = self._get_run_state(run_id)
+            if not initial_state or initial_state.get("deleted_at") is not None:
+                return
+            if initial_state["status"] in ("stopping", "stopped"):
+                self._update_batch_item_for_run(run_id, "stopped")
+                return
             self._update(
                 run_id,
                 status="running",
@@ -761,17 +1595,32 @@ class Scheduler:
             try:
                 sid, wid = self.runner.start_run(run_id, account, task)
                 self._update(run_id, sidecar_container=sid, worker_container=wid)
+                run_state = self._get_run_state(run_id)
+                if run_state and run_state["status"] in ("stopping", "stopped"):
+                    self.runner.persist_worker_profile(wid)
+                    self.runner.cleanup(sid, wid)
+                    self._update(run_id, status="stopped", ended_at=time.time())
+                    self._update_batch_item_for_run(run_id, "stopped")
+                    return
                 exit_code = self.runner.wait_worker(wid)
-                if exit_code == 0:
+                run_state = self._get_run_state(run_id)
+                if run_state and run_state["status"] in ("stopping", "stopped"):
+                    status = "stopped"
+                elif exit_code == 0:
                     status = "success"
                 elif exit_code == 124:
                     status = "timeout"
                 else:
                     status = "failed"
                 self._update(run_id, status=status, exit_code=exit_code, ended_at=time.time())
+                self._update_batch_item_for_run(run_id, status)
             except Exception as e:
-                self._update(run_id, status="failed", error=str(e), ended_at=time.time())
+                run_state = self._get_run_state(run_id)
+                status = "stopped" if run_state and run_state["status"] in ("stopping", "stopped") else "failed"
+                self._update(run_id, status=status, error=str(e), ended_at=time.time())
+                self._update_batch_item_for_run(run_id, status)
             finally:
+                self.runner.persist_worker_profile(wid)
                 self.runner.cleanup(sid, wid)
         finally:
             sem.release()
@@ -789,16 +1638,41 @@ class Scheduler:
             finally:
                 conn.close()
 
+    def _get_run_state(self, run_id: str) -> Optional[dict]:
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT status, deleted_at FROM runs WHERE id=?",
+                (run_id,),
+            ).fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()
+
+    def _update_batch_item_for_run(self, run_id: str, status: str) -> None:
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    conn.execute(
+                        "UPDATE task_batch_items SET status=?, updated_at=julianday('now') "
+                        "WHERE run_id=?",
+                        (status, run_id),
+                    )
+            finally:
+                conn.close()
+
 
 # ============== FastAPI ==============
 runner: Optional[Runner] = None
 scheduler: Optional[Scheduler] = None
 login_manager: Optional[LoginManager] = None
+continue_manager: Optional[ContinueManager] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global runner, scheduler, login_manager
+    global runner, scheduler, login_manager, continue_manager
     init_db()
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     FLOWS_DIR.mkdir(parents=True, exist_ok=True)
@@ -807,8 +1681,10 @@ async def lifespan(app: FastAPI):
     runner = Runner()
     scheduler = Scheduler(runner)
     login_manager = LoginManager(runner.client)
+    continue_manager = ContinueManager(runner)
     # 清掉上次进程残留的 login 容器，避免重启后僵尸容器堆积
     login_manager.cleanup_stale()
+    continue_manager.cleanup_stale()
     yield
 
 
@@ -999,6 +1875,27 @@ def delete_account(aid: int):
         finally:
             conn.close()
     return {"ok": True}
+
+
+@app.post("/api/accounts/{aid}/quota")
+def query_account_quota(aid: int):
+    """按账号 SOCKS5 查询 Claude Code 额度。"""
+    if not runner:
+        raise HTTPException(500, "runner not ready")
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT * FROM accounts WHERE id=?", (aid,)).fetchone()
+        if not row:
+            raise HTTPException(404, "account not found")
+        account = dict(row)
+    finally:
+        conn.close()
+    try:
+        return runner.query_quota(account)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"quota query failed: {e}")
 
 
 # ---------- accounts: 内嵌 OAuth 登录（WebUI 用） ----------
@@ -1278,9 +2175,90 @@ def login_cancel(sid: str):
 
 
 # ---------- topics ----------
+class TopicIn(BaseModel):
+    """创建或更新 topic 的请求体"""
+
+    no: int
+    title: str
+    description: str = ""
+    category: str = ""
+    enabled: bool = True
+
+
 @app.get("/api/topics")
 def list_topics():
-    return load_topics()
+    """列出未删除 topic。"""
+    return list_topic_rows()
+
+
+@app.post("/api/topics")
+def create_topic(body: TopicIn):
+    """新增一个 topic，持久化到 SQLite。"""
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                cur = conn.execute(
+                    "INSERT INTO topics(no, title, description, category, enabled) "
+                    "VALUES(?,?,?,?,?)",
+                    (
+                        body.no,
+                        body.title.strip(),
+                        body.description.strip(),
+                        body.category.strip(),
+                        int(body.enabled),
+                    ),
+                )
+                return {"id": cur.lastrowid}
+        except sqlite3.IntegrityError as e:
+            raise HTTPException(400, f"topic exists: {e}")
+        finally:
+            conn.close()
+
+
+@app.put("/api/topics/{topic_id}")
+def update_topic(topic_id: int, body: TopicIn):
+    """更新 topic 基本信息。"""
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                cur = conn.execute(
+                    "UPDATE topics SET no=?, title=?, description=?, category=?, enabled=?, "
+                    "updated_at=julianday('now') WHERE id=? AND deleted_at IS NULL",
+                    (
+                        body.no,
+                        body.title.strip(),
+                        body.description.strip(),
+                        body.category.strip(),
+                        int(body.enabled),
+                        topic_id,
+                    ),
+                )
+                if cur.rowcount == 0:
+                    raise HTTPException(404, "topic not found")
+        finally:
+            conn.close()
+    return {"ok": True}
+
+
+@app.delete("/api/topics/{topic_id}")
+def delete_topic(topic_id: int):
+    """软删除 topic，保留历史 task/run 引用。"""
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                cur = conn.execute(
+                    "UPDATE topics SET deleted_at=?, enabled=0, updated_at=julianday('now') "
+                    "WHERE id=? AND deleted_at IS NULL",
+                    (time.time(), topic_id),
+                )
+                if cur.rowcount == 0:
+                    raise HTTPException(404, "topic not found")
+        finally:
+            conn.close()
+    return {"ok": True}
 
 
 # ---------- tasks ----------
@@ -1292,24 +2270,48 @@ class TaskIn(BaseModel):
     repeat_n: int = 1
 
 
+class BatchIn(BaseModel):
+    """按账号批量调度 topic 的请求体"""
+
+    account_id: int
+    topic_ids: list[int]
+    prompt: Optional[str] = None
+    concurrency: int = 2
+    interval_min_sec: int = 0
+    interval_max_sec: int = 0
+    timeout_sec: int = 1800
+
+
 @app.post("/api/tasks")
 def create_task(body: TaskIn):
-    topic = next((t for t in load_topics() if t["no"] == body.topic_no), None)
-    if not topic:
-        raise HTTPException(404, f"topic {body.topic_no} not found")
-    prompt = body.prompt or (
-        f"{topic['title']}：{topic['description']}\n\n"
-        "请在当前目录下从 0 到 1 实现一个 MVP（功能跑通即可，先不追求架构完美）。"
-        "完成后简要总结你做了什么。"
-    )
+    conn = get_db()
+    try:
+        topic_row = conn.execute(
+            "SELECT * FROM topics WHERE no=? AND deleted_at IS NULL",
+            (body.topic_no,),
+        ).fetchone()
+        if not topic_row:
+            raise HTTPException(404, f"topic {body.topic_no} not found")
+        topic = dict(topic_row)
+    finally:
+        conn.close()
+    prompt = body.prompt or build_topic_prompt(topic)
     with _db_lock:
         conn = get_db()
         try:
             with conn:
                 cur = conn.execute(
-                    "INSERT INTO tasks(topic_no, title, prompt, account_id, timeout_sec, repeat_n) "
-                    "VALUES(?,?,?,?,?,?)",
-                    (body.topic_no, topic["title"], prompt, body.account_id, body.timeout_sec, body.repeat_n),
+                    "INSERT INTO tasks(topic_no, title, prompt, account_id, topic_id, timeout_sec, repeat_n) "
+                    "VALUES(?,?,?,?,?,?,?)",
+                    (
+                        body.topic_no,
+                        topic["title"],
+                        prompt,
+                        body.account_id,
+                        topic["id"],
+                        body.timeout_sec,
+                        body.repeat_n,
+                    ),
                 )
                 return {"id": cur.lastrowid}
         finally:
@@ -1320,10 +2322,126 @@ def create_task(body: TaskIn):
 def list_tasks():
     conn = get_db()
     try:
-        rows = conn.execute("SELECT * FROM tasks ORDER BY id DESC").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM tasks WHERE deleted_at IS NULL ORDER BY id DESC"
+        ).fetchall()
         return [dict(r) for r in rows]
     finally:
         conn.close()
+
+
+@app.delete("/api/tasks/{tid}")
+def delete_task(tid: int):
+    """软删除旧 task 定义，历史 runs 保留。"""
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                cur = conn.execute(
+                    "UPDATE tasks SET deleted_at=?, status='deleted' WHERE id=? AND deleted_at IS NULL",
+                    (time.time(), tid),
+                )
+                if cur.rowcount == 0:
+                    raise HTTPException(404, "task not found")
+        finally:
+            conn.close()
+    return {"ok": True}
+
+
+@app.post("/api/task-batches")
+def create_task_batch(body: BatchIn):
+    """创建账号维度 topic 批次，并启动后台随机间隔调度。"""
+    if not scheduler:
+        raise HTTPException(500, "scheduler not ready")
+    topic_ids = [int(tid) for tid in body.topic_ids if int(tid) > 0]
+    if not topic_ids:
+        raise HTTPException(400, "topic_ids required")
+    concurrency = max(1, min(2, int(body.concurrency or 2)))
+    interval_min = max(0, int(body.interval_min_sec or 0))
+    interval_max = max(0, int(body.interval_max_sec or 0))
+    if interval_max < interval_min:
+        raise HTTPException(400, "interval_max_sec must be >= interval_min_sec")
+    conn = get_db()
+    try:
+        account = conn.execute(
+            "SELECT * FROM accounts WHERE id=?",
+            (body.account_id,),
+        ).fetchone()
+        if not account:
+            raise HTTPException(404, "account not found")
+        placeholders = ",".join("?" for _ in topic_ids)
+        topics = conn.execute(
+            f"SELECT * FROM topics WHERE id IN ({placeholders}) AND deleted_at IS NULL",
+            topic_ids,
+        ).fetchall()
+        if len(topics) != len(set(topic_ids)):
+            raise HTTPException(404, "one or more topics not found")
+    finally:
+        conn.close()
+    name = f"batch acc#{body.account_id} · {len(topic_ids)} topics"
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                cur = conn.execute(
+                    "INSERT INTO task_batches(account_id, name, concurrency, interval_min_sec, "
+                    "interval_max_sec, timeout_sec) VALUES(?,?,?,?,?,?)",
+                    (
+                        body.account_id,
+                        name,
+                        concurrency,
+                        interval_min,
+                        interval_max,
+                        max(60, int(body.timeout_sec or 1800)),
+                    ),
+                )
+                batch_id = int(cur.lastrowid)
+                for topic_row in topics:
+                    topic = dict(topic_row)
+                    prompt = body.prompt or build_topic_prompt(topic)
+                    conn.execute(
+                        "INSERT INTO task_batch_items(batch_id, topic_id, prompt) VALUES(?,?,?)",
+                        (batch_id, topic["id"], prompt),
+                    )
+        finally:
+            conn.close()
+    scheduler.submit_batch(batch_id)
+    return {"id": batch_id}
+
+
+@app.get("/api/task-batches")
+def list_task_batches():
+    """列出未删除批次及其 item 统计。"""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT b.*, "
+            "(SELECT COUNT(*) FROM task_batch_items i WHERE i.batch_id=b.id) AS item_count, "
+            "(SELECT COUNT(*) FROM task_batch_items i WHERE i.batch_id=b.id AND i.status IN ('success','failed','timeout','stopped')) AS done_count "
+            "FROM task_batches b WHERE b.deleted_at IS NULL ORDER BY b.id DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+@app.delete("/api/task-batches/{batch_id}")
+def delete_task_batch(batch_id: int):
+    """软删除批次；已产生的 run 和磁盘产物保留。"""
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                cur = conn.execute(
+                    "UPDATE task_batches SET deleted_at=?, status='deleted', "
+                    "updated_at=julianday('now') WHERE id=? AND deleted_at IS NULL",
+                    (time.time(), batch_id),
+                )
+                if cur.rowcount == 0:
+                    raise HTTPException(404, "batch not found")
+        finally:
+            conn.close()
+    return {"ok": True}
 
 
 # ---------- runs ----------
@@ -1331,7 +2449,10 @@ def list_tasks():
 def run_task(tid: int):
     conn = get_db()
     try:
-        task_row = conn.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+        task_row = conn.execute(
+            "SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL",
+            (tid,),
+        ).fetchone()
         if not task_row:
             raise HTTPException(404, "task not found")
         task = dict(task_row)
@@ -1350,12 +2471,21 @@ def run_task(tid: int):
             try:
                 with conn:
                     conn.execute(
-                        "INSERT INTO runs(id, task_id, account_id, status) VALUES(?,?,?,?)",
-                        (rid, tid, account["id"], "queued"),
+                        "INSERT INTO runs(id, task_id, account_id, batch_id, topic_id, status) "
+                        "VALUES(?,?,?,?,?,?)",
+                        (
+                            rid,
+                            tid,
+                            account["id"],
+                            task.get("batch_id"),
+                            task.get("topic_id"),
+                            "queued",
+                        ),
                     )
             finally:
                 conn.close()
-        assert scheduler is not None
+        if not scheduler:
+            raise HTTPException(500, "scheduler not ready")
         scheduler.submit(rid, account, task)
         run_ids.append(rid)
     return {"run_ids": run_ids}
@@ -1366,7 +2496,8 @@ def list_runs(limit: int = 200):
     conn = get_db()
     try:
         rows = conn.execute(
-            "SELECT * FROM runs ORDER BY (started_at IS NULL), started_at DESC, created_at DESC LIMIT ?",
+            "SELECT * FROM runs WHERE deleted_at IS NULL "
+            "ORDER BY (started_at IS NULL), started_at DESC, created_at DESC LIMIT ?",
             (limit,),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -1378,7 +2509,10 @@ def list_runs(limit: int = 200):
 def get_run(rid: str):
     conn = get_db()
     try:
-        row = conn.execute("SELECT * FROM runs WHERE id=?", (rid,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM runs WHERE id=? AND deleted_at IS NULL",
+            (rid,),
+        ).fetchone()
         if not row:
             raise HTTPException(404)
         return dict(row)
@@ -1388,6 +2522,7 @@ def get_run(rid: str):
 
 @app.get("/api/runs/{rid}/transcript")
 def get_transcript(rid: str):
+    _require_visible_run(rid)
     p = WORKSPACES_DIR / rid / ".bench-transcript.log"
     if not p.exists():
         raise HTTPException(404, "transcript not yet available")
@@ -1396,6 +2531,7 @@ def get_transcript(rid: str):
 
 @app.get("/api/runs/{rid}/files")
 def list_workspace(rid: str):
+    _require_visible_run(rid)
     base = WORKSPACES_DIR / rid
     if not base.exists():
         raise HTTPException(404)
@@ -1414,12 +2550,16 @@ def list_workspace(rid: str):
 @app.get("/api/runs/{rid}/stats")
 def get_stats(rid: str):
     """从 sidecar 写的 stats.jsonl 聚合 token / 状态码"""
+    _require_visible_run(rid)
     base = FLOWS_DIR
     # flows 目录按 account/task/run 分层，扫描所有匹配
     matches = list(base.rglob(f"{rid}/stats.jsonl"))
     if not matches:
         return {"tokens_in": 0, "tokens_out": 0, "requests": 0, "errors": 0}
-    tokens_in = tokens_out = requests = errors = 0
+    tokens_in = tokens_out = errors = 0
+    request_ids: set[str] = set()
+    response_ids: set[str] = set()
+    fallback_requests = 0
     for f in matches:
         for line in f.read_text(encoding="utf-8", errors="ignore").splitlines():
             try:
@@ -1429,15 +2569,285 @@ def get_stats(rid: str):
             if "error" in rec:
                 errors += 1
                 continue
-            requests += 1
+            if rec.get("phase") == "request":
+                flow_id = rec.get("flow_id")
+                if flow_id:
+                    request_ids.add(str(flow_id))
+                else:
+                    fallback_requests += 1
+                continue
+            if rec.get("phase") and rec.get("phase") != "response":
+                continue
+            flow_id = rec.get("flow_id")
+            if flow_id:
+                response_ids.add(str(flow_id))
+            else:
+                fallback_requests += 1
             u = rec.get("usage") or {}
             tokens_in += int(u.get("input_tokens") or 0)
             tokens_out += int(u.get("output_tokens") or 0)
+    requests = len(request_ids | response_ids) + fallback_requests
     return {"tokens_in": tokens_in, "tokens_out": tokens_out, "requests": requests, "errors": errors}
 
 
+@app.post("/api/runs/{rid}/stop")
+def stop_run(rid: str):
+    """请求停止 queued/running run，并尽量先回写运行时凭据。"""
+    if not runner:
+        raise HTTPException(500, "runner not ready")
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT * FROM runs WHERE id=? AND deleted_at IS NULL",
+            (rid,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "run not found")
+        run = dict(row)
+    finally:
+        conn.close()
+    if run["status"] not in ("queued", "running"):
+        raise HTTPException(400, f"run {rid} is not queued/running")
+    runner.persist_worker_profile(run.get("worker_container"))
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "UPDATE runs SET status='stopping', stop_requested_at=? WHERE id=?",
+                    (time.time(), rid),
+                )
+        finally:
+            conn.close()
+    runner.cleanup(run.get("sidecar_container"), run.get("worker_container"))
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                row = conn.execute("SELECT status FROM runs WHERE id=?", (rid,)).fetchone()
+                if row and row["status"] == "stopping":
+                    conn.execute(
+                        "UPDATE runs SET status='stopped', ended_at=? WHERE id=?",
+                        (time.time(), rid),
+                    )
+        finally:
+            conn.close()
+    return {"ok": True}
+
+
+@app.delete("/api/runs/{rid}")
+def delete_run(rid: str):
+    """软删除 run；workspace/flow/transcript 保留。"""
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                cur = conn.execute(
+                    "UPDATE runs SET deleted_at=? WHERE id=? AND deleted_at IS NULL",
+                    (time.time(), rid),
+                )
+                if cur.rowcount == 0:
+                    raise HTTPException(404, "run not found")
+        finally:
+            conn.close()
+    return {"ok": True}
+
+
+@app.post("/api/runs/{rid}/continue/start")
+def continue_run_start(rid: str):
+    """启动 run 继续对话会话；前端随后连接返回的 WebSocket。"""
+    if not continue_manager:
+        raise HTTPException(500, "continue manager not ready")
+    conn = get_db()
+    try:
+        run_row = conn.execute(
+            "SELECT * FROM runs WHERE id=? AND deleted_at IS NULL",
+            (rid,),
+        ).fetchone()
+        if not run_row:
+            raise HTTPException(404, "run not found")
+        run = dict(run_row)
+        if run["status"] not in _TERMINAL_RUN_STATUSES:
+            raise HTTPException(400, f"run {rid} is not completed")
+        account_row = conn.execute(
+            "SELECT * FROM accounts WHERE id=?",
+            (run["account_id"],),
+        ).fetchone()
+        if not account_row:
+            raise HTTPException(404, "account not found")
+        account = dict(account_row)
+    finally:
+        conn.close()
+    try:
+        session = continue_manager.start(run, account)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"failed to start continue session: {e}")
+    return {
+        "session_id": session.sid,
+        "run_id": session.run_id,
+        "claude_session_id": session.session_id,
+        "ws_path": f"/api/run-continue/ws/{session.sid}",
+    }
+
+
+@app.websocket("/api/run-continue/ws/{sid}")
+async def continue_run_ws(websocket: WebSocket, sid: str):
+    """PTY 桥：把 `claude --resume <session>` 双向接到浏览器 xterm。"""
+    await websocket.accept()
+    if not continue_manager:
+        await websocket.close(code=4500)
+        return
+    session = continue_manager.get(sid)
+    if not session:
+        await websocket.send_text(json.dumps(
+            {"type": "error", "msg": "session not found"}))
+        await websocket.close(code=4004)
+        return
+
+    api = continue_manager.runner.client.api
+    try:
+        exec_id = api.exec_create(
+            session.worker_id,
+            [
+                "sh",
+                "-lc",
+                "if [ -f /workspace/.claude.json ] && [ ! -f \"$HOME/.claude.json\" ]; then "
+                "cp /workspace/.claude.json \"$HOME/.claude.json\"; fi; "
+                "claude --resume \"$CONTINUE_SESSION_ID\"",
+            ],
+            stdin=True,
+            tty=True,
+            user=WORKER_USER,
+            environment=_claude_exec_env(True, {
+                "TERM": "xterm-256color",
+                "COLUMNS": "120",
+                "LINES": "36",
+                "CONTINUE_SESSION_ID": session.session_id,
+            }),
+            workdir="/workspace",
+        )["Id"]
+        sock = api.exec_start(
+            exec_id, detach=False, tty=True,
+            stream=False, socket=True, demux=False,
+        )
+    except Exception as e:
+        await websocket.send_text(json.dumps(
+            {"type": "error", "msg": f"exec failed: {e}"}))
+        await websocket.close(code=4500)
+        continue_manager.cleanup(sid)
+        return
+
+    raw = getattr(sock, "_sock", None) or sock
+    try:
+        raw.setblocking(False)
+    except Exception:
+        pass
+
+    loop = asyncio.get_event_loop()
+    closed = asyncio.Event()
+
+    async def pump_container_to_ws():
+        """worker PTY → ws"""
+        try:
+            while not closed.is_set():
+                try:
+                    data = await asyncio.wait_for(
+                        loop.sock_recv(raw, 4096), timeout=1.0
+                    )
+                except asyncio.TimeoutError:
+                    continue
+                if not data:
+                    break
+                if websocket.client_state != WebSocketState.CONNECTED:
+                    break
+                await websocket.send_bytes(data)
+        except Exception:
+            pass
+        finally:
+            closed.set()
+
+    async def pump_ws_to_container():
+        """ws → worker PTY"""
+        try:
+            while not closed.is_set():
+                msg = await websocket.receive()
+                if msg["type"] == "websocket.disconnect":
+                    break
+                if msg.get("bytes"):
+                    raw.send(msg["bytes"])
+                    continue
+                txt = msg.get("text")
+                if not txt:
+                    continue
+                try:
+                    ev = json.loads(txt)
+                except json.JSONDecodeError:
+                    raw.send(txt.encode())
+                    continue
+                if ev.get("type") == "resize":
+                    try:
+                        api.exec_resize(
+                            exec_id,
+                            height=int(ev.get("rows") or 36),
+                            width=int(ev.get("cols") or 120),
+                        )
+                    except Exception:
+                        pass
+                elif ev.get("type") == "input":
+                    raw.send((ev.get("data") or "").encode())
+        except WebSocketDisconnect:
+            pass
+        except Exception:
+            pass
+        finally:
+            closed.set()
+
+    try:
+        await asyncio.gather(pump_container_to_ws(), pump_ws_to_container())
+    finally:
+        try:
+            raw.close()
+        except Exception:
+            pass
+        continue_manager.cleanup(sid)
+        if websocket.client_state == WebSocketState.CONNECTED:
+            try:
+                await websocket.close()
+            except Exception:
+                pass
+
+
+@app.delete("/api/run-continue/{sid}")
+def continue_run_cancel(sid: str):
+    """关闭继续对话 session，并回写可能刷新的凭据。"""
+    if continue_manager:
+        continue_manager.cleanup(sid)
+    return {"ok": True}
+
+
+def _require_visible_run(rid: str) -> None:
+    """
+    确保 run 未被软删。
+
+    :param rid: runs.id
+    :return: None
+    """
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT id FROM runs WHERE id=? AND deleted_at IS NULL",
+            (rid,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "run not found")
+    finally:
+        conn.close()
+
+
 # ---------- SSE：推送 runs 列表 ----------
-@app.get("/api/runs/stream")
+@app.get("/api/runs-stream")
 async def stream_runs():
     async def gen():
         last_payload = ""
@@ -1445,7 +2855,8 @@ async def stream_runs():
             conn = get_db()
             try:
                 rows = conn.execute(
-                    "SELECT * FROM runs ORDER BY (started_at IS NULL), started_at DESC, created_at DESC LIMIT 100"
+                    "SELECT * FROM runs WHERE deleted_at IS NULL "
+                    "ORDER BY (started_at IS NULL), started_at DESC, created_at DESC LIMIT 100"
                 ).fetchall()
             finally:
                 conn.close()

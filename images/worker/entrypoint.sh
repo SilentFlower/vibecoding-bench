@@ -2,7 +2,7 @@
 # =======================================================================
 # Worker 入口脚本
 # 模式：
-#   WORKER_MODE=task  （默认）跑题：注入 prompt → 等 Stop hook → 抓 transcript
+#   WORKER_MODE=task  （默认）跑题：注入 prompt → 等最终 assistant 回复 → 抓 transcript
 #   WORKER_MODE=login OAuth 引导：装 CA 后空转，等 orchestrator 用
 #                     docker exec 启动 `claude auth login` 走 PTY 桥到 WebUI
 # 必备环境变量（task 模式）：
@@ -18,7 +18,7 @@
 #     /home/node/.claude 直接挂宿主 data/profiles/<name>/（rw）
 #     /etc/mitm     同上
 # 退出码（task 模式）：
-#   0    Stop hook 正常触发
+#   0    Claude session JSONL 以稳定的最终 assistant 文本结束
 #   124  达到 TIMEOUT_SEC 超时
 #   其它 启动失败
 # =======================================================================
@@ -164,10 +164,13 @@ check_claude_auth_status() {
 }
 
 persist_runtime_claude_state() {
-  # task 模式里 Claude 跑在 $HOME 的运行时副本中；这里只把会影响下次启动的
-  # 两个配置文件写回 profile，避免 telemetry/sessions/backups 被并发 run 污染。
+  # task 模式里 Claude 跑在 $HOME 的运行时副本中；这里只按白名单回写会影响
+  # 下次启动/认证的文件，避免 sessions/telemetry/backups 被并发 run 污染。
   if [ ! -d /mnt/profile ] || [ ! -w /mnt/profile ]; then
     return 0
+  fi
+  if [ -f "$CLAUDE_DIR/.credentials.json" ]; then
+    cp "$CLAUDE_DIR/.credentials.json" /mnt/profile/.credentials.json || true
   fi
   if [ -f "$CLAUDE_HOME/.claude.json" ]; then
     patch_top_config_gates
@@ -176,7 +179,125 @@ persist_runtime_claude_state() {
   if [ -f "$CLAUDE_DIR/settings.json" ]; then
     cp "$CLAUDE_DIR/settings.json" /mnt/profile/settings.json || true
   fi
-  chown "$CLAUDE_USER:$CLAUDE_USER" /mnt/profile/.claude.json /mnt/profile/settings.json 2>/dev/null || true
+  chown "$CLAUDE_USER:$CLAUDE_USER" \
+    /mnt/profile/.credentials.json \
+    /mnt/profile/.claude.json \
+    /mnt/profile/settings.json 2>/dev/null || true
+}
+
+_CLEANUP_TASK_MODE_DONE=0
+cleanup_task_mode() {
+  # 成功、失败、timeout、SIGTERM 都会走这里；Claude 刚好刷新 token 时也尽量落回账号 profile。
+  if [ "$_CLEANUP_TASK_MODE_DONE" = "1" ]; then
+    return 0
+  fi
+  _CLEANUP_TASK_MODE_DONE=1
+  if [ "$WORKER_MODE" = "task" ]; then
+    persist_runtime_claude_state || true
+  fi
+}
+
+terminate_task_mode() {
+  local code="$1"
+  cleanup_task_mode || true
+  exit "$code"
+}
+
+check_claude_completion() {
+  # Stop hook 只能说明 Claude 结束了一次回合；真正成功必须看 session JSONL
+  # 最后一条对话消息是否为稳定的纯文本 assistant 回复，不能停在 tool_use/tool_result。
+  local idle_sec="$1"
+  python3 - "$CLAUDE_DIR/projects/-workspace" "$idle_sec" <<'PY'
+import json
+import sys
+import time
+from pathlib import Path
+
+project_dir = Path(sys.argv[1])
+idle_sec = float(sys.argv[2])
+
+
+def message_role(entry):
+    message = entry.get("message")
+    if isinstance(message, dict):
+        return message.get("role")
+    return entry.get("role")
+
+
+def message_stop_reason(entry):
+    message = entry.get("message")
+    if isinstance(message, dict):
+        return message.get("stop_reason")
+    return entry.get("stop_reason")
+
+
+def message_content(entry):
+    message = entry.get("message")
+    if isinstance(message, dict):
+        return message.get("content")
+    return entry.get("content")
+
+
+def content_text(content):
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "text":
+                parts.append(str(item.get("text") or ""))
+        return "\n".join(parts)
+    return ""
+
+
+def content_has_tool_use(content):
+    if not isinstance(content, list):
+        return False
+    return any(isinstance(item, dict) and item.get("type") == "tool_use" for item in content)
+
+
+jsonl_files = sorted(project_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+if not jsonl_files:
+    sys.exit(1)
+
+latest_entry = None
+latest_path = jsonl_files[0]
+latest_stat = latest_path.stat()
+if time.time() - latest_stat.st_mtime < idle_sec:
+    sys.exit(1)
+
+with latest_path.open("r", encoding="utf-8", errors="replace") as handle:
+    for line in handle:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if message_role(entry) in {"assistant", "user"}:
+            latest_entry = entry
+
+if not latest_entry:
+    sys.exit(1)
+
+role = message_role(latest_entry)
+content = message_content(latest_entry)
+text = content_text(content)
+stop_reason = message_stop_reason(latest_entry)
+
+if role != "assistant":
+    sys.exit(1)
+if content_has_tool_use(content):
+    sys.exit(1)
+if stop_reason == "tool_use":
+    sys.exit(1)
+lines = [line.strip() for line in text.splitlines() if line.strip()]
+if not lines:
+    sys.exit(1)
+
+print("complete")
+PY
 }
 
 # ---------- 0) /etc/machine-id 按账号名 hash 写入 ----------
@@ -242,6 +363,9 @@ fi
 : "${TASK_PROMPT:?TASK_PROMPT required in task mode}"
 : "${RUN_ID:?RUN_ID required in task mode}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-1800}"
+trap cleanup_task_mode EXIT
+trap 'terminate_task_mode 143' TERM
+trap 'terminate_task_mode 130' INT
 
 # ---------- 2) 复制账号 profile 到 node HOME + 还原顶层 .claude.json ----------
 # claude 启动时读两份配置:
@@ -281,6 +405,8 @@ write_default_settings
 # Stop hook 放到当前 workspace 的 project-local settings。
 # 官方 user-local 路径不是 ~/.claude/settings.local.json；放错位置会导致 hook
 # 不加载，worker 只能等 timeout。workspace 是每个 run 独立目录，不污染 profile。
+# hook 只作为“Claude 停过一轮”的观测信号，成功仍由 JSONL 最新对话消息判断，
+# 避免工具调用中间态被误判为 success。
 mkdir -p /workspace/.claude
 cat > /workspace/.claude/settings.local.json <<'EOF'
 {
@@ -289,7 +415,7 @@ cat > /workspace/.claude/settings.local.json <<'EOF'
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "touch /tmp/claude-done" }
+          { "type": "command", "command": "date +%s >> /tmp/claude-stop-seen" }
         ]
       }
     ]
@@ -297,7 +423,7 @@ cat > /workspace/.claude/settings.local.json <<'EOF'
 }
 EOF
 chown -R "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME" /workspace || true
-rm -f /tmp/claude-done
+rm -f /tmp/claude-done /tmp/claude-stop-seen
 rm -f /tmp/claude-exited /tmp/claude-exit-code
 
 # ---------- 4) 启动 tmux + claude (node 用户 + bypassPermissions) ----------
@@ -357,10 +483,21 @@ elif [ ! -f /tmp/claude-exited ]; then
   exit 1
 fi
 
-# ---------- 6) 等 Stop hook 触发 / 超时 ----------
-log "Waiting for Stop hook or timeout (${TIMEOUT_SEC}s)"
+# ---------- 6) 等最终 assistant 回复 / Claude 退出 / 超时 ----------
+COMPLETION_IDLE_SEC="${COMPLETION_IDLE_SEC:-10}"
+log "Waiting for final assistant message or timeout (${TIMEOUT_SEC}s)"
 deadline=$(( $(date +%s) + TIMEOUT_SEC ))
-while [ ! -f /tmp/claude-done ] && [ ! -f /tmp/claude-exited ] && [ "$(date +%s)" -lt "$deadline" ]; do
+while [ "$(date +%s)" -lt "$deadline" ]; do
+  if check_claude_completion "$COMPLETION_IDLE_SEC" >/dev/null 2>&1; then
+    touch /tmp/claude-done
+    break
+  fi
+  if [ -f /tmp/claude-exited ]; then
+    if check_claude_completion 0 >/dev/null 2>&1; then
+      touch /tmp/claude-done
+    fi
+    break
+  fi
   sleep 2
 done
 
@@ -368,15 +505,23 @@ done
 tmux capture-pane -t "$SESSION" -p -S - > /workspace/.bench-transcript.log 2>/dev/null || true
 persist_runtime_claude_state
 tmux kill-session -t "$SESSION" 2>/dev/null || true
+if [ ! -f /tmp/claude-done ] && check_claude_completion 0 >/dev/null 2>&1; then
+  touch /tmp/claude-done
+fi
 
 if [ -f /tmp/claude-done ]; then
-  log "Claude finished normally"
+  log "Claude finished with final assistant message"
   exit 0
 elif [ -f /tmp/claude-exited ]; then
   code=$(cat /tmp/claude-exit-code 2>/dev/null || echo 1)
-  log "Claude exited early with code ${code}"
-  exit "$code"
+  if [ "$code" = "0" ]; then
+    log "Claude exited without final assistant message"
+    exit 1
+  else
+    log "Claude exited early with code ${code}"
+    exit "$code"
+  fi
 else
-  log "Timeout after ${TIMEOUT_SEC}s"
+  log "Timeout after ${TIMEOUT_SEC}s without final assistant message"
   exit 124
 fi
