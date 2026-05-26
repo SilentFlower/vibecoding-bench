@@ -161,6 +161,8 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
 
 **Bad**:为了解决完成判定,把 `BENCH_DONE:<RUN_ID>` 之类的 bench sentinel 拼进题目 prompt。这样会污染被测任务的自然输出。
 
+**Bad**:refresh endpoint 返回 `invalid_grant` 或持续 `429` 时继续重试,或直接删除真实账号 profile 里的 `.credentials.json` 再让用户重登。`invalid_grant` 表示 refresh token 已被服务端废弃,没有新 access token 可回写,必须走账号"重授权"。重授权应使用一次性 login profile 副本并移除副本里的 `.credentials.json`,迫使 `claude auth login` 进入 OAuth 流程;用户取消时真实 profile 不变,commit 成功后只把 `.credentials.json` / `settings.json` / `.claude.json` 白名单覆盖回真实 profile。
+
 ### 6. Tests Required
 
 - `bash -n images/worker/entrypoint.sh`
