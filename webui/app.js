@@ -607,22 +607,31 @@ async function renderTasks() {
       <td>${b.done_count || 0}/${b.item_count || 0}</td>
       <td>${b.concurrency}</td>
       <td>${b.interval_min_sec}-${b.interval_max_sec}s</td>
-      <td>
-        ${b.status === 'active' ? `<button class="btn btn-sm btn-danger" data-stop-batch="${b.id}">停止</button>` : ''}
-        <button class="btn btn-sm btn-danger" data-del-batch="${b.id}">删除</button>
-      </td>
+      <td>${renderBatchActions(b)}</td>
     </tr>
   `).join('') || '<tr><td colspan="7" class="muted empty-cell">暂无批次</td></tr>';
 
   body.onclick = async (e) => {
-    const stopBatchId = e.target.dataset.stopBatch;
-    if (stopBatchId && confirm(`停止批次 #${stopBatchId}?`)) {
+    const pauseBatchId = e.target.dataset.pauseBatch;
+    if (pauseBatchId && confirm(`暂停批次 #${pauseBatchId}? 已运行的 run 会停止，未完成项目可继续。`)) {
       e.target.disabled = true;
       try {
-        await API(`/task-batches/${stopBatchId}/stop`, { method: 'POST' });
+        await API(`/task-batches/${pauseBatchId}/pause`, { method: 'POST' });
         renderTasks();
       } catch (err) {
-        alert('停止批次失败: ' + err.message);
+        alert('暂停批次失败: ' + err.message);
+        e.target.disabled = false;
+      }
+      return;
+    }
+    const resumeBatchId = e.target.dataset.resumeBatch;
+    if (resumeBatchId) {
+      e.target.disabled = true;
+      try {
+        await API(`/task-batches/${resumeBatchId}/resume`, { method: 'POST' });
+        renderTasks();
+      } catch (err) {
+        alert('继续批次失败: ' + err.message);
         e.target.disabled = false;
       }
       return;
@@ -689,6 +698,107 @@ function updateBatchSelectedCount() {
   if (el) el.textContent = `${n} selected`;
 }
 
+function renderBatchActions(batch) {
+  const pauseButton = batch.status === 'active'
+    ? `<button class="btn btn-sm btn-danger" data-pause-batch="${batch.id}">暂停</button>`
+    : '';
+  const resumeButton = ['paused', 'stopped'].includes(batch.status)
+    ? `<button class="btn btn-sm btn-primary" data-resume-batch="${batch.id}">继续</button>`
+    : '';
+  return `
+    <div class="op-actions">
+      ${pauseButton}
+      ${resumeButton}
+      <button class="btn btn-sm btn-danger" data-del-batch="${batch.id}">删除</button>
+    </div>
+  `;
+}
+
+function renderRunDetailShell(rid) {
+  $('#modal-content').innerHTML = `
+    <h3>Run <code>${rid}</code> <span id="run-detail-status" class="pill pill-queued">queued</span></h3>
+
+    <div class="detail-section">
+      <h4>统计</h4>
+      <div class="stats-grid">
+        <div class="stat-box"><div class="stat-label">输入 token</div><div class="stat-value" data-stat-key="tokens_in">等待采集</div></div>
+        <div class="stat-box"><div class="stat-label">输出 token</div><div class="stat-value" data-stat-key="tokens_out">等待采集</div></div>
+        <div class="stat-box"><div class="stat-label">请求数</div><div class="stat-value" data-stat-key="requests">等待采集</div></div>
+        <div class="stat-box"><div class="stat-label">退出码</div><div class="stat-value" data-stat-key="exit_code">-</div></div>
+      </div>
+      <div class="hint inline hidden" id="run-detail-stats-error"></div>
+    </div>
+
+    <div class="detail-section">
+      <h4>产物文件 (<span id="run-detail-file-count">0</span>)</h4>
+      <div class="file-tree" id="run-detail-files"><div class="muted">（空）</div></div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Transcript</h4>
+      <pre class="transcript-pre" id="run-detail-transcript">等待 transcript</pre>
+    </div>
+
+    <div class="detail-section hidden" id="run-detail-error-section">
+      <h4>错误</h4>
+      <pre id="run-detail-error"></pre>
+    </div>
+  `;
+}
+
+function setRunDetailText(selector, html) {
+  const el = $(selector);
+  if (el && el.innerHTML !== html) el.innerHTML = html;
+}
+
+function updateRunDetailContent(rid, run, files, stats, transcript, transcriptState) {
+  const detail = state.runDetail;
+  if (!detail?.rendered) renderRunDetailShell(rid);
+  const safeStatus = escapeHTML(run.status);
+
+  const statusEl = $('#run-detail-status');
+  if (statusEl) {
+    const nextClass = `pill pill-${safeStatus}`;
+    if (statusEl.className !== nextClass) statusEl.className = nextClass;
+    if (statusEl.textContent !== run.status) statusEl.textContent = run.status;
+  }
+
+  setRunDetailText('[data-stat-key="tokens_in"]', renderStatValue(stats, 'tokens_in'));
+  setRunDetailText('[data-stat-key="tokens_out"]', renderStatValue(stats, 'tokens_out'));
+  setRunDetailText('[data-stat-key="requests"]', renderStatValue(stats, 'requests'));
+  setRunDetailText('[data-stat-key="exit_code"]', escapeHTML(run.exit_code ?? '-'));
+
+  const statsError = $('#run-detail-stats-error');
+  if (statsError) {
+    statsError.classList.toggle('hidden', !stats?.error);
+    statsError.textContent = stats?.error ? `统计加载失败：${stats.error}` : '';
+  }
+
+  const filesHTML = files.length ? files.map(f => `
+    <div class="${escapeHTML(f.type)}">${escapeHTML(f.path)}${f.size != null ? `<span class="size">${formatSize(f.size)}</span>` : ''}</div>
+  `).join('') : '<div class="muted">（空）</div>';
+  if (detail.lastFilesHTML !== filesHTML) {
+    detail.lastFilesHTML = filesHTML;
+    setRunDetailText('#run-detail-file-count', escapeHTML(files.length));
+    setRunDetailText('#run-detail-files', filesHTML);
+  }
+
+  const transcriptText = transcript || transcriptState || '等待 transcript';
+  if (detail.lastTranscript !== transcriptText) {
+    detail.lastTranscript = transcriptText;
+    const pre = $('#run-detail-transcript');
+    if (pre) pre.textContent = transcriptText;
+  }
+
+  const errorSection = $('#run-detail-error-section');
+  const errorPre = $('#run-detail-error');
+  if (errorSection && errorPre) {
+    errorSection.classList.toggle('hidden', !run.error);
+    if (run.error && errorPre.textContent !== run.error) errorPre.textContent = run.error;
+  }
+  detail.rendered = true;
+}
+
 // ===================== Runs (SSE 实时) =====================
 async function renderRuns() {
   try {
@@ -728,12 +838,12 @@ function paintRuns(runs) {
         <td><span class="pill pill-${r.status}">${escapeHTML(r.status)}</span></td>
         <td>${dur}</td>
         <td>${r.exit_code ?? '-'}</td>
-        <td>
+        <td><div class="op-actions run-actions">
           <button class="btn btn-sm" data-detail="${r.id}">详情</button>
           ${['queued', 'running'].includes(r.status) ? `<button class="btn btn-sm btn-danger" data-stop="${r.id}">停止</button>` : ''}
           ${['success', 'failed', 'timeout', 'stopped'].includes(r.status) ? `<button class="btn btn-sm btn-primary" data-continue="${r.id}">继续</button>` : ''}
           <button class="btn btn-sm btn-danger" data-del-run="${r.id}">删除</button>
-        </td>
+        </div></td>
       </tr>
     `;
   }).join('') || '<tr><td colspan="7" class="muted empty-cell">暂无运行</td></tr>';
@@ -783,40 +893,6 @@ function renderStatValue(stats, key) {
   return escapeHTML(stats[key] ?? 0);
 }
 
-function renderRunDetailContent(rid, run, files, stats, transcript, transcriptState) {
-  const transcriptText = transcript ? escapeHTML(transcript) : escapeHTML(transcriptState || '等待 transcript');
-  $('#modal-content').innerHTML = `
-    <h3>Run <code>${rid}</code> <span class="pill pill-${escapeHTML(run.status)}">${escapeHTML(run.status)}</span></h3>
-
-    <div class="detail-section">
-      <h4>统计</h4>
-      <div class="stats-grid">
-        <div class="stat-box"><div class="stat-label">输入 token</div><div class="stat-value">${renderStatValue(stats, 'tokens_in')}</div></div>
-        <div class="stat-box"><div class="stat-label">输出 token</div><div class="stat-value">${renderStatValue(stats, 'tokens_out')}</div></div>
-        <div class="stat-box"><div class="stat-label">请求数</div><div class="stat-value">${renderStatValue(stats, 'requests')}</div></div>
-        <div class="stat-box"><div class="stat-label">退出码</div><div class="stat-value">${run.exit_code ?? '-'}</div></div>
-      </div>
-      ${stats?.error ? `<div class="hint inline">统计加载失败：${escapeHTML(stats.error)}</div>` : ''}
-    </div>
-
-    <div class="detail-section">
-      <h4>产物文件 (${files.length})</h4>
-      <div class="file-tree">
-        ${files.length ? files.map(f => `
-          <div class="${f.type}">${escapeHTML(f.path)}${f.size != null ? `<span class="size">${formatSize(f.size)}</span>` : ''}</div>
-        `).join('') : '<div class="muted">（空）</div>'}
-      </div>
-    </div>
-
-    <div class="detail-section">
-      <h4>Transcript</h4>
-      <pre>${transcriptText}</pre>
-    </div>
-
-    ${run.error ? `<div class="detail-section"><h4>错误</h4><pre>${escapeHTML(run.error)}</pre></div>` : ''}
-  `;
-}
-
 async function fetchRunTranscript(rid) {
   try {
     const r = await fetch(`/api/runs/${rid}/transcript`, { credentials: 'same-origin' });
@@ -846,7 +922,7 @@ async function refreshRunDetail() {
     detail.files = filesResult;
     if (shouldRefreshFiles) detail.lastFileRefreshAt = Date.now();
     detail.fileRefreshDue = false;
-    renderRunDetailContent(rid, run, detail.files, statsResult, transcriptResult.text, transcriptResult.state);
+    updateRunDetailContent(rid, run, detail.files, statsResult, transcriptResult.text, transcriptResult.state);
 
     if (isLiveRunStatus(run.status)) {
       detail.fileRefreshDue = Date.now() - detail.lastFileRefreshAt > 10000;
@@ -860,7 +936,7 @@ async function refreshRunDetail() {
     }
   } catch (e) {
     if (!state.runDetail || state.runDetail.rid !== rid || state.runDetail.seq !== seq) return;
-    $('#modal-content').innerHTML = `<p>加载失败: ${escapeHTML(e.message)}</p>`;
+    if (!detail.rendered) $('#modal-content').innerHTML = `<p>加载失败: ${escapeHTML(e.message)}</p>`;
     detail.timer = setTimeout(refreshRunDetail, 2500);
   }
 }
@@ -875,6 +951,9 @@ async function openRunDetail(rid) {
     fileRefreshDue: true,
     finalFilesPending: true,
     lastFileRefreshAt: 0,
+    rendered: false,
+    lastFilesHTML: '',
+    lastTranscript: '',
   };
   $('#modal-content').innerHTML = '<p class="muted">加载中…</p>';
   openModal('#modal');

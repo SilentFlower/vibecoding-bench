@@ -1727,6 +1727,7 @@ class Scheduler:
         self._sems: dict[int, threading.Semaphore] = {}
         self._sems_lock = threading.Lock()
         self._batch_threads: dict[int, threading.Thread] = {}
+        self._batch_restart: set[int] = set()
         self._batch_lock = threading.Lock()
 
     def _sem(self, account_id: int) -> threading.Semaphore:
@@ -1752,71 +1753,88 @@ class Scheduler:
         with self._batch_lock:
             t = self._batch_threads.get(batch_id)
             if t and t.is_alive():
+                self._batch_restart.add(batch_id)
                 return
             t = threading.Thread(target=self._execute_batch, args=(batch_id,), daemon=True)
             self._batch_threads[batch_id] = t
             t.start()
 
     def _execute_batch(self, batch_id: int) -> None:
-        conn = get_db()
         try:
-            batch_row = conn.execute(
-                "SELECT * FROM task_batches WHERE id=? AND deleted_at IS NULL",
-                (batch_id,),
-            ).fetchone()
-            if not batch_row:
-                return
-            account_row = conn.execute(
-                "SELECT * FROM accounts WHERE id=?",
-                (batch_row["account_id"],),
-            ).fetchone()
-            if not account_row:
-                return
-            items = conn.execute(
-                "SELECT bi.*, t.no AS topic_no, t.title, t.description "
-                "FROM task_batch_items bi JOIN topics t ON bi.topic_id=t.id "
-                "WHERE bi.batch_id=? ORDER BY bi.id",
-                (batch_id,),
-            ).fetchall()
-            batch = dict(batch_row)
-            account = dict(account_row)
-        finally:
-            conn.close()
+            conn = get_db()
+            try:
+                batch_row = conn.execute(
+                    "SELECT * FROM task_batches WHERE id=? AND deleted_at IS NULL",
+                    (batch_id,),
+                ).fetchone()
+                if not batch_row:
+                    return
+                account_row = conn.execute(
+                    "SELECT * FROM accounts WHERE id=?",
+                    (batch_row["account_id"],),
+                ).fetchone()
+                if not account_row:
+                    return
+                items = conn.execute(
+                    "SELECT bi.*, t.no AS topic_no, t.title, t.description "
+                    "FROM task_batch_items bi JOIN topics t ON bi.topic_id=t.id "
+                    "WHERE bi.batch_id=? AND bi.status IN ('pending','paused') ORDER BY bi.id",
+                    (batch_id,),
+                ).fetchall()
+                batch = dict(batch_row)
+                account = dict(account_row)
+            finally:
+                conn.close()
 
-        active_runs: list[str] = []
-        for idx, item_row in enumerate(items):
-            current = self._get_batch_status(batch_id)
-            if current != "active":
-                break
-            # 先投满并发窗口；之后每次等一个 run 收口再按随机间隔投放下一项。
-            if len(active_runs) >= int(batch.get("concurrency") or 2):
-                self._wait_any_run_finished(active_runs)
-            if idx >= int(batch.get("concurrency") or 2):
-                delay = self._random_batch_delay(batch)
-                if delay > 0:
-                    self._set_batch_next_launch(batch_id, time.time() + delay)
-                    time.sleep(delay)
+            active_runs: list[str] = []
+            for idx, item_row in enumerate(items):
+                current = self._get_batch_status(batch_id)
+                if current != "active":
+                    break
+                # 先投满并发窗口；之后每次等一个 run 收口再按随机间隔投放下一项。
+                if len(active_runs) >= int(batch.get("concurrency") or 2):
+                    self._wait_any_run_finished(active_runs)
                     if self._get_batch_status(batch_id) != "active":
                         break
-            item = dict(item_row)
-            run_id = uuid.uuid4().hex[:12]
-            task_id = self._create_batch_task_and_run(batch, account, item, run_id)
-            task = {
-                "id": task_id,
-                "prompt": item["prompt"],
-                "timeout_sec": batch["timeout_sec"],
-                "batch_id": batch_id,
-                "topic_id": item["topic_id"],
-            }
-            self.submit(run_id, account, task)
-            active_runs.append(run_id)
+                if idx >= int(batch.get("concurrency") or 2):
+                    delay = self._random_batch_delay(batch)
+                    if delay > 0:
+                        self._set_batch_next_launch(batch_id, time.time() + delay)
+                        if not self._sleep_batch_delay(batch_id, delay):
+                            break
+                item = dict(item_row)
+                run_id = uuid.uuid4().hex[:12]
+                task_id = self._create_batch_task_and_run(batch, account, item, run_id)
+                if task_id is None:
+                    if self._get_batch_status(batch_id) != "active":
+                        break
+                    continue
+                task = {
+                    "id": task_id,
+                    "prompt": item["prompt"],
+                    "timeout_sec": batch["timeout_sec"],
+                    "batch_id": batch_id,
+                    "topic_id": item["topic_id"],
+                }
+                self.submit(run_id, account, task)
+                active_runs.append(run_id)
 
-        self._wait_all_runs_finished(active_runs)
-        self._finish_batch_when_done(batch_id)
+            self._wait_all_runs_finished(active_runs)
+            self._finish_batch_when_done(batch_id)
+        finally:
+            with self._batch_lock:
+                if self._batch_threads.get(batch_id) is threading.current_thread():
+                    self._batch_threads.pop(batch_id, None)
+                    should_restart = batch_id in self._batch_restart
+                    self._batch_restart.discard(batch_id)
+                    if should_restart and self._get_batch_status(batch_id) == "active":
+                        t = threading.Thread(target=self._execute_batch, args=(batch_id,), daemon=True)
+                        self._batch_threads[batch_id] = t
+                        t.start()
 
     def _create_batch_task_and_run(
         self, batch: dict, account: dict, item: dict, run_id: str
-    ) -> int:
+    ) -> Optional[int]:
         """
         为批次 item 创建兼容旧 runs 的 task + run。
 
@@ -1824,12 +1842,27 @@ class Scheduler:
         :param account: accounts 行
         :param item: task_batch_items 行
         :param run_id: 新 run id
-        :return: task id
+        :return: task id；批次已暂停或 item 已被其他线程处理时返回 None
         """
         with _db_lock:
             conn = get_db()
             try:
                 with conn:
+                    current_batch = conn.execute(
+                        "SELECT status FROM task_batches WHERE id=? AND deleted_at IS NULL",
+                        (batch["id"],),
+                    ).fetchone()
+                    current_item = conn.execute(
+                        "SELECT status FROM task_batch_items WHERE id=?",
+                        (item["id"],),
+                    ).fetchone()
+                    if (
+                        not current_batch
+                        or current_batch["status"] != "active"
+                        or not current_item
+                        or current_item["status"] not in ("pending", "paused")
+                    ):
+                        return None
                     cur = conn.execute(
                         "INSERT INTO tasks(topic_no, title, prompt, account_id, batch_id, "
                         "topic_id, timeout_sec, repeat_n) VALUES(?,?,?,?,?,?,?,?)",
@@ -1891,6 +1924,21 @@ class Scheduler:
             finally:
                 conn.close()
 
+    def _sleep_batch_delay(self, batch_id: int, delay: int) -> bool:
+        """
+        按秒等待批次间隔，让暂停操作不必等完整随机间隔结束才生效。
+
+        :param batch_id: task_batches.id
+        :param delay: 需要等待的秒数
+        :return: 等待结束后批次仍为 active 时返回 True
+        """
+        deadline = time.time() + max(0, delay)
+        while time.time() < deadline:
+            if self._get_batch_status(batch_id) != "active":
+                return False
+            time.sleep(min(1, max(0, deadline - time.time())))
+        return self._get_batch_status(batch_id) == "active"
+
     def _finish_batch_when_done(self, batch_id: int) -> None:
         with _db_lock:
             conn = get_db()
@@ -1898,7 +1946,7 @@ class Scheduler:
                 with conn:
                     row = conn.execute(
                         "SELECT COUNT(*) AS n FROM task_batch_items "
-                        "WHERE batch_id=? AND status IN ('pending','queued','running')",
+                        "WHERE batch_id=? AND status IN ('pending','paused','queued','running')",
                         (batch_id,),
                     ).fetchone()
                     status = "done" if row and row["n"] == 0 else "active"
@@ -2031,6 +2079,13 @@ class Scheduler:
             conn = get_db()
             try:
                 with conn:
+                    if status == "stopped":
+                        conn.execute(
+                            "UPDATE task_batch_items SET status=?, updated_at=julianday('now') "
+                            "WHERE run_id=? AND status!='paused'",
+                            (status, run_id),
+                        )
+                        return
                     conn.execute(
                         "UPDATE task_batch_items SET status=?, updated_at=julianday('now') "
                         "WHERE run_id=?",
@@ -2802,7 +2857,7 @@ def list_task_batches():
         rows = conn.execute(
             "SELECT b.*, "
             "(SELECT COUNT(*) FROM task_batch_items i WHERE i.batch_id=b.id) AS item_count, "
-            "(SELECT COUNT(*) FROM task_batch_items i WHERE i.batch_id=b.id AND i.status IN ('success','failed','timeout','stopped')) AS done_count "
+            "(SELECT COUNT(*) FROM task_batch_items i WHERE i.batch_id=b.id AND i.status IN ('success','failed','timeout')) AS done_count "
             "FROM task_batches b WHERE b.deleted_at IS NULL ORDER BY b.id DESC"
         ).fetchall()
         return [dict(r) for r in rows]
@@ -2829,9 +2884,10 @@ def delete_task_batch(batch_id: int):
     return {"ok": True}
 
 
+@app.post("/api/task-batches/{batch_id}/pause")
 @app.post("/api/task-batches/{batch_id}/stop")
-def stop_task_batch(batch_id: int):
-    """停止批次调度，并停止已生成的 queued/running runs。"""
+def pause_task_batch(batch_id: int):
+    """暂停批次调度，并停止已生成的 queued/running runs 以便后续重新投放。"""
     if not runner:
         raise HTTPException(500, "runner not ready")
     with _db_lock:
@@ -2844,16 +2900,18 @@ def stop_task_batch(batch_id: int):
                 ).fetchone()
                 if not row:
                     raise HTTPException(404, "batch not found")
-                if row["status"] in ("done", "stopped", "deleted"):
-                    return {"ok": True, "stopped_runs": 0}
+                if row["status"] in ("done", "deleted"):
+                    return {"ok": True, "paused_runs": 0}
+                if row["status"] == "paused":
+                    return {"ok": True, "paused_runs": 0}
                 conn.execute(
-                    "UPDATE task_batches SET status='stopped', next_launch_at=NULL, "
+                    "UPDATE task_batches SET status='paused', next_launch_at=NULL, "
                     "updated_at=julianday('now') WHERE id=?",
                     (batch_id,),
                 )
                 conn.execute(
-                    "UPDATE task_batch_items SET status='stopped', updated_at=julianday('now') "
-                    "WHERE batch_id=? AND status IN ('pending','queued') AND run_id IS NULL",
+                    "UPDATE task_batch_items SET status='paused', updated_at=julianday('now') "
+                    "WHERE batch_id=? AND status IN ('queued','running') AND run_id IS NOT NULL",
                     (batch_id,),
                 )
         finally:
@@ -2897,13 +2955,47 @@ def stop_task_batch(batch_id: int):
                             (time.time(), run["id"]),
                         )
                     conn.execute(
-                        "UPDATE task_batch_items SET status='stopped', updated_at=julianday('now') "
+                        "UPDATE task_batch_items SET status='paused', updated_at=julianday('now') "
                         "WHERE run_id=?",
                         (run["id"],),
                     )
             finally:
                 conn.close()
-    return {"ok": True, "stopped_runs": len(run_rows)}
+    return {"ok": True, "paused_runs": len(run_rows)}
+
+
+@app.post("/api/task-batches/{batch_id}/resume")
+def resume_task_batch(batch_id: int):
+    """继续已暂停的批次，把暂停项重新排队并启动后台调度。"""
+    if not scheduler:
+        raise HTTPException(500, "scheduler not ready")
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                row = conn.execute(
+                    "SELECT id, status FROM task_batches WHERE id=? AND deleted_at IS NULL",
+                    (batch_id,),
+                ).fetchone()
+                if not row:
+                    raise HTTPException(404, "batch not found")
+                if row["status"] in ("done", "deleted"):
+                    return {"ok": True, "resumed": False}
+                conn.execute(
+                    "UPDATE task_batch_items SET task_id=NULL, run_id=NULL, status='pending', "
+                    "updated_at=julianday('now') "
+                    "WHERE batch_id=? AND status IN ('paused','stopped')",
+                    (batch_id,),
+                )
+                conn.execute(
+                    "UPDATE task_batches SET status='active', next_launch_at=NULL, "
+                    "updated_at=julianday('now') WHERE id=?",
+                    (batch_id,),
+                )
+        finally:
+            conn.close()
+    scheduler.submit_batch(batch_id)
+    return {"ok": True, "resumed": True}
 
 
 # ---------- runs ----------
