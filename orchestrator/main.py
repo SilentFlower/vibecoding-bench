@@ -376,7 +376,6 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE INDEX IF NOT EXISTS idx_runs_status  ON runs(status);
 CREATE INDEX IF NOT EXISTS idx_runs_account ON runs(account_id);
 CREATE INDEX IF NOT EXISTS idx_runs_task    ON runs(task_id);
-CREATE INDEX IF NOT EXISTS idx_runs_batch   ON runs(batch_id);
 CREATE INDEX IF NOT EXISTS idx_topics_no    ON topics(no);
 CREATE INDEX IF NOT EXISTS idx_batches_account ON task_batches(account_id);
 CREATE INDEX IF NOT EXISTS idx_batch_items_batch ON task_batch_items(batch_id);
@@ -405,6 +404,7 @@ def init_db() -> None:
             _ensure_column(conn, "runs", "topic_id", "INTEGER")
             _ensure_column(conn, "runs", "stop_requested_at", "REAL")
             _ensure_column(conn, "runs", "deleted_at", "REAL")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_batch ON runs(batch_id)")
             _seed_topics_if_empty(conn)
     finally:
         conn.close()
