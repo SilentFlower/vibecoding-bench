@@ -11,11 +11,11 @@
 #   TIMEOUT_SEC     超时（秒），默认 1800
 # 挂载约定：
 #   task 模式：
-#     /mnt/profile  账号 ~/.claude profile（只读复制到 /root/.claude）
+#     /mnt/profile  账号 ~/.claude profile（rw，仅回写关键配置文件）
 #     /etc/mitm     MITM CA 目录
 #     /workspace    claude 工作目录（每个 run 独立）
 #   login 模式：
-#     /root/.claude 直接挂宿主 data/profiles/<name>/（rw），claude auth login 直接落盘
+#     /home/node/.claude 直接挂宿主 data/profiles/<name>/（rw）
 #     /etc/mitm     同上
 # 退出码（task 模式）：
 #   0    Stop hook 正常触发
@@ -26,6 +26,158 @@ set -euo pipefail
 
 WORKER_MODE="${WORKER_MODE:-task}"
 log() { echo "[entrypoint $(date +%H:%M:%S)] $*"; }
+CLAUDE_USER=node
+CLAUDE_HOME=/home/node
+CLAUDE_DIR="$CLAUDE_HOME/.claude"
+
+write_default_settings() {
+  # settings.json 既要补齐默认值，又不能覆盖 Claude 自己写入的隐藏 gate。
+  # 用 jq 递归合并：已有字段保留，默认字段补齐；同名字段以默认值为准。
+  cat > /tmp/default-settings.json <<'EOF'
+{
+  "env": {
+    "CLAUDE_CODE_EFFORT_LEVEL": "max"
+  },
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "allow": [
+      "Bash", "BashOutput", "Edit", "Glob", "Grep",
+      "KillShell", "NotebookEdit", "Read", "SlashCommand",
+      "Task", "TodoWrite", "WebFetch", "WebSearch", "Write"
+    ],
+    "deny": []
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "autoMemoryEnabled": false,
+  "theme": "dark",
+  "model": "opus[1m]"
+}
+EOF
+  if [ -f "$CLAUDE_DIR/settings.json" ]; then
+    jq -s '.[0] * .[1]' "$CLAUDE_DIR/settings.json" /tmp/default-settings.json > "$CLAUDE_DIR/settings.json.tmp" \
+      && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
+  else
+    cp /tmp/default-settings.json "$CLAUDE_DIR/settings.json"
+  fi
+}
+
+patch_top_config_gates() {
+  # 这些 gate 属于顶层 ~/.claude.json，不属于 ~/.claude/settings.json。
+  # 旧 profile 缺字段时，交互 TUI 会重走 onboarding 或 bypassPermissions 确认页。
+  local path="$CLAUDE_HOME/.claude.json"
+  if [ ! -f "$path" ]; then
+    return 0
+  fi
+  jq '. + {
+    "hasCompletedOnboarding": true,
+    "bypassPermissionsModeAccepted": true
+  }' "$path" > "$path.tmp" && mv "$path.tmp" "$path"
+}
+
+handle_claude_startup_gates() {
+  # Claude 2.x 的首次启动主题菜单和 bypassPermissions 免责声明都可能拦在首屏。
+  # prompt 注入前只检测当前可见 pane；不能用 scrollback，否则菜单清掉后
+  # 旧文本还在历史里，会误判为仍卡在 first-run。
+  local theme_sent=0
+  local bypass_sent=0
+  local clear_ticks=0
+  local pane
+  for i in $(seq 1 75); do
+    if [ -f /tmp/claude-exited ]; then
+      return 1
+    fi
+    pane="$(tmux capture-pane -t "$SESSION" -p 2>/dev/null || true)"
+    if printf '%s' "$pane" | grep -q "Choose the text style that looks best with your terminal"; then
+      if [ "$theme_sent" -eq 0 ]; then
+        log "Detected Claude first-run theme menu; accepting default dark theme"
+        tmux send-keys -t "$SESSION" Enter
+        theme_sent=1
+      fi
+      clear_ticks=0
+      sleep 1
+      continue
+    fi
+    if printf '%s' "$pane" | grep -q "Claude Code running in Bypass Permissions mode"; then
+      if [ "$bypass_sent" -eq 0 ]; then
+        log "Detected Claude bypassPermissions disclaimer; accepting bypass permissions mode"
+        tmux send-keys -t "$SESSION" Down Enter
+        bypass_sent=1
+      fi
+      clear_ticks=0
+      sleep 1
+      continue
+    fi
+    if printf '%s' "$pane" | grep -Eiq "Browser didn't open|Paste code here|Use the url below to sign in|claude\.ai/oauth|org:create_api_key|setup-token|Choose how you want to log in"; then
+      log "WARN: Claude opened an auth/onboarding gate; refusing to inject task prompt"
+      echo "auth/onboarding gate" > /tmp/claude-startup-gate
+      return 1
+    fi
+    if [ "$theme_sent" -eq 1 ] || [ "$bypass_sent" -eq 1 ]; then
+      clear_ticks=$((clear_ticks + 1))
+      if [ "$clear_ticks" -ge 3 ]; then
+        log "Claude startup gates cleared"
+        return 0
+      fi
+      sleep 1
+      continue
+    fi
+    if [ "$i" -lt 20 ]; then
+      sleep 1
+      continue
+    fi
+    return 0
+  done
+  if [ "$theme_sent" -eq 1 ] || [ "$bypass_sent" -eq 1 ]; then
+    log "WARN: Claude startup gate did not clear; skip prompt injection"
+    return 1
+  fi
+  return 0
+}
+
+check_claude_auth_status() {
+  # 先用非 TUI 的 auth status 验证 profile，不把题目 prompt 粘进登录流。
+  # 这不是任务执行路径；真正做题仍走下方 tmux 交互 TUI。
+  log "Checking Claude auth status before interactive task run"
+  set +e
+  runuser -u "$CLAUDE_USER" -- env \
+    HOME="$CLAUDE_HOME" \
+    NODE_EXTRA_CA_CERTS="$CA_PEM" \
+    SSL_CERT_FILE="$CA_PEM" \
+    REQUESTS_CA_BUNDLE="$CA_PEM" \
+    CURL_CA_BUNDLE="$CA_PEM" \
+    GIT_SSL_CAINFO="$CA_PEM" \
+    claude auth status > /tmp/claude-auth-status.json 2> /tmp/claude-auth-status.err
+  local auth_code=$?
+  set -e
+  if [ "$auth_code" -ne 0 ] || ! jq -e '.loggedIn == true' /tmp/claude-auth-status.json >/dev/null 2>&1; then
+    {
+      echo "[entrypoint] Claude profile is not logged in; refusing to open OAuth prompt in task mode"
+      echo "--- auth status stdout ---"
+      cat /tmp/claude-auth-status.json 2>/dev/null || true
+      echo "--- auth status stderr ---"
+      cat /tmp/claude-auth-status.err 2>/dev/null || true
+    } > /workspace/.bench-transcript.log
+    persist_runtime_claude_state
+    log "Claude auth status check failed; not injecting task prompt into login flow"
+    exit 1
+  fi
+}
+
+persist_runtime_claude_state() {
+  # task 模式里 Claude 跑在 $HOME 的运行时副本中；这里只把会影响下次启动的
+  # 两个配置文件写回 profile，避免 telemetry/sessions/backups 被并发 run 污染。
+  if [ ! -d /mnt/profile ] || [ ! -w /mnt/profile ]; then
+    return 0
+  fi
+  if [ -f "$CLAUDE_HOME/.claude.json" ]; then
+    patch_top_config_gates
+    cp "$CLAUDE_HOME/.claude.json" /mnt/profile/.claude.json || true
+  fi
+  if [ -f "$CLAUDE_DIR/settings.json" ]; then
+    cp "$CLAUDE_DIR/settings.json" /mnt/profile/settings.json || true
+  fi
+  chown "$CLAUDE_USER:$CLAUDE_USER" /mnt/profile/.claude.json /mnt/profile/settings.json 2>/dev/null || true
+}
 
 # ---------- 0) /etc/machine-id 按账号名 hash 写入 ----------
 # 让 Claude Code / Node 通过系统接口读到的 machine-id 是按账号派生的稳定值:
@@ -53,12 +205,35 @@ else
   log "WARN: no MITM CA at $CA_PEM, traffic will NOT be decrypted"
 fi
 
-# ---------- login 模式：CA 已装好，profile 目录直接挂在 /root/.claude，空转待 exec ----------
+# ---------- 1.5) DNS 指向 sidecar netns 内的 unbound(127.0.0.1:53) ----------
+# worker 与 sidecar 共享 network namespace,所以 127.0.0.1:53 = sidecar 的 unbound。
+# 但 mount namespace 不共享,sidecar 写自己的 /etc/resolv.conf 不影响 worker。
+# Docker daemon 默认会在 worker 容器写一份 /etc/resolv.conf(指向宿主 DNS,例如
+# 192.168.x.1),那个 DNS 在 sidecar netns 里压根不可达 → 解析全坏。
+# 这里强制覆盖,让 worker 的所有 UDP 53 落到 unbound,unbound 再用 TCP 53 出口
+# (走 tun → hev → SOCKS5 TCP),解决商用 SOCKS5 不支持 UDP relay 的问题。
+# login 模式允许用户不填 SOCKS5 直连 bridge 网络；这种情况下没有 sidecar /
+# unbound，不能把 DNS 改到 127.0.0.1。task 模式恒定共享 sidecar netns。
+if [ "$WORKER_MODE" != "login" ] || [ "${USE_SIDECAR_DNS:-0}" = "1" ]; then
+  echo "nameserver 127.0.0.1" > /etc/resolv.conf
+  log "Overrode /etc/resolv.conf to use sidecar unbound (127.0.0.1)"
+else
+  log "Login mode without sidecar DNS: keeping Docker-provided /etc/resolv.conf"
+fi
+
+# ---------- login 模式：CA 已装好，profile 目录直接挂在 node HOME，空转待 exec ----------
 if [ "$WORKER_MODE" = "login" ]; then
-  mkdir -p /root/.claude
-  log "Login mode: idling; orchestrator will docker exec 'claude auth login'."
+  mkdir -p "$CLAUDE_DIR"
+  if [ -f "$CLAUDE_DIR/.claude.json" ] && [ ! -f "$CLAUDE_HOME/.claude.json" ]; then
+    cp "$CLAUDE_DIR/.claude.json" "$CLAUDE_HOME/.claude.json"
+    patch_top_config_gates
+    log "Restored top-level ~/.claude.json from profile"
+  fi
+  write_default_settings
+  chown -R "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME" || true
+  log "Login mode: idling; orchestrator will docker exec 'claude auth login' as $CLAUDE_USER."
   log "  profile dir contents at start:"
-  ls -la /root/.claude 2>/dev/null | head -20
+  ls -la "$CLAUDE_DIR" 2>/dev/null | head -20
   # 用 tail -f /dev/null 替代 sleep infinity（更可控，收到 SIGTERM 立刻退出）
   exec tail -f /dev/null
 fi
@@ -68,24 +243,46 @@ fi
 : "${RUN_ID:?RUN_ID required in task mode}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-1800}"
 
-# ---------- 2) 复制账号 profile 到 /root/.claude ----------
-mkdir -p /root/.claude
+# ---------- 2) 复制账号 profile 到 node HOME + 还原顶层 .claude.json ----------
+# claude 启动时读两份配置:
+#   ~/.claude.json       顶层文件,含 oauthAccount / migrationVersion / userID
+#                        等"已登录、已 onboarded"的标志(没它就重走 first-run)
+#   ~/.claude/...        子目录,含 .credentials.json / settings.json / sessions/
+# orchestrator 在 login commit 时把顶层 ~/.claude.json 复制回 profile:
+#   data/profiles/<name>/.claude.json    ← 顶层配置的持久化副本
+#   data/profiles/<name>/<其它>           ← /home/node/.claude/ 目录挂载落盘
+# task 模式 worker 拿到的 /mnt/profile 是同一个目录,所以 /mnt/profile/.claude.json
+# 就是当时 OAuth 完成时的顶层文件;复制时要单独 mv 到 /home/node/.claude.json,
+# 不能让它躺在 $HOME/.claude/ 子目录里(那里 claude 不会读顶层配置)。
+mkdir -p "$CLAUDE_DIR"
 if [ -d /mnt/profile ]; then
-  log "Copying account profile from /mnt/profile -> /root/.claude"
-  cp -a /mnt/profile/. /root/.claude/
-  # 不让历史 telemetry / backups 在每次 run 重放:
-  # - telemetry/1p_failed_events.*.json 会被 Claude Code 启动时重试上传,等于
-  #   把上次没传上去的事件每次都重放;
-  # - backups/.claude.json.backup.* 是旧 config 备份,运行时无用,且每次重 login
-  #   都会累积。
-  # 这里只清运行时副本(/root/.claude),不动只读源(/mnt/profile),并发安全。
-  rm -rf /root/.claude/telemetry /root/.claude/backups
+  log "Copying account profile from /mnt/profile -> $CLAUDE_DIR"
+  cp -a /mnt/profile/. "$CLAUDE_DIR/"
+  # 历史 telemetry / backups 不让重放
+  rm -rf "$CLAUDE_DIR/telemetry" "$CLAUDE_DIR/backups"
+  # 把顶层 .claude.json 还原到 $HOME/.claude.json(claude 只在 $HOME 根读它)
+  if [ -f "$CLAUDE_DIR/.claude.json" ]; then
+    mv "$CLAUDE_DIR/.claude.json" "$CLAUDE_HOME/.claude.json"
+    patch_top_config_gates
+    log "Restored top-level ~/.claude.json from profile"
+  else
+    log "WARN: no .claude.json in profile; first-run dialogs likely to appear"
+  fi
 else
   log "WARN: no profile mounted at /mnt/profile, claude likely not authenticated"
 fi
+chown -R "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME" /workspace || true
 
-# ---------- 3) 注入 Stop hook（settings.local.json 优先级最高，不污染 profile）----------
-cat > /root/.claude/settings.local.json <<'EOF'
+# ---------- 3) 注入 settings 文件 ----------
+# settings.json:用户偏好 + permissions allowlist + model 默认值。即使 .claude.json
+# 在场,settings.json 也仍生效(两个文件互不替代)。
+write_default_settings
+
+# Stop hook 放到当前 workspace 的 project-local settings。
+# 官方 user-local 路径不是 ~/.claude/settings.local.json；放错位置会导致 hook
+# 不加载，worker 只能等 timeout。workspace 是每个 run 独立目录，不污染 profile。
+mkdir -p /workspace/.claude
+cat > /workspace/.claude/settings.local.json <<'EOF'
 {
   "hooks": {
     "Stop": [
@@ -99,40 +296,86 @@ cat > /root/.claude/settings.local.json <<'EOF'
   }
 }
 EOF
+chown -R "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME" /workspace || true
 rm -f /tmp/claude-done
+rm -f /tmp/claude-exited /tmp/claude-exit-code
 
-# ---------- 4) 启动 tmux + claude ----------
+# ---------- 4) 启动 tmux + claude (node 用户 + bypassPermissions) ----------
+# Claude Code 的 bypassPermissions 不能以 root 跑，所以入口脚本只用 root
+# 做 CA/DNS/文件属主准备，真正的 TUI 进程切到 node 用户、同一 HOME。
+#
+# CA 环境变量必须显式带进 send-keys 的命令行:tmux 启的 shell 是新 bash 进程,
+# entrypoint 当前 shell 里 export 的 NODE_EXTRA_CA_CERTS 等不会自动继承(它们没有
+# 写到 /etc/profile)。Node 默认不读系统 ca-certificates,只信 NODE_EXTRA_CA_CERTS;
+# 不带的话 claude 一连 api.anthropic.com 就 UNABLE_TO_VERIFY_LEAF_SIGNATURE → 表现
+# 为 TUI 上的 "FailedToOpenSocket"。
+#
+# 启动前先等 sidecar 网络链路真正可用(DNS 通即可证明 tun→hev→mitm→上游全通):
+# orchestrator 的 SIDECAR_BOOT_WAIT 是固定常量,但 sidecar race-fix 后路由稳定要
+# 9-10s,常量不够。worker 自查 DNS 比依赖 orchestrator 估算更稳。
+log "Waiting for sidecar network to stabilize (DNS resolvable)..."
+for i in $(seq 1 30); do
+  if getent hosts api.anthropic.com >/dev/null 2>&1; then
+    log "Sidecar network ready (DNS ok after ${i}s)"
+    break
+  fi
+  sleep 1
+done
+if ! getent hosts api.anthropic.com >/dev/null 2>&1; then
+  log "WARN: DNS still not ready after 30s; claude may fail"
+fi
+
+check_claude_auth_status
+
 SESSION="claude-${RUN_ID}"
-log "Launching tmux session: $SESSION"
+log "Launching tmux session: $SESSION ($CLAUDE_USER bypassPermissions mode)"
 tmux new-session -d -s "$SESSION" -x 220 -y 60
-# claude 启动；进入 /workspace
-tmux send-keys -t "$SESSION" "cd /workspace && claude" Enter
+tmux send-keys -t "$SESSION" \
+  "export NODE_EXTRA_CA_CERTS='$CA_PEM' SSL_CERT_FILE='$CA_PEM' REQUESTS_CA_BUNDLE='$CA_PEM' CURL_CA_BUNDLE='$CA_PEM' GIT_SSL_CAINFO='$CA_PEM' HOME='$CLAUDE_HOME' && cd /workspace && runuser -u '$CLAUDE_USER' -- env HOME='$CLAUDE_HOME' NODE_EXTRA_CA_CERTS='$CA_PEM' SSL_CERT_FILE='$CA_PEM' REQUESTS_CA_BUNDLE='$CA_PEM' CURL_CA_BUNDLE='$CA_PEM' GIT_SSL_CAINFO='$CA_PEM' claude; code=\$?; echo; echo \"[entrypoint] claude exited with code \$code\"; echo \$code >/tmp/claude-exit-code; touch /tmp/claude-exited; sleep 3600" Enter
 
-# 等 claude TUI 就绪（无可靠信号，sleep 兜底）
-sleep 4
+# 等 claude TUI 就绪
+sleep 6
+if [ -f /tmp/claude-exited ]; then
+  log "Claude exited before prompt injection"
+fi
+startup_ready=1
+handle_claude_startup_gates || startup_ready=0
 
-# ---------- 5) 注入 prompt（用 bracketed paste，避免逐字符触发 TUI 行为）----------
-log "Injecting prompt (${#TASK_PROMPT} chars)"
-printf '%s' "$TASK_PROMPT" > /tmp/task-prompt.txt
-tmux load-buffer -b prompt /tmp/task-prompt.txt
-tmux paste-buffer -t "$SESSION" -b prompt -d -p
-sleep 1
-tmux send-keys -t "$SESSION" Enter
+# ---------- 5) 注入 prompt(用 bracketed paste,避免逐字符触发 TUI 行为) ----------
+if [ ! -f /tmp/claude-exited ] && [ "$startup_ready" = "1" ]; then
+  log "Injecting prompt (${#TASK_PROMPT} chars)"
+  printf '%s' "$TASK_PROMPT" > /tmp/task-prompt.txt
+  tmux load-buffer -b prompt /tmp/task-prompt.txt
+  tmux paste-buffer -t "$SESSION" -b prompt -d -p
+  sleep 1
+  tmux send-keys -t "$SESSION" Enter
+elif [ ! -f /tmp/claude-exited ]; then
+  log "Prompt injection skipped because Claude startup gates are still visible"
+  tmux capture-pane -t "$SESSION" -p -S - > /workspace/.bench-transcript.log 2>/dev/null || true
+  persist_runtime_claude_state
+  tmux kill-session -t "$SESSION" 2>/dev/null || true
+  exit 1
+fi
 
 # ---------- 6) 等 Stop hook 触发 / 超时 ----------
 log "Waiting for Stop hook or timeout (${TIMEOUT_SEC}s)"
 deadline=$(( $(date +%s) + TIMEOUT_SEC ))
-while [ ! -f /tmp/claude-done ] && [ "$(date +%s)" -lt "$deadline" ]; do
+while [ ! -f /tmp/claude-done ] && [ ! -f /tmp/claude-exited ] && [ "$(date +%s)" -lt "$deadline" ]; do
   sleep 2
 done
 
-# ---------- 7) 抓取 transcript，关掉 tmux ----------
+# ---------- 7) 抓取 transcript,关掉 tmux ----------
 tmux capture-pane -t "$SESSION" -p -S - > /workspace/.bench-transcript.log 2>/dev/null || true
+persist_runtime_claude_state
 tmux kill-session -t "$SESSION" 2>/dev/null || true
 
 if [ -f /tmp/claude-done ]; then
   log "Claude finished normally"
   exit 0
+elif [ -f /tmp/claude-exited ]; then
+  code=$(cat /tmp/claude-exit-code 2>/dev/null || echo 1)
+  log "Claude exited early with code ${code}"
+  exit "$code"
 else
   log "Timeout after ${TIMEOUT_SEC}s"
   exit 124

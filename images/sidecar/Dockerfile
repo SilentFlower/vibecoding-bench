@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       iproute2 iptables iputils-ping \
       ca-certificates curl wget xz-utils \
       proxychains4 \
+      unbound dnsutils \
       tini \
     && rm -rf /var/lib/apt/lists/*
 

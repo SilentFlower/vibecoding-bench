@@ -54,6 +54,10 @@ WORKER_IMAGE = os.environ.get("WORKER_IMAGE", "vibebench-worker:latest")
 SIDECAR_IMAGE = os.environ.get("SIDECAR_IMAGE", "vibebench-sidecar:latest")
 PER_ACCOUNT_CONCURRENCY = int(os.environ.get("PER_ACCOUNT_CONCURRENCY", "2"))
 SIDECAR_BOOT_WAIT = float(os.environ.get("SIDECAR_BOOT_WAIT", "4"))
+WORKER_USER = "node"
+WORKER_HOME = "/home/node"
+WORKER_UID = 1000
+WORKER_GID = 1000
 
 # Cookie-Session 鉴权(可选,替代 Basic Auth 给前端做风格统一的登录页):
 # - WEBUI_USER + WEBUI_PASS 都填才启用,任一为空则旁路放行(本地开发)
@@ -67,6 +71,170 @@ _AUTH_ENABLED = bool(WEBUI_USER and WEBUI_PASS)
 _SESSION_SECRET = os.environ.get("WEBUI_SESSION_SECRET") or secrets.token_hex(32)
 _SESSION_TTL = 7 * 24 * 3600  # 7 天
 _SESSION_COOKIE = "vb_session"
+_DEFAULT_CLAUDE_SETTINGS: dict[str, object] = {
+    "env": {
+        "CLAUDE_CODE_EFFORT_LEVEL": "max",
+    },
+    "permissions": {
+        "defaultMode": "bypassPermissions",
+        "allow": [
+            "Bash",
+            "BashOutput",
+            "Edit",
+            "Glob",
+            "Grep",
+            "KillShell",
+            "NotebookEdit",
+            "Read",
+            "SlashCommand",
+            "Task",
+            "TodoWrite",
+            "WebFetch",
+            "WebSearch",
+            "Write",
+        ],
+        "deny": [],
+    },
+    "skipDangerousModePermissionPrompt": True,
+    "autoMemoryEnabled": False,
+    "theme": "dark",
+    "model": "opus[1m]",
+}
+_DEFAULT_CLAUDE_TOP_CONFIG: dict[str, object] = {
+    "hasCompletedOnboarding": True,
+    "bypassPermissionsModeAccepted": True,
+}
+
+
+def _merge_claude_settings(existing: object, defaults: dict[str, object]) -> dict[str, object]:
+    """
+    递归合并 Claude settings，保留未知字段并让项目默认值覆盖同名字段。
+
+    :param existing: 现有 settings.json 解析结果；非对象时视为空配置
+    :param defaults: 项目要求写入的默认 settings
+    :return: 合并后的 settings 对象
+    """
+    merged = dict(existing) if isinstance(existing, dict) else {}
+    for key, value in defaults.items():
+        old_value = merged.get(key)
+        if isinstance(old_value, dict) and isinstance(value, dict):
+            merged[key] = _merge_claude_settings(old_value, value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _persist_default_claude_settings(profile_dir: Path) -> None:
+    """
+    把默认 settings.json 持久化进账号 profile 目录。
+
+    :param profile_dir: `data/profiles/<account>` 对应目录
+    :return: None
+    """
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    settings_path = profile_dir / "settings.json"
+    existing: object = {}
+    if settings_path.exists():
+        try:
+            existing = json.loads(settings_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            # 先备份坏文件再覆盖，避免 Claude 写半截时把现场直接抹掉。
+            backup = profile_dir / f"settings.json.invalid.{int(time.time())}"
+            try:
+                shutil.copy2(settings_path, backup)
+            except OSError:
+                pass
+    merged = _merge_claude_settings(existing, _DEFAULT_CLAUDE_SETTINGS)
+    tmp_path = profile_dir / "settings.json.tmp"
+    tmp_path.write_text(
+        json.dumps(merged, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    tmp_path.replace(settings_path)
+    _make_worker_owned(settings_path)
+
+
+def _persist_default_claude_top_config(profile_dir: Path) -> None:
+    """
+    补齐顶层 `~/.claude.json` 里的本地 onboarding / bypassPermissions gate。
+
+    :param profile_dir: `data/profiles/<account>` 对应目录
+    :return: None
+    """
+    top_config_path = profile_dir / ".claude.json"
+    if not top_config_path.exists():
+        return
+    try:
+        existing = json.loads(top_config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        # 顶层配置含 OAuth 身份信息；坏文件不应被默认值覆盖成空身份。
+        backup = profile_dir / f".claude.json.invalid.{int(time.time())}"
+        try:
+            shutil.copy2(top_config_path, backup)
+        except OSError:
+            pass
+        return
+    if not isinstance(existing, dict):
+        return
+    merged = dict(existing)
+    merged.update(_DEFAULT_CLAUDE_TOP_CONFIG)
+    tmp_path = profile_dir / ".claude.json.tmp"
+    tmp_path.write_text(
+        json.dumps(merged, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    tmp_path.replace(top_config_path)
+    _make_worker_owned(top_config_path)
+
+
+def _make_worker_owned(path: Path) -> None:
+    """
+    让 worker 容器内的 node 用户可读写宿主挂载路径。
+
+    docker bind mount 会保留宿主 uid/gid；orchestrator 以 root 创建的
+    profile/workspace 如果不改属主，Claude 以非 root 跑时无法写配置或产物。
+    """
+    if not path.exists():
+        return
+    targets = [path]
+    if path.is_dir():
+        targets.extend(path.rglob("*"))
+    for target in targets:
+        try:
+            os.chown(target, WORKER_UID, WORKER_GID)
+        except OSError:
+            # 某些宿主文件系统不支持 chown，保留 chmod 兜底。
+            pass
+        try:
+            mode = target.stat().st_mode & 0o777
+            if target.is_dir():
+                os.chmod(target, mode | 0o700)
+            else:
+                os.chmod(target, mode | 0o600)
+        except OSError:
+            pass
+
+
+def _claude_exec_env(use_sidecar: bool, extra: Optional[dict[str, str]] = None) -> dict[str, str]:
+    """
+    生成 docker exec 启动 Claude 子命令时必须显式传入的环境变量。
+
+    entrypoint 里 export 的变量不会自动进入 docker exec 创建的新进程；走
+    sidecar MITM 时必须重复传 CA 路径，否则登录 TUI 可能不信 MITM 证书。
+    """
+    env = {"HOME": WORKER_HOME}
+    if use_sidecar:
+        ca = "/etc/mitm/mitmproxy-ca-cert.pem"
+        env.update({
+            "NODE_EXTRA_CA_CERTS": ca,
+            "SSL_CERT_FILE": ca,
+            "REQUESTS_CA_BUNDLE": ca,
+            "CURL_CA_BUNDLE": ca,
+            "GIT_SSL_CAINFO": ca,
+        })
+    if extra:
+        env.update(extra)
+    return env
 
 
 # ============== DB ==============
@@ -234,10 +402,15 @@ class Runner:
 
         # 容器内创建运行目录（docker 会按宿主路径挂载到子容器）
         (BENCH_DATA / "workspaces" / run_id).mkdir(parents=True, exist_ok=True)
+        (BENCH_DATA / "workspaces" / run_id / ".claude-home").mkdir(parents=True, exist_ok=True)
         (BENCH_DATA / "flows" / acc_name / str(task["id"]) / run_id).mkdir(parents=True, exist_ok=True)
         CA_DIR.mkdir(parents=True, exist_ok=True)
+        _persist_default_claude_settings(BENCH_DATA / "profiles" / acc_name)
+        _persist_default_claude_top_config(BENCH_DATA / "profiles" / acc_name)
+        _make_worker_owned(BENCH_DATA / "workspaces" / run_id)
 
         host_workspace = HOST_BENCH_DATA / "workspaces" / run_id
+        host_claude_home = HOST_BENCH_DATA / "workspaces" / run_id / ".claude-home"
         host_flows = HOST_BENCH_DATA / "flows" / acc_name / str(task["id"]) / run_id
         host_profile = HOST_BENCH_DATA / "profiles" / acc_name
         host_ca = HOST_BENCH_DATA / "ca"
@@ -286,8 +459,9 @@ class Runner:
             auto_remove=False,
             network_mode=f"container:{sidecar_name}",
             volumes={
-                str(host_profile): {"bind": "/mnt/profile", "mode": "ro"},
+                str(host_profile): {"bind": "/mnt/profile", "mode": "rw"},
                 str(host_workspace): {"bind": "/workspace", "mode": "rw"},
+                str(host_claude_home): {"bind": f"{WORKER_HOME}/.claude", "mode": "rw"},
                 str(host_ca): {"bind": "/etc/mitm", "mode": "ro"},
             },
             environment={
@@ -385,7 +559,10 @@ class LoginManager:
 
         try:
             host_profile = HOST_BENCH_DATA / "profiles" / name
-            (BENCH_DATA / "profiles" / name).mkdir(parents=True, exist_ok=True)
+            local_profile = BENCH_DATA / "profiles" / name
+            local_profile.mkdir(parents=True, exist_ok=True)
+            _persist_default_claude_settings(local_profile)
+            _persist_default_claude_top_config(local_profile)
             CA_DIR.mkdir(parents=True, exist_ok=True)
             host_ca = HOST_BENCH_DATA / "ca"
 
@@ -422,12 +599,13 @@ class LoginManager:
                 time.sleep(SIDECAR_BOOT_WAIT)
                 worker_network = f"container:{sidecar_name}"
 
-            # worker：login 模式，profile 目录直接 rw 挂到 /root/.claude
+            # worker：login 模式，profile 目录直接 rw 挂到 node 用户 HOME。
             # hostname 注入条件:network_mode=container:xxx 时 Docker 拒绝
             # 同时传 hostname(会继承 sidecar 的);只在 bridge 模式自己设。
             # MAC 同样:有 sidecar 时由 sidecar 决定,bridge 模式我们控不了。
             # mem_limit 与 task 模式一致,确保 login 时 Anthropic 看到的
             # constrainedMemory 跟后续 task 时是同一台机器。
+            _make_worker_owned(local_profile)
             worker_kwargs: dict = {
                 "name": worker_name,
                 "mem_limit": fp["mem"],
@@ -438,11 +616,13 @@ class LoginManager:
                 "stdin_open": True,
                 "network_mode": worker_network,
                 "volumes": {
-                    str(host_profile): {"bind": "/root/.claude", "mode": "rw"},
+                    str(host_profile): {"bind": f"{WORKER_HOME}/.claude", "mode": "rw"},
                     str(host_ca): {"bind": "/etc/mitm", "mode": "ro"},
                 },
                 "environment": {
                     "WORKER_MODE": "login",
+                    "USE_SIDECAR_DNS": "1" if sidecar_id else "0",
+                    "HOME": WORKER_HOME,
                     "ACC_NAME": name,
                     "TZ": fp["tz"],
                     "LANG": fp["lang"],
@@ -476,6 +656,9 @@ class LoginManager:
         ex = api.exec_create(
             s.worker_id, ["claude", "auth", "status"],
             stdout=True, stderr=True,
+            user=WORKER_USER,
+            environment=_claude_exec_env(s.sidecar_id is not None),
+            workdir=WORKER_HOME,
         )
         raw = api.exec_start(ex["Id"])
         text = raw.decode("utf-8", errors="ignore").strip()
@@ -484,6 +667,41 @@ class LoginManager:
             return json.loads(text)
         except json.JSONDecodeError:
             return {"raw": text, "loggedIn": False}
+
+    def persist_top_config(self, sid: str) -> None:
+        """
+        把登录容器内的 $HOME/.claude.json 写回 profile 目录。
+
+        不能把该文件直接 bind mount 到容器内：Claude Code 用临时文件 +
+        rename 原子写配置，Docker file bind mount 会让 rename 报 EBUSY。
+        """
+        s = self.get(sid)
+        if not s:
+            raise KeyError(sid)
+        api = self.client.api
+        ex = api.exec_create(
+            s.worker_id,
+            ["sh", "-lc", "cat \"$HOME/.claude.json\""],
+            stdout=True,
+            stderr=True,
+            user=WORKER_USER,
+            environment={"HOME": WORKER_HOME},
+            workdir=WORKER_HOME,
+        )
+        raw = api.exec_start(ex["Id"])
+        inspected = api.exec_inspect(ex["Id"])
+        if inspected.get("ExitCode") != 0:
+            raise ValueError(
+                f"failed to read top-level .claude.json: exit "
+                f"{inspected.get('ExitCode')}"
+            )
+        text = raw.decode("utf-8", errors="ignore")
+        if not text.strip():
+            raise ValueError("top-level .claude.json is empty or missing")
+        path = BENCH_DATA / "profiles" / s.name / ".claude.json"
+        path.write_text(text, encoding="utf-8")
+        _persist_default_claude_top_config(path.parent)
+        _make_worker_owned(path)
 
     def cleanup(self, sid: str) -> None:
         with self._lock:
@@ -842,11 +1060,13 @@ async def login_ws(websocket: WebSocket, sid: str):
             ["claude", "auth", "login"],
             stdin=True,
             tty=True,
-            environment={
+            user=WORKER_USER,
+            environment=_claude_exec_env(session.sidecar_id is not None, {
                 "TERM": "xterm-256color",
                 "COLUMNS": "120",
                 "LINES": "36",
-            },
+            }),
+            workdir=WORKER_HOME,
         )["Id"]
         sock = api.exec_start(
             exec_id, detach=False, tty=True,
@@ -981,6 +1201,14 @@ def login_commit(sid: str, body: LoginStartIn):
     if not status.get("loggedIn"):
         # 不清容器：让用户继续 retry。返回错误细节给前端展示。
         raise HTTPException(400, f"not logged in yet: {status}")
+
+    try:
+        login_manager.persist_top_config(sid)
+    except Exception as e:
+        raise HTTPException(500, f"failed to persist top-level claude config: {e}")
+
+    _persist_default_claude_settings(BENCH_DATA / "profiles" / name)
+    _persist_default_claude_top_config(BENCH_DATA / "profiles" / name)
 
     # 清理 profile 残留遥测痕迹:OAuth 启动那次 claude 写到 telemetry/ 和
     # backups/ 的内容对后续 task run 无用,反而会被一路重放 → 入库前清掉。

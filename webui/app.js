@@ -260,6 +260,20 @@ async function attachAccLoginTerminal(wsPath) {
     }
   });
 
+  // 粘贴本地回显:claude TUI 的 "Paste code here >" 默认不回显粘贴内容,
+  // 用户看不到自己粘了啥。在 xterm 内部 textarea 上挂 paste 监听,把文本以
+  // 暗色写到屏幕(本地回显);onData 仍把数据照常透传给后端 PTY,服务端不变。
+  const ta = host.querySelector('textarea.xterm-helper-textarea');
+  if (ta) {
+    ta.addEventListener('paste', (e) => {
+      const text = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+      if (text) {
+        // \x1b[2m = dim, \x1b[0m = reset; 粘贴文本可能含换行,统一成 CRLF
+        term.write(`\x1b[2m${text.replace(/\r?\n/g, '\r\n')}\x1b[0m`);
+      }
+    });
+  }
+
   // 窗口变化重新 fit + 通知后端
   const onResize = () => {
     try { fit.fit(); } catch {}
