@@ -354,6 +354,7 @@ code {
 /* ===== tables ===== */
 .table-frame {
   position: relative;
+  overflow-x: auto;
   background:
     linear-gradient(180deg, rgba(255,182,73,0.02), transparent 40%),
     var(--surface);
@@ -373,6 +374,7 @@ code {
 
 table.data {
   width: 100%;
+  min-width: 1040px;
   table-layout: fixed;
   border-collapse: collapse;
 }
@@ -386,6 +388,11 @@ table.data td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+table.data td:last-child,
+table.data th:last-child {
+  overflow: visible;
+  text-overflow: clip;
 }
 table.data th.right, table.data td.right { text-align: right; font-variant-numeric: tabular-nums; }
 table.data thead th {
@@ -420,14 +427,14 @@ table.data td code {
 }
 table.data tbody tr:hover td code { color: var(--text); }
 .hidden { display: none !important; }
-table.data th:nth-child(1),
-table.data td:nth-child(1) {
-  width: 7.5rem;
-}
+.batches-table { min-width: 1160px; }
+.runs-table { min-width: 1220px; }
 .batches-table th:nth-child(1),
 .batches-table td:nth-child(1) { width: 4.25rem; }
+.batches-table th:nth-child(2),
+.batches-table td:nth-child(2) { width: 10rem; }
 .batches-table th:nth-child(3),
-.batches-table td:nth-child(3) { width: 6rem; }
+.batches-table td:nth-child(3) { width: 8.5rem; }
 .batches-table th:nth-child(4),
 .batches-table td:nth-child(4),
 .batches-table th:nth-child(5),
@@ -435,24 +442,25 @@ table.data td:nth-child(1) {
 .batches-table th:nth-child(6),
 .batches-table td:nth-child(6) { width: 7rem; }
 .batches-table th:nth-child(7),
-.batches-table td:nth-child(7) { width: 11rem; }
+.batches-table td:nth-child(7) { width: 13rem; }
 .runs-table th:nth-child(1),
-.runs-table td:nth-child(1) { width: 8rem; }
+.runs-table td:nth-child(1) { width: 6.5rem; }
 .runs-table th:nth-child(3),
-.runs-table td:nth-child(3) { width: 7.5rem; }
+.runs-table td:nth-child(3) { width: 7rem; }
 .runs-table th:nth-child(4),
-.runs-table td:nth-child(4) { width: 6rem; }
+.runs-table td:nth-child(4) { width: 8.5rem; }
 .runs-table th:nth-child(5),
 .runs-table td:nth-child(5),
 .runs-table th:nth-child(6),
 .runs-table td:nth-child(6) { width: 5rem; }
 .runs-table th:nth-child(7),
-.runs-table td:nth-child(7) { width: 15rem; }
+.runs-table td:nth-child(7) { width: 16rem; }
 .op-actions {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-width: 0;
+  min-width: max-content;
+  white-space: nowrap;
 }
 .op-actions .btn {
   flex: 0 0 auto;
