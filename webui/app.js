@@ -124,6 +124,7 @@ async function renderAccounts() {
       <td>${a.enabled ? '✓' : '✗'}</td>
       <td>
         <button class="btn btn-sm" data-quota="${a.id}">额度</button>
+        <button class="btn btn-sm" data-relogin="${a.id}">重授权</button>
         <button class="btn btn-sm btn-danger" data-del="${a.id}">删除</button>
       </td>
     </tr>
@@ -132,6 +133,7 @@ async function renderAccounts() {
   body.onclick = async (e) => {
     const id = e.target.dataset.del;
     const quotaId = e.target.dataset.quota;
+    const reloginId = e.target.dataset.relogin;
     if (quotaId) {
       e.target.disabled = true;
       try {
@@ -142,6 +144,11 @@ async function renderAccounts() {
       } finally {
         e.target.disabled = false;
       }
+      return;
+    }
+    if (reloginId) {
+      const account = state.accounts.find(a => String(a.id) === String(reloginId));
+      if (account) openAccLoginModal(account);
       return;
     }
     if (id && confirm(`删除账号 #${id}?`)) {
@@ -155,7 +162,12 @@ async function renderAccounts() {
     e.preventDefault();
     const fd = new FormData(e.target);
     const body = {};
-    for (const [k, v] of fd) if (v) body[k] = k.endsWith('_port') ? Number(v) : v;
+    for (const [k, v] of fd) {
+      if (!v) continue;
+      if (k.endsWith('_port')) body[k] = Number(v);
+      else if (k === 'force_reauth') body[k] = v === 'true';
+      else body[k] = v;
+    }
     startAccLogin(body);
   };
   // SOCKS5 URL 粘贴解析:输入即触发,实时回填下面 4 个字段
@@ -231,10 +243,22 @@ function applySocks5Url(raw) {
 //   step 2: 打开 WS PTY → 用户在 xterm 里走 claude auth login → 点 commit
 //   commit: POST /api/accounts/login/{sid}/commit → 校验 → 写库 → 关容器
 // 取消任意一步都 DELETE /api/accounts/login/{sid} 清场。
-function openAccLoginModal() {
+function openAccLoginModal(account = null) {
   // 重置到 step 1
+  const form = $('#acc-form');
   showAccStep('config');
-  $('#acc-form').reset();
+  form.reset();
+  state.accLogin = account ? { mode: 'relogin', accountId: account.id } : { mode: 'new' };
+  if (account) {
+    form.elements.name.value = account.name || '';
+    form.elements.upstream_socks5_host.value = account.upstream_socks5_host || '';
+    form.elements.upstream_socks5_port.value = account.upstream_socks5_port || '';
+    form.elements.upstream_socks5_user.value = account.upstream_socks5_user || '';
+    form.elements.upstream_socks5_pass.value = account.upstream_socks5_pass || '';
+  }
+  form.elements.name.readOnly = Boolean(account);
+  $('#acc-force-reauth').value = account ? 'true' : 'false';
+  $('.modal-titlebar-name', $('#acc-modal')).firstChild.textContent = account ? 'acc / relogin ' : 'acc / new ';
   $('#acc-modal-stage').textContent = 'step 1 · configure';
   openModal('#acc-modal');
 }
@@ -246,7 +270,8 @@ function showAccStep(which) {
 }
 
 async function startAccLogin(body) {
-  state.accLogin = state.accLogin || {};
+  const loginState = state.accLogin || {};
+  state.accLogin = loginState;
   let resp;
   try {
     resp = await API('/accounts/login/start', {
@@ -258,6 +283,8 @@ async function startAccLogin(body) {
   }
   // 保存 socks5/name 给 commit 用
   state.accLogin.body = body;
+  state.accLogin.mode = loginState.mode || 'new';
+  state.accLogin.accountId = loginState.accountId || null;
   state.accLogin.sid = resp.session_id;
   state.accLogin.name = resp.name;
 
@@ -377,7 +404,8 @@ async function commitAccLogin() {
       method: 'POST',
       body: JSON.stringify(al.body || { name: al.name }),
     });
-    if (al.term) al.term.write(`\r\n\x1b[32m[ok] account saved (#${r.id}) · auth=${r.auth_method}\x1b[0m\r\n`);
+    const action = al.mode === 'relogin' ? 'reauthorized' : 'saved';
+    if (al.term) al.term.write(`\r\n\x1b[32m[ok] account ${action} (#${r.id}) · auth=${r.auth_method}\x1b[0m\r\n`);
     // commit 成功后服务端已清容器；前端关 WS + 弹窗 + 刷列表
     endAccLogin({ alsoCloseModal: true, skipServerCancel: true });
     renderAccounts();

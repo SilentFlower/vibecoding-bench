@@ -248,6 +248,7 @@
 
       <!-- Step 1: 配置 + 启动登录会话 -->
       <form id="acc-form" class="form acc-step acc-step-config">
+        <input type="hidden" id="acc-force-reauth" name="force_reauth" value="false" />
         <label><span class="lbl">$ name</span>
           <span class="hint inline">本地账号标签（独一无二即可）</span>
           <input name="name" required pattern="[A-Za-z0-9_\-]+" placeholder="main" />

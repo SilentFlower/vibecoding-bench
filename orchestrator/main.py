@@ -1255,16 +1255,19 @@ class LoginSession:
     """单个 OAuth 引导会话：一对 sidecar+worker + 元数据"""
 
     __slots__ = ("sid", "name", "sidecar_id", "worker_id", "created_at",
-                 "socks5", "committed")
+                 "socks5", "profile_dir", "force_reauth", "committed")
 
     def __init__(self, sid: str, name: str, sidecar_id: Optional[str],
-                 worker_id: str, socks5: dict) -> None:
+                 worker_id: str, socks5: dict, profile_dir: Path,
+                 force_reauth: bool) -> None:
         self.sid = sid
         self.name = name
         self.sidecar_id = sidecar_id
         self.worker_id = worker_id
         self.created_at = time.time()
         self.socks5 = socks5
+        self.profile_dir = profile_dir
+        self.force_reauth = force_reauth
         self.committed = False
 
 
@@ -1313,7 +1316,7 @@ class LoginManager:
         except Exception:
             pass
 
-    def start(self, name: str, socks5: dict) -> LoginSession:
+    def start(self, name: str, socks5: dict, force_reauth: bool = False) -> LoginSession:
         if not _ACC_NAME_RE.match(name):
             raise ValueError(
                 "invalid account name: must match [a-zA-Z0-9_-]+"
@@ -1328,11 +1331,29 @@ class LoginManager:
             self._name_locks[name] = sid
 
         try:
-            host_profile = HOST_BENCH_DATA / "profiles" / name
-            local_profile = BENCH_DATA / "profiles" / name
-            local_profile.mkdir(parents=True, exist_ok=True)
-            _persist_default_claude_settings(local_profile)
-            _persist_default_claude_top_config(local_profile)
+            actual_host_profile = HOST_BENCH_DATA / "profiles" / name
+            actual_local_profile = BENCH_DATA / "profiles" / name
+            actual_local_profile.mkdir(parents=True, exist_ok=True)
+            _persist_default_claude_settings(actual_local_profile)
+            _persist_default_claude_top_config(actual_local_profile)
+            if force_reauth:
+                # 重授权不能直接删除真实 profile 里的旧凭据；用户取消时历史账号仍要可用。
+                # 因此给登录容器挂一个一次性 profile 副本，并移除副本里的 credentials，
+                # 迫使 `claude auth login` 进入 OAuth 流程，commit 成功后再白名单覆盖回真实 profile。
+                local_profile = BENCH_DATA / "login-sessions" / sid / "profile"
+                host_profile = HOST_BENCH_DATA / "login-sessions" / sid / "profile"
+                shutil.rmtree(local_profile.parent, ignore_errors=True)
+                local_profile.mkdir(parents=True, exist_ok=True)
+                _copy_profile_whitelist_to_claude_home(actual_local_profile, local_profile)
+                try:
+                    (local_profile / ".credentials.json").unlink()
+                except FileNotFoundError:
+                    pass
+                _persist_default_claude_settings(local_profile)
+                _persist_default_claude_top_config(local_profile)
+            else:
+                host_profile = actual_host_profile
+                local_profile = actual_local_profile
             CA_DIR.mkdir(parents=True, exist_ok=True)
             host_ca = HOST_BENCH_DATA / "ca"
 
@@ -1407,7 +1428,8 @@ class LoginManager:
             worker = self.client.containers.run(WORKER_IMAGE, **worker_kwargs)
 
             session = LoginSession(
-                sid, name, sidecar_id, worker.id, socks5
+                sid, name, sidecar_id, worker.id, socks5, local_profile,
+                force_reauth,
             )
             with self._lock:
                 self.sessions[sid] = session
@@ -1415,6 +1437,8 @@ class LoginManager:
         except Exception:
             with self._lock:
                 self._name_locks.pop(name, None)
+            if force_reauth:
+                shutil.rmtree(BENCH_DATA / "login-sessions" / sid, ignore_errors=True)
             raise
 
     def get(self, sid: str) -> Optional[LoginSession]:
@@ -1475,6 +1499,30 @@ class LoginManager:
         _persist_default_claude_top_config(path.parent)
         _make_worker_owned(path)
 
+    def persist_profile_files(self, sid: str) -> None:
+        """
+        把登录容器写入的认证文件同步回真实账号 profile。
+
+        :param sid: 登录会话 ID
+        :return: None
+        """
+        s = self.get(sid)
+        if not s:
+            raise KeyError(sid)
+        src_credentials = s.profile_dir / ".credentials.json"
+        if not src_credentials.exists():
+            raise ValueError("login session did not produce .credentials.json")
+        dst_profile = BENCH_DATA / "profiles" / s.name
+        dst_profile.mkdir(parents=True, exist_ok=True)
+        for name in (".credentials.json", "settings.json"):
+            src = s.profile_dir / name
+            if not src.exists() or not src.is_file():
+                continue
+            dst = dst_profile / name
+            if src.resolve() != dst.resolve():
+                shutil.copy2(src, dst)
+            _make_worker_owned(dst)
+
     def cleanup(self, sid: str) -> None:
         with self._lock:
             s = self.sessions.pop(sid, None)
@@ -1492,6 +1540,8 @@ class LoginManager:
                 c.remove(force=True)
             except Exception:
                 pass
+        if s.force_reauth:
+            shutil.rmtree(s.profile_dir.parent, ignore_errors=True)
         with self._lock:
             if self._name_locks.get(s.name) == sid:
                 del self._name_locks[s.name]
@@ -2172,6 +2222,7 @@ class LoginStartIn(BaseModel):
     upstream_socks5_port: Optional[int] = None
     upstream_socks5_user: Optional[str] = None
     upstream_socks5_pass: Optional[str] = None
+    force_reauth: bool = False
 
 
 @app.post("/api/accounts/login/start")
@@ -2188,6 +2239,7 @@ def login_start(body: LoginStartIn):
                 "user": body.upstream_socks5_user,
                 "pass": body.upstream_socks5_pass,
             },
+            body.force_reauth,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -2365,9 +2417,10 @@ def login_commit(sid: str, body: LoginStartIn):
         raise HTTPException(400, f"not logged in yet: {status}")
 
     try:
+        login_manager.persist_profile_files(sid)
         login_manager.persist_top_config(sid)
     except Exception as e:
-        raise HTTPException(500, f"failed to persist top-level claude config: {e}")
+        raise HTTPException(500, f"failed to persist claude profile: {e}")
 
     _persist_default_claude_settings(BENCH_DATA / "profiles" / name)
     _persist_default_claude_top_config(BENCH_DATA / "profiles" / name)
