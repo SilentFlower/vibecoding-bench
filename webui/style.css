@@ -428,13 +428,17 @@ table.data td code {
 table.data tbody tr:hover td code { color: var(--text); }
 .hidden { display: none !important; }
 .batches-table { min-width: 1160px; }
-.runs-table { min-width: 1380px; }
+.runs-table {
+  width: auto;
+  min-width: 1120px;
+}
 .run-col-id { width: 7.5rem; }
+.run-col-task { width: 24rem; }
 .run-col-account { width: 7rem; }
 .run-col-status { width: 9.5rem; }
 .run-col-duration { width: 6rem; }
 .run-col-exit { width: 4.5rem; }
-.run-col-op { width: 20rem; }
+.run-col-op { width: 18rem; }
 .batches-table th:nth-child(1),
 .batches-table td:nth-child(1) { width: 4.25rem; }
 .batches-table th:nth-child(2),
