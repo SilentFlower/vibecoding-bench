@@ -182,12 +182,27 @@ async function renderAccounts() {
 
 function openQuotaDetail(accountId, quota) {
   const row = state.accounts.find(a => String(a.id) === String(accountId));
+  const formatResetAt = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return new Intl.DateTimeFormat('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).format(date).replace(/\//g, '-');
+  };
   const fmt = (v) => {
     if (!v) return '<span class="muted">暂无数据 / 需一次 API 响应后可用</span>';
     const used = v.used_percentage ?? v.utilization ?? '-';
     return `
       <div>used: <strong>${escapeHTML(used)}%</strong></div>
-      <div>reset: <code>${escapeHTML(v.resets_at || '-')}</code></div>
+      <div>reset: <code>${escapeHTML(formatResetAt(v.resets_at))}</code> <span class="muted">UTC+8</span></div>
     `;
   };
   $('#modal-content').innerHTML = `
