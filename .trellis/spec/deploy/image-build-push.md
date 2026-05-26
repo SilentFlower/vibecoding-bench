@@ -116,9 +116,11 @@ Claude 返回认证错误文本时必须失败,不能作为最终 assistant 回�
 
 task 启动前可以刷新 OAuth access token,但必须先读 `.credentials.json` 里的 `claudeAiOauth.expiresAt`:只有 access token 缺失、已过期或距离过期小于安全缓冲(当前 10 分钟)时才调用 refresh endpoint,避免每次 run 都刷新 token。
 
-刷新 OAuth access token 或查询 OAuth usage API 前必须确认 sidecar DNS 对 `platform.claude.com` 和 `api.anthropic.com` 都可解析。不能只等待 `api.anthropic.com`:refresh endpoint 在 `platform.claude.com`,quota probe 又是通过 `docker exec` 进入 login-mode worker,两者都可能踩到 sidecar/unbound 冷启动竞态。DNS readiness 和 Python URL 请求都必须是有限等待/有限重试,不能无限循环。
+刷新 OAuth access token 或查询 OAuth usage API 前必须确认 sidecar 的通用 DNS resolver 已可用。sidecar/unbound 配的是通配 `forward-zone "."`,所以 readiness probe 应验证一个稳定探针域名能解析,不能把每个业务目标域名硬编码成白名单。orchestrator 可以用 `docker exec` 进 sidecar 等 `/tmp/sidecar-ready` 或通用探针解析成功,但不能用 orchestrator/宿主机网络代替 sidecar 解析。实际 OAuth/API URL 请求还必须有限重试,覆盖 resolver 刚启动后的瞬时 `Temporary failure in name resolution`。
 
 不能用宿主机网络或宿主 DNS 作为 OAuth refresh / usage 的 fallback。账号相关请求和域名解析都必须留在 worker→sidecar→账号 SOCKS5 链路里,否则会从宿主原始 IP 泄漏域名查询或 HTTPS 出口。
+
+上游 SOCKS5 服务器地址可以填域名。这个域名是建立代理链路之前的 bootstrap 解析,只能用 sidecar 启动时的默认 DNS 解析成 IP 后再连接代理;它和 Claude/API/WebFetch 访问的业务目标域名不是一类问题。不要为了阻断业务 DNS 泄漏而禁止 SOCKS5 域名。
 
 worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 prompt；只能等待 JSONL 变化,直到完成、Claude 退出或 `TIMEOUT_SEC` 到期。
 
@@ -147,6 +149,10 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
 
 **Bad**:worker 启动前只等 `api.anthropic.com` 可解析,然后立刻刷新 OAuth token。`platform.claude.com` 尚未解析成功时会出现 `<urlopen error [Errno -3] Temporary failure in name resolution>`。
 
+**Bad**:每遇到一个新网页域名就加一个 DNS 等待白名单。正确做法是验证 sidecar 的通用 resolver 可用,后续任意域名都走同一条 worker→unbound→tun→SOCKS5 链路。
+
+**Bad**:在 orchestrator 容器或宿主机上提前解析业务域名,再把解析结果当成 worker 可用。这个检查既不能证明 sidecar netns 里的 unbound 已经可用,也可能泄漏宿主 DNS 查询。
+
 **Bad**:为了解决完成判定,把 `BENCH_DONE:<RUN_ID>` 之类的 bench sentinel 拼进题目 prompt。这样会污染被测任务的自然输出。
 
 ### 6. Tests Required
@@ -159,7 +165,7 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
   - 最新 assistant 文本包含 `Please run /login · API Error: 401 Invalid authentication credentials` 时判失败。
   - 最新 session JSONL mtime 未达到稳定窗口时判未完成。
 - 用 profile settings 样例断言:合并默认 settings 后 `hooks` / `statusLine` 被删除。
-- 用 worker/quota 启动路径断言:OAuth refresh/usage 前等待 `platform.claude.com` 和 `api.anthropic.com`,且 DNS/URL 临时失败有限重试。
+- 用 worker/quota 启动路径断言:OAuth refresh/usage 前等待通用 DNS resolver 可用,且 DNS/URL 临时失败有限重试。
 - 远程发布后跑一个真实 task,检查 DB 里 `success` run 的 JSONL 最新对话消息是 assistant 文本,而不是 user `tool_result`。
 
 ### 7. Wrong vs Correct

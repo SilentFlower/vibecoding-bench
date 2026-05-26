@@ -164,29 +164,19 @@ check_claude_auth_status() {
 }
 
 wait_for_sidecar_dns() {
-  # OAuth refresh 访问 platform.claude.com，Claude API 访问 api.anthropic.com。
-  # 只等其中一个域名会在 sidecar/unbound 冷启动时留下竞态，导致临时 DNS 失败。
-  local hosts="api.anthropic.com platform.claude.com"
-  local ready
-  log "Waiting for sidecar network to stabilize (DNS resolvable)..."
-  for i in $(seq 1 45); do
-    ready=1
-    for host in $hosts; do
-      if ! getent hosts "$host" >/dev/null 2>&1; then
-        ready=0
-        break
-      fi
-    done
-    if [ "$ready" -eq 1 ]; then
+  # sidecar 的 unbound 配的是通配 forward-zone "."，这里验证通用 resolver
+  # 已经能工作，而不是为每个业务目标域名维护白名单。
+  local probe_host="${DNS_READY_HOST:-example.com}"
+  log "Verifying sidecar DNS from worker namespace..."
+  for i in $(seq 1 10); do
+    if getent hosts "$probe_host" >/dev/null 2>&1; then
       log "Sidecar network ready (DNS ok after ${i}s)"
       return 0
     fi
     sleep 1
   done
-  log "WARN: DNS still not ready for all OAuth/API hosts after 45s; claude may fail"
-  for host in $hosts; do
-    getent hosts "$host" >/dev/null 2>&1 || log "WARN: unresolved host: $host"
-  done
+  log "WARN: DNS resolver still not ready after worker fallback wait; claude may fail"
+  getent hosts "$probe_host" >/dev/null 2>&1 || log "WARN: unresolved DNS probe host: $probe_host"
   return 1
 }
 
@@ -598,9 +588,8 @@ rm -f /tmp/claude-fatal-error /tmp/claude-completion-state
 # 不带的话 claude 一连 api.anthropic.com 就 UNABLE_TO_VERIFY_LEAF_SIGNATURE → 表现
 # 为 TUI 上的 "FailedToOpenSocket"。
 #
-# 启动前先等 sidecar 网络链路真正可用(DNS 通即可证明 tun→hev→mitm→上游全通):
-# orchestrator 的 SIDECAR_BOOT_WAIT 是固定常量,但 sidecar race-fix 后路由稳定要
-# 9-10s,常量不够。worker 自查 DNS 比依赖 orchestrator 估算更稳。
+# orchestrator 已在创建 worker 前 exec 进 sidecar 等待通用 DNS resolver 就绪。
+# 这里保留短兜底,防止 worker /etc/resolv.conf 覆盖后仍遇到极短瞬时竞态。
 wait_for_sidecar_dns || true
 
 refresh_oauth_credentials

@@ -22,8 +22,9 @@ log() { echo "[sidecar $(date +%H:%M:%S)] $*"; }
 # ---------- 1) proxychains 配置：mitmproxy 出站走上游 socks5 ----------
 # proxychains4 在 strict_chain + ProxyList 首条 时,host 字段必须是 IP,
 # 不接受 hostname(会以 "invalid value or is not numeric" 拒启)。
-# 这里在写配置前把 hostname 解析成 IP;已经是 IP 的话 getent 也会原样回。
-# 解析失败直接退出,避免 mitmdump 起不来后被 hev 持续转发到死端口。
+# 上游 SOCKS5 域名属于 bootstrap 解析:它发生在代理链路建立之前,没法经由
+# 这个尚未连接的 SOCKS5 自己解析。这里仍支持域名,业务网页/API 域名则在
+# sidecar ready 后走通用 resolver 和 SOCKS5 出口。
 UPSTREAM_HOST_IP="$UPSTREAM_SOCKS5_HOST"
 if ! [[ "$UPSTREAM_SOCKS5_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   resolved=$(getent ahostsv4 "$UPSTREAM_SOCKS5_HOST" | awk '{print $1; exit}')
@@ -192,6 +193,23 @@ done
 # DNS 指向 unbound;worker 共享 netns 但不共享 mount ns,worker entrypoint 也要
 # 自行写一份 /etc/resolv.conf(这里只管 sidecar 自己的解析)。
 echo "nameserver 127.0.0.1" > /etc/resolv.conf
+
+# readiness 只验证通用 resolver 链路,不是按业务域名维护白名单。后续 Claude
+# 访问任意网页时仍走同一个 127.0.0.1:53 → unbound → tun → SOCKS5 出口。
+DNS_READY_HOST="${DNS_READY_HOST:-example.com}"
+for i in $(seq 1 45); do
+  if getent hosts "$DNS_READY_HOST" >/dev/null 2>&1; then
+    touch /tmp/sidecar-ready
+    log "Sidecar DNS ready via generic resolver ($DNS_READY_HOST, after ${i}s)"
+    break
+  fi
+  sleep 1
+done
+if [ ! -f /tmp/sidecar-ready ]; then
+  log "FATAL: DNS resolver not ready after 45s for probe host $DNS_READY_HOST"
+  tail -80 /var/log/unbound.log 2>/dev/null || true
+  exit 1
+fi
 
 log "Sidecar up: mitmproxy=$MITM_PID hev=$HEV_PID unbound=$UNBOUND_PID flow=$FLOW_FILE"
 wait

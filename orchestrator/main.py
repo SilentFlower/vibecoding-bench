@@ -54,7 +54,8 @@ HOST_BENCH_DATA = Path(os.environ.get("HOST_BENCH_DATA", str(BENCH_DATA)))
 WORKER_IMAGE = os.environ.get("WORKER_IMAGE", "vibebench-worker:latest")
 SIDECAR_IMAGE = os.environ.get("SIDECAR_IMAGE", "vibebench-sidecar:latest")
 PER_ACCOUNT_CONCURRENCY = int(os.environ.get("PER_ACCOUNT_CONCURRENCY", "2"))
-SIDECAR_BOOT_WAIT = float(os.environ.get("SIDECAR_BOOT_WAIT", "4"))
+SIDECAR_READY_TIMEOUT = float(os.environ.get("SIDECAR_READY_TIMEOUT", "60"))
+DNS_READY_HOST = os.environ.get("DNS_READY_HOST", "example.com")
 WORKER_USER = "node"
 WORKER_HOME = "/home/node"
 WORKER_UID = 1000
@@ -618,6 +619,50 @@ def derive_fingerprint(account_name: str) -> dict[str, str]:
     }
 
 
+def _wait_sidecar_ready(client: "docker.DockerClient", sidecar_id: str) -> None:
+    """
+    等 sidecar 自己的透明代理与通用 DNS resolver 就绪。
+
+    :param client: Docker client
+    :param sidecar_id: sidecar 容器 ID
+    :return: None
+    """
+    deadline = time.monotonic() + SIDECAR_READY_TIMEOUT
+    last_output = ""
+    while time.monotonic() < deadline:
+        try:
+            ex = client.api.exec_create(
+                sidecar_id,
+                [
+                    "sh",
+                    "-lc",
+                    (
+                        "if [ -f /tmp/sidecar-ready ]; then exit 0; fi; "
+                        "if grep -q '^nameserver 127[.]0[.]0[.]1' /etc/resolv.conf "
+                        "&& getent hosts \"$DNS_READY_HOST\" >/dev/null 2>&1; then exit 0; fi; "
+                        "tail -30 /var/log/unbound.log 2>/dev/null || true; "
+                        "tail -30 /var/log/mitmdump.log 2>/dev/null || true; "
+                        "exit 1"
+                    ),
+                ],
+                stdout=True,
+                stderr=True,
+                environment={"DNS_READY_HOST": DNS_READY_HOST},
+            )
+            raw = client.api.exec_start(ex["Id"])
+            inspected = client.api.exec_inspect(ex["Id"])
+            last_output = raw.decode("utf-8", errors="replace").strip()
+            if inspected.get("ExitCode") == 0:
+                return
+        except Exception as exc:
+            last_output = str(exc)
+        time.sleep(1)
+    raise RuntimeError(
+        f"sidecar network/DNS not ready after {int(SIDECAR_READY_TIMEOUT)}s: "
+        f"{last_output[-1000:]}"
+    )
+
+
 # ============== Docker 运行器 ==============
 class Runner:
     """封装 sidecar + worker 的生命周期"""
@@ -672,12 +717,12 @@ class Runner:
                     "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
                     "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
                     "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
+                    "DNS_READY_HOST": DNS_READY_HOST,
                 },
             )
             sidecar_id = sidecar.id
 
-            # 等 sidecar 起：mitmdump 启动 + CA 落盘大约 2-4 秒
-            time.sleep(SIDECAR_BOOT_WAIT)
+            _wait_sidecar_ready(self.client, sidecar_id)
 
             # --- worker：共享 sidecar 网络命名空间 ---
             # 注意:network_mode=container:xxx 时 Docker 拒绝同时传 hostname,
@@ -819,10 +864,11 @@ class Runner:
                     "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
                     "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
                     "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
+                    "DNS_READY_HOST": DNS_READY_HOST,
                 },
             )
             sidecar_id = sidecar.id
-            time.sleep(SIDECAR_BOOT_WAIT)
+            _wait_sidecar_ready(self.client, sidecar_id)
             worker = self.client.containers.run(
                 WORKER_IMAGE,
                 name=worker_name,
@@ -899,10 +945,11 @@ class Runner:
                     "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
                     "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
                     "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
+                    "DNS_READY_HOST": DNS_READY_HOST,
                 },
             )
             sidecar_id = sidecar.id
-            time.sleep(SIDECAR_BOOT_WAIT)
+            _wait_sidecar_ready(self.client, sidecar_id)
             worker = self.client.containers.run(
                 WORKER_IMAGE,
                 name=worker_name,
@@ -951,8 +998,10 @@ set -eu
 if [ -f /workspace/.claude.json ]; then
   cp /workspace/.claude.json "$HOME/.claude.json"
 fi
+DNS_READY_HOST="${DNS_READY_HOST:-example.com}"
 for i in $(seq 1 45); do
-  if getent hosts api.anthropic.com >/dev/null 2>&1 && getent hosts platform.claude.com >/dev/null 2>&1; then
+  if grep -q '^nameserver 127[.]0[.]0[.]1' /etc/resolv.conf \
+    && getent hosts "$DNS_READY_HOST" >/dev/null 2>&1; then
     break
   fi
   sleep 1
@@ -1242,10 +1291,11 @@ class LoginManager:
                         "UPSTREAM_SOCKS5_PORT": str(socks5.get("port") or 1080),
                         "UPSTREAM_SOCKS5_USER": socks5.get("user") or "",
                         "UPSTREAM_SOCKS5_PASS": socks5.get("pass") or "",
+                        "DNS_READY_HOST": DNS_READY_HOST,
                     },
                 )
                 sidecar_id = sidecar.id
-                time.sleep(SIDECAR_BOOT_WAIT)
+                _wait_sidecar_ready(self.client, sidecar_id)
                 worker_network = f"container:{sidecar_name}"
 
             # worker：login 模式，profile 目录直接 rw 挂到 node 用户 HOME。
