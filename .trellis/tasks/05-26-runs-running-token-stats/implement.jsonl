@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "详情弹窗属于 modal 组件，需要遵守关闭路径收口和事件绑定规范。"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "运行详情刷新需要新增临时态和副作用句柄，必须符合单 state 对象约定。"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "前端改动涉及 innerHTML、资源释放、错误兜底和手工验收路径。"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "后端 runs 读取和 stats/transcript 端点需保持裸 sqlite3 与连接关闭规范。"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "后端/worker 改动需符合路由 docstring、异常兜底和不阻塞 API 的质量要求。"}

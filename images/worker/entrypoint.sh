@@ -351,6 +351,17 @@ terminate_task_mode() {
   exit "$code"
 }
 
+capture_transcript_snapshot() {
+  # running 详情页复用最终 transcript 文件；用临时文件替换避免前端读到半截内容。
+  if [ -z "${SESSION:-}" ]; then
+    return 0
+  fi
+  tmux has-session -t "$SESSION" 2>/dev/null || return 0
+  tmux capture-pane -t "$SESSION" -p -S - > /workspace/.bench-transcript.log.tmp 2>/dev/null \
+    && mv /workspace/.bench-transcript.log.tmp /workspace/.bench-transcript.log \
+    || true
+}
+
 classify_claude_completion() {
   # Stop hook 只能说明 Claude 结束了一次回合；真正成功必须看 session JSONL
   # 最后一条对话消息是否为稳定的纯文本 assistant 回复，不能停在 tool_use/tool_result。
@@ -626,7 +637,7 @@ if [ ! -f /tmp/claude-exited ] && [ "$startup_ready" = "1" ]; then
   tmux send-keys -t "$SESSION" Enter
 elif [ ! -f /tmp/claude-exited ]; then
   log "Prompt injection skipped because Claude startup gates are still visible"
-  tmux capture-pane -t "$SESSION" -p -S - > /workspace/.bench-transcript.log 2>/dev/null || true
+  capture_transcript_snapshot
   persist_runtime_claude_state
   tmux kill-session -t "$SESSION" 2>/dev/null || true
   exit 1
@@ -637,7 +648,9 @@ COMPLETION_IDLE_SEC="${COMPLETION_IDLE_SEC:-10}"
 log "Waiting for final assistant message or timeout (${TIMEOUT_SEC}s)"
 deadline=$(( $(date +%s) + TIMEOUT_SEC ))
 completion_done=0
+capture_transcript_snapshot
 while [ "$(date +%s)" -lt "$deadline" ]; do
+  capture_transcript_snapshot
   completion_status=0
   classify_claude_completion "$COMPLETION_IDLE_SEC" >/tmp/claude-completion-state 2>/dev/null || completion_status=$?
   if [ "$completion_status" -eq 0 ]; then
@@ -663,7 +676,7 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
 done
 
 # ---------- 7) 抓取 transcript,关掉 tmux ----------
-tmux capture-pane -t "$SESSION" -p -S - > /workspace/.bench-transcript.log 2>/dev/null || true
+capture_transcript_snapshot
 persist_runtime_claude_state
 tmux kill-session -t "$SESSION" 2>/dev/null || true
 if [ "$completion_done" -ne 1 ] && [ ! -f /tmp/claude-fatal-error ]; then

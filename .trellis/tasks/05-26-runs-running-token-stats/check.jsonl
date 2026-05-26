@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "检查 XSS、资源释放、SSE/轮询边界、跨主题和手工验收要求。"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "检查详情 modal 是否统一关闭并释放刷新句柄。"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "检查后端端点和 worker 改动是否符合 P1 质量栏。"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "检查是否误加 DB 写锁或遗漏连接关闭。"}

@@ -33,6 +33,7 @@ const state = {
   runs: [],
   topicFilter: '',
   runsEventSource: null,
+  runDetail: null,
 };
 
 // ===================== 路由 =====================
@@ -61,6 +62,7 @@ function navigate() {
     state.runsEventSource.close();
     state.runsEventSource = null;
   }
+  if (tab !== 'runs') endRunDetail();
   ROUTES[tab]();
 }
 
@@ -181,6 +183,7 @@ async function renderAccounts() {
 }
 
 function openQuotaDetail(accountId, quota) {
+  endRunDetail();
   const row = state.accounts.find(a => String(a.id) === String(accountId));
   const formatResetAt = (value) => {
     if (!value) return '-';
@@ -748,53 +751,121 @@ function paintRuns(runs) {
   };
 }
 
+function isLiveRunStatus(status) {
+  return ['queued', 'running', 'stopping'].includes(status);
+}
+
+function endRunDetail() {
+  const detail = state.runDetail;
+  if (detail && detail.timer) clearTimeout(detail.timer);
+  state.runDetail = null;
+}
+
+function renderStatValue(stats, key) {
+  if (stats?.error) return '<span class="stat-waiting">加载失败</span>';
+  if (!stats || stats.available === false) return '<span class="stat-waiting">等待采集</span>';
+  if ((key === 'tokens_in' || key === 'tokens_out') && stats.usage_available === false) {
+    return '<span class="stat-waiting">等待采集</span>';
+  }
+  return escapeHTML(stats[key] ?? 0);
+}
+
+function renderRunDetailContent(rid, run, files, stats, transcript, transcriptState) {
+  const transcriptText = transcript ? escapeHTML(transcript) : escapeHTML(transcriptState || '等待 transcript');
+  $('#modal-content').innerHTML = `
+    <h3>Run <code>${rid}</code> <span class="pill pill-${escapeHTML(run.status)}">${escapeHTML(run.status)}</span></h3>
+
+    <div class="detail-section">
+      <h4>统计</h4>
+      <div class="stats-grid">
+        <div class="stat-box"><div class="stat-label">输入 token</div><div class="stat-value">${renderStatValue(stats, 'tokens_in')}</div></div>
+        <div class="stat-box"><div class="stat-label">输出 token</div><div class="stat-value">${renderStatValue(stats, 'tokens_out')}</div></div>
+        <div class="stat-box"><div class="stat-label">请求数</div><div class="stat-value">${renderStatValue(stats, 'requests')}</div></div>
+        <div class="stat-box"><div class="stat-label">退出码</div><div class="stat-value">${run.exit_code ?? '-'}</div></div>
+      </div>
+      ${stats?.error ? `<div class="hint inline">统计加载失败：${escapeHTML(stats.error)}</div>` : ''}
+    </div>
+
+    <div class="detail-section">
+      <h4>产物文件 (${files.length})</h4>
+      <div class="file-tree">
+        ${files.length ? files.map(f => `
+          <div class="${f.type}">${escapeHTML(f.path)}${f.size != null ? `<span class="size">${formatSize(f.size)}</span>` : ''}</div>
+        `).join('') : '<div class="muted">（空）</div>'}
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Transcript</h4>
+      <pre>${transcriptText}</pre>
+    </div>
+
+    ${run.error ? `<div class="detail-section"><h4>错误</h4><pre>${escapeHTML(run.error)}</pre></div>` : ''}
+  `;
+}
+
+async function fetchRunTranscript(rid) {
+  try {
+    const r = await fetch(`/api/runs/${rid}/transcript`, { credentials: 'same-origin' });
+    if (r.status === 404) return { text: '', state: '等待 transcript' };
+    if (!r.ok) return { text: '', state: `transcript 加载失败：${r.status} ${r.statusText}` };
+    return { text: await r.text(), state: '' };
+  } catch (e) {
+    return { text: '', state: `transcript 加载失败：${e.message}` };
+  }
+}
+
+async function refreshRunDetail() {
+  const detail = state.runDetail;
+  if (!detail) return;
+  const seq = ++detail.seq;
+  const rid = detail.rid;
+  try {
+    const shouldRefreshFiles = detail.files == null || detail.fileRefreshDue || detail.finalFilesPending;
+    const [run, statsResult, transcriptResult, filesResult] = await Promise.all([
+      API(`/runs/${rid}`),
+      API(`/runs/${rid}/stats`).catch(e => ({ error: e.message })),
+      fetchRunTranscript(rid),
+      shouldRefreshFiles ? API(`/runs/${rid}/files`).catch(() => detail.files || []) : Promise.resolve(detail.files || []),
+    ]);
+    if (!state.runDetail || state.runDetail.rid !== rid || state.runDetail.seq !== seq) return;
+
+    detail.files = filesResult;
+    if (shouldRefreshFiles) detail.lastFileRefreshAt = Date.now();
+    detail.fileRefreshDue = false;
+    renderRunDetailContent(rid, run, detail.files, statsResult, transcriptResult.text, transcriptResult.state);
+
+    if (isLiveRunStatus(run.status)) {
+      detail.fileRefreshDue = Date.now() - detail.lastFileRefreshAt > 10000;
+      detail.timer = setTimeout(refreshRunDetail, 2500);
+    } else if (detail.finalFilesPending) {
+      detail.finalFilesPending = false;
+      detail.fileRefreshDue = true;
+      detail.timer = setTimeout(refreshRunDetail, 200);
+    } else {
+      detail.timer = null;
+    }
+  } catch (e) {
+    if (!state.runDetail || state.runDetail.rid !== rid || state.runDetail.seq !== seq) return;
+    $('#modal-content').innerHTML = `<p>加载失败: ${escapeHTML(e.message)}</p>`;
+    detail.timer = setTimeout(refreshRunDetail, 2500);
+  }
+}
+
 async function openRunDetail(rid) {
+  endRunDetail();
+  state.runDetail = {
+    rid,
+    timer: null,
+    seq: 0,
+    files: null,
+    fileRefreshDue: true,
+    finalFilesPending: true,
+    lastFileRefreshAt: 0,
+  };
   $('#modal-content').innerHTML = '<p class="muted">加载中…</p>';
   openModal('#modal');
-  try {
-    const [run, files, stats] = await Promise.all([
-      API(`/runs/${rid}`),
-      API(`/runs/${rid}/files`).catch(() => []),
-      API(`/runs/${rid}/stats`).catch(() => ({})),
-    ]);
-    let transcript = '';
-    try {
-      const r = await fetch(`/api/runs/${rid}/transcript`);
-      if (r.ok) transcript = await r.text();
-    } catch {}
-
-    $('#modal-content').innerHTML = `
-      <h3>Run <code>${rid}</code> <span class="pill pill-${escapeHTML(run.status)}">${escapeHTML(run.status)}</span></h3>
-
-      <div class="detail-section">
-        <h4>统计</h4>
-        <div class="stats-grid">
-          <div class="stat-box"><div class="stat-label">输入 token</div><div class="stat-value">${stats.tokens_in ?? '-'}</div></div>
-          <div class="stat-box"><div class="stat-label">输出 token</div><div class="stat-value">${stats.tokens_out ?? '-'}</div></div>
-          <div class="stat-box"><div class="stat-label">请求数</div><div class="stat-value">${stats.requests ?? '-'}</div></div>
-          <div class="stat-box"><div class="stat-label">退出码</div><div class="stat-value">${run.exit_code ?? '-'}</div></div>
-        </div>
-      </div>
-
-      <div class="detail-section">
-        <h4>产物文件 (${files.length})</h4>
-        <div class="file-tree">
-          ${files.length ? files.map(f => `
-            <div class="${f.type}">${escapeHTML(f.path)}${f.size != null ? `<span class="size">${formatSize(f.size)}</span>` : ''}</div>
-          `).join('') : '<div class="muted">（空）</div>'}
-        </div>
-      </div>
-
-      <div class="detail-section">
-        <h4>Transcript</h4>
-        <pre>${transcript ? escapeHTML(transcript) : '（暂无）'}</pre>
-      </div>
-
-      ${run.error ? `<div class="detail-section"><h4>错误</h4><pre>${escapeHTML(run.error)}</pre></div>` : ''}
-    `;
-  } catch (e) {
-    $('#modal-content').innerHTML = `<p>加载失败: ${escapeHTML(e.message)}</p>`;
-  }
+  refreshRunDetail();
 }
 
 async function startContinueRun(rid) {
@@ -842,6 +913,7 @@ document.addEventListener('click', (e) => {
     if (sel === '#continue-modal' && typeof endContinueRun === 'function') {
       return endContinueRun({ alsoCloseModal: true });
     }
+    if (sel === '#modal') endRunDetail();
     closeModal(sel);
   }
   if (e.target.classList && e.target.classList.contains('modal')) {
@@ -852,6 +924,7 @@ document.addEventListener('click', (e) => {
     if (id === '#continue-modal' && typeof endContinueRun === 'function') {
       return endContinueRun({ alsoCloseModal: true });
     }
+    if (id === '#modal') endRunDetail();
     closeModal(id);
   }
 });
@@ -916,6 +989,7 @@ function bindShortcuts() {
         } else if (m.id === 'continue-modal' && typeof endContinueRun === 'function') {
           endContinueRun({ alsoCloseModal: true });
         } else {
+          if (m.id === 'modal') endRunDetail();
           closeModal('#' + m.id);
         }
       });

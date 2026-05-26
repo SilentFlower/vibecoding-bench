@@ -2840,6 +2840,12 @@ def get_run(rid: str):
 
 @app.get("/api/runs/{rid}/transcript")
 def get_transcript(rid: str):
+    """
+    返回 run workspace 中当前可读的 transcript 文本。
+
+    :param rid: runs.id
+    :return: `.bench-transcript.log` 文本响应
+    """
     _require_visible_run(rid)
     p = WORKSPACES_DIR / rid / ".bench-transcript.log"
     if not p.exists():
@@ -2849,6 +2855,12 @@ def get_transcript(rid: str):
 
 @app.get("/api/runs/{rid}/files")
 def list_workspace(rid: str):
+    """
+    列出 run workspace 中的产物文件树。
+
+    :param rid: runs.id
+    :return: 文件/目录条目列表
+    """
     _require_visible_run(rid)
     base = WORKSPACES_DIR / rid
     if not base.exists():
@@ -2867,17 +2879,30 @@ def list_workspace(rid: str):
 
 @app.get("/api/runs/{rid}/stats")
 def get_stats(rid: str):
-    """从 sidecar 写的 stats.jsonl 聚合 token / 状态码"""
+    """
+    从 sidecar 写入的 stats.jsonl 聚合 token、请求数和采集可用性。
+
+    :param rid: runs.id
+    :return: token / request 聚合结果及 available / usage_available 状态
+    """
     _require_visible_run(rid)
     base = FLOWS_DIR
     # flows 目录按 account/task/run 分层，扫描所有匹配
     matches = list(base.rglob(f"{rid}/stats.jsonl"))
     if not matches:
-        return {"tokens_in": 0, "tokens_out": 0, "requests": 0, "errors": 0}
+        return {
+            "tokens_in": 0,
+            "tokens_out": 0,
+            "requests": 0,
+            "errors": 0,
+            "available": False,
+            "usage_available": False,
+        }
     tokens_in = tokens_out = errors = 0
     request_ids: set[str] = set()
     response_ids: set[str] = set()
     fallback_requests = 0
+    usage_available = False
     for f in matches:
         for line in f.read_text(encoding="utf-8", errors="ignore").splitlines():
             try:
@@ -2902,10 +2927,21 @@ def get_stats(rid: str):
             else:
                 fallback_requests += 1
             u = rec.get("usage") or {}
+            if not isinstance(u, dict):
+                u = {}
+            if isinstance(u, dict) and ("input_tokens" in u or "output_tokens" in u):
+                usage_available = True
             tokens_in += int(u.get("input_tokens") or 0)
             tokens_out += int(u.get("output_tokens") or 0)
     requests = len(request_ids | response_ids) + fallback_requests
-    return {"tokens_in": tokens_in, "tokens_out": tokens_out, "requests": requests, "errors": errors}
+    return {
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "requests": requests,
+        "errors": errors,
+        "available": requests > 0 or usage_available,
+        "usage_available": usage_available,
+    }
 
 
 @app.post("/api/runs/{rid}/stop")
