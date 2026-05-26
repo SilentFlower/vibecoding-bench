@@ -136,30 +136,51 @@ handle_claude_startup_gates() {
 }
 
 check_claude_auth_status() {
-  # 先用非 TUI 的 auth status 验证 profile，不把题目 prompt 粘进登录流。
-  # 这不是任务执行路径；真正做题仍走下方 tmux 交互 TUI。
-  log "Checking Claude auth status before interactive task run"
-  set +e
-  runuser -u "$CLAUDE_USER" -- env \
-    HOME="$CLAUDE_HOME" \
-    NODE_EXTRA_CA_CERTS="$CA_PEM" \
-    SSL_CERT_FILE="$CA_PEM" \
-    REQUESTS_CA_BUNDLE="$CA_PEM" \
-    CURL_CA_BUNDLE="$CA_PEM" \
-    GIT_SSL_CAINFO="$CA_PEM" \
-    claude auth status > /tmp/claude-auth-status.json 2> /tmp/claude-auth-status.err
-  local auth_code=$?
-  set -e
-  if [ "$auth_code" -ne 0 ] || ! jq -e '.loggedIn == true' /tmp/claude-auth-status.json >/dev/null 2>&1; then
+  # task 模式不消耗 refreshToken；这里只做本地 credentials 形态检查，
+  # 真正 AT 刷新统一交给 orchestrator 后台刷新器。
+  local credentials_path="$CLAUDE_DIR/.credentials.json"
+  local buffer_ms=$(( ${OAUTH_REFRESH_BUFFER_SEC:-600} * 1000 ))
+  if ! node - "$credentials_path" "$buffer_ms" <<'JS' >/tmp/claude-auth-status.json 2>/tmp/claude-auth-status.err
+const fs = require('fs');
+const path = process.argv[2];
+const bufferMs = Number(process.argv[3] || '600000');
+
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+
+let data;
+try {
+  data = JSON.parse(fs.readFileSync(path, 'utf8'));
+} catch (error) {
+  fail(`读取 .credentials.json 失败: ${error.message}`);
+}
+const oauth = data && data.claudeAiOauth;
+if (!oauth || typeof oauth !== 'object') {
+  fail('.credentials.json 缺少 claudeAiOauth');
+}
+if (typeof oauth.accessToken !== 'string' || !oauth.accessToken) {
+  fail('OAuth accessToken 为空，请等待后台刷新器或重新登录账号');
+}
+if (typeof oauth.expiresAt !== 'number') {
+  fail('OAuth expiresAt 缺失或格式错误');
+}
+if (oauth.expiresAt <= Date.now() + bufferMs) {
+  fail('OAuth accessToken 已过期或 10 分钟内过期，请等待后台刷新器刷新');
+}
+process.stdout.write(JSON.stringify({loggedIn: true, expiresAt: oauth.expiresAt}) + '\n');
+JS
+  then
     {
-      echo "[entrypoint] Claude profile is not logged in; refusing to open OAuth prompt in task mode"
-      echo "--- auth status stdout ---"
+      echo "[entrypoint] Claude profile OAuth access token 不可用，拒绝在 task 模式打开登录流"
+      echo "--- local auth status stdout ---"
       cat /tmp/claude-auth-status.json 2>/dev/null || true
-      echo "--- auth status stderr ---"
+      echo "--- local auth status stderr ---"
       cat /tmp/claude-auth-status.err 2>/dev/null || true
     } > /workspace/.bench-transcript.log
     persist_runtime_claude_state
-    log "Claude auth status check failed; not injecting task prompt into login flow"
+    log "Claude local auth status check failed; not injecting task prompt into login flow"
     exit 1
   fi
 }
@@ -181,144 +202,11 @@ wait_for_sidecar_dns() {
   return 1
 }
 
-refresh_oauth_credentials() {
-  # 只在 access token 缺失/过期/快过期时刷新，避免每次 run 都轮换凭据。
-  # 刷新请求用 Node runtime 发出，且仍在 worker→sidecar→SOCKS5 链路内完成；
-  # 不再用 Python urllib，避免它的客户端/TLS 形态触发 Cloudflare 1010。
-  local credentials_path="$CLAUDE_DIR/.credentials.json"
-  if [ ! -f "$credentials_path" ]; then
-    return 0
-  fi
-  set +e
-  runuser -u "$CLAUDE_USER" -- env \
-    HOME="$CLAUDE_HOME" \
-    NODE_EXTRA_CA_CERTS="${NODE_EXTRA_CA_CERTS:-}" \
-    SSL_CERT_FILE="${SSL_CERT_FILE:-}" \
-    REQUESTS_CA_BUNDLE="${REQUESTS_CA_BUNDLE:-}" \
-    CURL_CA_BUNDLE="${CURL_CA_BUNDLE:-}" \
-    node - "$credentials_path" <<'JS'
-const fs = require('fs');
-
-const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
-const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
-const SCOPES = [
-  'user:profile',
-  'user:inference',
-  'user:sessions:claude_code',
-  'user:mcp_servers',
-  'user:file_upload',
-];
-
-const path = process.argv[2];
-const refreshBufferMs = 10 * 60 * 1000;
-
-function fail(message) {
-  console.error(message);
-  process.exit(1);
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-let data;
-try {
-  data = JSON.parse(fs.readFileSync(path, 'utf8'));
-} catch (error) {
-  fail(`读取 .credentials.json 失败: ${error.message}`);
-}
-
-const oauth = data && data.claudeAiOauth;
-if (!oauth || typeof oauth !== 'object') {
-  process.exit(0);
-}
-
-const nowMs = Date.now();
-if (
-  typeof oauth.accessToken === 'string' &&
-  oauth.accessToken &&
-  typeof oauth.expiresAt === 'number' &&
-  oauth.expiresAt > nowMs + refreshBufferMs
-) {
-  process.exit(0);
-}
-
-if (typeof oauth.refreshToken !== 'string' || !oauth.refreshToken) {
-  fail('OAuth refreshToken 为空，access token 已缺失或接近过期，请重新登录账号');
-}
-
-(async () => {
-  let lastError = '';
-  for (let attempt = 1; attempt <= 5; attempt += 1) {
-    try {
-      const response = await fetch(TOKEN_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'User-Agent': `claude-code/${process.env.CLAUDE_CODE_VERSION || '2.1.150'}`,
-        },
-        body: JSON.stringify({
-          grant_type: 'refresh_token',
-          refresh_token: oauth.refreshToken,
-          client_id: CLIENT_ID,
-          scope: SCOPES.join(' '),
-        }),
-      });
-      const text = await response.text();
-      if (!response.ok) {
-        fail(`OAuth token 刷新失败: HTTP ${response.status} ${text.slice(0, 500)}`);
-      }
-      let payload;
-      try {
-        payload = JSON.parse(text);
-      } catch (error) {
-        fail(`OAuth token 刷新响应不是 JSON: ${error.message}`);
-      }
-      if (typeof payload.access_token !== 'string' || !payload.access_token) {
-        fail('OAuth token 刷新响应缺少 access_token');
-      }
-      oauth.accessToken = payload.access_token;
-      if (typeof payload.refresh_token === 'string' && payload.refresh_token) {
-        oauth.refreshToken = payload.refresh_token;
-      }
-      const expiresIn = Number.isFinite(Number(payload.expires_in))
-        ? Number(payload.expires_in)
-        : 3600;
-      oauth.expiresAt = Date.now() + Math.max(expiresIn, 60) * 1000;
-      const tmp = `${path}.tmp`;
-      fs.writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
-      fs.renameSync(tmp, path);
-      process.exit(0);
-    } catch (error) {
-      lastError = error && error.message ? error.message : String(error);
-      if (attempt === 5) break;
-      await sleep(attempt * 1000);
-    }
-  }
-  fail(`OAuth token 刷新失败: ${lastError}`);
-})();
-JS
-  local refresh_code=$?
-  set -e
-  if [ "$refresh_code" -ne 0 ]; then
-    {
-      echo "[entrypoint] OAuth token 刷新失败，拒绝继续跑题以免 401 被误判成功"
-      echo "--- oauth refresh stderr 已见容器日志 ---"
-    } > /workspace/.bench-transcript.log
-    persist_runtime_claude_state
-    exit 1
-  fi
-}
-
 persist_runtime_claude_state() {
-  # task 模式里 Claude 跑在 $HOME 的运行时副本中；这里只按白名单回写会影响
-  # 下次启动/认证的文件，避免 sessions/telemetry/backups 被并发 run 污染。
+  # task 模式里 Claude 跑在 $HOME 的运行时副本中；OAuth token 统一由
+  # orchestrator 后台刷新器维护，run 结束不能把旧 credentials 覆盖回 profile。
   if [ ! -d /mnt/profile ] || [ ! -w /mnt/profile ]; then
     return 0
-  fi
-  if [ -f "$CLAUDE_DIR/.credentials.json" ]; then
-    cp "$CLAUDE_DIR/.credentials.json" /mnt/profile/.credentials.json || true
   fi
   if [ -f "$CLAUDE_HOME/.claude.json" ]; then
     patch_top_config_gates
@@ -328,7 +216,6 @@ persist_runtime_claude_state() {
     cp "$CLAUDE_DIR/settings.json" /mnt/profile/settings.json || true
   fi
   chown "$CLAUDE_USER:$CLAUDE_USER" \
-    /mnt/profile/.credentials.json \
     /mnt/profile/.claude.json \
     /mnt/profile/settings.json 2>/dev/null || true
 }
@@ -635,7 +522,6 @@ rm -f /tmp/claude-fatal-error /tmp/claude-completion-state
 # 这里保留短兜底,防止 worker /etc/resolv.conf 覆盖后仍遇到极短瞬时竞态。
 wait_for_sidecar_dns || true
 
-refresh_oauth_credentials
 check_claude_auth_status
 
 SESSION="claude-${RUN_ID}"

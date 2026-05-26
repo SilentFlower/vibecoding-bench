@@ -110,7 +110,25 @@ _DEFAULT_CLAUDE_TOP_CONFIG: dict[str, object] = {
     "bypassPermissionsModeAccepted": True,
 }
 _PROFILE_SYNC_FILES = (".credentials.json", "settings.json", ".claude.json")
+_PROFILE_CONFIG_SYNC_FILES = ("settings.json", ".claude.json")
 _TERMINAL_RUN_STATUSES = {"success", "failed", "timeout", "stopped"}
+OAUTH_REFRESH_INTERVAL_SEC = 60
+OAUTH_REFRESH_BUFFER_SEC = 10 * 60
+_profile_locks: dict[str, threading.Lock] = {}
+_profile_locks_lock = threading.Lock()
+
+
+def _profile_lock(account_name: str) -> threading.Lock:
+    """
+    获取账号 profile 的进程内互斥锁。
+
+    :param account_name: accounts.name 字段
+    :return: 该账号对应的 threading.Lock
+    """
+    with _profile_locks_lock:
+        if account_name not in _profile_locks:
+            _profile_locks[account_name] = threading.Lock()
+        return _profile_locks[account_name]
 
 
 def _usage_input_tokens(usage: dict) -> int:
@@ -240,6 +258,21 @@ def _make_worker_owned(path: Path) -> None:
             pass
 
 
+def _copy_file_atomically(src: Path, dst: Path) -> None:
+    """
+    通过临时文件 + rename 原子替换目标文件。
+
+    :param src: 源文件路径
+    :param dst: 目标文件路径
+    :return: None
+    """
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dst.with_name(f"{dst.name}.tmp.{uuid.uuid4().hex}")
+    shutil.copy2(src, tmp)
+    tmp.replace(dst)
+    _make_worker_owned(dst)
+
+
 def _copy_profile_whitelist_to_claude_home(profile_dir: Path, claude_home_dir: Path) -> None:
     """
     把账号 profile 的认证白名单复制到某个 Claude home 目录。
@@ -260,7 +293,18 @@ def _copy_profile_whitelist_to_claude_home(profile_dir: Path, claude_home_dir: P
 
 def _copy_claude_home_whitelist_to_profile(claude_home_dir: Path, profile_dir: Path) -> None:
     """
-    把运行时 Claude home 中刷新的认证白名单回写到账号 profile。
+    兼容旧调用名：现在只回写运行时本地配置，不回写 OAuth 凭据。
+
+    :param claude_home_dir: run workspace 下的 `.claude-home` 目录
+    :param profile_dir: `data/profiles/<account>` 目录
+    :return: None
+    """
+    _copy_claude_home_config_to_profile(claude_home_dir, profile_dir)
+
+
+def _copy_claude_home_config_to_profile(claude_home_dir: Path, profile_dir: Path) -> None:
+    """
+    只把运行时本地配置回写到账号 profile，不回写 OAuth 凭据。
 
     :param claude_home_dir: run workspace 下的 `.claude-home` 目录
     :param profile_dir: `data/profiles/<account>` 目录
@@ -269,14 +313,13 @@ def _copy_claude_home_whitelist_to_profile(claude_home_dir: Path, profile_dir: P
     if not claude_home_dir.exists():
         return
     profile_dir.mkdir(parents=True, exist_ok=True)
-    for name in _PROFILE_SYNC_FILES:
+    for name in _PROFILE_CONFIG_SYNC_FILES:
         src = claude_home_dir / name
         if not src.exists() or not src.is_file():
             continue
         dst = profile_dir / name
         try:
-            shutil.copy2(src, dst)
-            _make_worker_owned(dst)
+            _copy_file_atomically(src, dst)
         except OSError:
             pass
     _persist_default_claude_top_config(profile_dir)
@@ -828,6 +871,7 @@ class Runner:
                     "ACC_NAME": acc_name,
                     "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
                     "CLEAN_WORKSPACE_DEPS": CLEAN_WORKSPACE_DEPS,
+                    "OAUTH_REFRESH_BUFFER_SEC": str(OAUTH_REFRESH_BUFFER_SEC),
                     "TZ": fp["tz"],
                     "LANG": fp["lang"],
                     "LC_ALL": fp["lang"],
@@ -842,7 +886,7 @@ class Runner:
 
     def persist_worker_profile(self, worker_id: Optional[str]) -> None:
         """
-        在停止容器前尽量把运行时凭据回写 profile。
+        在停止容器前尽量把运行时本地配置回写 profile。
 
         :param worker_id: worker 容器 ID
         :return: None
@@ -855,10 +899,9 @@ class Runner:
                 "mkdir -p \"$HOME/.claude\"; "
                 "cp \"$HOME/.claude.json\" \"$HOME/.claude/.claude.json\" 2>/dev/null || true; "
                 "if [ -d /mnt/profile ] && [ -w /mnt/profile ]; then "
-                "cp \"$HOME/.claude/.credentials.json\" /mnt/profile/.credentials.json 2>/dev/null || true; "
                 "cp \"$HOME/.claude/settings.json\" /mnt/profile/settings.json 2>/dev/null || true; "
                 "cp \"$HOME/.claude/.claude.json\" /mnt/profile/.claude.json 2>/dev/null || true; "
-                "chown node:node /mnt/profile/.credentials.json /mnt/profile/settings.json /mnt/profile/.claude.json 2>/dev/null || true; "
+                "chown node:node /mnt/profile/settings.json /mnt/profile/.claude.json 2>/dev/null || true; "
                 "fi"
             )
             ex = api.exec_create(
@@ -871,7 +914,7 @@ class Runner:
             )
             api.exec_start(ex["Id"])
         except Exception:
-            # 容器可能已经退出或被删除；停止路径不应被凭据兜底阻断。
+            # 容器可能已经退出或被删除；停止路径不应被配置兜底阻断。
             pass
 
     def wait_worker(self, worker_id: str) -> int:
@@ -998,68 +1041,69 @@ class Runner:
         temp_workspace = WORKSPACES_DIR / temp_run_id
         temp_home = temp_workspace / ".claude-home"
         temp_workspace.mkdir(parents=True, exist_ok=True)
-        _copy_profile_whitelist_to_claude_home(PROFILES_DIR / acc_name, temp_home)
-        top_config = temp_home / ".claude.json"
-        if top_config.exists():
-            shutil.copy2(top_config, temp_workspace / ".claude.json")
-        _make_worker_owned(temp_workspace)
         CA_DIR.mkdir(parents=True, exist_ok=True)
 
         sidecar_id: Optional[str] = None
         worker_id: Optional[str] = None
         try:
-            sidecar = self.client.containers.run(
-                SIDECAR_IMAGE,
-                name=sidecar_name,
-                hostname=fp["hostname"],
-                mac_address=fp["mac"],
-                detach=True,
-                auto_remove=False,
-                cap_add=["NET_ADMIN"],
-                devices=["/dev/net/tun:/dev/net/tun"],
-                volumes={str(HOST_BENCH_DATA / "ca"): {"bind": "/ca", "mode": "rw"}},
-                environment={
-                    "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
-                    "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
-                    "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
-                    "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
-                    "DNS_READY_HOST": DNS_READY_HOST,
-                },
-            )
-            sidecar_id = sidecar.id
-            _wait_sidecar_ready(self.client, sidecar_id)
-            worker = self.client.containers.run(
-                WORKER_IMAGE,
-                name=worker_name,
-                mem_limit=fp["mem"],
-                memswap_limit=fp["mem"],
-                detach=True,
-                auto_remove=False,
-                tty=True,
-                stdin_open=True,
-                network_mode=f"container:{sidecar_name}",
-                volumes={
-                    str(HOST_BENCH_DATA / "workspaces" / temp_run_id): {"bind": "/workspace", "mode": "rw"},
-                    str(HOST_BENCH_DATA / "workspaces" / temp_run_id / ".claude-home"): {"bind": f"{WORKER_HOME}/.claude", "mode": "rw"},
-                    str(HOST_BENCH_DATA / "ca"): {"bind": "/etc/mitm", "mode": "ro"},
-                },
-                environment={
-                    "WORKER_MODE": "login",
-                    "USE_SIDECAR_DNS": "1",
-                    "HOME": WORKER_HOME,
-                    "ACC_NAME": acc_name,
-                    "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
-                    "TZ": fp["tz"],
-                    "LANG": fp["lang"],
-                    "LC_ALL": fp["lang"],
-                },
-            )
-            worker_id = worker.id
-            raw = self._exec_quota_probe(worker_id)
-            workspace_top_config = temp_workspace / ".claude.json"
-            if workspace_top_config.exists():
-                shutil.copy2(workspace_top_config, temp_home / ".claude.json")
-            _copy_claude_home_whitelist_to_profile(temp_home, PROFILES_DIR / acc_name)
+            with _profile_lock(acc_name):
+                _copy_profile_whitelist_to_claude_home(PROFILES_DIR / acc_name, temp_home)
+                top_config = temp_home / ".claude.json"
+                if top_config.exists():
+                    shutil.copy2(top_config, temp_workspace / ".claude.json")
+                _make_worker_owned(temp_workspace)
+                sidecar = self.client.containers.run(
+                    SIDECAR_IMAGE,
+                    name=sidecar_name,
+                    hostname=fp["hostname"],
+                    mac_address=fp["mac"],
+                    detach=True,
+                    auto_remove=False,
+                    cap_add=["NET_ADMIN"],
+                    devices=["/dev/net/tun:/dev/net/tun"],
+                    volumes={str(HOST_BENCH_DATA / "ca"): {"bind": "/ca", "mode": "rw"}},
+                    environment={
+                        "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
+                        "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
+                        "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
+                        "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
+                        "DNS_READY_HOST": DNS_READY_HOST,
+                    },
+                )
+                sidecar_id = sidecar.id
+                _wait_sidecar_ready(self.client, sidecar_id)
+                worker = self.client.containers.run(
+                    WORKER_IMAGE,
+                    name=worker_name,
+                    mem_limit=fp["mem"],
+                    memswap_limit=fp["mem"],
+                    detach=True,
+                    auto_remove=False,
+                    tty=True,
+                    stdin_open=True,
+                    network_mode=f"container:{sidecar_name}",
+                    volumes={
+                        str(HOST_BENCH_DATA / "workspaces" / temp_run_id): {"bind": "/workspace", "mode": "rw"},
+                        str(HOST_BENCH_DATA / "workspaces" / temp_run_id / ".claude-home"): {"bind": f"{WORKER_HOME}/.claude", "mode": "rw"},
+                        str(HOST_BENCH_DATA / "ca"): {"bind": "/etc/mitm", "mode": "ro"},
+                    },
+                    environment={
+                        "WORKER_MODE": "login",
+                        "USE_SIDECAR_DNS": "1",
+                        "HOME": WORKER_HOME,
+                        "ACC_NAME": acc_name,
+                        "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+                        "TZ": fp["tz"],
+                        "LANG": fp["lang"],
+                        "LC_ALL": fp["lang"],
+                    },
+                )
+                worker_id = worker.id
+                raw = self._exec_quota_probe(worker_id)
+                workspace_top_config = temp_workspace / ".claude.json"
+                if workspace_top_config.exists():
+                    shutil.copy2(workspace_top_config, temp_home / ".claude.json")
+                _copy_claude_home_config_to_profile(temp_home, PROFILES_DIR / acc_name)
             return _format_quota_result(raw)
         finally:
             self.cleanup(sidecar_id, worker_id)
@@ -1090,18 +1134,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
-const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
-const SCOPES = [
-  'user:profile',
-  'user:inference',
-  'user:sessions:claude_code',
-  'user:mcp_servers',
-  'user:file_upload',
-];
 const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
-const refreshBufferMs = 10 * 60 * 1000;
 const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.150';
 
 function emit(value) {
@@ -1150,88 +1184,28 @@ async function requestJson(url, options) {
   throw new Error(lastError || 'request failed after retries');
 }
 
-async function refreshAccessToken(data) {
-  const oauth = oauthSection(data);
-  if (typeof oauth.refreshToken !== 'string' || !oauth.refreshToken) {
-    throw new Error('OAuth refreshToken 为空，请重新登录账号');
-  }
-  const payload = await requestJson(TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'User-Agent': `claude-code/${claudeCodeVersion}`,
-    },
-    body: JSON.stringify({
-      grant_type: 'refresh_token',
-      refresh_token: oauth.refreshToken,
-      client_id: CLIENT_ID,
-      scope: SCOPES.join(' '),
-    }),
-  });
-  if (typeof payload.access_token !== 'string' || !payload.access_token) {
-    throw new Error('OAuth token 刷新响应缺少 access_token');
-  }
-  oauth.accessToken = payload.access_token;
-  if (typeof payload.refresh_token === 'string' && payload.refresh_token) {
-    oauth.refreshToken = payload.refresh_token;
-  }
-  const expiresIn = Number.isFinite(Number(payload.expires_in))
-    ? Number(payload.expires_in)
-    : 3600;
-  oauth.expiresAt = Date.now() + Math.max(expiresIn, 60) * 1000;
-  const tmp = `${credentialsPath}.tmp`;
-  fs.writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
-  fs.renameSync(tmp, credentialsPath);
-  return oauth.accessToken;
-}
-
 async function currentAccessToken(data) {
   const oauth = oauthSection(data);
-  if (
-    typeof oauth.accessToken === 'string' &&
-    oauth.accessToken &&
-    typeof oauth.expiresAt === 'number' &&
-    oauth.expiresAt > Date.now() + refreshBufferMs
-  ) {
-    return oauth.accessToken;
+  if (typeof oauth.accessToken !== 'string' || !oauth.accessToken) {
+    throw new Error('OAuth accessToken 为空，等待后台刷新器刷新或重新登录账号');
   }
-  return refreshAccessToken(data);
+  return oauth.accessToken;
 }
 
 (async () => {
   try {
     let credentials = loadCredentials();
     let token = await currentAccessToken(credentials);
-    let usage;
-    try {
-      usage = await requestJson(USAGE_URL, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'anthropic-beta': 'oauth-2025-04-20',
-          'User-Agent': `claude-code/${claudeCodeVersion}`,
-        },
-      });
-    } catch (error) {
-      if (!String(error.message || error).includes('HTTP 401') && !String(error.message || error).includes('HTTP 403')) {
-        throw error;
-      }
-      credentials = loadCredentials();
-      token = await refreshAccessToken(credentials);
-      usage = await requestJson(USAGE_URL, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'anthropic-beta': 'oauth-2025-04-20',
-          'User-Agent': `claude-code/${claudeCodeVersion}`,
-        },
-      });
-    }
+    const usage = await requestJson(USAGE_URL, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'anthropic-beta': 'oauth-2025-04-20',
+        'User-Agent': `claude-code/${claudeCodeVersion}`,
+      },
+    });
     emit(usage);
   } catch (error) {
     emit({error: error && error.message ? error.message : String(error)});
@@ -1239,7 +1213,6 @@ async function currentAccessToken(data) {
   }
 })();
 JS
-claude auth status >/tmp/bench-quota-auth-status.json 2>/tmp/bench-quota-auth-status.err || true
 '''
         api = self.client.api
         ex = api.exec_create(
@@ -1260,6 +1233,235 @@ claude auth status >/tmp/bench-quota-auth-status.json 2>/tmp/bench-quota-auth-st
             return {"error": "quota probe returned non-json output", "raw": text}
         if inspected.get("ExitCode") not in (0, None) and not parsed.get("error"):
             parsed["error"] = f"quota probe failed with exit {inspected.get('ExitCode')}"
+        return parsed
+
+    def refresh_account_oauth_token(self, account: dict) -> bool:
+        """
+        用账号 SOCKS5 刷新 OAuth access token，并回写账号 profile。
+
+        :param account: accounts 表行
+        :return: 发生刷新并成功回写时返回 True
+        """
+        if not account.get("upstream_socks5_host"):
+            raise ValueError("account has no upstream socks5 configured")
+        acc_name = account["name"]
+        with _profile_lock(acc_name):
+            status = _read_account_oauth_status(acc_name)
+            if status["oauth_token_state"] == "valid" and int(status.get("oauth_expires_in_sec") or 0) > OAUTH_REFRESH_BUFFER_SEC:
+                return False
+            sid = uuid.uuid4().hex[:12]
+            sidecar_name = f"bench-oauth-refresh-sidecar-{sid}"
+            worker_name = f"bench-oauth-refresh-worker-{sid}"
+            fp = derive_fingerprint(acc_name)
+            temp_run_id = f"oauth-refresh-{sid}"
+            temp_workspace = WORKSPACES_DIR / temp_run_id
+            temp_home = temp_workspace / ".claude-home"
+            temp_workspace.mkdir(parents=True, exist_ok=True)
+            _copy_profile_whitelist_to_claude_home(PROFILES_DIR / acc_name, temp_home)
+            top_config = temp_home / ".claude.json"
+            if top_config.exists():
+                shutil.copy2(top_config, temp_workspace / ".claude.json")
+            _make_worker_owned(temp_workspace)
+            CA_DIR.mkdir(parents=True, exist_ok=True)
+
+            sidecar_id: Optional[str] = None
+            worker_id: Optional[str] = None
+            try:
+                sidecar = self.client.containers.run(
+                    SIDECAR_IMAGE,
+                    name=sidecar_name,
+                    hostname=fp["hostname"],
+                    mac_address=fp["mac"],
+                    detach=True,
+                    auto_remove=False,
+                    cap_add=["NET_ADMIN"],
+                    devices=["/dev/net/tun:/dev/net/tun"],
+                    volumes={str(HOST_BENCH_DATA / "ca"): {"bind": "/ca", "mode": "rw"}},
+                    environment={
+                        "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
+                        "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
+                        "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
+                        "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
+                        "DNS_READY_HOST": DNS_READY_HOST,
+                    },
+                )
+                sidecar_id = sidecar.id
+                _wait_sidecar_ready(self.client, sidecar_id)
+                worker = self.client.containers.run(
+                    WORKER_IMAGE,
+                    name=worker_name,
+                    mem_limit=fp["mem"],
+                    memswap_limit=fp["mem"],
+                    detach=True,
+                    auto_remove=False,
+                    tty=True,
+                    stdin_open=True,
+                    network_mode=f"container:{sidecar_name}",
+                    volumes={
+                        str(HOST_BENCH_DATA / "workspaces" / temp_run_id): {"bind": "/workspace", "mode": "rw"},
+                        str(HOST_BENCH_DATA / "workspaces" / temp_run_id / ".claude-home"): {"bind": f"{WORKER_HOME}/.claude", "mode": "rw"},
+                        str(HOST_BENCH_DATA / "ca"): {"bind": "/etc/mitm", "mode": "ro"},
+                    },
+                    environment={
+                        "WORKER_MODE": "login",
+                        "USE_SIDECAR_DNS": "1",
+                        "HOME": WORKER_HOME,
+                        "ACC_NAME": acc_name,
+                        "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+                        "TZ": fp["tz"],
+                        "LANG": fp["lang"],
+                        "LC_ALL": fp["lang"],
+                    },
+                )
+                worker_id = worker.id
+                raw = self._exec_oauth_refresh_probe(worker_id)
+                if raw.get("skipped"):
+                    return False
+                if raw.get("error"):
+                    raise RuntimeError(str(raw["error"]))
+                refreshed_credentials = temp_home / ".credentials.json"
+                if not refreshed_credentials.exists():
+                    raise RuntimeError("OAuth token 刷新后未生成 .credentials.json")
+                _copy_file_atomically(refreshed_credentials, PROFILES_DIR / acc_name / ".credentials.json")
+                _copy_claude_home_config_to_profile(temp_home, PROFILES_DIR / acc_name)
+                return True
+            finally:
+                self.cleanup(sidecar_id, worker_id)
+                shutil.rmtree(temp_workspace, ignore_errors=True)
+
+    def _exec_oauth_refresh_probe(self, worker_id: str) -> dict:
+        """
+        在临时 worker 内使用 refreshToken 刷新 accessToken。
+
+        :param worker_id: refresh worker 容器 ID
+        :return: 刷新结果对象
+        """
+        script = r'''
+set -eu
+if [ -f /workspace/.claude.json ]; then
+  cp /workspace/.claude.json "$HOME/.claude.json"
+fi
+DNS_READY_HOST="${DNS_READY_HOST:-example.com}"
+for i in $(seq 1 45); do
+  if grep -q '^nameserver 127[.]0[.]0[.]1' /etc/resolv.conf \
+    && getent hosts "$DNS_READY_HOST" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+node - <<'JS'
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
+const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
+const SCOPES = [
+  'user:profile',
+  'user:inference',
+  'user:sessions:claude_code',
+  'user:mcp_servers',
+  'user:file_upload',
+];
+const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
+const refreshBufferMs = Number(process.env.OAUTH_REFRESH_BUFFER_SEC || '600') * 1000;
+const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.150';
+
+function emit(value) {
+  process.stdout.write(`${JSON.stringify(value)}\n`);
+}
+
+async function main() {
+  let data;
+  try {
+    data = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+  } catch (error) {
+    throw new Error(`.credentials.json 读取失败: ${error.message}`);
+  }
+  const oauth = data && data.claudeAiOauth;
+  if (!oauth || typeof oauth !== 'object') {
+    throw new Error('.credentials.json 缺少 claudeAiOauth');
+  }
+  if (
+    typeof oauth.accessToken === 'string' &&
+    oauth.accessToken &&
+    typeof oauth.expiresAt === 'number' &&
+    oauth.expiresAt > Date.now() + refreshBufferMs
+  ) {
+    emit({skipped: true});
+    return;
+  }
+  if (typeof oauth.refreshToken !== 'string' || !oauth.refreshToken) {
+    throw new Error('OAuth refreshToken 为空，请重新登录账号');
+  }
+  const response = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': `claude-code/${claudeCodeVersion}`,
+    },
+    body: JSON.stringify({
+      grant_type: 'refresh_token',
+      refresh_token: oauth.refreshToken,
+      client_id: CLIENT_ID,
+      scope: SCOPES.join(' '),
+    }),
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`OAuth token 刷新失败: HTTP ${response.status} ${text.slice(0, 500)}`);
+  }
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`OAuth token 刷新响应不是 JSON: ${error.message}`);
+  }
+  if (typeof payload.access_token !== 'string' || !payload.access_token) {
+    throw new Error('OAuth token 刷新响应缺少 access_token');
+  }
+  oauth.accessToken = payload.access_token;
+  oauth.refreshToken = typeof payload.refresh_token === 'string' && payload.refresh_token
+    ? payload.refresh_token
+    : oauth.refreshToken;
+  const expiresIn = Number.isFinite(Number(payload.expires_in))
+    ? Number(payload.expires_in)
+    : 3600;
+  oauth.expiresAt = Date.now() + Math.max(expiresIn, 60) * 1000;
+  const tmp = `${credentialsPath}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+  fs.renameSync(tmp, credentialsPath);
+  emit({refreshed: true, expiresAt: oauth.expiresAt});
+}
+
+main().catch((error) => {
+  emit({error: error && error.message ? error.message : String(error)});
+  process.exit(1);
+});
+JS
+'''
+        api = self.client.api
+        ex = api.exec_create(
+            worker_id,
+            ["sh", "-lc", script],
+            stdout=True,
+            stderr=True,
+            user=WORKER_USER,
+            environment=_claude_exec_env(True, {
+                "OAUTH_REFRESH_BUFFER_SEC": str(OAUTH_REFRESH_BUFFER_SEC),
+            }),
+            workdir=WORKER_HOME,
+        )
+        raw = api.exec_start(ex["Id"])
+        inspected = api.exec_inspect(ex["Id"])
+        text = raw.decode("utf-8", errors="ignore").strip()
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            return {"error": "oauth refresh probe returned non-json output", "raw": text}
+        if inspected.get("ExitCode") not in (0, None) and not parsed.get("error"):
+            parsed["error"] = f"oauth refresh probe failed with exit {inspected.get('ExitCode')}"
         return parsed
 
 
@@ -1622,7 +1824,7 @@ class ContinueManager:
         return self.sessions.get(sid)
 
     def cleanup(self, sid: str) -> None:
-        """停止并清理继续对话容器，同时尽量回写账号凭据。"""
+        """停止并清理继续对话容器，同时尽量回写本地配置。"""
         with self._lock:
             s = self.sessions.pop(sid, None)
         if not s:
@@ -1653,6 +1855,95 @@ class ContinueManager:
         with self._lock:
             if self._run_locks.get(s.run_id) == sid:
                 del self._run_locks[s.run_id]
+
+
+class OAuthRefreshScheduler:
+    """后台定时刷新账号 OAuth access token。"""
+
+    def __init__(self, runner: Runner) -> None:
+        self.runner = runner
+        self._stop = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+
+    def start(self) -> None:
+        """
+        启动后台刷新线程。
+
+        :return: None
+        """
+        if self._thread and self._thread.is_alive():
+            return
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+
+    def cleanup_stale(self) -> None:
+        """
+        启动时清掉上次残留的 bench-oauth-refresh-* 容器。
+
+        :return: None
+        """
+        try:
+            for c in self.runner.client.containers.list(
+                all=True, filters={"name": "bench-oauth-refresh-"}
+            ):
+                try:
+                    c.remove(force=True)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def stop(self) -> None:
+        """
+        请求后台刷新线程停止。
+
+        :return: None
+        """
+        self._stop.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=3)
+
+    def _loop(self) -> None:
+        # 启动后立即 tick 一次，避免服务重启时 profile 已过期还要等 60 秒。
+        while not self._stop.is_set():
+            self._tick()
+            self._stop.wait(OAUTH_REFRESH_INTERVAL_SEC)
+
+    def _tick(self) -> None:
+        conn = get_db()
+        try:
+            rows = conn.execute(
+                "SELECT * FROM accounts WHERE enabled=1 ORDER BY id"
+            ).fetchall()
+            accounts = [dict(r) for r in rows]
+        except Exception:
+            return
+        finally:
+            conn.close()
+        for account in accounts:
+            if self._stop.is_set():
+                return
+            if not self._needs_refresh(account["name"]):
+                continue
+            try:
+                self.runner.refresh_account_oauth_token(account)
+            except Exception:
+                # 后台刷新失败不能拖垮 orchestrator；账号页会继续显示 expired/expiring。
+                pass
+
+    def _needs_refresh(self, account_name: str) -> bool:
+        """
+        判断账号 access token 是否缺失、已过期或 10 分钟内过期。
+
+        :param account_name: accounts.name 字段
+        :return: 需要刷新时返回 True
+        """
+        status = _read_account_oauth_status(account_name)
+        if status["oauth_token_state"] in {"missing", "expired", "expiring", "invalid"}:
+            return True
+        expires_in = status.get("oauth_expires_in_sec")
+        return isinstance(expires_in, int) and expires_in <= OAUTH_REFRESH_BUFFER_SEC
 
 
 def _find_latest_claude_session_id(run_id: str) -> Optional[str]:
@@ -2100,11 +2391,12 @@ runner: Optional[Runner] = None
 scheduler: Optional[Scheduler] = None
 login_manager: Optional[LoginManager] = None
 continue_manager: Optional[ContinueManager] = None
+oauth_refresh_scheduler: Optional[OAuthRefreshScheduler] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global runner, scheduler, login_manager, continue_manager
+    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler
     init_db()
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     FLOWS_DIR.mkdir(parents=True, exist_ok=True)
@@ -2114,10 +2406,16 @@ async def lifespan(app: FastAPI):
     scheduler = Scheduler(runner)
     login_manager = LoginManager(runner.client)
     continue_manager = ContinueManager(runner)
+    oauth_refresh_scheduler = OAuthRefreshScheduler(runner)
     # 清掉上次进程残留的 login 容器，避免重启后僵尸容器堆积
     login_manager.cleanup_stale()
     continue_manager.cleanup_stale()
-    yield
+    oauth_refresh_scheduler.cleanup_stale()
+    oauth_refresh_scheduler.start()
+    try:
+        yield
+    finally:
+        oauth_refresh_scheduler.stop()
 
 
 app = FastAPI(title="vibecoding-100 bench", lifespan=lifespan)
