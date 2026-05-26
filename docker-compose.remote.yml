@@ -29,6 +29,7 @@ services:
       # 远程必须用 DockerHub 完整路径,否则 worker/sidecar 起不来
       WORKER_IMAGE: huajiwuyan/vibebench-worker:${VIBEBENCH_TAG:-latest}
       SIDECAR_IMAGE: huajiwuyan/vibebench-sidecar:${VIBEBENCH_TAG:-latest}
+      CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-2.1.150}
       PER_ACCOUNT_CONCURRENCY: 2
       SIDECAR_BOOT_WAIT: "4"
       # HTTP Basic Auth:两者都填才启用;留空 = 任何人可访问(仅本地开发)

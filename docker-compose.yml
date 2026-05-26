@@ -21,6 +21,7 @@ services:
       WEBUI_DIR: /webui
       WORKER_IMAGE: vibebench-worker:latest
       SIDECAR_IMAGE: vibebench-sidecar:latest
+      CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-2.1.150}
       PER_ACCOUNT_CONCURRENCY: 2
       SIDECAR_BOOT_WAIT: "4"
     volumes:
