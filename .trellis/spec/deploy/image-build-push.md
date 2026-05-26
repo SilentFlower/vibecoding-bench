@@ -116,6 +116,10 @@ Claude 返回认证错误文本时必须失败,不能作为最终 assistant 回�
 
 task 启动前可以刷新 OAuth access token,但必须先读 `.credentials.json` 里的 `claudeAiOauth.expiresAt`:只有 access token 缺失、已过期或距离过期小于安全缓冲(当前 10 分钟)时才调用 refresh endpoint,避免每次 run 都刷新 token。
 
+刷新 OAuth access token 或查询 OAuth usage API 前必须确认 sidecar DNS 对 `platform.claude.com` 和 `api.anthropic.com` 都可解析。不能只等待 `api.anthropic.com`:refresh endpoint 在 `platform.claude.com`,quota probe 又是通过 `docker exec` 进入 login-mode worker,两者都可能踩到 sidecar/unbound 冷启动竞态。DNS readiness 和 Python URL 请求都必须是有限等待/有限重试,不能无限循环。
+
+不能用宿主机网络或宿主 DNS 作为 OAuth refresh / usage 的 fallback。账号相关请求和域名解析都必须留在 worker→sidecar→账号 SOCKS5 链路里,否则会从宿主原始 IP 泄漏域名查询或 HTTPS 出口。
+
 worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 prompt；只能等待 JSONL 变化,直到完成、Claude 退出或 `TIMEOUT_SEC` 到期。
 
 ### 4. Validation & Error Matrix
@@ -141,6 +145,8 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
 
 **Bad**:access token 明明还有很久才过期,每次 task 启动都调用 OAuth refresh endpoint。这样会制造额外请求和不必要的凭据轮换。
 
+**Bad**:worker 启动前只等 `api.anthropic.com` 可解析,然后立刻刷新 OAuth token。`platform.claude.com` 尚未解析成功时会出现 `<urlopen error [Errno -3] Temporary failure in name resolution>`。
+
 **Bad**:为了解决完成判定,把 `BENCH_DONE:<RUN_ID>` 之类的 bench sentinel 拼进题目 prompt。这样会污染被测任务的自然输出。
 
 ### 6. Tests Required
@@ -153,6 +159,7 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
   - 最新 assistant 文本包含 `Please run /login · API Error: 401 Invalid authentication credentials` 时判失败。
   - 最新 session JSONL mtime 未达到稳定窗口时判未完成。
 - 用 profile settings 样例断言:合并默认 settings 后 `hooks` / `statusLine` 被删除。
+- 用 worker/quota 启动路径断言:OAuth refresh/usage 前等待 `platform.claude.com` 和 `api.anthropic.com`,且 DNS/URL 临时失败有限重试。
 - 远程发布后跑一个真实 task,检查 DB 里 `success` run 的 JSONL 最新对话消息是 assistant 文本,而不是 user `tool_result`。
 
 ### 7. Wrong vs Correct

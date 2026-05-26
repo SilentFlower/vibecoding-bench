@@ -951,6 +951,12 @@ set -eu
 if [ -f /workspace/.claude.json ]; then
   cp /workspace/.claude.json "$HOME/.claude.json"
 fi
+for i in $(seq 1 45); do
+  if getent hosts api.anthropic.com >/dev/null 2>&1 && getent hosts platform.claude.com >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
 python3 - <<'PY'
 import json
 import ssl
@@ -958,6 +964,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from urllib.error import URLError
 from pathlib import Path
 
 TOKEN_URL = "https://platform.claude.com/v1/oauth/token"
@@ -1001,14 +1008,20 @@ def oauth_section(data: dict) -> dict:
 
 def request_json(url: str, headers: dict[str, str], body: dict | None = None) -> dict:
     data = None if body is None else json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers=headers, method="GET" if body is None else "POST")
     context = ssl.create_default_context()
-    try:
-        with urllib.request.urlopen(req, timeout=45, context=context) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        text = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HTTP {exc.code}: {text[:1000]}") from exc
+    for attempt in range(1, 6):
+        req = urllib.request.Request(url, data=data, headers=headers, method="GET" if body is None else "POST")
+        try:
+            with urllib.request.urlopen(req, timeout=45, context=context) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            text = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"HTTP {exc.code}: {text[:1000]}") from exc
+        except URLError as exc:
+            if attempt == 5:
+                raise RuntimeError(str(exc)) from exc
+            time.sleep(attempt)
+    raise RuntimeError("request failed after retries")
 
 
 def refresh_access_token(data: dict) -> str:

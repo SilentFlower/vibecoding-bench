@@ -163,6 +163,33 @@ check_claude_auth_status() {
   fi
 }
 
+wait_for_sidecar_dns() {
+  # OAuth refresh 访问 platform.claude.com，Claude API 访问 api.anthropic.com。
+  # 只等其中一个域名会在 sidecar/unbound 冷启动时留下竞态，导致临时 DNS 失败。
+  local hosts="api.anthropic.com platform.claude.com"
+  local ready
+  log "Waiting for sidecar network to stabilize (DNS resolvable)..."
+  for i in $(seq 1 45); do
+    ready=1
+    for host in $hosts; do
+      if ! getent hosts "$host" >/dev/null 2>&1; then
+        ready=0
+        break
+      fi
+    done
+    if [ "$ready" -eq 1 ]; then
+      log "Sidecar network ready (DNS ok after ${i}s)"
+      return 0
+    fi
+    sleep 1
+  done
+  log "WARN: DNS still not ready for all OAuth/API hosts after 45s; claude may fail"
+  for host in $hosts; do
+    getent hosts "$host" >/dev/null 2>&1 || log "WARN: unresolved host: $host"
+  done
+  return 1
+}
+
 refresh_oauth_credentials() {
   # `claude auth status` 只验证本地 profile 形态，access token 失效时仍可能显示已登录。
   # 跑题前先看 expiresAt；只有 token 缺失/已过期/快过期才 refresh，避免每次 run 都打 OAuth 端点。
@@ -181,6 +208,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from urllib.error import URLError
 from pathlib import Path
 
 TOKEN_URL = "https://platform.claude.com/v1/oauth/token"
@@ -236,16 +264,23 @@ request = urllib.request.Request(
     },
     method="POST",
 )
-try:
-    with urllib.request.urlopen(request, timeout=30) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-except urllib.error.HTTPError as exc:
-    text = exc.read().decode("utf-8", errors="replace")
-    print(f"OAuth token 刷新失败: HTTP {exc.code} {text[:500]}", file=sys.stderr)
-    sys.exit(1)
-except Exception as exc:
-    print(f"OAuth token 刷新失败: {exc}", file=sys.stderr)
-    sys.exit(1)
+for attempt in range(1, 6):
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        break
+    except urllib.error.HTTPError as exc:
+        text = exc.read().decode("utf-8", errors="replace")
+        print(f"OAuth token 刷新失败: HTTP {exc.code} {text[:500]}", file=sys.stderr)
+        sys.exit(1)
+    except URLError as exc:
+        if attempt == 5:
+            print(f"OAuth token 刷新失败: {exc}", file=sys.stderr)
+            sys.exit(1)
+        time.sleep(attempt)
+    except Exception as exc:
+        print(f"OAuth token 刷新失败: {exc}", file=sys.stderr)
+        sys.exit(1)
 
 access_token = payload.get("access_token")
 if not isinstance(access_token, str) or not access_token:
@@ -566,17 +601,7 @@ rm -f /tmp/claude-fatal-error /tmp/claude-completion-state
 # 启动前先等 sidecar 网络链路真正可用(DNS 通即可证明 tun→hev→mitm→上游全通):
 # orchestrator 的 SIDECAR_BOOT_WAIT 是固定常量,但 sidecar race-fix 后路由稳定要
 # 9-10s,常量不够。worker 自查 DNS 比依赖 orchestrator 估算更稳。
-log "Waiting for sidecar network to stabilize (DNS resolvable)..."
-for i in $(seq 1 30); do
-  if getent hosts api.anthropic.com >/dev/null 2>&1; then
-    log "Sidecar network ready (DNS ok after ${i}s)"
-    break
-  fi
-  sleep 1
-done
-if ! getent hosts api.anthropic.com >/dev/null 2>&1; then
-  log "WARN: DNS still not ready after 30s; claude may fail"
-fi
+wait_for_sidecar_dns || true
 
 refresh_oauth_credentials
 check_claude_auth_status
