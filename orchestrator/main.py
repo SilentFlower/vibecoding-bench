@@ -1399,7 +1399,6 @@ async function main() {
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'User-Agent': `claude-code/${claudeCodeVersion}`,
     },
     body: JSON.stringify({
       grant_type: 'refresh_token',
