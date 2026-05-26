@@ -39,3 +39,37 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 2: runs running detail stats deploy
+
+**Date**: 2026-05-26
+**Task**: runs running detail stats deploy
+**Branch**: `main`
+
+### Summary
+
+实现 running runs 详情轮询与 token/request 统计兼容显示，构建并推送 Docker Hub 镜像，远程部署 1ae986d 到 ai.havefun.eu.cc。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1ae986d` | (see git log) |
+| `3ef8af2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
