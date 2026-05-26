@@ -25,6 +25,7 @@
 set -euo pipefail
 
 WORKER_MODE="${WORKER_MODE:-task}"
+CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.150}"
 log() { echo "[entrypoint $(date +%H:%M:%S)] $*"; }
 CLAUDE_USER=node
 CLAUDE_HOME=/home/node
@@ -181,8 +182,9 @@ wait_for_sidecar_dns() {
 }
 
 refresh_oauth_credentials() {
-  # `claude auth status` 只验证本地 profile 形态，access token 失效时仍可能显示已登录。
-  # 跑题前先看 expiresAt；只有 token 缺失/已过期/快过期才 refresh，避免每次 run 都打 OAuth 端点。
+  # 只在 access token 缺失/过期/快过期时刷新，避免每次 run 都轮换凭据。
+  # 刷新请求用 Node runtime 发出，且仍在 worker→sidecar→SOCKS5 链路内完成；
+  # 不再用 Python urllib，避免它的客户端/TLS 形态触发 Cloudflare 1010。
   local credentials_path="$CLAUDE_DIR/.credentials.json"
   if [ ! -f "$credentials_path" ]; then
     return 0
@@ -190,108 +192,113 @@ refresh_oauth_credentials() {
   set +e
   runuser -u "$CLAUDE_USER" -- env \
     HOME="$CLAUDE_HOME" \
+    NODE_EXTRA_CA_CERTS="${NODE_EXTRA_CA_CERTS:-}" \
     SSL_CERT_FILE="${SSL_CERT_FILE:-}" \
     REQUESTS_CA_BUNDLE="${REQUESTS_CA_BUNDLE:-}" \
-    python3 - "$credentials_path" <<'PY'
-import json
-import sys
-import time
-import urllib.error
-import urllib.request
-from urllib.error import URLError
-from pathlib import Path
+    CURL_CA_BUNDLE="${CURL_CA_BUNDLE:-}" \
+    node - "$credentials_path" <<'JS'
+const fs = require('fs');
 
-TOKEN_URL = "https://platform.claude.com/v1/oauth/token"
-CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-SCOPES = [
-    "user:profile",
-    "user:inference",
-    "user:sessions:claude_code",
-    "user:mcp_servers",
-    "user:file_upload",
-]
+const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
+const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
+const SCOPES = [
+  'user:profile',
+  'user:inference',
+  'user:sessions:claude_code',
+  'user:mcp_servers',
+  'user:file_upload',
+];
 
-path = Path(sys.argv[1])
-try:
-    data = json.loads(path.read_text(encoding="utf-8"))
-except Exception as exc:
-    print(f"读取 .credentials.json 失败: {exc}", file=sys.stderr)
-    sys.exit(1)
+const path = process.argv[2];
+const refreshBufferMs = 10 * 60 * 1000;
 
-oauth = data.get("claudeAiOauth")
-if not isinstance(oauth, dict):
-    sys.exit(0)
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
 
-access_token = oauth.get("accessToken")
-expires_at = oauth.get("expiresAt")
-now_ms = int(time.time() * 1000)
-refresh_buffer_ms = 10 * 60 * 1000
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+let data;
+try {
+  data = JSON.parse(fs.readFileSync(path, 'utf8'));
+} catch (error) {
+  fail(`读取 .credentials.json 失败: ${error.message}`);
+}
+
+const oauth = data && data.claudeAiOauth;
+if (!oauth || typeof oauth !== 'object') {
+  process.exit(0);
+}
+
+const nowMs = Date.now();
 if (
-    isinstance(access_token, str)
-    and access_token
-    and isinstance(expires_at, (int, float))
-    and expires_at > now_ms + refresh_buffer_ms
-):
-    sys.exit(0)
+  typeof oauth.accessToken === 'string' &&
+  oauth.accessToken &&
+  typeof oauth.expiresAt === 'number' &&
+  oauth.expiresAt > nowMs + refreshBufferMs
+) {
+  process.exit(0);
+}
 
-refresh_token = oauth.get("refreshToken")
-if not isinstance(refresh_token, str) or not refresh_token:
-    print("OAuth refreshToken 为空，access token 已缺失或接近过期，请重新登录账号", file=sys.stderr)
-    sys.exit(1)
+if (typeof oauth.refreshToken !== 'string' || !oauth.refreshToken) {
+  fail('OAuth refreshToken 为空，access token 已缺失或接近过期，请重新登录账号');
+}
 
-body = json.dumps({
-    "grant_type": "refresh_token",
-    "refresh_token": refresh_token,
-    "client_id": CLIENT_ID,
-    "scope": " ".join(SCOPES),
-}).encode("utf-8")
-request = urllib.request.Request(
-    TOKEN_URL,
-    data=body,
-    headers={
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    },
-    method="POST",
-)
-for attempt in range(1, 6):
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        break
-    except urllib.error.HTTPError as exc:
-        text = exc.read().decode("utf-8", errors="replace")
-        print(f"OAuth token 刷新失败: HTTP {exc.code} {text[:500]}", file=sys.stderr)
-        sys.exit(1)
-    except URLError as exc:
-        if attempt == 5:
-            print(f"OAuth token 刷新失败: {exc}", file=sys.stderr)
-            sys.exit(1)
-        time.sleep(attempt)
-    except Exception as exc:
-        print(f"OAuth token 刷新失败: {exc}", file=sys.stderr)
-        sys.exit(1)
-
-access_token = payload.get("access_token")
-if not isinstance(access_token, str) or not access_token:
-    print("OAuth token 刷新响应缺少 access_token", file=sys.stderr)
-    sys.exit(1)
-
-oauth["accessToken"] = access_token
-new_refresh_token = payload.get("refresh_token")
-if isinstance(new_refresh_token, str) and new_refresh_token:
-    oauth["refreshToken"] = new_refresh_token
-expires_in = payload.get("expires_in")
-try:
-    expires_in_sec = int(expires_in)
-except (TypeError, ValueError):
-    expires_in_sec = 3600
-oauth["expiresAt"] = int(time.time() * 1000) + max(expires_in_sec, 60) * 1000
-
-tmp = path.with_suffix(path.suffix + ".tmp")
-tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-tmp.replace(path)
-PY
+(async () => {
+  let lastError = '';
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    try {
+      const response = await fetch(TOKEN_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': `claude-code/${process.env.CLAUDE_CODE_VERSION || '2.1.150'}`,
+        },
+        body: JSON.stringify({
+          grant_type: 'refresh_token',
+          refresh_token: oauth.refreshToken,
+          client_id: CLIENT_ID,
+          scope: SCOPES.join(' '),
+        }),
+      });
+      const text = await response.text();
+      if (!response.ok) {
+        fail(`OAuth token 刷新失败: HTTP ${response.status} ${text.slice(0, 500)}`);
+      }
+      let payload;
+      try {
+        payload = JSON.parse(text);
+      } catch (error) {
+        fail(`OAuth token 刷新响应不是 JSON: ${error.message}`);
+      }
+      if (typeof payload.access_token !== 'string' || !payload.access_token) {
+        fail('OAuth token 刷新响应缺少 access_token');
+      }
+      oauth.accessToken = payload.access_token;
+      if (typeof payload.refresh_token === 'string' && payload.refresh_token) {
+        oauth.refreshToken = payload.refresh_token;
+      }
+      const expiresIn = Number.isFinite(Number(payload.expires_in))
+        ? Number(payload.expires_in)
+        : 3600;
+      oauth.expiresAt = Date.now() + Math.max(expiresIn, 60) * 1000;
+      const tmp = `${path}.tmp`;
+      fs.writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+      fs.renameSync(tmp, path);
+      process.exit(0);
+    } catch (error) {
+      lastError = error && error.message ? error.message : String(error);
+      if (attempt === 5) break;
+      await sleep(attempt * 1000);
+    }
+  }
+  fail(`OAuth token 刷新失败: ${lastError}`);
+})();
+JS
   local refresh_code=$?
   set -e
   if [ "$refresh_code" -ne 0 ]; then

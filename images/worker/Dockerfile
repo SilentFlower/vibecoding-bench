@@ -10,6 +10,7 @@
 FROM node:22-bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV CLAUDE_CODE_VERSION=2.1.150
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       python3 python3-pip python3-venv pipx \
@@ -20,8 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       tini \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装 Claude Code CLI
-RUN npm install -g @anthropic-ai/claude-code \
+# 安装 Claude Code CLI。版本要和 orchestrator/worker 里 usage 请求的 UA 保持一致。
+RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
     && claude --version || true
 
 # 默认非 root 跑可能更安全，但 OAuth profile / CA 安装都要 root 权限，先用 root

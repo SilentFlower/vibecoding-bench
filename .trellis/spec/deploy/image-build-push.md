@@ -114,13 +114,15 @@ Claude 返回认证错误文本时必须失败,不能作为最终 assistant 回�
 - `Invalid authentication credentials`
 - `OAuth token has expired`
 
-task 启动前可以刷新 OAuth access token,但必须先读 `.credentials.json` 里的 `claudeAiOauth.expiresAt`:只有 access token 缺失、已过期或距离过期小于安全缓冲(当前 10 分钟)时才调用 refresh endpoint,避免每次 run 都刷新 token。
+task 启动前可以刷新 OAuth access token,但必须先读 `.credentials.json` 里的 `claudeAiOauth.expiresAt`:只有 access token 缺失、已过期或距离过期小于安全缓冲(当前 10 分钟)时才调用 refresh endpoint,避免每次 run 都刷新 token。刷新请求不能用 Python `urllib` 这类容易触发 Cloudflare 1010 的客户端;当前约定是在 worker 容器内用 Node runtime 发起请求,并且仍走 worker→sidecar→账号 SOCKS5 链路。刷新后必须原子写回 `.credentials.json`,退出/停止路径也必须尽量回写 profile。
 
-刷新 OAuth access token 或查询 OAuth usage API 前必须确认 sidecar 的通用 DNS resolver 已可用。sidecar/unbound 配的是通配 `forward-zone "."`,所以 readiness probe 应验证一个稳定探针域名能解析,不能把每个业务目标域名硬编码成白名单。orchestrator 可以用 `docker exec` 进 sidecar 等 `/tmp/sidecar-ready` 或通用探针解析成功,但不能用 orchestrator/宿主机网络代替 sidecar 解析。实际 OAuth/API URL 请求还必须有限重试,覆盖 resolver 刚启动后的瞬时 `Temporary failure in name resolution`。
+查询 OAuth usage API 前必须确认 sidecar 的通用 DNS resolver 已可用。sidecar/unbound 配的是通配 `forward-zone "."`,所以 readiness probe 应验证一个稳定探针域名能解析,不能把每个业务目标域名硬编码成白名单。orchestrator 可以用 `docker exec` 进 sidecar 等 `/tmp/sidecar-ready` 或通用探针解析成功,但不能用 orchestrator/宿主机网络代替 sidecar 解析。usage probe 必须在 worker 容器内按同一套 `expiresAt` 规则刷新 access token,再读 `.credentials.json` 调 usage API。实际 API URL 请求还必须有限重试,覆盖 resolver 刚启动后的瞬时 `Temporary failure in name resolution`。
 
 不能用宿主机网络或宿主 DNS 作为 OAuth refresh / usage 的 fallback。账号相关请求和域名解析都必须留在 worker→sidecar→账号 SOCKS5 链路里,否则会从宿主原始 IP 泄漏域名查询或 HTTPS 出口。
 
 上游 SOCKS5 服务器地址可以填域名。这个域名是建立代理链路之前的 bootstrap 解析,只能用 sidecar 启动时的默认 DNS 解析成 IP 后再连接代理;它和 Claude/API/WebFetch 访问的业务目标域名不是一类问题。不要为了阻断业务 DNS 泄漏而禁止 SOCKS5 域名。
+
+worker 镜像里的 Claude Code CLI 版本、worker 运行时 `CLAUDE_CODE_VERSION`、OAuth refresh/usage 请求的 `User-Agent` 必须保持一致。当前固定为 `2.1.150`;升级时要同时改 Dockerfile 默认版本、orchestrator 注入的默认环境变量和相关请求头,不能让 runner 实际版本与 usage API UA 脱节。
 
 worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 prompt；只能等待 JSONL 变化,直到完成、Claude 退出或 `TIMEOUT_SEC` 到期。
 
@@ -149,6 +151,10 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
 
 **Bad**:worker 启动前只等 `api.anthropic.com` 可解析,然后立刻刷新 OAuth token。`platform.claude.com` 尚未解析成功时会出现 `<urlopen error [Errno -3] Temporary failure in name resolution>`。
 
+**Bad**:用 Python `urllib` 直接调用 `https://platform.claude.com/v1/oauth/token` 刷新 access token。Cloudflare 可能按浏览器签名返回 1010 `browser_signature_banned`;正确做法是在 worker 容器里按 `expiresAt` 判断后用 Node runtime 刷新,并把刷新后的 `.credentials.json` 回写 profile。
+
+**Bad**:对 `platform.claude.com` 做 MITM 解密后再刷新 OAuth token。这样 Cloudflare 看到的是 mitmproxy/OpenSSL 的上游 TLS 指纹,不是 Claude CLI/Node 指纹,更容易触发 1010。该域名应在 sidecar 中 TLS passthrough,仍走同一个 SOCKS5 出口但不解密。
+
 **Bad**:每遇到一个新网页域名就加一个 DNS 等待白名单。正确做法是验证 sidecar 的通用 resolver 可用,后续任意域名都走同一条 worker→unbound→tun→SOCKS5 链路。
 
 **Bad**:在 orchestrator 容器或宿主机上提前解析业务域名,再把解析结果当成 worker 可用。这个检查既不能证明 sidecar netns 里的 unbound 已经可用,也可能泄漏宿主 DNS 查询。
@@ -165,7 +171,7 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
   - 最新 assistant 文本包含 `Please run /login · API Error: 401 Invalid authentication credentials` 时判失败。
   - 最新 session JSONL mtime 未达到稳定窗口时判未完成。
 - 用 profile settings 样例断言:合并默认 settings 后 `hooks` / `statusLine` 被删除。
-- 用 worker/quota 启动路径断言:OAuth refresh/usage 前等待通用 DNS resolver 可用,且 DNS/URL 临时失败有限重试。
+- 用 worker/quota 启动路径断言:usage 前等待通用 DNS resolver 可用,只在 access token 快过期时刷新 OAuth,刷新不用 Python `urllib`,且 DNS/URL 临时失败有限重试。
 - 远程发布后跑一个真实 task,检查 DB 里 `success` run 的 JSONL 最新对话消息是 assistant 文本,而不是 user `tool_result`。
 
 ### 7. Wrong vs Correct

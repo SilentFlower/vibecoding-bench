@@ -60,6 +60,7 @@ WORKER_USER = "node"
 WORKER_HOME = "/home/node"
 WORKER_UID = 1000
 WORKER_GID = 1000
+CLAUDE_CODE_VERSION = os.environ.get("CLAUDE_CODE_VERSION", "2.1.150")
 
 # Cookie-Session 鉴权(可选,替代 Basic Auth 给前端做风格统一的登录页):
 # - WEBUI_USER + WEBUI_PASS 都填才启用,任一为空则旁路放行(本地开发)
@@ -265,6 +266,59 @@ def _copy_claude_home_whitelist_to_profile(claude_home_dir: Path, profile_dir: P
     _persist_default_claude_top_config(profile_dir)
 
 
+def _read_account_oauth_status(account_name: str) -> dict[str, object]:
+    """
+    读取账号 profile 中的 OAuth access token 过期状态。
+
+    :param account_name: accounts.name 字段
+    :return: 仅包含过期时间和状态的安全对象，不返回 token 明文
+    """
+    credentials_path = PROFILES_DIR / account_name / ".credentials.json"
+    result: dict[str, object] = {
+        "oauth_expires_at_ms": None,
+        "oauth_expires_at_iso": None,
+        "oauth_expires_in_sec": None,
+        "oauth_token_state": "missing",
+    }
+    if not credentials_path.exists():
+        return result
+    try:
+        data = json.loads(credentials_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        result["oauth_token_state"] = "invalid"
+        return result
+    oauth = data.get("claudeAiOauth") if isinstance(data, dict) else None
+    if not isinstance(oauth, dict):
+        result["oauth_token_state"] = "invalid"
+        return result
+    token = oauth.get("accessToken")
+    expires_at = oauth.get("expiresAt")
+    if not isinstance(token, str) or not token:
+        result["oauth_token_state"] = "missing"
+        return result
+    if not isinstance(expires_at, (int, float)):
+        result["oauth_token_state"] = "invalid"
+        return result
+    expires_at_ms = int(expires_at)
+    expires_in_sec = int((expires_at_ms - int(time.time() * 1000)) / 1000)
+    if expires_in_sec <= 0:
+        state = "expired"
+    elif expires_in_sec <= 10 * 60:
+        state = "expiring"
+    else:
+        state = "valid"
+    result.update({
+        "oauth_expires_at_ms": expires_at_ms,
+        "oauth_expires_at_iso": time.strftime(
+            "%Y-%m-%dT%H:%M:%SZ",
+            time.gmtime(expires_at_ms / 1000),
+        ),
+        "oauth_expires_in_sec": expires_in_sec,
+        "oauth_token_state": state,
+    })
+    return result
+
+
 def _claude_exec_env(use_sidecar: bool, extra: Optional[dict[str, str]] = None) -> dict[str, str]:
     """
     生成 docker exec 启动 Claude 子命令时必须显式传入的环境变量。
@@ -272,7 +326,10 @@ def _claude_exec_env(use_sidecar: bool, extra: Optional[dict[str, str]] = None) 
     entrypoint 里 export 的变量不会自动进入 docker exec 创建的新进程；走
     sidecar MITM 时必须重复传 CA 路径，否则登录 TUI 可能不信 MITM 证书。
     """
-    env = {"HOME": WORKER_HOME}
+    env = {
+        "HOME": WORKER_HOME,
+        "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+    }
     if use_sidecar:
         ca = "/etc/mitm/mitmproxy-ca-cert.pem"
         env.update({
@@ -752,6 +809,7 @@ class Runner:
                     "RUN_ID": run_id,
                     "TIMEOUT_SEC": str(task.get("timeout_sec", 1800)),
                     "ACC_NAME": acc_name,
+                    "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
                     "TZ": fp["tz"],
                     "LANG": fp["lang"],
                     "LC_ALL": fp["lang"],
@@ -889,6 +947,7 @@ class Runner:
                     "USE_SIDECAR_DNS": "1",
                     "HOME": WORKER_HOME,
                     "ACC_NAME": acc_name,
+                    "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
                     "TZ": fp["tz"],
                     "LANG": fp["lang"],
                     "LC_ALL": fp["lang"],
@@ -970,6 +1029,7 @@ class Runner:
                     "USE_SIDECAR_DNS": "1",
                     "HOME": WORKER_HOME,
                     "ACC_NAME": acc_name,
+                    "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
                     "TZ": fp["tz"],
                     "LANG": fp["lang"],
                     "LC_ALL": fp["lang"],
@@ -1006,149 +1066,161 @@ for i in $(seq 1 45); do
   fi
   sleep 1
 done
-python3 - <<'PY'
-import json
-import ssl
-import sys
-import time
-import urllib.error
-import urllib.request
-from urllib.error import URLError
-from pathlib import Path
+node - <<'JS'
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
-TOKEN_URL = "https://platform.claude.com/v1/oauth/token"
-USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
-CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-SCOPES = [
-    "user:profile",
-    "user:inference",
-    "user:sessions:claude_code",
-    "user:mcp_servers",
-    "user:file_upload",
-]
-CREDENTIALS_PATH = Path.home() / ".claude" / ".credentials.json"
+const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
+const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
+const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
+const SCOPES = [
+  'user:profile',
+  'user:inference',
+  'user:sessions:claude_code',
+  'user:mcp_servers',
+  'user:file_upload',
+];
+const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
+const refreshBufferMs = 10 * 60 * 1000;
+const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.150';
 
+function emit(value) {
+  process.stdout.write(`${JSON.stringify(value)}\n`);
+}
 
-def emit(value: dict) -> None:
-    print(json.dumps(value, ensure_ascii=False))
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
+function loadCredentials() {
+  if (!fs.existsSync(credentialsPath)) {
+    throw new Error('.credentials.json 不存在，请先登录账号');
+  }
+  try {
+    return JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+  } catch (error) {
+    throw new Error(`.credentials.json 解析失败: ${error.message}`);
+  }
+}
 
-def load_credentials() -> dict:
-    if not CREDENTIALS_PATH.exists():
-        raise RuntimeError(".credentials.json 不存在，请先登录账号")
-    try:
-        return json.loads(CREDENTIALS_PATH.read_text(encoding="utf-8"))
-    except Exception as exc:
-        raise RuntimeError(f".credentials.json 解析失败: {exc}") from exc
+function oauthSection(data) {
+  const oauth = data && data.claudeAiOauth;
+  if (!oauth || typeof oauth !== 'object') {
+    throw new Error('.credentials.json 缺少 claudeAiOauth，无法查询 OAuth usage');
+  }
+  return oauth;
+}
 
+async function requestJson(url, options) {
+  let lastError = '';
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    try {
+      const response = await fetch(url, options);
+      const text = await response.text();
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${text.slice(0, 1000)}`);
+      }
+      return JSON.parse(text);
+    } catch (error) {
+      lastError = error && error.message ? error.message : String(error);
+      if (attempt === 5) break;
+      await sleep(attempt * 1000);
+    }
+  }
+  throw new Error(lastError || 'request failed after retries');
+}
 
-def save_credentials(data: dict) -> None:
-    tmp = CREDENTIALS_PATH.with_suffix(CREDENTIALS_PATH.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    tmp.replace(CREDENTIALS_PATH)
+async function refreshAccessToken(data) {
+  const oauth = oauthSection(data);
+  if (typeof oauth.refreshToken !== 'string' || !oauth.refreshToken) {
+    throw new Error('OAuth refreshToken 为空，请重新登录账号');
+  }
+  const payload = await requestJson(TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': `claude-code/${claudeCodeVersion}`,
+    },
+    body: JSON.stringify({
+      grant_type: 'refresh_token',
+      refresh_token: oauth.refreshToken,
+      client_id: CLIENT_ID,
+      scope: SCOPES.join(' '),
+    }),
+  });
+  if (typeof payload.access_token !== 'string' || !payload.access_token) {
+    throw new Error('OAuth token 刷新响应缺少 access_token');
+  }
+  oauth.accessToken = payload.access_token;
+  if (typeof payload.refresh_token === 'string' && payload.refresh_token) {
+    oauth.refreshToken = payload.refresh_token;
+  }
+  const expiresIn = Number.isFinite(Number(payload.expires_in))
+    ? Number(payload.expires_in)
+    : 3600;
+  oauth.expiresAt = Date.now() + Math.max(expiresIn, 60) * 1000;
+  const tmp = `${credentialsPath}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+  fs.renameSync(tmp, credentialsPath);
+  return oauth.accessToken;
+}
 
+async function currentAccessToken(data) {
+  const oauth = oauthSection(data);
+  if (
+    typeof oauth.accessToken === 'string' &&
+    oauth.accessToken &&
+    typeof oauth.expiresAt === 'number' &&
+    oauth.expiresAt > Date.now() + refreshBufferMs
+  ) {
+    return oauth.accessToken;
+  }
+  return refreshAccessToken(data);
+}
 
-def oauth_section(data: dict) -> dict:
-    oauth = data.get("claudeAiOauth")
-    if not isinstance(oauth, dict):
-        raise RuntimeError(".credentials.json 缺少 claudeAiOauth，无法查询 OAuth usage")
-    return oauth
-
-
-def request_json(url: str, headers: dict[str, str], body: dict | None = None) -> dict:
-    data = None if body is None else json.dumps(body).encode("utf-8")
-    context = ssl.create_default_context()
-    for attempt in range(1, 6):
-        req = urllib.request.Request(url, data=data, headers=headers, method="GET" if body is None else "POST")
-        try:
-            with urllib.request.urlopen(req, timeout=45, context=context) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as exc:
-            text = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"HTTP {exc.code}: {text[:1000]}") from exc
-        except URLError as exc:
-            if attempt == 5:
-                raise RuntimeError(str(exc)) from exc
-            time.sleep(attempt)
-    raise RuntimeError("request failed after retries")
-
-
-def refresh_access_token(data: dict) -> str:
-    oauth = oauth_section(data)
-    refresh_token = oauth.get("refreshToken")
-    if not isinstance(refresh_token, str) or not refresh_token:
-        raise RuntimeError("OAuth refreshToken 为空，请重新登录账号")
-    payload = request_json(
-        TOKEN_URL,
-        {"Content-Type": "application/json", "Accept": "application/json"},
-        {
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-            "client_id": CLIENT_ID,
-            "scope": " ".join(SCOPES),
+(async () => {
+  try {
+    let credentials = loadCredentials();
+    let token = await currentAccessToken(credentials);
+    let usage;
+    try {
+      usage = await requestJson(USAGE_URL, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'anthropic-beta': 'oauth-2025-04-20',
+          'User-Agent': `claude-code/${claudeCodeVersion}`,
         },
-    )
-    access_token = payload.get("access_token")
-    if not isinstance(access_token, str) or not access_token:
-        raise RuntimeError("OAuth refresh 响应缺少 access_token")
-    oauth["accessToken"] = access_token
-    new_refresh_token = payload.get("refresh_token")
-    if isinstance(new_refresh_token, str) and new_refresh_token:
-        oauth["refreshToken"] = new_refresh_token
-    try:
-        expires_in = int(payload.get("expires_in"))
-    except (TypeError, ValueError):
-        expires_in = 3600
-    oauth["expiresAt"] = int(time.time() * 1000) + max(expires_in, 60) * 1000
-    save_credentials(data)
-    return access_token
-
-
-def current_access_token(data: dict) -> str:
-    oauth = oauth_section(data)
-    token = oauth.get("accessToken")
-    expires_at = oauth.get("expiresAt")
-    now_ms = int(time.time() * 1000)
-    refresh_buffer_ms = 10 * 60 * 1000
-    if isinstance(token, str) and token and isinstance(expires_at, (int, float)) and expires_at > now_ms + refresh_buffer_ms:
-        return token
-    return refresh_access_token(data)
-
-
-try:
-    credentials = load_credentials()
-    token = current_access_token(credentials)
-    try:
-        usage = request_json(
-            USAGE_URL,
-            {
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "anthropic-beta": "oauth-2025-04-20",
-                "User-Agent": "claude-code/2.1.150",
-            },
-        )
-    except RuntimeError as exc:
-        # access token 被服务端拒绝时再强制刷新一次，避免本地 expiresAt 不可信。
-        if "HTTP 401" not in str(exc) and "HTTP 403" not in str(exc):
-            raise
-        token = refresh_access_token(credentials)
-        usage = request_json(
-            USAGE_URL,
-            {
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "anthropic-beta": "oauth-2025-04-20",
-                "User-Agent": "claude-code/2.1.150",
-            },
-        )
-    emit(usage)
-except Exception as exc:
-    emit({"error": str(exc)})
-    sys.exit(1)
-PY
+      });
+    } catch (error) {
+      if (!String(error.message || error).includes('HTTP 401') && !String(error.message || error).includes('HTTP 403')) {
+        throw error;
+      }
+      credentials = loadCredentials();
+      token = await refreshAccessToken(credentials);
+      usage = await requestJson(USAGE_URL, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'anthropic-beta': 'oauth-2025-04-20',
+          'User-Agent': `claude-code/${claudeCodeVersion}`,
+        },
+      });
+    }
+    emit(usage);
+  } catch (error) {
+    emit({error: error && error.message ? error.message : String(error)});
+    process.exit(1);
+  }
+})();
+JS
+claude auth status >/tmp/bench-quota-auth-status.json 2>/tmp/bench-quota-auth-status.err || true
 '''
         api = self.client.api
         ex = api.exec_create(
@@ -1323,6 +1395,7 @@ class LoginManager:
                     "USE_SIDECAR_DNS": "1" if sidecar_id else "0",
                     "HOME": WORKER_HOME,
                     "ACC_NAME": name,
+                    "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
                     "TZ": fp["tz"],
                     "LANG": fp["lang"],
                     "LC_ALL": fp["lang"],
@@ -2047,7 +2120,12 @@ def list_accounts():
     conn = get_db()
     try:
         rows = conn.execute("SELECT * FROM accounts ORDER BY id").fetchall()
-        return [dict(r) for r in rows]
+        accounts = []
+        for row in rows:
+            account = dict(row)
+            account.update(_read_account_oauth_status(account["name"]))
+            accounts.append(account)
+        return accounts
     finally:
         conn.close()
 

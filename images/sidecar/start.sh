@@ -61,6 +61,7 @@ log "Starting mitmdump (socks5 inbound :8080, upstream via proxychains -> ${UPST
 proxychains4 -q mitmdump \
   --mode socks5 \
   --listen-host 127.0.0.1 --listen-port 8080 \
+  --ignore-hosts '^(platform\.claude\.com)$' \
   --save-stream-file "$FLOW_FILE" \
   -s /sidecar/recorder.py \
   >/var/log/mitmdump.log 2>&1 &

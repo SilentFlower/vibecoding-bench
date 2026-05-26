@@ -67,6 +67,47 @@ function navigate() {
 window.addEventListener('hashchange', navigate);
 
 // ===================== Accounts =====================
+function formatDuration(sec) {
+  if (typeof sec !== 'number' || Number.isNaN(sec)) return '未知';
+  const abs = Math.abs(sec);
+  const day = Math.floor(abs / 86400);
+  const hour = Math.floor((abs % 86400) / 3600);
+  const minute = Math.floor((abs % 3600) / 60);
+  if (day > 0) return `${day}d ${hour}h`;
+  if (hour > 0) return `${hour}h ${minute}m`;
+  return `${Math.max(0, minute)}m`;
+}
+
+function renderOauthTokenStatus(a) {
+  const stateClass = {
+    valid: 'pill-success',
+    expiring: 'pill-timeout',
+    expired: 'pill-failed',
+    missing: 'pill-queued',
+    invalid: 'pill-failed',
+  }[a.oauth_token_state] || 'pill-queued';
+  const stateLabel = {
+    valid: '有效',
+    expiring: '将过期',
+    expired: '已过期',
+    missing: '未登录',
+    invalid: '异常',
+  }[a.oauth_token_state] || '未知';
+  if (!a.oauth_expires_at_ms) {
+    return `<span class="pill ${stateClass}">${stateLabel}</span><div class="muted">无过期时间</div>`;
+  }
+  const expiresAt = new Date(a.oauth_expires_at_ms);
+  const expiresText = Number.isNaN(expiresAt.getTime()) ? '未知时间' : expiresAt.toLocaleString();
+  const remain = a.oauth_expires_in_sec <= 0
+    ? `超时 ${formatDuration(a.oauth_expires_in_sec)}`
+    : `剩余 ${formatDuration(a.oauth_expires_in_sec)}`;
+  return `
+    <span class="pill ${stateClass}">${stateLabel}</span>
+    <div>${escapeHTML(expiresText)}</div>
+    <div class="muted">${escapeHTML(remain)}</div>
+  `;
+}
+
 async function renderAccounts() {
   try {
     state.accounts = await API('/accounts');
@@ -79,13 +120,14 @@ async function renderAccounts() {
       <td><strong>${escapeHTML(a.name)}</strong></td>
       <td><code>${escapeHTML(a.profile_path)}</code></td>
       <td>${a.upstream_socks5_host ? `${escapeHTML(a.upstream_socks5_host)}:${a.upstream_socks5_port || ''}` : '<span class="muted">未配置</span>'}</td>
+      <td>${renderOauthTokenStatus(a)}</td>
       <td>${a.enabled ? '✓' : '✗'}</td>
       <td>
         <button class="btn btn-sm" data-quota="${a.id}">额度</button>
         <button class="btn btn-sm btn-danger" data-del="${a.id}">删除</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="6" class="muted empty-cell">暂无账号</td></tr>';
+  `).join('') || '<tr><td colspan="7" class="muted empty-cell">暂无账号</td></tr>';
 
   body.onclick = async (e) => {
     const id = e.target.dataset.del;
