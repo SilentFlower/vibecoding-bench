@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "确认后端单文件结构与新增逻辑放置位置。"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "确认 SQLite 写入、upsert 和锁策略约束。"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "确认后端改动的质量和验证要求。"}
+{"file": ".trellis/spec/deploy/remote-deploy.md", "reason": "确认远程 topics.md 与 SQLite 数据同步的部署约束。"}

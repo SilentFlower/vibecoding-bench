@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "检查 topics 同步 SQL 是否参数化、事务安全且不破坏历史引用。"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "检查后端 prompt 改动、校验命令和人工验收路径。"}
+{"file": ".trellis/spec/deploy/remote-deploy.md", "reason": "检查远程同步前备份、同步后验证和回滚路径。"}
