@@ -21,9 +21,8 @@ AGENTS.md
 # 哪些是本地状态(.developer/.runtime/*.tmp 等)由 .trellis/.gitignore 内层管。
 # 唯一额外排除:trellis update 留的 .bak 备份
 .trellis/workflow.md.bak
-.agents/
-.codex/
-.claude/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
 .deploy/
 
 # Local screenshots / playwright MCP dumps
