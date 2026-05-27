@@ -73,3 +73,36 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: 扩充 topics 题库并同步远程
+
+**Date**: 2026-05-27
+**Task**: 扩充 topics 题库并同步远程
+**Branch**: `main`
+
+### Summary
+
+将 topics 题库扩充到 200 条并完善原 1-100 描述；增强默认 topic prompt；新增 SQLite 题库 upsert 同步脚本；更新 README 和 Trellis spec；已把远程 /root/vibecoding-bench 的 topics.md 与 data/db.sqlite 同步到 200 条，备份为 data/db.sqlite.bak-20260527-134422，API 验证返回 1..200。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0bf8f95` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
