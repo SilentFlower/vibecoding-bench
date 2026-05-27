@@ -37,7 +37,7 @@
 │
 ├── docker-compose.yml            orchestrator 服务 + 镜像 build profile
 ├── .env.example                  HOST_BENCH_DATA 等环境变量样板
-└── topics.md                     100 道题题库(运行时解析,不入库)
+└── topics.md                     200 道题 seed 题库(SQLite 为空时导入；已 seed 实例需同步)
 ```
 
 ---
@@ -49,7 +49,7 @@
 ```python
 # ============== 配置 ==============         # 环境变量、路径常量
 # ============== DB ==============           # _SCHEMA 字符串、get_db()、init_db()
-# ============== Topics 解析 ==============   # _CAT_RE / _ITEM_RE + load_topics()
+# ============== Topics 解析 ==============   # _CAT_RE / _ITEM_RE + load_seed_topics()
 # ============== Docker 运行器 ==============  # class Runner
 # ============== Login 会话管理 ==============  # class LoginSession / LoginManager
 # ============== 调度器 ==============         # class Scheduler
@@ -99,4 +99,4 @@
 - **典型资源 CRUD**:`orchestrator/main.py` 的 accounts 路由组(`create_account` / `list_accounts` / `delete_account`)是后端 REST 端点的标准范式
 - **后台 run 调度**:`Scheduler._execute()` 展示了"DB 状态机 + 信号量 + 兜底清理"的写法
 - **PTY ↔ WebSocket 桥**:`login_ws()` 是异步双向流的范式参考
-- **正则解析外部数据**:`load_topics()` + `_CAT_RE` / `_ITEM_RE` 是"用正则把 Markdown 当结构化数据读"的样例
+- **正则解析外部数据**:`load_seed_topics()` + `_CAT_RE` / `_ITEM_RE` 是"用正则把 Markdown 当结构化 seed 数据读"的样例

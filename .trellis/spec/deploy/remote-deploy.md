@@ -26,6 +26,8 @@
 
 最便宜的拿齐法:`git clone https://github.com/SilentFlower/vibecoding-bench.git`,然后 `git pull` 升级。
 
+> 题库维护额外需要 `scripts/sync-topics-db.py`:远程如果不是 git 仓库,同步新版 `topics.md` 时也要同步这个脚本,再按下方 [Topic 题库同步](#topic-题库同步) 写入 SQLite。
+
 ---
 
 ## Compose 选择:`docker-compose.yml` vs `docker-compose.remote.yml`
@@ -157,6 +159,87 @@ cp docker-compose.remote.yml docker-compose.yml
 ```
 
 `.env` 是 gitignored,**不会被 git pull 动**,放心。
+
+---
+
+## Topic 题库同步
+
+### 1. Scope / Trigger
+
+`topics.md` 只在 SQLite `topics` 表为空时 seed。任何已经启动过 orchestrator 的本地或远程实例,更新 `topics.md` 后都必须显式同步 SQLite,否则 WebUI `/api/topics` 仍展示旧题库。
+
+### 2. Signatures
+
+```bash
+scripts/sync-topics-db.py \
+  --topics topics.md \
+  --db data/db.sqlite \
+  [--validate-only] \
+  [--apply]
+```
+
+### 3. Contracts
+
+| 参数 | 类型 | 默认值 | 契约 |
+|------|------|--------|------|
+| `--topics` | path | `topics.md` | Markdown 题库文件,条目格式必须是 `- [ ] N. **标题**：描述` |
+| `--db` | path | `data/db.sqlite` | 已由 orchestrator 初始化过、且存在 `topics` 表的 SQLite 文件 |
+| `--validate-only` | flag | false | 只校验 Markdown 解析结果,不访问数据库 |
+| `--apply` | flag | false | 实际写入数据库;不传时只输出 dry-run 计划 |
+
+同步策略按 `topics.no` upsert:
+- 已存在编号 → `UPDATE title/description/category/enabled/deleted_at/updated_at`,保留原 `id`
+- 不存在编号 → `INSERT`
+- 不删除额外编号;例如远程本地自定义的 `no > 200` 默认保留
+- `--apply` 前自动备份 DB 到同目录 `db.sqlite.bak-YYYYMMDD-HHMMSS`
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|------|------|
+| `topics.md` 解析不到任何题 | 退出并提示“题库为空” |
+| 编号重复 | 退出并列出重复编号 |
+| 编号不连续 | 退出并提示期望范围和实际首尾 |
+| 标题 / 描述 / 分类为空 | 退出并列出缺失编号 |
+| DB 文件不存在 | 退出并提示数据库不存在,避免 `sqlite3.connect` 创建空库 |
+| DB 未初始化 `topics` 表 | 退出并提示先启动 orchestrator 初始化 schema |
+| 不传 `--apply` | 只输出解析数量、计划更新数、计划新增数,不写库 |
+
+### 5. Good / Base / Bad Cases
+
+**Good**:远程更新题库后,先 `scripts/sync-topics-db.py --topics topics.md --db data/db.sqlite` 看计划,确认无误再 `--apply`,最后登录 API 验证 `/api/topics` 数量。
+
+**Base**:本地开发只想校验 `topics.md`,跑 `scripts/sync-topics-db.py --validate-only`。
+
+**Bad**:只 scp 新 `topics.md` 到远程就以为 WebUI 会变。远程 DB 已有 `topics` 表时 seed 不会再执行,页面仍是旧题库。
+
+### 6. Tests Required
+
+- `scripts/sync-topics-db.py --topics topics.md --validate-only` 断言题目数量和编号连续。
+- 用临时 SQLite 建 `topics` 表,插入 `no=1` 旧题和 `no=201` 自定义题,跑 dry-run + `--apply`,断言:
+  - `no=1` 被更新但 `id` 保留
+  - `no=200` 被插入
+  - `no=201` 被保留
+  - 生成 `.bak-YYYYMMDD-HHMMSS` 备份
+- 远程同步后登录 API,断言 `/api/topics` 至少返回 200 条且包含 1-200。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```bash
+scp topics.md server:/root/vibecoding-bench/topics.md
+# 误以为已 seed 过的远程 DB 会自动刷新
+```
+
+#### Correct
+
+```bash
+scp topics.md server:/root/vibecoding-bench/topics.md
+scp scripts/sync-topics-db.py server:/root/vibecoding-bench/scripts/sync-topics-db.py
+ssh server 'cd /root/vibecoding-bench && scripts/sync-topics-db.py --topics topics.md --db data/db.sqlite'
+ssh server 'cd /root/vibecoding-bench && scripts/sync-topics-db.py --topics topics.md --db data/db.sqlite --apply'
+```
 
 ---
 

@@ -56,7 +56,7 @@ const state = {
 1. **跨 tab 复用**:`accounts` 在 accounts / tasks / runs 三个 tab 都要用 → 全局
 2. **SSE 推送后异步覆盖**:`runs` 由 `/api/runs/stream` 异步覆盖 + UI 也读 → 全局
 3. **跨函数寿命**:OAuth 两步流的 ws / term 由 `attachAccLoginTerminal` 创建、由 `endAccLogin` 释放 → 全局
-4. **持久化 / 长寿命缓存**:`topics`(100 道题,一次加载后基本不变)→ 全局
+4. **持久化 / 长寿命缓存**:`topics`(200 道题,一次加载后基本不变)→ 全局
 
 **其余一律用局部变量**:render 内的中间计算、modal 内的 form 数据、单次按钮点击的临时数据。
 
@@ -71,7 +71,7 @@ const state = {
 | 场景 | 策略 |
 |------|------|
 | 列表数据(account / task / run) | 每次进 tab 时**重新拉** `await API('/...')`,覆盖 `state.<x>`。**不做客户端缓存有效期判定** |
-| 静态数据(topics 100 题) | 第一次拉了缓存到 `state.topics`,后续 `if (state.topics.length === 0) await API('/topics')` |
+| 静态数据(topics 200 题) | 第一次拉了缓存到 `state.topics`,后续 `if (state.topics.length === 0) await API('/topics')` |
 | 实时数据(runs) | SSE `/api/runs/stream` 推全量,前端无差量;且**首次进页同时拉一次 `/api/runs`** 兜底首屏(SSE 第一帧到达可能要 1 秒) |
 | 写操作后刷新 | 写完(`POST /api/...` 成功)显式调对应 `render<Tab>()` 重拉,**不做乐观更新**。例:删账号后 `renderAccounts()` |
 | 失败处理 | API 抛 → `alert('xxx失败: ' + e.message)`,**不做自动重试**,**不做 toast 队列** |

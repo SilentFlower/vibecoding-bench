@@ -1,5 +1,5 @@
 """
-vibecoding-100 bench · Orchestrator
+vibecoding bench · Orchestrator
 
 职责：
   1. 账号 / 题库 / 任务 / 运行 的 CRUD（SQLite 持久化）
@@ -627,10 +627,17 @@ def build_topic_prompt(topic: dict) -> str:
     :param topic: topic 行字典
     :return: 默认 prompt 文本
     """
+    category = (topic.get("category") or "未分类").strip()
+    description = (topic.get("description") or "").strip()
     return (
-        f"{topic['title']}：{topic.get('description') or ''}\n\n"
-        "请在当前目录下从 0 到 1 实现一个 MVP（功能跑通即可，先不追求架构完美）。"
-        "完成后简要总结你做了什么。"
+        f"题目：{topic['title']}\n"
+        f"分类：{category}\n"
+        f"描述：{description}\n\n"
+        "请在当前目录下从 0 到 1 实现一个可运行的 MVP。要求：\n"
+        "1. 先围绕描述中的核心用户场景完成主链路，不追求过度架构。\n"
+        "2. 补齐必要的输入校验、空状态、错误提示和基础持久化或示例数据。\n"
+        "3. 在实现完成后说明启动方式、验证方式、关键文件和主要取舍。\n"
+        "4. 遇到题目未明确的细节时，请做合理假设并在最终总结中列出，不要因为缺少细节而停止。"
     )
 
 

@@ -36,8 +36,11 @@
 ```python
 @app.post("/api/tasks")
 def create_task(body: TaskIn):
-    topic = next((t for t in load_topics() if t["no"] == body.topic_no), None)
-    if not topic:
+    topic_row = conn.execute(
+        "SELECT * FROM topics WHERE no=? AND deleted_at IS NULL",
+        (body.topic_no,),
+    ).fetchone()
+    if not topic_row:
         raise HTTPException(404, f"topic {body.topic_no} not found")
     # ...继续主逻辑
 ```

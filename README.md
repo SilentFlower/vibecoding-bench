@@ -1,6 +1,6 @@
 # vibecoding-bench
 
-把 [`topics.md`](./topics.md) 里的 100 道题作为题库，让真实的 **Claude Code** 在容器里跑，按账号隔离、按账号并发限流、全程透明代理 + TLS MITM 抓 Anthropic API 原文。
+把 [`topics.md`](./topics.md) 里的 200 道题作为题库，让真实的 **Claude Code** 在容器里跑，按账号隔离、按账号并发限流、全程透明代理 + TLS MITM 抓 Anthropic API 原文。
 
 ## 架构
 
@@ -51,7 +51,7 @@ open http://localhost:8000
 | 页 | 用途 |
 |---|---|
 | **账号** | 添加在 init-account.sh 已建好 profile 的账号，配置上游 SOCKS5 |
-| **题库** | 100 题；点击卡片 → 创建任务（选派发账号、prompt、重复次数、超时）|
+| **题库** | 200 题；点击卡片 → 查看 / 编辑 topic，批量任务页可多选派发 |
 | **任务** | 列表 + ▶ 运行（按 repeat_n 提交多次）|
 | **运行** | SSE 实时列表 + 详情：transcript / 产物文件树 / token 统计 |
 
@@ -96,7 +96,7 @@ bench/
 
 ## P1 范围 vs 后续
 
-**P1 已实现**：账号 CRUD、题库解析、任务创建/运行、单账号 2 并发调度、sidecar+worker 编排、TLS MITM + flow 落盘、token 统计、SSE 实时状态、详情面板。
+**P1 已实现**：账号 CRUD、题库解析、topic 持久化维护、任务批量创建/运行、单账号 2 并发调度、sidecar+worker 编排、TLS MITM + flow 落盘、token 统计、SSE 实时状态、详情面板。
 
 **待 P2**：多账号管理 UI、循环跑（题库扫完再来一轮）、按账号统计仪表盘、mitmproxy flow 在 WebUI 内浏览、失败重试策略、Stop hook 检测的更精细判定。
 
@@ -105,6 +105,7 @@ bench/
 ## 已知限制 / 排查
 
 - **HOST_BENCH_DATA 必须是宿主机绝对路径**，不能填 `./data`——orchestrator 用它告诉宿主 daemon 给 sibling 容器挂卷。
+- **topics.md 只在 topics 表为空时 seed**。已经运行过的本地/远程实例需要执行 `scripts/sync-topics-db.py --apply` 才会把新版题库同步进 SQLite；默认不带 `--apply` 只做 dry-run。远程如果不是 git 仓库，执行前要先同步这个脚本。
 - **OAuth flow** 假设 claude CLI 是 device-code/复制粘贴码方式；如果它非要回调到 `localhost:port`，init-account.sh 需要加 `-p` 端口映射。
 - **首次 MITM CA 生成**：sidecar 启动时若 `data/ca/` 为空，会让 mitmproxy 自己生成；worker 启动时 CA 已经在卷里。若并发首次启动多个 run，有微小窗口期某些 run 拿不到 CA——P1 用 `SIDECAR_BOOT_WAIT=4` 兜底，足以；P2 改成显式等 CA 文件就绪。
 - **certificate pinning 风险**：claude-code 当前不 pin；后续升级若 pin，MITM 会失败，需补丁或回退到不解密模式。
