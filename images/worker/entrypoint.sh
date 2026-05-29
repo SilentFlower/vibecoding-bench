@@ -25,7 +25,7 @@
 set -euo pipefail
 
 WORKER_MODE="${WORKER_MODE:-task}"
-CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.150}"
+CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.156}"
 log() { echo "[entrypoint $(date +%H:%M:%S)] $*"; }
 CLAUDE_USER=node
 CLAUDE_HOME=/home/node
