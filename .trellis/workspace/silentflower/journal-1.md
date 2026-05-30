@@ -19,7 +19,11 @@
 
 ### Main Changes
 
-(Add details)
+- 升级 Claude Code CLI 到 2.1.156，并保持 worker 镜像、orchestrator 注入版本和 usage User-Agent 一致。
+- 增加 run 可靠性配置：effort、timeout wrap-up、OAuth 401 后等待后台刷新并注入一次重试提示。
+- 增加 Claude API 卡死 watchdog：仅在 `system/api_error` 连接错误且长时间无有效进展时中断 busy TUI 并注入继续提示。
+- 将 watchdog 配置暴露到 `.env.example`、本地 compose、远程 compose，并更新 worker 部署契约。
+- 构建并推送 DockerHub `a38604d` 三镜像，远程 `/root/vibecoding-bench` 已更新到该 tag。
 
 ### Git Commits
 
@@ -30,7 +34,12 @@
 
 ### Testing
 
-- [OK] (Add test results)
+- [OK] `bash -n images/worker/entrypoint.sh`
+- [OK] `python3 -m py_compile orchestrator/main.py`
+- [OK] `git diff --check`
+- [OK] Trellis task context validation
+- [OK] 本地 JSONL 样例覆盖 API 卡死触发、有进展不触发、401 不触发、普通 error 字段不触发
+- [OK] 远程 Web 根路径返回 200，`/api/topics` 返回 401，符合开启鉴权预期
 
 ### Status
 
@@ -94,6 +103,41 @@
 | Hash | Message |
 |------|---------|
 | `0bf8f95` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 4: Run 可靠性与 API 卡死恢复
+
+**Date**: 2026-05-31
+**Task**: Run 可靠性与 API 卡死恢复
+**Branch**: `main`
+
+### Summary
+
+完成 Claude Code CLI 2.1.156 升级、effort/timeout/OAuth 401 恢复配置、API 卡死 watchdog 与有限自动续跑；已通过 check-all，构建并推送 DockerHub a38604d 三镜像，远程 /root/vibecoding-bench 已切到 a38604d。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d22edeb` | (see git log) |
+| `aa707fd` | (see git log) |
+| `a38604d` | (see git log) |
 
 ### Testing
 
