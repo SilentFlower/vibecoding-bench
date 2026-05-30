@@ -1,0 +1,11 @@
+{"file": ".trellis/tasks/05-31-claude-api-stall-watchdog-recovery/prd.md", "reason": "需求与验收基准"}
+{"file": ".trellis/tasks/05-31-claude-api-stall-watchdog-recovery/design.md", "reason": "技术设计基准"}
+{"file": ".trellis/tasks/05-31-claude-api-stall-watchdog-recovery/implement.md", "reason": "验证计划基准"}
+{"file": ".trellis/tasks/05-31-claude-api-stall-watchdog-recovery/research/1179c962831a-api-stall.md", "reason": "远程样本证据"}
+{"file": ".trellis/spec/deploy/image-build-push.md", "reason": "worker 完成判定和发布契约"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "后端质量约束"}
+{"file": "images/worker/entrypoint.sh", "reason": "主要实现和 shell 语法验证对象"}
+{"file": "orchestrator/main.py", "reason": "配置传递和 run error 落库检查对象"}
+{"file": ".env.example", "reason": "新增配置暴露检查"}
+{"file": "docker-compose.yml", "reason": "本地配置传递检查"}
+{"file": "docker-compose.remote.yml", "reason": "远程配置传递检查"}

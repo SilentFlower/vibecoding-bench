@@ -67,6 +67,10 @@ CLEAN_WORKSPACE_DEPS = os.environ.get("CLEAN_WORKSPACE_DEPS", "1")
 TIMEOUT_WRAPUP_SEC = int(os.environ.get("TIMEOUT_WRAPUP_SEC", "600"))
 OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC = int(os.environ.get("OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC", "15"))
 OAUTH_401_PROFILE_WAIT_SEC = int(os.environ.get("OAUTH_401_PROFILE_WAIT_SEC", "90"))
+CLAUDE_API_STALL_WATCHDOG_SEC = int(os.environ.get("CLAUDE_API_STALL_WATCHDOG_SEC", "400"))
+CLAUDE_API_STALL_MAX_RECOVERIES = int(os.environ.get("CLAUDE_API_STALL_MAX_RECOVERIES", "1"))
+CLAUDE_BUSY_INTERRUPT_GRACE_SEC = int(os.environ.get("CLAUDE_BUSY_INTERRUPT_GRACE_SEC", "8"))
+CLAUDE_API_STALL_RECOVERY_PROMPT = os.environ.get("CLAUDE_API_STALL_RECOVERY_PROMPT", "")
 
 # Cookie-Session 鉴权(可选,替代 Basic Auth 给前端做风格统一的登录页):
 # - WEBUI_USER + WEBUI_PASS 都填才启用,任一为空则旁路放行(本地开发)
@@ -889,6 +893,10 @@ class Runner:
                     "TIMEOUT_WRAPUP_SEC": str(TIMEOUT_WRAPUP_SEC),
                     "OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC": str(OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC),
                     "OAUTH_401_PROFILE_WAIT_SEC": str(OAUTH_401_PROFILE_WAIT_SEC),
+                    "CLAUDE_API_STALL_WATCHDOG_SEC": str(CLAUDE_API_STALL_WATCHDOG_SEC),
+                    "CLAUDE_API_STALL_MAX_RECOVERIES": str(CLAUDE_API_STALL_MAX_RECOVERIES),
+                    "CLAUDE_BUSY_INTERRUPT_GRACE_SEC": str(CLAUDE_BUSY_INTERRUPT_GRACE_SEC),
+                    "CLAUDE_API_STALL_RECOVERY_PROMPT": CLAUDE_API_STALL_RECOVERY_PROMPT,
                     "OAUTH_REFRESH_BUFFER_SEC": str(OAUTH_REFRESH_BUFFER_SEC),
                     "TZ": fp["tz"],
                     "LANG": fp["lang"],
@@ -2377,7 +2385,7 @@ class Scheduler:
                     "exit_code": exit_code,
                     "ended_at": time.time(),
                 }
-                if error:
+                if error and status not in ("success", "stopped"):
                     update_fields["error"] = error
                 self._update(run_id, **update_fields)
                 self._update_batch_item_for_run(run_id, status)

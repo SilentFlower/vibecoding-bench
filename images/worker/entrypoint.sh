@@ -11,6 +11,7 @@
 #   TIMEOUT_SEC     超时（秒），默认 1800
 #   TIMEOUT_WRAPUP_SEC  临近超时前自动注入收尾提示的秒数，默认 600；0 表示关闭
 #   OAUTH_401_PROFILE_WAIT_SEC  检测到 401 后等待后台刷新 profile 的秒数，默认 90
+#   CLAUDE_API_STALL_WATCHDOG_SEC  API 连接错误后无进展多久自动中断续跑，默认 400；0 表示关闭
 # 挂载约定：
 #   task 模式：
 #     /mnt/profile  账号 ~/.claude profile（rw，仅回写关键配置文件）
@@ -228,10 +229,17 @@ persist_runtime_claude_state() {
 write_bench_status() {
   local status="$1"
   local error="$2"
-  node - "$status" "$error" > /workspace/.bench-status.json.tmp <<'JS'
+  local api_stall_recoveries="${3:-}"
+  node - "$status" "$error" "$api_stall_recoveries" > /workspace/.bench-status.json.tmp <<'JS'
 const status = process.argv[2] || 'failed';
 const error = process.argv[3] || '';
-process.stdout.write(`${JSON.stringify({status, error}, null, 2)}\n`);
+const payload = {status, error};
+const apiStallRecoveriesRaw = process.argv[4] || '';
+const apiStallRecoveries = Number(apiStallRecoveriesRaw);
+if (apiStallRecoveriesRaw !== '' && Number.isFinite(apiStallRecoveries)) {
+  payload.api_stall_recoveries = apiStallRecoveries;
+}
+process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
 JS
   mv /workspace/.bench-status.json.tmp /workspace/.bench-status.json
 }
@@ -644,6 +652,266 @@ sys.exit(1)
 PY
 }
 
+detect_claude_api_stall() {
+  # Claude Code 偶发会在 /v1/messages ECONNRESET 后长期卡在 busy 状态。
+  # 这里只在“明确 API 连接错误 + 长时间没有对话/产物进展”同时成立时触发，
+  # 避免把正常长思考或普通工具失败误判成卡死。
+  local watchdog_sec="${1:-0}"
+  local since_epoch="${2:-0}"
+  python3 - "$CLAUDE_DIR/projects/-workspace" "/workspace" "$watchdog_sec" "$since_epoch" <<'PY'
+import json
+import os
+import sys
+import time
+import datetime as dt
+from pathlib import Path
+
+project_dir = Path(sys.argv[1])
+workspace = Path(sys.argv[2])
+watchdog_sec = float(sys.argv[3] or 0)
+since_epoch = float(sys.argv[4] or 0)
+
+if watchdog_sec <= 0:
+    sys.exit(1)
+
+markers = (
+    "econnreset",
+    "connection error",
+    "unable to connect to api",
+    "failedtoopensocket",
+)
+
+
+def entry_epoch(entry):
+    raw = entry.get("timestamp")
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        return dt.datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def message_role(entry):
+    message = entry.get("message")
+    if isinstance(message, dict):
+        return message.get("role")
+    return entry.get("role")
+
+
+def message_content(entry):
+    message = entry.get("message")
+    if isinstance(message, dict):
+        return message.get("content")
+    return entry.get("content")
+
+
+def message_stop_reason(entry):
+    message = entry.get("message")
+    if isinstance(message, dict):
+        return message.get("stop_reason")
+    return entry.get("stop_reason")
+
+
+def content_text(content):
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "text":
+                parts.append(str(item.get("text") or ""))
+            elif item.get("type") == "tool_result":
+                parts.append(content_text(item.get("content")))
+        return "\n".join(parts)
+    return ""
+
+
+def content_has_tool_use(content):
+    if not isinstance(content, list):
+        return False
+    return any(isinstance(item, dict) and item.get("type") == "tool_use" for item in content)
+
+
+def api_error_text(entry):
+    pieces = []
+    error = entry.get("error")
+    if isinstance(error, dict):
+        for key in ("message", "formatted"):
+            value = error.get(key)
+            if isinstance(value, str):
+                pieces.append(value)
+        connection = error.get("connection")
+        if isinstance(connection, dict):
+            for key in ("code", "message"):
+                value = connection.get(key)
+                if isinstance(value, str):
+                    pieces.append(value)
+    for key in ("message", "formatted"):
+        value = entry.get(key)
+        if isinstance(value, str):
+            pieces.append(value)
+    return "\n".join(pieces).lower()
+
+
+def is_api_error(entry):
+    if entry.get("type") != "system" or entry.get("subtype") != "api_error":
+        return False
+    text = api_error_text(entry)
+    return any(marker in text for marker in markers)
+
+
+def is_final_assistant(entry):
+    if message_role(entry) != "assistant":
+        return False
+    content = message_content(entry)
+    if content_has_tool_use(content):
+        return False
+    if message_stop_reason(entry) == "tool_use":
+        return False
+    return bool(content_text(content).strip())
+
+
+def workspace_progress_epoch():
+    latest = 0.0
+    excluded_dirs = {".claude-home", ".claude", ".git", "node_modules", ".venv", "venv", "__pycache__"}
+    excluded_files = {".bench-transcript.log", ".bench-status.json"}
+    try:
+        for root, dirs, files in os.walk(workspace):
+            dirs[:] = [name for name in dirs if name not in excluded_dirs]
+            for name in files:
+                if name in excluded_files or name.startswith("."):
+                    continue
+                path = Path(root) / name
+                try:
+                    mtime = path.stat().st_mtime
+                except OSError:
+                    continue
+                if mtime >= since_epoch:
+                    latest = max(latest, mtime)
+    except OSError:
+        pass
+    return latest
+
+
+latest_error = 0.0
+latest_progress = workspace_progress_epoch()
+latest_entry = None
+
+if project_dir.exists():
+    files = sorted(project_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+    for path in files[:3]:
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            ts = entry_epoch(entry)
+            if ts is None or ts < since_epoch:
+                continue
+            if message_role(entry) in {"assistant", "user"}:
+                latest_entry = entry
+                latest_progress = max(latest_progress, ts)
+            if is_api_error(entry):
+                latest_error = max(latest_error, ts)
+
+if latest_entry and is_final_assistant(latest_entry):
+    sys.exit(1)
+if latest_error <= 0 or latest_error <= latest_progress:
+    sys.exit(1)
+
+now = time.time()
+idle_from = max(latest_progress, since_epoch)
+idle_sec = now - idle_from
+if idle_sec < watchdog_sec:
+    sys.exit(1)
+
+print(json.dumps({
+    "latest_error_epoch": latest_error,
+    "latest_progress_epoch": latest_progress,
+    "idle_sec": int(idle_sec),
+}, ensure_ascii=False))
+PY
+}
+
+api_stall_recovery_count() {
+  local value="0"
+  if [ -f /tmp/claude-api-stall-recoveries ]; then
+    value="$(cat /tmp/claude-api-stall-recoveries 2>/dev/null || echo 0)"
+  fi
+  case "$value" in
+    ''|*[!0-9]*) value=0 ;;
+  esac
+  echo "$value"
+}
+
+api_stall_last_recovery_epoch() {
+  local value="0"
+  if [ -f /tmp/claude-api-stall-last-recovery ]; then
+    value="$(cat /tmp/claude-api-stall-last-recovery 2>/dev/null || echo 0)"
+  fi
+  case "$value" in
+    ''|*[!0-9]*) value=0 ;;
+  esac
+  echo "$value"
+}
+
+busy_interrupt_count() {
+  local value="0"
+  if [ -f /tmp/claude-busy-interrupts ]; then
+    value="$(cat /tmp/claude-busy-interrupts 2>/dev/null || echo 0)"
+  fi
+  case "$value" in
+    ''|*[!0-9]*) value=0 ;;
+  esac
+  echo "$value"
+}
+
+record_api_stall_recovery() {
+  local count
+  count="$(api_stall_recovery_count)"
+  count=$((count + 1))
+  echo "$count" > /tmp/claude-api-stall-recoveries
+  date +%s > /tmp/claude-api-stall-last-recovery
+  echo "$count"
+}
+
+record_busy_interrupt() {
+  local count
+  count="$(busy_interrupt_count)"
+  count=$((count + 1))
+  echo "$count" > /tmp/claude-busy-interrupts
+  echo "$count"
+}
+
+interrupt_budget_used_count() {
+  echo $(( $(api_stall_recovery_count) + $(busy_interrupt_count) ))
+}
+
+can_interrupt_for_recovery() {
+  local max_recoveries="${CLAUDE_API_STALL_MAX_RECOVERIES:-1}"
+  case "$max_recoveries" in
+    ''|*[!0-9]*) max_recoveries=1 ;;
+  esac
+  if [ "$max_recoveries" -le 0 ] 2>/dev/null; then
+    return 1
+  fi
+  [ "$(interrupt_budget_used_count)" -lt "$max_recoveries" ]
+}
+
+is_claude_tui_busy() {
+  tmux has-session -t "$SESSION" 2>/dev/null || return 1
+  local pane
+  pane="$(tmux capture-pane -t "$SESSION" -p 2>/dev/null || true)"
+  printf '%s' "$pane" | grep -Eiq "Beboppin|Herding|Frosting|Thinking|Retrying in|Running [0-9]+ shell command|tokens\\)"
+}
+
 inject_tmux_prompt() {
   local buffer="$1"
   local text="$2"
@@ -653,6 +921,29 @@ inject_tmux_prompt() {
   tmux paste-buffer -t "$SESSION" -b "$buffer" -d -p
   sleep 1
   tmux send-keys -t "$SESSION" Enter
+}
+
+interrupt_and_inject_tmux_prompt() {
+  local kind="$1"
+  local text="$2"
+  local grace="${CLAUDE_BUSY_INTERRUPT_GRACE_SEC:-8}"
+  case "$grace" in
+    ''|*[!0-9]*) grace=8 ;;
+  esac
+  tmux has-session -t "$SESSION" 2>/dev/null || return 1
+  log "中断 Claude TUI 后注入 ${kind} 提示"
+  tmux send-keys -t "$SESSION" C-c
+  for _ in $(seq 1 "$grace"); do
+    capture_transcript_snapshot
+    sleep 1
+  done
+  inject_tmux_prompt "$kind" "$text"
+}
+
+write_api_stall_status() {
+  local status="$1"
+  local error="$2"
+  write_bench_status "$status" "$error" "$(api_stall_recovery_count)"
 }
 
 # ---------- 0) /etc/machine-id 按账号名 hash 写入 ----------
@@ -782,6 +1073,7 @@ rm -f /tmp/claude-done /tmp/claude-stop-seen
 rm -f /tmp/claude-exited /tmp/claude-exit-code
 rm -f /tmp/claude-fatal-error /tmp/claude-completion-state
 rm -f /tmp/claude-auth-recovered-once /tmp/claude-wrapup-sent
+rm -f /tmp/claude-api-stall-recoveries /tmp/claude-api-stall-last-recovery /tmp/claude-busy-interrupts
 rm -f /workspace/.bench-status.json /workspace/.bench-status.json.tmp
 
 start_profile_credentials_sync
@@ -833,7 +1125,10 @@ COMPLETION_IDLE_SEC="${COMPLETION_IDLE_SEC:-10}"
 TIMEOUT_WRAPUP_SEC="${TIMEOUT_WRAPUP_SEC:-600}"
 TIMEOUT_WRAPUP_PROMPT="${TIMEOUT_WRAPUP_PROMPT:-时间快到，请停止扩展功能和长时间验证，优先补齐最小可运行交付。请整理当前已完成内容，必要时说明未完成项和验证降级原因，然后输出最终总结。}"
 AUTH_RECOVERY_PROMPT="${AUTH_RECOVERY_PROMPT:-检测到 OAuth access token 可能刚刷新。请重试刚才失败的请求；如果仍失败，不要打开登录流，请说明认证失败并输出最终总结。}"
+CLAUDE_API_STALL_WATCHDOG_SEC="${CLAUDE_API_STALL_WATCHDOG_SEC:-400}"
+CLAUDE_API_STALL_RECOVERY_PROMPT="${CLAUDE_API_STALL_RECOVERY_PROMPT:-刚才 Claude API 连接异常导致当前回合卡住。请从当前文件状态继续，优先完成最小可运行版本；不要重新做环境调研，不要安装大型依赖。若时间不足，请立即整理已完成内容、验证方式、未完成项并输出最终总结。}"
 log "Waiting for final assistant message or timeout (${TIMEOUT_SEC}s)"
+run_started_at=$(date +%s)
 deadline=$(( $(date +%s) + TIMEOUT_SEC ))
 completion_done=0
 capture_transcript_snapshot
@@ -844,7 +1139,13 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     && [ ! -f /tmp/claude-wrapup-sent ] \
     && [ $(( deadline - now )) -le "$TIMEOUT_WRAPUP_SEC" ]; then
     log "Injecting timeout wrap-up prompt (${TIMEOUT_WRAPUP_SEC}s before deadline)"
-    inject_tmux_prompt wrapup "$TIMEOUT_WRAPUP_PROMPT" || true
+    if is_claude_tui_busy && can_interrupt_for_recovery; then
+      busy_interrupts="$(record_busy_interrupt)"
+      write_api_stall_status "running" "临近超时且 Claude TUI 仍忙，已中断并注入收尾提示 ${busy_interrupts} 次"
+      interrupt_and_inject_tmux_prompt wrapup "$TIMEOUT_WRAPUP_PROMPT" || true
+    else
+      inject_tmux_prompt wrapup "$TIMEOUT_WRAPUP_PROMPT" || true
+    fi
     touch /tmp/claude-wrapup-sent
   fi
   auth_since=0
@@ -880,6 +1181,23 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     echo "auth_error" > /tmp/claude-fatal-error
     write_bench_status "auth_failed" "OAuth 认证失败: ${auth_marker}"
     break
+  fi
+  api_stall_status=0
+  api_stall_since="$(api_stall_last_recovery_epoch)"
+  if [ "$api_stall_since" -le 0 ] 2>/dev/null; then
+    api_stall_since="$run_started_at"
+  fi
+  detect_claude_api_stall "$CLAUDE_API_STALL_WATCHDOG_SEC" "$api_stall_since" >/dev/null 2>&1 || api_stall_status=$?
+  if [ "$api_stall_status" -eq 0 ]; then
+    if can_interrupt_for_recovery; then
+      recovery_count="$(record_api_stall_recovery)"
+      log "检测到 Claude API 卡死，准备自动中断并继续（第 ${recovery_count} 次）"
+      write_api_stall_status "running" "检测到 Claude API 连接卡死，已自动中断并继续 ${recovery_count} 次"
+      interrupt_and_inject_tmux_prompt api-stall "$CLAUDE_API_STALL_RECOVERY_PROMPT" || true
+      sleep 5
+      continue
+    fi
+    write_api_stall_status "running" "检测到 Claude API 连接卡死，但自动恢复次数已用完"
   fi
   completion_status=0
   classify_claude_completion "$COMPLETION_IDLE_SEC" >/tmp/claude-completion-state 2>/dev/null || completion_status=$?
@@ -942,5 +1260,10 @@ elif [ -f /tmp/claude-exited ]; then
   fi
 else
   log "Timeout after ${TIMEOUT_SEC}s without final assistant message"
+  if [ "$(api_stall_recovery_count)" -gt 0 ] 2>/dev/null; then
+    write_api_stall_status "timeout" "Claude API 连接卡死后仍未在超时前完成，已自动恢复 $(api_stall_recovery_count) 次"
+  elif [ "$(busy_interrupt_count)" -gt 0 ] 2>/dev/null; then
+    write_api_stall_status "timeout" "临近超时抢占 busy TUI 后仍未在超时前完成，已中断并注入收尾提示 $(busy_interrupt_count) 次"
+  fi
   exit 124
 fi
