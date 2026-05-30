@@ -650,6 +650,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .pill-running::before, .pill-running::after { animation: blink 1.05s steps(1) infinite; }
 .pill-success { color: var(--success); }
 .pill-failed  { color: var(--failed);  }
+.pill-auth_failed { color: var(--failed); }
 .pill-timeout { color: var(--timeout); }
 .pill-stopped { color: var(--failed); }
 .pill-paused  { color: var(--timeout); }

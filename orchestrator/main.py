@@ -61,8 +61,12 @@ WORKER_HOME = "/home/node"
 WORKER_UID = 1000
 WORKER_GID = 1000
 CLAUDE_CODE_VERSION = os.environ.get("CLAUDE_CODE_VERSION", "2.1.156")
+CLAUDE_CODE_EFFORT_LEVEL = os.environ.get("CLAUDE_CODE_EFFORT_LEVEL", "xhigh")
 SAVE_FULL_FLOWS = os.environ.get("SAVE_FULL_FLOWS", "0")
 CLEAN_WORKSPACE_DEPS = os.environ.get("CLEAN_WORKSPACE_DEPS", "1")
+TIMEOUT_WRAPUP_SEC = int(os.environ.get("TIMEOUT_WRAPUP_SEC", "600"))
+OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC = int(os.environ.get("OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC", "15"))
+OAUTH_401_PROFILE_WAIT_SEC = int(os.environ.get("OAUTH_401_PROFILE_WAIT_SEC", "90"))
 
 # Cookie-Session 鉴权(可选,替代 Basic Auth 给前端做风格统一的登录页):
 # - WEBUI_USER + WEBUI_PASS 都填才启用,任一为空则旁路放行(本地开发)
@@ -78,7 +82,7 @@ _SESSION_TTL = 7 * 24 * 3600  # 7 天
 _SESSION_COOKIE = "vb_session"
 _DEFAULT_CLAUDE_SETTINGS: dict[str, object] = {
     "env": {
-        "CLAUDE_CODE_EFFORT_LEVEL": "max",
+        "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
     },
     "permissions": {
         "defaultMode": "bypassPermissions",
@@ -111,7 +115,7 @@ _DEFAULT_CLAUDE_TOP_CONFIG: dict[str, object] = {
 }
 _PROFILE_SYNC_FILES = (".credentials.json", "settings.json", ".claude.json")
 _PROFILE_CONFIG_SYNC_FILES = ("settings.json", ".claude.json")
-_TERMINAL_RUN_STATUSES = {"success", "failed", "timeout", "stopped"}
+_TERMINAL_RUN_STATUSES = {"success", "failed", "timeout", "stopped", "auth_failed"}
 OAUTH_REFRESH_INTERVAL_SEC = 60
 OAUTH_REFRESH_BUFFER_SEC = 10 * 60
 _profile_locks: dict[str, threading.Lock] = {}
@@ -637,7 +641,10 @@ def build_topic_prompt(topic: dict) -> str:
         "1. 先围绕描述中的核心用户场景完成主链路，不追求过度架构。\n"
         "2. 补齐必要的输入校验、空状态、错误提示和基础持久化或示例数据。\n"
         "3. 在实现完成后说明启动方式、验证方式、关键文件和主要取舍。\n"
-        "4. 遇到题目未明确的细节时，请做合理假设并在最终总结中列出，不要因为缺少细节而停止。"
+        "4. 遇到题目未明确的细节时，请做合理假设并在最终总结中列出，不要因为缺少细节而停止。\n"
+        "5. 不要长时间停留在环境调研；优先使用当前环境已有能力，非必要不要安装大型依赖或启动长时间后台任务。\n"
+        "6. 验证失败时允许降级为轻量 smoke test，并在最终总结中说明失败原因和降级方式；不要因为验证工具不可用而卡住。\n"
+        "7. 如果时间接近超时，请立即停止扩展功能，补齐最小可交付状态，并输出最终总结。"
     )
 
 
@@ -877,7 +884,11 @@ class Runner:
                     "TIMEOUT_SEC": str(task.get("timeout_sec", 1800)),
                     "ACC_NAME": acc_name,
                     "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+                    "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
                     "CLEAN_WORKSPACE_DEPS": CLEAN_WORKSPACE_DEPS,
+                    "TIMEOUT_WRAPUP_SEC": str(TIMEOUT_WRAPUP_SEC),
+                    "OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC": str(OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC),
+                    "OAUTH_401_PROFILE_WAIT_SEC": str(OAUTH_401_PROFILE_WAIT_SEC),
                     "OAUTH_REFRESH_BUFFER_SEC": str(OAUTH_REFRESH_BUFFER_SEC),
                     "TZ": fp["tz"],
                     "LANG": fp["lang"],
@@ -928,6 +939,22 @@ class Runner:
         worker = self.client.containers.get(worker_id)
         result = worker.wait()
         return int(result.get("StatusCode", -1))
+
+    def read_worker_status(self, run_id: str) -> dict:
+        """
+        读取 worker 写入的轻量状态文件，用于区分普通失败和认证失败。
+
+        :param run_id: runs.id
+        :return: 状态字典；文件缺失或格式异常时返回空 dict
+        """
+        path = WORKSPACES_DIR / run_id / ".bench-status.json"
+        if not path.exists():
+            return {}
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return data if isinstance(data, dict) else {}
 
     def cleanup(self, sidecar_id: Optional[str], worker_id: Optional[str]) -> None:
         for cid in (worker_id, sidecar_id):
@@ -1017,6 +1044,7 @@ class Runner:
                     "HOME": WORKER_HOME,
                     "ACC_NAME": acc_name,
                     "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+                    "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
                     "TZ": fp["tz"],
                     "LANG": fp["lang"],
                     "LC_ALL": fp["lang"],
@@ -1100,6 +1128,7 @@ class Runner:
                         "HOME": WORKER_HOME,
                         "ACC_NAME": acc_name,
                         "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+                        "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
                         "TZ": fp["tz"],
                         "LANG": fp["lang"],
                         "LC_ALL": fp["lang"],
@@ -1315,6 +1344,7 @@ JS
                         "HOME": WORKER_HOME,
                         "ACC_NAME": acc_name,
                         "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+                        "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
                         "TZ": fp["tz"],
                         "LANG": fp["lang"],
                         "LC_ALL": fp["lang"],
@@ -2332,9 +2362,24 @@ class Scheduler:
                     status = "success"
                 elif exit_code == 124:
                     status = "timeout"
+                elif exit_code == 42:
+                    status = "auth_failed"
                 else:
                     status = "failed"
-                self._update(run_id, status=status, exit_code=exit_code, ended_at=time.time())
+                worker_status = self.runner.read_worker_status(run_id)
+                error = worker_status.get("error") if isinstance(worker_status.get("error"), str) else None
+                status_hint = worker_status.get("status")
+                if status_hint == "auth_failed" and status not in ("stopped", "success"):
+                    status = "auth_failed"
+                    error = error or "OAuth 认证失败"
+                update_fields = {
+                    "status": status,
+                    "exit_code": exit_code,
+                    "ended_at": time.time(),
+                }
+                if error:
+                    update_fields["error"] = error
+                self._update(run_id, **update_fields)
                 self._update_batch_item_for_run(run_id, status)
             except Exception as e:
                 run_state = self._get_run_state(run_id)
@@ -3161,7 +3206,7 @@ def list_task_batches():
         rows = conn.execute(
             "SELECT b.*, "
             "(SELECT COUNT(*) FROM task_batch_items i WHERE i.batch_id=b.id) AS item_count, "
-            "(SELECT COUNT(*) FROM task_batch_items i WHERE i.batch_id=b.id AND i.status IN ('success','failed','timeout')) AS done_count "
+            "(SELECT COUNT(*) FROM task_batch_items i WHERE i.batch_id=b.id AND i.status IN ('success','failed','timeout','auth_failed')) AS done_count "
             "FROM task_batches b WHERE b.deleted_at IS NULL ORDER BY b.id DESC"
         ).fetchall()
         return [dict(r) for r in rows]

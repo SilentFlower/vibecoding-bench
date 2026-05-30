@@ -841,7 +841,7 @@ function paintRuns(runs) {
         <td><div class="op-actions run-actions">
           <button class="btn btn-sm" data-detail="${r.id}">详情</button>
           ${['queued', 'running'].includes(r.status) ? `<button class="btn btn-sm btn-danger" data-stop="${r.id}">停止</button>` : ''}
-          ${['success', 'failed', 'timeout', 'stopped'].includes(r.status) ? `<button class="btn btn-sm btn-primary" data-continue="${r.id}">继续</button>` : ''}
+          ${['success', 'failed', 'timeout', 'stopped', 'auth_failed'].includes(r.status) ? `<button class="btn btn-sm btn-primary" data-continue="${r.id}">继续</button>` : ''}
           <button class="btn btn-sm btn-danger" data-del-run="${r.id}">删除</button>
         </div></td>
       </tr>

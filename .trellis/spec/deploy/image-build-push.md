@@ -74,7 +74,7 @@ worker 镜像 ~1.37 GB(node:22 基础大),首次推全量约 5–15 分钟视带
 
 ### 1. Scope / Trigger
 
-修改 `images/worker/entrypoint.sh` 的 Claude task 模式时必须遵守本契约。worker 是 run 终态的唯一来源:退出码 `0` 会被 orchestrator 映射成 `success`,退出码 `124` 映射成 `timeout`,其它非 0 映射成 `failed`。
+修改 `images/worker/entrypoint.sh` 的 Claude task 模式时必须遵守本契约。worker 是 run 终态的主要来源:退出码 `0` 会被 orchestrator 映射成 `success`,退出码 `124` 映射成 `timeout`,退出码 `42` 映射成 `auth_failed`,其它非 0 映射成 `failed`。worker 可在 `/workspace/.bench-status.json` 写入更细的状态提示;orchestrator 读取该文件后只允许把非成功 / 非停止状态细分成 `auth_failed`。
 
 ### 2. Signatures
 
@@ -85,6 +85,9 @@ task 模式环境变量:
 | `TASK_PROMPT` | 是 | 原始题目 prompt |
 | `RUN_ID` | 是 | 当前 run id,用于 tmux session 与日志归档 |
 | `TIMEOUT_SEC` | 否 | worker 硬超时时间,默认 1800 |
+| `TIMEOUT_WRAPUP_SEC` | 否 | 距离硬超时多少秒注入一次收尾提示,默认 600;`0` 关闭 |
+| `OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC` | 否 | 运行中从账号 profile 单向同步 `.credentials.json` 的间隔,默认 15;`0` 关闭 |
+| `OAUTH_401_PROFILE_WAIT_SEC` | 否 | 检测到 401 后等待后台刷新器更新 profile credentials 的最长秒数,默认 90;`0` 不等待 |
 | `COMPLETION_IDLE_SEC` | 否 | JSONL 稳定窗口,默认 10 秒 |
 
 ### 3. Contracts
@@ -107,14 +110,18 @@ Stop hook 只允许记录“Claude 停过一轮”的观测信号,不能直接 `
 - `statusLine` 只允许用于临时调试,不能写回 `data/profiles/<account>/settings.json`。
 - orchestrator 和 worker 合并 settings 时都必须删除 profile 中已有的 `hooks` / `statusLine`。
 
-Claude 返回认证错误文本时必须失败,不能作为最终 assistant 回复标成功。至少识别:
+Claude 返回认证错误文本时不能作为最终 assistant 回复标成功。至少识别:
 
 - `Please run /login`
 - `API Error: 401`
 - `Invalid authentication credentials`
 - `OAuth token has expired`
 
-task 启动前可以刷新 OAuth access token,但必须先读 `.credentials.json` 里的 `claudeAiOauth.expiresAt`:只有 access token 缺失、已过期或距离过期小于安全缓冲(当前 10 分钟)时才调用 refresh endpoint,避免每次 run 都刷新 token。刷新请求不能用 Python `urllib` 这类容易触发 Cloudflare 1010 的客户端;当前约定是在 worker 容器内用 Node runtime 发起请求,并且仍走 worker→sidecar→账号 SOCKS5 链路。刷新后必须原子写回 `.credentials.json`,退出/停止路径也必须尽量回写 profile。
+task worker **禁止**在启动 run 前强制刷新 OAuth access token。启动前只校验 `.credentials.json` 的结构和 `accessToken` 是否存在,即使 access token 已过期或即将过期也不在 worker 启动阶段拒绝运行。真正刷新由 orchestrator 后台 `OAuthRefreshScheduler` 周期执行,并把新 `.credentials.json` 原子写回账号 profile。
+
+task 运行期间必须单向同步 credentials:从 `/mnt/profile/.credentials.json` 同步到本地 `$HOME/.claude/.credentials.json`,不能从 run home 把 `.credentials.json` 回写覆盖 profile。同步前必须能解析 JSON 且存在 `claudeAiOauth`;写本地文件必须先写临时文件再 `rename` 原子替换。退出 / 停止路径只允许回写 `settings.json` 和 `.claude.json` 这类配置文件。
+
+运行中检测到 401 / OAuth 认证错误时,worker 先同步 profile credentials;如果是第一次认证错误,最多等待 `OAUTH_401_PROFILE_WAIT_SEC` 秒让后台刷新器把新 credentials 落盘。只有本地 credentials 指纹变化且 `expiresAt` 明显越过安全缓冲区后,才向 Claude TUI 注入一次重试提示。等不到新 credentials 或重试后再次出现认证错误时,worker 写 `/workspace/.bench-status.json` 为 `{"status":"auth_failed","error":"..."}` 并以退出码 `42` 结束。
 
 查询 OAuth usage API 前必须确认 sidecar 的通用 DNS resolver 已可用。sidecar/unbound 配的是通配 `forward-zone "."`,所以 readiness probe 应验证一个稳定探针域名能解析,不能把每个业务目标域名硬编码成白名单。orchestrator 可以用 `docker exec` 进 sidecar 等 `/tmp/sidecar-ready` 或通用探针解析成功,但不能用 orchestrator/宿主机网络代替 sidecar 解析。usage probe 必须在 worker 容器内按同一套 `expiresAt` 规则刷新 access token,再读 `.credentials.json` 调 usage API。实际 API URL 请求还必须有限重试,覆盖 resolver 刚启动后的瞬时 `Temporary failure in name resolution`。
 
@@ -132,7 +139,9 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
 |------|-------------|-------------------|
 | 最新对话消息是稳定的纯文本 assistant 回复 | `0` | `success` |
 | 最新对话消息是 user `tool_result` | 继续等到后续完成或超时 | 非 success |
-| 最新 assistant 文本包含 `/login` / 401 认证错误 | `1` | `failed` |
+| 首次检测到 401 且后台刷新器及时写入新 credentials | 注入一次重试提示并继续等待 | 取决于后续完成结果 |
+| 401 后等待 profile 刷新超时 | `42` | `auth_failed` |
+| 重试后再次检测到 `/login` / 401 认证错误 | `42` | `auth_failed` |
 | Claude 以 0 退出但没有最终 assistant 文本 | `1` | `failed` |
 | 达到 `TIMEOUT_SEC` 仍无最终 assistant 文本 | `124` | `timeout` |
 | 收到 `TERM/INT` | 先白名单回写 profile,再退出 | `stopped` 或 `failed` 由 orchestrator 状态决定 |
@@ -148,6 +157,10 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
 **Bad**:quota/statusLine 探测把 `statusLine` 写入账号 profile 的 `settings.json` 并回写。后续 task 会加载这段运行态配置,污染被测 run。
 
 **Bad**:access token 明明还有很久才过期,每次 task 启动都调用 OAuth refresh endpoint。这样会制造额外请求和不必要的凭据轮换。
+
+**Bad**:task worker 启动时发现 access token 已过期或 10 分钟内过期,就直接刷新或直接失败。正确做法是让 run 启动,运行中按 profile 单向同步;如果 Claude 实际遇到 401,再等待后台刷新器落盘并只重试一次。
+
+**Bad**:task 结束时把 run home 里的 `.credentials.json` 回写到真实账号 profile。后台刷新器可能已经写入了更新 token,旧 run 结束再回写会把新 token 覆盖掉。
 
 **Bad**:worker 启动前只等 `api.anthropic.com` 可解析,然后立刻刷新 OAuth token。`platform.claude.com` 尚未解析成功时会出现 `<urlopen error [Errno -3] Temporary failure in name resolution>`。
 
@@ -173,6 +186,11 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
   - 最新 assistant 文本包含 `Please run /login · API Error: 401 Invalid authentication credentials` 时判失败。
   - 最新 session JSONL mtime 未达到稳定窗口时判未完成。
 - 用 profile settings 样例断言:合并默认 settings 后 `hooks` / `statusLine` 被删除。
+- 用 worker credentials 样例断言:
+  - profile -> run home 同步只接受合法 JSON 和 `claudeAiOauth`。
+  - 同步写入本地 credentials 使用临时文件 + rename。
+  - run 结束路径不把 `.credentials.json` 回写 profile。
+  - 401 后等待新 credentials 超时会写 `.bench-status.json` 且退出码语义为 `auth_failed`。
 - 用 worker/quota 启动路径断言:usage 前等待通用 DNS resolver 可用,只在 access token 快过期时刷新 OAuth,刷新不用 Python `urllib`,且 DNS/URL 临时失败有限重试。
 - 远程发布后跑一个真实 task,检查 DB 里 `success` run 的 JSONL 最新对话消息是 assistant 文本,而不是 user `tool_result`。
 

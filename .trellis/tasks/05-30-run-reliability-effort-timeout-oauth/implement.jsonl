@@ -1,0 +1,9 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": "orchestrator/main.py", "reason": "核心后端：配置、调度、OAuth 刷新、run 状态映射"}
+{"file": "images/worker/entrypoint.sh", "reason": "核心 worker：settings 写入、超时循环、completion/401 检测、credentials 同步"}
+{"file": "webui/index.html", "reason": "前端任务表单和 run 状态 legend"}
+{"file": "webui/app.js", "reason": "前端状态渲染、批次创建 payload、run 操作按钮"}
+{"file": "docker-compose.yml", "reason": "本地 compose 环境变量传递"}
+{"file": "docker-compose.remote.yml", "reason": "远程 compose 环境变量传递"}
+{"file": ".env.example", "reason": "新增环境变量说明"}
+{"file": "README.md", "reason": "更新使用与排查说明"}

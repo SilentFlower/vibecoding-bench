@@ -9,6 +9,8 @@
 #   TASK_PROMPT     题目 prompt（字面文本）
 #   RUN_ID          本次运行的唯一 ID（用于会话名 / 日志归档）
 #   TIMEOUT_SEC     超时（秒），默认 1800
+#   TIMEOUT_WRAPUP_SEC  临近超时前自动注入收尾提示的秒数，默认 600；0 表示关闭
+#   OAUTH_401_PROFILE_WAIT_SEC  检测到 401 后等待后台刷新 profile 的秒数，默认 90
 # 挂载约定：
 #   task 模式：
 #     /mnt/profile  账号 ~/.claude profile（rw，仅回写关键配置文件）
@@ -20,12 +22,14 @@
 # 退出码（task 模式）：
 #   0    Claude session JSONL 以稳定的最终 assistant 文本结束
 #   124  达到 TIMEOUT_SEC 超时
+#   42   OAuth / 401 认证失败
 #   其它 启动失败
 # =======================================================================
 set -euo pipefail
 
 WORKER_MODE="${WORKER_MODE:-task}"
 CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.156}"
+CLAUDE_CODE_EFFORT_LEVEL="${CLAUDE_CODE_EFFORT_LEVEL:-xhigh}"
 log() { echo "[entrypoint $(date +%H:%M:%S)] $*"; }
 CLAUDE_USER=node
 CLAUDE_HOME=/home/node
@@ -34,26 +38,27 @@ CLAUDE_DIR="$CLAUDE_HOME/.claude"
 write_default_settings() {
   # settings.json 既要补齐默认值，又不能覆盖 Claude 自己写入的隐藏 gate。
   # 用 jq 递归合并：已有字段保留，默认字段补齐；同名字段以默认值为准。
-  cat > /tmp/default-settings.json <<'EOF'
-{
-  "env": {
-    "CLAUDE_CODE_EFFORT_LEVEL": "max"
+  node - "$CLAUDE_CODE_EFFORT_LEVEL" > /tmp/default-settings.json <<'JS'
+const effort = process.argv[2] || 'xhigh';
+process.stdout.write(`${JSON.stringify({
+  env: {
+    CLAUDE_CODE_EFFORT_LEVEL: effort,
   },
-  "permissions": {
-    "defaultMode": "bypassPermissions",
-    "allow": [
-      "Bash", "BashOutput", "Edit", "Glob", "Grep",
-      "KillShell", "NotebookEdit", "Read", "SlashCommand",
-      "Task", "TodoWrite", "WebFetch", "WebSearch", "Write"
+  permissions: {
+    defaultMode: 'bypassPermissions',
+    allow: [
+      'Bash', 'BashOutput', 'Edit', 'Glob', 'Grep',
+      'KillShell', 'NotebookEdit', 'Read', 'SlashCommand',
+      'Task', 'TodoWrite', 'WebFetch', 'WebSearch', 'Write',
     ],
-    "deny": []
+    deny: [],
   },
-  "skipDangerousModePermissionPrompt": true,
-  "autoMemoryEnabled": false,
-  "theme": "dark",
-  "model": "opus[1m]"
-}
-EOF
+  skipDangerousModePermissionPrompt: true,
+  autoMemoryEnabled: false,
+  theme: 'dark',
+  model: 'opus[1m]',
+}, null, 2)}\n`);
+JS
   if [ -f "$CLAUDE_DIR/settings.json" ]; then
     jq -s '(.[0] | del(.hooks, .statusLine)) * .[1]' "$CLAUDE_DIR/settings.json" /tmp/default-settings.json > "$CLAUDE_DIR/settings.json.tmp" \
       && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
@@ -137,13 +142,12 @@ handle_claude_startup_gates() {
 
 check_claude_auth_status() {
   # task 模式不消耗 refreshToken；这里只做本地 credentials 形态检查，
-  # 真正 AT 刷新统一交给 orchestrator 后台刷新器。
+  # 真正 AT 刷新统一交给 orchestrator 后台刷新器。即将过期 / 已过期
+  # 不在启动阶段拒绝，避免撞上后台定时刷新窗口时还没运行就失败。
   local credentials_path="$CLAUDE_DIR/.credentials.json"
-  local buffer_ms=$(( ${OAUTH_REFRESH_BUFFER_SEC:-600} * 1000 ))
-  if ! node - "$credentials_path" "$buffer_ms" <<'JS' >/tmp/claude-auth-status.json 2>/tmp/claude-auth-status.err
+  if ! node - "$credentials_path" <<'JS' >/tmp/claude-auth-status.json 2>/tmp/claude-auth-status.err
 const fs = require('fs');
 const path = process.argv[2];
-const bufferMs = Number(process.argv[3] || '600000');
 
 function fail(message) {
   console.error(message);
@@ -166,10 +170,11 @@ if (typeof oauth.accessToken !== 'string' || !oauth.accessToken) {
 if (typeof oauth.expiresAt !== 'number') {
   fail('OAuth expiresAt 缺失或格式错误');
 }
-if (oauth.expiresAt <= Date.now() + bufferMs) {
-  fail('OAuth accessToken 已过期或 10 分钟内过期，请等待后台刷新器刷新');
-}
-process.stdout.write(JSON.stringify({loggedIn: true, expiresAt: oauth.expiresAt}) + '\n');
+process.stdout.write(JSON.stringify({
+  loggedIn: true,
+  expiresAt: oauth.expiresAt,
+  expiresInSec: Math.floor((oauth.expiresAt - Date.now()) / 1000),
+}) + '\n');
 JS
   then
     {
@@ -220,6 +225,172 @@ persist_runtime_claude_state() {
     /mnt/profile/settings.json 2>/dev/null || true
 }
 
+write_bench_status() {
+  local status="$1"
+  local error="$2"
+  node - "$status" "$error" > /workspace/.bench-status.json.tmp <<'JS'
+const status = process.argv[2] || 'failed';
+const error = process.argv[3] || '';
+process.stdout.write(`${JSON.stringify({status, error}, null, 2)}\n`);
+JS
+  mv /workspace/.bench-status.json.tmp /workspace/.bench-status.json
+}
+
+sync_profile_credentials_once() {
+  # 后台刷新器只更新账号 profile；运行中的 Claude 读本地副本。
+  # 这里单向同步 profile -> 本地，避免 run 结束时旧 credentials 覆盖新 token。
+  local src="/mnt/profile/.credentials.json"
+  local dst="$CLAUDE_DIR/.credentials.json"
+  [ -f "$src" ] || return 1
+  set +e
+  node - "$src" "$dst" "$CLAUDE_USER" <<'JS'
+const fs = require('fs');
+const path = require('path');
+const src = process.argv[2];
+const dst = process.argv[3];
+
+function readJson(file) {
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
+
+let source;
+try {
+  source = readJson(src);
+} catch {
+  process.exit(1);
+}
+if (!source || typeof source !== 'object' || !source.claudeAiOauth) {
+  process.exit(1);
+}
+let current = null;
+try {
+  current = readJson(dst);
+} catch {}
+const sourceOauth = source.claudeAiOauth || {};
+const currentOauth = current && current.claudeAiOauth ? current.claudeAiOauth : {};
+if (
+  currentOauth.accessToken === sourceOauth.accessToken &&
+  currentOauth.expiresAt === sourceOauth.expiresAt
+) {
+  process.exit(2);
+}
+fs.mkdirSync(path.dirname(dst), {recursive: true});
+const tmp = `${dst}.tmp.${process.pid}`;
+fs.writeFileSync(tmp, `${JSON.stringify(source, null, 2)}\n`, 'utf8');
+fs.renameSync(tmp, dst);
+JS
+  local rc=$?
+  set -e
+  if [ "$rc" -eq 0 ]; then
+    chown "$CLAUDE_USER:$CLAUDE_USER" "$dst" 2>/dev/null || true
+    chmod 600 "$dst" 2>/dev/null || true
+    log "Synced refreshed OAuth credentials from profile"
+    return 0
+  fi
+  return "$rc"
+}
+
+credential_fingerprint() {
+  local path="${1:-$CLAUDE_DIR/.credentials.json}"
+  node - "$path" <<'JS'
+const crypto = require('crypto');
+const fs = require('fs');
+const path = process.argv[2];
+let data;
+try {
+  data = JSON.parse(fs.readFileSync(path, 'utf8'));
+} catch {
+  process.exit(1);
+}
+const oauth = data && data.claudeAiOauth;
+if (!oauth || typeof oauth !== 'object') {
+  process.exit(1);
+}
+const payload = JSON.stringify({
+  accessToken: typeof oauth.accessToken === 'string' ? oauth.accessToken : '',
+  expiresAt: typeof oauth.expiresAt === 'number' ? oauth.expiresAt : 0,
+});
+process.stdout.write(crypto.createHash('sha256').update(payload).digest('hex'));
+JS
+}
+
+local_credentials_fresh_enough() {
+  # 401 后只有拿到明显越过刷新缓冲区的新 token 才直接重试；临期 token
+  # 继续等待后台刷新器，避免用同一份旧 credentials 立即二次失败。
+  local buffer_sec="${OAUTH_REFRESH_BUFFER_SEC:-600}"
+  node - "$CLAUDE_DIR/.credentials.json" "$buffer_sec" <<'JS' >/dev/null 2>&1
+const fs = require('fs');
+const path = process.argv[2];
+const bufferMs = Number(process.argv[3] || '600') * 1000;
+let data;
+try {
+  data = JSON.parse(fs.readFileSync(path, 'utf8'));
+} catch {
+  process.exit(1);
+}
+const oauth = data && data.claudeAiOauth;
+if (
+  !oauth ||
+  typeof oauth !== 'object' ||
+  typeof oauth.accessToken !== 'string' ||
+  !oauth.accessToken ||
+  typeof oauth.expiresAt !== 'number'
+) {
+  process.exit(1);
+}
+process.exit(oauth.expiresAt > Date.now() + bufferMs ? 0 : 1);
+JS
+}
+
+wait_for_profile_credentials_refresh() {
+  local base_fingerprint="${1:-}"
+  local wait_sec="${OAUTH_401_PROFILE_WAIT_SEC:-90}"
+  case "$wait_sec" in
+    ''|*[!0-9]*) wait_sec=90 ;;
+  esac
+  if [ "$wait_sec" -le 0 ] 2>/dev/null; then
+    return 1
+  fi
+  local deadline=$(( $(date +%s) + wait_sec ))
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    sync_profile_credentials_once >/dev/null 2>&1 || true
+    if local_credentials_fresh_enough; then
+      local current_fingerprint=""
+      current_fingerprint="$(credential_fingerprint "$CLAUDE_DIR/.credentials.json" 2>/dev/null || true)"
+      if [ -z "$base_fingerprint" ] || [ "$current_fingerprint" != "$base_fingerprint" ]; then
+        return 0
+      fi
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+start_profile_credentials_sync() {
+  if [ ! -f /mnt/profile/.credentials.json ]; then
+    return 0
+  fi
+  local interval="${OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC:-15}"
+  if [ "$interval" -le 0 ] 2>/dev/null; then
+    return 0
+  fi
+  (
+    while true; do
+      sync_profile_credentials_once >/dev/null 2>&1 || true
+      sleep "$interval"
+    done
+  ) &
+  CREDENTIAL_SYNC_PID=$!
+}
+
+stop_profile_credentials_sync() {
+  if [ -n "${CREDENTIAL_SYNC_PID:-}" ]; then
+    kill "$CREDENTIAL_SYNC_PID" 2>/dev/null || true
+    wait "$CREDENTIAL_SYNC_PID" 2>/dev/null || true
+    CREDENTIAL_SYNC_PID=""
+  fi
+}
+
 cleanup_workspace_dependencies() {
   # 运行产物要留给详情页查看，但依赖目录很容易吞掉磁盘，结束后默认清理。
   if [ "${CLEAN_WORKSPACE_DEPS:-1}" != "1" ]; then
@@ -252,6 +423,7 @@ cleanup_task_mode() {
   fi
   _CLEANUP_TASK_MODE_DONE=1
   if [ "$WORKER_MODE" = "task" ]; then
+    stop_profile_credentials_sync || true
     persist_runtime_claude_state || true
     cleanup_workspace_dependencies || true
   fi
@@ -381,6 +553,108 @@ print("complete")
 PY
 }
 
+detect_claude_auth_error() {
+  # 认证错误可能出现在最终 assistant 文本、tool_result 或 TUI transcript 中。
+  # 只匹配明确 OAuth/401 标记，避免把普通失败误判为账号失效。
+  # 发生过一次恢复后只扫描恢复时间之后的新 JSONL 事件，避免旧 transcript
+  # 中残留的 401 文本让下一轮立刻误判为再次失败。
+  local since_epoch="${1:-0}"
+  local transcript_offset="${2:-0}"
+  python3 - "$CLAUDE_DIR/projects/-workspace" "/workspace/.bench-transcript.log" "$since_epoch" "$transcript_offset" <<'PY'
+import json
+import sys
+import datetime as dt
+from pathlib import Path
+
+project_dir = Path(sys.argv[1])
+transcript_path = Path(sys.argv[2])
+since_epoch = float(sys.argv[3] or 0)
+transcript_offset = max(0, int(float(sys.argv[4] or 0)))
+markers = (
+    "Please run /login",
+    "API Error: 401",
+    "Invalid authentication credentials",
+    "OAuth token has expired",
+)
+
+def content_text(content):
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "text":
+                parts.append(str(item.get("text") or ""))
+            elif item.get("type") == "tool_result":
+                parts.append(content_text(item.get("content")))
+        return "\n".join(parts)
+    return ""
+
+def entry_text(entry):
+    message = entry.get("message")
+    if isinstance(message, dict):
+        return content_text(message.get("content"))
+    return content_text(entry.get("content"))
+
+def entry_epoch(entry):
+    raw = entry.get("timestamp")
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        return dt.datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+texts = []
+if project_dir.exists():
+    files = sorted(project_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+    for path in files[:2]:
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()[-80:]
+        except OSError:
+            continue
+        for line in lines:
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if since_epoch > 0:
+                ts = entry_epoch(entry)
+                if ts is None or ts < since_epoch:
+                    continue
+            texts.append(entry_text(entry))
+try:
+    data = transcript_path.read_bytes()
+    if since_epoch > 0:
+        data = data[transcript_offset:]
+    else:
+        data = data[-12000:]
+    texts.append(data.decode("utf-8", errors="replace"))
+except OSError:
+    pass
+
+haystack = "\n".join(texts)
+for marker in markers:
+    if marker in haystack:
+        print(marker)
+        sys.exit(0)
+sys.exit(1)
+PY
+}
+
+inject_tmux_prompt() {
+  local buffer="$1"
+  local text="$2"
+  tmux has-session -t "$SESSION" 2>/dev/null || return 1
+  printf '%s' "$text" > "/tmp/${buffer}.txt"
+  tmux load-buffer -b "$buffer" "/tmp/${buffer}.txt"
+  tmux paste-buffer -t "$SESSION" -b "$buffer" -d -p
+  sleep 1
+  tmux send-keys -t "$SESSION" Enter
+}
+
 # ---------- 0) /etc/machine-id 按账号名 hash 写入 ----------
 # 让 Claude Code / Node 通过系统接口读到的 machine-id 是按账号派生的稳定值:
 #   - 同账号每次 run → 同 machine-id(Anthropic 端看作同一台稳定设备)
@@ -507,6 +781,10 @@ chown -R "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME" /workspace || true
 rm -f /tmp/claude-done /tmp/claude-stop-seen
 rm -f /tmp/claude-exited /tmp/claude-exit-code
 rm -f /tmp/claude-fatal-error /tmp/claude-completion-state
+rm -f /tmp/claude-auth-recovered-once /tmp/claude-wrapup-sent
+rm -f /workspace/.bench-status.json /workspace/.bench-status.json.tmp
+
+start_profile_credentials_sync
 
 # ---------- 4) 启动 tmux + claude (node 用户 + bypassPermissions) ----------
 # Claude Code 的 bypassPermissions 不能以 root 跑，所以入口脚本只用 root
@@ -541,11 +819,7 @@ handle_claude_startup_gates || startup_ready=0
 # ---------- 5) 注入 prompt(用 bracketed paste,避免逐字符触发 TUI 行为) ----------
 if [ ! -f /tmp/claude-exited ] && [ "$startup_ready" = "1" ]; then
   log "Injecting prompt (${#TASK_PROMPT} chars)"
-  printf '%s' "$TASK_PROMPT" > /tmp/task-prompt.txt
-  tmux load-buffer -b prompt /tmp/task-prompt.txt
-  tmux paste-buffer -t "$SESSION" -b prompt -d -p
-  sleep 1
-  tmux send-keys -t "$SESSION" Enter
+  inject_tmux_prompt prompt "$TASK_PROMPT"
 elif [ ! -f /tmp/claude-exited ]; then
   log "Prompt injection skipped because Claude startup gates are still visible"
   capture_transcript_snapshot
@@ -556,12 +830,57 @@ fi
 
 # ---------- 6) 等最终 assistant 回复 / Claude 退出 / 超时 ----------
 COMPLETION_IDLE_SEC="${COMPLETION_IDLE_SEC:-10}"
+TIMEOUT_WRAPUP_SEC="${TIMEOUT_WRAPUP_SEC:-600}"
+TIMEOUT_WRAPUP_PROMPT="${TIMEOUT_WRAPUP_PROMPT:-时间快到，请停止扩展功能和长时间验证，优先补齐最小可运行交付。请整理当前已完成内容，必要时说明未完成项和验证降级原因，然后输出最终总结。}"
+AUTH_RECOVERY_PROMPT="${AUTH_RECOVERY_PROMPT:-检测到 OAuth access token 可能刚刷新。请重试刚才失败的请求；如果仍失败，不要打开登录流，请说明认证失败并输出最终总结。}"
 log "Waiting for final assistant message or timeout (${TIMEOUT_SEC}s)"
 deadline=$(( $(date +%s) + TIMEOUT_SEC ))
 completion_done=0
 capture_transcript_snapshot
 while [ "$(date +%s)" -lt "$deadline" ]; do
+  now=$(date +%s)
   capture_transcript_snapshot
+  if [ "$TIMEOUT_WRAPUP_SEC" -gt 0 ] 2>/dev/null \
+    && [ ! -f /tmp/claude-wrapup-sent ] \
+    && [ $(( deadline - now )) -le "$TIMEOUT_WRAPUP_SEC" ]; then
+    log "Injecting timeout wrap-up prompt (${TIMEOUT_WRAPUP_SEC}s before deadline)"
+    inject_tmux_prompt wrapup "$TIMEOUT_WRAPUP_PROMPT" || true
+    touch /tmp/claude-wrapup-sent
+  fi
+  auth_since=0
+  auth_transcript_offset=0
+  if [ -f /tmp/claude-auth-recovered-once ]; then
+    auth_since="$(sed -n '1p' /tmp/claude-auth-recovered-once 2>/dev/null || echo 0)"
+    auth_transcript_offset="$(sed -n '2p' /tmp/claude-auth-recovered-once 2>/dev/null || echo 0)"
+  fi
+  auth_marker=""
+  auth_status=0
+  auth_marker="$(detect_claude_auth_error "$auth_since" "$auth_transcript_offset" 2>/dev/null)" || auth_status=$?
+  if [ "$auth_status" -eq 0 ]; then
+    credential_before=""
+    credential_before="$(credential_fingerprint "$CLAUDE_DIR/.credentials.json" 2>/dev/null || true)"
+    sync_profile_credentials_once >/dev/null 2>&1 || true
+    if [ ! -f /tmp/claude-auth-recovered-once ]; then
+      log "Detected Claude auth error (${auth_marker}); waiting for refreshed profile credentials"
+      if ! wait_for_profile_credentials_refresh "$credential_before"; then
+        log "No refreshed OAuth credentials appeared within ${OAUTH_401_PROFILE_WAIT_SEC:-90}s"
+        echo "auth_error" > /tmp/claude-fatal-error
+        write_bench_status "auth_failed" "OAuth 认证失败: ${auth_marker}，等待后台刷新凭据超时"
+        break
+      fi
+      log "Refreshed OAuth credentials synced; prompting one retry"
+      inject_tmux_prompt auth-retry "$AUTH_RECOVERY_PROMPT" || true
+      {
+        date +%s
+        wc -c < /workspace/.bench-transcript.log 2>/dev/null || echo 0
+      } > /tmp/claude-auth-recovered-once
+      sleep 5
+      continue
+    fi
+    echo "auth_error" > /tmp/claude-fatal-error
+    write_bench_status "auth_failed" "OAuth 认证失败: ${auth_marker}"
+    break
+  fi
   completion_status=0
   classify_claude_completion "$COMPLETION_IDLE_SEC" >/tmp/claude-completion-state 2>/dev/null || completion_status=$?
   if [ "$completion_status" -eq 0 ]; then
@@ -570,6 +889,7 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
   fi
   if [ "$completion_status" -eq 2 ]; then
     echo "auth_error" > /tmp/claude-fatal-error
+    write_bench_status "auth_failed" "OAuth 认证失败"
     break
   fi
   if [ -f /tmp/claude-exited ]; then
@@ -580,6 +900,7 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     fi
     if [ "$completion_status" -eq 2 ]; then
       echo "auth_error" > /tmp/claude-fatal-error
+      write_bench_status "auth_failed" "OAuth 认证失败"
     fi
     break
   fi
@@ -597,6 +918,7 @@ if [ "$completion_done" -ne 1 ] && [ ! -f /tmp/claude-fatal-error ]; then
     completion_done=1
   elif [ "$completion_status" -eq 2 ]; then
     echo "auth_error" > /tmp/claude-fatal-error
+    write_bench_status "auth_failed" "OAuth 认证失败"
   fi
 fi
 
@@ -605,7 +927,10 @@ if [ "$completion_done" -eq 1 ]; then
   exit 0
 elif [ -f /tmp/claude-fatal-error ]; then
   log "Claude returned a fatal authentication error"
-  exit 1
+  if [ ! -f /workspace/.bench-status.json ]; then
+    write_bench_status "auth_failed" "OAuth 认证失败"
+  fi
+  exit 42
 elif [ -f /tmp/claude-exited ]; then
   code=$(cat /tmp/claude-exit-code 2>/dev/null || echo 1)
   if [ "$code" = "0" ]; then

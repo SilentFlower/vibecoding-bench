@@ -1,0 +1,5 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "后端质量检查规范"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "前端状态渲染规范"}
+{"file": ".trellis/tasks/05-30-run-reliability-effort-timeout-oauth/design.md", "reason": "技术设计基准"}
+{"file": ".trellis/tasks/05-30-run-reliability-effort-timeout-oauth/prd.md", "reason": "需求与验收基准"}
