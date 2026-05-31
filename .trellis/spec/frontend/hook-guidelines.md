@@ -100,7 +100,7 @@ async function renderX() {
 - 非 2xx → 抛 `Error(detail || statusText)`
 - 2xx → 返回 `json()` 结果
 
-**不引入** SWR / React Query / 任何缓存层。**列表数据每次 render 重拉**,P1 数据量小够用。`state.topics` 是唯一带"已加载就复用"判断的(`if (state.topics.length === 0) { state.topics = await API('/topics'); }`),因为 200 道题通常只在题库维护后变化。
+**不引入** SWR / React Query / 任何缓存层。**列表数据每次 render 重拉**,P1 数据量小够用。`state.topics` 是唯一带"已加载就复用"判断的(`if (state.topics.length === 0) { state.topics = await API('/topics'); }`),因为 300 道题通常只在题库维护后变化。
 
 ### SSE / WebSocket
 

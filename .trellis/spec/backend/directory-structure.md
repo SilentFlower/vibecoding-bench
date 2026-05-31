@@ -37,7 +37,7 @@
 │
 ├── docker-compose.yml            orchestrator 服务 + 镜像 build profile
 ├── .env.example                  HOST_BENCH_DATA 等环境变量样板
-└── topics.md                     200 道题 seed 题库(SQLite 为空时导入；已 seed 实例需同步)
+└── topics.md                     300 道题 seed 题库(SQLite 为空时导入；已 seed 实例需同步)
 ```
 
 ---

@@ -66,7 +66,7 @@
 |------|--------|
 | 账号 CRUD | WebUI 账号页 → + 添加 / 删除 |
 | OAuth 内嵌登录 | WebUI 账号页 → 走完两步流 → 浏览器看 step 2 PTY 终端能收到 URL → 浏览器完成 OAuth → 粘回授权码 → commit & save 落库 |
-| 题库解析 | WebUI 题库页 → 看到 200 道题、能过滤、能点开查看 / 编辑 topic |
+| 题库解析 | WebUI 题库页 → 看到 300 道题、能过滤、能点开查看 / 编辑 topic |
 | 题库同步 | 已 seed 的 SQLite 实例 → 先跑 `scripts/sync-topics-db.py` dry-run → 再带 `--apply` 同步，确认会先备份 DB 且 `/api/topics` 返回目标数量 |
 | 任务运行(单 run) | 题库 → 选账号 + repeat_n=1 → 任务页 ▶ run → 运行页看到 queued → running → success,详情面板有 transcript + token 统计 |
 | 任务运行(并发) | 单账号 repeat_n=4 → 一次提交 → 运行页同账号最多 2 个 running,其余 queued |
