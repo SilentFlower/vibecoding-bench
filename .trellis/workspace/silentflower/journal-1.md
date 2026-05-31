@@ -62,7 +62,12 @@
 
 ### Main Changes
 
-(Add details)
+- 实现 topic 题库扩充到 300 道，题库校验编号连续 1..300。
+- 将默认 topic prompt 收敛为薄 prompt，超时收敛逻辑保留在 worker timeout wrap-up。
+- 批次创建时随机打乱 topic，再以 task_batch_items.id 固化执行顺序。
+- 将 CLAUDE_CODE_EFFORT_LEVEL 默认值统一为 max，并确认远程容器环境生效。
+- DockerHub 已发布 huajiwuyan/vibebench-{orchestrator,worker,sidecar}:latest 与 :2fdf20b。
+- 远程 ai-havefun 已部署 tag 2fdf20b，同步 SQLite 题库后 /api/topics 登录态返回 300 条。
 
 ### Git Commits
 
@@ -73,7 +78,13 @@
 
 ### Testing
 
-- [OK] (Add test results)
+- [OK] python3 scripts/sync-topics-db.py --topics topics.md --validate-only
+- [OK] python3 -m py_compile orchestrator/main.py scripts/sync-topics-db.py
+- [OK] node --check webui/app.js
+- [OK] docker compose config
+- [OK] docker compose -f docker-compose.remote.yml --env-file .env.example config
+- [OK] git diff --check
+- [OK] 远程 docker compose ps、容器 env、DB 题库数量、登录态 /api/topics 验证通过
 
 ### Status
 
@@ -138,6 +149,41 @@
 | `d22edeb` | (see git log) |
 | `aa707fd` | (see git log) |
 | `a38604d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 5: 扩充题库并远程部署
+
+**Date**: 2026-05-31
+**Task**: 扩充题库并远程部署
+**Branch**: `main`
+
+### Summary
+
+扩充 topic 题库到 300 道，批次创建随机化出题顺序，默认思考预算改为 max，完成 DockerHub 镜像发布并部署到 ai-havefun 远程实例。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `78fa224` | (see git log) |
+| `5616bf0` | (see git log) |
+| `2fdf20b` | (see git log) |
 
 ### Testing
 
