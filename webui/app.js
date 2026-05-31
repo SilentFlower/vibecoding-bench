@@ -1,5 +1,5 @@
 /**
- * vibecoding-100 bench WebUI
+ * vibecoding-bench WebUI
  * 纯原生 JS + Hash 路由 + Fetch + SSE
  */
 

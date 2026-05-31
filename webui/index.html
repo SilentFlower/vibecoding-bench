@@ -29,7 +29,7 @@
   <header class="topbar">
     <div class="brand">
       <span class="prompt">~/vibebench</span><span class="caret">_</span>
-      <span class="brand-sub">100·tasks · claude-code · mitm</span>
+      <span class="brand-sub">300·topics · claude-code · mitm</span>
     </div>
     <nav class="tabs" role="tablist">
       <a href="#accounts" data-tab="accounts"><span class="tab-en">accounts</span><span class="tab-cn">账号</span></a>
@@ -109,7 +109,7 @@
       <header class="view-head">
         <div>
           <h2 class="view-title"><span class="bracket">▌</span>tasks <span class="muted">// dispatched</span></h2>
-          <p class="hint">先选账号，再多选 topic；批次按最多 2 并发和随机间隔投放。</p>
+          <p class="hint">先选账号，再多选 topic；批次会随机打乱选中题目，并按最多 2 并发和随机间隔投放。</p>
         </div>
       </header>
       <form id="batch-form" class="form batch-panel">
@@ -133,7 +133,7 @@
           </label>
         </div>
         <label><span class="lbl">$ prompt_override</span>
-          <span class="hint inline">留空则每个 topic 使用标题 + 描述生成默认 prompt</span>
+          <span class="hint inline">留空则每个 topic 使用精简默认 prompt</span>
           <textarea name="prompt" rows="4" placeholder="可选：给本批次所有 topic 使用同一段 prompt"></textarea>
         </label>
         <div class="batch-toolbar">
@@ -388,7 +388,7 @@
         <div class="auth-banner-meta">
           <span>terminal lab</span>
           <span class="muted">·</span>
-          <span>100 vibe-coding tasks</span>
+          <span>300 vibe-coding topics</span>
           <span class="muted">·</span>
           <span>mitm-audited</span>
         </div>

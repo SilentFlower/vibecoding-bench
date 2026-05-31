@@ -1,6 +1,6 @@
 # vibecoding-bench
 
-把 [`topics.md`](./topics.md) 里的 200 道题作为题库，让真实的 **Claude Code** 在容器里跑，按账号隔离、按账号并发限流、全程透明代理 + TLS MITM 抓 Anthropic API 原文。
+把 [`topics.md`](./topics.md) 里的 300 道题作为题库，让真实的 **Claude Code** 在容器里跑，按账号隔离、按账号并发限流、全程透明代理 + TLS MITM 抓 Anthropic API 原文。
 
 ## 架构
 
@@ -51,7 +51,7 @@ open http://localhost:8000
 | 页 | 用途 |
 |---|---|
 | **账号** | 添加在 init-account.sh 已建好 profile 的账号，配置上游 SOCKS5 |
-| **题库** | 200 题；点击卡片 → 查看 / 编辑 topic，批量任务页可多选派发 |
+| **题库** | 300 题；点击卡片 → 查看 / 编辑 topic，批量任务页可多选派发 |
 | **任务** | 列表 + ▶ 运行（按 repeat_n 提交多次）|
 | **运行** | SSE 实时列表 + 详情：transcript / 产物文件树 / token 统计 |
 
@@ -64,7 +64,7 @@ open http://localhost:8000
 | 并发 | 单账号 2 并发；总并发 = 账号数 × 2 |
 | 任务派发 | 创建任务时指定账号，不切换 |
 | 速率限制 | 撞限即停（标 failed），不自动切其它账号 |
-| 思考预算 | 默认 `CLAUDE_CODE_EFFORT_LEVEL=xhigh`，可在 `.env` 调整 |
+| 思考预算 | 默认 `CLAUDE_CODE_EFFORT_LEVEL=max`，可在 `.env` 调整 |
 | 透明代理 | sidecar 容器 + hev-socks5-tunnel + mitmproxy（TLS MITM）|
 | WebUI | 纯 HTML + 原生 JS + SSE，零构建 |
 
@@ -111,6 +111,7 @@ bench/
 - **首次 MITM CA 生成**：sidecar 启动时若 `data/ca/` 为空，会让 mitmproxy 自己生成；worker 启动时 CA 已经在卷里。若并发首次启动多个 run，有微小窗口期某些 run 拿不到 CA——P1 用 `SIDECAR_BOOT_WAIT=4` 兜底，足以；P2 改成显式等 CA 文件就绪。
 - **certificate pinning 风险**：claude-code 当前不 pin；后续升级若 pin，MITM 会失败，需补丁或回退到不解密模式。
 - **超时**：默认每 run 1800s，可在创建任务时调整。worker 默认会在超时前 `TIMEOUT_WRAPUP_SEC=600` 秒注入一次收尾提示，要求 Claude 停止扩展并输出最终总结；设为 `0` 可关闭。
-- **思考预算**：默认 `CLAUDE_CODE_EFFORT_LEVEL=xhigh`，减少批量任务中 `max` 带来的长时间 thinking；需要更深思考时可在 `.env` 改成 `max` 后重建 / recreate。
+- **批次顺序**：题库浏览仍按编号展示；创建批次时会把已选 topic 随机写入执行队列，同一个批次内顺序固定，便于追踪运行结果。
+- **思考预算**：默认 `CLAUDE_CODE_EFFORT_LEVEL=max`，需要降低耗时或额度消耗时可在 `.env` 改成 `xhigh` / `high` / `medium` / `low` 后重建 / recreate。
 - **OAuth 401 / token 刷新竞态**：orchestrator 后台刷新器会更新账号 profile，运行中的 worker 会按 `OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC` 单向同步新的 `.credentials.json`。若 Claude 仍返回 401，worker 会最多等 `OAUTH_401_PROFILE_WAIT_SEC=90` 秒看后台刷新是否落盘，拿到新凭据后提示重试一次；等不到或再次失败会标记 `auth_failed`，不会继续等到普通 timeout。
 - **磁盘占用**：默认 `SAVE_FULL_FLOWS=0` 不再保存完整 MITM `.flow`，只保留 `stats.jsonl`；默认 `CLEAN_WORKSPACE_DEPS=1` 会在 run 结束后清理 workspace 里的 `node_modules`、`.venv` 等依赖目录。

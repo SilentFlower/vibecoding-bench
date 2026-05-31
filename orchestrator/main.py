@@ -61,7 +61,7 @@ WORKER_HOME = "/home/node"
 WORKER_UID = 1000
 WORKER_GID = 1000
 CLAUDE_CODE_VERSION = os.environ.get("CLAUDE_CODE_VERSION", "2.1.156")
-CLAUDE_CODE_EFFORT_LEVEL = os.environ.get("CLAUDE_CODE_EFFORT_LEVEL", "xhigh")
+CLAUDE_CODE_EFFORT_LEVEL = os.environ.get("CLAUDE_CODE_EFFORT_LEVEL", "max")
 SAVE_FULL_FLOWS = os.environ.get("SAVE_FULL_FLOWS", "0")
 CLEAN_WORKSPACE_DEPS = os.environ.get("CLEAN_WORKSPACE_DEPS", "1")
 TIMEOUT_WRAPUP_SEC = int(os.environ.get("TIMEOUT_WRAPUP_SEC", "600"))
@@ -641,14 +641,8 @@ def build_topic_prompt(topic: dict) -> str:
         f"题目：{topic['title']}\n"
         f"分类：{category}\n"
         f"描述：{description}\n\n"
-        "请在当前目录下从 0 到 1 实现一个可运行的 MVP。要求：\n"
-        "1. 先围绕描述中的核心用户场景完成主链路，不追求过度架构。\n"
-        "2. 补齐必要的输入校验、空状态、错误提示和基础持久化或示例数据。\n"
-        "3. 在实现完成后说明启动方式、验证方式、关键文件和主要取舍。\n"
-        "4. 遇到题目未明确的细节时，请做合理假设并在最终总结中列出，不要因为缺少细节而停止。\n"
-        "5. 不要长时间停留在环境调研；优先使用当前环境已有能力，非必要不要安装大型依赖或启动长时间后台任务。\n"
-        "6. 验证失败时允许降级为轻量 smoke test，并在最终总结中说明失败原因和降级方式；不要因为验证工具不可用而卡住。\n"
-        "7. 如果时间接近超时，请立即停止扩展功能，补齐最小可交付状态，并输出最终总结。"
+        "请在当前目录下实现一个可运行的 MVP。\n"
+        "完成后请说明启动方式、验证方式和主要取舍。"
     )
 
 
@@ -2477,7 +2471,7 @@ async def lifespan(app: FastAPI):
         oauth_refresh_scheduler.stop()
 
 
-app = FastAPI(title="vibecoding-100 bench", lifespan=lifespan)
+app = FastAPI(title="vibecoding-bench", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -3193,6 +3187,9 @@ def create_task_batch(body: BatchIn):
                     ),
                 )
                 batch_id = int(cur.lastrowid)
+                # 批次执行顺序在创建时随机化；之后由 item id 固化顺序，便于运行追踪和恢复。
+                topics = list(topics)
+                random.shuffle(topics)
                 for topic_row in topics:
                     topic = dict(topic_row)
                     prompt = body.prompt or build_topic_prompt(topic)

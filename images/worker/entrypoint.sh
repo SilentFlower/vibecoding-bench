@@ -30,7 +30,7 @@ set -euo pipefail
 
 WORKER_MODE="${WORKER_MODE:-task}"
 CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.156}"
-CLAUDE_CODE_EFFORT_LEVEL="${CLAUDE_CODE_EFFORT_LEVEL:-xhigh}"
+CLAUDE_CODE_EFFORT_LEVEL="${CLAUDE_CODE_EFFORT_LEVEL:-max}"
 log() { echo "[entrypoint $(date +%H:%M:%S)] $*"; }
 CLAUDE_USER=node
 CLAUDE_HOME=/home/node
@@ -40,7 +40,7 @@ write_default_settings() {
   # settings.json 既要补齐默认值，又不能覆盖 Claude 自己写入的隐藏 gate。
   # 用 jq 递归合并：已有字段保留，默认字段补齐；同名字段以默认值为准。
   node - "$CLAUDE_CODE_EFFORT_LEVEL" > /tmp/default-settings.json <<'JS'
-const effort = process.argv[2] || 'xhigh';
+const effort = process.argv[2] || 'max';
 process.stdout.write(`${JSON.stringify({
   env: {
     CLAUDE_CODE_EFFORT_LEVEL: effort,
