@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "检查后端改动的语法、数据兼容和运行风险。"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "检查 SQLite upsert、查询顺序和批次队列写入是否符合项目约定。"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "检查 WebUI 文案改动是否破坏零构建静态前端。"}

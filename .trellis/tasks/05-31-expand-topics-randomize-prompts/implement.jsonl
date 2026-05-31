@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "后端改动涉及 SQLite 查询、批次 item 写入和兼容既有表结构。"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "后端改动需要遵守单文件 FastAPI 的质量检查和禁止模式。"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "WebUI 文案更新需要保持静态前端、中文文案和转义约定。"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "本任务横跨题库 Markdown、API、SQLite 批次队列和前端文案。"}
