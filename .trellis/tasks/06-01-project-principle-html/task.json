@@ -22,5 +22,22 @@
   "parent": null,
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {},
+  "last_push_snapshot": {
+    "snapshot_at": "2026-06-01T11:31:42+08:00",
+    "branch": "main",
+    "pushed_commits": {
+      "root": "ef9ecdc"
+    },
+    "completed_steps": [
+      "阅读 README、WebUI 静态资源、docker-compose、orchestrator、sidecar 和 worker 入口脚本，确认页面内容依据",
+      "确定 HTML 放置位置和入口方式，优先选择不影响现有 WebUI 的静态页面",
+      "编写项目原理页面，覆盖架构、执行流程、容器网络、数据落盘、WebUI 联动和关键限制",
+      "根据现有前端风格补充必要样式，保证桌面和移动视口可读",
+      "本地打开页面或启动静态服务验证资源路径、布局和无明显控制台错误"
+    ],
+    "partial_step": null,
+    "next_step": "/trellis:finish-work 归档任务并记录 session",
+    "notes": "project-principles.html 已提交并推送到 origin/main；check-all 已通过。"
+  }
 }
