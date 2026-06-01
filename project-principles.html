@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>vibecoding-bench 项目原理说明</title>
+  <style>
+    :root {
+      --bg: #0d0e0c;
+      --bg-soft: #141612;
+      --surface: #161914;
+      --surface-2: #1e221c;
+      --surface-3: #252a22;
+      --border: #34382f;
+      --border-strong: #4f5848;
+      --text: #ebe4d3;
+      --text-dim: #b8af99;
+      --text-muted: #807867;
+      --amber: #ffb649;
+      --amber-soft: #ffd58a;
+      --cyan: #5fd7d7;
+      --green: #7cd97c;
+      --red: #ff6b58;
+      --shadow: rgba(0, 0, 0, 0.45);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      border-radius: 0 !important;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      overflow-x: hidden;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(900px 460px at 10% 0%, rgba(255, 182, 73, 0.08), transparent 68%),
+        radial-gradient(740px 380px at 90% 0%, rgba(95, 215, 215, 0.07), transparent 64%),
+        var(--bg);
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.7;
+      letter-spacing: 0;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.018) 0,
+        rgba(255, 255, 255, 0.018) 1px,
+        transparent 1px,
+        transparent 4px
+      );
+      mix-blend-mode: lighten;
+    }
+
+    a {
+      color: var(--amber-soft);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(255, 182, 73, 0.45);
+    }
+
+    a:hover {
+      color: var(--text);
+      border-bottom-color: var(--text);
+    }
+
+    code,
+    pre,
+    .mono,
+    .tag,
+    .metric-value {
+      font-family: var(--mono);
+    }
+
+    code {
+      padding: 1px 5px;
+      color: var(--amber-soft);
+      background: rgba(255, 182, 73, 0.08);
+      border: 1px solid rgba(255, 182, 73, 0.18);
+    }
+
+    pre code {
+      padding: 0;
+      color: inherit;
+      background: transparent;
+      border: 0;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 0;
+      padding: 18px;
+      color: var(--text);
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    figure {
+      margin: 0;
+    }
+
+    .page-shell {
+      width: min(1320px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 28px 0 72px;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: grid;
+      grid-template-columns: minmax(220px, auto) 1fr;
+      gap: 20px;
+      align-items: center;
+      margin: -28px calc((100vw - min(1320px, calc(100vw - 40px))) / -2) 34px;
+      padding: 12px max(20px, calc((100vw - 1320px) / 2));
+      background: rgba(13, 14, 12, 0.94);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 10px 24px var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .brand {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      color: var(--amber);
+      font-family: var(--mono);
+      font-weight: 800;
+    }
+
+    .brand-sub {
+      color: var(--text-muted);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .nav {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+
+    .nav a {
+      flex: 0 0 auto;
+      padding: 6px 10px;
+      color: var(--text-dim);
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .nav a:hover {
+      color: var(--bg);
+      background: var(--amber);
+      border-color: var(--amber);
+    }
+
+    .intro {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1.1fr);
+      gap: 28px;
+      align-items: start;
+      min-height: 520px;
+      padding-bottom: 28px;
+      border-bottom: 1px dashed var(--border);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 14px;
+      color: var(--cyan);
+      font-family: var(--mono);
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: ">";
+      color: var(--amber);
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      max-width: 760px;
+      font-size: 68px;
+      font-weight: 820;
+    }
+
+    .title-line {
+      display: block;
+      overflow-wrap: anywhere;
+    }
+
+    h2 {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 18px;
+      font-size: 38px;
+      font-weight: 760;
+    }
+
+    h2::before {
+      content: "▌";
+      color: var(--amber);
+      font-family: var(--mono);
+    }
+
+    h3 {
+      margin-bottom: 8px;
+      color: var(--amber-soft);
+      font-size: 18px;
+      font-weight: 720;
+    }
+
+    .lead {
+      max-width: 760px;
+      margin: 20px 0 0;
+      color: var(--text-dim);
+      font-size: 18px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .metric {
+      padding: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .metric-value {
+      display: block;
+      color: var(--text);
+      font-size: 22px;
+      font-weight: 800;
+    }
+
+    .metric-label {
+      display: block;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .screen-frame {
+      position: relative;
+      min-width: 0;
+      padding: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      box-shadow: 0 24px 70px var(--shadow);
+    }
+
+    .screen-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .screen-toolbar span {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+
+    .screen-frame img {
+      display: block;
+      max-width: 100%;
+      width: 100%;
+      height: auto;
+      border: 1px solid var(--border);
+      background: var(--bg);
+    }
+
+    .caption {
+      margin: 10px 0 0;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    section {
+      padding: 48px 0;
+      border-bottom: 1px dashed var(--border);
+    }
+
+    .summary-grid,
+    .module-grid,
+    .decision-grid,
+    .file-grid,
+    .limits-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .panel {
+      min-width: 0;
+      padding: 18px;
+      background: rgba(22, 25, 20, 0.92);
+      border: 1px solid var(--border);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+    }
+
+    .panel p {
+      margin: 0;
+      color: var(--text-dim);
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 3px 8px;
+      color: var(--cyan);
+      background: rgba(95, 215, 215, 0.07);
+      border: 1px solid rgba(95, 215, 215, 0.2);
+      font-size: 12px;
+    }
+
+    .architecture {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 0.86fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .diagram {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      padding: 18px;
+      min-height: 360px;
+      background:
+        linear-gradient(90deg, transparent 0 24%, rgba(255, 182, 73, 0.12) 24% 25%, transparent 25% 49%, rgba(95, 215, 215, 0.12) 49% 50%, transparent 50% 74%, rgba(124, 217, 124, 0.12) 74% 75%, transparent 75%),
+        var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .node {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 150px;
+      padding: 15px;
+      background: rgba(13, 14, 12, 0.86);
+      border: 1px solid var(--border-strong);
+    }
+
+    .node strong {
+      display: block;
+      color: var(--text);
+      font-size: 18px;
+    }
+
+    .node span {
+      color: var(--text-muted);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .node p {
+      margin: 12px 0 0;
+      color: var(--text-dim);
+      font-size: 14px;
+    }
+
+    .node-web {
+      border-color: rgba(255, 182, 73, 0.55);
+    }
+
+    .node-core {
+      border-color: rgba(95, 215, 215, 0.55);
+    }
+
+    .node-sidecar {
+      border-color: rgba(124, 217, 124, 0.55);
+    }
+
+    .node-worker {
+      border-color: rgba(255, 107, 88, 0.55);
+    }
+
+    .flow-list {
+      counter-reset: step;
+      display: grid;
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .flow-list li {
+      counter-increment: step;
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+      padding: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .flow-list li::before {
+      content: counter(step, decimal-leading-zero);
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      color: var(--bg);
+      background: var(--amber);
+      font-family: var(--mono);
+      font-weight: 800;
+    }
+
+    .flow-list p {
+      margin: 4px 0 0;
+      color: var(--text-dim);
+    }
+
+    .timeline {
+      display: grid;
+      gap: 14px;
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 170px minmax(0, 1fr);
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .timeline-key {
+      padding: 14px;
+      color: var(--amber-soft);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    .timeline-body {
+      padding: 14px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .timeline-body p {
+      margin: 0;
+      color: var(--text-dim);
+    }
+
+    .network-map {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .network-box {
+      min-width: 0;
+      padding: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .network-arrow {
+      display: grid;
+      place-items: center;
+      color: var(--amber);
+      font-family: var(--mono);
+      font-size: 28px;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .data-table th,
+    .data-table td {
+      padding: 12px;
+      vertical-align: top;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table th {
+      color: var(--amber-soft);
+      background: var(--surface-2);
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .data-table td {
+      color: var(--text-dim);
+    }
+
+    .data-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .code-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.96fr) minmax(0, 1.04fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .code-grid-spaced {
+      margin-top: 16px;
+    }
+
+    .callout {
+      padding: 18px;
+      color: var(--text-dim);
+      background: linear-gradient(90deg, rgba(255, 182, 73, 0.09), rgba(95, 215, 215, 0.04));
+      border: 1px solid rgba(255, 182, 73, 0.28);
+    }
+
+    .callout strong {
+      color: var(--text);
+    }
+
+    .callout-follow {
+      margin-top: 12px;
+    }
+
+    .footer {
+      padding-top: 32px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    @media (max-width: 1060px) {
+      h1 {
+        font-size: 52px;
+      }
+
+      h2 {
+        font-size: 34px;
+      }
+
+      .intro,
+      .architecture,
+      .code-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .summary-grid,
+      .module-grid,
+      .decision-grid,
+      .file-grid,
+      .limits-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .diagram {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .network-map {
+        grid-template-columns: 1fr;
+      }
+
+      .network-arrow {
+        min-height: 30px;
+        transform: rotate(90deg);
+      }
+    }
+
+    @media (max-width: 720px) {
+      body {
+        font-size: 15px;
+      }
+
+      .page-shell {
+        width: min(100% - 24px, 1320px);
+        padding-bottom: 44px;
+      }
+
+      h1 {
+        font-size: 34px;
+      }
+
+      h2 {
+        font-size: 30px;
+      }
+
+      .topbar {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        margin: -28px -12px 24px;
+        padding: 12px;
+        margin-bottom: 24px;
+      }
+
+      .nav {
+        justify-content: flex-start;
+      }
+
+      .intro {
+        min-height: auto;
+      }
+
+      .screen-frame {
+        width: 100%;
+        padding: 8px;
+      }
+
+      .screen-toolbar {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+
+      .brand-mark,
+      .brand-sub,
+      .eyebrow,
+      h1,
+      .lead {
+        overflow-wrap: anywhere;
+      }
+
+      .metrics,
+      .summary-grid,
+      .module-grid,
+      .decision-grid,
+      .file-grid,
+      .limits-grid,
+      .diagram {
+        grid-template-columns: 1fr;
+      }
+
+      .timeline-row {
+        grid-template-columns: 1fr;
+      }
+
+      .data-table {
+        display: block;
+        overflow-x: visible;
+      }
+
+      .data-table thead {
+        display: none;
+      }
+
+      .data-table tbody,
+      .data-table tr,
+      .data-table td {
+        display: block;
+        width: 100%;
+      }
+
+      .data-table tr {
+        border-bottom: 1px solid var(--border);
+      }
+
+      .data-table tr:last-child {
+        border-bottom: 0;
+      }
+
+      .data-table td {
+        display: grid;
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: 10px;
+        padding: 10px 12px;
+        overflow-wrap: anywhere;
+        border-bottom: 1px dashed var(--border);
+      }
+
+      .data-table td:last-child {
+        border-bottom: 0;
+      }
+
+      .data-table td::before {
+        color: var(--amber-soft);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      .data-table td:nth-child(1)::before {
+        content: "路径";
+      }
+
+      .data-table td:nth-child(2)::before {
+        content: "内容";
+      }
+
+      .data-table td:nth-child(3)::before {
+        content: "原因";
+      }
+
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">~/vibecoding-bench</span>
+        <span class="brand-sub">principles.html · 零构建静态说明页</span>
+      </div>
+      <nav class="nav" aria-label="页面导航">
+        <a href="#overview">概览</a>
+        <a href="#architecture">架构</a>
+        <a href="#lifecycle">生命周期</a>
+        <a href="#network">代理链路</a>
+        <a href="#data">数据</a>
+        <a href="#files">文件</a>
+        <a href="#limits">限制</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="intro" id="overview">
+        <div>
+          <span class="eyebrow">真实 Claude Code · 容器化跑题 · 全链路观测</span>
+          <h1>
+            <span class="title-line">vibecoding-bench</span>
+            <span class="title-line">项目原理说明</span>
+          </h1>
+          <p class="lead">
+            这个项目把 <code>topics.md</code> 里的题目变成可调度的运行任务，让真实的 Claude Code 在隔离容器中完成题目，并通过账号级并发、透明代理、TLS MITM、SQLite 和 SSE 把执行过程记录下来。
+          </p>
+          <div class="metrics" aria-label="关键指标">
+            <div class="metric">
+              <span class="metric-value">300</span>
+              <span class="metric-label">题库题目来自 <code>topics.md</code></span>
+            </div>
+            <div class="metric">
+              <span class="metric-value">2 / account</span>
+              <span class="metric-label">默认单账号并发上限</span>
+            </div>
+            <div class="metric">
+              <span class="metric-value">2 containers</span>
+              <span class="metric-label">每个 run 启动 sidecar + worker</span>
+            </div>
+            <div class="metric">
+              <span class="metric-value">0 build</span>
+              <span class="metric-label">WebUI 是静态 HTML + 原生 JS</span>
+            </div>
+          </div>
+        </div>
+        <figure class="screen-frame">
+          <div class="screen-toolbar">
+            <span>webui / runs</span>
+            <span>transcript · files · tokens</span>
+          </div>
+          <img src="tlab-runs.png" alt="vibecoding-bench 运行列表和详情界面截图" />
+          <figcaption class="caption">真实 WebUI 截图：运行页通过 SSE 实时刷新，详情页汇总 transcript、产物文件和 token 统计。</figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2>一句话原理</h2>
+        <div class="summary-grid">
+          <article class="panel">
+            <h3>题目进入系统</h3>
+            <p>README 和代码显示，题库从 <code>topics.md</code> 初始化到 SQLite；WebUI 可以维护 topic，并把选中的 topic 组成批次任务。</p>
+            <div class="tag-row">
+              <span class="tag">topics.md</span>
+              <span class="tag">SQLite</span>
+              <span class="tag">task_batches</span>
+            </div>
+          </article>
+          <article class="panel">
+            <h3>任务被调度</h3>
+            <p>Orchestrator 使用 FastAPI 提供 API，用 Docker SDK 启动容器，并用每账号信号量限制并发，避免单账号被同时挤爆。</p>
+            <div class="tag-row">
+              <span class="tag">FastAPI</span>
+              <span class="tag">Docker SDK</span>
+              <span class="tag">Semaphore(2)</span>
+            </div>
+          </article>
+          <article class="panel">
+            <h3>流量被观测</h3>
+            <p>worker 共享 sidecar 的网络命名空间，出口先进入 mitmproxy，再经 SOCKS5 上游；摘要写入 <code>stats.jsonl</code>。</p>
+            <div class="tag-row">
+              <span class="tag">sidecar</span>
+              <span class="tag">mitmproxy</span>
+              <span class="tag">stats.jsonl</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="architecture">
+        <h2>整体架构</h2>
+        <div class="architecture">
+          <div class="diagram" aria-label="项目模块架构图">
+            <div class="node node-web">
+              <div>
+                <span>01</span>
+                <strong>WebUI</strong>
+                <p>静态 HTML、CSS、原生 JS。提供账号、题库、任务、运行四个主要页面。</p>
+              </div>
+              <span>/webui</span>
+            </div>
+            <div class="node node-core">
+              <div>
+                <span>02</span>
+                <strong>Orchestrator</strong>
+                <p>FastAPI 服务，负责 CRUD、批次调度、Docker 容器生命周期和 SSE 推送。</p>
+              </div>
+              <span>orchestrator/main.py</span>
+            </div>
+            <div class="node node-sidecar">
+              <div>
+                <span>03</span>
+                <strong>Sidecar</strong>
+                <p>透明代理容器，运行 hev-socks5-tunnel、mitmproxy 和 unbound DNS 桥。</p>
+              </div>
+              <span>images/sidecar</span>
+            </div>
+            <div class="node node-worker">
+              <div>
+                <span>04</span>
+                <strong>Worker</strong>
+                <p>运行 Claude Code、tmux、Stop hook 和题目工作目录，最终输出 transcript。</p>
+              </div>
+              <span>images/worker</span>
+            </div>
+          </div>
+          <ol class="flow-list">
+            <li>
+              <div>
+                <h3>WebUI 不直接跑模型</h3>
+                <p>前端只调用 <code>/api/...</code>，创建账号、topic、批次和运行；运行状态通过 <code>/api/runs-stream</code> 订阅。</p>
+              </div>
+            </li>
+            <li>
+              <div>
+                <h3>Orchestrator 是控制面</h3>
+                <p>它持有 SQLite 状态、Docker socket 和调度线程；真正执行题目的进程不在后端进程内，而在 worker 容器里。</p>
+              </div>
+            </li>
+            <li>
+              <div>
+                <h3>Sidecar 是网络面</h3>
+                <p>每个 run 都有独立 sidecar，worker 使用 <code>network_mode=container:&lt;sidecar&gt;</code> 共享网络命名空间。</p>
+              </div>
+            </li>
+            <li>
+              <div>
+                <h3>Worker 是执行面</h3>
+                <p>worker 复制账号 profile，安装 MITM CA，启动 tmux 中的 <code>claude</code>，粘贴题目 prompt，并等待完成或超时。</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="lifecycle">
+        <h2>一次任务的生命周期</h2>
+        <div class="timeline">
+          <div class="timeline-row">
+            <div class="timeline-key">1. 题库入库</div>
+            <div class="timeline-body">
+              <p><code>topics.md</code> 在 topics 表为空时作为 seed 来源。之后 WebUI 可以编辑 topic，已有实例要用同步脚本把新版题库写进 SQLite。</p>
+            </div>
+          </div>
+          <div class="timeline-row">
+            <div class="timeline-key">2. 批次创建</div>
+            <div class="timeline-body">
+              <p>用户选择账号和多个 topic 后，后端创建 <code>task_batches</code> 和 <code>task_batch_items</code>。创建时会随机打乱选中题目，后续按 item id 固化顺序。</p>
+            </div>
+          </div>
+          <div class="timeline-row">
+            <div class="timeline-key">3. run 排队</div>
+            <div class="timeline-body">
+              <p>调度器为每个 item 创建兼容旧表的 task 和 run。每个账号由 <code>threading.Semaphore(PER_ACCOUNT_CONCURRENCY)</code> 控制并发，默认值是 2。</p>
+            </div>
+          </div>
+          <div class="timeline-row">
+            <div class="timeline-key">4. 容器启动</div>
+            <div class="timeline-body">
+              <p>Orchestrator 先启动 sidecar，等待 <code>/tmp/sidecar-ready</code> 和 DNS 可用，再启动 worker 并让 worker 共享 sidecar 网络命名空间。</p>
+            </div>
+          </div>
+          <div class="timeline-row">
+            <div class="timeline-key">5. Claude 执行</div>
+            <div class="timeline-body">
+              <p>worker 用 tmux 启动交互式 <code>claude</code>，通过 bracketed paste 注入题目。Stop hook 只表示 Claude 停过一轮，最终成功仍要看 session JSONL 中的稳定 assistant 回复。</p>
+            </div>
+          </div>
+          <div class="timeline-row">
+            <div class="timeline-key">6. 结果归档</div>
+            <div class="timeline-body">
+              <p>worker 写出 <code>.bench-transcript.log</code> 和状态文件；sidecar 记录 API 摘要；后端根据退出码和 worker 状态把 run 标为 success、failed、timeout、auth_failed 或 stopped。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="network">
+        <h2>透明代理与 TLS MITM</h2>
+        <div class="network-map" aria-label="代理链路图">
+          <article class="network-box">
+            <h3>Worker</h3>
+            <p>Claude Code 进程认为自己在正常访问网络；DNS 被 worker entrypoint 改到 <code>127.0.0.1</code>。</p>
+          </article>
+          <div class="network-arrow">-&gt;</div>
+          <article class="network-box">
+            <h3>Sidecar netns</h3>
+            <p>worker 与 sidecar 共用网络命名空间，所以 <code>127.0.0.1:53</code> 和默认路由都落在 sidecar 内。</p>
+          </article>
+          <div class="network-arrow">-&gt;</div>
+          <article class="network-box">
+            <h3>SOCKS5 出口</h3>
+            <p>mitmproxy 接收本地 SOCKS5 流量，proxychains 再把它送到账号配置的上游 SOCKS5。</p>
+          </article>
+        </div>
+        <div class="code-grid code-grid-spaced">
+          <div class="panel">
+            <h3>为什么要 sidecar</h3>
+            <p>worker 不能只设置环境变量代理，因为需要尽量保证流量必经代理并能被 MITM 观测。sidecar 把默认路由切到 tun0，并用 hev-socks5-tunnel 把透明流量转成 SOCKS5。</p>
+          </div>
+          <pre><code>worker
+  DNS: 127.0.0.1:53
+  default route: sidecar tun0
+  CA: /etc/mitm/mitmproxy-ca-cert.pem
+
+sidecar
+  unbound: UDP 53 -&gt; TCP DNS
+  hev-socks5-tunnel: tun0 -&gt; 127.0.0.1:8080
+  mitmdump: socks5 inbound -&gt; proxychains -&gt; upstream SOCKS5</code></pre>
+        </div>
+      </section>
+
+      <section id="data">
+        <h2>数据如何落盘</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>路径</th>
+              <th>内容</th>
+              <th>为什么存在</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>data/db.sqlite</code></td>
+              <td>accounts、topics、tasks、runs、task_batches 等状态</td>
+              <td>让 WebUI、调度器和详情页共享同一份持久状态。</td>
+            </tr>
+            <tr>
+              <td><code>data/profiles/&lt;acc&gt;/</code></td>
+              <td>每个账号的 Claude OAuth profile 白名单文件</td>
+              <td>账号隔离；运行前复制到 worker，运行后只回写配置，不用旧 token 覆盖刷新后的凭据。</td>
+            </tr>
+            <tr>
+              <td><code>data/flows/&lt;acc&gt;/&lt;task&gt;/&lt;run&gt;/stats.jsonl</code></td>
+              <td>mitmproxy recorder 写出的 API 请求、响应、usage 摘要</td>
+              <td>详情页 token 统计优先从 sidecar 摘要聚合；没有 usage 时回退读 Claude session JSONL。</td>
+            </tr>
+            <tr>
+              <td><code>data/workspaces/&lt;run&gt;/</code></td>
+              <td>Claude 工作目录、产物、<code>.bench-transcript.log</code>、<code>.bench-status.json</code></td>
+              <td>保留每次 run 的可检查现场，供 WebUI 详情页展示文件树和 transcript。</td>
+            </tr>
+            <tr>
+              <td><code>data/ca/</code></td>
+              <td>mitmproxy 首次生成并持久化的 CA</td>
+              <td>让后续 worker 信任同一个 MITM CA，避免每次 run 使用不同证书。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>状态观测链路</h2>
+        <div class="module-grid">
+          <article class="panel">
+            <h3>SSE 实时列表</h3>
+            <p><code>/api/runs-stream</code> 每秒读取最近 100 条 run。如果 payload 变化，就以 <code>runs</code> 事件推给浏览器。</p>
+          </article>
+          <article class="panel">
+            <h3>Transcript</h3>
+            <p>worker 周期性或结束时抓 tmux pane，写入 <code>.bench-transcript.log</code>。详情页直接请求文本文件。</p>
+          </article>
+          <article class="panel">
+            <h3>Token 统计</h3>
+            <p>优先读取 sidecar 的 <code>stats.jsonl</code>；如果 MITM 没拿到 usage，则扫描 Claude session JSONL 聚合。</p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>关键设计决策</h2>
+        <div class="decision-grid">
+          <article class="panel">
+            <h3>交互式 Claude</h3>
+            <p>项目使用交互式 <code>claude</code> 和 tmux 驱动，而不是简单的 <code>claude -p</code>。这样更接近真实 Claude Code 使用路径。</p>
+          </article>
+          <article class="panel">
+            <h3>账号指定派发</h3>
+            <p>任务创建时绑定账号；运行中撞限或认证失败不会自动切换账号，避免结果归因混乱。</p>
+          </article>
+          <article class="panel">
+            <h3>固定并发上限</h3>
+            <p>默认 <code>PER_ACCOUNT_CONCURRENCY=2</code>。总并发等于账号数乘以单账号并发，而不是全局无限投放。</p>
+          </article>
+          <article class="panel">
+            <h3>零构建 WebUI</h3>
+            <p>前端是 <code>index.html</code>、<code>style.css</code>、<code>app.js</code> 三个静态文件，FastAPI 使用 <code>StaticFiles</code> 托管。</p>
+          </article>
+          <article class="panel">
+            <h3>MITM 摘要优先</h3>
+            <p>默认不保存完整 flow，只保存 <code>stats.jsonl</code>。需要完整流量时再用 <code>SAVE_FULL_FLOWS=1</code>。</p>
+          </article>
+          <article class="panel">
+            <h3>超时前收尾</h3>
+            <p>worker 默认会在超时前 <code>TIMEOUT_WRAPUP_SEC=600</code> 秒注入收尾提示，让 Claude 尽量停止扩展并输出结果。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="files">
+        <h2>关键文件索引</h2>
+        <div class="file-grid">
+          <article class="panel">
+            <h3><code>orchestrator/main.py</code></h3>
+            <p>后端主文件。包含配置、SQLite schema、API、调度器、Docker runner、SSE 和静态 WebUI 托管。</p>
+          </article>
+          <article class="panel">
+            <h3><code>images/sidecar/start.sh</code></h3>
+            <p>sidecar 入口。配置 proxychains、启动 mitmdump、创建 tun0、启动 hev、配置 unbound，并写 readiness 标记。</p>
+          </article>
+          <article class="panel">
+            <h3><code>images/sidecar/recorder.py</code></h3>
+            <p>mitmproxy addon。筛选 Anthropic / Claude API 流量，把请求、响应和 usage 摘要追加到 <code>stats.jsonl</code>。</p>
+          </article>
+          <article class="panel">
+            <h3><code>images/worker/entrypoint.sh</code></h3>
+            <p>worker 入口。准备 Claude profile、注入 CA、处理启动门禁、启动 tmux、注入 prompt、处理超时和认证恢复。</p>
+          </article>
+          <article class="panel">
+            <h3><code>webui/app.js</code></h3>
+            <p>原生 JS 前端逻辑。管理 hash 路由、全局 state、账号登录、题库维护、批次创建、运行详情和 SSE。</p>
+          </article>
+          <article class="panel">
+            <h3><code>docker-compose.yml</code></h3>
+            <p>本地启动入口。定义 orchestrator 服务和三个镜像的构建关系，并把 <code>webui/</code>、<code>topics.md</code>、<code>data/</code> 挂入后端。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="limits">
+        <h2>已知限制与排查重点</h2>
+        <div class="limits-grid">
+          <article class="panel">
+            <h3>宿主路径必须绝对</h3>
+            <p><code>HOST_BENCH_DATA</code> 要给宿主 Docker daemon 使用，不能写 <code>./data</code>。</p>
+          </article>
+          <article class="panel">
+            <h3>题库不会自动覆盖</h3>
+            <p><code>topics.md</code> 只在 topics 表为空时 seed。已有实例同步题库要运行 <code>scripts/sync-topics-db.py --apply</code>。</p>
+          </article>
+          <article class="panel">
+            <h3>首次 CA 有窗口期</h3>
+            <p>sidecar 首次生成 CA 后 worker 才能注入；当前用 <code>SIDECAR_BOOT_WAIT</code> 和 readiness 兜底。</p>
+          </article>
+          <article class="panel">
+            <h3>证书固定风险</h3>
+            <p>当前 Claude Code 未做 certificate pinning；如果后续版本 pin 证书，MITM 会失败。</p>
+          </article>
+          <article class="panel">
+            <h3>OAuth 刷新竞态</h3>
+            <p>orchestrator 后台刷新 profile；运行中的 worker 定期单向同步新的 <code>.credentials.json</code>。</p>
+          </article>
+          <article class="panel">
+            <h3>磁盘占用控制</h3>
+            <p>默认不保存完整 MITM flow，并在 run 结束后清理 workspace 中的依赖目录。</p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>最小启动路径</h2>
+        <div class="code-grid">
+          <pre><code>cd bench
+
+cp .env.example .env
+# 编辑 HOST_BENCH_DATA 为 data/ 的宿主绝对路径
+
+docker compose --profile build build
+./scripts/init-account.sh main
+docker compose up -d orchestrator
+
+open http://localhost:8000</code></pre>
+          <div class="callout">
+            <p><strong>阅读顺序建议：</strong>先看 README 的启动方式，再打开 WebUI 跑一次账号登录和批次创建；遇到运行失败时，从 run 详情页的 transcript、文件树、token 统计和后端 run 状态开始排查。</p>
+            <p class="callout-follow">本页面只解释现有项目原理，不新增 API、不改变容器编排，也不修改现有 WebUI 功能。</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>生成文件：project-principles.html</span>
+      <span> · </span>
+      <a href="README.md">README.md</a>
+      <span> · </span>
+      <a href="webui/index.html">打开本地 WebUI 静态入口</a>
+    </footer>
+  </div>
+</body>
+</html>
