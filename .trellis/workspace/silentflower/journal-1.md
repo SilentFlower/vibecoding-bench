@@ -362,3 +362,37 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: 完成 cc2api system role guard
+
+**Date**: 2026-06-05
+**Task**: 完成 cc2api system role guard
+**Branch**: `main`
+
+### Summary
+
+实现并提交 cc2api system role guard: 新增允许 messages[].role=system 的模型白名单配置,默认 claude-opus-4-8;请求热路径使用 GatewayService 内存缓存;设置页和 README 已同步;已推送 cc2api v2 与父仓 main。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f72b7ff` | (see git log) |
+| `32f820f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
