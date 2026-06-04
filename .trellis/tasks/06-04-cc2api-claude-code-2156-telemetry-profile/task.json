@@ -1,0 +1,47 @@
+{
+  "id": "cc2api-claude-code-2156-telemetry-profile",
+  "name": "cc2api-claude-code-2156-telemetry-profile",
+  "title": "brainstorm: cc2api Claude Code 2.1.156 遥测事件画像优化",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-06-04",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "last_push_snapshot": {
+    "snapshot_at": "2026-06-04T10:43:36Z",
+    "branch": "v2",
+    "pushed_commits": {
+      "cc2api": "baa9935"
+    },
+    "completed_steps": [
+      "安全遥测事件目录",
+      "当前 telemetry/rewriter 梳理",
+      "event context 与 event queue",
+      "gateway /v1/messages 生命周期接入",
+      "2.1.156 首批事件模板",
+      "batch 聚合节奏",
+      "隐私保护测试",
+      "任务研究文档更新",
+      "最终验证与 push"
+    ],
+    "partial_step": null,
+    "next_step": "finish-work / archive",
+    "notes": "cc2api origin/v2 已推送；父仓仍有其他 Trellis bookkeeping 变更，快照提交只包含当前任务 task.json。"
+  },
+  "meta": {}
+}
