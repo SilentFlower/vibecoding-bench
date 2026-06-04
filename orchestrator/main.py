@@ -495,6 +495,9 @@ CREATE TABLE IF NOT EXISTS runs (
   sidecar_container TEXT,
   workspace_dir TEXT,
   flows_dir TEXT,
+  run_kind TEXT DEFAULT 'normal',
+  capture_mode TEXT,
+  capture_summary_path TEXT,
   started_at REAL,
   ended_at REAL,
   stop_requested_at REAL,
@@ -533,6 +536,9 @@ def init_db() -> None:
             _ensure_column(conn, "runs", "topic_id", "INTEGER")
             _ensure_column(conn, "runs", "stop_requested_at", "REAL")
             _ensure_column(conn, "runs", "deleted_at", "REAL")
+            _ensure_column(conn, "runs", "run_kind", "TEXT DEFAULT 'normal'")
+            _ensure_column(conn, "runs", "capture_mode", "TEXT")
+            _ensure_column(conn, "runs", "capture_summary_path", "TEXT")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_batch ON runs(batch_id)")
             _seed_topics_if_empty(conn)
     finally:
@@ -821,6 +827,23 @@ class Runner:
         host_flows = HOST_BENCH_DATA / "flows" / acc_name / str(task["id"]) / run_id
         host_profile = HOST_BENCH_DATA / "profiles" / acc_name
         host_ca = HOST_BENCH_DATA / "ca"
+        capture_full_http = bool(task.get("capture_full_http"))
+        sidecar_env = {
+            "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
+            "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
+            "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
+            "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
+            "DNS_READY_HOST": DNS_READY_HOST,
+            # 抓包 run 是诊断模式，必须独立于全局默认值保存完整 flow。
+            "SAVE_FULL_FLOWS": "1" if capture_full_http else SAVE_FULL_FLOWS,
+        }
+        if capture_full_http:
+            sidecar_env.update({
+                "CAPTURE_FULL_HTTP": "1",
+                "CAPTURE_MODE": str(task.get("capture_mode") or "full_http"),
+                "CAPTURE_TARGETS": "anthropic.com,claude.com",
+                "CAPTURE_MAX_BODY_BYTES": "0",
+            })
 
         sidecar_id: Optional[str] = None
         worker_id: Optional[str] = None
@@ -840,14 +863,7 @@ class Runner:
                     str(host_flows): {"bind": "/flows", "mode": "rw"},
                     str(host_ca): {"bind": "/ca", "mode": "rw"},
                 },
-                environment={
-                    "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
-                    "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
-                    "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
-                    "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
-                    "DNS_READY_HOST": DNS_READY_HOST,
-                    "SAVE_FULL_FLOWS": SAVE_FULL_FLOWS,
-                },
+                environment=sidecar_env,
             )
             sidecar_id = sidecar.id
 
@@ -2049,6 +2065,119 @@ def _aggregate_claude_session_usage(run_id: str) -> dict[str, int | bool]:
     }
 
 
+_SENSITIVE_HEADER_RE = re.compile(
+    r"(authorization|cookie|set-cookie|x-api-key|token|secret|credential|key)",
+    re.IGNORECASE,
+)
+
+
+def _redact_capture_value(name: str, value: object) -> object:
+    """
+    对抓包索引预览里的敏感 header 值做脱敏。
+
+    :param name: header 或字段名
+    :param value: 原始值
+    :return: 可安全展示的值
+    """
+    if _SENSITIVE_HEADER_RE.search(name):
+        return "[redacted]"
+    return value
+
+
+def _redact_capture_headers(headers: object) -> dict[str, object]:
+    """
+    脱敏 header 对象，供 WebUI / API 预览使用。
+
+    :param headers: header dict
+    :return: 脱敏后的 header dict
+    """
+    if not isinstance(headers, dict):
+        return {}
+    return {
+        str(k): _redact_capture_value(str(k), v)
+        for k, v in headers.items()
+    }
+
+
+def _redact_capture_record(record: object) -> object:
+    """
+    对 capture_index.json 里的单条索引记录做浅层脱敏。
+
+    :param record: 索引记录
+    :return: 脱敏后的记录
+    """
+    if not isinstance(record, dict):
+        return record
+    out = dict(record)
+    for section in ("request", "response"):
+        value = out.get(section)
+        if not isinstance(value, dict):
+            continue
+        copied = dict(value)
+        copied["headers"] = _redact_capture_headers(copied.get("headers"))
+        out[section] = copied
+    analysis = out.get("analysis")
+    if isinstance(analysis, dict):
+        copied = dict(analysis)
+        if "cch_headers" in copied:
+            copied["cch_headers"] = _redact_capture_headers(copied.get("cch_headers"))
+        out["analysis"] = copied
+    return out
+
+
+def _read_capture_index(path: Path) -> dict[str, object]:
+    """
+    读取并脱敏抓包索引。
+
+    :param path: capture_index.json 路径
+    :return: 索引内容；不存在或解析失败时返回可展示状态
+    """
+    if not path.exists():
+        return {
+            "available": False,
+            "error": "capture_index.json not found",
+            "entries": [],
+        }
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            "available": False,
+            "error": f"failed to read capture index: {exc}",
+            "entries": [],
+        }
+    if not isinstance(data, dict):
+        return {
+            "available": False,
+            "error": "capture index is not an object",
+            "entries": [],
+        }
+    entries = data.get("entries")
+    if isinstance(entries, list):
+        data["entries"] = [_redact_capture_record(item) for item in entries]
+    data["available"] = True
+    return data
+
+
+def _capture_files(base: Path) -> list[dict[str, object]]:
+    """
+    返回抓包目录下的文件列表。
+
+    :param base: run flows 目录
+    :return: 文件元信息列表
+    """
+    if not base.exists():
+        return []
+    files: list[dict[str, object]] = []
+    for path in sorted(p for p in base.rglob("*") if p.is_file()):
+        rel = path.relative_to(base)
+        files.append({
+            "path": str(rel),
+            "size": path.stat().st_size,
+        })
+    return files
+
+
 # ============== 调度器：每账号 Semaphore(2) ==============
 class Scheduler:
     def __init__(self, runner: Runner) -> None:
@@ -2333,6 +2462,8 @@ class Scheduler:
         sid: Optional[str] = None
         wid: Optional[str] = None
         try:
+            flows_path = FLOWS_DIR / account["name"] / str(task["id"]) / run_id
+            capture_full_http = bool(task.get("capture_full_http"))
             initial_state = self._get_run_state(run_id)
             if not initial_state or initial_state.get("deleted_at") is not None:
                 return
@@ -2344,7 +2475,8 @@ class Scheduler:
                 status="running",
                 started_at=time.time(),
                 workspace_dir=str(WORKSPACES_DIR / run_id),
-                flows_dir=str(FLOWS_DIR / account["name"] / str(task["id"]) / run_id),
+                flows_dir=str(flows_path),
+                capture_summary_path=str(flows_path / "capture_index.json") if capture_full_http else None,
             )
             try:
                 sid, wid = self.runner.start_run(run_id, account, task)
@@ -3073,6 +3205,22 @@ class BatchIn(BaseModel):
     timeout_sec: int = 1800
 
 
+class CaptureRunIn(BaseModel):
+    """
+    启动单次完整 HTTP 抓包 run 的请求体。
+
+    :param account_id: 账号 ID
+    :param topic_id: topic ID
+    :param prompt: 可选 prompt 覆盖
+    :param timeout_sec: 本次 run 超时时间
+    """
+
+    account_id: int
+    topic_id: int
+    prompt: Optional[str] = None
+    timeout_sec: int = 1800
+
+
 @app.post("/api/tasks")
 def create_task(body: TaskIn):
     conn = get_db()
@@ -3352,6 +3500,92 @@ def resume_task_batch(batch_id: int):
     return {"ok": True, "resumed": True}
 
 
+# ---------- captures ----------
+@app.post("/api/captures/run")
+def start_capture_run(body: CaptureRunIn):
+    """
+    选择一个账号和 topic，启动完整 HTTP 抓包分析 run。
+
+    :param body: 抓包 run 创建参数
+    :return: run id、task id 和抓包模式
+    """
+    if not scheduler:
+        raise HTTPException(500, "scheduler not ready")
+    timeout_sec = max(60, int(body.timeout_sec or 1800))
+    conn = get_db()
+    try:
+        account_row = conn.execute(
+            "SELECT * FROM accounts WHERE id=? AND enabled=1",
+            (body.account_id,),
+        ).fetchone()
+        if not account_row:
+            raise HTTPException(404, "account not found or disabled")
+        topic_row = conn.execute(
+            "SELECT * FROM topics WHERE id=? AND deleted_at IS NULL",
+            (body.topic_id,),
+        ).fetchone()
+        if not topic_row:
+            raise HTTPException(404, "topic not found")
+        account = dict(account_row)
+        topic = dict(topic_row)
+    finally:
+        conn.close()
+
+    prompt = body.prompt or build_topic_prompt(topic)
+    run_id = uuid.uuid4().hex[:12]
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                cur = conn.execute(
+                    "INSERT INTO tasks(topic_no, title, prompt, account_id, topic_id, "
+                    "timeout_sec, repeat_n) VALUES(?,?,?,?,?,?,?)",
+                    (
+                        topic["no"],
+                        f"[capture] {topic['title']}",
+                        prompt,
+                        account["id"],
+                        topic["id"],
+                        timeout_sec,
+                        1,
+                    ),
+                )
+                task_id = int(cur.lastrowid)
+                flows_path = FLOWS_DIR / account["name"] / str(task_id) / run_id
+                conn.execute(
+                    "INSERT INTO runs(id, task_id, account_id, topic_id, status, "
+                    "run_kind, capture_mode, capture_summary_path) "
+                    "VALUES(?,?,?,?,?,?,?,?)",
+                    (
+                        run_id,
+                        task_id,
+                        account["id"],
+                        topic["id"],
+                        "queued",
+                        "capture",
+                        "full_http",
+                        str(flows_path / "capture_index.json"),
+                    ),
+                )
+        finally:
+            conn.close()
+
+    task = {
+        "id": task_id,
+        "prompt": prompt,
+        "timeout_sec": timeout_sec,
+        "topic_id": topic["id"],
+        "capture_full_http": True,
+        "capture_mode": "full_http",
+    }
+    scheduler.submit(run_id, account, task)
+    return {
+        "run_id": run_id,
+        "task_id": task_id,
+        "capture_mode": "full_http",
+    }
+
+
 # ---------- runs ----------
 @app.post("/api/tasks/{tid}/run")
 def run_task(tid: int):
@@ -3542,6 +3776,48 @@ def get_stats(rid: str):
         "available": requests > 0 or usage_available,
         "usage_available": usage_available,
         "source": source,
+    }
+
+
+@app.get("/api/runs/{rid}/capture")
+def get_capture(rid: str):
+    """
+    返回抓包 run 的索引和文件列表。
+
+    :param rid: runs.id
+    :return: 脱敏后的抓包索引与文件元信息
+    """
+    _require_visible_run(rid)
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT * FROM runs WHERE id=? AND deleted_at IS NULL",
+            (rid,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "run not found")
+        run = dict(row)
+    finally:
+        conn.close()
+    if (run.get("run_kind") or "normal") != "capture":
+        raise HTTPException(404, "capture data not available for this run")
+
+    flows_dir_value = run.get("flows_dir")
+    if isinstance(flows_dir_value, str) and flows_dir_value:
+        flows_dir = Path(flows_dir_value)
+    else:
+        matches = [p.parent for p in FLOWS_DIR.rglob(f"{rid}/stats.jsonl")]
+        flows_dir = matches[0] if matches else FLOWS_DIR / "_missing" / rid
+    index_path = Path(run["capture_summary_path"]) if run.get("capture_summary_path") else flows_dir / "capture_index.json"
+    index = _read_capture_index(index_path)
+    return {
+        "run_id": rid,
+        "mode": run.get("capture_mode") or "full_http",
+        "available": bool(index.get("available")),
+        "flows_dir": str(flows_dir),
+        "index_path": str(index_path),
+        "files": _capture_files(flows_dir),
+        "index": index,
     }
 
 

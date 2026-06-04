@@ -657,6 +657,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .pill-done    { color: var(--success); }
 .pill-active  { color: var(--running); }
 .pill-deleted { color: var(--queued); }
+.pill-capture { color: var(--amber); }
 
 @keyframes pulse-cyan {
   0%, 100% { box-shadow: 0 0 12px var(--running-glow), inset 0 0 8px rgba(95,215,215,0.12); }
@@ -896,12 +897,47 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   color: var(--text-faint);
   font-weight: 600;
 }
+.capture-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.capture-stats {
+  grid-template-columns: 90px minmax(180px, 1fr) 120px;
+}
+.capture-files {
+  max-height: 160px;
+  overflow: auto;
+}
+.capture-table {
+  margin-top: 12px;
+}
+.capture-table th,
+.capture-table td {
+  font-size: 11px;
+  vertical-align: top;
+}
 
 /* ===== batch scheduler ===== */
+.capture-panel,
 .batch-panel {
   border: 1px solid var(--border);
   background: var(--surface);
   padding: 16px;
+}
+.capture-panel {
+  margin-bottom: 18px;
+}
+.capture-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--amber);
+  text-transform: lowercase;
+}
+.capture-title strong::before {
+  content: '$ ';
+  color: var(--text-faint);
 }
 .batch-toolbar {
   display: flex;

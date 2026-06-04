@@ -1,0 +1,9 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": "orchestrator/main.py", "reason": "检查后端 schema/API/调度兼容性"}
+{"file": "images/sidecar/recorder.py", "reason": "检查完整抓包、脱敏和 stats 兼容性"}
+{"file": "images/sidecar/start.sh", "reason": "检查 sidecar 启动参数和 SAVE_FULL_FLOWS 行为"}
+{"file": "webui/app.js", "reason": "检查前端 API 调用和 run 详情展示"}
+{"file": "webui/index.html", "reason": "检查抓包表单和详情 DOM 结构"}
+{"file": "README.md", "reason": "检查使用文档和敏感数据说明"}
+{"file": "webui/style.css", "reason": "检查新增 UI 样式不会破坏现有布局"}
+{"file": "docker-compose.yml", "reason": "检查运行环境变量没有破坏默认配置"}

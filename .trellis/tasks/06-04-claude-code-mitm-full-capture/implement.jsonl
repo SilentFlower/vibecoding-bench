@@ -1,0 +1,9 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": "orchestrator/main.py", "reason": "后端 schema、Runner、Scheduler、API、run 详情需要扩展"}
+{"file": "images/sidecar/recorder.py", "reason": "mitmproxy addon 需要新增完整 HTTP JSONL 捕获和指纹提取"}
+{"file": "images/sidecar/start.sh", "reason": "sidecar 启动脚本已有 SAVE_FULL_FLOWS，需要配合 capture 环境变量"}
+{"file": "webui/index.html", "reason": "WebUI 需要新增抓包启动入口和详情区块"}
+{"file": "webui/app.js", "reason": "WebUI 状态、API 调用、run 详情刷新逻辑需要扩展"}
+{"file": "README.md", "reason": "需要记录使用方式、输出路径和敏感数据风险"}
+{"file": "webui/style.css", "reason": "抓包入口和详情区块可能需要样式"}
+{"file": "docker-compose.yml", "reason": "orchestrator 环境变量和镜像运行上下文"}

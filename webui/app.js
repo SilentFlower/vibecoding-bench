@@ -734,6 +734,11 @@ function renderRunDetailShell(rid) {
       <div class="file-tree" id="run-detail-files"><div class="muted">（空）</div></div>
     </div>
 
+    <div class="detail-section hidden" id="run-detail-capture-section">
+      <h4>抓包</h4>
+      <div class="capture-summary" id="run-detail-capture">等待抓包索引</div>
+    </div>
+
     <div class="detail-section">
       <h4>Transcript</h4>
       <pre class="transcript-pre" id="run-detail-transcript">等待 transcript</pre>
@@ -751,7 +756,54 @@ function setRunDetailText(selector, html) {
   if (el && el.innerHTML !== html) el.innerHTML = html;
 }
 
-function updateRunDetailContent(rid, run, files, stats, transcript, transcriptState) {
+function renderCaptureDetail(capture) {
+  if (!capture || capture.error) {
+    return `<div class="muted">${escapeHTML(capture?.error || '等待抓包索引')}</div>`;
+  }
+  const index = capture.index || {};
+  const entries = Array.isArray(index.entries) ? index.entries : [];
+  const files = Array.isArray(capture.files) ? capture.files : [];
+  const versions = Array.isArray(index.cc_versions) ? index.cc_versions : [];
+  const entryRows = entries.slice(-8).map(e => {
+    const req = e.request || {};
+    const resp = e.response || {};
+    const ana = e.analysis || {};
+    const path = `${req.method || '-'} ${req.host || '-'}${req.path || ''}`;
+    return `
+      <tr>
+        <td><code>${escapeHTML(e.flow_id || '-')}</code></td>
+        <td>${escapeHTML(path)}</td>
+        <td>${escapeHTML(resp.status ?? '-')}</td>
+        <td>${escapeHTML(req.body_bytes ?? 0)} / ${escapeHTML(resp.body_bytes ?? 0)}</td>
+        <td>${escapeHTML(ana.cc_version || '-')}</td>
+      </tr>
+    `;
+  }).join('');
+  const fileRows = files.map(f => `
+    <div class="file">${escapeHTML(f.path)}<span class="size">${formatSize(f.size || 0)}</span></div>
+  `).join('') || '<div class="muted">暂无抓包文件</div>';
+  if (capture.available === false) {
+    return `
+      <div class="muted">${escapeHTML(index.error || '等待抓包索引')}</div>
+      <div class="file-tree capture-files">${fileRows}</div>
+    `;
+  }
+  return `
+    <div class="stats-grid capture-stats">
+      <div class="stat-box"><div class="stat-label">flows</div><div class="stat-value">${escapeHTML(index.total_flows ?? entries.length)}</div></div>
+      <div class="stat-box"><div class="stat-label">cc_version</div><div class="stat-value-sm">${versions.length ? versions.map(escapeHTML).join('<br>') : '<span class="muted">未观察到</span>'}</div></div>
+      <div class="stat-box"><div class="stat-label">模式</div><div class="stat-value-sm">${escapeHTML(capture.mode || 'full_http')}</div></div>
+    </div>
+    <div class="hint inline">完整请求体和响应体保存在 flows 目录；此处只展示脱敏索引。</div>
+    <div class="file-tree capture-files">${fileRows}</div>
+    <table class="data capture-table">
+      <thead><tr><th>flow</th><th>请求</th><th>状态</th><th>请求/响应字节</th><th>cc_version</th></tr></thead>
+      <tbody>${entryRows || '<tr><td colspan="5" class="muted empty-cell">暂无目标请求</td></tr>'}</tbody>
+    </table>
+  `;
+}
+
+function updateRunDetailContent(rid, run, files, stats, transcript, transcriptState, capture) {
   const detail = state.runDetail;
   if (!detail?.rendered) renderRunDetailShell(rid);
   const safeStatus = escapeHTML(run.status);
@@ -783,6 +835,19 @@ function updateRunDetailContent(rid, run, files, stats, transcript, transcriptSt
     setRunDetailText('#run-detail-files', filesHTML);
   }
 
+  const captureSection = $('#run-detail-capture-section');
+  if (captureSection) {
+    const isCapture = (run.run_kind || 'normal') === 'capture';
+    captureSection.classList.toggle('hidden', !isCapture);
+    if (isCapture) {
+      const captureHTML = renderCaptureDetail(capture);
+      if (detail.lastCaptureHTML !== captureHTML) {
+        detail.lastCaptureHTML = captureHTML;
+        setRunDetailText('#run-detail-capture', captureHTML);
+      }
+    }
+  }
+
   const transcriptText = transcript || transcriptState || '等待 transcript';
   if (detail.lastTranscript !== transcriptText) {
     detail.lastTranscript = transcriptText;
@@ -804,9 +869,11 @@ async function renderRuns() {
   try {
     state.accounts = await API('/accounts');
     state.tasks = await API('/tasks');
+    state.topics = await API('/topics');
   } catch (e) {
     return alert('加载运行依赖失败: ' + e.message);
   }
+  bindCaptureForm();
   paintRuns(state.runs);
   if (state.runsEventSource) state.runsEventSource.close();
   state.runsEventSource = new EventSource('/api/runs-stream');
@@ -820,6 +887,46 @@ async function renderRuns() {
   API('/runs').then(rs => { state.runs = rs; paintRuns(rs); }).catch(() => {});
 }
 
+function bindCaptureForm() {
+  const form = $('#capture-form');
+  if (!form) return;
+  form.account_id.innerHTML = state.accounts
+    .map(a => `<option value="${a.id}">${escapeHTML(a.name)}</option>`).join('');
+  form.topic_id.innerHTML = state.topics
+    .map(t => `<option value="${t.id}">#${t.no} ${escapeHTML(t.title)}</option>`).join('');
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    if (state.accounts.length === 0) return alert('请先添加账号');
+    if (state.topics.length === 0) return alert('请先添加题目');
+    const btn = form.querySelector('button[type=submit]');
+    const fd = new FormData(form);
+    const body = {
+      account_id: Number(fd.get('account_id')),
+      topic_id: Number(fd.get('topic_id')),
+      timeout_sec: Number(fd.get('timeout_sec')),
+      prompt: fd.get('prompt') || null,
+    };
+    btn.disabled = true;
+    try {
+      const res = await API('/captures/run', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      form.prompt.value = '';
+      await Promise.all([
+        API('/tasks').then(ts => { state.tasks = ts; }),
+        API('/runs').then(rs => { state.runs = rs; }),
+      ]).catch(() => {});
+      paintRuns(state.runs);
+      openRunDetail(res.run_id);
+    } catch (err) {
+      alert('启动抓包失败: ' + err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+}
+
 function paintRuns(runs) {
   const body = $('#runs-body');
   if (!body) return;
@@ -828,12 +935,15 @@ function paintRuns(runs) {
   body.innerHTML = runs.map(r => {
     const task = taskMap[r.task_id];
     const tname = task ? `#${task.topic_no} ${escapeHTML(task.title)}` : `task#${r.task_id}`;
+    const kind = (r.run_kind || 'normal') === 'capture'
+      ? ' <span class="pill pill-capture">抓包</span>'
+      : '';
     const dur = (r.started_at && r.ended_at) ? `${(r.ended_at - r.started_at).toFixed(0)}s` :
                 (r.started_at ? `${(Date.now()/1000 - r.started_at).toFixed(0)}s` : '-');
     return `
       <tr>
         <td><code>${r.id}</code></td>
-        <td>${tname}</td>
+        <td>${tname}${kind}</td>
         <td>${escapeHTML(accMap[r.account_id] || `acc#${r.account_id}`)}</td>
         <td><span class="pill pill-${r.status}">${escapeHTML(r.status)}</span></td>
         <td>${dur}</td>
@@ -922,7 +1032,21 @@ async function refreshRunDetail() {
     detail.files = filesResult;
     if (shouldRefreshFiles) detail.lastFileRefreshAt = Date.now();
     detail.fileRefreshDue = false;
-    updateRunDetailContent(rid, run, detail.files, statsResult, transcriptResult.text, transcriptResult.state);
+    let captureResult = detail.capture || null;
+    if ((run.run_kind || 'normal') === 'capture') {
+      captureResult = await API(`/runs/${rid}/capture`).catch(e => ({ error: e.message }));
+      if (!state.runDetail || state.runDetail.rid !== rid || state.runDetail.seq !== seq) return;
+      detail.capture = captureResult;
+    }
+    updateRunDetailContent(
+      rid,
+      run,
+      detail.files,
+      statsResult,
+      transcriptResult.text,
+      transcriptResult.state,
+      captureResult,
+    );
 
     if (isLiveRunStatus(run.status)) {
       detail.fileRefreshDue = Date.now() - detail.lastFileRefreshAt > 10000;
@@ -954,6 +1078,8 @@ async function openRunDetail(rid) {
     rendered: false,
     lastFilesHTML: '',
     lastTranscript: '',
+    lastCaptureHTML: '',
+    capture: null,
   };
   $('#modal-content').innerHTML = '<p class="muted">加载中…</p>';
   openModal('#modal');

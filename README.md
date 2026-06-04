@@ -53,7 +53,7 @@ open http://localhost:8000
 | **账号** | 添加在 init-account.sh 已建好 profile 的账号，配置上游 SOCKS5 |
 | **题库** | 300 题；点击卡片 → 查看 / 编辑 topic，批量任务页可多选派发 |
 | **任务** | 列表 + ▶ 运行（按 repeat_n 提交多次）|
-| **运行** | SSE 实时列表 + 详情：transcript / 产物文件树 / token 统计 |
+| **运行** | SSE 实时列表 + 详情：transcript / 产物文件树 / token 统计；也可启动单次完整 HTTP 抓包 run |
 
 ## 关键决策（已锁定 PRD）
 
@@ -90,18 +90,34 @@ bench/
 └── data/                运行时数据（已 gitignore）
     ├── profiles/<acc>/      每账号一份 ~/.claude 副本
     ├── ca/                  mitmproxy 持久 CA（首次启动自动生成）
-    ├── flows/<acc>/<task>/<run>/   stats.jsonl（SAVE_FULL_FLOWS=1 时额外保留 .flow）
+    ├── flows/<acc>/<task>/<run>/   stats.jsonl；抓包 run 额外有 http_capture.jsonl / capture_index.json / .flow
     ├── workspaces/<run>/    claude 工作目录 + .bench-transcript.log
     └── db.sqlite
 ```
 
 ## P1 范围 vs 后续
 
-**P1 已实现**：账号 CRUD、题库解析、topic 持久化维护、任务批量创建/运行、单账号 2 并发调度、sidecar+worker 编排、TLS MITM + flow 落盘、token 统计、SSE 实时状态、详情面板。
+**P1 已实现**：账号 CRUD、题库解析、topic 持久化维护、任务批量创建/运行、单账号 2 并发调度、sidecar+worker 编排、TLS MITM + flow 落盘、token 统计、SSE 实时状态、详情面板、单 topic + 单账号完整 HTTP 抓包分析 run。
 
 **待 P2**：多账号管理 UI、循环跑（题库扫完再来一轮）、按账号统计仪表盘、mitmproxy flow 在 WebUI 内浏览、失败重试策略、Stop hook 检测的更精细判定。
 
 **待 P3（评测）**：自动跑产物里的测试 / lint / 起 dev server 截图 / LLM-as-judge。
+
+## 完整 HTTP 抓包分析 run
+
+运行页顶部的 `capture` 面板可以选择一个账号和一个 topic，启动一条专用抓包 run。该 run 复用普通 run 的账号 profile、SOCKS5、sidecar MITM 和 worker 执行流程，但会强制开启完整抓包，不受全局 `SAVE_FULL_FLOWS=0` 默认值影响。
+
+输出目录：
+
+```text
+data/flows/<account>/<task_id>/<run_id>/
+├── stats.jsonl          token / 状态码摘要，普通统计继续使用
+├── http_capture.jsonl   每条目标 HTTP flow 的请求 headers、请求体全文、响应 headers、响应体全文
+├── capture_index.json   轻量索引：method / host / path / status / bytes / cc_version / cc_entrypoint / CCH 相关字段
+└── *.flow               mitmproxy 原生 flow 文件
+```
+
+抓包目标覆盖 Anthropic / Claude Code 相关流量，包括 `anthropic.com`、`claude.com` 以及 `/v1/`、`/api/oauth/`、`/api/eval/`、`/api/claude_code/` 路径。WebUI 详情页只展示脱敏索引；完整 `http_capture.jsonl` 会保存本地原文，可能包含 OAuth token、prompt、代码、响应内容等高敏数据，不要提交到 git，也不要暴露给不可信网络。
 
 ## 已知限制 / 排查
 
@@ -114,4 +130,4 @@ bench/
 - **批次顺序**：题库浏览仍按编号展示；创建批次时会把已选 topic 随机写入执行队列，同一个批次内顺序固定，便于追踪运行结果。
 - **思考预算**：默认 `CLAUDE_CODE_EFFORT_LEVEL=max`，需要降低耗时或额度消耗时可在 `.env` 改成 `xhigh` / `high` / `medium` / `low` 后重建 / recreate。
 - **OAuth 401 / token 刷新竞态**：orchestrator 后台刷新器会更新账号 profile，运行中的 worker 会按 `OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC` 单向同步新的 `.credentials.json`。若 Claude 仍返回 401，worker 会最多等 `OAUTH_401_PROFILE_WAIT_SEC=90` 秒看后台刷新是否落盘，拿到新凭据后提示重试一次；等不到或再次失败会标记 `auth_failed`，不会继续等到普通 timeout。
-- **磁盘占用**：默认 `SAVE_FULL_FLOWS=0` 不再保存完整 MITM `.flow`，只保留 `stats.jsonl`；默认 `CLEAN_WORKSPACE_DEPS=1` 会在 run 结束后清理 workspace 里的 `node_modules`、`.venv` 等依赖目录。
+- **磁盘占用 / 敏感数据**：普通 run 默认 `SAVE_FULL_FLOWS=0`，只保留 `stats.jsonl`；完整抓包 run 会保存请求体和响应体全文、`.flow` 和索引，体积更大且包含高敏数据；默认 `CLEAN_WORKSPACE_DEPS=1` 会在 run 结束后清理 workspace 里的 `node_modules`、`.venv` 等依赖目录。

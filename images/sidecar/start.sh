@@ -62,11 +62,16 @@ if [ "${SAVE_FULL_FLOWS:-0}" = "1" ]; then
   MITM_SAVE_ARGS=(--save-stream-file "$FLOW_FILE")
   log "Full mitm flow capture enabled: $FLOW_FILE"
 fi
+MITM_IGNORE_ARGS=(--ignore-hosts '^(platform\.claude\.com)$')
+if [ "${CAPTURE_FULL_HTTP:-0}" = "1" ]; then
+  # 完整抓包 run 要尽量覆盖 OAuth / 平台侧 Claude Code 请求，不能沿用普通 run 的忽略规则。
+  MITM_IGNORE_ARGS=()
+fi
 log "Starting mitmdump (socks5 inbound :8080, upstream via proxychains -> ${UPSTREAM_SOCKS5_HOST}:${UPSTREAM_SOCKS5_PORT})"
 proxychains4 -q mitmdump \
   --mode socks5 \
   --listen-host 127.0.0.1 --listen-port 8080 \
-  --ignore-hosts '^(platform\.claude\.com)$' \
+  "${MITM_IGNORE_ARGS[@]}" \
   "${MITM_SAVE_ARGS[@]}" \
   -s /sidecar/recorder.py \
   >/var/log/mitmdump.log 2>&1 &
