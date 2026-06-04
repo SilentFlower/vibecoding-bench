@@ -16,6 +16,7 @@ STATS_FILE = os.environ.get("STATS_FILE", "/flows/stats.jsonl")
 CAPTURE_FILE = os.environ.get("CAPTURE_FILE", "/flows/http_capture.jsonl")
 CAPTURE_INDEX_FILE = os.environ.get("CAPTURE_INDEX_FILE", "/flows/capture_index.json")
 CAPTURE_FULL_HTTP = os.environ.get("CAPTURE_FULL_HTTP", "0") == "1"
+CAPTURE_SCOPE = os.environ.get("CAPTURE_SCOPE", "anthropic").strip().lower() or "anthropic"
 CAPTURE_MAX_BODY_BYTES = int(os.environ.get("CAPTURE_MAX_BODY_BYTES", "0") or "0")
 TARGET_HOST_KEYWORDS = ("anthropic.com", "claude.com")
 TARGET_API_PATH_PREFIXES = ("/v1/", "/api/oauth/", "/api/eval/", "/api/claude_code/")
@@ -26,6 +27,10 @@ CAPTURE_TARGETS = tuple(
 ) or TARGET_HOST_KEYWORDS
 _BILLING_PART_RE = re.compile(r"([^=;,\s]+)=([^;,\s]+)")
 _CCH_RE = re.compile(r"(cch|fingerprint|billing|anthropic)", re.IGNORECASE)
+_TELEMETRY_RE = re.compile(
+    r"(telemetry|event_logging|datadog|statsig|sentry|posthog|growthbook|analytics|metrics|log|trace|rum|ws)",
+    re.IGNORECASE,
+)
 _SENSITIVE_HEADER_RE = re.compile(
     r"(authorization|cookie|set-cookie|x-api-key|token|secret|credential|key)",
     re.IGNORECASE,
@@ -145,12 +150,47 @@ def _should_record(flow: http.HTTPFlow) -> bool:
     return any(path.startswith(prefix) for prefix in TARGET_API_PATH_PREFIXES)
 
 
+def _should_capture_full_http(flow: http.HTTPFlow) -> bool:
+    """
+    判断完整 HTTP JSONL 是否记录该 flow。
+
+    :param flow: mitmproxy flow
+    :return: capture scope 为 all 时记录所有 HTTP flow，否则沿用目标流量过滤
+    """
+    return CAPTURE_SCOPE == "all" or _should_record(flow)
+
+
 def _record_host(flow: http.HTTPFlow) -> str:
     """优先返回可读域名，避免 stats.jsonl 里只剩 IP。"""
     for host in _flow_host_values(flow):
         if any(keyword in host for keyword in CAPTURE_TARGETS):
             return host
     return flow.request.host or ""
+
+
+def _classify_flow(flow: http.HTTPFlow) -> dict[str, Any]:
+    """
+    给抓包索引补充分类字段，便于后续从全量 HTTP 中筛遥测和 Anthropic 主链路。
+
+    :param flow: mitmproxy flow
+    :return: 分类信息
+    """
+    host = _record_host(flow)
+    path = flow.request.path or ""
+    headers = _headers_dict(flow.request.headers)
+    haystack = " ".join([
+        host,
+        flow.request.pretty_host or "",
+        path,
+        _header_value(headers, "user-agent"),
+        _header_value(headers, "content-type"),
+    ])
+    return {
+        "capture_scope": CAPTURE_SCOPE,
+        "is_target": _should_record(flow),
+        "is_anthropic": any(keyword in host for keyword in TARGET_HOST_KEYWORDS),
+        "is_telemetry_candidate": bool(_TELEMETRY_RE.search(haystack)),
+    }
 
 
 def _capture_body(message: http.Message | None) -> dict[str, Any]:
@@ -259,6 +299,7 @@ def _capture_record(flow: http.HTTPFlow) -> dict[str, Any]:
             **response_body,
         },
         "analysis": _extract_analysis(flow, response_text),
+        "classification": _classify_flow(flow),
     }
 
 
@@ -267,6 +308,7 @@ def _capture_index_entry(record: dict[str, Any]) -> dict[str, Any]:
     request = record.get("request") if isinstance(record.get("request"), dict) else {}
     response = record.get("response") if isinstance(record.get("response"), dict) else {}
     analysis = record.get("analysis") if isinstance(record.get("analysis"), dict) else {}
+    classification = record.get("classification") if isinstance(record.get("classification"), dict) else {}
     request_headers = request.get("headers") if isinstance(request.get("headers"), dict) else {}
     response_headers = response.get("headers") if isinstance(response.get("headers"), dict) else {}
     return {
@@ -303,6 +345,12 @@ def _capture_index_entry(record: dict[str, Any]) -> dict[str, Any]:
             "cc_entrypoint": analysis.get("cc_entrypoint"),
             "cch_headers": _redact_headers(analysis.get("cch_headers") or {}),
             "usage": analysis.get("usage"),
+        },
+        "classification": {
+            "capture_scope": classification.get("capture_scope"),
+            "is_target": bool(classification.get("is_target")),
+            "is_anthropic": bool(classification.get("is_anthropic")),
+            "is_telemetry_candidate": bool(classification.get("is_telemetry_candidate")),
         },
     }
 
@@ -394,7 +442,7 @@ class Recorder:
                 "usage": usage,
             }
             _jsonl_append(STATS_FILE, stat)
-            if CAPTURE_FULL_HTTP:
+            if CAPTURE_FULL_HTTP and _should_capture_full_http(flow):
                 record = _capture_record(flow)
                 _jsonl_append(CAPTURE_FILE, record)
                 _write_capture_index(_capture_index_entry(record))

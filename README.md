@@ -112,12 +112,12 @@ bench/
 ```text
 data/flows/<account>/<task_id>/<run_id>/
 ├── stats.jsonl          token / 状态码摘要，普通统计继续使用
-├── http_capture.jsonl   每条目标 HTTP flow 的请求 headers、请求体全文、响应 headers、响应体全文
-├── capture_index.json   轻量索引：method / host / path / status / bytes / cc_version / cc_entrypoint / CCH 相关字段
+├── http_capture.jsonl   每条 HTTP flow 的请求 headers、请求体全文、响应 headers、响应体全文
+├── capture_index.json   轻量索引：method / host / path / status / bytes / cc_version / cc_entrypoint / CCH / 分类字段
 └── *.flow               mitmproxy 原生 flow 文件
 ```
 
-抓包目标覆盖 Anthropic / Claude Code 相关流量，包括 `anthropic.com`、`claude.com` 以及 `/v1/`、`/api/oauth/`、`/api/eval/`、`/api/claude_code/` 路径。WebUI 详情页只展示脱敏索引；完整 `http_capture.jsonl` 会保存本地原文，可能包含 OAuth token、prompt、代码、响应内容等高敏数据，不要提交到 git，也不要暴露给不可信网络。
+抓包 run 的 `http_capture.jsonl` 默认记录所有经过 sidecar MITM 的 HTTP flow，不只限于 Anthropic 域名；Datadog、Statsig、Sentry、WebSocket upgrade、额外遥测域名等请求只要走到 MITM，也会进入完整 JSONL。`capture_index.json` 会额外标记 `is_target`、`is_anthropic`、`is_telemetry_candidate`，便于从全量流量里筛 Anthropic 主链路和遥测候选。WebUI 详情页只展示脱敏索引；完整 `http_capture.jsonl` 会保存本地原文，可能包含 OAuth token、prompt、代码、响应内容、第三方请求内容等高敏数据，不要提交到 git，也不要暴露给不可信网络。
 
 ## 已知限制 / 排查
 

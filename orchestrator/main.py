@@ -841,6 +841,7 @@ class Runner:
             sidecar_env.update({
                 "CAPTURE_FULL_HTTP": "1",
                 "CAPTURE_MODE": str(task.get("capture_mode") or "full_http"),
+                "CAPTURE_SCOPE": "all",
                 "CAPTURE_TARGETS": "anthropic.com,claude.com",
                 "CAPTURE_MAX_BODY_BYTES": "0",
             })
