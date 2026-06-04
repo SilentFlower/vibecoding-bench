@@ -24,20 +24,21 @@
   "notes": "",
   "meta": {},
   "last_push_snapshot": {
-    "snapshot_at": "2026-06-04T01:28:15.523240+00:00",
+    "snapshot_at": "2026-06-04T10:43:30+08:00",
     "branch": "main",
     "pushed_commits": {
-      "vibecoding-bench": "a680c12"
+      "vibecoding-bench": "e8e9112"
     },
     "completed_steps": [
       "规划三件套完成",
       "完整抓包模式实现完成",
+      "抓包 run 已扩展为 CAPTURE_SCOPE=all，全量捕获所有经过 sidecar MITM 的 HTTP flow",
       "check-all 静态与模拟验证完成",
       "代码已提交并推送",
       "DockerHub 三镜像已推送",
-      "ai-havefun 远程已部署到 a680c12"
+      "ai-havefun 远程已部署到 e8e9112"
     ],
     "next_step": "进行一次真实 Claude Code capture run 验证请求/响应体落盘",
-    "notes": "远程实例使用 VIBEBENCH_TAG=a680c12；普通 run 默认 SAVE_FULL_FLOWS=0。"
+    "notes": "远程实例使用 VIBEBENCH_TAG=e8e9112；DockerHub 已推送 orchestrator/worker/sidecar 的 latest 和 e8e9112 标签；普通 run 默认 SAVE_FULL_FLOWS=0，capture run 的完整 http_capture.jsonl 默认记录所有经过 MITM 的 HTTP flow。"
   }
 }
