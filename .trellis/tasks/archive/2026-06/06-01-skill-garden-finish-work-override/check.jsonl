@@ -1,0 +1,6 @@
+{"file": ".trellis/tasks/06-01-skill-garden-finish-work-override/prd.md", "reason": "检查实现是否满足只改 0.6 override、只限制 bookkeeping commit 的验收标准。"}
+{"file": ".trellis/tasks/06-01-skill-garden-finish-work-override/design.md", "reason": "检查安装注入策略、sentinel 幂等和版本范围是否符合设计。"}
+{"file": ".trellis/tasks/06-01-skill-garden-finish-work-override/implement.md", "reason": "检查验证命令是否执行，且没有改动 0.5 / old。"}
+{"file": "/root/project/skill-garden/scripts/install.sh", "reason": "检查 shell 语法、注入逻辑和重复安装幂等性。"}
+{"file": "/root/project/skill-garden/.trellis/0.6/overrides/finish-work.md", "reason": "检查新增 override 文案是否精准限制 archive / journal bookkeeping commit。"}
+{"file": "/root/project/skill-garden/README.md", "reason": "检查 README 是否只补充 0.6 finish-work override 说明且未扩大范围。"}

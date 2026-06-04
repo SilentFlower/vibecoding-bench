@@ -1,0 +1,6 @@
+{"file": ".trellis/tasks/06-01-skill-garden-finish-work-override/prd.md", "reason": "实现前读取需求边界，特别是只改 skill-garden 0.6 override、只限制 bookkeeping commit 的确认结论。"}
+{"file": ".trellis/tasks/06-01-skill-garden-finish-work-override/design.md", "reason": "实现前读取注入点、sentinel、安装脚本兼容性和版本范围设计。"}
+{"file": ".trellis/tasks/06-01-skill-garden-finish-work-override/implement.md", "reason": "实现前读取步骤、验证命令和不触碰 0.5 / old 的约束。"}
+{"file": "/root/project/skill-garden/scripts/install.sh", "reason": "需要在现有 0.6 workflow override 注入逻辑上做最小扩展。"}
+{"file": "/root/project/skill-garden/.trellis/0.6/overrides/trellis-route.md", "reason": "需要复用现有 0.6 override 文案风格和 sentinel 结构。"}
+{"file": "/root/project/skill-garden/README.md", "reason": "需要最小更新 0.6 finish-work override 的安装、重灌和回滚说明。"}

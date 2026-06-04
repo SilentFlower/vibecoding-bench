@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
-- **Last Active**: 2026-05-31
+- **Total Sessions**: 6
+- **Last Active**: 2026-06-01
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~187 | Active |
+| `journal-1.md` | ~232 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-06-01 | 完成项目原理页面与 skill-garden workflow override | `ef9ecdc`, `a7578da` | `main` |
 | 5 | 2026-05-31 | 扩充题库并远程部署 | `78fa224`, `5616bf0`, `2fdf20b` | `main` |
 | 4 | 2026-05-31 | Run 可靠性与 API 卡死恢复 | `d22edeb`, `aa707fd`, `a38604d` | `main` |
 | 3 | 2026-05-27 | 扩充 topics 题库并同步远程 | `0bf8f95` | `main` |

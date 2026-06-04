@@ -196,3 +196,37 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: 完成项目原理页面与 skill-garden workflow override
+
+**Date**: 2026-06-01
+**Task**: 完成项目原理页面与 skill-garden workflow override
+**Branch**: `main`
+
+### Summary
+
+完成项目原理介绍 HTML，并收尾 skill-garden 0.6 workflow override 注入；归档两个已完成任务。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ef9ecdc` | (see git log) |
+| `a7578da` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
