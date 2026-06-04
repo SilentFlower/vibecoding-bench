@@ -1,0 +1,9 @@
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-cch-upgrade/prd.md", "reason": "检查实现是否满足 cc2api 2.1.156 兼容和 CCH/cc_version 逆向验收标准。"}
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-cch-upgrade/design.md", "reason": "检查实现是否遵循版本 profile、遥测 v2、保守 CCH 策略和敏感数据边界。"}
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-cch-upgrade/implement.md", "reason": "检查实施清单和验证命令是否完成。"}
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-cch-upgrade/research/cch-cc-version-first-pass.md", "reason": "检查 CCH/cc_version 结论是否回应浅尝研究中的失败样本和下一步矩阵。"}
+{"file": "/root/project/cc2api/src/service/rewriter.rs", "reason": "检查 header/body/beta/CCH/cc_version 改写是否正确且有测试覆盖。"}
+{"file": "/root/project/cc2api/src/service/telemetry.rs", "reason": "检查 event_logging v2 和自动遥测兼容。"}
+{"file": "/root/project/cc2api/src/service/gateway.rs", "reason": "检查遥测拦截和上游转发行为未回归。"}
+{"file": "/root/project/cc2api/src/model/identity.rs", "reason": "检查默认身份指纹是否升级到 2.1.156。"}
+{"file": "/root/project/cc2api/src/service/oauth.rs", "reason": "检查 OAuth/usage 请求 UA 和 beta 是否一致。"}

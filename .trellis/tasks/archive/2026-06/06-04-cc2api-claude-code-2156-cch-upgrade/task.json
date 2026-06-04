@@ -1,0 +1,30 @@
+{
+  "id": "cc2api-claude-code-2156-cch-upgrade",
+  "name": "cc2api-claude-code-2156-cch-upgrade",
+  "title": "brainstorm: cc2api Claude Code 2.1.156 兼容升级与 CCH 逆向",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-06-04",
+  "completedAt": "2026-06-04",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "06-04-cc2api-claude-code-2156-telemetry-profile",
+    "06-04-cc2api-claude-code-2156-identity-profile",
+    "06-04-cc2api-claude-code-2156-transport-profile"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

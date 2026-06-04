@@ -1,0 +1,9 @@
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-cch-upgrade/prd.md", "reason": "实现前读取需求范围、抓包结论和 CCH/cc_version 验收标准。"}
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-cch-upgrade/design.md", "reason": "实现前读取版本 profile、遥测 v2、请求 schema 和 CCH 保守策略设计。"}
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-cch-upgrade/implement.md", "reason": "实现前读取实施顺序、验证命令和提交前敏感数据约束。"}
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-cch-upgrade/research/cch-cc-version-first-pass.md", "reason": "实现前读取规划期 CCH/cc_version 浅尝结论、旧算法失败证据和下一轮研究矩阵。"}
+{"file": "/root/project/cc2api/src/service/rewriter.rs", "reason": "主要改造 Claude Code header、body、beta、billing、CCH/cc_version 策略。"}
+{"file": "/root/project/cc2api/src/service/telemetry.rs", "reason": "主要改造 event_logging v2 自动遥测和事件模板。"}
+{"file": "/root/project/cc2api/src/service/gateway.rs", "reason": "检查遥测拦截、转发查询参数、请求改写和上游转发行为。"}
+{"file": "/root/project/cc2api/src/model/identity.rs", "reason": "升级默认 Claude Code 版本、build_time 和环境指纹字段。"}
+{"file": "/root/project/cc2api/src/service/oauth.rs", "reason": "升级 usage/token 测试请求的 UA 和 beta 版本指纹。"}

@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 6
-- **Last Active**: 2026-06-01
+- **Total Sessions**: 10
+- **Last Active**: 2026-06-04
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~232 | Active |
+| `journal-1.md` | ~364 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,10 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-06-04 | cc2api Claude Code 2.1.156 transport profile | `23ec419` | `main` |
+| 9 | 2026-06-04 | cc2api Claude Code 2.1.156 遥测事件画像优化 | `baa9935` | `main` |
+| 8 | 2026-06-04 | cc2api Claude Code 身份画像优化 | `0df2059` | `main` |
+| 7 | 2026-06-04 | cc2api Claude Code 2.1.156 CCH 升级 | `275a470` | `main` |
 | 6 | 2026-06-01 | 完成项目原理页面与 skill-garden workflow override | `ef9ecdc`, `a7578da` | `main` |
 | 5 | 2026-05-31 | 扩充题库并远程部署 | `78fa224`, `5616bf0`, `2fdf20b` | `main` |
 | 4 | 2026-05-31 | Run 可靠性与 API 卡死恢复 | `d22edeb`, `aa707fd`, `a38604d` | `main` |

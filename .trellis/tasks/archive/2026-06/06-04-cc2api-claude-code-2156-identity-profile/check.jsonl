@@ -1,0 +1,5 @@
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-identity-profile/prd.md", "reason": "检查身份画像分层、兼容策略和验收标准。"}
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-identity-profile/design.md", "reason": "检查 DeviceProfile、RunProfile、RequestProfile、process 曲线和回滚边界是否按设计落地。"}
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-identity-profile/implement.md", "reason": "检查实施清单、验证命令和 review gates 是否完成。"}
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-identity-profile/research/identity-field-matrix.md", "reason": "对照账号级、运行级、请求级字段矩阵检查统一来源。"}
+{"file": ".trellis/tasks/archive/2026-06/06-04-cc2api-claude-code-2156-cch-upgrade/research/cch-cc-version-first-pass.md", "reason": "确认本任务建立在 2.1.156 版本指纹和 CCH 结论之上。"}

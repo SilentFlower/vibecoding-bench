@@ -230,3 +230,135 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: cc2api Claude Code 2.1.156 CCH 升级
+
+**Date**: 2026-06-04
+**Task**: cc2api Claude Code 2.1.156 CCH 升级
+**Branch**: `main`
+
+### Summary
+
+完成 cc2api Claude Code 2.1.156 指纹升级，复现 CCH seed 0x4D659218E32A3268，补充 CCH 逆向参考，并拆分遥测、身份、传输层后续优化任务。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `275a470` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 8: cc2api Claude Code 身份画像优化
+
+**Date**: 2026-06-04
+**Task**: cc2api Claude Code 身份画像优化
+**Branch**: `main`
+
+### Summary
+
+完成 cc2api Claude Code 2.1.156 身份画像优化：新增统一 DeviceProfile/RunProfile/RequestProfile，统一 rewriter、telemetry、GrowthBook、system prompt 和 process 指纹来源；验证通过并推送 origin/v2。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0df2059` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 9: cc2api Claude Code 2.1.156 遥测事件画像优化
+
+**Date**: 2026-06-04
+**Task**: cc2api Claude Code 2.1.156 遥测事件画像优化
+**Branch**: `main`
+
+### Summary
+
+完成 cc2api 遥测事件画像 MVP：基于抓包安全目录实现事件队列、/v1/messages 生命周期事件、启动/GrowthBook/工具/附件/文件类安全模板，补充隐私边界测试并推送 cc2api origin/v2。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `baa9935` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 10: cc2api Claude Code 2.1.156 transport profile
+
+**Date**: 2026-06-04
+**Task**: cc2api Claude Code 2.1.156 transport profile
+**Branch**: `main`
+
+### Summary
+
+完成 Claude Code 2.1.156 header wire profile 优化：按真实抓包稳定主要 endpoint header 顺序，补齐自动遥测 header，预热链路复用统一顺序，并完成验证与推送。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `23ec419` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

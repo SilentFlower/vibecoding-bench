@@ -1,0 +1,5 @@
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-telemetry-profile/prd.md", "reason": "检查遥测事件画像需求和隐私验收标准。"}
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-telemetry-profile/design.md", "reason": "检查事件队列、gateway 生命周期和 rollback 边界是否落地。"}
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-telemetry-profile/implement.md", "reason": "检查实施清单、验证命令和 review gates 完成情况。"}
+{"file": ".trellis/tasks/06-04-cc2api-claude-code-2156-telemetry-profile/research/telemetry-event-catalog.md", "reason": "对照安全事件目录检查模板覆盖和敏感数据边界。"}
+{"file": ".trellis/tasks/archive/2026-06/06-04-cc2api-claude-code-2156-identity-profile/research/identity-field-matrix.md", "reason": "确认 telemetry 继续复用统一身份画像。"}
