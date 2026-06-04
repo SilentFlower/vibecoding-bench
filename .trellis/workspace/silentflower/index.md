@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 11
+- **Total Sessions**: 12
 - **Last Active**: 2026-06-05
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~398 | Active |
+| `journal-1.md` | ~432 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 12 | 2026-06-05 | cc2api thinking signature retry | `b815e3f`, `80d17a0` | `main` |
 | 11 | 2026-06-05 | 完成 cc2api system role guard | `f72b7ff`, `32f820f` | `main` |
 | 10 | 2026-06-04 | cc2api Claude Code 2.1.156 transport profile | `23ec419` | `main` |
 | 9 | 2026-06-04 | cc2api Claude Code 2.1.156 遥测事件画像优化 | `baa9935` | `main` |

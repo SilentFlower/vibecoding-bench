@@ -396,3 +396,37 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: cc2api thinking signature retry
+
+**Date**: 2026-06-05
+**Task**: cc2api thinking signature retry
+**Branch**: `main`
+
+### Summary
+
+实现 cc2api 官方 Anthropic /v1/messages thinking signature 相关 400 两阶段降级重试；对齐 sub2api Antigravity/Claude thinking-only 与 thinking+tools 降级逻辑；补充 CCH 刷新、测试、README 和任务检查记录。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b815e3f` | (see git log) |
+| `80d17a0` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
