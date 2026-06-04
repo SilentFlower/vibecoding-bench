@@ -1,0 +1,5 @@
+{"file":"/root/project/cc2api/src/service/gateway.rs","reason":"官方 Anthropic /v1/messages 上游转发、400 响应处理、账号与 token 复用的主要落点。"}
+{"file":"/root/project/cc2api/src/service/rewriter.rs","reason":"现有请求体改写 helper 所在文件，适合承载 thinking/tool block 降级转换或提供参考模式。"}
+{"file":"/root/project/cc2api/src/service/telemetry.rs","reason":"签名重试需要安全摘要或错误类型记录，不能记录正文。"}
+{"file":"/root/project/sub2api/backend/internal/service/antigravity_gateway_service.go","reason":"参考实现：Antigravity/Claude signature 相关 400 的两阶段 thinking-only 与 thinking+tools 降级重试。"}
+{"file":"/root/project/sub2api/backend/internal/service/gemini_native_signature_cleaner.go","reason":"反例参考：Gemini thoughtSignature dummy 仅适用于 Gemini native，不能迁移到 Anthropic thinking.signature。"}

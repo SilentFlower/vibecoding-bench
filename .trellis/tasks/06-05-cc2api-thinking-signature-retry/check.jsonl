@@ -1,0 +1,8 @@
+{"file":"/root/project/cc2api/src/service/gateway.rs","reason":"检查 signature retry 是否只作用于 /v1/messages + 400 + signature 相关错误，且复用同账号同 token。"}
+{"file":"/root/project/cc2api/src/service/rewriter.rs","reason":"检查 thinking/redacted_thinking/tool_use/tool_result 转换是否符合 PRD，且不泄露敏感正文到日志。"}
+{"file":"/root/project/cc2api/src/service/telemetry.rs","reason":"检查遥测只记录安全摘要和 retry stage，不保存请求体/响应体全文。"}
+{"file":"/root/project/sub2api/backend/internal/service/antigravity_gateway_service.go","reason":"对照 sub2api 的 Antigravity/Claude 行为，确认 cc2api 迁移的两阶段策略一致。"}
+{"result":"check-all","status":"passed_with_note","summary":"PRD/design/implement 对照通过：/v1/messages + signature 相关 400 才触发两阶段 retry；thinking-only 与 thinking+tools 转换、同账号同 token 重试、两阶段停止条件、失败返回最后上游响应、非 signature 400 和 429 行为均符合任务要求。"}
+{"result":"assumption-validation","status":"passed","summary":"API contract 无前端 API 变化；数据流为 final_body/final_headers 首次上游请求后进入 maybe_retry_signature_error；retry body 变更后会刷新 billing_mode=rewrite 的 cch；日志和遥测只记录阶段、安全摘要和状态，不记录请求/响应全文、thinking、signature 或 token。"}
+{"result":"validation","status":"passed_with_note","summary":"npm --prefix web run build 通过；git diff --check 通过；Dockerfile backend release 构建通过；docker run --rm cc2api-thinking-signature-check cargo test --offline 通过，86 个单测全绿；本机缺 cargo/rustfmt，容器工具链也缺 cargo-fmt，因此 cargo fmt --check 未能执行。"}
+{"result":"sub2api-consistency-final","status":"passed","summary":"已再次对照 /root/project/sub2api/backend/internal/service/antigravity_gateway_service.go：cc2api 与 sub2api Antigravity/Claude 降级逻辑在触发条件、signature/thought_signature/Expected thinking 识别、thinking-only 阶段、thinking+tools 阶段、非 signature 400 停止、两阶段仍失败返回最后响应方面一致。cc2api 额外刷新 billing_mode=rewrite 的 cch 仅用于保持自身 billing header/body hash 一致，不改变降级语义。"}
