@@ -197,14 +197,16 @@ wait_for_sidecar_dns() {
   local probe_host="${DNS_READY_HOST:-example.com}"
   log "Verifying sidecar DNS from worker namespace..."
   for i in $(seq 1 10); do
-    if getent hosts "$probe_host" >/dev/null 2>&1; then
+    # getent 在启动瞬间可能受 NSS/IPv6 查询策略影响;这里用 Node 做 A 记录探测,
+    # 与 Claude Code 的运行时更接近,也避免给 worker 镜像额外安装 dig。
+    if DNS_READY_HOST="$probe_host" node -e "require('dns').resolve4(process.env.DNS_READY_HOST || 'example.com', (err, addresses) => process.exit(!err && addresses && addresses.length ? 0 : 1))" >/dev/null 2>&1; then
       log "Sidecar network ready (DNS ok after ${i}s)"
       return 0
     fi
     sleep 1
   done
   log "WARN: DNS resolver still not ready after worker fallback wait; claude may fail"
-  getent hosts "$probe_host" >/dev/null 2>&1 || log "WARN: unresolved DNS probe host: $probe_host"
+  DNS_READY_HOST="$probe_host" node -e "require('dns').resolve4(process.env.DNS_READY_HOST || 'example.com', (err, addresses) => process.exit(!err && addresses && addresses.length ? 0 : 1))" >/dev/null 2>&1 || log "WARN: unresolved DNS probe host: $probe_host"
   return 1
 }
 

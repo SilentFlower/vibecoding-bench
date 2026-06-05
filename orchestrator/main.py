@@ -54,8 +54,13 @@ HOST_BENCH_DATA = Path(os.environ.get("HOST_BENCH_DATA", str(BENCH_DATA)))
 WORKER_IMAGE = os.environ.get("WORKER_IMAGE", "vibebench-worker:latest")
 SIDECAR_IMAGE = os.environ.get("SIDECAR_IMAGE", "vibebench-sidecar:latest")
 PER_ACCOUNT_CONCURRENCY = int(os.environ.get("PER_ACCOUNT_CONCURRENCY", "2"))
-SIDECAR_READY_TIMEOUT = float(os.environ.get("SIDECAR_READY_TIMEOUT", "60"))
+SIDECAR_READY_TIMEOUT = float(os.environ.get("SIDECAR_READY_TIMEOUT", "120"))
 DNS_READY_HOST = os.environ.get("DNS_READY_HOST", "example.com")
+_SIDECAR_DNS_READY_SH = (
+    "grep -q '^nameserver 127[.]0[.]0[.]1' /etc/resolv.conf "
+    "&& dig @127.0.0.1 \"$DNS_READY_HOST\" A +time=3 +tries=1 +short "
+    "2>/dev/null | grep -q ."
+)
 WORKER_USER = "node"
 WORKER_HOME = "/home/node"
 WORKER_UID = 1000
@@ -772,8 +777,7 @@ def _wait_sidecar_ready(client: "docker.DockerClient", sidecar_id: str) -> None:
                     "-lc",
                     (
                         "if [ -f /tmp/sidecar-ready ]; then exit 0; fi; "
-                        "if grep -q '^nameserver 127[.]0[.]0[.]1' /etc/resolv.conf "
-                        "&& getent hosts \"$DNS_READY_HOST\" >/dev/null 2>&1; then exit 0; fi; "
+                        f"if {_SIDECAR_DNS_READY_SH}; then exit 0; fi; "
                         "tail -30 /var/log/unbound.log 2>/dev/null || true; "
                         "tail -30 /var/log/mitmdump.log 2>/dev/null || true; "
                         "exit 1"
@@ -795,7 +799,6 @@ def _wait_sidecar_ready(client: "docker.DockerClient", sidecar_id: str) -> None:
         f"sidecar network/DNS not ready after {int(SIDECAR_READY_TIMEOUT)}s: "
         f"{last_output[-1000:]}"
     )
-
 
 # ============== Docker 运行器 ==============
 class Runner:
@@ -1179,7 +1182,7 @@ fi
 DNS_READY_HOST="${DNS_READY_HOST:-example.com}"
 for i in $(seq 1 45); do
   if grep -q '^nameserver 127[.]0[.]0[.]1' /etc/resolv.conf \
-    && getent hosts "$DNS_READY_HOST" >/dev/null 2>&1; then
+    && DNS_READY_HOST="$DNS_READY_HOST" node -e "require('dns').resolve4(process.env.DNS_READY_HOST || 'example.com', (err, addresses) => process.exit(!err && addresses && addresses.length ? 0 : 1))" >/dev/null 2>&1; then
     break
   fi
   sleep 1
@@ -1400,7 +1403,7 @@ fi
 DNS_READY_HOST="${DNS_READY_HOST:-example.com}"
 for i in $(seq 1 45); do
   if grep -q '^nameserver 127[.]0[.]0[.]1' /etc/resolv.conf \
-    && getent hosts "$DNS_READY_HOST" >/dev/null 2>&1; then
+    && DNS_READY_HOST="$DNS_READY_HOST" node -e "require('dns').resolve4(process.env.DNS_READY_HOST || 'example.com', (err, addresses) => process.exit(!err && addresses && addresses.length ? 0 : 1))" >/dev/null 2>&1; then
     break
   fi
   sleep 1

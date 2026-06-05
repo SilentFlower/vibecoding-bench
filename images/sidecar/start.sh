@@ -209,7 +209,9 @@ echo "nameserver 127.0.0.1" > /etc/resolv.conf
 # 访问任意网页时仍走同一个 127.0.0.1:53 → unbound → tun → SOCKS5 出口。
 DNS_READY_HOST="${DNS_READY_HOST:-example.com}"
 for i in $(seq 1 45); do
-  if getent hosts "$DNS_READY_HOST" >/dev/null 2>&1; then
+  # getent 会同时受 glibc/NSS、IPv6 排序和缓存状态影响;ready 阶段只需要证明
+  # unbound 能经当前出口拿到通用 A 记录,所以直接查询本地 resolver 更稳。
+  if dig @127.0.0.1 "$DNS_READY_HOST" A +time=3 +tries=1 +short 2>/dev/null | grep -q .; then
     touch /tmp/sidecar-ready
     log "Sidecar DNS ready via generic resolver ($DNS_READY_HOST, after ${i}s)"
     break
