@@ -430,3 +430,36 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: cc2api 全局 UA 与版本访问策略
+
+**Date**: 2026-06-05
+**Task**: cc2api 全局 UA 与版本访问策略
+**Branch**: `main`
+
+### Summary
+
+完成 cc2api 客户端访问策略：限制 Claude Code/CLI 版本范围为 2.1.89-2.1.156，允许 AI-Hub-Monitor* 和 python-httpx* UA，新增后台设置热刷新、前端配置入口、README 说明和测试验证。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `38c3231` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
