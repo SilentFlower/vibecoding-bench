@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/06-08-cc2api-api-mode-claude-code-alignment/research/sub2api-api-mimicry.md", "reason": "实现时参考 sub2api 的 OAuth mimicry、billing/cch、message cache 和 TTL 行为。"}
+{"file": ".trellis/tasks/06-08-cc2api-api-mode-claude-code-alignment/research/cc2api-current-state.md", "reason": "实现前确认 cc2api 当前 API/ClaudeCode 模式差异、CCH 顺序和风险点。"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "本任务会新增/复用多个 helper，需先搜索复用现有 CCH、metadata、cache rewrite 逻辑。"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "本任务跨请求体、请求头、gateway 发送前 final body 和响应 usage/cache 行为，需要检查跨层一致性。"}

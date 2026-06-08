@@ -1,0 +1,56 @@
+{
+  "id": "cc2api-api-mode-claude-code-alignment",
+  "name": "cc2api-api-mode-claude-code-alignment",
+  "title": "cc2api API 模式对齐 Claude Code 请求画像",
+  "description": "参考 sub2api 的 Claude Code OAuth mimicry 链路，补齐 cc2api API 模式的 system、billing/cch、metadata/session、headers 和 message cache 断点行为。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": "cc2api-api-mode",
+  "package": "cc2api",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-06-08",
+  "completedAt": null,
+  "branch": "v2",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "/root/project/cc2api/src/service/rewriter.rs",
+    "/root/project/cc2api/src/service/gateway.rs",
+    "/root/project/cc2api/src/service/version_profile.rs",
+    "/root/project/cc2api/src/model/identity.rs",
+    "/root/project/sub2api/backend/internal/service/gateway_service.go",
+    "/root/project/sub2api/backend/internal/service/gateway_billing_block.go",
+    "/root/project/sub2api/backend/internal/service/gateway_billing_header.go",
+    "/root/project/sub2api/backend/internal/service/gateway_messages_cache.go"
+  ],
+  "notes": "规划已补齐 PRD/design/implement。开始实现前需 task.py start，并按 trellis-route 选择实现方式。",
+  "last_push_snapshot": {
+    "snapshot_at": "2026-06-08T11:19:53+08:00",
+    "branch": {
+      "cc2api": "main"
+    },
+    "pushed_commits": {
+      "cc2api": "2d4ce4f"
+    },
+    "completed_steps": [
+      "补齐 API mimicry system 常量和 billing block 构造函数",
+      "复用或调整 CCH 计算，让 API 模式最终 body 后签名",
+      "修改 API 模式 /v1/messages 改写链路",
+      "处理 API 模式 _session_id 清理与 CCH 顺序",
+      "让 API 模式按设置进入 message cache 断点修复",
+      "检查 header 生成与 session 对齐",
+      "增加单元测试覆盖 API mimicry、CCH、tools、message cache 和 Claude Code 回归"
+    ],
+    "partial_step": null,
+    "next_step": "trellis-finish-work",
+    "notes": "cc2api 已提交并推送；rustfmt、cargo test rewriter、cargo test gateway、cargo test 全量通过。"
+  },
+  "meta": {}
+}

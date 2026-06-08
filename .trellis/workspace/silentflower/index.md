@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 13
-- **Last Active**: 2026-06-05
+- **Total Sessions**: 17
+- **Last Active**: 2026-06-08
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~465 | Active |
+| `journal-1.md` | ~599 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,10 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 17 | 2026-06-08 | cc2api stateful 缓存锚点收尾 | `ed77cd3`, `4400743` | `main` |
+| 16 | 2026-06-07 | 完成 cc2api Anthropic 缓存改写 | `5d9d217`, `53287e7` | `main` |
+| 15 | 2026-06-05 | cc2api API 模式 max_tokens 对齐 | `18523e2` | `main` |
+| 14 | 2026-06-05 | cc2api 本地拒绝错误体兼容 new-api | `1144ef7` | `main` |
 | 13 | 2026-06-05 | cc2api 全局 UA 与版本访问策略 | `38c3231` | `main` |
 | 12 | 2026-06-05 | cc2api thinking signature retry | `b815e3f`, `80d17a0` | `main` |
 | 11 | 2026-06-05 | 完成 cc2api system role guard | `f72b7ff`, `32f820f` | `main` |

@@ -1,0 +1,3 @@
+{"file": ".trellis/tasks/06-08-cc2api-api-mode-claude-code-alignment/research/sub2api-api-mimicry.md", "reason": "检查实现是否覆盖 sub2api 参考链路中的关键行为，不只补短 prompt。"}
+{"file": ".trellis/tasks/06-08-cc2api-api-mode-claude-code-alignment/research/cc2api-current-state.md", "reason": "检查实现是否保留 Claude Code 模式现有 CCH 顺序，并修正 API 模式缺口。"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "检查 final body、headers、metadata session、CCH 签名和 cache usage 是否跨层一致。"}

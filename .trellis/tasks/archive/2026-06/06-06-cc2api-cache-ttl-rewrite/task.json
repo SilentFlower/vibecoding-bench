@@ -1,0 +1,33 @@
+{
+  "id": "cc2api-cache-ttl-rewrite",
+  "name": "cc2api-cache-ttl-rewrite",
+  "title": "cc2api 增加 Anthropic cache_control TTL 改写设置",
+  "description": "在 cc2api 系统设置中增加 Anthropic cache_control TTL 改写选项,支持 off/5m/1h,仅改已有 ephemeral cache_control,不新增缓存断点。",
+  "status": "completed",
+  "dev_type": "feature",
+  "scope": "backend+frontend",
+  "package": "cc2api",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-06-06",
+  "completedAt": "2026-06-07",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "/root/project/cc2api/src/store/settings_store.rs",
+    "/root/project/cc2api/src/store/db.rs",
+    "/root/project/cc2api/src/handler/router.rs",
+    "/root/project/cc2api/src/service/gateway.rs",
+    "/root/project/cc2api/src/service/rewriter.rs",
+    "/root/project/cc2api/web/src/components/Settings.vue"
+  ],
+  "notes": "sub2api 的 TTL 改写逻辑不新增缓存断点;本任务只仿照该部分,不仿照 tools/messages 自动注入 cache_control 的逻辑。",
+  "meta": {}
+}

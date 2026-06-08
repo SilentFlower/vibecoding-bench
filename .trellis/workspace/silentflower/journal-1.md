@@ -463,3 +463,137 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: cc2api 本地拒绝错误体兼容 new-api
+
+**Date**: 2026-06-05
+**Task**: cc2api 本地拒绝错误体兼容 new-api
+**Branch**: `main`
+
+### Summary
+
+完成 cc2api 本地自定义拒绝响应兼容：访问策略 403 与 system role 400 均改为 Anthropic/OpenAI 可解析的 error 对象，保留诊断字段，不改上游透传和 account busy / 429 行为。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1144ef7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 15: cc2api API 模式 max_tokens 对齐
+
+**Date**: 2026-06-05
+**Task**: cc2api API 模式 max_tokens 对齐
+**Branch**: `main`
+
+### Summary
+
+对齐 cc2api API 模式 /v1/messages max_tokens：缺省 Opus 4.8 使用 64000，其他默认 32000，保留 <=64000 的显式值并限制超大值；补充 rewriter 回归测试并通过 Rust 测试。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `18523e2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 16: 完成 cc2api Anthropic 缓存改写
+
+**Date**: 2026-06-07
+**Task**: 完成 cc2api Anthropic 缓存改写
+**Branch**: `main`
+
+### Summary
+
+cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳定化设置；验证 cargo test、npm run build、git diff --check；已推送 v2 并 merge 到 main。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5d9d217` | (see git log) |
+| `53287e7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 17: cc2api stateful 缓存锚点收尾
+
+**Date**: 2026-06-08
+**Task**: cc2api stateful 缓存锚点收尾
+**Branch**: `main`
+
+### Summary
+
+完成 cc2api stateful 缓存锚点防污染收尾：旁路解析压缩 usage，收紧冷启动小请求主线提交，并修复随机 CCH suffix flaky；已通过 cargo test、message_cache_control 相关测试、web build 和 diff check。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ed77cd3` | (see git log) |
+| `4400743` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
