@@ -1,0 +1,5 @@
+{"file": ".trellis/tasks/06-08-cc2api-account-rpm-sticky-protection/prd.md", "reason": "实现前确认账号级 RPM、粘性会话不切号和前端展示的验收边界。"}
+{"file": ".trellis/tasks/06-08-cc2api-account-rpm-sticky-protection/design.md", "reason": "实现前确认调度位置、计数维度、粘性约束、管理端 API/UI 和日志契约。"}
+{"file": ".trellis/tasks/06-08-cc2api-account-rpm-sticky-protection/implement.md", "reason": "执行任务的分步清单和验证命令。"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "本任务会改账号调度、store、cache、前端账号页，需要先复用现有模型、API 和 UI 结构。"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "本任务跨后端调度、缓存、数据库、API DTO 和 Vue 展示，需要检查跨层一致性。"}

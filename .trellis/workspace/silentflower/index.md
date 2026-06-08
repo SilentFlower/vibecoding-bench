@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 17
+- **Total Sessions**: 19
 - **Last Active**: 2026-06-08
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~599 | Active |
+| `journal-1.md` | ~665 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,8 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 19 | 2026-06-08 | cc2api 账号级 RPM 粘性保护 | `4748a1a` | `main` |
+| 18 | 2026-06-08 | cc2api 缓存诊断与 API 模式对齐收尾 | `5ecb6ce` | `main` |
 | 17 | 2026-06-08 | cc2api stateful 缓存锚点收尾 | `ed77cd3`, `4400743` | `main` |
 | 16 | 2026-06-07 | 完成 cc2api Anthropic 缓存改写 | `5d9d217`, `53287e7` | `main` |
 | 15 | 2026-06-05 | cc2api API 模式 max_tokens 对齐 | `18523e2` | `main` |

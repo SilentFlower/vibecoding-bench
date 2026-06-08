@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/06-08-cc2api-account-rpm-sticky-protection/prd.md", "reason": "检查实现是否满足所有验收项，尤其是粘性会话不因 RPM 切号。"}
+{"file": ".trellis/tasks/06-08-cc2api-account-rpm-sticky-protection/design.md", "reason": "检查 RPM 计数维度、admission 位置、前端状态字段和日志格式是否符合设计。"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "检查 DB 字段、Rust 模型、API 返回和 Vue 展示是否全链路一致。"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "检查是否复用现有账号选择、缓存、score info 和账号页面模式，避免重复实现。"}

@@ -597,3 +597,69 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 18: cc2api 缓存诊断与 API 模式对齐收尾
+
+**Date**: 2026-06-08
+**Task**: cc2api 缓存诊断与 API 模式对齐收尾
+**Branch**: `main`
+
+### Summary
+
+修正 metadata.user_id 诊断状态，区分 strict 有效与 session 可用；完成 cc2api API 模式对齐任务的提交、推送和 23 服务器 latest 部署验证。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5ecb6ce` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 19: cc2api 账号级 RPM 粘性保护
+
+**Date**: 2026-06-08
+**Task**: cc2api 账号级 RPM 粘性保护
+**Branch**: `main`
+
+### Summary
+
+为 cc2api 增加账号级 RPM 限制、管理端展示和 Claude Code 粘性会话保护；非粘性请求超限换号，粘性请求超限等待或本地 429，避免因 RPM 切号破坏缓存。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4748a1a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
