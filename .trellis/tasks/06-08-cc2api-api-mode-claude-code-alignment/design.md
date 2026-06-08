@@ -27,7 +27,9 @@ API 模式需要额外处理一个现有差异：gateway 层会从改写后的 b
 
 无论采用哪种做法，测试必须验证签名输入就是最终上游 body。
 
-message cache 断点策略应复用现有 cc2api 逻辑，避免另起一套不可控模式。API 模式不应再在 `rewrite_message_cache_control` 入口直接返回；应允许 API mimicry 请求进入配置的 auto/rolling/stateful 策略，或拆出可复用的 message cache selection 函数。
+message cache 断点策略对 API 模式单独处理：API 模式只要全局设置不是 `off`，统一使用 sub2api 风格的稳定断点算法，即清理 `messages` 内已有断点后，只给最后一条 message 和倒数第二个 `role=user` message 的最后可缓存 block 打断点。这个算法避免复用 Claude Code 并行 tool 专用的 rolling/lookback 选择器，减少 API 长历史里断点位置持续漂移。
+
+全局设置额外提供 `sub2api` 模式，允许真实 Claude Code 客户端显式切到同一算法做线上对照。该模式只接管 `messages` 断点，不主动清理 system/tools 断点；`auto` / `rolling` / `stateful` 的 Claude Code 专用逻辑保持不变。
 
 headers 应继续由 `rewrite_headers` 统一产出。API 模式应尽量使用 Claude Code 画像的固定 header 集合与顺序，且 `X-Claude-Code-Session-Id` 与 body `metadata.user_id.session_id` 对齐。
 
@@ -42,7 +44,7 @@ headers 应继续由 `rewrite_headers` 统一产出。API 模式应尽量使用 
 
 - 不把真实 Claude Code 抓包中的项目级编码规范 prompt 默认注入 API 模式。
 - 不改变真实 Claude Code 客户端模式的 system prompt 内容来源。
-- 不新增与 auto/rolling/stateful 平行的缓存模式；优先复用现有设置语义。
+- 不让 API 模式复用 Claude Code 并行 tool 专用的 rolling/lookback/stateful 选择器。
 
 ## Rollout / Rollback
 
