@@ -133,7 +133,7 @@ task 运行期间必须单向同步 credentials:从 `/mnt/profile/.credentials.j
 
 上游 SOCKS5 服务器地址可以填域名。这个域名是建立代理链路之前的 bootstrap 解析,只能用 sidecar 启动时的默认 DNS 解析成 IP 后再连接代理;它和 Claude/API/WebFetch 访问的业务目标域名不是一类问题。不要为了阻断业务 DNS 泄漏而禁止 SOCKS5 域名。
 
-worker 镜像里的 Claude Code CLI 版本、worker 运行时 `CLAUDE_CODE_VERSION`、OAuth usage 请求的 `User-Agent` 必须保持一致。当前固定为 `2.1.156`;升级时要同时改 Dockerfile 默认版本、orchestrator 注入的默认环境变量和 usage 请求头,不能让 runner 实际版本与 usage API UA 脱节。OAuth refresh 请求不要带 `User-Agent`:实测带 `claude-code/<version>` 会触发 token endpoint 429;refresh 仍必须在 worker→sidecar→账号 SOCKS5 链路内完成。
+worker 镜像里的 Claude Code CLI 版本、worker 运行时 `CLAUDE_CODE_VERSION`、OAuth usage 请求的 `User-Agent` 必须保持一致。当前固定为 `2.1.169`;升级时要同时改 Dockerfile 默认版本、orchestrator 注入的默认环境变量和 usage 请求头,不能让 runner 实际版本与 usage API UA 脱节。OAuth refresh 请求不要带 `User-Agent`:实测带 `claude-code/<version>` 会触发 token endpoint 429;refresh 仍必须在 worker→sidecar→账号 SOCKS5 链路内完成。
 
 worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 prompt；只能等待 JSONL 变化,直到完成、Claude 退出或 `TIMEOUT_SEC` 到期。
 
