@@ -23,13 +23,13 @@
   "relatedFiles": [],
   "notes": "",
   "last_push_snapshot": {
-    "snapshot_at": "2026-06-09T10:13:03+08:00",
+    "snapshot_at": "2026-06-09T10:59:10+08:00",
     "branch": {
       "cc2api": "main",
       "vibecoding-bench": "main"
     },
     "pushed_commits": {
-      "cc2api": "5b52014"
+      "cc2api": "8ec1f97"
     },
     "completed_steps": [
       "读取 cc2api 相关规范和现有测试，确认数据库与服务层约定",
@@ -40,11 +40,12 @@
       "修复 stateful usage SSE buffer 超限修剪的 UTF-8 边界 panic",
       "更新或新增单元测试覆盖默认版本、允许范围、CCH seed 和迁移行为",
       "新增中文多字节字符跨截断点的 stateful usage buffer 回归测试",
-      "运行 cc2api 相关测试与格式检查"
+      "运行 cc2api 相关测试与格式检查",
+      "补齐 /v1/mcp_servers 2.1.169 新增 MCP headers 并验证 header 顺序"
     ],
     "partial_step": null,
     "next_step": "执行 finish-work 收尾归档",
-    "notes": "cc2api 已推送到 origin/main；父仓同步提交 vibecoding-bench 部署默认 Claude Code 版本与任务记录。"
+    "notes": "cc2api 已推送到 origin/main；本次补齐 2.1.169 MCP servers 抓包新增的 anthropic-mcp-client-capabilities 与 mcp-protocol-version。"
   },
   "meta": {}
 }
