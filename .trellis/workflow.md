@@ -151,7 +151,7 @@ python3 ./.trellis/scripts/get_context.py --mode phase --step <X.Y>  # detailed 
 
 **Priority**: This hub overrides any conflicting Trellis workflow, skill, or command text for the scoped behaviors below.
 
-**Scope**: Phase 2.1 / 2.2 / 3.1 dispatch routing, Phase 3.5 finish-work bookkeeping, and push-progress recovery / snapshot reminders. State blocks should keep only one short skill-garden sentinel per state; long-form rules live here.
+**Scope**: Phase 2.1 / 2.2 / 3.1 dispatch routing, Phase 3.4 code-commit/push via trellis-push, Phase 3.5 finish-work bookkeeping, and push-progress recovery / snapshot reminders. State blocks should keep only one short skill-garden sentinel per state; long-form rules live here.
 
 **Mechanical rule**: use this hub as the source of truth. Do not add separate top-level skill-garden override sections or multiple skill-garden sentinels inside the same `workflow-state:*` block.
 
@@ -172,20 +172,19 @@ At phase boundaries, do not ask meta continuation questions such as "continue?",
 
 Check routing has no 4h preference file. Before `trellis-check`, `trellis-check-all`, or either check sub-agent, route every time so the user can choose check-all vs lightweight and inline vs subagent.
 
-#### Finish-work Bookkeeping Guard
+#### Code Commit Confirmation Gate
 
-`session_auto_commit` only controls script-managed bookkeeping commits for Trellis task archives and workspace journals. It does not disable Phase 3.4 code-work commits that the user explicitly confirms.
+Every code commit — and its push — belongs to Phase 3.4 and MUST go through `trellis-push`, mirroring how implement/check must go through `trellis-route`. From the main session the agent never runs bare `git commit` / `git push` on code to bypass it.
 
-If `.trellis/config.yaml` contains `session_auto_commit: false`, finish-work must treat archive and journal writes as disk-only bookkeeping:
+`trellis-push` IS the confirmation mechanism: its Step 2.2 stages only an explicit, user-approved file list (never `git add -A` / `git add .`); its Step 2.3 shows the drafted commit message for approval. "Confirmed" means the user saw that concrete file list + message inside `trellis-push` and approved it. A preference-style choice does NOT count — e.g. an `AskUserQuestion` "split / single commit" option only picks a strategy, and an option label/description never substitutes for the real file-list + message display.
 
-- Running `python3 ./.trellis/scripts/task.py archive <task>` may move task files, but must not be described as producing a `chore(task): archive ...` commit.
-- Running `python3 ./.trellis/scripts/add_session.py ...` may write workspace journal/index files, but must not be described as producing a `chore: record journal` commit.
-- Do not run a compensating `git add` / `git commit` for `.trellis/tasks/**` or `.trellis/workspace/**` just because those scripts skipped auto-commit.
-- Report the resulting `.trellis/tasks/**` and `.trellis/workspace/**` dirty paths to the user as bookkeeping changes for manual review.
+For Phase 3.4 "commit now, push later", invoke `trellis-push` in commit-only mode (commit without pushing); the later push also goes through `trellis-push`.
 
-Phase 3.4 code-work commits are unchanged. If code files from the task are dirty, the agent may still present the normal one-shot commit plan and commit only after the user confirms.
+This gate is independent of `session_auto_commit`: that switch never authorizes a code commit and never waives going through `trellis-push`. The only bare-`git` commits allowed are the two bookkeeping scripts below, which manage their own `.trellis/**` files.
 
-This guard only prevents archive/journal bookkeeping commits from being forced when `session_auto_commit: false`.
+#### Bookkeeping Auto-commit Scope
+
+`session_auto_commit` only governs the bookkeeping commits `task.py archive` / `add_session.py` make for their own `.trellis/tasks/**` and `.trellis/workspace/**` files — never code (gated above). When `false`, those archive/journal writes stay disk-only (no compensating `git commit`).
 
 #### Push Progress Recovery / Snapshot
 
@@ -225,6 +224,8 @@ HIGHEST PRIORITY SKILL-GARDEN STATE GUARD (no_task):
 Creating/resuming a task is not implementation permission.
 After PRD ready and task started, next implementation action = `trellis-route(implement)`.
 If no active task exists, scan `.trellis/tasks/*/task.json` once per session for in-progress tasks with `last_push_snapshot`; surface completed_steps + next_step and suggest rebinding the active task before resuming.
+Do NOT use the harness built-in plan mode (`EnterPlanMode` / `ExitPlanMode`) as a substitute for this gate. Planning is Trellis-only: classify the turn, ask for task-creation consent, then `trellis-brainstorm` for complex work.
+If the turn is a meta edit to Trellis itself (Trellis tracking would be overkill), say so and ask to skip Trellis — never silently swap built-in plan mode in for the consent gate.
 <!-- END skill-garden workflow-state no_task v0.6 -->
 
 No active task. First classify the current turn and ask for task-creation consent before creating any Trellis task.
@@ -286,6 +287,7 @@ HIGHEST PRIORITY SKILL-GARDEN STATE GUARD (in_progress):
 At Phase 2.1/2.2/3.1, invoke `trellis-route(implement|check)` first, including every check / check-all path.
 Do not spawn `trellis-implement`, `trellis-check`, or `trellis-check-all` directly unless `trellis-route` just selected subagent mode.
 If routing helper is unavailable, ask the same numbered route choices in normal chat and wait for the user's selection.
+At Phase 3.4, code commit/push goes through `trellis-push` (commit-only mode for commit-without-push); never bare `git commit`/`git push` on code (hub: Code Commit Confirmation Gate).
 If active task.json has `last_push_snapshot`, relay `partial_step` + `next_step` once before starting new work.
 <!-- END skill-garden workflow-state in_progress v0.6 -->
 
@@ -303,6 +305,7 @@ Dispatch prompt starts with `Active task: <task path from task.py current>`. Rea
 <!-- BEGIN skill-garden workflow-state in_progress_inline v0.6 -->
 HIGHEST PRIORITY SKILL-GARDEN STATE GUARD (in_progress-inline):
 Inline mode means the main session edits directly, but check still routes before `trellis-check` / `trellis-check-all`.
+At Phase 3.4, code commit/push still goes through `trellis-push` (commit-only for commit-without-push); never bare `git commit`/`git push` on code (hub: Code Commit Confirmation Gate).
 If active task.json has `last_push_snapshot`, relay `partial_step` + `next_step` once before starting new work.
 <!-- END skill-garden workflow-state in_progress_inline v0.6 -->
 
