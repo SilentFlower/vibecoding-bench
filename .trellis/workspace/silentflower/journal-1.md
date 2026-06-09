@@ -663,3 +663,36 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 20: cc2api Claude Code 2.1.169 升级收尾
+
+**Date**: 2026-06-09
+**Task**: cc2api Claude Code 2.1.169 升级收尾
+**Branch**: `main`
+
+### Summary
+
+完成 cc2api Claude Code 2.1.169 升级收尾，补齐 /v1/mcp_servers 169 抓包新增 MCP headers，验证 cargo test --lib、格式检查和 header 顺序，并归档任务。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8ec1f97` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
