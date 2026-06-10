@@ -1,0 +1,45 @@
+{
+  "id": "cc2api-prefill-429-observability",
+  "name": "cc2api-prefill-429-observability",
+  "title": "cc2api assistant prefill 拦截与 429 请求观测",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-06-10",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "last_push_snapshot": {
+    "snapshot_at": "2026-06-10T18:13:25+08:00",
+    "branch": "main",
+    "pushed_commits": {
+      "cc2api": "cf71247"
+    },
+    "completed_steps": [
+      "读取 Trellis 后端/前端/共享规范和 cc2api 现有模式。",
+      "在 settings_store/db/router/main/gateway 增加 assistant prefill 拦截配置。",
+      "在 gateway 增加 prefill 检测、模型匹配和本地 400 响应。",
+      "在 settings_store/db/router/main/gateway 增加 429 请求观测配置。",
+      "在 gateway 429 分支增加脱敏、截断后的请求抓取日志。",
+      "在 Settings.vue 增加新配置 UI、加载、保存和输入校验。",
+      "增加 Rust 单测覆盖检测、匹配、脱敏、截断。",
+      "运行格式化、测试、前端构建和 diff 检查。"
+    ],
+    "next_step": "等待用户决定是否部署/归档",
+    "notes": "cc2api commit cf71247 已推送 origin/main；check-all 已通过。"
+  }
+}
