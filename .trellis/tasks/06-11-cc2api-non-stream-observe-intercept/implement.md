@@ -1,17 +1,19 @@
-# cc2api 非流请求观测与拦截实施计划
+# cc2api Auto Mode classifier 实施计划
 
 ## Implementation Checklist
 
-- [ ] 先提交/处理 Settings 页 `step=1` 小修，避免与本任务核心 diff 混淆。
-- [ ] 扩展 settings 默认值、DB migration、router GET/PUT 校验和热刷新。
-- [ ] 扩展 `WarmupInterceptConfig` / `WarmupInterceptType`，新增非流辅助请求检测规则。
-- [ ] 实现非流辅助请求 mock_text / error 两种响应模式。
-- [ ] 为 `/v1/messages` 上游非 429 错误响应补充透传诊断日志；如确认响应头/body 不一致导致 newapi 显示 500，则重建错误响应时移除 `content-length`、`content-encoding`、`transfer-encoding`，保持原 status 和 body。
-- [ ] 在 `forward_to_upstream` 中为开启日志的非流 `/v1/messages` 缓冲响应、记录响应摘要后重建响应。
-- [ ] 更新 Settings.vue：预热请求拦截卡片新增非流辅助请求开关和响应模式。
-- [ ] 添加/更新 Rust 单测：检测规则、响应模式、响应日志脱敏和截断、非 429 错误响应头清理/透传。
-- [ ] 添加/更新前端类型和保存逻辑。
-- [ ] 执行验证命令。
+- [x] 新增 settings 默认值、DB migration、router GET/PUT 校验和热刷新。
+- [x] 移除旧 `intercept_warmup_non_stream_aux_*` 配置读写、展示和历史 settings 行。
+- [x] 扩展 `WarmupInterceptConfig` / `WarmupInterceptType`，增加 Stage 1 / Stage 2 classifier 模式。
+- [x] 实现 Stage 1 / Stage 2 强特征检测。
+- [x] 实现 `passthrough` / `mock_allow` / `mock_block` / `error` 四种模式。
+- [x] 更新命中日志，区分 stage 和 action，不输出 prompt。
+- [x] 更新 Settings.vue：预热请求拦截区域增加 Stage 1 / Stage 2 模式选择。
+- [x] 添加 Rust 单测：Stage 1、Stage 2、非 classifier 8192/64000 不误拦、mock allow/block/error、旧 settings 清理。
+- [x] 新增流式稳定性 settings、热刷新、Settings.vue 配置入口。
+- [x] 实现首包后 SSE comment keep-alive，降低 `64000` non-stream fallback 触发概率，不影响首字时间。
+- [x] 添加 Rust 单测：首包前不注入、开启后静默注入、关闭时不注入。
+- [x] 执行验证命令。
 
 ## Validation
 
@@ -19,10 +21,11 @@
 - `cargo test`
 - `npm run build` in `/root/project/cc2api/web`
 - `git diff --check`
-- 手动验证 Settings 保存和远程日志行为。
 
 ## Review Gates
 
-- 默认拦截响应模式已确认：HTTP 200 固定 assistant 文本。
+- 默认模式必须是 `passthrough`。
+- mock allow 必须返回 `<block>no</block>`。
+- 本轮不得新增 `64000` fallback 拦截或 cache replay。
+- 流式 keep-alive 默认关闭，且必须只插入 SSE comment，不伪造 `data` 业务事件。
 - 提交前运行 `trellis-check-all`。
-- 部署前确认新拦截默认关闭，不会误伤现有流量。

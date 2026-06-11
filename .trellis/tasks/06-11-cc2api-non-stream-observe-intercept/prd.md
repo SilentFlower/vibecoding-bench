@@ -1,76 +1,74 @@
-# cc2api 非流请求观测与拦截
+# cc2api Auto Mode classifier 观测与拦截
 
 ## Goal
 
-在 `/root/project/cc2api` 中增强 429 请求观测里的非流 `/v1/messages` 可观测性，并把已经确认的 Claude Code 非流辅助轮询请求纳入“预热请求拦截”体系，减少这类短输出、大上下文请求对上游 token、连接和账号并发的消耗。
+在 `/root/project/cc2api` 中保留非流 `/v1/messages` 响应观测能力，并先针对 Claude Code Auto Mode classifier 的 Stage 1 / Stage 2 side-query 做强特征识别与可控本地 mock，减少已确认的 classifier 请求对上游 token、连接和账号并发的消耗。
 
 ## Background / Known Context
 
-- 当前 429 请求观测已有两个开关：`log_429_request_enabled` 和 `log_non_stream_request_enabled`，并共用 `log_429_request_body_limit` 作为请求体日志字符上限。
-- 当前非流请求日志只在上游转发前打印最终上游请求头和请求体，不打印上游返回内容。
-- 远程观测到的 `non_stream_request_capture` 主体特征：`/v1/messages`、`stream=false`、多数 `max_tokens=64`、`X-Stainless-Retry-Count=0`、`claude-cli/2.1.172`、多数带 `context-1m-2025-08-07`，请求体约 `57KB..183KB`，多个 Claude Code session 反复出现。
-- 最新 3 小时样本中，非流请求并非全部 `max_tokens=64`：53 条里 `64` 为 51 条，另有 `64000` 和 `8192` 各 1 条；初始拦截只覆盖 `max_tokens=64` 的高置信辅助轮询子类，其它非流请求先观测不拦截。
-- 最新 3 小时样本中的 400 均为上游 `/v1/messages` 返回的 `prompt is too long: ... > 1000000 maximum`，集中在 account 14；newapi 侧实际展示成 500，但 429（例如 `status_code=429, too many requests: sticky account rpm limit reached`）能正常显示，说明问题更可能在非 429 上游错误的透传链路、响应头或外层包装，而不是 newapi 无法处理所有错误格式。
-- 这类请求不像主回答流式请求，更像 Claude Code 的短输出辅助请求/状态分析/小结类轮询。
-- 现有“预热请求拦截”已支持标题/Warmup、Suggestion Mode、Haiku 探测，命中后本地返回 mock 响应，不转发上游。
-- Settings 页目前已有“预热请求拦截”和“429 请求观测”卡片，适合新增相关配置入口。
-- 相关前置小修：请求体字符上限输入应允许填 `64000` 这类任意合法整数，前端 `step=1024` 与后端校验不一致。
+- 当前 429 请求观测已有 `log_429_request_enabled`、`log_non_stream_request_enabled` 和共用的 `log_429_request_body_limit`。
+- 已实现的非流响应缓冲日志会在重建下游响应前解码 gzip/br/zstd/deflate，并移除旧 `Content-Encoding`、`Content-Length`、`Transfer-Encoding`，避免已缓冲明文 body 仍带压缩头导致下游展示异常。
+- `/root/project/claude-code/src/utils/permissions/yoloClassifier.ts` 显示 Auto Mode XML classifier 是两阶段 side-query：
+  - Stage 1：`max_tokens=64 + thinkingPadding`，追加 `XML_S1_SUFFIX`，默认带 `stop_sequences=["</block>"]`。
+  - Stage 2：`max_tokens=4096 + thinkingPadding`，追加 `XML_S2_SUFFIX`，无 `stop_sequences`。
+  - 两阶段都走 `sideQuery()`，`temperature=0`，`skipSystemPromptPrefix=true`，user content 包 `<transcript>...</transcript>`。
+  - allow 语义是 `<block>no</block>`；block 语义是 `<block>yes</block>`。
+- 远程日志中 `max_tokens=64` 高频非流大 transcript 请求与 Stage 1 classifier 高度吻合。
+- 远程日志中的 `8192` 不能只按数字归类；必须叠加 Stage 2 suffix、XML output format、transcript 结构等强特征。
+- `max_tokens=64000` 结合 Claude Code `MAX_NON_STREAMING_TOKENS=64000`，更像 streaming watchdog / streaming failure 后的 non-streaming fallback，本轮不拦截。
+- 这类 `64000` fallback 的优化方向是稳定流式连接，避免 Claude Code 字节级 watchdog 因长时间无新字节而触发 fallback；本轮通过可配置 SSE comment keep-alive 做低风险缓解。
 
 ## Requirements
 
-- 非流 `/v1/messages` 观测在开启 `log_non_stream_request_enabled` 时，除请求头和请求体外，还要记录上游返回的输出内容摘要。
-- 非流返回日志必须脱敏并截断，不能输出 Authorization、Cookie、token、password、secret 等敏感内容。
-- 非流返回日志的截断上限优先复用现有“请求体字符上限”，避免新增过多相近配置。
-- 非流返回日志必须只作用于非流 `/v1/messages`，不改变流式响应语义。
-- 新增一类“非流辅助请求”拦截，归入预热请求拦截设置区域。
-- 非流辅助请求拦截必须默认关闭，避免升级后改变现有转发行为。
-- 非流辅助请求命中特征至少覆盖当前高置信形态：Claude Code 客户端、`/v1/messages`、`stream=false`、`max_tokens=64`、较大请求体/多 text block、非 Haiku 探测、非标题、非 Suggestion Mode。
-- 非流辅助请求初始拦截不得把 `model` 固定为 Opus 系列；模型只做日志字段或可选配置项，避免未来 Fable / 其它 Claude Code 模型漏判。
-- 命中拦截时不进入上游转发，避免消耗上游请求、账号并发和 token。
-- 拦截响应模式可配置，至少支持“返回固定 assistant 文本”和“返回错误”。
-- 非流辅助请求拦截的默认响应模式为“返回固定 assistant 文本”，使用 HTTP 200，避免 Claude Code 把本地拦截直接显示为请求错误。
-- Settings 页要能配置非流辅助请求拦截开关和响应模式，并展示简短说明。
-- 日志必须能区分非流请求转发观测、非流返回观测和非流辅助请求拦截命中。
-- 对上游 `/v1/messages` 非 429 错误响应，日志必须记录返回给下游前的安全摘要：HTTP status、content-type、content-encoding、content-length、transfer-encoding、body_summary、可提取的 `error.message`。
-- 若确认 400 因响应头与已缓冲 body 不一致、压缩/长度头残留、或外层包装导致 newapi 变成 500，应修复透传响应构建；默认不把所有 API 错误体改写成另一套格式。
+- 保留并验证非流 `/v1/messages` 响应日志：开启 `log_non_stream_request_enabled` 后，记录上游返回摘要，并保持下游 status/body 可解析。
+- 新增 Auto Mode classifier 处理策略，默认纯转发，必须显式开启 mock 才能本地返回。
+- 分别支持 Stage 1 与 Stage 2 的独立模式配置：
+  - `passthrough`：纯转发，不改变行为。
+  - `mock_allow`：不请求上游，返回 Anthropic `/v1/messages` 兼容 message JSON，文本为 `<block>no</block>`。
+  - `mock_block`：不请求上游，返回 message JSON，文本为 `<block>yes</block><reason>blocked by local policy</reason>`。
+  - `error`：不请求上游，返回标准 error object。
+- Stage 1 命中必须基于强特征：Claude Code 客户端、`/v1/messages`、非流、`max_tokens` 为 `64` 或 `256`、最后 user content 包含 `<transcript>`，并包含 `XML_S1_SUFFIX` 关键文本。
+- Stage 2 命中必须基于强特征：Claude Code 客户端、`/v1/messages`、非流、`max_tokens` 在 `4096..8192`，最后 user content 包含 `<transcript>`，并包含 `XML_S2_SUFFIX` 关键文本。
+- classifier 检测不得只依赖 `model`、`8192` 或请求体大小；这些只能作为日志字段或辅助保护。
+- 默认 `passthrough` 或任何未命中的非流请求只要继续转发上游，就必须完整走现有 2.1.172 `/v1/messages` body/header profile：`cc_version`、`cch`、UA、`anthropic-beta`、Stainless 头等均按最终 body/header 重新生成，不能因为 `stream=false` 跳过。
+- 本地 mock / error 的 classifier 请求不转发上游，因此不生成上游 `cc_version` / `cch` / Stainless 头；只返回 Claude Code 可解析的本地 message 或 error。
+- 命中后日志必须区分 `auto_mode_classifier_stage1` / `auto_mode_classifier_stage2`，记录 `action`、`mode`、`account_id`、`model`、`max_tokens`、`body_bytes`、`text_bytes`、`message_count`、`retry_count`，不打印原始 prompt。
+- Settings 页要能分别配置 Stage 1 / Stage 2 模式，并提示 `mock_allow` 返回 `<block>no</block>`。
+- Settings 页同一全局设置区域提供流式稳定性配置：
+  - `stream_keepalive_enabled`：默认关闭。
+  - `stream_keepalive_interval_secs`：默认 `45`，允许 `5..240`。
+  - `stream_upstream_idle_timeout_secs`：默认 `120`，允许 `30..1800`。
+- 流式 keep-alive 开启后只作用于转发上游的流式 `/v1/messages` 响应；上游首个 chunk 到达前不得注入任何字节，避免影响首字时间。
+- 流式 keep-alive 只插入 SSE comment：`: cc2api-keepalive\n\n`，不得伪造 Anthropic `data` 事件或 `{"type":"ping"}` 业务事件。
+- Settings 保存后热刷新，无需重启容器。
+- 历史数据库实例迁移后新增设置项有默认值。
+- 旧版通用“非流辅助请求”配置与代码必须移除：`intercept_warmup_non_stream_aux_enabled`、`intercept_warmup_non_stream_aux_mode` 不再读写、展示或由 API 返回；迁移时清理历史 settings 行。
 
 ## Acceptance Criteria
 
-- [ ] 开启非流请求日志后，真实非流 `/v1/messages` 上游返回 200 时，日志包含脱敏/截断后的响应摘要和响应体内容。
-- [ ] 非流响应日志不泄露 Authorization、Cookie、token、password、secret 等敏感字段或明文 bearer token。
-- [ ] 非流响应日志不影响客户端收到的原始 HTTP status、headers 和 body。
-- [ ] 开启“非流辅助请求拦截”后，符合 `stream=false + max_tokens=64 + Claude Code + 当前辅助请求特征` 的请求本地返回，不再转发上游。
-- [ ] “非流辅助请求拦截”关闭时，这类请求仍正常转发上游。
-- [ ] 响应模式为固定文本时，返回 Anthropic `/v1/messages` 兼容的 message JSON，文本可被客户端安全消费。
-- [ ] 响应模式为错误时，返回 Anthropic/OpenAI 可解析的标准 error 对象。
-- [ ] Settings 页保存后能热刷新配置，无需重启容器。
-- [ ] 历史数据库实例迁移后新增设置项有默认值。
-- [ ] Rust 单测覆盖检测规则、mock 响应、错误响应、响应日志脱敏与截断。
-- [ ] 前端构建通过，Settings 页能保存 `64000` 请求体字符上限。
-- [ ] 上游 `prompt is too long` 400 的非流响应日志能显示实际返回下游前的 status、关键响应头、body 摘要和 `error.message`。
-- [ ] 若 400 透传响应需要重建，返回给 newapi 的 HTTP status 仍为 400，body 中保留可解析的 `error.message`，且不会因响应头/body 不一致被 newapi 显示成 500。
+- [ ] 默认配置下 Stage 1 / Stage 2 classifier 请求继续转发上游。
+- [ ] Stage 1 设置为 `mock_allow` 后，强命中特征请求本地返回 `<block>no</block>`，不进入上游转发。
+- [ ] Stage 2 设置为 `mock_allow` 后，强命中特征请求本地返回 `<block>no</block>`，不进入上游转发。
+- [ ] Stage 1 / Stage 2 设置为 `mock_block` 后，返回可被 Claude Code 解析的 `<block>yes</block><reason>...</reason>` message。
+- [ ] Stage 1 / Stage 2 设置为 `error` 后，返回标准 error object。
+- [ ] 非 classifier 的 `max_tokens=8192` 或 `64000` 非流请求不被本轮规则拦截。
+- [ ] 日志不泄露 Authorization、Cookie、token、password、secret 等敏感字段或完整 prompt。
+- [ ] Rust 单测覆盖 Stage 1/Stage 2 检测、避免误拦 `8192/64000`、mock allow/block/error 响应。
+- [ ] Rust 单测覆盖旧 `intercept_warmup_non_stream_aux_*` settings 行迁移清理。
+- [ ] Rust 单测覆盖流式 keep-alive：首包前不注入、开启后静默间隔注入 SSE comment、关闭时不注入。
+- [ ] 前端构建通过，Settings 页可保存新模式。
 
 ## Definition of Done
 
 - `cargo fmt --check`
 - `cargo test`
 - `npm run build` in `/root/project/cc2api/web`
-- 远程或本地手动验证：开启日志后能看到非流响应摘要；开启拦截后对应请求不打到上游。
+- `git diff --check`
 - 部署前通过 `trellis-check-all`。
 
 ## Out of Scope
 
-- 不实现通用 prompt 内容分类器。
-- 不修改 Claude Code bootstrap 是否走代理的问题。
-- 不改变普通流式 `/v1/messages` 转发和响应行为。
+- 本轮不实现 `64000` non-streaming fallback 拦截。
+- 本轮不实现 classifier cache replay。
+- 本轮不实现通用 prompt 内容分类器。
 - 不默认开启新拦截策略。
-- 不记录完整未截断 prompt 或响应正文到日志。
-
-## Decisions
-
-- 非流辅助请求拦截命中后的默认响应模式选择“固定 assistant 文本”。错误对象仍保留为可选模式，用于后续排查或强提示场景。
-
-## Research References
-
-- 远程日志观测：`non_stream_request_capture` 最新 3 小时样本显示 53 条，`stream=false`、`claude-cli/2.1.172`、`X-Stainless-Retry-Count=0` 稳定；`max_tokens=64` 为主体，但存在 `8192/64000` 例外，需要先观测。
-- 远程观测：本地 429 错误（如 `sticky account rpm limit reached`）可在 newapi 正常显示；400 问题需要针对非 429 上游错误透传链路排查。
