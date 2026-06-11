@@ -14,7 +14,7 @@
   - 两阶段都走 `sideQuery()`，`temperature=0`，`skipSystemPromptPrefix=true`，user content 包 `<transcript>...</transcript>`。
   - allow 语义是 `<block>no</block>`；block 语义是 `<block>yes</block>`。
 - 远程日志中 `max_tokens=64` 高频非流大 transcript 请求与 Stage 1 classifier 高度吻合。
-- 远程日志中的 `8192` 不能只按数字归类；必须叠加 Stage 2 suffix、XML output format、transcript 结构等强特征。
+- 远程日志中的 `8192` 不能只按数字归类；必须叠加 XML output format、transcript 结构、`stop_sequences` 排除等强特征。
 - `max_tokens=64000` 结合 Claude Code `MAX_NON_STREAMING_TOKENS=64000`，更像 streaming watchdog / streaming failure 后的 non-streaming fallback，本轮不拦截。
 - 这类 `64000` fallback 的优化方向是稳定流式连接，避免 Claude Code 字节级 watchdog 因长时间无新字节而触发 fallback；本轮通过可配置 SSE comment keep-alive 做低风险缓解。
 
@@ -27,8 +27,8 @@
   - `mock_allow`：不请求上游，返回 Anthropic `/v1/messages` 兼容 message JSON，文本为 `<block>no</block>`。
   - `mock_block`：不请求上游，返回 message JSON，文本为 `<block>yes</block><reason>blocked by local policy</reason>`。
   - `error`：不请求上游，返回标准 error object。
-- Stage 1 命中必须基于强特征：Claude Code 客户端、`/v1/messages`、非流、`max_tokens` 为 `64` 或 `256`、最后 user content 包含 `<transcript>`，并包含 `XML_S1_SUFFIX` 关键文本。
-- Stage 2 命中必须基于强特征：Claude Code 客户端、`/v1/messages`、非流、`max_tokens` 在 `4096..8192`，最后 user content 包含 `<transcript>`，并包含 `XML_S2_SUFFIX` 关键文本。
+- Stage 1 命中必须基于强特征：Claude Code 客户端、`/v1/messages`、非流、`max_tokens` 为 `64` 或 `256`、最后一条消息为 `user`、请求文本包含完整 `<transcript>...</transcript>`，并包含 XML classifier 输出格式 `<block>yes</block>` 与 `<block>no</block>`。`max_tokens=64` 时优先通过 `stop_sequences=["</block>"]` 命中，旧 `XML_S1_SUFFIX` 只作为兼容信号；不得把 `temperature=0` 或 exact suffix 作为硬条件。
+- Stage 2 命中必须基于强特征：Claude Code 客户端、`/v1/messages`、非流、`max_tokens` 在 `4096..8192`、最后一条消息为 `user`、请求文本包含完整 `<transcript>...</transcript>`，并包含 XML classifier 输出格式 `<block>yes</block>` 与 `<block>no</block>`；如 `stop_sequences` 含 `"</block>"` 则不视为 Stage 2。Stage 2 suffix 文本可作为人工核对线索，不作为硬条件。
 - classifier 检测不得只依赖 `model`、`8192` 或请求体大小；这些只能作为日志字段或辅助保护。
 - 默认 `passthrough` 或任何未命中的非流请求只要继续转发上游，就必须完整走现有 2.1.172 `/v1/messages` body/header profile：`cc_version`、`cch`、UA、`anthropic-beta`、Stainless 头等均按最终 body/header 重新生成，不能因为 `stream=false` 跳过。
 - 本地 mock / error 的 classifier 请求不转发上游，因此不生成上游 `cc_version` / `cch` / Stainless 头；只返回 Claude Code 可解析的本地 message 或 error。

@@ -57,13 +57,15 @@
 Stage 1：
 
 - `max_tokens == 64` 或 `max_tokens == 256`。
-- text 内容包含 `Err on the side of blocking. <block> immediately.`。
+- `max_tokens == 64` 时，`stop_sequences` 包含 `"</block>"` 即命中；旧 `Err on the side of blocking. <block> immediately.` suffix 只作为兼容信号，避免 prompt 尾部微调导致漏命中。
+- `max_tokens == 256` 是 Claude Code fast-only Stage 1 形态，可能不带 `stop_sequences`，满足公共 XML classifier 结构即命中。
+- 不把 `temperature=0` 或 exact suffix 作为硬条件，因为实际抓包与源码形态会随 CLI/feature flag 微调。
 
 Stage 2：
 
 - `4096 <= max_tokens <= 8192`。
-- text 内容包含 Stage 2 suffix 的稳定片段：`Review the classification process` 和 `follow it carefully`。
-- 不要求 `stop_sequences` 字段缺失，因为 cc2api 的最终 body 未必保留 SDK 层 request options；如存在且等于 `["</block>"]`，则不视为 Stage 2。
+- 不要求 exact Stage 2 suffix；满足公共 XML classifier 结构即可，避免 CLI prompt 尾部微调导致漏命中。
+- 如 `stop_sequences` 包含 `"</block>"`，则不视为 Stage 2，因为这是 Stage 1 immediate decision 的强信号。
 
 `model`、`anthropic-beta`、body 大小只用于日志，不作为默认硬条件。
 
