@@ -100,7 +100,12 @@ Beta 顺序契约：
 claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,redact-thinking-2026-02-12,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,mid-conversation-system-2026-04-07,advisor-tool-2026-03-01,advanced-tool-use-2025-11-20,effort-2025-11-24,server-side-fallback-2026-06-01,fallback-credit-2026-06-01,extended-cache-ttl-2025-04-11,cache-diagnosis-2026-04-07
 ```
 
-- Fable `[1m]` 主请求顺序：
+- Fable `[1m]` 的主请求画像必须按目标版本抓包判断，不能只从 CLI model 后缀推断：
+  - `2.1.172` 抓包中，Fable `[1m]` 主请求包含 `context-1m-2025-08-07`，顺序如下。
+  - `2.1.173` 抓包中，Fable `[1m]` 主请求不包含 `context-1m-2025-08-07`，只在 telemetry 启动配置里体现 `cli_flag=claude-fable-5[1m]`。
+  - 账号 `allow_1m_models` 只控制客户端已有 `context-1m-2025-08-07` 是否透传，不应自动给 Fable 主请求注入 1M beta。
+
+`2.1.172` Fable `[1m]` 主请求顺序：
 
 ```text
 claude-code-20250219,oauth-2025-04-20,context-1m-2025-08-07,interleaved-thinking-2025-05-14,redact-thinking-2026-02-12,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,mid-conversation-system-2026-04-07,advisor-tool-2026-03-01,advanced-tool-use-2025-11-20,effort-2025-11-24,server-side-fallback-2026-06-01,fallback-credit-2026-06-01,extended-cache-ttl-2025-04-11,cache-diagnosis-2026-04-07
@@ -139,7 +144,7 @@ Telemetry 契约：
 |------|------|
 | 新版本抓包 CCH 不命中旧 seed | 先尝试输入规范化差异；只有多组样本都不命中时再逆向 seed |
 | `cc_version` 主请求按第一个 text block 计算不命中 | 检查首条 user message 是否有多个 text block；按最后一个 text block 复算 |
-| Fable 带 `[1m]` 时 beta 顺序与抓包不同 | 把 `context-1m-2025-08-07` 整理到 `oauth` 后面 |
+| Fable 带 `[1m]` 时 beta 顺序与抓包不同 | 先按目标版本抓包判断是否应有 `context-1m-2025-08-07`；若应有，再整理到 `oauth` 后面 |
 | bootstrap response 有 gzip | 先解码再改 JSON，返回时修正压缩/长度相关 header |
 | 远程部署后账号仍是旧版本 | 检查迁移是否执行；直接查 volume 内 SQLite/Postgres 的 `canonical_env` |
 | 抓包分析需要保存到仓库 | 禁止提交完整 `http_capture.jsonl`、token、Cookie、Authorization、邮箱、完整 prompt/响应正文 |
@@ -172,7 +177,7 @@ Telemetry 契约：
   - 169 baseline CCH 命中旧完整 body 规则。
   - 172 Opus CCH 命中 `model + max_tokens` 排除规则。
   - 172 Fable CCH 命中 `model + max_tokens + fallbacks` 排除规则。
-  - Fable `[1m]` 抓包 beta 顺序与代码输出完全一致。
+- Fable `[1m]` 抓包 beta 是否包含 `context-1m-2025-08-07`、以及包含时的顺序，与目标版本代码输出完全一致。
 - 远程部署验收：
   - `docker compose pull` 后必须 `up -d --force-recreate`。
   - `curl http://127.0.0.1:<port>/` 返回 200。
