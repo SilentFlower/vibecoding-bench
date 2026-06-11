@@ -798,3 +798,36 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 24: 升级 vibebench Claude Code 到 2.1.173
+
+**Date**: 2026-06-12
+**Task**: 升级 vibebench Claude Code 到 2.1.173
+**Branch**: `main`
+
+### Summary
+
+将 vibebench 的 Claude Code 默认版本统一升级到 2.1.173；提交并推送代码，构建并推送 orchestrator/worker/sidecar 的 latest 与 88ac336 镜像；远程服务器切换 VIBEBENCH_TAG=88ac336 与 CLAUDE_CODE_VERSION=2.1.173，拉取三镜像并 force-recreate orchestrator，验证首页 200、鉴权接口 401、容器启动日志正常。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `88ac336` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
