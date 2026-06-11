@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/06-11-cc2api-claude-code-2172-upgrade/research/cch-2172-recheck.md", "reason": "实现 2.1.172 CCH profile 时必须参考 seed 与输入规范化复核结论。"}
+{"file": ".trellis/tasks/06-11-cc2api-claude-code-2172-upgrade/research/wire-telemetry-2172-diff.md", "reason": "实现 169→172 UA/header、Fable beta、bootstrap 和 telemetry metadata profile 时必须参考抓包差异。"}
+{"file": ".trellis/tasks/archive/2026-06/06-04-cc2api-claude-code-2156-cch-upgrade/research/cch-reversal-playbook.md", "reason": "沿用 CCH 逆向方法、seed 推导和旧版本行为边界。"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "修改 cc2api 版本 profile 和 CCH helper 前先复用现有结构，避免重复实现。"}

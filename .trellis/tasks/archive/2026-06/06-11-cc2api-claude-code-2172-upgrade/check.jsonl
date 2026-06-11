@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/06-11-cc2api-claude-code-2172-upgrade/research/cch-2172-recheck.md", "reason": "检查时验证 169、172 Opus、172 Fable 三组 CCH 命中规则没有回退。"}
+{"file": ".trellis/tasks/06-11-cc2api-claude-code-2172-upgrade/research/wire-telemetry-2172-diff.md", "reason": "检查 172 UA/header、Fable beta、bootstrap、telemetry metadata 和 context-1m 策略是否符合抓包。"}
+{"file": ".trellis/tasks/archive/2026-06/06-04-cc2api-claude-code-2156-cch-upgrade/research/cch-reversal-playbook.md", "reason": "检查 seed、输入和最终 body 顺序是否符合既有逆向结论。"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "检查是否复用现有 profile/helper，避免引入重复逻辑。"}
