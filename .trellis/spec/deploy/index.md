@@ -31,7 +31,8 @@
 
 1. **第一次部署到新机器**:从头读 [Remote Deploy](./remote-deploy.md) 走 4 件套流程
 2. **代码改了要发新版**:读 [Image Build & Push](./image-build-push.md) 走双 tag + recreate
-3. **加 / 改鉴权**:读 [Auth Design](./auth-design.md) 看中间件豁免规则与 API 契约
+3. **远程重启 cc2api / claude-code-gateway**:读 [Remote Deploy](./remote-deploy.md) 的 `cc2api.env` 场景
+4. **加 / 改鉴权**:读 [Auth Design](./auth-design.md) 看中间件豁免规则与 API 契约
 
 每个文件结尾的 **Common Mistakes** 是上次实际踩到的坑,新人先看那部分。
 

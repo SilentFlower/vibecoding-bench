@@ -283,6 +283,148 @@ ssh server 'cd /root/vibecoding-bench && scripts/sync-topics-db.py --topics topi
 
 ---
 
+## Scenario: `cc2api.env` 远程升级与重启
+
+### 1. Scope / Trigger
+
+- Trigger: 用户要求重启远程 `cc2api.env`、升级 `claude-code-gateway` latest 镜像、清空容器日志、确认已有账号升级到新 Claude Code 画像。
+- 这是独立于 vibecoding-bench 三镜像的远程服务，路径和镜像以 `.deploy/cc2api.env` 与远程 compose 为准。
+- 重启前必须检查服务端口 established 连接数；连接数高时不要直接 recreate。
+
+### 2. Signatures
+
+本地 env 文件：
+
+```text
+.deploy/cc2api.env
+REMOTE_HOST=<host>
+REMOTE_PORT=<ssh port>
+REMOTE_USER=<ssh user>
+REMOTE_PASS=<secret>
+REMOTE_PATH=/root/claude-code-gateway
+```
+
+远程 compose 入口：
+
+```bash
+cd "$REMOTE_PATH/docker"
+docker compose --env-file ../.env pull claude-code-gateway
+docker compose --env-file ../.env up -d --force-recreate claude-code-gateway
+```
+
+默认容器和端口：
+
+```text
+docker-claude-code-gateway-1
+SERVER_PORT=5674
+image=ghcr.io/silentflower/claude-code-gateway:latest
+volume=docker_claude-code-gateway-data:/app/data
+```
+
+### 3. Contracts
+
+- 读取 `.deploy/cc2api.env` 时要去掉 CRLF：`tr -d '\r'`，否则 SSH 端口可能变成 `22\r`。
+- 只打印非敏感参数；不要输出 `REMOTE_PASS`、token、账号邮箱、Authorization、Cookie。
+- 重启前检查连接数：
+
+```bash
+PORT="${SERVER_PORT:-5674}"
+ss -tan state established "( sport = :$PORT or dport = :$PORT )" | tail -n +2 | wc -l
+```
+
+- 低连接窗口再执行重启；当前实践中 `0` established 可直接重启，超过小阈值应暂停并回报用户。
+- 清日志要截断 Docker JSON log 文件，而不是删除容器或删除 volume：
+
+```bash
+log=$(docker inspect -f '{{.LogPath}}' docker-claude-code-gateway-1)
+: > "$log"
+```
+
+- 镜像升级必须 `pull` 后 `up -d --force-recreate`；`docker compose restart` 不会加载新镜像。
+- 账号版本升级依赖 `cc2api` 启动迁移，部署后必须查 volume 内 DB：
+
+```text
+/var/lib/docker/volumes/docker_claude-code-gateway-data/_data/claude-code-gateway.db
+```
+
+- SQLite 查询只输出版本分布，不输出账号敏感字段。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 处理 |
+|------|------|
+| SSH 报 `Bad port '22\r'` | 读取 env 时 `tr -d '\r'` |
+| established 连接数偏高 | 不重启；告知用户等待低峰或明确确认 |
+| `docker compose pull` 成功但行为没变 | 检查是否漏了 `up -d --force-recreate` |
+| 容器内无 `python3` / `sqlite3` | 在宿主机读取 Docker volume 内 SQLite |
+| 日志很大 | 先截断旧容器 LogPath，再 recreate |
+| 账号版本仍旧 | 查迁移代码和 DB 路径是否为当前容器 volume，不要查错宿主目录 |
+
+### 5. Good/Base/Bad Cases
+
+**Good**：连接数为 0 → 截断旧日志 → `pull latest` → `up -d --force-recreate` → `curl /` 200 → DB 版本分布全为目标版本 → 最近日志无 error。
+
+**Base**：GitHub Actions 已经构建并推送 latest，本地只负责远程 pull/recreate，不再本地 build。
+
+**Bad**：只执行 `docker compose restart`，容器 Up 了但仍跑旧 image id。
+
+**Bad**：删除 Docker volume 来清日志，导致账号和设置数据丢失。
+
+### 6. Tests Required
+
+部署后至少断言：
+
+1. `docker ps --filter name=docker-claude-code-gateway-1` 显示 `Up`。
+2. `docker inspect -f '{{.Config.Image}}' docker-claude-code-gateway-1` 是 `ghcr.io/silentflower/claude-code-gateway:latest`。
+3. `curl -sS -o /tmp/cc2api_root.out -w '%{http_code}\n' http://127.0.0.1:${SERVER_PORT:-5674}/` 返回 `200`。
+4. Docker log 文件被重建后大小处于合理范围，不再保留重启前的大日志。
+5. DB 版本分布：
+
+```text
+accounts.canonical_env.version      -> 目标版本
+accounts.canonical_env.version_base -> 目标版本
+accounts.canonical_env.build_time   -> 目标 build_time
+```
+
+6. `settings.allowed_claude_code_versions` 包含目标版本上限。
+7. `docker logs --tail 200` 不出现 `error|panic|failed|thread.*panicked`。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```bash
+cd /root/claude-code-gateway/docker
+docker compose restart claude-code-gateway
+```
+
+`restart` 只重启旧容器进程，不会使用 GitHub 已推送的新 latest 镜像。
+
+#### Correct
+
+```bash
+cd /root/claude-code-gateway/docker
+docker compose --env-file ../.env pull claude-code-gateway
+docker compose --env-file ../.env up -d --force-recreate claude-code-gateway
+```
+
+#### Wrong
+
+```bash
+rm -rf /var/lib/docker/volumes/docker_claude-code-gateway-data/_data
+```
+
+这是数据 volume，不是日志目录，会删除账号和配置。
+
+#### Correct
+
+```bash
+log=$(docker inspect -f '{{.LogPath}}' docker-claude-code-gateway-1)
+: > "$log"
+```
+
+---
+
 ## Wrong vs Correct
 
 ### ❌ Wrong:HOST_BENCH_DATA 写容器内路径
