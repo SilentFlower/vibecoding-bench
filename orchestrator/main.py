@@ -32,7 +32,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
 
@@ -3249,6 +3249,8 @@ class CaptureRunIn(BaseModel):
     :param timeout_sec: 本次 run 超时时间
     :param model_override: 本次抓包 run 的 Claude Code `--model` 覆盖
     """
+
+    model_config = ConfigDict(protected_namespaces=())
 
     account_id: int
     topic_id: int
