@@ -729,3 +729,38 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 22: cc2api 升级 Claude Code 2.1.172
+
+**Date**: 2026-06-11
+**Task**: cc2api 升级 Claude Code 2.1.172
+**Branch**: `main`
+
+### Summary
+
+完成 cc2api Claude Code 2.1.172 画像升级，按抓包修正 CCH、cc_version、Fable beta 顺序、bootstrap/telemetry 行为，部署远程 latest，并沉淀升级 code-spec。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cc91b73` | (see git log) |
+| `2d57c3f` | (see git log) |
+| `f6a7a89` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
