@@ -24,10 +24,11 @@
   "notes": "",
   "meta": {},
   "last_push_snapshot": {
-    "snapshot_at": "2026-06-11T18:27:20+08:00",
+    "snapshot_at": "2026-06-11T19:01:42+08:00",
     "branch": "main",
     "pushed_commits": {
-      "cc2api": "d7b9941"
+      "cc2api": "541f78f",
+      "vibecoding-bench": "b79e9f2"
     },
     "completed_steps": [
       "扩展 settings 默认值、DB migration、router GET/PUT 校验和热刷新",
@@ -41,10 +42,12 @@
       "添加 Rust 单测覆盖检测规则、响应模式、旧 settings 清理和流式 keep-alive 行为",
       "执行 cargo fmt --check、cargo check、cargo test、npm run build、git diff --check",
       "通过 trellis-check-all 对照检查",
-      "提交并推送 cc2api main"
+      "提交并推送 cc2api main",
+      "放宽 Auto Mode classifier Stage1/Stage2 检测条件，避免 exact suffix 或 temperature 导致漏命中",
+      "同步并推送任务 PRD/design 检测契约"
     ],
     "partial_step": "远程部署验证未执行",
     "next_step": "等待 GitHub 镜像构建后远程部署并验证日志/拦截行为",
-    "notes": "cc2api commit d7b9941 已推送到 origin/main。"
+    "notes": "cc2api commit 541f78f 与 vibecoding-bench commit b79e9f2 已推送到 origin/main。"
   }
 }
