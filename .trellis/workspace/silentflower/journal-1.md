@@ -764,3 +764,37 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 23: cc2api Auto Mode classifier 观测与拦截
+
+**Date**: 2026-06-11
+**Task**: cc2api Auto Mode classifier 观测与拦截
+**Branch**: `main`
+
+### Summary
+
+完成 cc2api Auto Mode classifier 非流请求观测与拦截：Stage1/Stage2 mock 策略、非流响应日志解码、流式 keepalive、检测规则放宽到 Stage1 64..2304 / Stage2 4096..8192；完成 check-all、提交推送并远程部署 cc2api latest 验证。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1bea5f9` | (see git log) |
+| `7f9c4d9` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
