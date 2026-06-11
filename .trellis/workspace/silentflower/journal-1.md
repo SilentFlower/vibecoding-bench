@@ -696,3 +696,36 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 21: 归档 cc2api prefill 429 observability
+
+**Date**: 2026-06-11
+**Task**: 归档 cc2api prefill 429 observability
+**Branch**: `main`
+
+### Summary
+
+确认 cc2api assistant prefill 拦截与 429 请求观测任务已推送并归档，记录本次收尾状态。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cf71247` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

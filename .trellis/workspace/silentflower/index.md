@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 20
-- **Last Active**: 2026-06-09
+- **Total Sessions**: 21
+- **Last Active**: 2026-06-11
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~698 | Active |
+| `journal-1.md` | ~731 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 21 | 2026-06-11 | 归档 cc2api prefill 429 observability | `cf71247` | `main` |
 | 20 | 2026-06-09 | cc2api Claude Code 2.1.169 升级收尾 | `8ec1f97` | `main` |
 | 19 | 2026-06-08 | cc2api 账号级 RPM 粘性保护 | `4748a1a` | `main` |
 | 18 | 2026-06-08 | cc2api 缓存诊断与 API 模式对齐收尾 | `5ecb6ce` | `main` |
