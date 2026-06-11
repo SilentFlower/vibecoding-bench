@@ -24,11 +24,11 @@
   "notes": "",
   "meta": {},
   "last_push_snapshot": {
-    "snapshot_at": "2026-06-11T19:01:42+08:00",
+    "snapshot_at": "2026-06-11T19:34:33+08:00",
     "branch": "main",
     "pushed_commits": {
-      "cc2api": "541f78f",
-      "vibecoding-bench": "b79e9f2"
+      "cc2api": "1bea5f9",
+      "vibecoding-bench": "7f9c4d9"
     },
     "completed_steps": [
       "扩展 settings 默认值、DB migration、router GET/PUT 校验和热刷新",
@@ -44,10 +44,12 @@
       "通过 trellis-check-all 对照检查",
       "提交并推送 cc2api main",
       "放宽 Auto Mode classifier Stage1/Stage2 检测条件，避免 exact suffix 或 temperature 导致漏命中",
-      "同步并推送任务 PRD/design 检测契约"
+      "同步并推送任务 PRD/design 检测契约",
+      "将 Stage1 max_tokens 扩展为 64..2304，Stage2 保持 4096..8192 并移除 stop_sequences 排除",
+      "执行 trellis-check-all：三件套对齐、源码假设核对、cargo fmt/check/test、npm run build、git diff --check 均通过"
     ],
     "partial_step": "远程部署验证未执行",
     "next_step": "等待 GitHub 镜像构建后远程部署并验证日志/拦截行为",
-    "notes": "cc2api commit 541f78f 与 vibecoding-bench commit b79e9f2 已推送到 origin/main。"
+    "notes": "cc2api commit 1bea5f9 与 vibecoding-bench commit 7f9c4d9 已推送到 origin/main。"
   }
 }
