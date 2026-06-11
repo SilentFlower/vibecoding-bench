@@ -4143,5 +4143,23 @@ async def stream_runs():
 
 
 # ---------- 静态 WebUI ----------
+class NoStoreStaticFiles(StaticFiles):
+    """为 WebUI 静态文件统一附加禁用缓存响应头。"""
+
+    async def get_response(self, path: str, scope) -> Response:
+        """
+        返回静态文件响应，并阻止浏览器复用旧前端资源。
+
+        :param path: StaticFiles 解析到的相对路径
+        :param scope: ASGI 请求上下文
+        :return: 带 no-store 响应头的静态文件响应
+        """
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
+
 if WEBUI_DIR.exists():
-    app.mount("/", StaticFiles(directory=str(WEBUI_DIR), html=True), name="ui")
+    app.mount("/", NoStoreStaticFiles(directory=str(WEBUI_DIR), html=True), name="ui")
