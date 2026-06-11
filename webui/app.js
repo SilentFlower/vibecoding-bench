@@ -725,6 +725,7 @@ function renderRunDetailShell(rid) {
         <div class="stat-box"><div class="stat-label">输出 token</div><div class="stat-value" data-stat-key="tokens_out">等待采集</div></div>
         <div class="stat-box"><div class="stat-label">请求数</div><div class="stat-value" data-stat-key="requests">等待采集</div></div>
         <div class="stat-box"><div class="stat-label">退出码</div><div class="stat-value" data-stat-key="exit_code">-</div></div>
+        <div class="stat-box"><div class="stat-label">模型覆盖</div><div class="stat-value-sm" data-stat-key="model_override">默认</div></div>
       </div>
       <div class="hint inline hidden" id="run-detail-stats-error"></div>
     </div>
@@ -793,6 +794,7 @@ function renderCaptureDetail(capture) {
       <div class="stat-box"><div class="stat-label">flows</div><div class="stat-value">${escapeHTML(index.total_flows ?? entries.length)}</div></div>
       <div class="stat-box"><div class="stat-label">cc_version</div><div class="stat-value-sm">${versions.length ? versions.map(escapeHTML).join('<br>') : '<span class="muted">未观察到</span>'}</div></div>
       <div class="stat-box"><div class="stat-label">模式</div><div class="stat-value-sm">${escapeHTML(capture.mode || 'full_http')}</div></div>
+      <div class="stat-box"><div class="stat-label">model</div><div class="stat-value-sm">${capture.model_override ? escapeHTML(capture.model_override) : '<span class="muted">默认</span>'}</div></div>
     </div>
     <div class="hint inline">完整请求体和响应体保存在 flows 目录；此处只展示脱敏索引。</div>
     <div class="file-tree capture-files">${fileRows}</div>
@@ -819,6 +821,7 @@ function updateRunDetailContent(rid, run, files, stats, transcript, transcriptSt
   setRunDetailText('[data-stat-key="tokens_out"]', renderStatValue(stats, 'tokens_out'));
   setRunDetailText('[data-stat-key="requests"]', renderStatValue(stats, 'requests'));
   setRunDetailText('[data-stat-key="exit_code"]', escapeHTML(run.exit_code ?? '-'));
+  setRunDetailText('[data-stat-key="model_override"]', run.capture_model_override ? escapeHTML(run.capture_model_override) : '<span class="muted">默认</span>');
 
   const statsError = $('#run-detail-stats-error');
   if (statsError) {
@@ -905,6 +908,7 @@ function bindCaptureForm() {
       topic_id: Number(fd.get('topic_id')),
       timeout_sec: Number(fd.get('timeout_sec')),
       prompt: fd.get('prompt') || null,
+      model_override: (fd.get('model_override') || '').trim() || null,
     };
     btn.disabled = true;
     try {
@@ -913,6 +917,7 @@ function bindCaptureForm() {
         body: JSON.stringify(body),
       });
       form.prompt.value = '';
+      form.model_override.value = '';
       await Promise.all([
         API('/tasks').then(ts => { state.tasks = ts; }),
         API('/runs').then(rs => { state.runs = rs; }),

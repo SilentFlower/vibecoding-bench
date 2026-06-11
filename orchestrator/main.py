@@ -61,11 +61,12 @@ _SIDECAR_DNS_READY_SH = (
     "&& dig @127.0.0.1 \"$DNS_READY_HOST\" A +time=3 +tries=1 +short "
     "2>/dev/null | grep -q ."
 )
+_CLAUDE_MODEL_OVERRIDE_RE = re.compile(r"^[A-Za-z0-9._\-\[\]]+$")
 WORKER_USER = "node"
 WORKER_HOME = "/home/node"
 WORKER_UID = 1000
 WORKER_GID = 1000
-CLAUDE_CODE_VERSION = os.environ.get("CLAUDE_CODE_VERSION", "2.1.169")
+CLAUDE_CODE_VERSION = os.environ.get("CLAUDE_CODE_VERSION", "2.1.172")
 CLAUDE_CODE_EFFORT_LEVEL = os.environ.get("CLAUDE_CODE_EFFORT_LEVEL", "max")
 SAVE_FULL_FLOWS = os.environ.get("SAVE_FULL_FLOWS", "0")
 CLEAN_WORKSPACE_DEPS = os.environ.get("CLEAN_WORKSPACE_DEPS", "1")
@@ -503,6 +504,7 @@ CREATE TABLE IF NOT EXISTS runs (
   run_kind TEXT DEFAULT 'normal',
   capture_mode TEXT,
   capture_summary_path TEXT,
+  capture_model_override TEXT,
   started_at REAL,
   ended_at REAL,
   stop_requested_at REAL,
@@ -544,6 +546,7 @@ def init_db() -> None:
             _ensure_column(conn, "runs", "run_kind", "TEXT DEFAULT 'normal'")
             _ensure_column(conn, "runs", "capture_mode", "TEXT")
             _ensure_column(conn, "runs", "capture_summary_path", "TEXT")
+            _ensure_column(conn, "runs", "capture_model_override", "TEXT")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_batch ON runs(batch_id)")
             _seed_topics_if_empty(conn)
     finally:
@@ -655,6 +658,28 @@ def build_topic_prompt(topic: dict) -> str:
         "请在当前目录下实现一个可运行的 MVP。\n"
         "完成后请说明启动方式、验证方式和主要取舍。"
     )
+
+
+def normalize_claude_model_override(value: Optional[str]) -> Optional[str]:
+    """
+    规范化抓包 run 的一次性 Claude 模型覆盖。
+
+    :param value: 用户提交的模型名或别名
+    :return: trim 后的模型名；空值返回 None
+    """
+    if value is None:
+        return None
+    model = value.strip()
+    if not model:
+        return None
+    if len(model) > 128:
+        raise HTTPException(400, "model_override too long: max 128 chars")
+    if not _CLAUDE_MODEL_OVERRIDE_RE.match(model):
+        raise HTTPException(
+            400,
+            "model_override contains invalid chars: only letters, digits, dot, underscore, dash and [] are allowed",
+        )
+    return model
 
 
 def _format_quota_result(raw: dict) -> dict:
@@ -848,6 +873,30 @@ class Runner:
                 "CAPTURE_TARGETS": "anthropic.com,claude.com",
                 "CAPTURE_MAX_BODY_BYTES": "0",
             })
+        worker_env = {
+            "TASK_PROMPT": task["prompt"],
+            "RUN_ID": run_id,
+            "TIMEOUT_SEC": str(task.get("timeout_sec", 1800)),
+            "ACC_NAME": acc_name,
+            "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+            "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
+            "CLEAN_WORKSPACE_DEPS": CLEAN_WORKSPACE_DEPS,
+            "TIMEOUT_WRAPUP_SEC": str(TIMEOUT_WRAPUP_SEC),
+            "OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC": str(OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC),
+            "OAUTH_401_PROFILE_WAIT_SEC": str(OAUTH_401_PROFILE_WAIT_SEC),
+            "CLAUDE_API_STALL_WATCHDOG_SEC": str(CLAUDE_API_STALL_WATCHDOG_SEC),
+            "CLAUDE_API_STALL_MAX_RECOVERIES": str(CLAUDE_API_STALL_MAX_RECOVERIES),
+            "CLAUDE_BUSY_INTERRUPT_GRACE_SEC": str(CLAUDE_BUSY_INTERRUPT_GRACE_SEC),
+            "CLAUDE_API_STALL_RECOVERY_PROMPT": CLAUDE_API_STALL_RECOVERY_PROMPT,
+            "OAUTH_REFRESH_BUFFER_SEC": str(OAUTH_REFRESH_BUFFER_SEC),
+            "TZ": fp["tz"],
+            "LANG": fp["lang"],
+            "LC_ALL": fp["lang"],
+        }
+        model_override = task.get("model_override")
+        if isinstance(model_override, str) and model_override:
+            # 只给当前 worker 进程传一次性模型覆盖，避免污染账号 profile settings。
+            worker_env["CLAUDE_MODEL_OVERRIDE"] = model_override
 
         sidecar_id: Optional[str] = None
         worker_id: Optional[str] = None
@@ -896,26 +945,7 @@ class Runner:
                     str(host_claude_home): {"bind": f"{WORKER_HOME}/.claude", "mode": "rw"},
                     str(host_ca): {"bind": "/etc/mitm", "mode": "ro"},
                 },
-                environment={
-                    "TASK_PROMPT": task["prompt"],
-                    "RUN_ID": run_id,
-                    "TIMEOUT_SEC": str(task.get("timeout_sec", 1800)),
-                    "ACC_NAME": acc_name,
-                    "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
-                    "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
-                    "CLEAN_WORKSPACE_DEPS": CLEAN_WORKSPACE_DEPS,
-                    "TIMEOUT_WRAPUP_SEC": str(TIMEOUT_WRAPUP_SEC),
-                    "OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC": str(OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC),
-                    "OAUTH_401_PROFILE_WAIT_SEC": str(OAUTH_401_PROFILE_WAIT_SEC),
-                    "CLAUDE_API_STALL_WATCHDOG_SEC": str(CLAUDE_API_STALL_WATCHDOG_SEC),
-                    "CLAUDE_API_STALL_MAX_RECOVERIES": str(CLAUDE_API_STALL_MAX_RECOVERIES),
-                    "CLAUDE_BUSY_INTERRUPT_GRACE_SEC": str(CLAUDE_BUSY_INTERRUPT_GRACE_SEC),
-                    "CLAUDE_API_STALL_RECOVERY_PROMPT": CLAUDE_API_STALL_RECOVERY_PROMPT,
-                    "OAUTH_REFRESH_BUFFER_SEC": str(OAUTH_REFRESH_BUFFER_SEC),
-                    "TZ": fp["tz"],
-                    "LANG": fp["lang"],
-                    "LC_ALL": fp["lang"],
-                },
+                environment=worker_env,
             )
             worker_id = worker.id
             return sidecar_id, worker_id
@@ -1194,7 +1224,7 @@ const path = require('path');
 
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
 const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
-const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.169';
+const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.172';
 
 function emit(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
@@ -1424,7 +1454,7 @@ const SCOPES = [
 ];
 const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
 const refreshBufferMs = Number(process.env.OAUTH_REFRESH_BUFFER_SEC || '600') * 1000;
-const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.169';
+const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.172';
 
 function emit(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
@@ -3217,12 +3247,14 @@ class CaptureRunIn(BaseModel):
     :param topic_id: topic ID
     :param prompt: 可选 prompt 覆盖
     :param timeout_sec: 本次 run 超时时间
+    :param model_override: 本次抓包 run 的 Claude Code `--model` 覆盖
     """
 
     account_id: int
     topic_id: int
     prompt: Optional[str] = None
     timeout_sec: int = 1800
+    model_override: Optional[str] = None
 
 
 @app.post("/api/tasks")
@@ -3516,6 +3548,7 @@ def start_capture_run(body: CaptureRunIn):
     if not scheduler:
         raise HTTPException(500, "scheduler not ready")
     timeout_sec = max(60, int(body.timeout_sec or 1800))
+    model_override = normalize_claude_model_override(body.model_override)
     conn = get_db()
     try:
         account_row = conn.execute(
@@ -3558,8 +3591,8 @@ def start_capture_run(body: CaptureRunIn):
                 flows_path = FLOWS_DIR / account["name"] / str(task_id) / run_id
                 conn.execute(
                     "INSERT INTO runs(id, task_id, account_id, topic_id, status, "
-                    "run_kind, capture_mode, capture_summary_path) "
-                    "VALUES(?,?,?,?,?,?,?,?)",
+                    "run_kind, capture_mode, capture_summary_path, capture_model_override) "
+                    "VALUES(?,?,?,?,?,?,?,?,?)",
                     (
                         run_id,
                         task_id,
@@ -3569,6 +3602,7 @@ def start_capture_run(body: CaptureRunIn):
                         "capture",
                         "full_http",
                         str(flows_path / "capture_index.json"),
+                        model_override,
                     ),
                 )
         finally:
@@ -3581,12 +3615,14 @@ def start_capture_run(body: CaptureRunIn):
         "topic_id": topic["id"],
         "capture_full_http": True,
         "capture_mode": "full_http",
+        "model_override": model_override,
     }
     scheduler.submit(run_id, account, task)
     return {
         "run_id": run_id,
         "task_id": task_id,
         "capture_mode": "full_http",
+        "model_override": model_override,
     }
 
 
@@ -3817,6 +3853,7 @@ def get_capture(rid: str):
     return {
         "run_id": rid,
         "mode": run.get("capture_mode") or "full_http",
+        "model_override": run.get("capture_model_override"),
         "available": bool(index.get("available")),
         "flows_dir": str(flows_dir),
         "index_path": str(index_path),

@@ -29,7 +29,7 @@
 set -euo pipefail
 
 WORKER_MODE="${WORKER_MODE:-task}"
-CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.169}"
+CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.172}"
 CLAUDE_CODE_EFFORT_LEVEL="${CLAUDE_CODE_EFFORT_LEVEL:-max}"
 log() { echo "[entrypoint $(date +%H:%M:%S)] $*"; }
 CLAUDE_USER=node
@@ -1098,9 +1098,15 @@ check_claude_auth_status
 
 SESSION="claude-${RUN_ID}"
 log "Launching tmux session: $SESSION ($CLAUDE_USER bypassPermissions mode)"
+claude_args=(claude)
+if [ -n "${CLAUDE_MODEL_OVERRIDE:-}" ]; then
+  # 后端已校验模型名字符集；这里用数组参数传递，避免把用户输入拼进 shell。
+  claude_args+=(--model "$CLAUDE_MODEL_OVERRIDE")
+  log "Using one-shot Claude model override: $CLAUDE_MODEL_OVERRIDE"
+fi
 tmux new-session -d -s "$SESSION" -x 220 -y 60
 tmux send-keys -t "$SESSION" \
-  "export NODE_EXTRA_CA_CERTS='$CA_PEM' SSL_CERT_FILE='$CA_PEM' REQUESTS_CA_BUNDLE='$CA_PEM' CURL_CA_BUNDLE='$CA_PEM' GIT_SSL_CAINFO='$CA_PEM' HOME='$CLAUDE_HOME' && cd /workspace && runuser -u '$CLAUDE_USER' -- env HOME='$CLAUDE_HOME' NODE_EXTRA_CA_CERTS='$CA_PEM' SSL_CERT_FILE='$CA_PEM' REQUESTS_CA_BUNDLE='$CA_PEM' CURL_CA_BUNDLE='$CA_PEM' GIT_SSL_CAINFO='$CA_PEM' claude; code=\$?; echo; echo \"[entrypoint] claude exited with code \$code\"; echo \$code >/tmp/claude-exit-code; touch /tmp/claude-exited; sleep 3600" Enter
+  "export NODE_EXTRA_CA_CERTS='$CA_PEM' SSL_CERT_FILE='$CA_PEM' REQUESTS_CA_BUNDLE='$CA_PEM' CURL_CA_BUNDLE='$CA_PEM' GIT_SSL_CAINFO='$CA_PEM' HOME='$CLAUDE_HOME' && cd /workspace && runuser -u '$CLAUDE_USER' -- env HOME='$CLAUDE_HOME' NODE_EXTRA_CA_CERTS='$CA_PEM' SSL_CERT_FILE='$CA_PEM' REQUESTS_CA_BUNDLE='$CA_PEM' CURL_CA_BUNDLE='$CA_PEM' GIT_SSL_CAINFO='$CA_PEM' $(printf '%q ' "${claude_args[@]}"); code=\$?; echo; echo \"[entrypoint] claude exited with code \$code\"; echo \$code >/tmp/claude-exit-code; touch /tmp/claude-exited; sleep 3600" Enter
 
 # 等 claude TUI 就绪
 sleep 6

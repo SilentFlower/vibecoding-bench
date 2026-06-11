@@ -190,6 +190,22 @@
             <input name="timeout_sec" type="number" min="60" value="1800" />
           </label>
         </div>
+        <label><span class="lbl">$ model 覆盖</span>
+          <span class="hint inline">可从预置模型选择，也可手填完整模型名；留空则沿用默认模型。</span>
+          <input name="model_override" list="capture-model-options" placeholder="例如 opus[1m] 或 claude-opus-4-8[1m]" />
+          <datalist id="capture-model-options">
+            <option value="opus"></option>
+            <option value="opus[1m]"></option>
+            <option value="sonnet"></option>
+            <option value="sonnet[1m]"></option>
+            <option value="haiku"></option>
+            <option value="fable"></option>
+            <option value="claude-opus-4-8"></option>
+            <option value="claude-opus-4-8[1m]"></option>
+            <option value="claude-opus-4-7"></option>
+            <option value="claude-fable-5"></option>
+          </datalist>
+        </label>
         <label><span class="lbl">$ prompt 覆盖</span>
           <span class="hint inline">留空则使用该 topic 默认 prompt；抓包 run 会保存请求体和响应体全文。</span>
           <textarea name="prompt" rows="3" placeholder="可选：覆盖本次抓包运行的 prompt"></textarea>
