@@ -831,3 +831,39 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 25: cc2api 2.1.173 抓包评估与远程部署
+
+**Date**: 2026-06-12
+**Task**: cc2api 2.1.173 抓包评估与远程部署
+**Branch**: `main`
+
+### Summary
+
+完成 Claude Code 2.1.173 三组抓包安全对比，确认 CCH 与 Fable 1M 语义，升级 cc2api 默认画像并补齐 2.1.172 旧默认版本范围迁移；远程部署后确认账号 1M 白名单仅保留 opus。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `def8df5` | (see git log) |
+| `7677f86` | (see git log) |
+| `9058b21` | (see git log) |
+| `6309300` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
