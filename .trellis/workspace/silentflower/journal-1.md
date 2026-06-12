@@ -867,3 +867,37 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 26: cc2api 非流单消息探针缓存
+
+**Date**: 2026-06-12
+**Task**: cc2api 非流单消息探针缓存
+**Branch**: `main`
+
+### Summary
+
+实现 Claude Code 非流单消息探针 30 分钟进程内缓存，增加全局开关、缓存创建/命中日志、响应安全改写，并完成验证、提交与推送。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8717697` | (see git log) |
+| `cf8deb0` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
