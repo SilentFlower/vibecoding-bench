@@ -1,0 +1,44 @@
+{
+  "id": "cc2api-non-stream-probe-cache",
+  "name": "cc2api-non-stream-probe-cache",
+  "title": "cc2api 非流单消息探针缓存",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-06-12",
+  "completedAt": "2026-06-12",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "last_push_snapshot": {
+    "snapshot_at": "2026-06-12T12:37:50+08:00",
+    "branch": {
+      "cc2api": "main",
+      "parent": "main"
+    },
+    "pushed_commits": {
+      "cc2api": "8717697"
+    },
+    "completed_steps": [
+      "planning",
+      "implementation",
+      "check-all",
+      "cc2api commit and push"
+    ],
+    "next_step": "Phase 3.5 finish-work / archive when user explicitly asks",
+    "notes": "cc2api 非流单消息探针缓存已实现、验证并推送到 origin/main。"
+  }
+}
