@@ -1,0 +1,3 @@
+[submodule "cc2api"]
+	path = cc2api
+	url = https://github.com/SilentFlower/cc2api.git

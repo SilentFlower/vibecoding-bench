@@ -8,7 +8,7 @@
 
 ### 1. Scope / Trigger
 
-- Trigger: 升级 `/root/project/cc2api` 的 Claude Code 默认版本、User-Agent、请求头、CCH、`cc_version`、bootstrap response、telemetry metadata 或账号默认画像。
+- Trigger: 升级 `cc2api/` 的 Claude Code 默认版本、User-Agent、请求头、CCH、`cc_version`、bootstrap response、telemetry metadata 或账号默认画像。
 - 必须使用真实抓包对比，不允许只根据代码常量推断协议。
 - 本场景属于跨层契约：请求重写、header profile、body profile、telemetry、DB migration、Web settings 和远程部署都可能一起受影响。
 

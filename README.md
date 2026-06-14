@@ -74,6 +74,7 @@ open http://localhost:8000
 bench/
 ├── docker-compose.yml
 ├── .env.example
+├── cc2api/              Git submodule: Claude Code 网关与账号池
 ├── orchestrator/        FastAPI 后端
 │   ├── main.py
 │   ├── Dockerfile
