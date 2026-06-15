@@ -120,6 +120,8 @@ data/flows/<account>/<task_id>/<run_id>/
 
 抓包 run 的 `http_capture.jsonl` 默认记录所有经过 sidecar MITM 的 HTTP flow，不只限于 Anthropic 域名；Datadog、Statsig、Sentry、WebSocket upgrade、额外遥测域名等请求只要走到 MITM，也会进入完整 JSONL。`capture_index.json` 会额外标记 `is_target`、`is_anthropic`、`is_telemetry_candidate`，便于从全量流量里筛 Anthropic 主链路和遥测候选。WebUI 详情页只展示脱敏索引；完整 `http_capture.jsonl` 会保存本地原文，可能包含 OAuth token、prompt、代码、响应内容、第三方请求内容等高敏数据，不要提交到 git，也不要暴露给不可信网络。
 
+如果对抓包 run 点击“继续”并在继续会话里执行 `/cost`、`/context` 等操作，continue sidecar 会继承完整抓包配置，并把后续 HTTP flow 追加写回同一个 run 的 flows 目录；普通非抓包 run 的继续会话仍不保存完整请求/响应正文。
+
 ## 已知限制 / 排查
 
 - **HOST_BENCH_DATA 必须是宿主机绝对路径**，不能填 `./data`——orchestrator 用它告诉宿主 daemon 给 sibling 容器挂卷。

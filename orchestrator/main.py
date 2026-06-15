@@ -417,6 +417,54 @@ def _claude_exec_env(use_sidecar: bool, extra: Optional[dict[str, str]] = None) 
     return env
 
 
+def _host_bench_data_path(container_path: Path) -> Path:
+    """
+    将 orchestrator 容器内 BENCH_DATA 路径转换成宿主机挂载路径。
+
+    :param container_path: orchestrator 视角下的文件路径
+    :return: docker daemon 可识别的宿主机路径
+    """
+    try:
+        relative_path = container_path.relative_to(BENCH_DATA)
+    except ValueError:
+        return container_path
+    return HOST_BENCH_DATA / relative_path
+
+
+def _resolve_capture_flows_dirs(
+    run: dict,
+    *,
+    ensure_exists: bool = False,
+) -> Optional[tuple[Path, Path]]:
+    """
+    解析 run 是否需要完整抓包，以及对应的容器内/宿主机 flows 目录。
+
+    :param run: runs 表行
+    :param ensure_exists: 是否创建本地 flows 目录
+    :return: (orchestrator 容器内 flows 目录, 宿主机 flows 目录)；非 capture run 返回 None
+    """
+    capture_summary_path = run.get("capture_summary_path")
+    is_capture_run = isinstance(capture_summary_path, str) and bool(capture_summary_path)
+    is_capture_run = is_capture_run or (run.get("run_kind") or "normal") == "capture"
+    if not is_capture_run:
+        return None
+
+    flows_dir_value = run.get("flows_dir")
+    if isinstance(flows_dir_value, str) and flows_dir_value:
+        flows_dir = Path(flows_dir_value)
+    else:
+        run_id = str(run.get("id") or "")
+        matches = [p.parent for p in FLOWS_DIR.rglob(f"{run_id}/stats.jsonl")] if run_id else []
+        if not matches:
+            raise ValueError(f"capture run {run_id or '(unknown)'} has no flows_dir")
+        flows_dir = matches[0]
+
+    # sibling sidecar 挂卷必须用宿主机路径；DB 里保存的是 orchestrator 容器内路径。
+    if ensure_exists:
+        flows_dir.mkdir(parents=True, exist_ok=True)
+    return flows_dir, _host_bench_data_path(flows_dir)
+
+
 # ============== DB ==============
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS accounts (
@@ -1050,6 +1098,28 @@ class Runner:
         host_workspace = HOST_BENCH_DATA / "workspaces" / run["id"]
         host_claude_home = HOST_BENCH_DATA / "workspaces" / run["id"] / ".claude-home"
         host_ca = HOST_BENCH_DATA / "ca"
+        continue_capture_dirs = _resolve_capture_flows_dirs(run, ensure_exists=True)
+        sidecar_volumes = {str(host_ca): {"bind": "/ca", "mode": "rw"}}
+        sidecar_env = {
+            "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
+            "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
+            "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
+            "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
+            "DNS_READY_HOST": DNS_READY_HOST,
+            "SAVE_FULL_FLOWS": SAVE_FULL_FLOWS,
+        }
+        if continue_capture_dirs:
+            _flows_dir, host_flows = continue_capture_dirs
+            # capture run 的继续会话仍是诊断链路，必须追加保存到原 run flows 目录。
+            sidecar_volumes[str(host_flows)] = {"bind": "/flows", "mode": "rw"}
+            sidecar_env.update({
+                "SAVE_FULL_FLOWS": "1",
+                "CAPTURE_FULL_HTTP": "1",
+                "CAPTURE_MODE": "continue_full_http",
+                "CAPTURE_SCOPE": "all",
+                "CAPTURE_TARGETS": "anthropic.com,claude.com",
+                "CAPTURE_MAX_BODY_BYTES": "0",
+            })
 
         sidecar_id: Optional[str] = None
         worker_id: Optional[str] = None
@@ -1063,15 +1133,8 @@ class Runner:
                 auto_remove=False,
                 cap_add=["NET_ADMIN"],
                 devices=["/dev/net/tun:/dev/net/tun"],
-                volumes={str(host_ca): {"bind": "/ca", "mode": "rw"}},
-                environment={
-                    "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
-                    "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
-                    "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
-                    "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
-                    "DNS_READY_HOST": DNS_READY_HOST,
-                    "SAVE_FULL_FLOWS": SAVE_FULL_FLOWS,
-                },
+                volumes=sidecar_volumes,
+                environment=sidecar_env,
             )
             sidecar_id = sidecar.id
             _wait_sidecar_ready(self.client, sidecar_id)
@@ -3844,12 +3907,11 @@ def get_capture(rid: str):
     if (run.get("run_kind") or "normal") != "capture":
         raise HTTPException(404, "capture data not available for this run")
 
-    flows_dir_value = run.get("flows_dir")
-    if isinstance(flows_dir_value, str) and flows_dir_value:
-        flows_dir = Path(flows_dir_value)
-    else:
-        matches = [p.parent for p in FLOWS_DIR.rglob(f"{rid}/stats.jsonl")]
-        flows_dir = matches[0] if matches else FLOWS_DIR / "_missing" / rid
+    try:
+        capture_dirs = _resolve_capture_flows_dirs(run)
+    except ValueError:
+        capture_dirs = None
+    flows_dir = capture_dirs[0] if capture_dirs else FLOWS_DIR / "_missing" / rid
     index_path = Path(run["capture_summary_path"]) if run.get("capture_summary_path") else flows_dir / "capture_index.json"
     index = _read_capture_index(index_path)
     return {
