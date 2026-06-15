@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 26
-- **Last Active**: 2026-06-12
+- **Total Sessions**: 27
+- **Last Active**: 2026-06-15
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~903 | Active |
+| `journal-1.md` | ~939 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 27 | 2026-06-15 | new-api Claude count_tokens 透传 | `5a84be5d`, `16276a1`, `491f181` | `main` |
 | 26 | 2026-06-12 | cc2api 非流单消息探针缓存 | `8717697`, `cf8deb0` | `main` |
 | 25 | 2026-06-12 | cc2api 2.1.173 抓包评估与远程部署 | `def8df5`, `7677f86`, `9058b21`, `6309300` | `main` |
 | 24 | 2026-06-12 | 升级 vibebench Claude Code 到 2.1.173 | `88ac336` | `main` |

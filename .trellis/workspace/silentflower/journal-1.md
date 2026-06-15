@@ -901,3 +901,39 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 27: new-api Claude count_tokens 透传
+
+**Date**: 2026-06-15
+**Task**: new-api Claude count_tokens 透传
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+为 new-api 增加 Claude /v1/messages/count_tokens 专用透传链路，补齐路由、header/beta 合并、body 字段清理、响应透传和定向测试，并记录任务快照。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5a84be5d` | (see git log) |
+| `16276a1` | (see git log) |
+| `491f181` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
