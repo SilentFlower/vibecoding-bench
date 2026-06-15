@@ -1,11 +1,11 @@
 {
-  "id": "cc2api-count-tokens-compat",
-  "name": "cc2api-count-tokens-compat",
-  "title": "强化 cc2api count_tokens 兼容",
+  "id": "new-api-claude-count-tokens",
+  "name": "new-api-claude-count-tokens",
+  "title": "new-api 支持 Claude count_tokens 透传",
   "description": "",
   "status": "in_progress",
   "dev_type": null,
-  "scope": null,
+  "scope": "/root/project/new-api",
   "package": "vibecoding-bench",
   "priority": "P2",
   "creator": "silentflower",
@@ -18,10 +18,8 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [
-    "06-15-new-api-claude-count-tokens"
-  ],
-  "parent": null,
+  "children": [],
+  "parent": "06-15-cc2api-count-tokens-compat",
   "relatedFiles": [],
   "notes": "",
   "meta": {}
