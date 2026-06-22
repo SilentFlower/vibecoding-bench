@@ -65,6 +65,9 @@ WEBUI_SESSION_SECRET=<openssl rand -hex 32>
 
 # 可选:锁定镜像 tag(默认 latest)
 VIBEBENCH_TAG=158b462
+
+# 可选:普通 run / 批量 run 的默认 Claude Code 模型(默认 opus[1m])
+CLAUDE_DEFAULT_MODEL=opus[1m]
 ```
 
 ### HOST_BENCH_DATA 怎么填(最常错)
@@ -80,6 +83,27 @@ VIBEBENCH_TAG=158b462
 | `/srv/bench/` | `/srv/bench/data` |
 
 填错的后果:**worker/sidecar 容器会挂载一个不存在的宿主路径,生成空目录,所有 profiles / flows / workspaces 都写入这个孤儿位置,看不到也找不回**。
+
+---
+
+### CLAUDE_DEFAULT_MODEL 默认模型
+
+`CLAUDE_DEFAULT_MODEL` 只控制普通 run 和批量 run。orchestrator 创建 worker 时会把它作为一次性 `CLAUDE_MODEL_OVERRIDE` 传给 worker，worker 再用 Claude Code CLI 的 `--model` 参数启动本次 TUI。它不写入账号 profile 的 `settings.json`，也不改变抓包 run 的默认模型。
+
+模型值必须匹配字符集 `[A-Za-z0-9._\-\[\]]+`，最长 128 字符。非法值会让 orchestrator 启动失败，避免无效模型静默回退到旧默认。
+
+| 场景 | 行为 |
+|------|------|
+| 未配置 `CLAUDE_DEFAULT_MODEL` | 普通 / 批量 run 使用 `opus[1m]` |
+| 配置 `CLAUDE_DEFAULT_MODEL=sonnet[1m]` | 新启动的普通 / 批量 run 使用 `sonnet[1m]` |
+| 完整 HTTP 抓包 run 未填 `model_override` | 仍沿用抓包现有默认模型，不受 `CLAUDE_DEFAULT_MODEL` 影响 |
+| 完整 HTTP 抓包 run 填了 `model_override` | 只覆盖当前抓包 run |
+
+修改 `.env` 后必须 recreate orchestrator，已运行中的 run 不受影响：
+
+```bash
+docker compose -f docker-compose.remote.yml --env-file .env up -d --force-recreate orchestrator
+```
 
 ---
 
@@ -254,6 +278,8 @@ ssh server 'cd /root/vibecoding-bench && scripts/sync-topics-db.py --topics topi
 | 浏览器看到 401 弹框/JSON | 启用了 auth,正常 | 输入 WEBUI_USER/PASS |
 | 升级后浏览器仍旧 UI | 浏览器缓存了旧 webui | Ctrl+F5 强刷 |
 | `git pull` 报 unstaged changes | 用户改过 docker-compose.yml | 按 [Pull 冲突协议](#pull-冲突协议) 处理 |
+| 设置 `CLAUDE_DEFAULT_MODEL` 后普通 run 仍旧模型 | 只改了 `.env` 但用了 `restart` 或未 recreate | `docker compose ... up -d --force-recreate orchestrator` |
+| 抓包 run 未填 `model_override` 却被全局模型影响 | 说明实现错误：抓包 run 不应收到全局 `CLAUDE_MODEL_OVERRIDE` | 检查 `capture_full_http` 分支和 worker 环境变量 |
 
 ---
 
@@ -280,6 +306,7 @@ ssh server 'cd /root/vibecoding-bench && scripts/sync-topics-db.py --topics topi
 4. 浏览器从**外网**访问 `http://<公网域名>:$BENCH_PORT/` 看到登录页
 5. `docker exec vibebench-orchestrator ls /data/profiles /data/flows /data/workspaces` 三个目录都在(说明 BENCH_DATA 挂卷对了)
 6. 跑一次 OAuth 登录账号 → 跑一次 task → `ls data/profiles/<name>/ data/workspaces/<run_id>/` 在**宿主**侧能看到落盘文件(说明 HOST_BENCH_DATA 给 sibling 容器报对了路径)
+7. 若改了 `CLAUDE_DEFAULT_MODEL`，部署后新建普通 run，确认 worker 启动环境含本次 `CLAUDE_MODEL_OVERRIDE`；同时启动未填 `model_override` 的抓包 run，确认它没有继承全局模型。
 
 ---
 

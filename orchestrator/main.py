@@ -62,12 +62,40 @@ _SIDECAR_DNS_READY_SH = (
     "2>/dev/null | grep -q ."
 )
 _CLAUDE_MODEL_OVERRIDE_RE = re.compile(r"^[A-Za-z0-9._\-\[\]]+$")
+
+
+def _normalize_claude_model_name(value: Optional[str], field_name: str) -> Optional[str]:
+    """
+    规范化 Claude Code 模型名，供环境配置和一次性 run 覆盖复用。
+
+    :param value: 原始模型名
+    :param field_name: 错误消息中展示的字段名
+    :return: trim 后的模型名；空值返回 None
+    """
+    if value is None:
+        return None
+    model = value.strip()
+    if not model:
+        return None
+    if len(model) > 128:
+        raise ValueError(f"{field_name} too long: max 128 chars")
+    if not _CLAUDE_MODEL_OVERRIDE_RE.match(model):
+        raise ValueError(
+            f"{field_name} contains invalid chars: only letters, digits, dot, underscore, dash and [] are allowed"
+        )
+    return model
+
+
 WORKER_USER = "node"
 WORKER_HOME = "/home/node"
 WORKER_UID = 1000
 WORKER_GID = 1000
 CLAUDE_CODE_VERSION = os.environ.get("CLAUDE_CODE_VERSION", "2.1.185")
 CLAUDE_CODE_EFFORT_LEVEL = os.environ.get("CLAUDE_CODE_EFFORT_LEVEL", "max")
+CLAUDE_DEFAULT_MODEL = _normalize_claude_model_name(
+    os.environ.get("CLAUDE_DEFAULT_MODEL") or "opus[1m]",
+    "CLAUDE_DEFAULT_MODEL",
+) or "opus[1m]"
 SAVE_FULL_FLOWS = os.environ.get("SAVE_FULL_FLOWS", "0")
 CLEAN_WORKSPACE_DEPS = os.environ.get("CLEAN_WORKSPACE_DEPS", "1")
 TIMEOUT_WRAPUP_SEC = int(os.environ.get("TIMEOUT_WRAPUP_SEC", "600"))
@@ -715,19 +743,10 @@ def normalize_claude_model_override(value: Optional[str]) -> Optional[str]:
     :param value: 用户提交的模型名或别名
     :return: trim 后的模型名；空值返回 None
     """
-    if value is None:
-        return None
-    model = value.strip()
-    if not model:
-        return None
-    if len(model) > 128:
-        raise HTTPException(400, "model_override too long: max 128 chars")
-    if not _CLAUDE_MODEL_OVERRIDE_RE.match(model):
-        raise HTTPException(
-            400,
-            "model_override contains invalid chars: only letters, digits, dot, underscore, dash and [] are allowed",
-        )
-    return model
+    try:
+        return _normalize_claude_model_name(value, "model_override")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 def _format_quota_result(raw: dict) -> dict:
@@ -945,6 +964,10 @@ class Runner:
         if isinstance(model_override, str) and model_override:
             # 只给当前 worker 进程传一次性模型覆盖，避免污染账号 profile settings。
             worker_env["CLAUDE_MODEL_OVERRIDE"] = model_override
+        elif not capture_full_http:
+            # 普通 / 批量 run 复用抓包的 --model 一次性覆盖链路；
+            # 抓包 run 留空时必须沿用自身默认模型，不能被全局配置带偏。
+            worker_env["CLAUDE_MODEL_OVERRIDE"] = CLAUDE_DEFAULT_MODEL
 
         sidecar_id: Optional[str] = None
         worker_id: Optional[str] = None
