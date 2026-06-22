@@ -972,3 +972,39 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 29: cc2api metadata user_id account alignment
+
+**Date**: 2026-06-22
+**Task**: cc2api metadata user_id account alignment
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+修复 cc2api Claude Code 模式 metadata.user_id 账号身份对齐，保留 session_id；补充 JSON/legacy 回归测试，通过 fmt、metadata、cch 和全量 cargo test；提交 Trellis 升级与任务快照。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `703e4ab` | (see git log) |
+| `80adb26` | (see git log) |
+| `b59a5bc` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
