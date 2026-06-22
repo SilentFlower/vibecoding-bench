@@ -63,6 +63,8 @@ _SIDECAR_DNS_READY_SH = (
 )
 _CLAUDE_MODEL_OVERRIDE_RE = re.compile(r"^[A-Za-z0-9._\-\[\]]+$")
 _RUNTIME_MODEL_SETTING_KEY = "claude_default_model"
+_RUNTIME_EFFORT_SETTING_KEY = "claude_effort_level"
+_CLAUDE_EFFORT_LEVELS = ("max", "xhigh", "high", "medium", "low")
 
 
 def _normalize_claude_model_name(value: Optional[str], field_name: str) -> Optional[str]:
@@ -87,12 +89,34 @@ def _normalize_claude_model_name(value: Optional[str], field_name: str) -> Optio
     return model
 
 
+def _normalize_claude_effort_level(value: Optional[str], field_name: str) -> Optional[str]:
+    """
+    规范化 Claude Code 思考预算值。
+
+    :param value: 原始思考预算值
+    :param field_name: 错误消息中展示的字段名
+    :return: 规范化后的枚举值；空值返回 None
+    """
+    if value is None:
+        return None
+    effort = value.strip().lower()
+    if not effort:
+        return None
+    if effort not in _CLAUDE_EFFORT_LEVELS:
+        allowed = ", ".join(_CLAUDE_EFFORT_LEVELS)
+        raise ValueError(f"{field_name} 无效：只允许 {allowed}")
+    return effort
+
+
 WORKER_USER = "node"
 WORKER_HOME = "/home/node"
 WORKER_UID = 1000
 WORKER_GID = 1000
 CLAUDE_CODE_VERSION = os.environ.get("CLAUDE_CODE_VERSION", "2.1.185")
-CLAUDE_CODE_EFFORT_LEVEL = os.environ.get("CLAUDE_CODE_EFFORT_LEVEL", "max")
+CLAUDE_CODE_EFFORT_LEVEL = _normalize_claude_effort_level(
+    os.environ.get("CLAUDE_CODE_EFFORT_LEVEL") or "max",
+    "CLAUDE_CODE_EFFORT_LEVEL",
+) or "max"
 CLAUDE_DEFAULT_MODEL = _normalize_claude_model_name(
     os.environ.get("CLAUDE_DEFAULT_MODEL") or "opus[1m]",
     "CLAUDE_DEFAULT_MODEL",
@@ -789,6 +813,70 @@ def save_runtime_model_setting(value: Optional[str]) -> Optional[str]:
             conn.close()
 
 
+def get_runtime_effort_setting() -> Optional[str]:
+    """
+    读取 WebUI 保存的普通 / 批量 run 思考预算覆盖值。
+
+    :return: 思考预算覆盖值；未配置时返回 None
+    """
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT value FROM app_settings WHERE key=?",
+            (_RUNTIME_EFFORT_SETTING_KEY,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return None
+    try:
+        return _normalize_claude_effort_level(row["value"], "runtime_effort")
+    except ValueError:
+        # SQLite 是运行态存储，遇到旧版本遗留坏值时不能静默传给 worker。
+        raise ValueError("已保存的思考预算配置无效，请在 WebUI 运行页重置")
+
+
+def effective_runtime_effort() -> str:
+    """
+    返回普通 / 批量 run 当前生效的思考预算。
+
+    :return: WebUI 覆盖值优先，否则返回 `.env` 的 CLAUDE_CODE_EFFORT_LEVEL
+    """
+    return get_runtime_effort_setting() or CLAUDE_CODE_EFFORT_LEVEL
+
+
+def save_runtime_effort_setting(value: Optional[str]) -> Optional[str]:
+    """
+    保存或清除 WebUI 思考预算覆盖值。
+
+    :param value: 用户提交的思考预算；空值表示清除覆盖并回退到 `.env`
+    :return: 保存后的思考预算；清除覆盖时返回 None
+    """
+    try:
+        effort = _normalize_claude_effort_level(value, "effort_level")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                if effort is None:
+                    conn.execute(
+                        "DELETE FROM app_settings WHERE key=?",
+                        (_RUNTIME_EFFORT_SETTING_KEY,),
+                    )
+                    return None
+                conn.execute(
+                    "INSERT INTO app_settings(key, value, updated_at) VALUES(?,?,julianday('now')) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=julianday('now')",
+                    (_RUNTIME_EFFORT_SETTING_KEY, effort),
+                )
+                return effort
+        finally:
+            conn.close()
+
+
 def build_topic_prompt(topic: dict) -> str:
     """
     按 topic 生成默认 Claude prompt。
@@ -1017,7 +1105,12 @@ class Runner:
             "TIMEOUT_SEC": str(task.get("timeout_sec", 1800)),
             "ACC_NAME": acc_name,
             "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
-            "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
+            # 抓包 run 是协议诊断路径，必须独立于页面运行时覆盖值；
+            # 普通 / 批量 run 才读取 SQLite 中的动态思考预算配置。
+            "CLAUDE_CODE_EFFORT_LEVEL": (
+                CLAUDE_CODE_EFFORT_LEVEL if capture_full_http else effective_runtime_effort()
+            ),
+            "PROFILE_CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
             "CLEAN_WORKSPACE_DEPS": CLEAN_WORKSPACE_DEPS,
             "TIMEOUT_WRAPUP_SEC": str(TIMEOUT_WRAPUP_SEC),
             "OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC": str(OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC),
@@ -1096,11 +1189,16 @@ class Runner:
             self.cleanup(sidecar_id, worker_id)
             raise
 
-    def persist_worker_profile(self, worker_id: Optional[str]) -> None:
+    def persist_worker_profile(
+        self,
+        worker_id: Optional[str],
+        profile_effort_level: str = CLAUDE_CODE_EFFORT_LEVEL,
+    ) -> None:
         """
         在停止容器前尽量把运行时本地配置回写 profile。
 
         :param worker_id: worker 容器 ID
+        :param profile_effort_level: 回写账号 profile 时保留的思考预算兜底值
         :return: None
         """
         if not worker_id:
@@ -1111,7 +1209,20 @@ class Runner:
                 "mkdir -p \"$HOME/.claude\"; "
                 "cp \"$HOME/.claude.json\" \"$HOME/.claude/.claude.json\" 2>/dev/null || true; "
                 "if [ -d /mnt/profile ] && [ -w /mnt/profile ]; then "
-                "cp \"$HOME/.claude/settings.json\" /mnt/profile/settings.json 2>/dev/null || true; "
+                "if [ -f \"$HOME/.claude/settings.json\" ]; then "
+                "node - \"$HOME/.claude/settings.json\" \"$PROFILE_CLAUDE_CODE_EFFORT_LEVEL\" "
+                "> /tmp/profile-settings.json <<'JS' || cp \"$HOME/.claude/settings.json\" /tmp/profile-settings.json\n"
+                "const fs = require('fs');\n"
+                "const path = process.argv[2];\n"
+                "const effort = process.argv[3] || 'max';\n"
+                "const data = JSON.parse(fs.readFileSync(path, 'utf8'));\n"
+                "const settings = data && typeof data === 'object' ? data : {};\n"
+                "const env = settings.env && typeof settings.env === 'object' ? settings.env : {};\n"
+                "settings.env = {...env, CLAUDE_CODE_EFFORT_LEVEL: effort};\n"
+                "process.stdout.write(`${JSON.stringify(settings, null, 2)}\\n`);\n"
+                "JS\n"
+                "cp /tmp/profile-settings.json /mnt/profile/settings.json 2>/dev/null || true; "
+                "fi; "
                 "cp \"$HOME/.claude/.claude.json\" /mnt/profile/.claude.json 2>/dev/null || true; "
                 "chown node:node /mnt/profile/settings.json /mnt/profile/.claude.json 2>/dev/null || true; "
                 "fi"
@@ -1121,7 +1232,10 @@ class Runner:
                 ["sh", "-lc", cmd],
                 stdout=True,
                 stderr=True,
-                environment={"HOME": WORKER_HOME},
+                environment={
+                    "HOME": WORKER_HOME,
+                    "PROFILE_CLAUDE_CODE_EFFORT_LEVEL": profile_effort_level,
+                },
                 workdir=WORKER_HOME,
             )
             api.exec_start(ex["Id"])
@@ -2879,6 +2993,16 @@ class RuntimeModelIn(BaseModel):
     default_model: Optional[str] = None
 
 
+class RuntimeEffortIn(BaseModel):
+    """
+    WebUI 保存普通 / 批量 run 思考预算的请求体。
+
+    :param effort_level: 思考预算枚举；空值表示清除页面覆盖并回退到 `.env`
+    """
+
+    effort_level: Optional[str] = None
+
+
 @app.post("/api/auth/login")
 def auth_login(body: AuthIn, response: Response):
     """校验账密 → 签发 session cookie(7 天)。auth 未启用时 400。"""
@@ -2944,6 +3068,24 @@ def runtime_model_response() -> dict:
     }
 
 
+def runtime_effort_response() -> dict:
+    """
+    组装普通 / 批量 run 思考预算设置响应。
+
+    :return: 页面覆盖值、环境兜底值、当前生效值和允许枚举
+    """
+    try:
+        configured_effort = get_runtime_effort_setting()
+    except ValueError as e:
+        raise HTTPException(500, str(e))
+    return {
+        "configured_effort": configured_effort,
+        "env_default_effort": CLAUDE_CODE_EFFORT_LEVEL,
+        "effective_effort": configured_effort or CLAUDE_CODE_EFFORT_LEVEL,
+        "allowed_efforts": list(_CLAUDE_EFFORT_LEVELS),
+    }
+
+
 @app.get("/api/settings/runtime-model")
 def get_runtime_model():
     """
@@ -2964,6 +3106,28 @@ def update_runtime_model(body: RuntimeModelIn):
     """
     save_runtime_model_setting(body.default_model)
     return runtime_model_response()
+
+
+@app.get("/api/settings/runtime-effort")
+def get_runtime_effort():
+    """
+    返回普通 / 批量 run 当前思考预算设置。
+
+    :return: 页面覆盖值、环境兜底值、当前生效值和允许枚举
+    """
+    return runtime_effort_response()
+
+
+@app.put("/api/settings/runtime-effort")
+def update_runtime_effort(body: RuntimeEffortIn):
+    """
+    保存普通 / 批量 run 思考预算覆盖值；空值表示回退到 `.env`。
+
+    :param body: 思考预算设置请求体
+    :return: 保存后的当前思考预算设置
+    """
+    save_runtime_effort_setting(body.effort_level)
+    return runtime_effort_response()
 
 
 # ---------- accounts ----------

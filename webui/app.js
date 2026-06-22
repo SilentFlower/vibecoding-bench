@@ -32,6 +32,7 @@ const state = {
   batches: [],
   runs: [],
   runtimeModel: null,
+  runtimeEffort: null,
   topicFilter: '',
   runsEventSource: null,
   runDetail: null,
@@ -875,10 +876,12 @@ async function renderRuns() {
     state.tasks = await API('/tasks');
     state.topics = await API('/topics');
     state.runtimeModel = await API('/settings/runtime-model');
+    state.runtimeEffort = await API('/settings/runtime-effort');
   } catch (e) {
     return alert('加载运行依赖失败: ' + e.message);
   }
   bindRuntimeModelForm();
+  bindRuntimeEffortForm();
   bindCaptureForm();
   paintRuns(state.runs);
   if (state.runsEventSource) state.runsEventSource.close();
@@ -932,6 +935,57 @@ function bindRuntimeModelForm() {
       paintRuntimeModelSetting();
     } catch (err) {
       alert('保存默认模型失败: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      if (resetBtn) resetBtn.disabled = false;
+    }
+  };
+}
+
+function paintRuntimeEffortSetting() {
+  const form = $('#runtime-effort-form');
+  if (!form || !state.runtimeEffort) return;
+  const configured = state.runtimeEffort.configured_effort;
+  const effective = state.runtimeEffort.effective_effort || state.runtimeEffort.env_default_effort || '-';
+  const allowed = state.runtimeEffort.allowed_efforts || [];
+  form.effort_level.innerHTML = [
+    `<option value="">回退 .env (${escapeHTML(state.runtimeEffort.env_default_effort || '-')})</option>`,
+    ...allowed.map(v => `<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`),
+  ].join('');
+  form.effort_level.value = configured || '';
+  $('#runtime-effort-effective').textContent = effective;
+  $('#runtime-effort-source').innerHTML = configured
+    ? `页面覆盖；.env 兜底为 <code>${escapeHTML(state.runtimeEffort.env_default_effort || '-')}</code>`
+    : `.env 兜底：<code>${escapeHTML(state.runtimeEffort.env_default_effort || '-')}</code>`;
+}
+
+function bindRuntimeEffortForm() {
+  const form = $('#runtime-effort-form');
+  if (!form) return;
+  paintRuntimeEffortSetting();
+  const resetBtn = $('#runtime-effort-reset');
+  if (resetBtn) {
+    resetBtn.onclick = () => {
+      form.effort_level.value = '';
+      form.requestSubmit();
+    };
+  }
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector('button[type=submit]');
+    const body = {
+      effort_level: (new FormData(form).get('effort_level') || '').trim() || null,
+    };
+    btn.disabled = true;
+    if (resetBtn) resetBtn.disabled = true;
+    try {
+      state.runtimeEffort = await API('/settings/runtime-effort', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+      paintRuntimeEffortSetting();
+    } catch (err) {
+      alert('保存思考预算失败: ' + err.message);
     } finally {
       btn.disabled = false;
       if (resetBtn) resetBtn.disabled = false;

@@ -88,7 +88,7 @@ task 模式环境变量:
 | `TIMEOUT_WRAPUP_SEC` | 否 | 距离硬超时多少秒注入一次收尾提示,默认 600;`0` 关闭 |
 | `OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC` | 否 | 运行中从账号 profile 单向同步 `.credentials.json` 的间隔,默认 15;`0` 关闭 |
 | `OAUTH_401_PROFILE_WAIT_SEC` | 否 | 检测到 401 后等待后台刷新器更新 profile credentials 的最长秒数,默认 90;`0` 不等待 |
-| `CLAUDE_API_STALL_WATCHDOG_SEC` | 否 | Claude Code API 连接错误后持续无有效进展多久自动中断续跑,默认 400;`0` 关闭 |
+| `CLAUDE_API_STALL_WATCHDOG_SEC` | 否 | Claude Code API 连接错误或 TUI `Request timed out` 后持续无有效进展多久自动中断续跑,默认 400;`0` 关闭 |
 | `CLAUDE_API_STALL_MAX_RECOVERIES` | 否 | 每个 run 最多自动中断续跑次数,默认 1;`0` 不恢复 |
 | `CLAUDE_BUSY_INTERRUPT_GRACE_SEC` | 否 | 发送中断后等待 TUI 回到输入状态的秒数,默认 8 |
 | `CLAUDE_API_STALL_RECOVERY_PROMPT` | 否 | API 卡死自动续跑提示;留空使用 worker 内置中文提示 |
@@ -137,7 +137,9 @@ worker 镜像里的 Claude Code CLI 版本、worker 运行时 `CLAUDE_CODE_VERSI
 
 worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 prompt；只能等待 JSONL 变化,直到完成、Claude 退出或 `TIMEOUT_SEC` 到期。
 
-若 Claude Code session JSONL 明确出现 `system api_error` 连接错误(如 `ECONNRESET` / `Unable to connect to API`),且之后超过 `CLAUDE_API_STALL_WATCHDOG_SEC` 没有对话或 workspace 产物进展,worker 可在 `CLAUDE_API_STALL_MAX_RECOVERIES` 上限内对 TUI 发送一次中断并注入继续提示。这是对 API 卡死的有限恢复,不是通用催促机制;没有明确 API 连接错误时禁止触发。
+若 Claude Code session JSONL 明确出现 `system api_error` 连接错误(如 `ECONNRESET` / `Unable to connect to API`),或 TUI transcript 明确显示 `API error · Retrying ...` / `Request timed out · Retrying ...`,且之后超过 `CLAUDE_API_STALL_WATCHDOG_SEC` 没有对话或 workspace 产物进展,worker 可在 `CLAUDE_API_STALL_MAX_RECOVERIES` 上限内对 TUI 发送一次中断并注入继续提示。这是对 API 卡死的有限恢复,不是通用催促机制;没有明确 API 连接错误 / timeout 文案时禁止触发。
+
+若 Claude Code session JSONL 最终写入 synthetic API error 消息(例如 `isApiErrorMessage=true` 且文本为 `Request timed out`),worker 必须写 `/workspace/.bench-status.json` 并以非 0 退出,让 orchestrator 标记为 `failed`。这种消息不是最终交付总结,禁止按普通 assistant 文本判定为 `success`。
 
 临近 timeout 注入收尾提示时,如果 TUI 仍处于 busy 状态且恢复次数未用完,worker 可先中断 busy 回合再注入收尾提示,避免提示只排队在输入框。若恢复后仍超时,worker 应在 `/workspace/.bench-status.json` 写入可见错误,orchestrator 继续把 run 标为 `timeout`。
 
@@ -205,6 +207,8 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
 - 用 worker/quota 启动路径断言:usage 前等待通用 DNS resolver 可用,只在 access token 快过期时刷新 OAuth,刷新不用 Python `urllib`,且 DNS/URL 临时失败有限重试。
 - 用 Claude JSONL 样例断言:
   - `system api_error` 的 `ECONNRESET` 后超过 watchdog 窗口且无产物/对话进展时触发恢复。
+  - transcript 中 `Request timed out · Retrying ...` 后超过 watchdog 窗口且无产物/对话进展时触发恢复。
+  - synthetic `Request timed out` API error 消息判 `failed`,不判 `success`。
   - API error 后已有 assistant/tool/文件进展时不触发恢复。
   - OAuth 401 文本仍走 `auth_failed`,不走 API 卡死恢复。
 - 远程发布后跑一个真实 task,检查 DB 里 `success` run 的 JSONL 最新对话消息是 assistant 文本,而不是 user `tool_result`。

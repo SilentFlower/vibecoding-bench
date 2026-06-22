@@ -195,6 +195,27 @@
           <button class="btn btn-primary" type="submit">保存默认模型</button>
         </div>
       </form>
+      <form id="runtime-effort-form" class="form runtime-model-panel">
+        <div class="capture-title">
+          <strong>思考预算</strong>
+          <span class="muted">// 普通 run + 批量 run</span>
+        </div>
+        <div class="row">
+          <label><span class="lbl">$ effort_level</span>
+            <span class="hint inline">页面保存后立即影响新启动的普通 / 批量 run；抓包 run 不受影响。</span>
+            <select name="effort_level"></select>
+          </label>
+          <div class="runtime-model-status">
+            <span class="muted">当前生效</span>
+            <strong id="runtime-effort-effective">加载中</strong>
+            <span class="hint inline" id="runtime-effort-source">读取配置中</span>
+          </div>
+        </div>
+        <div class="row-end">
+          <button class="btn btn-sm" type="button" id="runtime-effort-reset">回退 .env</button>
+          <button class="btn btn-primary" type="submit">保存思考预算</button>
+        </div>
+      </form>
       <form id="capture-form" class="form capture-panel">
         <div class="capture-title">
           <strong>完整抓包</strong>

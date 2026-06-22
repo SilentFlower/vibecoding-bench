@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/index.md", "reason": "后端 FastAPI、SQLite 和运行配置接口规范入口"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/index.md", "reason": "WebUI 三文件零构建和 runs 页交互规范入口"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/index.md", "reason": "worker、镜像、远程部署和运行环境变量规范入口"}
+{"file": ".trellis/spec/guides/index.md", "reason": "跨层配置改动和复用检查的通用思考指南入口"}

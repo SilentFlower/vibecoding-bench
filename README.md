@@ -53,7 +53,7 @@ open http://localhost:8000
 | **账号** | 添加在 init-account.sh 已建好 profile 的账号，配置上游 SOCKS5 |
 | **题库** | 300 题；点击卡片 → 查看 / 编辑 topic，批量任务页可多选派发 |
 | **任务** | 列表 + ▶ 运行（按 repeat_n 提交多次）|
-| **运行** | SSE 实时列表 + 默认模型配置 + 详情：transcript / 产物文件树 / token 统计；也可启动单次完整 HTTP 抓包 run |
+| **运行** | SSE 实时列表 + 默认模型 / 思考预算配置 + 详情：transcript / 产物文件树 / token 统计；也可启动单次完整 HTTP 抓包 run |
 
 ## 关键决策（已锁定 PRD）
 
@@ -64,7 +64,7 @@ open http://localhost:8000
 | 并发 | 单账号 2 并发；总并发 = 账号数 × 2 |
 | 任务派发 | 创建任务时指定账号，不切换 |
 | 速率限制 | 撞限即停（标 failed），不自动切其它账号 |
-| 思考预算 | 默认 `CLAUDE_CODE_EFFORT_LEVEL=max`，可在 `.env` 调整 |
+| 思考预算 | 普通 / 批量 run 默认使用 WebUI 运行页配置；未配置时回退到 `CLAUDE_CODE_EFFORT_LEVEL=max` |
 | 默认模型 | 普通 / 批量 run 默认使用 WebUI 运行页配置；未配置时回退到 `CLAUDE_DEFAULT_MODEL=opus[1m]` |
 | 透明代理 | sidecar 容器 + hev-socks5-tunnel + mitmproxy（TLS MITM）|
 | WebUI | 纯 HTML + 原生 JS + SSE，零构建 |
@@ -132,7 +132,8 @@ data/flows/<account>/<task_id>/<run_id>/
 - **certificate pinning 风险**：claude-code 当前不 pin；后续升级若 pin，MITM 会失败，需补丁或回退到不解密模式。
 - **超时**：默认每 run 1800s，可在创建任务时调整。worker 默认会在超时前 `TIMEOUT_WRAPUP_SEC=600` 秒注入一次收尾提示，要求 Claude 停止扩展并输出最终总结；设为 `0` 可关闭。
 - **批次顺序**：题库浏览仍按编号展示；创建批次时会把已选 topic 随机写入执行队列，同一个批次内顺序固定，便于追踪运行结果。
-- **思考预算**：默认 `CLAUDE_CODE_EFFORT_LEVEL=max`，需要降低耗时或额度消耗时可在 `.env` 改成 `xhigh` / `high` / `medium` / `low` 后重建 / recreate。
+- **思考预算**：普通 run 和批量 run 默认使用 WebUI「运行」页保存的思考预算；未保存页面覆盖值时回退到 `CLAUDE_CODE_EFFORT_LEVEL=max`。需要降低耗时或额度消耗时，优先在页面切到 `high` / `medium` / `low`，新启动的普通 / 批量 run 立即生效；清空页面覆盖后才回退到 `.env`。完整 HTTP 抓包 run 不受页面思考预算配置影响。只有修改 `.env` 兜底值时才需要重建 / recreate orchestrator。
+- **API timeout 终态**：worker 会识别 Claude TUI 的 `API error` / `Request timed out` 重试卡死并按 watchdog 尝试恢复；如果 Claude JSONL 最终写入 synthetic `Request timed out`，run 会标记为 `failed` 并显示错误，不再当作 `success`。
 - **默认模型**：普通 run 和批量 run 默认使用 WebUI「运行」页保存的模型；未保存页面覆盖值时回退到 `CLAUDE_DEFAULT_MODEL=opus[1m]`。如果某个模型临时不可用，优先在页面改成 `sonnet[1m]`、`haiku` 或完整模型 ID，新启动的普通 / 批量 run 立即生效；清空页面覆盖后才回退到 `.env`。完整 HTTP 抓包 run 不受页面配置或 `CLAUDE_DEFAULT_MODEL` 影响，只在抓包页填写 `model_override` 时覆盖当前抓包 run。
 - **OAuth 401 / token 刷新竞态**：orchestrator 后台刷新器会更新账号 profile，运行中的 worker 会按 `OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC` 单向同步新的 `.credentials.json`。若 Claude 仍返回 401，worker 会最多等 `OAUTH_401_PROFILE_WAIT_SEC=90` 秒看后台刷新是否落盘，拿到新凭据后提示重试一次；等不到或再次失败会标记 `auth_failed`，不会继续等到普通 timeout。
 - **磁盘占用 / 敏感数据**：普通 run 默认 `SAVE_FULL_FLOWS=0`，只保留 `stats.jsonl`；完整抓包 run 会保存请求体和响应体全文、`.flow` 和索引，体积更大且包含高敏数据；默认 `CLEAN_WORKSPACE_DEPS=1` 会在 run 结束后清理 workspace 里的 `node_modules`、`.venv` 等依赖目录。

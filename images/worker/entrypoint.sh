@@ -31,6 +31,7 @@ set -euo pipefail
 WORKER_MODE="${WORKER_MODE:-task}"
 CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.185}"
 CLAUDE_CODE_EFFORT_LEVEL="${CLAUDE_CODE_EFFORT_LEVEL:-max}"
+PROFILE_CLAUDE_CODE_EFFORT_LEVEL="${PROFILE_CLAUDE_CODE_EFFORT_LEVEL:-$CLAUDE_CODE_EFFORT_LEVEL}"
 log() { echo "[entrypoint $(date +%H:%M:%S)] $*"; }
 CLAUDE_USER=node
 CLAUDE_HOME=/home/node
@@ -213,6 +214,8 @@ wait_for_sidecar_dns() {
 persist_runtime_claude_state() {
   # task 模式里 Claude 跑在 $HOME 的运行时副本中；OAuth token 统一由
   # orchestrator 后台刷新器维护，run 结束不能把旧 credentials 覆盖回 profile。
+  # 页面运行时思考预算只应影响当前 worker 进程；回写 profile 前还原成
+  # orchestrator 环境兜底值，避免把一次页面覆盖污染进账号长期 settings。
   if [ ! -d /mnt/profile ] || [ ! -w /mnt/profile ]; then
     return 0
   fi
@@ -221,7 +224,17 @@ persist_runtime_claude_state() {
     cp "$CLAUDE_HOME/.claude.json" /mnt/profile/.claude.json || true
   fi
   if [ -f "$CLAUDE_DIR/settings.json" ]; then
-    cp "$CLAUDE_DIR/settings.json" /mnt/profile/settings.json || true
+    node - "$CLAUDE_DIR/settings.json" "$PROFILE_CLAUDE_CODE_EFFORT_LEVEL" >/tmp/profile-settings.json <<'JS' || cp "$CLAUDE_DIR/settings.json" /tmp/profile-settings.json
+const fs = require('fs');
+const path = process.argv[2];
+const effort = process.argv[3] || 'max';
+const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+const settings = data && typeof data === 'object' ? data : {};
+const env = settings.env && typeof settings.env === 'object' ? settings.env : {};
+settings.env = {...env, CLAUDE_CODE_EFFORT_LEVEL: effort};
+process.stdout.write(`${JSON.stringify(settings, null, 2)}\n`);
+JS
+    cp /tmp/profile-settings.json /mnt/profile/settings.json || true
   fi
   chown "$CLAUDE_USER:$CLAUDE_USER" \
     /mnt/profile/.claude.json \
@@ -509,6 +522,16 @@ def content_has_tool_use(content):
     return any(isinstance(item, dict) and item.get("type") == "tool_use" for item in content)
 
 
+def is_synthetic_api_timeout(entry, text):
+    # Claude Code 2.x 在请求重试耗尽后会写入 synthetic assistant 消息。
+    # 这不是模型完成结果，不能按普通最终 assistant 文本判 success。
+    is_api_error = entry.get("isApiErrorMessage") is True
+    message = entry.get("message")
+    if isinstance(message, dict) and message.get("model") == "<synthetic>":
+        is_api_error = True
+    return is_api_error and "request timed out" in text.lower()
+
+
 jsonl_files = sorted(project_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
 if not jsonl_files:
     sys.exit(1)
@@ -541,6 +564,9 @@ stop_reason = message_stop_reason(latest_entry)
 
 if role != "assistant":
     sys.exit(1)
+if is_synthetic_api_timeout(latest_entry, text):
+    print("fatal_api_timeout")
+    sys.exit(3)
 if content_has_tool_use(content):
     sys.exit(1)
 if stop_reason == "tool_use":
@@ -765,6 +791,19 @@ def is_api_error(entry):
     return any(marker in text for marker in markers)
 
 
+def transcript_api_error_epoch():
+    transcript = workspace / ".bench-transcript.log"
+    try:
+        text = transcript.read_text(encoding="utf-8", errors="replace").lower()
+        mtime = transcript.stat().st_mtime
+    except OSError:
+        return 0.0
+    has_retry = "retrying" in text
+    if has_retry and ("api error" in text or "request timed out" in text):
+        return max(mtime, since_epoch)
+    return 0.0
+
+
 def is_final_assistant(entry):
     if message_role(entry) != "assistant":
         return False
@@ -822,6 +861,8 @@ if project_dir.exists():
                 latest_progress = max(latest_progress, ts)
             if is_api_error(entry):
                 latest_error = max(latest_error, ts)
+
+latest_error = max(latest_error, transcript_api_error_epoch())
 
 if latest_entry and is_final_assistant(latest_entry):
     sys.exit(1)
@@ -946,6 +987,11 @@ write_api_stall_status() {
   local status="$1"
   local error="$2"
   write_bench_status "$status" "$error" "$(api_stall_recovery_count)"
+}
+
+write_api_timeout_status() {
+  echo "api_timeout" > /tmp/claude-api-fatal-error
+  write_bench_status "failed" "Claude API 请求超时：Request timed out" "$(api_stall_recovery_count)"
 }
 
 # ---------- 0) /etc/machine-id 按账号名 hash 写入 ----------
@@ -1073,7 +1119,7 @@ EOF
 chown -R "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME" /workspace || true
 rm -f /tmp/claude-done /tmp/claude-stop-seen
 rm -f /tmp/claude-exited /tmp/claude-exit-code
-rm -f /tmp/claude-fatal-error /tmp/claude-completion-state
+rm -f /tmp/claude-fatal-error /tmp/claude-api-fatal-error /tmp/claude-completion-state
 rm -f /tmp/claude-auth-recovered-once /tmp/claude-wrapup-sent
 rm -f /tmp/claude-api-stall-recoveries /tmp/claude-api-stall-last-recovery /tmp/claude-busy-interrupts
 rm -f /workspace/.bench-status.json /workspace/.bench-status.json.tmp
@@ -1218,6 +1264,10 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     write_bench_status "auth_failed" "OAuth 认证失败"
     break
   fi
+  if [ "$completion_status" -eq 3 ]; then
+    write_api_timeout_status
+    break
+  fi
   if [ -f /tmp/claude-exited ]; then
     completion_status=0
     classify_claude_completion 0 >/tmp/claude-completion-state 2>/dev/null || completion_status=$?
@@ -1227,6 +1277,9 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     if [ "$completion_status" -eq 2 ]; then
       echo "auth_error" > /tmp/claude-fatal-error
       write_bench_status "auth_failed" "OAuth 认证失败"
+    fi
+    if [ "$completion_status" -eq 3 ]; then
+      write_api_timeout_status
     fi
     break
   fi
@@ -1245,6 +1298,8 @@ if [ "$completion_done" -ne 1 ] && [ ! -f /tmp/claude-fatal-error ]; then
   elif [ "$completion_status" -eq 2 ]; then
     echo "auth_error" > /tmp/claude-fatal-error
     write_bench_status "auth_failed" "OAuth 认证失败"
+  elif [ "$completion_status" -eq 3 ]; then
+    write_api_timeout_status
   fi
 fi
 
@@ -1257,6 +1312,12 @@ elif [ -f /tmp/claude-fatal-error ]; then
     write_bench_status "auth_failed" "OAuth 认证失败"
   fi
   exit 42
+elif [ -f /tmp/claude-api-fatal-error ]; then
+  log "Claude returned a fatal API timeout"
+  if [ ! -f /workspace/.bench-status.json ]; then
+    write_api_timeout_status
+  fi
+  exit 1
 elif [ -f /tmp/claude-exited ]; then
   code=$(cat /tmp/claude-exit-code 2>/dev/null || echo 1)
   if [ "$code" = "0" ]; then
