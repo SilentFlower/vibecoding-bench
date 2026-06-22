@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "校验 cargo fmt、cargo test、敏感数据边界"}
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "检查 /v1/messages 改写后 CCH/header/session 一致性"}

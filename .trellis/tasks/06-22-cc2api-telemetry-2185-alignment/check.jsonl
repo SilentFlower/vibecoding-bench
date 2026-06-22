@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "校验 cargo fmt、cargo test、敏感数据不入库"}
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "检查 2.1.185 telemetry payload 与 header/profile 对齐"}

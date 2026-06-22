@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "cc2api 后端 service/rewriter 分层与 Gateway 热路径改写顺序约束"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "请求体改写、敏感数据边界和 Rust 后端验证命令"}
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "Claude Code wire profile、metadata/header/CCH 相关协议约束"}
