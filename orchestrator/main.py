@@ -62,6 +62,7 @@ _SIDECAR_DNS_READY_SH = (
     "2>/dev/null | grep -q ."
 )
 _CLAUDE_MODEL_OVERRIDE_RE = re.compile(r"^[A-Za-z0-9._\-\[\]]+$")
+_RUNTIME_MODEL_SETTING_KEY = "claude_default_model"
 
 
 def _normalize_claude_model_name(value: Optional[str], field_name: str) -> Optional[str]:
@@ -78,10 +79,10 @@ def _normalize_claude_model_name(value: Optional[str], field_name: str) -> Optio
     if not model:
         return None
     if len(model) > 128:
-        raise ValueError(f"{field_name} too long: max 128 chars")
+        raise ValueError(f"{field_name} 过长：最多 128 个字符")
     if not _CLAUDE_MODEL_OVERRIDE_RE.match(model):
         raise ValueError(
-            f"{field_name} contains invalid chars: only letters, digits, dot, underscore, dash and [] are allowed"
+            f"{field_name} 包含非法字符：只允许字母、数字、点、下划线、短横线和 []"
         )
     return model
 
@@ -565,6 +566,12 @@ CREATE TABLE IF NOT EXISTS task_batch_items (
   FOREIGN KEY(topic_id) REFERENCES topics(id)
 );
 
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at REAL DEFAULT (julianday('now'))
+);
+
 CREATE TABLE IF NOT EXISTS runs (
   id TEXT PRIMARY KEY,
   task_id INTEGER NOT NULL,
@@ -716,6 +723,70 @@ def list_topic_rows(include_deleted: bool = False) -> list[dict]:
         return [dict(r) for r in rows]
     finally:
         conn.close()
+
+
+def get_runtime_model_setting() -> Optional[str]:
+    """
+    读取 WebUI 保存的普通 / 批量 run 默认模型覆盖值。
+
+    :return: 模型覆盖值；未配置时返回 None
+    """
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT value FROM app_settings WHERE key=?",
+            (_RUNTIME_MODEL_SETTING_KEY,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return None
+    try:
+        return _normalize_claude_model_name(row["value"], "runtime_model")
+    except ValueError:
+        # SQLite 是运行态存储，遇到旧版本遗留坏值时不能静默传给 worker。
+        raise ValueError("已保存的默认模型配置无效，请在 WebUI 运行页重置")
+
+
+def effective_runtime_model() -> str:
+    """
+    返回普通 / 批量 run 当前生效的默认模型。
+
+    :return: WebUI 覆盖值优先，否则返回 `.env` 的 CLAUDE_DEFAULT_MODEL
+    """
+    return get_runtime_model_setting() or CLAUDE_DEFAULT_MODEL
+
+
+def save_runtime_model_setting(value: Optional[str]) -> Optional[str]:
+    """
+    保存或清除 WebUI 默认模型覆盖值。
+
+    :param value: 用户提交的模型名；空值表示清除覆盖并回退到 `.env`
+    :return: 保存后的模型名；清除覆盖时返回 None
+    """
+    try:
+        model = _normalize_claude_model_name(value, "default_model")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                if model is None:
+                    conn.execute(
+                        "DELETE FROM app_settings WHERE key=?",
+                        (_RUNTIME_MODEL_SETTING_KEY,),
+                    )
+                    return None
+                conn.execute(
+                    "INSERT INTO app_settings(key, value, updated_at) VALUES(?,?,julianday('now')) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=julianday('now')",
+                    (_RUNTIME_MODEL_SETTING_KEY, model),
+                )
+                return model
+        finally:
+            conn.close()
 
 
 def build_topic_prompt(topic: dict) -> str:
@@ -966,8 +1037,8 @@ class Runner:
             worker_env["CLAUDE_MODEL_OVERRIDE"] = model_override
         elif not capture_full_http:
             # 普通 / 批量 run 复用抓包的 --model 一次性覆盖链路；
-            # 抓包 run 留空时必须沿用自身默认模型，不能被全局配置带偏。
-            worker_env["CLAUDE_MODEL_OVERRIDE"] = CLAUDE_DEFAULT_MODEL
+            # 抓包 run 留空时必须沿用自身默认模型，不能被页面或环境全局配置带偏。
+            worker_env["CLAUDE_MODEL_OVERRIDE"] = effective_runtime_model()
 
         sidecar_id: Optional[str] = None
         worker_id: Optional[str] = None
@@ -2798,6 +2869,16 @@ class AuthIn(BaseModel):
     pwd: str
 
 
+class RuntimeModelIn(BaseModel):
+    """
+    WebUI 保存普通 / 批量 run 默认模型的请求体。
+
+    :param default_model: 模型名；空值表示清除页面覆盖并回退到 `.env`
+    """
+
+    default_model: Optional[str] = None
+
+
 @app.post("/api/auth/login")
 def auth_login(body: AuthIn, response: Response):
     """校验账密 → 签发 session cookie(7 天)。auth 未启用时 400。"""
@@ -2843,6 +2924,46 @@ def auth_me(request: Request):
     if not user:
         raise HTTPException(401, "not authenticated")
     return {"authenticated": True, "user": user, "auth_required": True}
+
+
+# ---------- settings ----------
+def runtime_model_response() -> dict:
+    """
+    组装普通 / 批量 run 默认模型设置响应。
+
+    :return: 页面覆盖值、环境兜底值和当前生效值
+    """
+    try:
+        configured_model = get_runtime_model_setting()
+    except ValueError as e:
+        raise HTTPException(500, str(e))
+    return {
+        "configured_model": configured_model,
+        "env_default_model": CLAUDE_DEFAULT_MODEL,
+        "effective_model": configured_model or CLAUDE_DEFAULT_MODEL,
+    }
+
+
+@app.get("/api/settings/runtime-model")
+def get_runtime_model():
+    """
+    返回普通 / 批量 run 当前默认模型设置。
+
+    :return: 页面覆盖值、环境兜底值和当前生效值
+    """
+    return runtime_model_response()
+
+
+@app.put("/api/settings/runtime-model")
+def update_runtime_model(body: RuntimeModelIn):
+    """
+    保存普通 / 批量 run 默认模型覆盖值；空值表示回退到 `.env`。
+
+    :param body: 默认模型设置请求体
+    :return: 保存后的当前模型设置
+    """
+    save_runtime_model_setting(body.default_model)
+    return runtime_model_response()
 
 
 # ---------- accounts ----------

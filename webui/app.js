@@ -31,6 +31,7 @@ const state = {
   tasks: [],
   batches: [],
   runs: [],
+  runtimeModel: null,
   topicFilter: '',
   runsEventSource: null,
   runDetail: null,
@@ -873,9 +874,11 @@ async function renderRuns() {
     state.accounts = await API('/accounts');
     state.tasks = await API('/tasks');
     state.topics = await API('/topics');
+    state.runtimeModel = await API('/settings/runtime-model');
   } catch (e) {
     return alert('加载运行依赖失败: ' + e.message);
   }
+  bindRuntimeModelForm();
   bindCaptureForm();
   paintRuns(state.runs);
   if (state.runsEventSource) state.runsEventSource.close();
@@ -888,6 +891,52 @@ async function renderRuns() {
   });
   // 首次也拉一下
   API('/runs').then(rs => { state.runs = rs; paintRuns(rs); }).catch(() => {});
+}
+
+function paintRuntimeModelSetting() {
+  const form = $('#runtime-model-form');
+  if (!form || !state.runtimeModel) return;
+  const configured = state.runtimeModel.configured_model;
+  const effective = state.runtimeModel.effective_model || state.runtimeModel.env_default_model || '-';
+  form.default_model.value = configured || '';
+  $('#runtime-model-effective').textContent = effective;
+  $('#runtime-model-source').innerHTML = configured
+    ? `页面覆盖；.env 兜底为 <code>${escapeHTML(state.runtimeModel.env_default_model || '-')}</code>`
+    : `.env 兜底：<code>${escapeHTML(state.runtimeModel.env_default_model || '-')}</code>`;
+}
+
+function bindRuntimeModelForm() {
+  const form = $('#runtime-model-form');
+  if (!form) return;
+  paintRuntimeModelSetting();
+  const resetBtn = $('#runtime-model-reset');
+  if (resetBtn) {
+    resetBtn.onclick = () => {
+      form.default_model.value = '';
+      form.requestSubmit();
+    };
+  }
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector('button[type=submit]');
+    const body = {
+      default_model: (new FormData(form).get('default_model') || '').trim() || null,
+    };
+    btn.disabled = true;
+    if (resetBtn) resetBtn.disabled = true;
+    try {
+      state.runtimeModel = await API('/settings/runtime-model', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+      paintRuntimeModelSetting();
+    } catch (err) {
+      alert('保存默认模型失败: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      if (resetBtn) resetBtn.disabled = false;
+    }
+  };
 }
 
 function bindCaptureForm() {

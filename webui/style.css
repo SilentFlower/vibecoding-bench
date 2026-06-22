@@ -920,11 +920,13 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 
 /* ===== batch scheduler ===== */
 .capture-panel,
+.runtime-model-panel,
 .batch-panel {
   border: 1px solid var(--border);
   background: var(--surface);
   padding: 16px;
 }
+.runtime-model-panel,
 .capture-panel {
   margin-bottom: 18px;
 }
@@ -938,6 +940,21 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .capture-title strong::before {
   content: '$ ';
   color: var(--text-faint);
+}
+.runtime-model-status {
+  min-width: 220px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--text-dim);
+}
+.runtime-model-status strong {
+  color: var(--amber);
+  font-size: 16px;
+  word-break: break-all;
 }
 .batch-toolbar {
   display: flex;

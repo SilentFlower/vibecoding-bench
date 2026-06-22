@@ -174,6 +174,27 @@
           <span class="pill pill-stopped">stopped</span>
         </div>
       </header>
+      <form id="runtime-model-form" class="form runtime-model-panel">
+        <div class="capture-title">
+          <strong>默认模型</strong>
+          <span class="muted">// 普通 run + 批量 run</span>
+        </div>
+        <div class="row">
+          <label><span class="lbl">$ default_model</span>
+            <span class="hint inline">页面保存后立即影响新启动的普通 / 批量 run；留空并保存则回退到 .env。</span>
+            <input name="default_model" list="claude-model-options" placeholder="例如 opus[1m] 或 sonnet[1m]" />
+          </label>
+          <div class="runtime-model-status">
+            <span class="muted">当前生效</span>
+            <strong id="runtime-model-effective">加载中</strong>
+            <span class="hint inline" id="runtime-model-source">读取配置中</span>
+          </div>
+        </div>
+        <div class="row-end">
+          <button class="btn btn-sm" type="button" id="runtime-model-reset">回退 .env</button>
+          <button class="btn btn-primary" type="submit">保存默认模型</button>
+        </div>
+      </form>
       <form id="capture-form" class="form capture-panel">
         <div class="capture-title">
           <strong>完整抓包</strong>
@@ -191,9 +212,9 @@
           </label>
         </div>
         <label><span class="lbl">$ model 覆盖</span>
-          <span class="hint inline">可从预置模型选择，也可手填完整模型名；留空则沿用默认模型。</span>
-          <input name="model_override" list="capture-model-options" placeholder="例如 opus[1m] 或 claude-opus-4-8[1m]" />
-          <datalist id="capture-model-options">
+          <span class="hint inline">只覆盖当前抓包 run；留空则沿用抓包默认模型，不受上方默认模型影响。</span>
+          <input name="model_override" list="claude-model-options" placeholder="例如 opus[1m] 或 claude-opus-4-8[1m]" />
+          <datalist id="claude-model-options">
             <option value="opus"></option>
             <option value="opus[1m]"></option>
             <option value="sonnet"></option>

@@ -18,11 +18,15 @@
 - `.env.example` 目前没有默认运行模型配置项。
 - 用户已确认本任务只需要全局默认模型配置，不需要给普通单次 task / 批量 task 增加逐次模型覆盖字段。
 - 用户已确认抓包 run 不应被全局默认模型配置影响；抓包 run 继续只受已有 `model_override` 参数影响。
+- 用户进一步确认希望能在 WebUI 页面上灵活修改普通 / 批量 run 的默认模型，不必每次改 `.env` 并重启 orchestrator。
 
 ## Requirements
 
 - 新增全局默认模型配置项，建议命名为 `CLAUDE_DEFAULT_MODEL`，默认值保持 `opus[1m]`。
+- 新增 WebUI 运行时默认模型配置入口，页面保存后应持久化到 SQLite，并优先于 `.env` 中的 `CLAUDE_DEFAULT_MODEL`。
+- 页面配置为空时应清除 SQLite 覆盖值，回退到 `.env` / 默认值。
 - orchestrator 创建普通运行和批量运行的 worker 时必须把全局默认模型通过一次性模型参数传给 worker，优先复用抓包 run 已使用的 `CLAUDE_MODEL_OVERRIDE` 链路。
+- 普通运行和批量运行必须在 worker 启动时读取当前页面配置，确保后续新启动的 run 能立刻使用最新默认模型。
 - 账号 profile 的默认 `settings.json` 模型继续保持现有 `opus[1m]` 基线，避免普通/批量运行的全局配置污染抓包 run。
 - 抓包 run 必须保持现有行为：只有前端/接口传入 `model_override` 时才使用一次性覆盖；全局 `CLAUDE_DEFAULT_MODEL` 不改变抓包 run 的默认模型。
 - 模型配置值必须复用现有模型名校验规则，避免无效字符进入 shell / CLI 参数。
@@ -33,10 +37,13 @@
 
 - [ ] 未设置 `CLAUDE_DEFAULT_MODEL` 时，普通运行、批量运行和抓包 run 的默认模型仍是 `opus[1m]`。
 - [ ] 设置 `CLAUDE_DEFAULT_MODEL=sonnet[1m]` 后，新启动的普通运行和批量运行会使用 `sonnet[1m]`。
+- [ ] 在 WebUI 保存默认模型为 `haiku` 后，新启动的普通运行和批量运行会使用 `haiku`，且不需要重启 orchestrator。
+- [ ] 在 WebUI 清空/重置默认模型后，新启动的普通运行和批量运行回退到 `.env` 的 `CLAUDE_DEFAULT_MODEL`。
 - [ ] 设置 `CLAUDE_DEFAULT_MODEL=sonnet[1m]` 后，抓包 run 未填写 `model_override` 时仍使用抓包现有默认模型，不受全局配置影响。
+- [ ] 在 WebUI 保存默认模型后，抓包 run 未填写 `model_override` 时仍使用抓包现有默认模型，不受页面配置影响。
 - [ ] 抓包 run 的 `model_override` 非空时，本次 run 使用覆盖模型，且该覆盖仍只影响当前抓包 run。
 - [ ] 非法模型配置会在 orchestrator 启动或创建 run 前给出明确错误，不静默回退。
-- [ ] 文档说明修改 `.env` 后需要 recreate/restart orchestrator，已运行中的 run 不受影响。
+- [ ] 文档说明页面配置优先级高于 `.env`；只有修改 `.env` 兜底值时才需要 recreate/restart orchestrator，已运行中的 run 不受影响。
 
 ## Out of Scope
 
