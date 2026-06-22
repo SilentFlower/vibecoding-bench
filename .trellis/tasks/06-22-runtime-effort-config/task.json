@@ -1,0 +1,42 @@
+{
+  "id": "runtime-effort-config",
+  "name": "runtime-effort-config",
+  "title": "思考预算动态配置",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-06-22",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "last_push_snapshot": {
+    "snapshot_at": "2026-06-23T00:29:34+08:00",
+    "branch": "main",
+    "pushed_commits": {
+      "vibecoding-bench": "31927aa"
+    },
+    "completed_steps": [
+      "后端配置",
+      "前端配置",
+      "worker timeout 识别",
+      "文档更新",
+      "质量验证"
+    ],
+    "next_step": "Phase 3.5 wrap-up / trellis-finish-work（如需归档）",
+    "notes": "实现运行时思考预算配置；普通/批量 run 使用页面覆盖，抓包 run 隔离；修复 synthetic Request timed out 误判 success；检查已通过。"
+  }
+}
