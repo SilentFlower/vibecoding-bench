@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 29
+- **Total Sessions**: 30
 - **Last Active**: 2026-06-22
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1010 | Active |
+| `journal-1.md` | ~1045 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 30 | 2026-06-22 | 完成 cc2api telemetry 2.1.185 对齐 | `014c0e5`, `ada7f6a` | `main` |
 | 29 | 2026-06-22 | cc2api metadata user_id account alignment | `703e4ab`, `80adb26`, `b59a5bc` | `main` |
 | 28 | 2026-06-22 | 升级 Claude Code 2.1.185 并部署 cc2api | `4b936cc`, `b2b34ce` | `main` |
 | 27 | 2026-06-15 | new-api Claude count_tokens 透传 | `5a84be5d`, `16276a1`, `491f181` | `main` |

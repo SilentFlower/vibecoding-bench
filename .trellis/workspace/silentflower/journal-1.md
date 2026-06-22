@@ -1008,3 +1008,38 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 30: 完成 cc2api telemetry 2.1.185 对齐
+
+**Date**: 2026-06-22
+**Task**: 完成 cc2api telemetry 2.1.185 对齐
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+实现并推送 cc2api 主动 telemetry payload 对齐：移除主动 email 字段、补齐 betas/additional_metadata/env 字段、调整 GrowthBook eval 结构，并完成 check-all、任务 snapshot 与归档。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `014c0e5` | (see git log) |
+| `ada7f6a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
