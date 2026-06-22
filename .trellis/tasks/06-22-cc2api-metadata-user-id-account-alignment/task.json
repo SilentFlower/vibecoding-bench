@@ -22,5 +22,24 @@
   "parent": null,
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {},
+  "last_push_snapshot": {
+    "snapshot_at": "2026-06-22T17:48:57+08:00",
+    "branch": {
+      "vibecoding-bench": "main",
+      "cc2api": "main"
+    },
+    "pushed_commits": {
+      "vibecoding-bench": "80adb26",
+      "cc2api": "703e4ab"
+    },
+    "completed_steps": [
+      "Phase 1: 创建并启动 metadata user_id 对齐任务",
+      "Phase 2.1: 完成 cc2api rewriter 实现",
+      "Phase 2.2: check-all inline 通过",
+      "Phase 3.4: 业务仓库 commit/push 完成"
+    ],
+    "next_step": "Phase 3.5: finish-work/archive",
+    "notes": "metadata.user_id 的 device_id/account_uuid 已对齐当前账号，session_id 保持不变；遥测对齐任务另行处理。"
+  }
 }
