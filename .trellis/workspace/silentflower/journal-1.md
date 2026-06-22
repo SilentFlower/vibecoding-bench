@@ -1043,3 +1043,37 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 31: 运行模型动态配置
+
+**Date**: 2026-06-22
+**Task**: 运行模型动态配置
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+支持在 WebUI 运行页持久化普通/批量 run 默认模型配置，页面覆盖值优先于 CLAUDE_DEFAULT_MODEL，抓包 run 仍只受自身 model_override 影响；已构建并推送 DockerHub 三镜像 tag 30f52db，远端 23.80.83.23 部署并验证通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e318a65` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
