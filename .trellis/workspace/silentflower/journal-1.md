@@ -1077,3 +1077,38 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 32: 思考预算动态配置
+
+**Date**: 2026-06-23
+**Task**: 思考预算动态配置
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+新增 WebUI 运行时思考预算配置，普通/批量 run 使用页面覆盖且抓包隔离；修复 Claude synthetic Request timed out 误判 success；构建并推送 a908b58 三镜像，完成远端部署和验证。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `31927aa` | (see git log) |
+| `a908b58` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

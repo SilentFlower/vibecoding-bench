@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 31
-- **Last Active**: 2026-06-22
+- **Total Sessions**: 32
+- **Last Active**: 2026-06-23
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1079 | Active |
+| `journal-1.md` | ~1114 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 32 | 2026-06-23 | 思考预算动态配置 | `31927aa`, `a908b58` | `main` |
 | 31 | 2026-06-22 | 运行模型动态配置 | `e318a65` | `main` |
 | 30 | 2026-06-22 | 完成 cc2api telemetry 2.1.185 对齐 | `014c0e5`, `ada7f6a` | `main` |
 | 29 | 2026-06-22 | cc2api metadata user_id account alignment | `703e4ab`, `80adb26`, `b59a5bc` | `main` |
