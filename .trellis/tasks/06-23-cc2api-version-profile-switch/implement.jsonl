@@ -1,0 +1,19 @@
+{"file": ".trellis/tasks/06-23-cc2api-version-profile-switch/prd.md", "reason": "实现前读取需求、验收标准和用户确认的覆盖策略。"}
+{"file": ".trellis/tasks/06-23-cc2api-version-profile-switch/design.md", "reason": "实现前读取运行时版本画像、账号同步和设置保存设计。"}
+{"file": ".trellis/tasks/06-23-cc2api-version-profile-switch/implement.md", "reason": "实现步骤、验证命令和风险点。"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "后端分层、Gateway 热路径和 settings reload 规则。"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "settings 默认值、迁移、账号 canonical env 同步和 SQLite/PostgreSQL 双栈规则。"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "Rust 测试、敏感数据边界和 settings/DB 验证要求。"}
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "Claude Code 版本画像、CCH、cc_version、telemetry 和账号迁移契约。"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "Settings 页面、API client 和前端类型同步规则。"}
+{"file": ".trellis/tasks/archive/2026-06/06-22-cc2api-claude-code-2-1-185/research/cc2api-2-1-185-capture-summary.md", "reason": "2.1.185 版本画像、CCH、cc_version、telemetry 抓包摘要。"}
+{"file": ".trellis/tasks/archive/2026-06/06-12-cc2api-2-1-173-packet-diff/research/cc2api-2-1-173-capture-diff.md", "reason": "2.1.173 版本画像、CCH、cc_version、Fable 和 telemetry 差异摘要。"}
+{"file": "cc2api/src/service/version_profile.rs", "reason": "版本画像常量和 UA helper 的主要改造点。"}
+{"file": "cc2api/src/handler/router.rs", "reason": "GET/PUT settings 校验、保存和 reload 入口。"}
+{"file": "cc2api/src/store/db.rs", "reason": "settings 默认插入和账号 canonical env 启动迁移。"}
+{"file": "cc2api/src/store/account_store.rs", "reason": "账号持久化与批量 canonical env 更新的合适位置。"}
+{"file": "cc2api/src/service/account.rs", "reason": "新账号 canonical identity 生成入口。"}
+{"file": "cc2api/src/service/rewriter.rs", "reason": "请求 UA、billing、CCH、cc_version 从账号版本画像派生。"}
+{"file": "cc2api/src/service/telemetry.rs", "reason": "自动 telemetry 与 GrowthBook 使用账号版本画像。"}
+{"file": "cc2api/web/src/components/Settings.vue", "reason": "版本特征切换控件和 settings 保存 payload。"}
+{"file": "cc2api/web/src/api.ts", "reason": "前端 settings API 类型和请求入口。"}

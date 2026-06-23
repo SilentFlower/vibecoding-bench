@@ -1,0 +1,11 @@
+{"file": ".trellis/tasks/06-23-cc2api-version-profile-switch/prd.md", "reason": "检查实现是否满足用户需求和验收标准。"}
+{"file": ".trellis/tasks/06-23-cc2api-version-profile-switch/design.md", "reason": "检查运行时版本画像、账号同步、settings 覆盖策略是否按设计实现。"}
+{"file": ".trellis/tasks/06-23-cc2api-version-profile-switch/implement.md", "reason": "检查实施清单和验证命令是否完成。"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "检查 settings、迁移、账号 canonical env 同步和双数据库兼容。"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "检查 Rust 测试、敏感数据边界和热路径风险。"}
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "检查版本画像、CCH、cc_version、telemetry 和账号迁移契约。"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "检查 Settings UI、API client 和前端构建。"}
+{"file": ".trellis/tasks/archive/2026-06/06-22-cc2api-claude-code-2-1-185/research/cc2api-2-1-185-capture-summary.md", "reason": "核对 2.1.185 画像字段。"}
+{"file": ".trellis/tasks/archive/2026-06/06-12-cc2api-2-1-173-packet-diff/research/cc2api-2-1-173-capture-diff.md", "reason": "核对 2.1.173 画像字段。"}
+{"file": "cc2api/src/service/version_profile.rs", "reason": "检查 profile registry 是否集中声明 identity/request/billing/telemetry/endpoint 子画像，避免版本分支散落。"}
+{"file": "cc2api/src/service/telemetry.rs", "reason": "检查 telemetry 和 GrowthBook 是否按 profile shape 切换，而不是只替换 UA/version。"}

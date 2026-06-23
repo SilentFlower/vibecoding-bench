@@ -232,3 +232,137 @@ claude-code-20250219,oauth-2025-04-20,context-1m-2025-08-07,interleaved-thinking
 | 重新序列化 body 再算 CCH | 字段顺序或转义变化导致 hash 偏移 | 在最终 body 字节上做 top-level 裁剪 |
 | Fable beta 无条件注入 1M | 不允许 1M 的账号也带 `context-1m` | 让客户端/白名单决定 1M |
 | 部署后只看容器 Up | 账号仍可能停旧 `canonical_env` | 查 DB 版本分布 |
+
+---
+
+## Scenario: Claude Code 版本画像切换
+
+### 1. Scope / Trigger
+
+- Trigger: 新增或修改 `claude_code_version_profile` 可选版本，或让系统设置切换 Claude Code 版本特征。
+- 本场景属于跨层契约：settings、账号 `canonical_env`、访问策略、请求重写、telemetry、前端 Settings 必须一起更新。
+- 版本画像切换必须只允许内置 profile key，不能接受任意版本字符串拼装请求特征。
+
+### 2. Signatures
+
+关键代码入口：
+
+```text
+src/service/version_profile.rs
+src/store/settings_store.rs
+src/store/account_store.rs
+src/service/account.rs
+src/handler/router.rs
+src/service/rewriter.rs
+src/service/telemetry.rs
+web/src/api.ts
+web/src/components/Settings.vue
+```
+
+关键 setting：
+
+```text
+claude_code_version_profile=<profile key>
+allowed_claude_code_versions=<profile.access_policy.allowed_claude_code_versions>
+allowed_user_agents=<管理员自定义值，版本切换不得覆盖>
+```
+
+账号身份字段：
+
+```json
+{
+  "version": "<profile.identity.version>",
+  "version_base": "<profile.identity.version_base>",
+  "build_time": "<profile.identity.build_time>"
+}
+```
+
+### 3. Contracts
+
+- `src/service/version_profile.rs` 是唯一画像注册表。新增版本必须声明 `identity`、`access_policy`、`request`、`billing`、`telemetry`、`endpoints` 子画像。
+- `claude_code_version_profile` 保存时必须校验为内置 profile key；未知 key 返回 `BadRequest`，不能落库。
+- 切换 profile 必须在同一事务中完成：
+  - 写入 `settings.claude_code_version_profile`。
+  - 强制覆盖 `settings.allowed_claude_code_versions` 为目标画像范围。
+  - 批量覆盖所有账号 `canonical_env.version/version_base/build_time`。
+- 切换 profile 不得覆盖 `allowed_user_agents`，该 setting 仍由管理员独立维护。
+- 新账号创建必须读取当前 `claude_code_version_profile`，再把目标 `identity` 写入 `canonical_env`。
+- 请求重写和 telemetry 必须从账号 `canonical_env.version` 映射到内置 profile；映射失败只能回退默认内置 profile，不能拼出未验证特征。
+- 只提交 `claude_code_version_profile` 的 settings payload 时，也必须 reload access policy，因为后端会同步改写 `allowed_claude_code_versions`。
+- 前端 Settings 保存成功后必须重新加载 settings，用后端强制覆盖后的版本范围作为只读回显。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 期望 |
+|------|------|
+| settings 提交未知 `claude_code_version_profile` | 返回 `BadRequest`，不更新 settings 和账号 env |
+| 只提交 `claude_code_version_profile` | 同步覆盖 `allowed_claude_code_versions` 并 reload access policy |
+| 切换 profile 时存在自定义 `allowed_user_agents` | 原值保持不变 |
+| 切换 profile 后已有账号仍保留旧 `canonical_env.version` | 视为失败，检查事务内账号批量更新 |
+| 账号 env.version 不是内置版本 | 热路径回退默认 profile，避免组合未验证请求/telemetry 特征 |
+| 新增 profile 只填版本号 | 视为不完整，必须补齐 request/billing/telemetry/endpoints 子画像和测试 |
+
+### 5. Good/Base/Bad Cases
+
+**Good**：新增 `2.1.xxx` 时先把抓包差异整理成 profile 子画像，补 settings 切换测试、账号 env 批量更新测试、rewriter/telemetry shape 测试，再开放前端选项。
+
+**Base**：两个版本暂时共享 request/billing 子画像，也要在 profile 中显式声明共享字段，便于后续版本局部拆分。
+
+**Bad**：在 `telemetry.rs` 或 `rewriter.rs` 里散落 `if version == "2.1.xxx"`，导致新增版本需要多处猜测。
+
+**Bad**：允许管理员输入任意版本号，并用该字符串直接生成 UA、billing header 或 telemetry payload。
+
+### 6. Tests Required
+
+- profile registry：
+  - profile key 唯一。
+  - 默认 profile 存在。
+  - 每个 profile 的 identity、access policy、telemetry UA、endpoint 字段非空。
+- settings：
+  - 未知 `claude_code_version_profile` 返回错误。
+  - 切换 profile 后 settings 与所有账号 env 在同一事务结果中一致。
+  - `allowed_claude_code_versions` 被强制覆盖，`allowed_user_agents` 保留。
+  - profile-only payload 触发 access policy reload 的可观察行为。
+- account：
+  - 新账号使用当前 profile 的 `identity`。
+- protocol：
+  - rewriter 按账号 env.version 选择 UA、beta、billing/CCH 子画像。
+  - telemetry 按 profile shape 切换 event logging 和 GrowthBook payload。
+
+### 7. Wrong vs Correct
+
+#### Wrong: 任意版本字符串直通
+
+```rust
+settings.insert("claude_code_version_profile".into(), user_input_version);
+```
+
+这会让请求和 telemetry 进入没有抓包验证的组合状态。
+
+#### Correct: 只能选择内置画像
+
+```rust
+let profile = profile_for_key(&user_input_version)?;
+settings.insert("claude_code_version_profile".into(), profile.key.to_string());
+settings.insert(
+    "allowed_claude_code_versions".into(),
+    profile.access_policy.allowed_claude_code_versions.to_string(),
+);
+```
+
+#### Wrong: 切版本时顺手覆盖 UA 白名单
+
+```rust
+settings.insert("allowed_user_agents".into(), profile_default_user_agents);
+```
+
+这样会覆盖管理员的独立安全策略。
+
+#### Correct: 只覆盖 Claude Code 版本范围
+
+```rust
+settings.insert(
+    "allowed_claude_code_versions".into(),
+    profile.access_policy.allowed_claude_code_versions.to_string(),
+);
+```
