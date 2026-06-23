@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 33
+- **Total Sessions**: 34
 - **Last Active**: 2026-06-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1149 | Active |
+| `journal-1.md` | ~1184 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 34 | 2026-06-23 | 隐藏 cc2api UA 允许规则错误详情 | `909e4a2`, `bd91558` | `main` |
 | 33 | 2026-06-23 | cc2api 版本特征切换 | `320471c`, `30b1f80` | `main` |
 | 32 | 2026-06-23 | 思考预算动态配置 | `31927aa`, `a908b58` | `main` |
 | 31 | 2026-06-22 | 运行模型动态配置 | `e318a65` | `main` |

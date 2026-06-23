@@ -1147,3 +1147,38 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 34: 隐藏 cc2api UA 允许规则错误详情
+
+**Date**: 2026-06-23
+**Task**: 隐藏 cc2api UA 允许规则错误详情
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+调整 cc2api allowed_user_agents 未命中时的访问策略错误响应：返回当前请求 User-Agent 便于自查，但不再暴露 allowed_user_agents 原始配置或允许 pattern；补充访问策略单测、保留 allowed_claude_code_versions 允许范围行为，并更新 cc2api 后端规范中的本地拒绝错误体边界。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `909e4a2` | (see git log) |
+| `bd91558` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
