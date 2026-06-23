@@ -33,6 +33,7 @@ const state = {
   runs: [],
   runtimeModel: null,
   runtimeEffort: null,
+  claudeCodeVersion: null,
   topicFilter: '',
   runsEventSource: null,
   runDetail: null,
@@ -156,8 +157,11 @@ async function renderAccounts() {
       return;
     }
     if (id && confirm(`删除账号 #${id}?`)) {
-      await API(`/accounts/${id}`, { method: 'DELETE' });
-      renderAccounts();
+      const result = await API(`/accounts/${id}`, { method: 'DELETE' });
+      if (result.disabled) {
+        alert('账号仍有关联任务或运行记录，已改为停用。');
+      }
+      await renderAccounts();
     }
   };
 
@@ -877,11 +881,13 @@ async function renderRuns() {
     state.topics = await API('/topics');
     state.runtimeModel = await API('/settings/runtime-model');
     state.runtimeEffort = await API('/settings/runtime-effort');
+    state.claudeCodeVersion = await API('/settings/claude-code-version');
   } catch (e) {
     return alert('加载运行依赖失败: ' + e.message);
   }
   bindRuntimeModelForm();
   bindRuntimeEffortForm();
+  bindClaudeCodeVersionForm();
   bindCaptureForm();
   paintRuns(state.runs);
   if (state.runsEventSource) state.runsEventSource.close();
@@ -986,6 +992,52 @@ function bindRuntimeEffortForm() {
       paintRuntimeEffortSetting();
     } catch (err) {
       alert('保存思考预算失败: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      if (resetBtn) resetBtn.disabled = false;
+    }
+  };
+}
+
+function paintClaudeCodeVersionSetting() {
+  const form = $('#claude-code-version-form');
+  if (!form || !state.claudeCodeVersion) return;
+  const configured = state.claudeCodeVersion.configured_version;
+  const effective = state.claudeCodeVersion.effective_version || state.claudeCodeVersion.env_default_version || '-';
+  form.claude_code_version.value = configured || '';
+  $('#claude-code-version-effective').textContent = effective;
+  $('#claude-code-version-source').innerHTML = configured
+    ? `页面覆盖；.env 兜底为 <code>${escapeHTML(state.claudeCodeVersion.env_default_version || '-')}</code>`
+    : `.env 兜底：<code>${escapeHTML(state.claudeCodeVersion.env_default_version || '-')}</code>`;
+}
+
+function bindClaudeCodeVersionForm() {
+  const form = $('#claude-code-version-form');
+  if (!form) return;
+  paintClaudeCodeVersionSetting();
+  const resetBtn = $('#claude-code-version-reset');
+  if (resetBtn) {
+    resetBtn.onclick = () => {
+      form.claude_code_version.value = '';
+      form.requestSubmit();
+    };
+  }
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector('button[type=submit]');
+    const body = {
+      claude_code_version: (new FormData(form).get('claude_code_version') || '').trim() || null,
+    };
+    btn.disabled = true;
+    if (resetBtn) resetBtn.disabled = true;
+    try {
+      state.claudeCodeVersion = await API('/settings/claude-code-version', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+      paintClaudeCodeVersionSetting();
+    } catch (err) {
+      alert('保存 Claude Code 版本失败: ' + err.message);
     } finally {
       btn.disabled = false;
       if (resetBtn) resetBtn.disabled = false;

@@ -86,13 +86,14 @@ task 模式环境变量:
 | `RUN_ID` | 是 | 当前 run id,用于 tmux session 与日志归档 |
 | `TIMEOUT_SEC` | 否 | worker 硬超时时间,默认 1800 |
 | `TIMEOUT_WRAPUP_SEC` | 否 | 距离硬超时多少秒注入一次收尾提示,默认 600;`0` 关闭 |
-| `OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC` | 否 | 运行中从账号 profile 单向同步 `.credentials.json` 的间隔,默认 15;`0` 关闭 |
-| `OAUTH_401_PROFILE_WAIT_SEC` | 否 | 检测到 401 后等待后台刷新器更新 profile credentials 的最长秒数,默认 90;`0` 不等待 |
+| `OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC` | 否 | 运行中按新鲜度同步账号 profile / 本地 `.credentials.json` 的间隔,默认 15;`0` 关闭 |
+| `OAUTH_401_PROFILE_WAIT_SEC` | 否 | 401 强制 refresh 失败后等待后台刷新器更新 profile credentials 的最长秒数,默认 90;`0` 不等待 |
 | `CLAUDE_API_STALL_WATCHDOG_SEC` | 否 | Claude Code API 连接错误或 TUI `Request timed out` 后持续无有效进展多久自动中断续跑,默认 400;`0` 关闭 |
 | `CLAUDE_API_STALL_MAX_RECOVERIES` | 否 | 每个 run 最多自动中断续跑次数,默认 1;`0` 不恢复 |
 | `CLAUDE_BUSY_INTERRUPT_GRACE_SEC` | 否 | 发送中断后等待 TUI 回到输入状态的秒数,默认 8 |
 | `CLAUDE_API_STALL_RECOVERY_PROMPT` | 否 | API 卡死自动续跑提示;留空使用 worker 内置中文提示 |
 | `COMPLETION_IDLE_SEC` | 否 | JSONL 稳定窗口,默认 10 秒 |
+| `CLAUDE_CODE_VERSION` | 否 | 本次 worker 应使用的 Claude Code CLI 版本,默认 2.1.185;启动时若镜像内版本不一致,worker 会安装指定版本 |
 
 ### 3. Contracts
 
@@ -121,11 +122,15 @@ Claude 返回认证错误文本时不能作为最终 assistant 回复标成功�
 - `Invalid authentication credentials`
 - `OAuth token has expired`
 
-task worker **禁止**在启动 run 前强制刷新 OAuth access token。启动前只校验 `.credentials.json` 的结构和 `accessToken` 是否存在,即使 access token 已过期或即将过期也不在 worker 启动阶段拒绝运行。真正刷新由 orchestrator 后台 `OAuthRefreshScheduler` 周期执行,并把新 `.credentials.json` 原子写回账号 profile。
+task worker **禁止**在启动 run 前强制刷新 OAuth access token。启动前只校验 `.credentials.json` 的结构和 `accessToken` 是否存在,即使 access token 已过期或即将过期也不在 worker 启动阶段拒绝运行。常规临期刷新由 orchestrator 后台 `OAuthRefreshScheduler` 周期执行,并把新 `.credentials.json` 原子写回账号 profile。
 
-task 运行期间必须单向同步 credentials:从 `/mnt/profile/.credentials.json` 同步到本地 `$HOME/.claude/.credentials.json`,不能从 run home 把 `.credentials.json` 回写覆盖 profile。同步前必须能解析 JSON 且存在 `claudeAiOauth`;写本地文件必须先写临时文件再 `rename` 原子替换。退出 / 停止路径只允许回写 `settings.json` 和 `.claude.json` 这类配置文件。
+task 运行期间必须双向但按新鲜度同步 credentials:
+- profile → 本地:只在 profile 文件更新、`expiresAt` 明显更新,或 profile 能恢复本地缺失的 `refreshToken` 时同步,不能用旧 profile 覆盖 Claude Code 在当前 run 内刚刷新出的 token。
+- 本地 → profile:只在本地凭证明显更新时原子回写,尤其要保存 Claude Code 2.x 刚轮换出的 `refreshToken`。不能无条件把 run home 的 `.credentials.json` 覆盖 profile。
+- 同一账号多个 worker 并行时,强制 refresh / profile 回写必须用 profile 目录下文件锁串行化;多个账号并行互不影响。
+同步前必须能解析 JSON 且存在 `claudeAiOauth`;写文件必须先写临时文件再 `rename` 原子替换。退出 / 停止路径仍只允许白名单回写 `settings.json` / `.claude.json`,credentials 只能走新鲜度判断。
 
-运行中检测到 401 / OAuth 认证错误时,worker 先同步 profile credentials;如果是第一次认证错误,最多等待 `OAUTH_401_PROFILE_WAIT_SEC` 秒让后台刷新器把新 credentials 落盘。只有本地 credentials 指纹变化且 `expiresAt` 明显越过安全缓冲区后,才向 Claude TUI 注入一次重试提示。等不到新 credentials 或重试后再次出现认证错误时,worker 写 `/workspace/.bench-status.json` 为 `{"status":"auth_failed","error":"..."}` 并以退出码 `42` 结束。
+运行中检测到 401 / OAuth 认证错误时,worker 先同步 profile credentials,再在 worker→sidecar→账号 SOCKS5 链路内用当前 `refreshToken` 强制 refresh 一次。refresh 成功后原子回写 profile,并向 Claude TUI 注入一次重试提示。refresh 返回 `invalid_grant` / 429 / 其它非 2xx 时,错误消息要带 HTTP 状态与 retry-after 摘要;如果后台刷新器在 `OAUTH_401_PROFILE_WAIT_SEC` 内写入更新 credentials,可同步后重试一次,否则 worker 写 `/workspace/.bench-status.json` 为 `{"status":"auth_failed","error":"..."}` 并以退出码 `42` 结束。
 
 查询 OAuth usage API 前必须确认 sidecar 的通用 DNS resolver 已可用。sidecar/unbound 配的是通配 `forward-zone "."`,所以 readiness probe 应验证一个稳定探针域名能解析,不能把每个业务目标域名硬编码成白名单。orchestrator 可以用 `docker exec` 进 sidecar 等 `/tmp/sidecar-ready` 或通用探针解析成功,但不能用 orchestrator/宿主机网络代替 sidecar 解析。usage probe 必须在 worker 容器内按同一套 `expiresAt` 规则刷新 access token,再读 `.credentials.json` 调 usage API。实际 API URL 请求还必须有限重试,覆盖 resolver 刚启动后的瞬时 `Temporary failure in name resolution`。
 
@@ -133,7 +138,7 @@ task 运行期间必须单向同步 credentials:从 `/mnt/profile/.credentials.j
 
 上游 SOCKS5 服务器地址可以填域名。这个域名是建立代理链路之前的 bootstrap 解析,只能用 sidecar 启动时的默认 DNS 解析成 IP 后再连接代理;它和 Claude/API/WebFetch 访问的业务目标域名不是一类问题。不要为了阻断业务 DNS 泄漏而禁止 SOCKS5 域名。
 
-worker 镜像里的 Claude Code CLI 版本、worker 运行时 `CLAUDE_CODE_VERSION`、OAuth usage 请求的 `User-Agent` 必须保持一致。当前固定为 `2.1.169`;升级时要同时改 Dockerfile 默认版本、orchestrator 注入的默认环境变量和 usage 请求头,不能让 runner 实际版本与 usage API UA 脱节。OAuth refresh 请求不要带 `User-Agent`:实测带 `claude-code/<version>` 会触发 token endpoint 429;refresh 仍必须在 worker→sidecar→账号 SOCKS5 链路内完成。
+worker 启动时必须让实际 `claude --version`、worker 运行时 `CLAUDE_CODE_VERSION`、OAuth usage 请求的 `User-Agent` 保持一致。镜像内可预装默认版本,但 WebUI / `.env` 可以覆盖版本;entrypoint 必须校验版本号格式,不一致时安装 `@anthropic-ai/claude-code@<CLAUDE_CODE_VERSION>`,安装失败要让 worker 明确失败,不能静默回退到镜像默认版本。OAuth refresh 请求不要带 `User-Agent`:实测带 `claude-code/<version>` 会触发 token endpoint 429;refresh 仍必须在 worker→sidecar→账号 SOCKS5 链路内完成。
 
 worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 prompt；只能等待 JSONL 变化,直到完成、Claude 退出或 `TIMEOUT_SEC` 到期。
 
@@ -171,9 +176,9 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
 
 **Bad**:access token 明明还有很久才过期,每次 task 启动都调用 OAuth refresh endpoint。这样会制造额外请求和不必要的凭据轮换。
 
-**Bad**:task worker 启动时发现 access token 已过期或 10 分钟内过期,就直接刷新或直接失败。正确做法是让 run 启动,运行中按 profile 单向同步;如果 Claude 实际遇到 401,再等待后台刷新器落盘并只重试一次。
+**Bad**:task worker 启动时发现 access token 已过期或 10 分钟内过期,就直接刷新或直接失败。正确做法是让 run 启动,运行中按 profile 新鲜度同步;如果 Claude 实际遇到 401,再锁住 profile 强制刷新一次并只重试一次。
 
-**Bad**:task 结束时把 run home 里的 `.credentials.json` 回写到真实账号 profile。后台刷新器可能已经写入了更新 token,旧 run 结束再回写会把新 token 覆盖掉。
+**Bad**:task 结束时无条件把 run home 里的 `.credentials.json` 覆盖真实账号 profile。后台刷新器或另一个并行 run 可能已经写入更新 token,旧 run 结束再覆盖会把新 token / 新 RT 写坏。正确做法是按 `expiresAt` / refreshToken 轮换 / 文件新鲜度判断后原子回写。
 
 **Bad**:worker 启动前只等 `api.anthropic.com` 可解析,然后立刻刷新 OAuth token。`platform.claude.com` 尚未解析成功时会出现 `<urlopen error [Errno -3] Temporary failure in name resolution>`。
 
@@ -202,8 +207,10 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
 - 用 worker credentials 样例断言:
   - profile -> run home 同步只接受合法 JSON 和 `claudeAiOauth`。
   - 同步写入本地 credentials 使用临时文件 + rename。
-  - run 结束路径不把 `.credentials.json` 回写 profile。
-  - 401 后等待新 credentials 超时会写 `.bench-status.json` 且退出码语义为 `auth_failed`。
+  - profile 旧 token 不覆盖 run home 中刚刷新的新 token / 新 RT。
+  - run home 中刚轮换的新 accessToken / refreshToken 会按新鲜度原子回写 profile。
+  - 同账号两个 worker 同时强制 refresh 时必须通过 profile 文件锁串行化。
+  - 401 后强制 refresh 失败或等待新 credentials 超时会写 `.bench-status.json` 且退出码语义为 `auth_failed`。
 - 用 worker/quota 启动路径断言:usage 前等待通用 DNS resolver 可用,只在 access token 快过期时刷新 OAuth,刷新不用 Python `urllib`,且 DNS/URL 临时失败有限重试。
 - 用 Claude JSONL 样例断言:
   - `system api_error` 的 `ECONNRESET` 后超过 watchdog 窗口且无产物/对话进展时触发恢复。

@@ -62,8 +62,10 @@ _SIDECAR_DNS_READY_SH = (
     "2>/dev/null | grep -q ."
 )
 _CLAUDE_MODEL_OVERRIDE_RE = re.compile(r"^[A-Za-z0-9._\-\[\]]+$")
+_CLAUDE_CODE_VERSION_RE = re.compile(r"^[0-9]+[.][0-9]+[.][0-9]+(?:[-+][A-Za-z0-9._-]+)?$")
 _RUNTIME_MODEL_SETTING_KEY = "claude_default_model"
 _RUNTIME_EFFORT_SETTING_KEY = "claude_effort_level"
+_RUNTIME_CLAUDE_CODE_VERSION_SETTING_KEY = "claude_code_version"
 _CLAUDE_EFFORT_LEVELS = ("max", "xhigh", "high", "medium", "low")
 
 
@@ -108,11 +110,36 @@ def _normalize_claude_effort_level(value: Optional[str], field_name: str) -> Opt
     return effort
 
 
+def _normalize_claude_code_version(value: Optional[str], field_name: str) -> Optional[str]:
+    """
+    规范化 Claude Code CLI 版本号。
+
+    :param value: 原始版本号
+    :param field_name: 错误消息中展示的字段名
+    :return: trim 后的版本号；空值返回 None
+    """
+    if value is None:
+        return None
+    version = value.strip()
+    if not version:
+        return None
+    if len(version) > 64:
+        raise ValueError(f"{field_name} 过长：最多 64 个字符")
+    if not _CLAUDE_CODE_VERSION_RE.match(version):
+        raise ValueError(
+            f"{field_name} 无效：必须类似 2.1.185，只允许语义版本号和 -/+ 后缀"
+        )
+    return version
+
+
 WORKER_USER = "node"
 WORKER_HOME = "/home/node"
 WORKER_UID = 1000
 WORKER_GID = 1000
-CLAUDE_CODE_VERSION = os.environ.get("CLAUDE_CODE_VERSION", "2.1.185")
+CLAUDE_CODE_VERSION = _normalize_claude_code_version(
+    os.environ.get("CLAUDE_CODE_VERSION") or "2.1.185",
+    "CLAUDE_CODE_VERSION",
+) or "2.1.185"
 CLAUDE_CODE_EFFORT_LEVEL = _normalize_claude_effort_level(
     os.environ.get("CLAUDE_CODE_EFFORT_LEVEL") or "max",
     "CLAUDE_CODE_EFFORT_LEVEL",
@@ -452,9 +479,13 @@ def _claude_exec_env(use_sidecar: bool, extra: Optional[dict[str, str]] = None) 
     entrypoint 里 export 的变量不会自动进入 docker exec 创建的新进程；走
     sidecar MITM 时必须重复传 CA 路径，否则登录 TUI 可能不信 MITM 证书。
     """
+    try:
+        claude_code_version = effective_claude_code_version()
+    except Exception:
+        claude_code_version = CLAUDE_CODE_VERSION
     env = {
         "HOME": WORKER_HOME,
-        "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+        "CLAUDE_CODE_VERSION": claude_code_version,
     }
     if use_sidecar:
         ca = "/etc/mitm/mitmproxy-ca-cert.pem"
@@ -749,6 +780,51 @@ def list_topic_rows(include_deleted: bool = False) -> list[dict]:
         conn.close()
 
 
+def _account_reference_counts(conn: sqlite3.Connection, account_id: int) -> dict[str, int]:
+    """
+    统计账号是否仍被任务、运行或批次引用。
+
+    :param conn: 当前数据库连接
+    :param account_id: accounts.id
+    :return: 各引用表的数量
+    """
+    counts: dict[str, int] = {}
+    for table in ("tasks", "runs", "task_batches"):
+        row = conn.execute(
+            f"SELECT COUNT(*) AS n FROM {table} WHERE account_id=?",
+            (account_id,),
+        ).fetchone()
+        counts[table] = int(row["n"] if row else 0)
+    return counts
+
+
+def _infer_deleted_account_id(conn: sqlite3.Connection, account_name: str) -> Optional[int]:
+    """
+    从历史 run 的 flows_dir 反推被误删账号的原始 ID。
+
+    :param conn: 当前数据库连接
+    :param account_name: 账号 profile 名
+    :return: 能唯一推断时返回原 account_id，否则返回 None
+    """
+    existing = conn.execute(
+        "SELECT id FROM accounts WHERE name=?",
+        (account_name,),
+    ).fetchone()
+    if existing:
+        return None
+    flows_prefix = str(FLOWS_DIR / account_name) + "/%"
+    rows = conn.execute(
+        "SELECT r.account_id, COUNT(*) AS n "
+        "FROM runs r LEFT JOIN accounts a ON a.id=r.account_id "
+        "WHERE a.id IS NULL AND r.flows_dir LIKE ? "
+        "GROUP BY r.account_id ORDER BY n DESC",
+        (flows_prefix,),
+    ).fetchall()
+    if len(rows) != 1:
+        return None
+    return int(rows[0]["account_id"])
+
+
 def get_runtime_model_setting() -> Optional[str]:
     """
     读取 WebUI 保存的普通 / 批量 run 默认模型覆盖值。
@@ -877,6 +953,70 @@ def save_runtime_effort_setting(value: Optional[str]) -> Optional[str]:
             conn.close()
 
 
+def get_runtime_claude_code_version_setting() -> Optional[str]:
+    """
+    读取 WebUI 保存的 Claude Code 版本覆盖值。
+
+    :return: Claude Code 版本覆盖值；未配置时返回 None
+    """
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT value FROM app_settings WHERE key=?",
+            (_RUNTIME_CLAUDE_CODE_VERSION_SETTING_KEY,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return None
+    try:
+        return _normalize_claude_code_version(row["value"], "runtime_claude_code_version")
+    except ValueError:
+        # SQLite 是运行态存储，遇到旧版本遗留坏值时不能静默传给 worker。
+        raise ValueError("已保存的 Claude Code 版本配置无效，请在 WebUI 运行页重置")
+
+
+def effective_claude_code_version() -> str:
+    """
+    返回当前新 worker 应使用的 Claude Code CLI 版本。
+
+    :return: WebUI 覆盖值优先，否则返回 `.env` 的 CLAUDE_CODE_VERSION
+    """
+    return get_runtime_claude_code_version_setting() or CLAUDE_CODE_VERSION
+
+
+def save_runtime_claude_code_version_setting(value: Optional[str]) -> Optional[str]:
+    """
+    保存或清除 WebUI Claude Code 版本覆盖值。
+
+    :param value: 用户提交的版本号；空值表示清除覆盖并回退到 `.env`
+    :return: 保存后的版本号；清除覆盖时返回 None
+    """
+    try:
+        version = _normalize_claude_code_version(value, "claude_code_version")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                if version is None:
+                    conn.execute(
+                        "DELETE FROM app_settings WHERE key=?",
+                        (_RUNTIME_CLAUDE_CODE_VERSION_SETTING_KEY,),
+                    )
+                    return None
+                conn.execute(
+                    "INSERT INTO app_settings(key, value, updated_at) VALUES(?,?,julianday('now')) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=julianday('now')",
+                    (_RUNTIME_CLAUDE_CODE_VERSION_SETTING_KEY, version),
+                )
+                return version
+        finally:
+            conn.close()
+
+
 def build_topic_prompt(topic: dict) -> str:
     """
     按 topic 生成默认 Claude prompt。
@@ -935,9 +1075,13 @@ def _format_quota_result(raw: dict) -> dict:
             "raw": raw,
         }
     if raw.get("error"):
+        message = str(raw.get("error"))
+        retry_after = raw.get("retry_after_sec")
+        if isinstance(retry_after, int) and retry_after > 0:
+            message = f"{message}；请等待约 {retry_after}s 后再查"
         return {
             "ok": False,
-            "message": raw.get("error"),
+            "message": message,
             "five_hour": None,
             "seven_day": None,
             "seven_day_sonnet": None,
@@ -1082,6 +1226,7 @@ class Runner:
         host_profile = HOST_BENCH_DATA / "profiles" / acc_name
         host_ca = HOST_BENCH_DATA / "ca"
         capture_full_http = bool(task.get("capture_full_http"))
+        claude_code_version = effective_claude_code_version()
         sidecar_env = {
             "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
             "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
@@ -1104,7 +1249,7 @@ class Runner:
             "RUN_ID": run_id,
             "TIMEOUT_SEC": str(task.get("timeout_sec", 1800)),
             "ACC_NAME": acc_name,
-            "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+            "CLAUDE_CODE_VERSION": claude_code_version,
             # 抓包 run 是协议诊断路径，必须独立于页面运行时覆盖值；
             # 普通 / 批量 run 才读取 SQLite 中的动态思考预算配置。
             "CLAUDE_CODE_EFFORT_LEVEL": (
@@ -1328,6 +1473,7 @@ class Runner:
                 "CAPTURE_TARGETS": "anthropic.com,claude.com",
                 "CAPTURE_MAX_BODY_BYTES": "0",
             })
+        claude_code_version = effective_claude_code_version()
 
         sidecar_id: Optional[str] = None
         worker_id: Optional[str] = None
@@ -1366,7 +1512,7 @@ class Runner:
                     "USE_SIDECAR_DNS": "1",
                     "HOME": WORKER_HOME,
                     "ACC_NAME": acc_name,
-                    "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+                    "CLAUDE_CODE_VERSION": claude_code_version,
                     "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
                     "TZ": fp["tz"],
                     "LANG": fp["lang"],
@@ -1400,6 +1546,7 @@ class Runner:
         temp_home = temp_workspace / ".claude-home"
         temp_workspace.mkdir(parents=True, exist_ok=True)
         CA_DIR.mkdir(parents=True, exist_ok=True)
+        claude_code_version = effective_claude_code_version()
 
         sidecar_id: Optional[str] = None
         worker_id: Optional[str] = None
@@ -1450,7 +1597,7 @@ class Runner:
                         "USE_SIDECAR_DNS": "1",
                         "HOME": WORKER_HOME,
                         "ACC_NAME": acc_name,
-                        "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+                        "CLAUDE_CODE_VERSION": claude_code_version,
                         "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
                         "TZ": fp["tz"],
                         "LANG": fp["lang"],
@@ -1458,7 +1605,15 @@ class Runner:
                     },
                 )
                 worker_id = worker.id
-                raw = self._exec_quota_probe(worker_id)
+                raw = self._exec_oauth_refresh_probe(worker_id)
+                if raw.get("refreshed"):
+                    refreshed_credentials = temp_home / ".credentials.json"
+                    if refreshed_credentials.exists():
+                        _copy_file_atomically(refreshed_credentials, PROFILES_DIR / acc_name / ".credentials.json")
+                    else:
+                        raw = {"error": "OAuth token 刷新后未生成 .credentials.json"}
+                if not raw.get("error"):
+                    raw = self._exec_quota_probe(worker_id)
                 workspace_top_config = temp_workspace / ".claude.json"
                 if workspace_top_config.exists():
                     shutil.copy2(workspace_top_config, temp_home / ".claude.json")
@@ -1524,23 +1679,35 @@ function oauthSection(data) {
   return oauth;
 }
 
-async function requestJson(url, options) {
+async function requestUsage(url, options) {
   let lastError = '';
   for (let attempt = 1; attempt <= 5; attempt += 1) {
     try {
       const response = await fetch(url, options);
       const text = await response.text();
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${text.slice(0, 1000)}`);
+        const retryAfter = Number.parseInt(response.headers.get('retry-after') || '', 10);
+        return {
+          error: `HTTP ${response.status}: ${text.slice(0, 1000)}`,
+          status: response.status,
+          retry_after_sec: Number.isFinite(retryAfter) ? retryAfter : null,
+        };
       }
-      return JSON.parse(text);
+      let payload;
+      try {
+        payload = JSON.parse(text);
+      } catch (error) {
+        return {error: `usage parse failed: ${error.message}`, raw: text.slice(0, 1000)};
+      }
+      return payload;
     } catch (error) {
       lastError = error && error.message ? error.message : String(error);
+      // 已经拿到 HTTP 响应时不能重试，尤其 429 会被一次点击放大成多次上游请求。
       if (attempt === 5) break;
       await sleep(attempt * 1000);
     }
   }
-  throw new Error(lastError || 'request failed after retries');
+  return {error: lastError || 'request failed after retries'};
 }
 
 async function currentAccessToken(data) {
@@ -1555,7 +1722,7 @@ async function currentAccessToken(data) {
   try {
     let credentials = loadCredentials();
     let token = await currentAccessToken(credentials);
-    const usage = await requestJson(USAGE_URL, {
+    const usage = await requestUsage(USAGE_URL, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -1566,6 +1733,9 @@ async function currentAccessToken(data) {
       },
     });
     emit(usage);
+    if (usage && usage.error) {
+      process.exit(1);
+    }
   } catch (error) {
     emit({error: error && error.message ? error.message : String(error)});
     process.exit(1);
@@ -1616,6 +1786,7 @@ JS
             temp_workspace = WORKSPACES_DIR / temp_run_id
             temp_home = temp_workspace / ".claude-home"
             temp_workspace.mkdir(parents=True, exist_ok=True)
+            claude_code_version = effective_claude_code_version()
             _copy_profile_whitelist_to_claude_home(PROFILES_DIR / acc_name, temp_home)
             top_config = temp_home / ".claude.json"
             if top_config.exists():
@@ -1666,7 +1837,7 @@ JS
                         "USE_SIDECAR_DNS": "1",
                         "HOME": WORKER_HOME,
                         "ACC_NAME": acc_name,
-                        "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+                        "CLAUDE_CODE_VERSION": claude_code_version,
                         "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
                         "TZ": fp["tz"],
                         "LANG": fp["lang"],
@@ -1722,6 +1893,8 @@ const SCOPES = [
   'user:sessions:claude_code',
   'user:mcp_servers',
   'user:file_upload',
+  'user:design:read',
+  'user:design:write',
 ];
 const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
 const refreshBufferMs = Number(process.env.OAUTH_REFRESH_BUFFER_SEC || '600') * 1000;
@@ -1769,7 +1942,13 @@ async function main() {
   });
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(`OAuth token 刷新失败: HTTP ${response.status} ${text.slice(0, 500)}`);
+    const retryAfter = Number.parseInt(response.headers.get('retry-after') || '', 10);
+    emit({
+      error: `OAuth token 刷新失败: HTTP ${response.status} ${text.slice(0, 500)}`,
+      status: response.status,
+      retry_after_sec: Number.isFinite(retryAfter) ? retryAfter : null,
+    });
+    process.exit(1);
   }
   let payload;
   try {
@@ -1913,6 +2092,7 @@ class LoginManager:
         try:
             actual_host_profile = HOST_BENCH_DATA / "profiles" / name
             actual_local_profile = BENCH_DATA / "profiles" / name
+            claude_code_version = effective_claude_code_version()
             actual_local_profile.mkdir(parents=True, exist_ok=True)
             _persist_default_claude_settings(actual_local_profile)
             _persist_default_claude_top_config(actual_local_profile)
@@ -1996,7 +2176,7 @@ class LoginManager:
                     "USE_SIDECAR_DNS": "1" if sidecar_id else "0",
                     "HOME": WORKER_HOME,
                     "ACC_NAME": name,
-                    "CLAUDE_CODE_VERSION": CLAUDE_CODE_VERSION,
+                    "CLAUDE_CODE_VERSION": claude_code_version,
                     "TZ": fp["tz"],
                     "LANG": fp["lang"],
                     "LC_ALL": fp["lang"],
@@ -3003,6 +3183,16 @@ class RuntimeEffortIn(BaseModel):
     effort_level: Optional[str] = None
 
 
+class ClaudeCodeVersionIn(BaseModel):
+    """
+    WebUI 保存 Claude Code CLI 版本的请求体。
+
+    :param claude_code_version: 版本号；空值表示清除页面覆盖并回退到 `.env`
+    """
+
+    claude_code_version: Optional[str] = None
+
+
 @app.post("/api/auth/login")
 def auth_login(body: AuthIn, response: Response):
     """校验账密 → 签发 session cookie(7 天)。auth 未启用时 400。"""
@@ -3086,6 +3276,23 @@ def runtime_effort_response() -> dict:
     }
 
 
+def claude_code_version_response() -> dict:
+    """
+    组装 Claude Code CLI 版本设置响应。
+
+    :return: 页面覆盖值、环境兜底值和当前生效值
+    """
+    try:
+        configured_version = get_runtime_claude_code_version_setting()
+    except ValueError as e:
+        raise HTTPException(500, str(e))
+    return {
+        "configured_version": configured_version,
+        "env_default_version": CLAUDE_CODE_VERSION,
+        "effective_version": configured_version or CLAUDE_CODE_VERSION,
+    }
+
+
 @app.get("/api/settings/runtime-model")
 def get_runtime_model():
     """
@@ -3130,6 +3337,28 @@ def update_runtime_effort(body: RuntimeEffortIn):
     return runtime_effort_response()
 
 
+@app.get("/api/settings/claude-code-version")
+def get_claude_code_version():
+    """
+    返回新 worker 当前使用的 Claude Code CLI 版本设置。
+
+    :return: 页面覆盖值、环境兜底值和当前生效值
+    """
+    return claude_code_version_response()
+
+
+@app.put("/api/settings/claude-code-version")
+def update_claude_code_version(body: ClaudeCodeVersionIn):
+    """
+    保存 Claude Code CLI 版本覆盖值；空值表示回退到 `.env`。
+
+    :param body: Claude Code 版本设置请求体
+    :return: 保存后的当前版本设置
+    """
+    save_runtime_claude_code_version_setting(body.claude_code_version)
+    return claude_code_version_response()
+
+
 # ---------- accounts ----------
 class AccountIn(BaseModel):
     name: str
@@ -3153,22 +3382,30 @@ def create_account(body: AccountIn):
         conn = get_db()
         try:
             with conn:
-                cur = conn.execute(
-                    "INSERT INTO accounts(name, profile_path, "
-                    "upstream_socks5_host, upstream_socks5_port, "
-                    "upstream_socks5_user, upstream_socks5_pass, enabled) "
-                    "VALUES(?,?,?,?,?,?,?)",
-                    (
-                        body.name,
-                        f"profiles/{body.name}",
-                        body.upstream_socks5_host,
-                        body.upstream_socks5_port,
-                        body.upstream_socks5_user,
-                        body.upstream_socks5_pass,
-                        int(body.enabled),
-                    ),
+                restored_account_id = _infer_deleted_account_id(conn, body.name)
+                columns = (
+                    "id, name, profile_path, upstream_socks5_host, upstream_socks5_port, "
+                    "upstream_socks5_user, upstream_socks5_pass, enabled"
+                ) if restored_account_id is not None else (
+                    "name, profile_path, upstream_socks5_host, upstream_socks5_port, "
+                    "upstream_socks5_user, upstream_socks5_pass, enabled"
                 )
-                return {"id": cur.lastrowid}
+                values_sql = "(?,?,?,?,?,?,?,?)" if restored_account_id is not None else "(?,?,?,?,?,?,?)"
+                base_values = (
+                    body.name,
+                    f"profiles/{body.name}",
+                    body.upstream_socks5_host,
+                    body.upstream_socks5_port,
+                    body.upstream_socks5_user,
+                    body.upstream_socks5_pass,
+                    int(body.enabled),
+                )
+                values = ((restored_account_id,) + base_values) if restored_account_id is not None else base_values
+                cur = conn.execute(
+                    f"INSERT INTO accounts({columns}) VALUES{values_sql}",
+                    values,
+                )
+                return {"id": restored_account_id if restored_account_id is not None else cur.lastrowid}
         except sqlite3.IntegrityError as e:
             raise HTTPException(400, f"account exists: {e}")
         finally:
@@ -3192,14 +3429,24 @@ def list_accounts():
 
 @app.delete("/api/accounts/{aid}")
 def delete_account(aid: int):
+    """删除无历史引用账号；已有任务/运行引用时只停用账号行。"""
     with _db_lock:
         conn = get_db()
         try:
             with conn:
+                row = conn.execute("SELECT * FROM accounts WHERE id=?", (aid,)).fetchone()
+                if not row:
+                    raise HTTPException(404, "account not found")
+                counts = _account_reference_counts(conn, aid)
+                if sum(counts.values()) > 0:
+                    # 任务、批次和 run 都按 account_id 保存历史引用；硬删账号会让
+                    # OAuth 后台刷新器看不到账号，并留下无法恢复的孤儿任务。
+                    conn.execute("UPDATE accounts SET enabled=0 WHERE id=?", (aid,))
+                    return {"ok": True, "deleted": False, "disabled": True, "references": counts}
                 conn.execute("DELETE FROM accounts WHERE id=?", (aid,))
         finally:
             conn.close()
-    return {"ok": True}
+    return {"ok": True, "deleted": True, "disabled": False}
 
 
 @app.post("/api/accounts/{aid}/quota")
@@ -3449,28 +3696,37 @@ def login_commit(sid: str, body: LoginStartIn):
         try:
             with conn:
                 try:
-                    cur = conn.execute(
-                        "INSERT INTO accounts(name, profile_path, "
-                        "upstream_socks5_host, upstream_socks5_port, "
-                        "upstream_socks5_user, upstream_socks5_pass, enabled) "
-                        "VALUES(?,?,?,?,?,?,?)",
-                        (
-                            name,
-                            f"profiles/{name}",
-                            body.upstream_socks5_host,
-                            body.upstream_socks5_port,
-                            body.upstream_socks5_user,
-                            body.upstream_socks5_pass,
-                            1,
-                        ),
+                    restored_account_id = _infer_deleted_account_id(conn, name)
+                    columns = (
+                        "id, name, profile_path, upstream_socks5_host, upstream_socks5_port, "
+                        "upstream_socks5_user, upstream_socks5_pass, enabled"
+                    ) if restored_account_id is not None else (
+                        "name, profile_path, upstream_socks5_host, upstream_socks5_port, "
+                        "upstream_socks5_user, upstream_socks5_pass, enabled"
                     )
-                    account_id = cur.lastrowid
+                    values_sql = "(?,?,?,?,?,?,?,?)" if restored_account_id is not None else "(?,?,?,?,?,?,?)"
+                    values: tuple[object, ...]
+                    base_values = (
+                        name,
+                        f"profiles/{name}",
+                        body.upstream_socks5_host,
+                        body.upstream_socks5_port,
+                        body.upstream_socks5_user,
+                        body.upstream_socks5_pass,
+                        1,
+                    )
+                    values = ((restored_account_id,) + base_values) if restored_account_id is not None else base_values
+                    cur = conn.execute(
+                        f"INSERT INTO accounts({columns}) VALUES{values_sql}",
+                        values,
+                    )
+                    account_id = restored_account_id if restored_account_id is not None else cur.lastrowid
                 except sqlite3.IntegrityError:
-                    # 同名账号已存在 → 视为"重新登录"：只覆盖 socks5
+                    # 同名账号已存在 → 视为"重新登录"：覆盖 socks5，并重新启用账号。
                     conn.execute(
                         "UPDATE accounts SET upstream_socks5_host=?, "
                         "upstream_socks5_port=?, upstream_socks5_user=?, "
-                        "upstream_socks5_pass=? WHERE name=?",
+                        "upstream_socks5_pass=?, enabled=1 WHERE name=?",
                         (
                             body.upstream_socks5_host,
                             body.upstream_socks5_port,

@@ -37,6 +37,30 @@ CLAUDE_USER=node
 CLAUDE_HOME=/home/node
 CLAUDE_DIR="$CLAUDE_HOME/.claude"
 
+ensure_claude_code_version() {
+  # 镜像只内置一个默认版本；WebUI 可覆盖版本用于快速回退/验证。
+  # 版本号由 orchestrator 校验，这里再次做最小校验，避免把环境变量拼进 npm 参数。
+  local desired="$CLAUDE_CODE_VERSION"
+  if ! printf '%s' "$desired" | grep -Eq '^[0-9]+[.][0-9]+[.][0-9]+([-+][A-Za-z0-9._-]+)?$'; then
+    log "Invalid CLAUDE_CODE_VERSION: $desired"
+    return 1
+  fi
+  local current=""
+  current="$(claude --version 2>/dev/null | grep -Eo '[0-9]+[.][0-9]+[.][0-9]+' | head -1 || true)"
+  if [ "$current" = "$desired" ]; then
+    log "Claude Code version $desired ready"
+    return 0
+  fi
+  log "Installing Claude Code $desired (current: ${current:-missing})"
+  npm install -g "@anthropic-ai/claude-code@$desired"
+  current="$(claude --version 2>/dev/null | grep -Eo '[0-9]+[.][0-9]+[.][0-9]+' | head -1 || true)"
+  if [ "$current" != "$desired" ]; then
+    log "Claude Code version mismatch after install: expected $desired, got ${current:-missing}"
+    return 1
+  fi
+  log "Claude Code version $desired installed"
+}
+
 write_default_settings() {
   # settings.json 既要补齐默认值，又不能覆盖 Claude 自己写入的隐藏 gate。
   # 用 jq 递归合并：已有字段保留，默认字段补齐；同名字段以默认值为准。
@@ -212,13 +236,15 @@ wait_for_sidecar_dns() {
 }
 
 persist_runtime_claude_state() {
-  # task 模式里 Claude 跑在 $HOME 的运行时副本中；OAuth token 统一由
-  # orchestrator 后台刷新器维护，run 结束不能把旧 credentials 覆盖回 profile。
+  # task 模式里 Claude 跑在 $HOME 的运行时副本中；Claude Code 2.x 会在
+  # 推理前主动 refresh 并轮换 refreshToken，所以 credentials 需要按新鲜度
+  # 回写 profile，不能只依赖 orchestrator 后台刷新器。
   # 页面运行时思考预算只应影响当前 worker 进程；回写 profile 前还原成
   # orchestrator 环境兜底值，避免把一次页面覆盖污染进账号长期 settings。
   if [ ! -d /mnt/profile ] || [ ! -w /mnt/profile ]; then
     return 0
   fi
+  persist_local_credentials_to_profile_once >/dev/null 2>&1 || true
   if [ -f "$CLAUDE_HOME/.claude.json" ]; then
     patch_top_config_gates
     cp "$CLAUDE_HOME/.claude.json" /mnt/profile/.claude.json || true
@@ -261,7 +287,8 @@ JS
 
 sync_profile_credentials_once() {
   # 后台刷新器只更新账号 profile；运行中的 Claude 读本地副本。
-  # 这里单向同步 profile -> 本地，避免 run 结束时旧 credentials 覆盖新 token。
+  # 这里只在 profile 明显更新时同步到本地，避免旧 profile 覆盖 Claude Code
+  # 在当前 run 内刚刷新出来的 accessToken / refreshToken。
   local src="/mnt/profile/.credentials.json"
   local dst="$CLAUDE_DIR/.credentials.json"
   [ -f "$src" ] || return 1
@@ -291,11 +318,37 @@ try {
 } catch {}
 const sourceOauth = source.claudeAiOauth || {};
 const currentOauth = current && current.claudeAiOauth ? current.claudeAiOauth : {};
+function expiresAt(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+let sourceStat = null;
+let currentStat = null;
+try {
+  sourceStat = fs.statSync(src);
+} catch {}
+try {
+  currentStat = fs.statSync(dst);
+} catch {}
 if (
   currentOauth.accessToken === sourceOauth.accessToken &&
-  currentOauth.expiresAt === sourceOauth.expiresAt
+  currentOauth.expiresAt === sourceOauth.expiresAt &&
+  currentOauth.refreshToken === sourceOauth.refreshToken
 ) {
   process.exit(2);
+}
+if (current && currentOauth.accessToken) {
+  const sourceExpiresAt = expiresAt(sourceOauth.expiresAt);
+  const currentExpiresAt = expiresAt(currentOauth.expiresAt);
+  const sourceHasRefresh = typeof sourceOauth.refreshToken === 'string' && sourceOauth.refreshToken;
+  const currentHasRefresh = typeof currentOauth.refreshToken === 'string' && currentOauth.refreshToken;
+  const sourceIsNewerFile = sourceStat && currentStat
+    ? sourceStat.mtimeMs > currentStat.mtimeMs + 1000
+    : false;
+  const sourceHasNewerToken = sourceExpiresAt > currentExpiresAt + 60000;
+  const sourceRestoresRefresh = sourceHasRefresh && !currentHasRefresh && sourceExpiresAt >= currentExpiresAt;
+  if (!sourceIsNewerFile && !sourceHasNewerToken && !sourceRestoresRefresh) {
+    process.exit(2);
+  }
 }
 fs.mkdirSync(path.dirname(dst), {recursive: true});
 const tmp = `${dst}.tmp.${process.pid}`;
@@ -308,6 +361,115 @@ JS
     chown "$CLAUDE_USER:$CLAUDE_USER" "$dst" 2>/dev/null || true
     chmod 600 "$dst" 2>/dev/null || true
     log "Synced refreshed OAuth credentials from profile"
+    return 0
+  fi
+  return "$rc"
+}
+
+persist_local_credentials_to_profile_once() {
+  local lock_path="/mnt/profile/.credentials.lock"
+  [ -d /mnt/profile ] && [ -w /mnt/profile ] || return 1
+  (
+    flock 8
+    persist_local_credentials_to_profile_unlocked
+  ) 8>"$lock_path"
+}
+
+persist_local_credentials_to_profile_unlocked() {
+  local src="$CLAUDE_DIR/.credentials.json"
+  local dst="/mnt/profile/.credentials.json"
+  [ -f "$src" ] || return 1
+  [ -d /mnt/profile ] && [ -w /mnt/profile ] || return 1
+  set +e
+  node - "$src" "$dst" <<'JS'
+const fs = require('fs');
+const path = require('path');
+const src = process.argv[2];
+const dst = process.argv[3];
+
+function readJson(file) {
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
+
+function oauthOf(data) {
+  return data && typeof data === 'object' && data.claudeAiOauth
+    ? data.claudeAiOauth
+    : null;
+}
+
+function expiresAt(oauth) {
+  return oauth && typeof oauth.expiresAt === 'number' && Number.isFinite(oauth.expiresAt)
+    ? oauth.expiresAt
+    : 0;
+}
+
+let source;
+try {
+  source = readJson(src);
+} catch {
+  process.exit(1);
+}
+const sourceOauth = oauthOf(source);
+if (
+  !sourceOauth ||
+  typeof sourceOauth.accessToken !== 'string' ||
+  !sourceOauth.accessToken
+) {
+  process.exit(1);
+}
+let current = null;
+try {
+  current = readJson(dst);
+} catch {}
+const currentOauth = oauthOf(current);
+if (
+  currentOauth &&
+  currentOauth.accessToken === sourceOauth.accessToken &&
+  currentOauth.expiresAt === sourceOauth.expiresAt &&
+  currentOauth.refreshToken === sourceOauth.refreshToken
+) {
+  process.exit(2);
+}
+if (currentOauth) {
+  const sourceExpiresAt = expiresAt(sourceOauth);
+  const currentExpiresAt = expiresAt(currentOauth);
+  let sourceStat = null;
+  let currentStat = null;
+  try {
+    sourceStat = fs.statSync(src);
+  } catch {}
+  try {
+    currentStat = fs.statSync(dst);
+  } catch {}
+  const sourceIsNewerFile = sourceStat && currentStat
+    ? sourceStat.mtimeMs > currentStat.mtimeMs + 1000
+    : false;
+  const sourceHasRefresh = typeof sourceOauth.refreshToken === 'string' && sourceOauth.refreshToken;
+  const currentHasRefresh = typeof currentOauth.refreshToken === 'string' && currentOauth.refreshToken;
+  const tokenRotated = currentHasRefresh && sourceHasRefresh && sourceOauth.refreshToken !== currentOauth.refreshToken;
+  const accessRotated = sourceOauth.accessToken !== currentOauth.accessToken;
+  const sourceHasNewerToken = sourceExpiresAt > currentExpiresAt + 60000;
+  const sourceRestoresRefresh = sourceHasRefresh && !currentHasRefresh && sourceExpiresAt >= currentExpiresAt;
+  const sourceIsBetter = sourceHasNewerToken || sourceRestoresRefresh || (
+    sourceIsNewerFile &&
+    sourceExpiresAt >= currentExpiresAt &&
+    (tokenRotated || accessRotated)
+  );
+  if (!sourceIsBetter) {
+    process.exit(2);
+  }
+}
+fs.mkdirSync(path.dirname(dst), {recursive: true});
+const tmp = `${dst}.tmp.${process.pid}`;
+fs.writeFileSync(tmp, `${JSON.stringify(source, null, 2)}\n`, 'utf8');
+fs.renameSync(tmp, dst);
+JS
+  local rc=$?
+  set -e
+  if [ "$rc" -eq 0 ]; then
+    chown "$CLAUDE_USER:$CLAUDE_USER" "$dst" 2>/dev/null || true
+    chmod 600 "$dst" 2>/dev/null || true
+    log "Persisted refreshed OAuth credentials to profile"
     return 0
   fi
   return "$rc"
@@ -365,6 +527,130 @@ process.exit(oauth.expiresAt > Date.now() + bufferMs ? 0 : 1);
 JS
 }
 
+force_refresh_profile_credentials_once() {
+  local reason="${1:-auth_error}"
+  local credentials_path="$CLAUDE_DIR/.credentials.json"
+  [ -f "$credentials_path" ] || return 1
+  local lock_path="/mnt/profile/.credentials.lock"
+  if [ -d /mnt/profile ] && [ -w /mnt/profile ]; then
+    (
+      flock 9
+      sync_profile_credentials_once >/dev/null 2>&1 || true
+      force_refresh_profile_credentials_unlocked "$reason"
+    ) 9>"$lock_path"
+    return $?
+  fi
+  force_refresh_profile_credentials_unlocked "$reason"
+}
+
+force_refresh_profile_credentials_unlocked() {
+  local reason="${1:-auth_error}"
+  local credentials_path="$CLAUDE_DIR/.credentials.json"
+  [ -f "$credentials_path" ] || return 1
+  set +e
+  node - "$credentials_path" "$CLAUDE_CODE_VERSION" "$reason" <<'JS'
+const fs = require('fs');
+const path = process.argv[2];
+const claudeCodeVersion = process.argv[3] || '2.1.185';
+const reason = process.argv[4] || 'auth_error';
+const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
+const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
+const SCOPES = [
+  'user:profile',
+  'user:inference',
+  'user:sessions:claude_code',
+  'user:mcp_servers',
+  'user:file_upload',
+  'user:design:read',
+  'user:design:write',
+];
+
+function emit(value) {
+  process.stdout.write(`${JSON.stringify(value)}\n`);
+}
+
+async function main() {
+  let data;
+  try {
+    data = JSON.parse(fs.readFileSync(path, 'utf8'));
+  } catch (error) {
+    throw new Error(`.credentials.json 读取失败: ${error.message}`);
+  }
+  const oauth = data && data.claudeAiOauth;
+  if (!oauth || typeof oauth !== 'object') {
+    throw new Error('.credentials.json 缺少 claudeAiOauth');
+  }
+  if (typeof oauth.refreshToken !== 'string' || !oauth.refreshToken) {
+    throw new Error('OAuth refreshToken 为空，请重新登录账号');
+  }
+  const response = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      grant_type: 'refresh_token',
+      refresh_token: oauth.refreshToken,
+      client_id: CLIENT_ID,
+      scope: SCOPES.join(' '),
+    }),
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    const retryAfter = Number.parseInt(response.headers.get('retry-after') || '', 10);
+    emit({
+      error: `OAuth token 刷新失败: HTTP ${response.status} ${text.slice(0, 500)}`,
+      status: response.status,
+      retry_after_sec: Number.isFinite(retryAfter) ? retryAfter : null,
+      reason,
+    });
+    process.exit(1);
+  }
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`OAuth token 刷新响应不是 JSON: ${error.message}`);
+  }
+  if (typeof payload.access_token !== 'string' || !payload.access_token) {
+    throw new Error('OAuth token 刷新响应缺少 access_token');
+  }
+  oauth.accessToken = payload.access_token;
+  oauth.refreshToken = typeof payload.refresh_token === 'string' && payload.refresh_token
+    ? payload.refresh_token
+    : oauth.refreshToken;
+  oauth.scopes = Array.isArray(payload.scope)
+    ? payload.scope
+    : String(payload.scope || '').split(/\s+/).filter(Boolean);
+  oauth.subscriptionType = payload.subscription_type || oauth.subscriptionType;
+  oauth.rateLimitTier = payload.rate_limit_tier || oauth.rateLimitTier;
+  const expiresIn = Number.isFinite(Number(payload.expires_in))
+    ? Number(payload.expires_in)
+    : 3600;
+  oauth.expiresAt = Date.now() + Math.max(expiresIn, 60) * 1000;
+  const tmp = `${path}.tmp.${process.pid}`;
+  fs.writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+  fs.renameSync(tmp, path);
+  emit({refreshed: true, expiresAt: oauth.expiresAt, claudeCodeVersion, reason});
+}
+
+main().catch((error) => {
+  emit({error: error && error.message ? error.message : String(error), reason});
+  process.exit(1);
+});
+JS
+  local rc=$?
+  set -e
+  if [ "$rc" -eq 0 ]; then
+    chown "$CLAUDE_USER:$CLAUDE_USER" "$credentials_path" 2>/dev/null || true
+    chmod 600 "$credentials_path" 2>/dev/null || true
+    persist_local_credentials_to_profile_unlocked >/dev/null 2>&1 || true
+    return 0
+  fi
+  return "$rc"
+}
+
 wait_for_profile_credentials_refresh() {
   local base_fingerprint="${1:-}"
   local wait_sec="${OAUTH_401_PROFILE_WAIT_SEC:-90}"
@@ -399,6 +685,7 @@ start_profile_credentials_sync() {
   fi
   (
     while true; do
+      persist_local_credentials_to_profile_once >/dev/null 2>&1 || true
       sync_profile_credentials_once >/dev/null 2>&1 || true
       sleep "$interval"
     done
@@ -1036,6 +1323,9 @@ else
   log "Login mode without sidecar DNS: keeping Docker-provided /etc/resolv.conf"
 fi
 
+# ---------- 1.6) 按运行时配置确保 Claude Code CLI 版本 ----------
+ensure_claude_code_version
+
 # ---------- login 模式：CA 已装好，profile 目录直接挂在 node HOME，空转待 exec ----------
 if [ "$WORKER_MODE" = "login" ]; then
   mkdir -p "$CLAUDE_DIR"
@@ -1216,14 +1506,26 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     credential_before="$(credential_fingerprint "$CLAUDE_DIR/.credentials.json" 2>/dev/null || true)"
     sync_profile_credentials_once >/dev/null 2>&1 || true
     if [ ! -f /tmp/claude-auth-recovered-once ]; then
-      log "Detected Claude auth error (${auth_marker}); waiting for refreshed profile credentials"
-      if ! wait_for_profile_credentials_refresh "$credential_before"; then
-        log "No refreshed OAuth credentials appeared within ${OAUTH_401_PROFILE_WAIT_SEC:-90}s"
-        echo "auth_error" > /tmp/claude-fatal-error
-        write_bench_status "auth_failed" "OAuth 认证失败: ${auth_marker}，等待后台刷新凭据超时"
-        break
+      log "Detected Claude auth error (${auth_marker}); refreshing OAuth credentials once"
+      refresh_result=""
+      refresh_status=0
+      refresh_result="$(force_refresh_profile_credentials_once "worker_401" 2>/tmp/oauth-refresh-stderr.log)" || refresh_status=$?
+      if [ "$refresh_status" -ne 0 ]; then
+        log "OAuth force refresh failed after auth error: ${refresh_result:-$(cat /tmp/oauth-refresh-stderr.log 2>/dev/null || true)}"
+        if printf '%s' "$refresh_result" | grep -Eiq 'invalid_grant|"status"[[:space:]]*:[[:space:]]*(400|429)'; then
+          echo "auth_error" > /tmp/claude-fatal-error
+          write_bench_status "auth_failed" "OAuth 认证失败: ${auth_marker}；刷新失败：${refresh_result}"
+          break
+        fi
+        sync_profile_credentials_once >/dev/null 2>&1 || true
+        if ! wait_for_profile_credentials_refresh "$credential_before"; then
+          echo "auth_error" > /tmp/claude-fatal-error
+          write_bench_status "auth_failed" "OAuth 认证失败: ${auth_marker}；刷新失败：${refresh_result:-等待后台刷新凭据超时}"
+          break
+        fi
       fi
-      log "Refreshed OAuth credentials synced; prompting one retry"
+      persist_local_credentials_to_profile_once >/dev/null 2>&1 || true
+      log "OAuth credentials refreshed/synced; prompting one retry"
       inject_tmux_prompt auth-retry "$AUTH_RECOVERY_PROMPT" || true
       {
         date +%s

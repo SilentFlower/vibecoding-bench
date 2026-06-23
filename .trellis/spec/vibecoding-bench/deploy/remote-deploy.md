@@ -73,6 +73,10 @@ CLAUDE_DEFAULT_MODEL=opus[1m]
 # 可选:普通 run / 批量 run 的兜底思考预算(默认 max);
 # WebUI「运行」页保存的页面覆盖值优先于这里。
 CLAUDE_CODE_EFFORT_LEVEL=max
+
+# 可选:新启动 worker 的 Claude Code CLI 兜底版本(默认 2.1.185);
+# WebUI「运行」页保存的页面覆盖值优先于这里。
+CLAUDE_CODE_VERSION=2.1.185
 ```
 
 ### HOST_BENCH_DATA 怎么填(最常错)
@@ -131,6 +135,22 @@ docker compose -f docker-compose.remote.yml --env-file .env up -d --force-recrea
 | 完整 HTTP 抓包 run | 继续使用 `.env` / 抓包现有默认行为，不受页面覆盖值影响 |
 
 修改 WebUI 页面覆盖值不需要重启，只影响后续新启动的普通 / 批量 run。修改 `.env` 的兜底值后必须 recreate orchestrator，已运行中的 run 不受影响。
+
+### CLAUDE_CODE_VERSION 兜底 CLI 版本
+
+`CLAUDE_CODE_VERSION` 是新启动 worker 的 Claude Code CLI 兜底版本。WebUI「运行」页可以保存运行时页面覆盖值，页面覆盖值保存在 SQLite，优先级高于 `.env`，不需要 recreate orchestrator。页面覆盖值为空时，orchestrator 才回退到 `CLAUDE_CODE_VERSION`。
+
+worker 启动时会检查 `claude --version`；如果和当前生效版本不一致，会在容器内执行 `npm install -g @anthropic-ai/claude-code@<version>`，然后再启动登录 / task / quota 流程。usage API 的 `User-Agent` 也使用同一个当前生效版本，避免 CLI 版本与 usage 探测 UA 脱节。
+
+| 场景 | 行为 |
+|------|------|
+| 未配置 `CLAUDE_CODE_VERSION` | 新 worker 使用 `2.1.185` |
+| 配置 `CLAUDE_CODE_VERSION=2.1.169` | 页面未覆盖时，新 worker 使用 `2.1.169` |
+| WebUI 运行页保存 `2.1.169` | 新启动的 task / 抓包 / 登录 / quota worker 使用 `2.1.169`，即使 `.env` 仍是 `2.1.185` |
+| WebUI 运行页清空覆盖值 | 新 worker 回退到 `.env` 的 `CLAUDE_CODE_VERSION` |
+| 指定不存在的版本 | worker 启动安装失败，run 明确失败，不静默回退 |
+
+修改 WebUI 页面覆盖值不需要重启，只影响后续新启动 worker。修改 `.env` 的兜底值后必须 recreate orchestrator，已运行中的 run 不受影响。
 
 ---
 
