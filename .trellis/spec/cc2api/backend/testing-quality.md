@@ -32,6 +32,13 @@ cargo test
 
 需要记录抓包结论时，只写字段差异、header 顺序、hash 结果和脱敏摘要。
 
+## 本地拒绝错误体边界
+
+- 访问策略本地拒绝必须保留 Anthropic/OpenAI 可解析的 error object，`error.code` / `setting` 用于机器识别。
+- `allowed_user_agents` 未命中时，响应可以返回当前请求的 `User-Agent`，便于客户端自查；但不得返回 `allowed_user_agents` 原始配置、允许 pattern 列表或“允许规则”引导文案。
+- `allowed_claude_code_versions` 的版本范围是独立策略；是否隐藏必须按任务范围明确，不要和 `allowed_user_agents` 规则混改。
+- 修改访问策略错误体时，至少补单测断言：状态码、`error.code` / `setting`、当前 UA 是否按需求出现、允许列表 pattern 是否未泄露。
+
 ## Review Checklist
 
 - [ ] 新代码沿用现有 `AppError` / `Result<_, AppError>` 风格。
