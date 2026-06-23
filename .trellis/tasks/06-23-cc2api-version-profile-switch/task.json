@@ -22,5 +22,25 @@
   "parent": null,
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {},
+  "last_push_snapshot": {
+    "snapshot_at": "2026-06-23T03:56:54.964507Z",
+    "branch": {
+      "vibecoding-bench": "main",
+      "cc2api": "main"
+    },
+    "pushed_commits": {
+      "vibecoding-bench": "320471c",
+      "cc2api": "30b1f80"
+    },
+    "completed_steps": [
+      "Phase 1 planning",
+      "Phase 2 implementation",
+      "Phase 2.2 check-all",
+      "Phase 3.3 spec update",
+      "Phase 3.4 push"
+    ],
+    "next_step": "Phase 3.5 wrap-up reminder",
+    "notes": "已实现 cc2api 版本特征切换，正式 trellis-check-all 与验证命令均通过；等待用户显式要求 finish-work 时归档任务。"
+  }
 }
