@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/06-24-cc2api-upgrade-claude-code-2-1-187/research/cc2api-2-1-187-capture-summary.md","reason":"脱敏抓包摘要，提供 2.1.187 identity、UA、beta、cc_version、CCH、telemetry、GrowthBook 和 bootstrap 结论"}
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"Claude Code 画像升级协议契约，覆盖 CCH、cc_version、beta、telemetry、bootstrap 和账号迁移"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"settings、数据库迁移、账号 canonical_env 同步和 SQLite/PostgreSQL 双栈规则"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"后端测试、敏感数据边界和质量检查要求"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"Settings 前端控件、API client、类型同步和构建规则"}

@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/06-24-cc2api-upgrade-claude-code-2-1-187/research/cc2api-2-1-187-capture-summary.md","reason":"检查实现是否符合脱敏抓包确认的 2.1.187 协议字段"}
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"检查 CCH、cc_version、beta、telemetry、bootstrap 和账号迁移是否满足协议规范"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"检查 settings 默认值、迁移一致性和账号 canonical_env 同步"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"检查后端测试、敏感数据边界和质量门槛"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"检查 Settings 前端改动是否同步类型、控件和构建"}
