@@ -1182,3 +1182,40 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 35: cc2api 升级 Claude Code 2.1.187 画像
+
+**Date**: 2026-06-24
+**Task**: cc2api 升级 Claude Code 2.1.187 画像
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+完成 cc2api Claude Code 2.1.187 画像升级，补齐请求改写、CCH、telemetry/GrowthBook、启动迁移一致性、Settings 展示澄清和 release 操作单，并归档任务。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5584ce4` | (see git log) |
+| `3d172c0` | (see git log) |
+| `ea89625` | (see git log) |
+| `29f0ec7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
