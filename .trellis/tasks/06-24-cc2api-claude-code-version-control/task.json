@@ -24,14 +24,14 @@
   "notes": "",
   "meta": {},
   "last_push_snapshot": {
-    "snapshot_at": "2026-06-24T14:29:54+08:00",
+    "snapshot_at": "2026-06-24T17:43:16+08:00",
     "branch": {
       "cc2api": "main",
       "vibecoding-bench": "main"
     },
     "pushed_commits": {
-      "cc2api": "2fbd0c7",
-      "vibecoding-bench": "97142fc"
+      "cc2api": "e6b7d50",
+      "vibecoding-bench": "3c74184"
     },
     "completed_steps": [
       "Step 1 更新访问策略核心",
@@ -41,9 +41,13 @@
       "Step 5 更新前端设置页",
       "Step 6 更新文档",
       "Step 7 补测试",
-      "Phase 2.2 check-all 已通过"
+      "Phase 2.2 check-all 已通过",
+      "追加修复：registry 不透传上游 Authorization",
+      "追加修复：仅 messages/count_tokens 补 beta=true",
+      "追加修复：Haiku 标题/探测请求使用 2.1.187 窄 beta",
+      "追加修复：event_logging 2.1.187 保留 shell 和 is_running_with_bun"
     ],
     "next_step": "Phase 3.5：用户明确要求后运行 trellis-finish-work 收尾",
-    "notes": "已通过 cargo fmt --check、cargo test、cargo test cch、npm run build。"
+    "notes": "追加协议修复已通过 cargo fmt --check、cargo test event_logging_、cargo test cch、cargo test、git diff --check。注意：默认 is_running_with_bun=true 仍未落代码，本次不纳入提交。"
   }
 }
