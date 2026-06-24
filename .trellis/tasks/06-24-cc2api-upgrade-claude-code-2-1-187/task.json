@@ -24,14 +24,14 @@
   "notes": "",
   "meta": {},
   "last_push_snapshot": {
-    "snapshot_at": "2026-06-24T03:00:19Z",
+    "snapshot_at": "2026-06-24T04:11:14Z",
     "branch": {
       "vibecoding-bench": "main",
       "cc2api": "main"
     },
     "pushed_commits": {
-      "vibecoding-bench": "ea89625",
-      "cc2api": "5584ce4"
+      "vibecoding-bench": "29f0ec7",
+      "cc2api": "3d172c0"
     },
     "completed_steps": [
       "Step 1: 更新 version_profile.rs 新增 2.1.187 并切换默认画像",
@@ -39,10 +39,11 @@
       "Step 3: 修复启动迁移按 settings.claude_code_version_profile 同步账号 env",
       "Step 4: 更新 Settings 前端 fallback 与 README 默认范围",
       "Step 5: 完成硬编码搜索、全面检查、cargo fmt、cargo test、cargo test cch、npm run build",
-      "Phase 3.4: 业务提交并推送 cc2api 与父仓记录"
+      "Phase 3.4: 业务提交并推送 cc2api 与父仓记录",
+      "Phase 3.4: 增量提交 Settings telemetry 结构展示澄清"
     ],
     "partial_step": "",
     "next_step": "如需收尾，执行 finish-work/归档任务",
-    "notes": "2.1.187 画像升级已实现并验证；抓包原文、data/、route 本地偏好未提交。"
+    "notes": "补充 Settings 展示文案：2.1.187 profile 复用 2.1.185 telemetry shape 时展示为兼容结构，避免误读为当前版本未更新；npm run build 已通过。"
   }
 }
