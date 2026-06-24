@@ -22,5 +22,28 @@
   "parent": null,
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {},
+  "last_push_snapshot": {
+    "snapshot_at": "2026-06-24T14:29:54+08:00",
+    "branch": {
+      "cc2api": "main",
+      "vibecoding-bench": "main"
+    },
+    "pushed_commits": {
+      "cc2api": "2fbd0c7",
+      "vibecoding-bench": "97142fc"
+    },
+    "completed_steps": [
+      "Step 1 更新访问策略核心",
+      "Step 2 更新 settings 默认值和迁移",
+      "Step 3 更新管理 API",
+      "Step 4 更新 Gateway 热刷新",
+      "Step 5 更新前端设置页",
+      "Step 6 更新文档",
+      "Step 7 补测试",
+      "Phase 2.2 check-all 已通过"
+    ],
+    "next_step": "Phase 3.5：用户明确要求后运行 trellis-finish-work 收尾",
+    "notes": "已通过 cargo fmt --check、cargo test、cargo test cch、npm run build。"
+  }
 }
