@@ -24,14 +24,14 @@
   "notes": "",
   "meta": {},
   "last_push_snapshot": {
-    "snapshot_at": "2026-06-24T17:43:16+08:00",
+    "snapshot_at": "2026-06-24T18:10:12+08:00",
     "branch": {
       "cc2api": "main",
       "vibecoding-bench": "main"
     },
     "pushed_commits": {
-      "cc2api": "e6b7d50",
-      "vibecoding-bench": "3c74184"
+      "cc2api": "35e087a",
+      "vibecoding-bench": "c2d90ef"
     },
     "completed_steps": [
       "Step 1 更新访问策略核心",
@@ -45,9 +45,10 @@
       "追加修复：registry 不透传上游 Authorization",
       "追加修复：仅 messages/count_tokens 补 beta=true",
       "追加修复：Haiku 标题/探测请求使用 2.1.187 窄 beta",
-      "追加修复：event_logging 2.1.187 保留 shell 和 is_running_with_bun"
+      "追加修复：event_logging 2.1.187 保留 shell 和 is_running_with_bun",
+      "追加修复：默认 is_running_with_bun 对齐为 true"
     ],
     "next_step": "Phase 3.5：用户明确要求后运行 trellis-finish-work 收尾",
-    "notes": "追加协议修复已通过 cargo fmt --check、cargo test event_logging_、cargo test cch、cargo test、git diff --check。注意：默认 is_running_with_bun=true 仍未落代码，本次不纳入提交。"
+    "notes": "Bun 默认画像修复已通过 cargo fmt --check、cargo test normalize_env、cargo test event_batch_uses_unified_profile_and_bounded_process、cargo test event_logging_、cargo test cch、cargo test、git diff --check。"
   }
 }
