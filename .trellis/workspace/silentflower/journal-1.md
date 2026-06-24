@@ -1219,3 +1219,40 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 36: cc2api Claude Code 版本治理和协议画像收尾
+
+**Date**: 2026-06-24
+**Task**: cc2api Claude Code 版本治理和协议画像收尾
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+完成 cc2api Claude Code 禁止版本规则、2.1.187 协议特征对齐、event_logging env 修复和 Bun 默认画像修复；已推送子仓与父仓快照，并归档任务。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2fbd0c7` | (see git log) |
+| `e6b7d50` | (see git log) |
+| `35e087a` | (see git log) |
+| `a32b450` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
