@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "新增全局 setting 必须同步默认值、迁移、GET/PUT 校验、热刷新、前端和文档。"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "访问策略属于 Gateway 热路径前置治理，新增配置必须遵守 service/store/handler 分层和热刷新模式。"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "Settings 页面新增控件必须使用真实 setting key、前端基础校验和统一 API client。"}
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "版本画像切换约束要求只覆盖 allowed_claude_code_versions 和账号 env，不能覆盖管理员独立策略。"}

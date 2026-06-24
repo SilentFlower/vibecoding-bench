@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "后端提交前需要 cargo fmt、cargo test，并关注网关访问控制回归和敏感错误响应边界。"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "检查新增 setting 是否完整覆盖默认值、迁移、校验、热刷新和老库兼容。"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "检查 Settings 页面类型、字段名、校验、保存 payload 和 npm build。"}
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "检查 profile 切换仍保留独立策略，不破坏版本画像切换契约。"}
