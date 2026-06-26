@@ -58,15 +58,43 @@ max_journal_lines: 2000
 # Trellis auto-detects workspaces during `trellis init`, but you can also
 # configure them manually here.
 #
-packages:
-  vibecoding-bench:
-    path: .
-  cc2api:
-    path: cc2api
-    type: submodule
+# packages:
+#   frontend:
+#     path: packages/frontend
+#   backend:
+#     path: packages/backend
+#   docs:
+#     path: docs-site
+#     type: submodule
+#   # For polyrepo / meta-repo layouts (independent .git in each subdir),
+#   # mark the package with `git: true`. The runtime treats it as an
+#   # independent repository for things like git-context display.
+#   webapp:
+#     path: ./webapp
+#     git: true
 
 # Default package used when --package is not specified.
-default_package: vibecoding-bench
+# default_package: frontend
+
+#-------------------------------------------------------------------------------
+# Channel worker OOM guard
+#-------------------------------------------------------------------------------
+# Default safeguards for `trellis channel spawn` workers. The guard runs
+# at spawn time (cleans expired idle workers, then enforces the live-worker
+# budget) and inside each supervisor (self-terminates a worker that stays
+# continuously idle past `idle_timeout`).
+#
+# Precedence: CLI flag > env var (TRELLIS_CHANNEL_WORKER_IDLE_TIMEOUT /
+# TRELLIS_CHANNEL_MAX_LIVE_WORKERS) > this config > built-in default.
+#
+# `idle_timeout: 0` disables idle cleanup (workers can sit idle forever
+# unless explicitly killed or given `--timeout`).
+# `max_live_workers: 0` disables the spawn-time budget check.
+#
+channel:
+  worker_guard:
+    idle_timeout: 5m
+    max_live_workers: 6
 
 #-------------------------------------------------------------------------------
 # Codex (dispatch behavior)
@@ -83,3 +111,17 @@ default_package: vibecoding-bench
 
 codex:
   dispatch_mode: sub-agent
+
+# Declare packages for monorepo projects.
+# Trellis auto-detects workspaces during `trellis init`, but you can also
+# configure them manually here.
+#
+packages:
+  vibecoding-bench:
+    path: .
+  cc2api:
+    path: cc2api
+    type: submodule
+
+# Default package used when --package is not specified.
+default_package: vibecoding-bench
