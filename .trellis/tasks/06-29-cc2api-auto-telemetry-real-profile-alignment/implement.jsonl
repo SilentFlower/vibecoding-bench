@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "Claude Code telemetry/env/profile 与抓包证据保存边界。"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "TelemetryService 与 GatewayService 的服务边界。"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "遥测、请求摘要和敏感字段测试要求。"}
+{"file": ".trellis/tasks/06-29-cc2api-2-1-195-fingerprint-upgrade/research/run-23594999fa77-summary.md", "reason": "2.1.195 telemetry env 和事件概览。"}
+{"file": ".trellis/tasks/06-29-cc2api-2-1-195-fingerprint-upgrade/research/2-1-195-deep-diff-and-leak-risk.md", "reason": "auto telemetry additional_metadata 稀疏风险分析。"}

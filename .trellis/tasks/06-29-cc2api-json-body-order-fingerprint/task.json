@@ -1,0 +1,43 @@
+{
+  "id": "cc2api-json-body-order-fingerprint",
+  "name": "cc2api-json-body-order-fingerprint",
+  "title": "cc2api 请求体 JSON 顺序指纹对齐",
+  "description": "为 cc2api 增加可配置的 /v1/messages JSON 顶层字段顺序对齐，降低 serde_json 重序列化导致的 body order 指纹偏差。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "cc2api",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-06-29",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "06-29-cc2api-2-1-195-fingerprint-upgrade",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "last_push_snapshot": {
+    "snapshot_at": "2026-06-29T15:27:37+08:00",
+    "branch": {
+      "cc2api": "main"
+    },
+    "pushed_commits": {
+      "cc2api": "66d0c06"
+    },
+    "completed_steps": [
+      "Step 1：依赖与 setting",
+      "Step 2：Rewriter 排序",
+      "Step 3：测试",
+      "Step 4：验证"
+    ],
+    "next_step": "Phase 3.3 spec update / Phase 3.4 trellis-push",
+    "notes": "实现 preserve_order 与 message_body_order_fingerprint_enabled，全链路验证通过。"
+  }
+}

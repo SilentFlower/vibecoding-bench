@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "Claude Code wire 指纹、body 顺序、CCH 和抓包回归契约。"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "cc2api service/rewrite/gateway 层边界与请求改写规则。"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "新增 settings key、DB 默认值和前后端同步契约。"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "请求体改写、CCH、settings 测试要求。"}
+{"file": ".trellis/spec/cc2api/frontend/index.md", "reason": "Settings 前端改动入口规范。"}
+{"file": ".trellis/tasks/06-29-cc2api-2-1-195-fingerprint-upgrade/research/2-1-195-deep-diff-and-leak-risk.md", "reason": "2.1.195 抓包 body 顺序和 serde_json 重序列化风险分析。"}

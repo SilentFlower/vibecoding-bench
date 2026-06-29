@@ -18,7 +18,10 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [],
+  "children": [
+    "06-29-cc2api-json-body-order-fingerprint",
+    "06-29-cc2api-auto-telemetry-real-profile-alignment"
+  ],
   "parent": null,
   "relatedFiles": [],
   "notes": "",
