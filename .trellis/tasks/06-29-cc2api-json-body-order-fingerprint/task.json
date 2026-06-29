@@ -24,12 +24,12 @@
   "notes": "",
   "meta": {},
   "last_push_snapshot": {
-    "snapshot_at": "2026-06-29T15:27:37+08:00",
+    "snapshot_at": "2026-06-29T16:14:52+08:00",
     "branch": {
       "cc2api": "main"
     },
     "pushed_commits": {
-      "cc2api": "66d0c06"
+      "cc2api": "dd5aa20"
     },
     "completed_steps": [
       "Step 1：依赖与 setting",
@@ -37,7 +37,7 @@
       "Step 3：测试",
       "Step 4：验证"
     ],
-    "next_step": "Phase 3.3 spec update / Phase 3.4 trellis-push",
-    "notes": "实现 preserve_order 与 message_body_order_fingerprint_enabled，全链路验证通过。"
+    "next_step": "Phase 3.5 finish-work（如需归档任务）",
+    "notes": "修正排序范围：仅 API mimicry 执行顶层字段排序，Claude Code 客户端保留原始顶层顺序；cargo fmt --check、cargo test message_body_order、cargo test settings、cargo test、npm run build 已通过。"
   }
 }
