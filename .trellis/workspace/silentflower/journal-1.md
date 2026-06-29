@@ -1292,3 +1292,42 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 38: cc2api 2.1.195 任务收尾归档
+
+**Date**: 2026-06-29
+**Task**: cc2api 2.1.195 任务收尾归档
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+补充 cc2api 2.1.195 画像升级与 JSON body 顺序指纹任务的 release 操作说明，归档剩余父任务和子任务；任务队列已清空，后续发布需按 release.md 做 settings/canonical env、body 顺序和远程验收。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b24cf56` | (see git log) |
+| `dd5aa20` | (see git log) |
+| `66d0c06` | (see git log) |
+| `01a4a4d` | (see git log) |
+| `832ce2c` | (see git log) |
+| `f3f4876` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
