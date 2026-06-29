@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "检查 cargo fmt、telemetry 单测、敏感数据泄露边界。"}
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "检查 telemetry shape 与 Claude Code 画像边界。"}
+{"file": ".trellis/tasks/06-29-cc2api-simulated-telemetry-safety-realism-baseline/prd.md", "reason": "按任务验收标准检查实现范围。"}
+{"file": ".trellis/tasks/06-29-cc2api-simulated-telemetry-safety-realism-baseline/design.md", "reason": "检查 scanner、日志、correlation fallback 设计是否落地。"}
