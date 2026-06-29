@@ -2,7 +2,7 @@
   "id": "cc2api-json-body-order-fingerprint",
   "name": "cc2api-json-body-order-fingerprint",
   "title": "cc2api 请求体 JSON 顺序指纹对齐",
-  "description": "为 cc2api 增加可配置的 /v1/messages JSON 顶层字段顺序对齐，降低 serde_json 重序列化导致的 body order 指纹偏差。",
+  "description": "为 cc2api 增加可配置的 API mimicry /v1/messages JSON 顶层字段顺序对齐，保留真实 Claude Code 客户端原始 body order。",
   "status": "in_progress",
   "dev_type": null,
   "scope": null,

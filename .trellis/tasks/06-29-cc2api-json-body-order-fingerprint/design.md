@@ -2,9 +2,10 @@
 
 ## 设计原则
 
-- 只把 `/v1/messages` 顶层 key 顺序作为 wire 指纹处理，不引入全局 JSON formatter。
+- 只把 API mimicry 生成的 `/v1/messages` 顶层 key 顺序作为 wire 指纹处理，不引入全局 JSON formatter。
 - `serde_json/preserve_order` 是基础能力；是否执行 profile reorder 由 setting 控制。
 - CCH 输入必须是排序后的最终 body 字节。
+- 真实 Claude Code 客户端请求优先保留客户端原始顶层顺序，不套用服务端推断的固定 profile 顺序。
 - 设置默认开启，但必须可关闭以便线上对照和快速回滚。
 
 ## Setting
@@ -20,7 +21,7 @@
 
 1. `GatewayService` 读取 setting，并将 bool 传入 `Rewriter::rewrite_body_with_stateful_completion` / `rewrite_body`。
 2. `Rewriter` 解析和改写 body。
-3. 若 path 为 `/v1/messages` 且开关开启，调用 `order_message_body_top_level_fields(&mut parsed)`。
+3. 若 path 为 `/v1/messages`、client type 为 `API` 且开关开启，调用 `order_message_body_top_level_fields(&mut parsed)`。
 4. 序列化为 bytes。
 5. billing rewrite/API mimicry 按最终 bytes 计算 CCH。
 
@@ -42,10 +43,12 @@
 
 - `serde_json/preserve_order` 会影响 `Value::Object` 的底层 map 类型；测试中不能依赖对象按字母排序。
 - 其它 endpoint 不调用排序函数，行为应保持不变。
-- 如果管理员关闭开关，仍保留 preserve_order feature，但不会主动重排 `/v1/messages` 顶层字段。
+- `ClientType::ClaudeCode` 不调用排序函数，依赖 `preserve_order` 保留下游真实客户端的顶层字段顺序。
+- 如果管理员关闭开关，仍保留 preserve_order feature，但不会主动重排 API mimicry `/v1/messages` 顶层字段。
 
 ## 风险与回滚
 
-- 风险：排序函数误判 body 形态，导致字段顺序不符合抓包。通过三类抓包 shape 单测覆盖。
+- 风险：排序函数误用于真实 Claude Code 请求，覆盖客户端原始 wire 顺序。通过 Claude Code 保序单测覆盖。
+- 风险：排序函数误判 API mimicry body 形态，导致字段顺序不符合抓包。通过生成体 shape 单测覆盖。
 - 风险：新增参数影响调用点。统一更新 `GatewayService` 和测试 helper。
 - 回滚：把 setting 改为 `false`，或后续移除排序调用。

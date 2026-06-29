@@ -2,20 +2,21 @@
 
 ## Goal
 
-为 `cc2api` 增加可配置的 `/v1/messages` JSON 顶层字段顺序对齐，降低 `serde_json` 重序列化导致的 body order 指纹偏差，并确保 CCH 在最终排序后的 body 上计算。
+为 `cc2api` 增加可配置的 API mimicry `/v1/messages` JSON 顶层字段顺序对齐，降低生成式 body 与 Claude Code 画像的 body order 指纹偏差，并确保 CCH 在最终排序后的 body 上计算。
 
 ## 背景
 
-- 2.1.195 抓包显示 `/v1/messages` body 顶层字段顺序稳定。
+- 2.1.195 抓包显示真实 Claude Code `/v1/messages` body 顶层字段顺序稳定。
 - 当前 `cc2api` 会把请求体解析为 `serde_json::Value` 后重新序列化；默认 `serde_json` 不保留 object 插入顺序。
+- 真实 Claude Code 客户端请求本身已经携带 wire 顺序，开启 `preserve_order` 后应保留原始顶层顺序；API mimicry / 预热这类生成式 body 才需要按 Claude Code 画像排序。
 - CCH 已在最终 body 上计算，因此排序修复不能发生在 CCH 之后。
 - 用户要求 `preserve_order` 由全局 setting 开关控制，避免不可回滚地改变所有 JSON 行为。
 
 ## 需求
 
 - 为 `serde_json` 开启 `preserve_order` crate feature，让 JSON object 能保留插入顺序。
-- 新增全局 setting 控制 `/v1/messages` 顶层字段顺序对齐，默认开启以降低当前 2.1.195 指纹风险。
-- 只对 `/v1/messages` 请求体执行顶层字段重排；其他 endpoint 不改变 body 顺序。
+- 新增全局 setting 控制 API mimicry `/v1/messages` 顶层字段顺序对齐，默认开启以降低当前 2.1.195 指纹风险。
+- 只对 `ClientType::API` 的 `/v1/messages` 请求体执行顶层字段重排；真实 Claude Code 客户端请求保留原始顶层顺序，其他 endpoint 不改变 body 顺序。
 - 排序必须在 body 所有改写之后、CCH 计算之前执行。
 - 根据 2.1.195 抓包对齐已知 body 形态：
   - Opus 主请求：`model,messages,system,tools,metadata,max_tokens,thinking,context_management,output_config,diagnostics,stream`
@@ -35,7 +36,8 @@
 
 - [ ] `Cargo.toml` 中 `serde_json` 启用 `preserve_order`。
 - [ ] settings 中存在可配置开关，默认开启，旧库迁移后有默认值。
-- [ ] 开启开关时 `/v1/messages` 三种抓包 body 形态输出顶层 key 顺序与 2.1.195 抓包一致。
+- [ ] 开启开关时 API mimicry `/v1/messages` 生成体输出顶层 key 顺序与 2.1.195 抓包画像一致。
+- [ ] 开启开关时真实 Claude Code 客户端 `/v1/messages` 不执行额外顶层 key 重排，依赖 `preserve_order` 保留客户端原顺序。
 - [ ] 关闭开关时不执行额外顶层 key 重排。
 - [ ] 额外未知字段保留在已知字段之后，字段值不丢失。
 - [ ] billing/CCH 在排序后的最终 body 上计算。
