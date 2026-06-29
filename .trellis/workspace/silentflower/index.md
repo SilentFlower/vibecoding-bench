@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 36
-- **Last Active**: 2026-06-24
+- **Total Sessions**: 37
+- **Last Active**: 2026-06-29
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1258 | Active |
+| `journal-1.md` | ~1294 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 37 | 2026-06-29 | cc2api 自动遥测真实画像对齐 | `a74ae52`, `548d6fb`, `06aada6` | `main` |
 | 36 | 2026-06-24 | cc2api Claude Code 版本治理和协议画像收尾 | `2fbd0c7`, `e6b7d50`, `35e087a`, `a32b450` | `main` |
 | 35 | 2026-06-24 | cc2api 升级 Claude Code 2.1.187 画像 | `5584ce4`, `3d172c0`, `ea89625`, `29f0ec7` | `main` |
 | 34 | 2026-06-23 | 隐藏 cc2api UA 允许规则错误详情 | `909e4a2`, `bd91558` | `main` |

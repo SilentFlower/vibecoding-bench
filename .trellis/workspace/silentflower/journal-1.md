@@ -1256,3 +1256,39 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 37: cc2api 自动遥测真实画像对齐
+
+**Date**: 2026-06-29
+**Task**: cc2api 自动遥测真实画像对齐
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+完成 cc2api auto telemetry 与 Claude Code 2.1.195 抓包的第一阶段对齐：补齐 correlation ID、事件 metadata 模板、usage/ttft/stop_reason 摘要、脱敏 catalog 与 diff 脚本；完成本地验证和 trellis-push，归档任务并记录发布后远程灰度抓包验收要求。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a74ae52` | (see git log) |
+| `548d6fb` | (see git log) |
+| `06aada6` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
