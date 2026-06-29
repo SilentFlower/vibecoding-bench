@@ -22,5 +22,27 @@
   "parent": null,
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {},
+  "last_push_snapshot": {
+    "snapshot_at": "2026-06-29T11:02:00.122404Z",
+    "branch": {
+      "cc2api": "main",
+      "vibecoding-bench": "main"
+    },
+    "pushed_commits": {
+      "cc2api": "bfdc0a6",
+      "vibecoding-bench": "72267ed"
+    },
+    "completed_steps": [
+      "Step 1",
+      "Step 2",
+      "Step 3",
+      "Step 4",
+      "Step 5",
+      "Step 6"
+    ],
+    "partial_step": null,
+    "next_step": "Phase 3.3 spec update / Phase 3.4 commit 后可进入 finish-work",
+    "notes": "实现与 check-all 已通过；已完成模拟遥测安全扫描、结构化日志、假值清理与 correlation fallback。"
+  }
 }
