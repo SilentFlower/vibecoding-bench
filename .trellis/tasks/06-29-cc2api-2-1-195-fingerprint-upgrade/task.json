@@ -22,5 +22,26 @@
   "parent": null,
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {},
+  "last_push_snapshot": {
+    "snapshot_at": "2026-06-29T04:13:37Z",
+    "branch": {
+      "cc2api": "main",
+      "vibecoding-bench": "main"
+    },
+    "pushed_commits": {
+      "cc2api": "b24cf56",
+      "vibecoding-bench": "01a4a4d"
+    },
+    "completed_steps": [
+      "Step 1",
+      "Step 2",
+      "Step 3",
+      "Step 4",
+      "Step 5",
+      "Step 6"
+    ],
+    "next_step": "Phase 3.5：push 后按需 finish-work；远程部署和 DB 验收另行执行",
+    "notes": "实现和检查已通过 cargo fmt --check、cargo test、cargo test cch、npm run build；原始 evidence 未提交。"
+  }
 }
