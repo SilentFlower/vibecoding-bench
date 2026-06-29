@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "Claude Code 版本画像升级契约，覆盖 CCH、cc_version、beta、bootstrap、telemetry 和账号迁移。"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "cc2api Rust 后端分层、Gateway 热路径和 service/store 边界。"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "settings 默认值、SQLite/PostgreSQL 迁移和账号 canonical_env 更新规则。"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "后端测试、敏感数据边界和 review checklist。"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "修改常量和画像前必须搜索复用，避免版本字段散落。"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "本任务跨 request profile、settings、DB、frontend 和 telemetry，需要按层检查。"}
+{"file": ".trellis/tasks/06-29-cc2api-2-1-195-fingerprint-upgrade/research/run-23594999fa77-summary.md", "reason": "远程抓包 23594999fa77 的脱敏证据摘要和 2.1.195 指纹差异。"}

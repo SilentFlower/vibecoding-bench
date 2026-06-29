@@ -14,7 +14,8 @@
 
 - `ALTER TABLE ... ADD COLUMN` 目前采用幂等失败吞掉的方式支持旧库升级；新增列要确认重复执行安全。
 - settings 默认值通过 `settings` 表插入 key/value；新增 setting 必须有默认值、老值迁移策略和非法值兜底。
-- 版本画像相关迁移必须更新已有账号的 `canonical_env.version/version_base/build_time`，不能只改新账号默认值。
+- 版本画像相关迁移必须更新已有账号的 `canonical_env.version/version_base/build_time/node_version`，不能只改新账号默认值。
+- 多个 setting 共同表达一个默认画像时，旧默认组合必须成对迁移。例如 `claude_code_version_profile` 和 `allowed_claude_code_versions` 只有同时仍是旧默认值时才自动升级；管理员自定义过其中一个 key 时按显式配置保留。
 - 删除或废弃 setting key 时，加入 `OBSOLETE_SETTINGS_KEYS`，并确认 UI 不再提交旧 key。
 
 ## Settings Key 契约
@@ -57,6 +58,7 @@ web/src/components/Accounts.vue
 |--------|------|----------|
 | 只更新 SQLite schema | PostgreSQL 部署启动失败 | SQLite/PG 同步改 |
 | 老 settings 没有迁移 | 远程实例仍使用旧行为 | 在 `migrate` 中处理旧 key/value |
+| 只迁移组合 setting 的一半 | 服务启动后仍按另一个旧 key 刷回旧行为 | 把旧默认组合一起迁移，并用自定义值测试保护显式回滚 |
 | setting 写入后不 reload | UI 显示已保存但热路径不生效 | `update_settings` 后调用对应 reload |
 | 前端类型漏字段 | 构建或运行时展示异常 | 同步 `web/src/api.ts` |
 | 直接暴露 `access_token` / `refresh_token` | 凭据泄露 | 管理 API 和 UI 做脱敏或必要最小展示 |

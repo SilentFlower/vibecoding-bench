@@ -47,6 +47,8 @@ x-anthropic-billing-header: cc_version=<version>.<suffix>; cc_entrypoint=cli; cc
 accounts.canonical_env.version
 accounts.canonical_env.version_base
 accounts.canonical_env.build_time
+accounts.canonical_env.node_version
+settings.claude_code_version_profile
 settings.allowed_claude_code_versions
 ```
 
@@ -67,6 +69,8 @@ data/flows/<account>/<topic_id>/<run_id>/
 - `DEFAULT_CLAUDE_CODE_VERSION`
 - `DEFAULT_CLAUDE_CODE_VERSION_BASE`
 - `DEFAULT_CLAUDE_CODE_BUILD_TIME`
+- `DEFAULT_CLAUDE_CODE_VERSION_PROFILE`
+- `STAINLESS_RUNTIME_VERSION`
 - `claude_cli_user_agent(version)`
 - `claude_code_user_agent(version)`
 - `DEFAULT_ALLOWED_CLAUDE_CODE_VERSIONS_SETTING`
@@ -135,7 +139,9 @@ Telemetry 契约：
 
 账号迁移契约：
 
-- 启动迁移必须把已有账号 `canonical_env.version/version_base/build_time` 更新到当前默认画像。
+- 启动迁移必须把已有账号 `canonical_env.version/version_base/build_time/node_version` 更新到当前默认画像。
+- 启动迁移必须同时迁移旧默认 settings 组合：当 `settings.claude_code_version_profile` 仍是上一个默认 profile，且 `settings.allowed_claude_code_versions` 仍是对应旧默认范围时，必须把二者升级到当前默认画像。
+- 显式回滚 profile 只能在管理员自定义过 `allowed_claude_code_versions` 时保留；否则旧默认 profile 会让远程老库继续发送旧 UA / env 画像。
 - 远程部署后必须查 DB 版本分布，不能只依赖日志判断。
 
 ### 4. Validation & Error Matrix
@@ -146,6 +152,7 @@ Telemetry 契约：
 | `cc_version` 主请求按第一个 text block 计算不命中 | 检查首条 user message 是否有多个 text block；按最后一个 text block 复算 |
 | Fable 带 `[1m]` 时 beta 顺序与抓包不同 | 先按目标版本抓包判断是否应有 `context-1m-2025-08-07`；若应有，再整理到 `oauth` 后面 |
 | bootstrap response 有 gzip | 先解码再改 JSON，返回时修正压缩/长度相关 header |
+| 老库保留旧默认 `claude_code_version_profile` | 若 `allowed_claude_code_versions` 也是旧默认范围，迁移 profile 和 allowed range 到当前默认；若 allowed range 是管理员自定义值，则保留显式回滚 |
 | 远程部署后账号仍是旧版本 | 检查迁移是否执行；直接查 volume 内 SQLite/Postgres 的 `canonical_env` |
 | 抓包分析需要保存到仓库 | 禁止提交完整 `http_capture.jsonl`、token、Cookie、Authorization、邮箱、完整 prompt/响应正文 |
 
@@ -156,6 +163,8 @@ Telemetry 契约：
 **Base**：只升级一个 patch 版本，也必须至少验证 `/v1/messages` header、body keys、billing header、bootstrap 和 telemetry metadata 是否变化。
 
 **Bad**：只把 `DEFAULT_CLAUDE_CODE_VERSION` 改成新版本，未同步 `User-Agent`、账号迁移、CCH 输入 profile 和 beta 顺序。
+
+**Bad**：只迁移 `allowed_claude_code_versions`，但没有把旧默认 `claude_code_version_profile` 迁到新默认，导致启动时继续按旧 profile 刷账号 env。
 
 **Bad**：看到 Fable 抓包里有 `flags=model`，就把它硬编码成所有 Fable telemetry 字段。
 
@@ -173,6 +182,8 @@ Telemetry 契约：
   - `fable_context_1m_beta_keeps_claude_code_order_when_allowed`
   - bootstrap gzip 解码和 configured/hide_fable 行为
   - telemetry 中 Fable `betas`、`model`，以及不无条件写 `flags=model`
+  - 旧默认 `claude_code_version_profile` + 旧默认 `allowed_claude_code_versions` 会升级到当前默认
+  - 自定义 `allowed_claude_code_versions` 下的旧 profile 作为显式回滚保留
 - 抓包回归：
   - 169 baseline CCH 命中旧完整 body 规则。
   - 172 Opus CCH 命中 `model + max_tokens` 排除规则。
@@ -231,6 +242,7 @@ claude-code-20250219,oauth-2025-04-20,context-1m-2025-08-07,interleaved-thinking
 | 只看 CCH 不看 `cc_version` | CCH 命中但 billing header 后缀不真实 | 对每条主请求复算 suffix |
 | 重新序列化 body 再算 CCH | 字段顺序或转义变化导致 hash 偏移 | 在最终 body 字节上做 top-level 裁剪 |
 | Fable beta 无条件注入 1M | 不允许 1M 的账号也带 `context-1m` | 让客户端/白名单决定 1M |
+| 只迁移 allowed range | 老库仍读取旧 `claude_code_version_profile`，账号 env 被刷新回旧版本 | 旧默认 profile setting 和旧默认 allowed range 必须成对迁移 |
 | 部署后只看容器 Up | 账号仍可能停旧 `canonical_env` | 查 DB 版本分布 |
 
 ---

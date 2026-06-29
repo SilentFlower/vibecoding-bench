@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "检查实现是否满足 Claude Code 画像升级抓包验收和 CCH/cc_version 契约。"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "检查 cargo fmt、cargo test、cargo test cch 和敏感数据边界。"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "检查 settings/profile 切换、DB migration 和 canonical_env 同步。"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "检查后端、DB、前端 Settings 和热路径的跨层一致性。"}
+{"file": ".trellis/tasks/06-29-cc2api-2-1-195-fingerprint-upgrade/research/run-23594999fa77-summary.md", "reason": "检查实现输出是否对齐 2.1.195 脱敏抓包证据。"}
