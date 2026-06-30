@@ -247,6 +247,136 @@ claude-code-20250219,oauth-2025-04-20,context-1m-2025-08-07,interleaved-thinking
 
 ---
 
+## Scenario: Claude Code currentDate 风险治理
+
+### 1. Scope / Trigger
+
+- Trigger: Claude Code 在非官方 `ANTHROPIC_BASE_URL`、代理、网关或中国时区画像下改变自动上下文中的 currentDate 标记。
+- 该场景属于跨层契约：`/v1/messages` body 改写、settings、管理 API、前端设置页、telemetry 清洗和日志策略必须一致。
+- 默认行为必须低风险：只观测和 telemetry 清洗；只有管理员显式选择 `normalize` 时才改写请求体。
+
+### 2. Signatures
+
+关键代码入口：
+
+```text
+src/service/rewriter.rs
+src/service/gateway.rs
+src/service/telemetry.rs
+src/handler/router.rs
+src/store/settings_store.rs
+src/store/db.rs
+web/src/components/Settings.vue
+```
+
+关键 setting：
+
+```text
+settings.claude_code_context_sanitizer_mode = off | report_only | normalize
+```
+
+### 3. Contracts
+
+请求体治理契约：
+
+- 仅对 `ClientType::ClaudeCode` 的 `/v1/messages` 改写链路生效；普通 API 客户端不触发。
+- 只扫描 Claude Code 自动上下文位置：`system` text、`system[] .text`、带上下文 marker 的 `messages[].content` text、多 text block 中首个上下文 block。
+- `report_only` 只记录脱敏摘要，不修改 body；`normalize` 才把命中句式统一为 `Today's date is YYYY-MM-DD.`。
+- 规范化必须发生在最终 CCH / `cc_version` 刷新前，避免 hash 和 billing header 基于旧文本计算。
+- 支持日期分隔符 `-` 和 `/`，但同一句中年月、月日分隔符必须一致。
+
+currentDate 撇号契约：
+
+```text
+Today['\u{2019}\u{02BC}\u{02B9}\u{2032}]s date is YYYY[-/]MM[-/]DD.
+```
+
+已知变体：
+
+| 字符 | 码点 | 日志类别 |
+|------|------|----------|
+| `'` | U+0027 | `ascii` |
+| `’` | U+2019 | `right_single_quote` |
+| `ʼ` | U+02BC | `modifier_letter_apostrophe` |
+| `ʹ` | U+02B9 | `modifier_letter_prime` |
+| `′` | U+2032 | `prime` |
+
+日志和 telemetry 契约：
+
+- currentDate finding 日志只能包含 `mode`、`action`、`path`、`date_separator`、`apostrophe_variant`、`text_len`、短 hash、`client_type`，禁止输出完整 prompt、system 或 request body。
+- telemetry sanitizer 必须清洗非官方 `base_url` / `gateway` / `proxy` key/value 痕迹。
+- 官方 Anthropic host 值允许保留：`anthropic.com`、`api.anthropic.com`、`claude.ai`、`console.anthropic.com` 及其子域。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 期望 |
+|------|------|
+| `claude_code_context_sanitizer_mode` 是未知值 | `/admin/settings` PUT 返回 BadRequest，不刷新热路径 |
+| mode=`off` | 不扫描、不打 finding 日志、不改写 body |
+| mode=`report_only` 且命中 currentDate | 输出脱敏 warning，body 字节语义不变 |
+| mode=`normalize` 且命中 `Todayʹs date is 2026/06/30.` | 改为 `Today's date is 2026-06-30.` |
+| 非 Claude Code 客户端发送同样文本 | 不触发扫描或规范化 |
+| 普通用户正文单 text block 包含 `Today's date is ...` | 不改写，避免误伤真实用户内容 |
+| telemetry 中出现 `gatewayHost=https://internal.example` | 删除该字段 |
+| telemetry 中出现 `baseUrl=https://api.anthropic.com` | 保留该字段 |
+
+### 5. Good/Base/Bad Cases
+
+**Good**：默认 `report_only` 上线，先通过脱敏日志确认 `date_separator` 和 `apostrophe_variant` 分布，再由管理员显式打开 `normalize`。
+
+**Base**：中国时区下出现 `2026/06/30` 时，只在 `normalize` 模式改为 `2026-06-30`。
+
+**Bad**：把所有用户消息中的 `Today's date is` 都替换，导致真实用户内容被静默修改。
+
+**Bad**：只覆盖 `′` U+2032，漏掉 Claude Code 实际可能使用的 `ʹ` U+02B9。
+
+**Bad**：在日志里输出完整 system prompt 或 request body，泄露工作目录、环境、token 或用户正文。
+
+### 6. Tests Required
+
+- `cargo fmt --check`
+- `cargo test context_sanitizer`
+- `cargo test telemetry_sanitizer`
+- `cargo test`
+- 涉及设置页时运行 `cd cc2api/web && npm run build`
+- 断言点：
+  - 默认 settings 返回 `report_only`。
+  - `report_only` 不修改 body。
+  - `normalize` 覆盖 `'`、`’`、`ʼ`、`ʹ`、`′` 与 `YYYY/MM/DD`。
+  - 规范化后 CCH 占位符被最终刷新。
+  - API 客户端和普通用户正文不被误改。
+  - telemetry 清洗非官方 base URL / gateway / proxy，同时保留官方 Anthropic host。
+
+### 7. Wrong vs Correct
+
+#### Wrong: 只匹配 ASCII 撇号
+
+```text
+Today's date is 2026/06/30.
+```
+
+这样会漏掉 `Todayʹs date is ...`，其中 `ʹ` 是 U+02B9，不是 U+2032。
+
+#### Correct: 明确列出已知 Unicode 变体
+
+```text
+Today['\u{2019}\u{02BC}\u{02B9}\u{2032}]s date is YYYY[-/]MM[-/]DD.
+```
+
+#### Wrong: report_only 中改写请求体
+
+```text
+mode=report_only, action=normalize
+```
+
+#### Correct: report_only 只输出脱敏摘要
+
+```text
+mode=report_only, action=report_only, apostrophe_variant=modifier_letter_prime, date_separator=/
+```
+
+---
+
 ## Scenario: Claude Code 版本画像切换
 
 ### 1. Scope / Trigger
