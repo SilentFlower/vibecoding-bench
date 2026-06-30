@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 39
-- **Last Active**: 2026-06-29
+- **Total Sessions**: 40
+- **Last Active**: 2026-07-01
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1369 | Active |
+| `journal-1.md` | ~1405 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 40 | 2026-07-01 | 完成 cc2api Claude Code base URL 风险控制 | `27f00cd`, `00e63af`, `d319ccf` | `main` |
 | 39 | 2026-06-29 | cc2api 模拟遥测安全基线 | `bfdc0a6`, `72267ed`, `4285348` | `main` |
 | 38 | 2026-06-29 | cc2api 2.1.195 任务收尾归档 | `b24cf56`, `dd5aa20`, `66d0c06`, `01a4a4d`, `832ce2c`, `f3f4876` | `main` |
 | 37 | 2026-06-29 | cc2api 自动遥测真实画像对齐 | `a74ae52`, `548d6fb`, `06aada6` | `main` |
