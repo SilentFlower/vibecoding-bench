@@ -66,7 +66,7 @@ open http://localhost:8000
 | 速率限制 | 撞限即停（标 failed），不自动切其它账号 |
 | 思考预算 | 普通 / 批量 run 默认使用 WebUI 运行页配置；未配置时回退到 `CLAUDE_CODE_EFFORT_LEVEL=max` |
 | 默认模型 | 普通 / 批量 run 默认使用 WebUI 运行页配置；未配置时回退到 `CLAUDE_DEFAULT_MODEL=opus[1m]` |
-| Claude Code 版本 | 新启动 worker 使用 WebUI 运行页配置；未配置时回退到 `CLAUDE_CODE_VERSION=2.1.185` |
+| Claude Code 版本 | 新启动 worker 使用 WebUI 运行页配置；未配置时回退到 `CLAUDE_CODE_VERSION=2.1.195` |
 | 透明代理 | sidecar 容器 + hev-socks5-tunnel + mitmproxy（TLS MITM）|
 | WebUI | 纯 HTML + 原生 JS + SSE，零构建 |
 
@@ -137,6 +137,6 @@ data/flows/<account>/<task_id>/<run_id>/
 - **API timeout 终态**：worker 会识别 Claude TUI 的 `API error` / `Request timed out` 重试卡死并按 watchdog 尝试恢复；如果 Claude JSONL 最终写入 synthetic `Request timed out`，run 会标记为 `failed` 并显示错误，不再当作 `success`。
 - **默认模型**：普通 run 和批量 run 默认使用 WebUI「运行」页保存的模型；未保存页面覆盖值时回退到 `CLAUDE_DEFAULT_MODEL=opus[1m]`。如果某个模型临时不可用，优先在页面改成 `sonnet[1m]`、`haiku` 或完整模型 ID，新启动的普通 / 批量 run 立即生效；清空页面覆盖后才回退到 `.env`。完整 HTTP 抓包 run 不受页面配置或 `CLAUDE_DEFAULT_MODEL` 影响，只在抓包页填写 `model_override` 时覆盖当前抓包 run。
 
-- **Claude Code 版本**：新启动的 task / 抓包 / 登录 / quota worker 使用 WebUI「运行」页保存的版本；未保存页面覆盖值时回退到 `CLAUDE_CODE_VERSION=2.1.185`。版本覆盖会在 worker 启动时检查 `claude --version`，不一致则安装指定 `@anthropic-ai/claude-code` 版本。清空页面覆盖后才回退到 `.env`。
+- **Claude Code 版本**：新启动的 task / 抓包 / 登录 / quota worker 使用 WebUI「运行」页保存的版本；未保存页面覆盖值时回退到 `CLAUDE_CODE_VERSION=2.1.195`。版本覆盖会在 worker 启动时检查 `claude --version`，不一致则安装指定 `@anthropic-ai/claude-code` 版本。清空页面覆盖后才回退到 `.env`。
 - **OAuth 401 / token 刷新竞态**：orchestrator 后台刷新器会更新账号 profile，运行中的 worker 会按 `OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC` 做 profile / 本地凭证的新鲜度同步。若 Claude 仍返回 401，worker 会锁住该账号 profile，用当前 refreshToken 强制刷新一次并回写新 AT/RT，再提示 Claude 重试一次；同账号多个并行 run 会串行化刷新，多个账号互不影响。刷新失败或再次 401 会标记 `auth_failed`，不会继续等到普通 timeout。
 - **磁盘占用 / 敏感数据**：普通 run 默认 `SAVE_FULL_FLOWS=0`，只保留 `stats.jsonl`；完整抓包 run 会保存请求体和响应体全文、`.flow` 和索引，体积更大且包含高敏数据；默认 `CLEAN_WORKSPACE_DEPS=1` 会在 run 结束后清理 workspace 里的 `node_modules`、`.venv` 等依赖目录。

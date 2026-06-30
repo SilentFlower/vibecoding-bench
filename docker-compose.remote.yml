@@ -29,7 +29,7 @@ services:
       # 远程必须用 DockerHub 完整路径,否则 worker/sidecar 起不来
       WORKER_IMAGE: huajiwuyan/vibebench-worker:${VIBEBENCH_TAG:-latest}
       SIDECAR_IMAGE: huajiwuyan/vibebench-sidecar:${VIBEBENCH_TAG:-latest}
-      CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-2.1.185}
+      CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-2.1.195}
       CLAUDE_CODE_EFFORT_LEVEL: ${CLAUDE_CODE_EFFORT_LEVEL:-max}
       CLAUDE_DEFAULT_MODEL: ${CLAUDE_DEFAULT_MODEL:-opus[1m]}
       SAVE_FULL_FLOWS: ${SAVE_FULL_FLOWS:-0}
