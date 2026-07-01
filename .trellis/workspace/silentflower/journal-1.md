@@ -1403,3 +1403,40 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 41: 完成 cc2api 2.1.197 升级与远程部署
+
+**Date**: 2026-07-01
+**Task**: 完成 cc2api 2.1.197 升级与远程部署
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+完成 cc2api Claude Code 2.1.197 默认画像升级，覆盖 Sonnet 5 1M beta、CCH/billing、settings/account 迁移、前端选项和 vibecoding-bench 默认版本兜底；构建并推送 vibebench 三镜像 latest 与 0c8d8f9，远程 /root/vibecoding-bench 更新到 0c8d8f9 和 CLAUDE_CODE_VERSION=2.1.197，HTTP 与容器环境验收通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8ee5160` | (see git log) |
+| `2ecf013` | (see git log) |
+| `0c8d8f9` | (see git log) |
+| `d149d49` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
