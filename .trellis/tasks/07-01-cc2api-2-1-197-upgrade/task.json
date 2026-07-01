@@ -22,5 +22,29 @@
   "parent": null,
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {},
+  "last_push_snapshot": {
+    "snapshot_at": "2026-07-01T01:09:07.446712Z",
+    "branch": {
+      "vibecoding-bench": "main",
+      "cc2api": "main"
+    },
+    "pushed_commits": {
+      "vibecoding-bench": "2ecf013",
+      "cc2api": "8ee5160"
+    },
+    "completed_steps": [
+      "Step 1 更新版本画像注册表",
+      "Step 2 更新 CCH / billing 版本分支",
+      "Step 3 更新 allow_1m_models 默认与迁移",
+      "Step 4 更新 settings/profile 迁移",
+      "Step 5 更新前端管理页",
+      "Step 6 更新 vibecoding-bench 默认版本配置",
+      "Step 7 本地验证已完成",
+      "追加完成 Opus 抓包 38335b80e9ef 脱敏复核"
+    ],
+    "partial_step": "Step 8 远程验收准备，已完成抓包复核，尚未执行远程部署",
+    "next_step": "推送后按远程部署 SOP 部署并验收 curl /、DB 版本分布和日志",
+    "notes": "本次为默认画像升级提交；完整抓包未入库，只记录脱敏摘要"
+  }
 }
