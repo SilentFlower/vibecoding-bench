@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "质量检查要求，覆盖 cargo fmt/test、定向协议测试、敏感数据边界和日志边界。"}
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "检查实现是否满足版本画像、1M beta、cc_version、CCH、telemetry 和迁移契约。"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "检查 settings 与账号默认值迁移是否覆盖 SQLite/PostgreSQL 并保留管理员自定义。"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "检查前端设置页、账号页文案、类型和构建是否同步。"}
+{"file": ".trellis/spec/cc2api/deploy/deploy-guidelines.md", "reason": "检查远程部署与 DB 版本分布验收是否完整。"}
+{"file": ".trellis/tasks/07-01-cc2api-2-1-197-upgrade/research.md", "reason": "检查协议实现是否对齐本任务脱敏抓包摘要，并避免记录敏感抓包正文。"}

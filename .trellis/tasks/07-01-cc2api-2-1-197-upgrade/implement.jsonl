@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "Claude Code 版本画像升级的协议契约，覆盖 UA、beta、cc_version、CCH、telemetry、账号迁移与抓包边界。"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "约束 cc2api 后端分层、Gateway 热路径、settings 热刷新和 CCH 计算顺序。"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "约束 settings 默认值、SQLite/PostgreSQL 双栈迁移、账号字段同步和旧默认组合迁移。"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "约束 Vue 设置页、账号页、API 类型同步和前端构建。"}
+{"file": ".trellis/spec/cc2api/deploy/deploy-guidelines.md", "reason": "约束 cc2api 构建、镜像、远程部署和部署后 DB 验证。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/remote-deploy.md", "reason": "约束 vibecoding-bench 远程 env、worker 默认 Claude Code 版本和 cc2api.env 远程重启流程。"}
+{"file": ".trellis/tasks/07-01-cc2api-2-1-197-upgrade/research.md", "reason": "本任务脱敏抓包摘要，包含 2.1.197 Sonnet 5 1M beta、build_time、node_version 和请求形态。"}
