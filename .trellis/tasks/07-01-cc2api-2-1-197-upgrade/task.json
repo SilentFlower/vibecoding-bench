@@ -24,13 +24,13 @@
   "notes": "",
   "meta": {},
   "last_push_snapshot": {
-    "snapshot_at": "2026-07-01T01:09:07.446712Z",
+    "snapshot_at": "2026-07-01T01:34:16.746254Z",
     "branch": {
       "vibecoding-bench": "main",
       "cc2api": "main"
     },
     "pushed_commits": {
-      "vibecoding-bench": "2ecf013",
+      "vibecoding-bench": "0c8d8f9",
       "cc2api": "8ee5160"
     },
     "completed_steps": [
@@ -41,10 +41,13 @@
       "Step 5 更新前端管理页",
       "Step 6 更新 vibecoding-bench 默认版本配置",
       "Step 7 本地验证已完成",
-      "追加完成 Opus 抓包 38335b80e9ef 脱敏复核"
+      "追加完成 Opus 抓包 38335b80e9ef 脱敏复核",
+      "修复 continue / login / quota 裸兜底版本一致性",
+      "构建并推送 vibecoding-bench DockerHub 镜像 tag 0c8d8f9",
+      "远程 vibecoding-bench 已部署 0c8d8f9 并验收通过"
     ],
-    "partial_step": "Step 8 远程验收准备，已完成抓包复核，尚未执行远程部署",
-    "next_step": "推送后按远程部署 SOP 部署并验收 curl /、DB 版本分布和日志",
-    "notes": "本次为默认画像升级提交；完整抓包未入库，只记录脱敏摘要"
+    "partial_step": "Step 8 远程验收已完成：vibecoding-bench 使用 0c8d8f9，CLAUDE_CODE_VERSION=2.1.197，HTTP 验收通过",
+    "next_step": "如需继续验证新 worker 运行行为，可在远程 WebUI 启动一次普通 run 或抓包 run 观察 claude --version 与 usage UA",
+    "notes": "DockerHub 已推送 orchestrator/worker/sidecar 的 latest 与 0c8d8f9；远端 /root/vibecoding-bench .env 已备份并更新，orchestrator force recreate 后外网首页 200、/api/topics 401，worker/sidecar 0c8d8f9 已预拉取。"
   }
 }
