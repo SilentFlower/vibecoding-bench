@@ -35,6 +35,68 @@ src/tlsfp/
 - 上游非成功响应如果要重试，必须保留原有错误体兼容性和敏感信息边界。
 - SSE 流式响应只能插入明确允许的 keepalive/comment，不要重排上游 chunk。
 
+## Scenario: Gateway 账号槽位与 RPM Admission 顺序
+
+### 1. Scope / Trigger
+
+- Trigger：修改 `GatewayService::handle_request_inner` 中账号选择、账号级 FIFO 队列、RPM admission、429 重试或本地拦截顺序时适用。
+- 目标：RPM 计数表示“已经获得账号执行槽位、即将进入上游转发链路”的请求数，而不是“进入本地等待队列”的请求数。
+
+### 2. Signatures
+
+- 槽位入口：`AccountService::get_or_create_queue(account.id, account.concurrency).await`
+- 等待入口：`AccountQueue::acquire(timeout).await -> Result<OwnedSemaphorePermit, QueueWaitError>`
+- RPM 入口：`AccountService::acquire_account_rpm(account, sticky, session_hash).await -> Result<(), AppError>`
+- RPM 状态：`AccountService::get_account_rpm_status(account).await -> AccountRpmStatus`
+
+### 3. Contracts
+
+- Gateway 正常上游路径必须先获得 `OwnedSemaphorePermit`，再调用 `acquire_account_rpm`。
+- 处于 `AccountQueue::acquire(...)` 等待阶段的请求不得递增 RPM。
+- `QueueWaitError::QueueFull` / `QueueWaitError::Timeout` / `QueueWaitError::Closed` 发生时，该账号 RPM 不得变化。
+- 非粘性请求拿到槽位后若 RPM 饱和并返回 `AppError::ServiceUnavailable`，必须释放当前账号槽位并排除该账号后重新选号。
+- 粘性请求拿到槽位后若 RPM 饱和，仍按 `acquire_account_rpm` 的等待/本地 429 语义处理，不得随意切号。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 期望行为 |
+|------|----------|
+| 排队等待槽位 | `queued` 可增加，RPM `current` 不增加 |
+| 成功获得槽位且 RPM 未满 | RPM `current += 1`，permit 交给 `SlotReleaseGuard` / `SlotGuardBody` |
+| 队列满 | 返回/换号前不消耗 RPM |
+| 槽位等待超时 | 返回/换号前不消耗 RPM |
+| 非粘性 RPM 饱和 | 释放已获槽位，排除账号并重新选号 |
+| 粘性 RPM 饱和 | 保持粘性账号等待；超时后返回本地 429 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：请求 A 占满账号槽位，请求 B 在 FIFO 队列等待；B 等待期间 RPM 不变，A 释放后 B 获得槽位并通过 RPM admission 才递增。
+- Base：`rpm_limit = 0` 时保持不限 RPM，槽位顺序仍由 `AccountQueue` 控制。
+- Bad：在 `queue.acquire(...)` 前调用 `acquire_account_rpm(...)`，会让排队中或最终超时/队列满的请求提前消耗 RPM。
+
+### 6. Tests Required
+
+- 覆盖等待中请求不增加 `get_account_rpm_status(...).current`。
+- 覆盖等待请求获得槽位并通过 RPM admission 后才递增。
+- 覆盖 `QueueFull` 和 `Timeout` 不消耗 RPM。
+- 保留非粘性 RPM 饱和换号、粘性 RPM 饱和等待/拒绝、429 后释放槽位的回归测试。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+account_svc.acquire_account_rpm(&account, sticky, &session_hash).await?;
+let permit = queue.acquire(SLOT_WAIT_TIMEOUT).await?;
+```
+
+#### Correct
+
+```rust
+let permit = queue.acquire(SLOT_WAIT_TIMEOUT).await?;
+account_svc.acquire_account_rpm(&account, sticky, &session_hash).await?;
+```
+
 ## 设置热刷新模式
 
 新增全局 setting 通常要经过这些位置：

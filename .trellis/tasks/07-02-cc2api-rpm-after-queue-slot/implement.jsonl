@@ -1,0 +1,2 @@
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"约束 cc2api gateway 热路径、账号调度、RPM 与粘性会话行为。"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"约束账号调度、RPM、队列相关测试和 Rust 后端验证命令。"}
