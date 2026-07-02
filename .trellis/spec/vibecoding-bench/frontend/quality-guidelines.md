@@ -62,7 +62,7 @@
 | 中文注释解释 WHY(为什么这里 `try {} catch {}`、为什么这里加 setTimeout) | 全局指令 §3 |
 | API helper 检测 401 → 自动 `showAuthModal()` + 抛 `'auth required'` Error | session 过期时任何调用都触发重登,无需每个 caller 自己写;`/api/auth/*` 自身豁免不递归弹框 |
 | 启动时 `bootstrapAuth()` 探一次 `/api/auth/me`,401 时**只显示登录框,不调 navigate()** | 未登录就 navigate → 每个 render 都 401 → 一堆 alert 堆叠 |
-| "粘贴一行 URL 自动填多个字段"模式(paste-helper) | 减少手填错;格式正则:`^socks5h?:\/\/(?:([^:@\s]+)(?::([^@\s]+))?@)?([^:/\s@]+)(?::(\d+))?\/?$`;参考 `parseSocks5Url` / `applySocks5Url` |
+| "粘贴一行 URL 自动填多个字段"模式(paste-helper) | 减少手填错;账号代理 URL 只支持 `http://` / `socks5://` / `socks5h://`,拒绝 `https://`;参考 `parseProxyUrl` / `applyProxyUrl` |
 
 ---
 

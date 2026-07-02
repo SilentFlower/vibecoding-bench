@@ -11,7 +11,7 @@
 镜像清单:
 - `huajiwuyan/vibebench-orchestrator` — FastAPI 后端
 - `huajiwuyan/vibebench-worker` — 跑题的 Claude Code 容器
-- `huajiwuyan/vibebench-sidecar` — MITM + SOCKS5 透明代理
+- `huajiwuyan/vibebench-sidecar` — MITM + HTTP/SOCKS5 上游代理透明链路
 
 远程参考实例: <http://186.244.215.29:8080/>(AWS EC2 + Docker + Caddy 未配)
 

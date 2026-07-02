@@ -67,6 +67,7 @@ _RUNTIME_MODEL_SETTING_KEY = "claude_default_model"
 _RUNTIME_EFFORT_SETTING_KEY = "claude_effort_level"
 _RUNTIME_CLAUDE_CODE_VERSION_SETTING_KEY = "claude_code_version"
 _CLAUDE_EFFORT_LEVELS = ("max", "xhigh", "high", "medium", "low")
+_UPSTREAM_PROXY_SCHEMES = ("http", "socks5", "socks5h")
 
 
 def _normalize_claude_model_name(value: Optional[str], field_name: str) -> Optional[str]:
@@ -130,6 +131,45 @@ def _normalize_claude_code_version(value: Optional[str], field_name: str) -> Opt
             f"{field_name} 无效：必须类似 2.1.195，只允许语义版本号和 -/+ 后缀"
         )
     return version
+
+
+def _normalize_upstream_proxy_scheme(value: Optional[str]) -> str:
+    """
+    规范化账号上游代理协议。
+
+    :param value: 原始代理协议
+    :return: 规范化后的协议；空值返回兼容旧账号的 socks5
+    """
+    if value is None:
+        return "socks5"
+    scheme = value.strip().lower()
+    if not scheme:
+        return "socks5"
+    if scheme not in _UPSTREAM_PROXY_SCHEMES:
+        allowed = ", ".join(_UPSTREAM_PROXY_SCHEMES)
+        raise ValueError(f"upstream_proxy_scheme 无效：只允许 {allowed}")
+    return scheme
+
+
+def _sidecar_proxy_env(proxy: dict) -> dict[str, str]:
+    """
+    生成 sidecar 上游代理环境变量，保留历史 SOCKS5 变量名以兼容脚本入口。
+
+    :param proxy: accounts 表行或登录会话代理配置
+    :return: sidecar 可直接使用的代理环境变量
+    """
+    scheme = _normalize_upstream_proxy_scheme(
+        proxy.get("upstream_proxy_scheme") or proxy.get("scheme")
+    )
+    return {
+        "UPSTREAM_PROXY_SCHEME": scheme,
+        "UPSTREAM_SOCKS5_HOST": proxy.get("upstream_socks5_host") or proxy.get("host") or "",
+        "UPSTREAM_SOCKS5_PORT": str(
+            proxy.get("upstream_socks5_port") or proxy.get("port") or 1080
+        ),
+        "UPSTREAM_SOCKS5_USER": proxy.get("upstream_socks5_user") or proxy.get("user") or "",
+        "UPSTREAM_SOCKS5_PASS": proxy.get("upstream_socks5_pass") or proxy.get("pass") or "",
+    }
 
 
 WORKER_USER = "node"
@@ -555,6 +595,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT UNIQUE NOT NULL,
   profile_path TEXT NOT NULL,
+  upstream_proxy_scheme TEXT DEFAULT 'socks5',
   upstream_socks5_host TEXT,
   upstream_socks5_port INTEGER,
   upstream_socks5_user TEXT,
@@ -673,6 +714,7 @@ def init_db() -> None:
     try:
         with conn:
             conn.executescript(_SCHEMA)
+            _ensure_column(conn, "accounts", "upstream_proxy_scheme", "TEXT DEFAULT 'socks5'")
             _ensure_column(conn, "tasks", "batch_id", "INTEGER")
             _ensure_column(conn, "tasks", "topic_id", "INTEGER")
             _ensure_column(conn, "tasks", "status", "TEXT DEFAULT 'active'")
@@ -1293,15 +1335,12 @@ class Runner:
         host_ca = HOST_BENCH_DATA / "ca"
         capture_full_http = bool(task.get("capture_full_http"))
         claude_code_version = effective_claude_code_version()
-        sidecar_env = {
-            "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
-            "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
-            "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
-            "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
+        sidecar_env = _sidecar_proxy_env(account)
+        sidecar_env.update({
             "DNS_READY_HOST": DNS_READY_HOST,
             # 抓包 run 是诊断模式，必须独立于全局默认值保存完整 flow。
             "SAVE_FULL_FLOWS": "1" if capture_full_http else SAVE_FULL_FLOWS,
-        }
+        })
         if capture_full_http:
             sidecar_env.update({
                 "CAPTURE_FULL_HTTP": "1",
@@ -1519,14 +1558,11 @@ class Runner:
         host_ca = HOST_BENCH_DATA / "ca"
         continue_capture_dirs = _resolve_capture_flows_dirs(run, ensure_exists=True)
         sidecar_volumes = {str(host_ca): {"bind": "/ca", "mode": "rw"}}
-        sidecar_env = {
-            "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
-            "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
-            "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
-            "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
+        sidecar_env = _sidecar_proxy_env(account)
+        sidecar_env.update({
             "DNS_READY_HOST": DNS_READY_HOST,
             "SAVE_FULL_FLOWS": SAVE_FULL_FLOWS,
-        }
+        })
         if continue_capture_dirs:
             _flows_dir, host_flows = continue_capture_dirs
             # capture run 的继续会话仍是诊断链路，必须追加保存到原 run flows 目录。
@@ -1595,13 +1631,13 @@ class Runner:
 
     def query_quota(self, account: dict) -> dict:
         """
-        用账号 SOCKS5 启动临时 worker，经 sidecar 网络查询 OAuth usage API。
+        用账号代理启动临时 worker，经 sidecar 网络查询 OAuth usage API。
 
         :param account: accounts 表行
         :return: 额度查询结果
         """
         if not account.get("upstream_socks5_host"):
-            raise ValueError("account has no upstream socks5 configured")
+            raise ValueError("account has no upstream proxy configured")
         sid = uuid.uuid4().hex[:12]
         sidecar_name = f"bench-quota-sidecar-{sid}"
         worker_name = f"bench-quota-worker-{sid}"
@@ -1634,10 +1670,7 @@ class Runner:
                     devices=["/dev/net/tun:/dev/net/tun"],
                     volumes={str(HOST_BENCH_DATA / "ca"): {"bind": "/ca", "mode": "rw"}},
                     environment={
-                        "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
-                        "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
-                        "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
-                        "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
+                        **_sidecar_proxy_env(account),
                         "DNS_READY_HOST": DNS_READY_HOST,
                     },
                 )
@@ -1832,13 +1865,13 @@ JS
 
     def refresh_account_oauth_token(self, account: dict) -> bool:
         """
-        用账号 SOCKS5 刷新 OAuth access token，并回写账号 profile。
+        用账号代理刷新 OAuth access token，并回写账号 profile。
 
         :param account: accounts 表行
         :return: 发生刷新并成功回写时返回 True
         """
         if not account.get("upstream_socks5_host"):
-            raise ValueError("account has no upstream socks5 configured")
+            raise ValueError("account has no upstream proxy configured")
         acc_name = account["name"]
         with _profile_lock(acc_name):
             status = _read_account_oauth_status(acc_name)
@@ -1874,10 +1907,7 @@ JS
                     devices=["/dev/net/tun:/dev/net/tun"],
                     volumes={str(HOST_BENCH_DATA / "ca"): {"bind": "/ca", "mode": "rw"}},
                     environment={
-                        "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
-                        "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
-                        "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
-                        "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or "",
+                        **_sidecar_proxy_env(account),
                         "DNS_READY_HOST": DNS_READY_HOST,
                     },
                 )
@@ -2080,17 +2110,17 @@ class LoginSession:
     """单个 OAuth 引导会话：一对 sidecar+worker + 元数据"""
 
     __slots__ = ("sid", "name", "sidecar_id", "worker_id", "created_at",
-                 "socks5", "profile_dir", "force_reauth", "committed")
+                 "proxy", "profile_dir", "force_reauth", "committed")
 
     def __init__(self, sid: str, name: str, sidecar_id: Optional[str],
-                 worker_id: str, socks5: dict, profile_dir: Path,
+                 worker_id: str, proxy: dict, profile_dir: Path,
                  force_reauth: bool) -> None:
         self.sid = sid
         self.name = name
         self.sidecar_id = sidecar_id
         self.worker_id = worker_id
         self.created_at = time.time()
-        self.socks5 = socks5
+        self.proxy = proxy
         self.profile_dir = profile_dir
         self.force_reauth = force_reauth
         self.committed = False
@@ -2141,7 +2171,7 @@ class LoginManager:
         except Exception:
             pass
 
-    def start(self, name: str, socks5: dict, force_reauth: bool = False) -> LoginSession:
+    def start(self, name: str, proxy: dict, force_reauth: bool = False) -> LoginSession:
         if not _ACC_NAME_RE.match(name):
             raise ValueError(
                 "invalid account name: must match [a-zA-Z0-9_-]+"
@@ -2191,8 +2221,10 @@ class LoginManager:
             # 调用在 Anthropic 端看起来是同一台机器
             fp = derive_fingerprint(name)
 
-            # 有 SOCKS5 才起 sidecar；没填的话直走宿主默认网络（用户自担风险）
-            if socks5.get("host"):
+            # 有代理才起 sidecar；没填的话直走宿主默认网络（用户自担风险）
+            if proxy.get("host"):
+                sidecar_env = _sidecar_proxy_env(proxy)
+                sidecar_env["DNS_READY_HOST"] = DNS_READY_HOST
                 sidecar = self.client.containers.run(
                     SIDECAR_IMAGE,
                     name=sidecar_name,
@@ -2205,13 +2237,7 @@ class LoginManager:
                     volumes={
                         str(host_ca): {"bind": "/ca", "mode": "rw"},
                     },
-                    environment={
-                        "UPSTREAM_SOCKS5_HOST": socks5.get("host") or "",
-                        "UPSTREAM_SOCKS5_PORT": str(socks5.get("port") or 1080),
-                        "UPSTREAM_SOCKS5_USER": socks5.get("user") or "",
-                        "UPSTREAM_SOCKS5_PASS": socks5.get("pass") or "",
-                        "DNS_READY_HOST": DNS_READY_HOST,
-                    },
+                    environment=sidecar_env,
                 )
                 sidecar_id = sidecar.id
                 _wait_sidecar_ready(self.client, sidecar_id)
@@ -2254,7 +2280,7 @@ class LoginManager:
             worker = self.client.containers.run(WORKER_IMAGE, **worker_kwargs)
 
             session = LoginSession(
-                sid, name, sidecar_id, worker.id, socks5, local_profile,
+                sid, name, sidecar_id, worker.id, proxy, local_profile,
                 force_reauth,
             )
             with self._lock:
@@ -3427,7 +3453,10 @@ def update_claude_code_version(body: ClaudeCodeVersionIn):
 
 # ---------- accounts ----------
 class AccountIn(BaseModel):
+    """账号创建请求体，包含兼容旧字段名的上游代理配置。"""
+
     name: str
+    upstream_proxy_scheme: Optional[str] = None
     upstream_socks5_host: Optional[str] = None
     upstream_socks5_port: Optional[int] = None
     upstream_socks5_user: Optional[str] = None
@@ -3437,6 +3466,7 @@ class AccountIn(BaseModel):
 
 @app.post("/api/accounts")
 def create_account(body: AccountIn):
+    """创建已有 profile 对应的账号记录。"""
     pp = PROFILES_DIR / body.name
     if not pp.exists() or not any(pp.iterdir()):
         raise HTTPException(
@@ -3444,22 +3474,29 @@ def create_account(body: AccountIn):
             f"profile empty or missing: {pp}. "
             f"Run scripts/init-account.sh {body.name} first.",
         )
+    try:
+        proxy_scheme = _normalize_upstream_proxy_scheme(body.upstream_proxy_scheme)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     with _db_lock:
         conn = get_db()
         try:
             with conn:
                 restored_account_id = _infer_deleted_account_id(conn, body.name)
                 columns = (
-                    "id, name, profile_path, upstream_socks5_host, upstream_socks5_port, "
+                    "id, name, profile_path, upstream_proxy_scheme, "
+                    "upstream_socks5_host, upstream_socks5_port, "
                     "upstream_socks5_user, upstream_socks5_pass, enabled"
                 ) if restored_account_id is not None else (
-                    "name, profile_path, upstream_socks5_host, upstream_socks5_port, "
+                    "name, profile_path, upstream_proxy_scheme, "
+                    "upstream_socks5_host, upstream_socks5_port, "
                     "upstream_socks5_user, upstream_socks5_pass, enabled"
                 )
-                values_sql = "(?,?,?,?,?,?,?,?)" if restored_account_id is not None else "(?,?,?,?,?,?,?)"
+                values_sql = "(?,?,?,?,?,?,?,?,?)" if restored_account_id is not None else "(?,?,?,?,?,?,?,?)"
                 base_values = (
                     body.name,
                     f"profiles/{body.name}",
+                    proxy_scheme,
                     body.upstream_socks5_host,
                     body.upstream_socks5_port,
                     body.upstream_socks5_user,
@@ -3480,12 +3517,16 @@ def create_account(body: AccountIn):
 
 @app.get("/api/accounts")
 def list_accounts():
+    """返回账号列表，并补充 OAuth token 状态。"""
     conn = get_db()
     try:
         rows = conn.execute("SELECT * FROM accounts ORDER BY id").fetchall()
         accounts = []
         for row in rows:
             account = dict(row)
+            account["upstream_proxy_scheme"] = _normalize_upstream_proxy_scheme(
+                account.get("upstream_proxy_scheme")
+            )
             account.update(_read_account_oauth_status(account["name"]))
             accounts.append(account)
         return accounts
@@ -3517,7 +3558,7 @@ def delete_account(aid: int):
 
 @app.post("/api/accounts/{aid}/quota")
 def query_account_quota(aid: int):
-    """按账号 SOCKS5 查询 Claude Code 额度。"""
+    """按账号代理查询 Claude Code 额度。"""
     if not runner:
         raise HTTPException(500, "runner not ready")
     conn = get_db()
@@ -3538,9 +3579,10 @@ def query_account_quota(aid: int):
 
 # ---------- accounts: 内嵌 OAuth 登录（WebUI 用） ----------
 class LoginStartIn(BaseModel):
-    """添加账号第一步：起 login 会话，配置 SOCKS5 走代理做 OAuth"""
+    """添加账号第一步：起 login 会话，配置代理走 OAuth。"""
 
     name: str
+    upstream_proxy_scheme: Optional[str] = None
     upstream_socks5_host: Optional[str] = None
     upstream_socks5_port: Optional[int] = None
     upstream_socks5_user: Optional[str] = None
@@ -3554,9 +3596,11 @@ def login_start(body: LoginStartIn):
     if not login_manager:
         raise HTTPException(500, "login manager not ready")
     try:
+        proxy_scheme = _normalize_upstream_proxy_scheme(body.upstream_proxy_scheme)
         session = login_manager.start(
             body.name,
             {
+                "scheme": proxy_scheme,
                 "host": body.upstream_socks5_host,
                 "port": body.upstream_socks5_port,
                 "user": body.upstream_socks5_user,
@@ -3707,6 +3751,10 @@ def login_commit(sid: str, body: LoginStartIn):
         raise HTTPException(404, "session not found")
     if session.name != body.name:
         raise HTTPException(400, "name mismatch with session")
+    try:
+        proxy_scheme = _normalize_upstream_proxy_scheme(body.upstream_proxy_scheme)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
     # 撞 in-flight run 直接拒绝:此时若 commit 继续往下走会清 telemetry/backups,
     # 与正在跑的 run 复制 profile 的窗口发生竞态。让用户主动决定何时重登。
@@ -3764,17 +3812,20 @@ def login_commit(sid: str, body: LoginStartIn):
                 try:
                     restored_account_id = _infer_deleted_account_id(conn, name)
                     columns = (
-                        "id, name, profile_path, upstream_socks5_host, upstream_socks5_port, "
+                        "id, name, profile_path, upstream_proxy_scheme, "
+                        "upstream_socks5_host, upstream_socks5_port, "
                         "upstream_socks5_user, upstream_socks5_pass, enabled"
                     ) if restored_account_id is not None else (
-                        "name, profile_path, upstream_socks5_host, upstream_socks5_port, "
+                        "name, profile_path, upstream_proxy_scheme, "
+                        "upstream_socks5_host, upstream_socks5_port, "
                         "upstream_socks5_user, upstream_socks5_pass, enabled"
                     )
-                    values_sql = "(?,?,?,?,?,?,?,?)" if restored_account_id is not None else "(?,?,?,?,?,?,?)"
+                    values_sql = "(?,?,?,?,?,?,?,?,?)" if restored_account_id is not None else "(?,?,?,?,?,?,?,?)"
                     values: tuple[object, ...]
                     base_values = (
                         name,
                         f"profiles/{name}",
+                        proxy_scheme,
                         body.upstream_socks5_host,
                         body.upstream_socks5_port,
                         body.upstream_socks5_user,
@@ -3788,12 +3839,13 @@ def login_commit(sid: str, body: LoginStartIn):
                     )
                     account_id = restored_account_id if restored_account_id is not None else cur.lastrowid
                 except sqlite3.IntegrityError:
-                    # 同名账号已存在 → 视为"重新登录"：覆盖 socks5，并重新启用账号。
+                    # 同名账号已存在 → 视为"重新登录"：覆盖代理配置，并重新启用账号。
                     conn.execute(
-                        "UPDATE accounts SET upstream_socks5_host=?, "
+                        "UPDATE accounts SET upstream_proxy_scheme=?, upstream_socks5_host=?, "
                         "upstream_socks5_port=?, upstream_socks5_user=?, "
                         "upstream_socks5_pass=?, enabled=1 WHERE name=?",
                         (
+                            proxy_scheme,
                             body.upstream_socks5_host,
                             body.upstream_socks5_port,
                             body.upstream_socks5_user,

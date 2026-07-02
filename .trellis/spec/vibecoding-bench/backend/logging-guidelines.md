@@ -87,7 +87,7 @@ P2 引入 `logging` 时,**直接用 `logging.Formatter` 加固定字段**,不引
 | 完整请求 body(可能含 prompt 中的私密信息) | `TaskIn.prompt` | 如要 log 任务创建,只记 `topic_no + account_id`,不记 prompt |
 | `.env` 内容、环境变量 dump | 配置加载阶段 | 启动时若想确认配置,只 log **键名 + 是否非空**,不 log 值 |
 
-**前端展示的容器名 / SOCKS5 host:port** 不算敏感,可以 log。
+**前端展示的容器名 / 代理 scheme + host:port** 不算敏感,可以 log。
 
 ---
 

@@ -70,6 +70,108 @@ worker 镜像 ~1.37 GB(node:22 基础大),首次推全量约 5–15 分钟视带
 
 ---
 
+## 账号上游代理协议契约
+
+### 1. Scope / Trigger
+
+修改账号代理字段、`orchestrator/main.py` 的 sidecar environment、`images/sidecar/start.sh` 的 proxychains 配置、或 WebUI 账号代理表单时必须遵守本契约。
+
+### 2. Signatures
+
+账号表:
+
+| Column | Type | Default | 含义 |
+|--------|------|---------|------|
+| `upstream_proxy_scheme` | `TEXT` | `'socks5'` | 上游代理协议；允许 `http`、`socks5`、`socks5h` |
+| `upstream_socks5_host` | `TEXT` | `NULL` | 上游代理主机；字段名保留历史兼容 |
+| `upstream_socks5_port` | `INTEGER` | `NULL` | 上游代理端口；字段名保留历史兼容 |
+| `upstream_socks5_user` | `TEXT` | `NULL` | 上游代理用户名 |
+| `upstream_socks5_pass` | `TEXT` | `NULL` | 上游代理密码；日志必须脱敏 |
+
+API 请求体:
+
+```json
+{
+  "name": "main",
+  "upstream_proxy_scheme": "http",
+  "upstream_socks5_host": "proxy.example.com",
+  "upstream_socks5_port": 8080,
+  "upstream_socks5_user": "user",
+  "upstream_socks5_pass": "pass"
+}
+```
+
+sidecar environment:
+
+| Env | 必填 | 默认 | 含义 |
+|-----|------|------|------|
+| `UPSTREAM_PROXY_SCHEME` | 否 | `socks5` | `http` / `socks5` / `socks5h`;`https` 不支持 |
+| `UPSTREAM_SOCKS5_HOST` | 是 | - | 上游代理主机，历史变量名保留 |
+| `UPSTREAM_SOCKS5_PORT` | 是 | - | 上游代理端口，历史变量名保留 |
+| `UPSTREAM_SOCKS5_USER` | 否 | 空 | 上游代理用户名 |
+| `UPSTREAM_SOCKS5_PASS` | 否 | 空 | 上游代理密码 |
+
+### 3. Contracts
+
+- 后端只接受 `http`、`socks5`、`socks5h`；空值归一化为 `socks5` 兼容旧账号。
+- `init_db()` 必须对 `accounts.upstream_proxy_scheme` 做幂等 `_ensure_column(..., "TEXT DEFAULT 'socks5'")`。
+- WebUI paste-helper 只自动解析 `http://`、`socks5://`、`socks5h://`；`http` 省略端口时填 `8080`，SOCKS 省略端口时填 `1080`。
+- sidecar 的 proxychains 类型映射：`http -> http`，`socks5/socks5h -> socks5`。`socks5h` 的目标域名代理解析由当前 proxychains `proxy_dns` 链路承担。
+- `https://proxy:443` 不是支持的上游代理入口；用户必须改填 `http://` 或 SOCKS。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|------|------|
+| API 未传 `upstream_proxy_scheme` | 按 `socks5` 保存 / 运行 |
+| API 传 `http` / `socks5` / `socks5h` | 保存该协议并传给 sidecar |
+| API 传 `https` 或其它值 | 400,提示只允许 `http, socks5, socks5h` |
+| sidecar 收到 `UPSTREAM_PROXY_SCHEME=https` | FATAL 退出,提示不支持 HTTPS upstream proxy |
+| WebUI 粘贴 `https://proxy.example.com:443` | 解析失败且不覆盖已手填字段 |
+
+### 5. Good/Base/Bad Cases
+
+**Good**:用户粘贴 `http://user:pass@proxy.example.com:8080`,表单自动填协议、host、port、user、pass;登录、quota、run、continue、OAuth refresh 都通过 `UPSTREAM_PROXY_SCHEME=http` 走同一条 sidecar 链路。
+
+**Base**:老账号没有 `upstream_proxy_scheme`,升级后 DB 默认和后端归一化都按 `socks5` 处理。
+
+**Bad**:只改 WebUI 支持 `http://`,但 orchestrator 仍不保存协议或 sidecar 仍固定写 `socks5`,导致 HTTP 代理被当成 SOCKS5 用。
+
+### 6. Tests Required
+
+- `python3 -m py_compile orchestrator/main.py`
+- `bash -n images/sidecar/start.sh`
+- `node --check webui/app.js`
+- SQLite 冒烟:旧 `accounts` 表补列后,已有账号读取到 `upstream_proxy_scheme='socks5'`。
+- URL 解析冒烟:`http://user:pass@proxy.example.com:8080`、`socks5h://proxy.example.com`、`https://proxy.example.com:443` 三个样例分别覆盖成功、默认端口、拒绝。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```bash
+cat > /etc/proxychains4.conf <<EOF
+[ProxyList]
+socks5 ${UPSTREAM_HOST_IP} ${UPSTREAM_SOCKS5_PORT}
+EOF
+```
+
+#### Correct
+
+```bash
+case "$UPSTREAM_PROXY_SCHEME" in
+  http) PROXYCHAINS_TYPE="http" ;;
+  socks5|socks5h) PROXYCHAINS_TYPE="socks5" ;;
+  *) exit 1 ;;
+esac
+cat > /etc/proxychains4.conf <<EOF
+[ProxyList]
+${PROXYCHAINS_TYPE} ${UPSTREAM_HOST_IP} ${UPSTREAM_SOCKS5_PORT}
+EOF
+```
+
+---
+
 ## Worker 完成判定契约
 
 ### 1. Scope / Trigger
@@ -130,15 +232,15 @@ task 运行期间必须双向但按新鲜度同步 credentials:
 - 同一账号多个 worker 并行时,强制 refresh / profile 回写必须用 profile 目录下文件锁串行化;多个账号并行互不影响。
 同步前必须能解析 JSON 且存在 `claudeAiOauth`;写文件必须先写临时文件再 `rename` 原子替换。退出 / 停止路径仍只允许白名单回写 `settings.json` / `.claude.json`,credentials 只能走新鲜度判断。
 
-运行中检测到 401 / OAuth 认证错误时,worker 先同步 profile credentials,再在 worker→sidecar→账号 SOCKS5 链路内用当前 `refreshToken` 强制 refresh 一次。refresh 成功后原子回写 profile,并向 Claude TUI 注入一次重试提示。refresh 返回 `invalid_grant` / 429 / 其它非 2xx 时,错误消息要带 HTTP 状态与 retry-after 摘要;如果后台刷新器在 `OAUTH_401_PROFILE_WAIT_SEC` 内写入更新 credentials,可同步后重试一次,否则 worker 写 `/workspace/.bench-status.json` 为 `{"status":"auth_failed","error":"..."}` 并以退出码 `42` 结束。
+运行中检测到 401 / OAuth 认证错误时,worker 先同步 profile credentials,再在 worker→sidecar→账号上游代理链路内用当前 `refreshToken` 强制 refresh 一次。refresh 成功后原子回写 profile,并向 Claude TUI 注入一次重试提示。refresh 返回 `invalid_grant` / 429 / 其它非 2xx 时,错误消息要带 HTTP 状态与 retry-after 摘要;如果后台刷新器在 `OAUTH_401_PROFILE_WAIT_SEC` 内写入更新 credentials,可同步后重试一次,否则 worker 写 `/workspace/.bench-status.json` 为 `{"status":"auth_failed","error":"..."}` 并以退出码 `42` 结束。
 
 查询 OAuth usage API 前必须确认 sidecar 的通用 DNS resolver 已可用。sidecar/unbound 配的是通配 `forward-zone "."`,所以 readiness probe 应验证一个稳定探针域名能解析,不能把每个业务目标域名硬编码成白名单。orchestrator 可以用 `docker exec` 进 sidecar 等 `/tmp/sidecar-ready` 或通用探针解析成功,但不能用 orchestrator/宿主机网络代替 sidecar 解析。usage probe 必须在 worker 容器内按同一套 `expiresAt` 规则刷新 access token,再读 `.credentials.json` 调 usage API。实际 API URL 请求还必须有限重试,覆盖 resolver 刚启动后的瞬时 `Temporary failure in name resolution`。
 
-不能用宿主机网络或宿主 DNS 作为 OAuth refresh / usage 的 fallback。账号相关请求和域名解析都必须留在 worker→sidecar→账号 SOCKS5 链路里,否则会从宿主原始 IP 泄漏域名查询或 HTTPS 出口。
+不能用宿主机网络或宿主 DNS 作为 OAuth refresh / usage 的 fallback。账号相关请求和域名解析都必须留在 worker→sidecar→账号上游代理链路里,否则会从宿主原始 IP 泄漏域名查询或 HTTPS 出口。
 
-上游 SOCKS5 服务器地址可以填域名。这个域名是建立代理链路之前的 bootstrap 解析,只能用 sidecar 启动时的默认 DNS 解析成 IP 后再连接代理;它和 Claude/API/WebFetch 访问的业务目标域名不是一类问题。不要为了阻断业务 DNS 泄漏而禁止 SOCKS5 域名。
+上游代理服务器地址可以填域名。这个域名是建立代理链路之前的 bootstrap 解析,只能用 sidecar 启动时的默认 DNS 解析成 IP 后再连接代理;它和 Claude/API/WebFetch 访问的业务目标域名不是一类问题。不要为了阻断业务 DNS 泄漏而禁止代理域名。
 
-worker 启动时必须让实际 `claude --version`、worker 运行时 `CLAUDE_CODE_VERSION`、OAuth usage 请求的 `User-Agent` 保持一致。镜像内可预装默认版本,但 WebUI / `.env` 可以覆盖版本;entrypoint 必须校验版本号格式,不一致时安装 `@anthropic-ai/claude-code@<CLAUDE_CODE_VERSION>`,安装失败要让 worker 明确失败,不能静默回退到镜像默认版本。OAuth refresh 请求不要带 `User-Agent`:实测带 `claude-code/<version>` 会触发 token endpoint 429;refresh 仍必须在 worker→sidecar→账号 SOCKS5 链路内完成。
+worker 启动时必须让实际 `claude --version`、worker 运行时 `CLAUDE_CODE_VERSION`、OAuth usage 请求的 `User-Agent` 保持一致。镜像内可预装默认版本,但 WebUI / `.env` 可以覆盖版本;entrypoint 必须校验版本号格式,不一致时安装 `@anthropic-ai/claude-code@<CLAUDE_CODE_VERSION>`,安装失败要让 worker 明确失败,不能静默回退到镜像默认版本。OAuth refresh 请求不要带 `User-Agent`:实测带 `claude-code/<version>` 会触发 token endpoint 429;refresh 仍必须在 worker→sidecar→账号上游代理链路内完成。
 
 worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 prompt；只能等待 JSONL 变化,直到完成、Claude 退出或 `TIMEOUT_SEC` 到期。
 
@@ -184,9 +286,9 @@ worker 不能因为没看到最终 assistant 文本而反复向 Claude 追加 pr
 
 **Bad**:用 Python `urllib` 直接调用 `https://platform.claude.com/v1/oauth/token` 刷新 access token。Cloudflare 可能按浏览器签名返回 1010 `browser_signature_banned`;正确做法是在 worker 容器里按 `expiresAt` 判断后用 Node runtime 刷新,并把刷新后的 `.credentials.json` 回写 profile。
 
-**Bad**:对 `platform.claude.com` 做 MITM 解密后再刷新 OAuth token。这样 Cloudflare 看到的是 mitmproxy/OpenSSL 的上游 TLS 指纹,不是 Claude CLI/Node 指纹,更容易触发 1010。该域名应在 sidecar 中 TLS passthrough,仍走同一个 SOCKS5 出口但不解密。
+**Bad**:对 `platform.claude.com` 做 MITM 解密后再刷新 OAuth token。这样 Cloudflare 看到的是 mitmproxy/OpenSSL 的上游 TLS 指纹,不是 Claude CLI/Node 指纹,更容易触发 1010。该域名应在 sidecar 中 TLS passthrough,仍走同一个账号上游代理出口但不解密。
 
-**Bad**:每遇到一个新网页域名就加一个 DNS 等待白名单。正确做法是验证 sidecar 的通用 resolver 可用,后续任意域名都走同一条 worker→unbound→tun→SOCKS5 链路。
+**Bad**:每遇到一个新网页域名就加一个 DNS 等待白名单。正确做法是验证 sidecar 的通用 resolver 可用,后续任意域名都走同一条 worker→unbound→tun→账号上游代理链路。
 
 **Bad**:在 orchestrator 容器或宿主机上提前解析业务域名,再把解析结果当成 worker 可用。这个检查既不能证明 sidecar netns 里的 unbound 已经可用,也可能泄漏宿主 DNS 查询。
 

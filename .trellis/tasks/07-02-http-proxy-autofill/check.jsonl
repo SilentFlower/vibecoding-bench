@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md", "reason": "检查 schema 新增列、init_db 兼容和 DB 写路径是否符合项目约定。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "检查容器启动环境变量、错误处理和后端验证命令是否覆盖风险。"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md", "reason": "检查前端解析、表单提交、XSS 和零构建约束。"}
+{"file": ".trellis/tasks/07-02-http-proxy-autofill/prd.md", "reason": "检查实现是否覆盖 HTTP 代理、一键填写、兼容旧 SOCKS5 和拒绝 https://proxy 的验收标准。"}
+{"file": ".trellis/tasks/07-02-http-proxy-autofill/design.md", "reason": "检查实现是否符合跨 WebUI、orchestrator、sidecar 的设计边界和兼容策略。"}

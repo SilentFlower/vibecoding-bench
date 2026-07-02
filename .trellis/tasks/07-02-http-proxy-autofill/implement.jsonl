@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md", "reason": "账号表新增代理协议列需要遵守 SQLite schema 与幂等 ALTER 约定。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "后端 DTO、容器环境变量和 DB 写入需要遵守 FastAPI、裸 sqlite3、容器启动质量约束。"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/component-guidelines.md", "reason": "账号弹窗和表单粘贴辅助需要遵守三静态文件、modal 收口和渲染模式。"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md", "reason": "前端 URL 解析、innerHTML 展示和零构建校验需要遵守质量清单。"}
+{"file": ".trellis/tasks/07-02-http-proxy-autofill/research.md", "reason": "记录 proxychains HTTP CONNECT 能力、MVP 不支持 https://proxy 的设计依据。"}

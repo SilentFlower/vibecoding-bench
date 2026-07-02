@@ -69,7 +69,7 @@
       <header class="view-head">
         <div>
           <h2 class="view-title"><span class="bracket">▌</span>accounts <span class="muted">// oauth profiles</span></h2>
-          <p class="hint">添加账号后可查询 Claude Code 5h / 7d 额度；所有查询和运行都走该账号 SOCKS5。</p>
+          <p class="hint">添加账号后可查询 Claude Code 5h / 7d 额度；所有查询和运行都走该账号代理。</p>
         </div>
         <button class="btn btn-primary" id="add-account">+ 添加账号</button>
       </header>
@@ -77,7 +77,7 @@
         <table class="data">
           <thead><tr>
             <th>id</th><th>name</th><th>profile</th>
-            <th>upstream socks5</th><th>access token</th><th>on</th><th>op</th>
+            <th>upstream proxy</th><th>access token</th><th>on</th><th>op</th>
           </tr></thead>
           <tbody id="accounts-body"></tbody>
         </table>
@@ -372,21 +372,28 @@
           <input name="name" required pattern="[A-Za-z0-9_\-]+" placeholder="main" />
         </label>
         <label class="paste-helper">
-          <span class="lbl">$ socks5_url <span class="muted">// paste &amp; auto-fill</span></span>
-          <span class="hint inline">粘贴整条 URL 自动拆到下面 4 项;格式: <code>socks5://user:pass@host:port</code>(也支持 <code>socks5h://</code> 和无凭据)</span>
-          <input id="acc-socks5-url" placeholder="socks5://user:pass@host:port" autocomplete="off" spellcheck="false" />
+          <span class="lbl">$ proxy_url <span class="muted">// paste &amp; auto-fill</span></span>
+          <span class="hint inline">粘贴整条 URL 自动拆到下面 5 项;格式: <code>http://user:pass@host:port</code>(也支持 <code>socks5://</code> / <code>socks5h://</code>)</span>
+          <input id="acc-proxy-url" placeholder="http://user:pass@host:8080" autocomplete="off" spellcheck="false" />
         </label>
-        <label><span class="lbl">$ socks5_host</span>
+        <label><span class="lbl">$ proxy_scheme</span>
+          <select name="upstream_proxy_scheme">
+            <option value="socks5" selected>socks5</option>
+            <option value="socks5h">socks5h</option>
+            <option value="http">http</option>
+          </select>
+        </label>
+        <label><span class="lbl">$ proxy_host</span>
           <span class="hint inline">OAuth 必须走代理；空 = 直连宿主网络（不推荐）</span>
           <input name="upstream_socks5_host" placeholder="host.docker.internal" />
         </label>
-        <label><span class="lbl">$ socks5_port</span>
-          <input name="upstream_socks5_port" type="number" min="1" max="65535" placeholder="1080" />
+        <label><span class="lbl">$ proxy_port</span>
+          <input name="upstream_socks5_port" type="number" min="1" max="65535" placeholder="8080 / 1080" />
         </label>
-        <label><span class="lbl">$ socks5_user</span>
+        <label><span class="lbl">$ proxy_user</span>
           <input name="upstream_socks5_user" />
         </label>
-        <label><span class="lbl">$ socks5_pass</span>
+        <label><span class="lbl">$ proxy_pass</span>
           <input name="upstream_socks5_pass" type="password" />
         </label>
         <div class="row-end">

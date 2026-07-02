@@ -124,7 +124,7 @@ async function renderAccounts() {
       <td>${a.id}</td>
       <td><strong>${escapeHTML(a.name)}</strong></td>
       <td><code>${escapeHTML(a.profile_path)}</code></td>
-      <td>${a.upstream_socks5_host ? `${escapeHTML(a.upstream_socks5_host)}:${a.upstream_socks5_port || ''}` : '<span class="muted">未配置</span>'}</td>
+      <td>${renderProxyEndpoint(a)}</td>
       <td>${renderOauthTokenStatus(a)}</td>
       <td>${a.enabled ? '✓' : '✗'}</td>
       <td>
@@ -178,14 +178,23 @@ async function renderAccounts() {
     }
     startAccLogin(body);
   };
-  // SOCKS5 URL 粘贴解析:输入即触发,实时回填下面 4 个字段
-  const urlInput = $('#acc-socks5-url');
+  // Proxy URL 粘贴解析:输入即触发,实时回填下面 5 个字段
+  const urlInput = $('#acc-proxy-url');
   if (urlInput) {
-    urlInput.addEventListener('input', () => applySocks5Url(urlInput.value));
+    urlInput.addEventListener('input', () => applyProxyUrl(urlInput.value));
   }
   $('#acc-login-cancel').onclick = () => endAccLogin({ alsoCloseModal: true });
   $('#acc-login-commit').onclick = () => commitAccLogin();
   $('#acc-modal-close').onclick = () => endAccLogin({ alsoCloseModal: true });
+}
+
+function renderProxyEndpoint(account) {
+  if (!account.upstream_socks5_host) {
+    return '<span class="muted">未配置</span>';
+  }
+  const scheme = account.upstream_proxy_scheme || 'socks5';
+  const port = account.upstream_socks5_port ? `:${escapeHTML(account.upstream_socks5_port)}` : '';
+  return `<code>${escapeHTML(scheme)}://${escapeHTML(account.upstream_socks5_host)}${port}</code>`;
 }
 
 function openQuotaDetail(accountId, quota) {
@@ -228,33 +237,52 @@ function openQuotaDetail(accountId, quota) {
 }
 
 /**
- * 解析 socks5 / socks5h URL,成功则回填 acc-form 的 4 个字段。
+ * 解析 http / socks5 / socks5h URL,成功则回填 acc-form 的 5 个字段。
  * 支持格式:
+ *   http://user:pass@host:port
  *   socks5://user:pass@host:port
  *   socks5h://user:pass@host:port
- *   socks5://host:port            (无凭据)
+ *   http://host:port              (无凭据)
  *   socks5://user:pass@host       (省略端口 → 1080)
  * 失败静默不动 — 让用户手填或继续粘贴。
  */
-function parseSocks5Url(s) {
+function parseProxyUrl(s) {
   if (!s) return null;
-  const m = String(s).trim().match(
-    /^socks5h?:\/\/(?:([^:@\s]+)(?::([^@\s]+))?@)?([^:/\s@]+)(?::(\d+))?\/?$/i
-  );
-  if (!m) return null;
+  let url;
+  try {
+    url = new URL(String(s).trim());
+  } catch (_e) {
+    return null;
+  }
+  const scheme = url.protocol.replace(':', '').toLowerCase();
+  if (!['http', 'socks5', 'socks5h'].includes(scheme)) return null;
+  if (!url.hostname) return null;
+  if (!['', '/'].includes(url.pathname) || url.search || url.hash) return null;
+  const port = url.port ? Number(url.port) : (scheme === 'http' ? 8080 : 1080);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
   return {
-    user: m[1] ? decodeURIComponent(m[1]) : '',
-    pass: m[2] ? decodeURIComponent(m[2]) : '',
-    host: m[3],
-    port: m[4] ? Number(m[4]) : 1080,
+    scheme,
+    user: decodeUrlPart(url.username),
+    pass: decodeUrlPart(url.password),
+    host: url.hostname,
+    port,
   };
 }
 
-function applySocks5Url(raw) {
-  const parsed = parseSocks5Url(raw);
+function decodeUrlPart(value) {
+  try {
+    return decodeURIComponent(value || '');
+  } catch (_e) {
+    return value || '';
+  }
+}
+
+function applyProxyUrl(raw) {
+  const parsed = parseProxyUrl(raw);
   if (!parsed) return false;
   const form = $('#acc-form');
   if (!form) return false;
+  form.elements['upstream_proxy_scheme'].value = parsed.scheme;
   form.elements['upstream_socks5_host'].value = parsed.host;
   form.elements['upstream_socks5_port'].value = String(parsed.port);
   form.elements['upstream_socks5_user'].value = parsed.user;
@@ -264,7 +292,7 @@ function applySocks5Url(raw) {
 
 // ============== OAuth 登录两步流（acc-modal） ==============
 // 流程：
-//   step 1: 用户填 name + socks5 → POST /api/accounts/login/start → 拿 session_id
+//   step 1: 用户填 name + proxy → POST /api/accounts/login/start → 拿 session_id
 //   step 2: 打开 WS PTY → 用户在 xterm 里走 claude auth login → 点 commit
 //   commit: POST /api/accounts/login/{sid}/commit → 校验 → 写库 → 关容器
 // 取消任意一步都 DELETE /api/accounts/login/{sid} 清场。
@@ -274,6 +302,7 @@ function openAccLoginModal(account = null) {
   showAccStep('config');
   form.reset();
   state.accLogin = account ? { mode: 'relogin', accountId: account.id } : { mode: 'new' };
+  form.elements.upstream_proxy_scheme.value = account?.upstream_proxy_scheme || 'socks5';
   if (account) {
     form.elements.name.value = account.name || '';
     form.elements.upstream_socks5_host.value = account.upstream_socks5_host || '';
@@ -306,7 +335,7 @@ async function startAccLogin(body) {
   } catch (e) {
     return alert('启动登录会话失败: ' + e.message);
   }
-  // 保存 socks5/name 给 commit 用
+  // 保存 proxy/name 给 commit 用
   state.accLogin.body = body;
   state.accLogin.mode = loginState.mode || 'new';
   state.accLogin.accountId = loginState.accountId || null;

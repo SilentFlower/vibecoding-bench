@@ -14,7 +14,7 @@
 │
 ├─ Sidecar  (hev-socks5-tunnel + mitmproxy 11)
 │     tun → socks5 inbound → TLS MITM 解密 + flow 落盘
-│     → proxychains 包装 mitmproxy 出站 → 上游 SOCKS5
+│     → proxychains 包装 mitmproxy 出站 → 上游 HTTP/SOCKS5 代理
 │
 └─ Worker   (node:22 + claude-code + tmux)
      network_mode: container:sidecar  ← 流量必走代理
@@ -50,7 +50,7 @@ open http://localhost:8000
 
 | 页 | 用途 |
 |---|---|
-| **账号** | 添加在 init-account.sh 已建好 profile 的账号，配置上游 SOCKS5 |
+| **账号** | 添加在 init-account.sh 已建好 profile 的账号，配置上游 HTTP/SOCKS5 代理 |
 | **题库** | 300 题；点击卡片 → 查看 / 编辑 topic，批量任务页可多选派发 |
 | **任务** | 列表 + ▶ 运行（按 repeat_n 提交多次）|
 | **运行** | SSE 实时列表 + 默认模型 / 思考预算配置 + 详情：transcript / 产物文件树 / token 统计；也可启动单次完整 HTTP 抓包 run |
@@ -108,7 +108,7 @@ bench/
 
 ## 完整 HTTP 抓包分析 run
 
-运行页顶部的 `capture` 面板可以选择一个账号和一个 topic，启动一条专用抓包 run。该 run 复用普通 run 的账号 profile、SOCKS5、sidecar MITM 和 worker 执行流程，但会强制开启完整抓包，不受全局 `SAVE_FULL_FLOWS=0` 默认值影响。
+运行页顶部的 `capture` 面板可以选择一个账号和一个 topic，启动一条专用抓包 run。该 run 复用普通 run 的账号 profile、上游代理、sidecar MITM 和 worker 执行流程，但会强制开启完整抓包，不受全局 `SAVE_FULL_FLOWS=0` 默认值影响。
 
 输出目录：
 

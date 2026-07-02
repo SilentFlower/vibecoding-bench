@@ -2,8 +2,9 @@
 # =======================================================================
 # Sidecar 启动脚本
 # 必备环境变量：
-#   UPSTREAM_SOCKS5_HOST  上游 socks5 主机
-#   UPSTREAM_SOCKS5_PORT  上游 socks5 端口
+#   UPSTREAM_PROXY_SCHEME 上游代理协议：http / socks5 / socks5h（默认 socks5）
+#   UPSTREAM_SOCKS5_HOST  上游代理主机（历史变量名，继续兼容）
+#   UPSTREAM_SOCKS5_PORT  上游代理端口（历史变量名，继续兼容）
 #   UPSTREAM_SOCKS5_USER  上游用户名（可选）
 #   UPSTREAM_SOCKS5_PASS  上游密码（可选）
 # 挂载约定：
@@ -14,17 +15,37 @@ set -euo pipefail
 
 : "${UPSTREAM_SOCKS5_HOST:?UPSTREAM_SOCKS5_HOST required}"
 : "${UPSTREAM_SOCKS5_PORT:?UPSTREAM_SOCKS5_PORT required}"
+UPSTREAM_PROXY_SCHEME="${UPSTREAM_PROXY_SCHEME:-socks5}"
+UPSTREAM_PROXY_SCHEME="${UPSTREAM_PROXY_SCHEME,,}"
 UPSTREAM_USER="${UPSTREAM_SOCKS5_USER:-}"
 UPSTREAM_PASS="${UPSTREAM_SOCKS5_PASS:-}"
 
 log() { echo "[sidecar $(date +%H:%M:%S)] $*"; }
 
-# ---------- 1) proxychains 配置：mitmproxy 出站走上游 socks5 ----------
+# ---------- 1) proxychains 配置：mitmproxy 出站走上游代理 ----------
+case "$UPSTREAM_PROXY_SCHEME" in
+  http)
+    PROXYCHAINS_TYPE="http"
+    ;;
+  socks5|socks5h)
+    # proxychains 负责目标域名代理解析；socks5h 在当前透明代理链路中等价为 socks5 出站。
+    PROXYCHAINS_TYPE="socks5"
+    ;;
+  https)
+    log "FATAL: https upstream proxy is not supported; use http:// or socks5://"
+    exit 1
+    ;;
+  *)
+    log "FATAL: unsupported UPSTREAM_PROXY_SCHEME=$UPSTREAM_PROXY_SCHEME"
+    exit 1
+    ;;
+esac
+
 # proxychains4 在 strict_chain + ProxyList 首条 时,host 字段必须是 IP,
 # 不接受 hostname(会以 "invalid value or is not numeric" 拒启)。
-# 上游 SOCKS5 域名属于 bootstrap 解析:它发生在代理链路建立之前,没法经由
-# 这个尚未连接的 SOCKS5 自己解析。这里仍支持域名,业务网页/API 域名则在
-# sidecar ready 后走通用 resolver 和 SOCKS5 出口。
+# 上游代理域名属于 bootstrap 解析:它发生在代理链路建立之前,没法经由
+# 这个尚未连接的代理自己解析。这里仍支持域名,业务网页/API 域名则在
+# sidecar ready 后走通用 resolver 和上游代理出口。
 UPSTREAM_HOST_IP="$UPSTREAM_SOCKS5_HOST"
 if ! [[ "$UPSTREAM_SOCKS5_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   resolved=$(getent ahostsv4 "$UPSTREAM_SOCKS5_HOST" | awk '{print $1; exit}')
@@ -33,7 +54,7 @@ if ! [[ "$UPSTREAM_SOCKS5_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     exit 1
   fi
   UPSTREAM_HOST_IP="$resolved"
-  log "Resolved upstream socks5 host: $UPSTREAM_SOCKS5_HOST -> $UPSTREAM_HOST_IP"
+  log "Resolved upstream proxy host: $UPSTREAM_SOCKS5_HOST -> $UPSTREAM_HOST_IP"
 fi
 
 cat > /etc/proxychains4.conf <<EOF
@@ -43,7 +64,7 @@ remote_dns_subnet 224
 tcp_read_time_out 15000
 tcp_connect_time_out 8000
 [ProxyList]
-socks5 ${UPSTREAM_HOST_IP} ${UPSTREAM_SOCKS5_PORT} ${UPSTREAM_USER} ${UPSTREAM_PASS}
+${PROXYCHAINS_TYPE} ${UPSTREAM_HOST_IP} ${UPSTREAM_SOCKS5_PORT} ${UPSTREAM_USER} ${UPSTREAM_PASS}
 EOF
 
 # ---------- 2) 准备 mitmproxy CA（从持久卷恢复或首次生成） ----------
@@ -67,7 +88,7 @@ if [ "${CAPTURE_FULL_HTTP:-0}" = "1" ]; then
   # 完整抓包 run 要尽量覆盖 OAuth / 平台侧 Claude Code 请求，不能沿用普通 run 的忽略规则。
   MITM_IGNORE_ARGS=()
 fi
-log "Starting mitmdump (socks5 inbound :8080, upstream via proxychains -> ${UPSTREAM_SOCKS5_HOST}:${UPSTREAM_SOCKS5_PORT})"
+log "Starting mitmdump (socks5 inbound :8080, upstream via proxychains ${PROXYCHAINS_TYPE} -> ${UPSTREAM_SOCKS5_HOST}:${UPSTREAM_SOCKS5_PORT})"
 proxychains4 -q mitmdump \
   --mode socks5 \
   --listen-host 127.0.0.1 --listen-port 8080 \
@@ -105,7 +126,7 @@ ip tuntap add mode tun dev tun0
 ip addr add 198.18.0.1/15 dev tun0
 ip link set dev tun0 up
 
-# 给上游 SOCKS5 服务器单独留 host route 走 eth0:这条路由不指向 tun0,
+# 给上游代理服务器单独留 host route 走 eth0:这条路由不指向 tun0,
 # 不会被 hev 清掉,可以提前加。
 ETH_GW=$(ip route | awk '$1=="default" {print $3; exit}')
 ETH_IF=$(ip route | awk '$1=="default" {print $5; exit}')
@@ -161,12 +182,11 @@ if [ $ok -ne 1 ]; then
   exit 1
 fi
 
-# ---------- 6) unbound: UDP 53 进 → TCP 53 出(走 tun → hev → SOCKS5 TCP) ----------
-# 商用 SOCKS5 代理大多只支持 TCP CONNECT,UDP relay 多半不开,所以 hev 的
-# udp:'tcp' 也无济于事(它只是把 UDP 封装成 TCP 帧塞给上游 SOCKS5,上游不开 UDP
-# 一律拒)。这里在 sidecar netns 里跑 unbound 做 UDP→TCP DNS 桥:
+# ---------- 6) unbound: UDP 53 进 → TCP 53 出(走 tun → hev → 上游代理 TCP 隧道) ----------
+# 商用代理通常只稳定支持 TCP 隧道,UDP relay 多半不开,所以 hev 的
+# udp:'tcp' 不能直接依赖上游 UDP 能力。这里在 sidecar netns 里跑 unbound 做 UDP→TCP DNS 桥:
 #   worker → UDP 53 → unbound(127.0.0.1) → TCP 53 → 1.1.1.1 → tun → hev →
-#   SOCKS5 TCP CONNECT(上游必支持) → 解析成功
+#   proxychains → 上游代理 TCP 隧道 → 解析成功
 # tcp-upstream:yes 是关键,强制对 forward-addr 走 TCP。
 mkdir -p /etc/unbound
 cat > /etc/unbound/sidecar.conf <<'EOF'
@@ -206,7 +226,7 @@ done
 echo "nameserver 127.0.0.1" > /etc/resolv.conf
 
 # readiness 只验证通用 resolver 链路,不是按业务域名维护白名单。后续 Claude
-# 访问任意网页时仍走同一个 127.0.0.1:53 → unbound → tun → SOCKS5 出口。
+# 访问任意网页时仍走同一个 127.0.0.1:53 → unbound → tun → 上游代理出口。
 DNS_READY_HOST="${DNS_READY_HOST:-example.com}"
 for i in $(seq 1 45); do
   # getent 会同时受 glibc/NSS、IPv6 排序和缓存状态影响;ready 阶段只需要证明

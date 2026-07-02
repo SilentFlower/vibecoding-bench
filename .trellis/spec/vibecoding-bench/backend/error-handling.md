@@ -56,7 +56,7 @@ def create_task(body: TaskIn):
 
 ```python
 # LoginManager 层
-def start(self, name: str, socks5: dict) -> LoginSession:
+def start(self, name: str, proxy: dict) -> LoginSession:
     if not _ACC_NAME_RE.match(name):
         raise ValueError("invalid account name: must match [a-zA-Z0-9_-]+")
     # ...
