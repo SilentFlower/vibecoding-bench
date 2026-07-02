@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 41
-- **Last Active**: 2026-07-01
+- **Total Sessions**: 42
+- **Last Active**: 2026-07-02
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1442 | Active |
+| `journal-1.md` | ~1479 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 42 | 2026-07-02 | 修正 cc2api 排队请求 RPM 计数 | `ae020a0`, `d601bd9`, `40e3245`, `fa08509` | `main` |
 | 41 | 2026-07-01 | 完成 cc2api 2.1.197 升级与远程部署 | `8ee5160`, `2ecf013`, `0c8d8f9`, `d149d49` | `main` |
 | 40 | 2026-07-01 | 完成 cc2api Claude Code base URL 风险控制 | `27f00cd`, `00e63af`, `d319ccf` | `main` |
 | 39 | 2026-06-29 | cc2api 模拟遥测安全基线 | `bfdc0a6`, `72267ed`, `4285348` | `main` |

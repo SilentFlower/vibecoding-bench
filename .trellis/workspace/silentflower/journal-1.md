@@ -1440,3 +1440,40 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 42: 修正 cc2api 排队请求 RPM 计数
+
+**Date**: 2026-07-02
+**Task**: 修正 cc2api 排队请求 RPM 计数
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+修正 cc2api gateway 中账号并发排队阶段提前消耗 RPM 的问题：调整为获得账号槽位后再做 RPM admission，补充等待、超时、队列满回归测试，更新 cc2api 后端服务架构 spec，并完成提交推送与任务归档。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ae020a0` | (see git log) |
+| `d601bd9` | (see git log) |
+| `40e3245` | (see git log) |
+| `fa08509` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
