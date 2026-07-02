@@ -1048,6 +1048,68 @@ def normalize_claude_model_override(value: Optional[str]) -> Optional[str]:
         raise HTTPException(400, str(e))
 
 
+def _usage_window(value: object) -> Optional[dict]:
+    """
+    读取 usage 窗口对象，避免上游返回 null / 字符串时前端拿到不稳定结构。
+
+    :param value: 原始 usage 窗口值
+    :return: 合法窗口 dict；非法时返回 None
+    """
+    return value if isinstance(value, dict) else None
+
+
+def _scoped_weekly_usage_window(usage: dict, model_name: str) -> Optional[dict]:
+    """
+    从新版 usage `limits` 数组里提取指定模型的周用量窗口。
+
+    :param usage: OAuth usage API 返回对象
+    :param model_name: `scope.model.display_name` 里的模型展示名
+    :return: `{utilization, resets_at}` 窗口；未命中时返回 None
+    """
+    limits = usage.get("limits")
+    if not isinstance(limits, list):
+        return None
+    expected = model_name.casefold()
+    for item in limits:
+        if not isinstance(item, dict):
+            continue
+        scope = item.get("scope")
+        model = scope.get("model") if isinstance(scope, dict) else None
+        if not isinstance(model, dict):
+            continue
+        display_name = model.get("display_name")
+        model_id = model.get("id")
+        matches_name = isinstance(display_name, str) and display_name.casefold() == expected
+        matches_id = isinstance(model_id, str) and expected in model_id.casefold()
+        if not (matches_name or matches_id):
+            continue
+        kind = item.get("kind")
+        group = item.get("group")
+        if kind != "weekly_scoped" and group != "weekly":
+            continue
+        percent = item.get("percent")
+        if not isinstance(percent, (int, float)):
+            continue
+        reset_at = item.get("resets_at")
+        return {
+            "utilization": percent,
+            "resets_at": reset_at if isinstance(reset_at, str) else None,
+        }
+    return None
+
+
+def _usage_window_with_scoped_fallback(usage: dict, key: str, model_name: str) -> Optional[dict]:
+    """
+    优先读取顶层窗口，缺失时从 `limits` scoped 结构回填。
+
+    :param usage: OAuth usage API 返回对象
+    :param key: 顶层窗口字段名
+    :param model_name: scoped limit 里的模型展示名
+    :return: 前端可展示的用量窗口
+    """
+    return _usage_window(usage.get(key)) or _scoped_weekly_usage_window(usage, model_name)
+
+
 def _format_quota_result(raw: dict) -> dict:
     """
     把 OAuth usage API 原始 JSON 转成前端稳定字段。
@@ -1062,6 +1124,7 @@ def _format_quota_result(raw: dict) -> dict:
             "five_hour": None,
             "seven_day": None,
             "seven_day_sonnet": None,
+            "seven_day_fable": None,
             "raw": raw,
         }
     usage = raw.get("usage") if isinstance(raw.get("usage"), dict) else raw
@@ -1072,6 +1135,7 @@ def _format_quota_result(raw: dict) -> dict:
             "five_hour": None,
             "seven_day": None,
             "seven_day_sonnet": None,
+            "seven_day_fable": None,
             "raw": raw,
         }
     if raw.get("error"):
@@ -1085,16 +1149,18 @@ def _format_quota_result(raw: dict) -> dict:
             "five_hour": None,
             "seven_day": None,
             "seven_day_sonnet": None,
+            "seven_day_fable": None,
             "raw": raw,
         }
-    five_hour = usage.get("five_hour") if isinstance(usage.get("five_hour"), dict) else None
-    seven_day = usage.get("seven_day") if isinstance(usage.get("seven_day"), dict) else None
+    five_hour = _usage_window(usage.get("five_hour"))
+    seven_day = _usage_window(usage.get("seven_day"))
     return {
         "ok": bool(five_hour or seven_day),
         "message": "" if five_hour or seven_day else "usage API 未返回 5h/7d 额度窗口",
         "five_hour": five_hour,
         "seven_day": seven_day,
-        "seven_day_sonnet": usage.get("seven_day_sonnet") if isinstance(usage.get("seven_day_sonnet"), dict) else None,
+        "seven_day_sonnet": _usage_window(usage.get("seven_day_sonnet")),
+        "seven_day_fable": _usage_window_with_scoped_fallback(usage, "seven_day_fable", "Fable"),
         "raw": raw,
     }
 

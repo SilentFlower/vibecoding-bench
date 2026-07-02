@@ -97,6 +97,71 @@ let permit = queue.acquire(SLOT_WAIT_TIMEOUT).await?;
 account_svc.acquire_account_rpm(&account, sticky, &session_hash).await?;
 ```
 
+## Scenario: OAuth Usage Scoped 模型窗口
+
+### 1. Scope / Trigger
+
+- Trigger：修改 `service::oauth::fetch_usage`、`AccountService::refresh_usage`、`UsagePollerService`、`web/src/api.ts`、`Accounts.vue` 中 OAuth usage 解析或展示时适用。
+- 背景：Claude Code 新版 usage API 可能把模型专属周用量放在 `limits[]` 的 scoped 结构里，而不是顶层 `seven_day_<model>` 字段。
+
+### 2. Signatures
+
+- 上游接口：`GET https://api.anthropic.com/api/oauth/usage`
+- 后端入口：`service::oauth::fetch_usage(token, proxy_url).await -> Result<serde_json::Value, AppError>`
+- 账号刷新：`AccountService::refresh_usage(id).await -> Result<serde_json::Value, AppError>`
+- 管理端接口：`POST /admin/accounts/:id/usage -> { status: "ok", usage }`
+- 前端类型：`UsageData` 包含 `five_hour`、`seven_day`、`seven_day_sonnet`、`seven_day_fable`、`limits`
+
+### 3. Contracts
+
+- `five_hour` / `seven_day` / `seven_day_sonnet` 仍按顶层窗口读取，窗口最少包含 `utilization`，`resets_at` 可为空。
+- Fable 周用量必须稳定暴露为 `seven_day_fable`；若上游没有顶层 `seven_day_fable`，从 `limits[]` 中匹配：
+  - `kind == "weekly_scoped"` 或 `group == "weekly"`
+  - `scope.model.display_name == "Fable"`，或 `scope.model.id` 包含 `fable`
+  - `percent` 写入 `utilization`
+  - `resets_at` 为字符串时保留，否则写 `null`
+- 后端归一化只能补稳定字段，不得删除 `limits`、`spend`、`extra_usage` 等原始字段，方便排查上游变化。
+- 前端展示应优先读取稳定字段；为了兼容旧缓存，也可从 `usage_data.limits` 回退提取 Fable。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 期望行为 |
+|------|----------|
+| `limits` 缺失或不是数组 | 不补 `seven_day_fable`，保留原始 usage |
+| `limits` 前置项 `scope: null` | 跳过该项，继续查找后续 scoped 项 |
+| Fable scoped 项 `percent` 非数字 | 不补窗口，避免 UI 展示脏值 |
+| Fable scoped 项 `resets_at: null` | 窗口保留 `resets_at: null`，前端显示 `—` |
+| 顶层已有 `seven_day_fable` 对象 | 保留顶层对象，不用 `limits` 覆盖 |
+| 上游返回 401/403/429 | 维持现有 `AppError` 分类，不吞错误体 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：usage 先返回 session/weekly all 两个 `scope: null` limit，后返回 Fable scoped limit；解析器跳过前两项并补出 `seven_day_fable`。
+- Base：只返回传统 `five_hour` / `seven_day`；UI 继续显示基础用量，Fable 为 0 或空状态。
+- Bad：直接假设 `limits[0]` 就是 Fable，或遇到第一个 `scope: null` 用 `?` 提前返回，导致真实 Fable 项被漏掉。
+
+### 6. Tests Required
+
+- `service::oauth` 单测覆盖：前置 `scope: null` 项、Fable scoped 项、已有顶层 `seven_day_fable` 不覆盖、非 Fable scoped 项忽略。
+- `cc2api/web` 构建必须通过 `npm run build`，确保 `UsageData` 类型与 `Accounts.vue` 展示同步。
+- 改动 `fetch_usage` 后至少跑 `cargo test`，确认账号调度和 usage 相关共享测试不回归。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+let model = item.get("scope")?.get("model")?;
+```
+
+#### Correct
+
+```rust
+let Some(model) = item.get("scope").and_then(|scope| scope.get("model")) else {
+    continue;
+};
+```
+
 ## 设置热刷新模式
 
 新增全局 setting 通常要经过这些位置：

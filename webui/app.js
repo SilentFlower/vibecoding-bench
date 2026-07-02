@@ -220,7 +220,8 @@ function openQuotaDetail(accountId, quota) {
     <div class="stats-grid">
       <div class="stat-box"><div class="stat-label">5h</div><div class="stat-value-sm">${fmt(quota.five_hour)}</div></div>
       <div class="stat-box"><div class="stat-label">7d</div><div class="stat-value-sm">${fmt(quota.seven_day)}</div></div>
-      <div class="stat-box"><div class="stat-label">7d sonnet</div><div class="stat-value-sm"><span class="muted">未返回 / 暂不支持</span></div></div>
+      <div class="stat-box"><div class="stat-label">7d sonnet</div><div class="stat-value-sm">${fmt(quota.seven_day_sonnet)}</div></div>
+      <div class="stat-box"><div class="stat-label">7d fable</div><div class="stat-value-sm">${fmt(quota.seven_day_fable)}</div></div>
     </div>
   `;
   openModal('#modal');
