@@ -32,14 +32,14 @@
   "notes": "",
   "meta": {},
   "last_push_snapshot": {
-    "snapshot_at": "2026-07-02T09:46:55+08:00",
+    "snapshot_at": "2026-07-02T09:52:14+08:00",
     "branch": {
       "cc2api": "main",
       "vibecoding-bench": "main"
     },
     "pushed_commits": {
       "cc2api": "ae020a0",
-      "vibecoding-bench": "d601bd9"
+      "vibecoding-bench": "40e3245"
     },
     "completed_steps": [
       "planning artifacts completed",
@@ -47,9 +47,10 @@
       "regression tests added",
       "check-all passed",
       "spec updated",
-      "commit-only local commits created"
+      "commit-only local commits created",
+      "pushed to origin"
     ],
     "next_step": "Phase 3.5 finish-work",
-    "notes": "commit-only：本地已提交，未推送"
+    "notes": "已推送到 origin/main"
   }
 }
