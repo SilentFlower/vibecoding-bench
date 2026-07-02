@@ -122,6 +122,7 @@ account_svc.acquire_account_rpm(&account, sticky, &session_hash).await?;
   - `resets_at` 为字符串时保留，否则写 `null`
 - 后端归一化只能补稳定字段，不得删除 `limits`、`spend`、`extra_usage` 等原始字段，方便排查上游变化。
 - 前端展示应优先读取稳定字段；为了兼容旧缓存，也可从 `usage_data.limits` 回退提取 Fable。
+- Fable 周用量不能从普通 `anthropic-ratelimit-unified-*` 响应头可靠推导。OAuth 账号的 Fable `/v1/messages` 成功响应必须在 body EOF 后异步触发一次 usage API 刷新，并按账号做短间隔节流；该刷新不得阻塞 Gateway 热路径，也不得对 SetupToken、`count_tokens`、bootstrap 或非 Fable 请求触发。
 
 ### 4. Validation & Error Matrix
 
@@ -132,17 +133,22 @@ account_svc.acquire_account_rpm(&account, sticky, &session_hash).await?;
 | Fable scoped 项 `percent` 非数字 | 不补窗口，避免 UI 展示脏值 |
 | Fable scoped 项 `resets_at: null` | 窗口保留 `resets_at: null`，前端显示 `—` |
 | 顶层已有 `seven_day_fable` 对象 | 保留顶层对象，不用 `limits` 覆盖 |
+| Fable OAuth `/v1/messages` 2xx 响应 body EOF | 延迟异步刷新 usage；同账号短时间重复请求只刷新一次 |
+| Fable SetupToken / 非 Fable / `count_tokens` / 非 2xx 响应 | 不触发请求后 usage API 刷新 |
 | 上游返回 401/403/429 | 维持现有 `AppError` 分类，不吞错误体 |
 
 ### 5. Good/Base/Bad Cases
 
 - Good：usage 先返回 session/weekly all 两个 `scope: null` limit，后返回 Fable scoped limit；解析器跳过前两项并补出 `seven_day_fable`。
+- Good：OAuth Fable 流式响应完整结束后，Gateway 后台延迟刷新该账号 usage；并发多个 Fable 请求只由节流窗口内的第一个刷新，避免打爆 usage 端点。
 - Base：只返回传统 `five_hour` / `seven_day`；UI 继续显示基础用量，Fable 为 0 或空状态。
 - Bad：直接假设 `limits[0]` 就是 Fable，或遇到第一个 `scope: null` 用 `?` 提前返回，导致真实 Fable 项被漏掉。
+- Bad：在收到响应头时同步调用 usage API，既可能早于上游计量落库，也会阻塞 Gateway 热路径。
 
 ### 6. Tests Required
 
 - `service::oauth` 单测覆盖：前置 `scope: null` 项、Fable scoped 项、已有顶层 `seven_day_fable` 不覆盖、非 Fable scoped 项忽略。
+- `service::gateway` / `service::account` 单测覆盖：只有 OAuth Fable `/v1/messages` 成功响应触发刷新条件；账号级请求后 usage 刷新节流生效。
 - `cc2api/web` 构建必须通过 `npm run build`，确保 `UsageData` 类型与 `Accounts.vue` 展示同步。
 - 改动 `fetch_usage` 后至少跑 `cargo test`，确认账号调度和 usage 相关共享测试不回归。
 
