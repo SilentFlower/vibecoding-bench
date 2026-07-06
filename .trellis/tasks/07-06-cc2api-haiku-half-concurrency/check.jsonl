@@ -1,0 +1,6 @@
+{"file": ".trellis/tasks/07-06-cc2api-haiku-half-concurrency/prd.md", "reason": "检查实现是否覆盖 Haiku 半槽、FIFO 公平、等待队列、缩容、RPM 和前端悬浮展示验收标准。"}
+{"file": ".trellis/tasks/07-06-cc2api-haiku-half-concurrency/design.md", "reason": "检查实现是否符合内部单位、AccountQueue、Gateway admission、API 契约和前端展示设计。"}
+{"file": ".trellis/tasks/07-06-cc2api-haiku-half-concurrency/implement.md", "reason": "检查实现顺序、风险点和验证命令是否完整执行。"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "检查账号槽位与 RPM admission 顺序、热路径和粘性/换号行为未回归。"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "检查 Rust 格式、单测覆盖和敏感数据边界。"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "检查前端类型、管理页展示、构建和 UI 文案符合 cc2api 规范。"}

@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "实现会修改 Gateway 账号槽位、RPM admission 顺序和 AccountQueue，必须遵守 cc2api 后端热路径约束。"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "实现需要补账号调度、并发队列和 gateway admission 测试，并运行 Rust 质量门禁。"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "实现会修改账号管理页和 api.ts 类型，必须遵守管理后台 API client、类型同步和 UI 文案规则。"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "该任务跨 service、handler API 和 Vue 组件，需要保持后端字段与前端展示契约一致。"}

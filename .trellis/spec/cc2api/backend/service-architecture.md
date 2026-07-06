@@ -39,20 +39,28 @@ src/tlsfp/
 
 ### 1. Scope / Trigger
 
-- Trigger：修改 `GatewayService::handle_request_inner` 中账号选择、账号级 FIFO 队列、RPM admission、429 重试或本地拦截顺序时适用。
-- 目标：RPM 计数表示“已经获得账号执行槽位、即将进入上游转发链路”的请求数，而不是“进入本地等待队列”的请求数。
+- Trigger：修改 `GatewayService::handle_request_inner` 中账号选择、账号级 FIFO 队列、请求槽位权重、RPM admission、429 重试或本地拦截顺序时适用。
+- 目标：RPM 计数表示“已经获得账号执行槽位、即将进入上游转发链路”的请求数，而不是“进入本地等待队列”的请求数；账号并发槽位使用标准槽位语义展示，内部用整数单位支持 Haiku 半槽。
 
 ### 2. Signatures
 
 - 槽位入口：`AccountService::get_or_create_queue(account.id, account.concurrency).await`
-- 等待入口：`AccountQueue::acquire(timeout).await -> Result<OwnedSemaphorePermit, QueueWaitError>`
+- 请求权重：`request_slot_units(path, body) -> u32`；`/v1/messages` 且 `body.model` 小写包含 `haiku` 时返回 `HAIKU_REQUEST_SLOT_UNITS = 1`，其他真实上游请求返回 `DEFAULT_REQUEST_SLOT_UNITS = 2`
+- 等待入口：`AccountQueue::acquire(timeout, slot_units).await -> Result<AccountSlotPermit, QueueWaitError>`
 - RPM 入口：`AccountService::acquire_account_rpm(account, sticky, session_hash).await -> Result<(), AppError>`
 - RPM 状态：`AccountService::get_account_rpm_status(account).await -> AccountRpmStatus`
+- 管理端实时并发字段：`current_concurrency`（标准槽位，可小数）、`current_concurrency_units`、`max_concurrency_units`、`active_requests`、`queued_requests`、`queued_request_units`
 
 ### 3. Contracts
 
-- Gateway 正常上游路径必须先获得 `OwnedSemaphorePermit`，再调用 `acquire_account_rpm`。
+- `Account.concurrency` 的外部语义是标准并发槽位数；管理员填 `5` 表示最多 5 个普通请求，而不是内部单位数。
+- 内部单位固定为 `1 标准槽 = 2 内部单位`；普通/Opus 请求占 2 单位，Haiku 请求占 1 单位。不要把 `concurrency` 存成或显示成翻倍值。
+- Gateway 正常上游路径必须先计算 `slot_units` 并获得 `AccountSlotPermit`，再调用 `acquire_account_rpm`。
+- 本地拦截路径（assistant prefill、warmup、Auto Mode classifier、telemetry 假响应等）必须在账号槽位获取前返回，不得新增并发槽位消耗。
 - 处于 `AccountQueue::acquire(...)` 等待阶段的请求不得递增 RPM。
+- 等待队列容量仍按请求数计，保持 `2 × concurrency` 个等待请求；不要按半槽权重扩大为 `4 × concurrency`。
+- `AccountQueue` 必须使用 `Semaphore::acquire_many_owned(slot_units)` 保持 Tokio semaphore FIFO 公平性。若队首普通请求需要 2 单位而当前只剩 1 单位，后续 Haiku 请求不得绕过队首。
+- 调度的满载判断和 `concurrency_pct` 必须按内部单位计算：`(active_units + waiting_units) / max_units × 100`。
 - `QueueWaitError::QueueFull` / `QueueWaitError::Timeout` / `QueueWaitError::Closed` 发生时，该账号 RPM 不得变化。
 - 非粘性请求拿到槽位后若 RPM 饱和并返回 `AppError::ServiceUnavailable`，必须释放当前账号槽位并排除该账号后重新选号。
 - 粘性请求拿到槽位后若 RPM 饱和，仍按 `acquire_account_rpm` 的等待/本地 429 语义处理，不得随意切号。
@@ -61,17 +69,23 @@ src/tlsfp/
 
 | 条件 | 期望行为 |
 |------|----------|
-| 排队等待槽位 | `queued` 可增加，RPM `current` 不增加 |
+| 普通请求进入真实上游路径 | 占 2 内部单位，管理端标准槽位 +1 |
+| Haiku `/v1/messages` 进入真实上游路径 | 占 1 内部单位，管理端标准槽位 +0.5 |
+| 排队等待槽位 | `queued_requests` 和 `queued_request_units` 可增加，RPM `current` 不增加 |
+| 队首普通请求等待 2 单位且只剩 1 单位 | 后续 Haiku 不插队，直到队首请求获得 2 单位或退出 |
 | 成功获得槽位且 RPM 未满 | RPM `current += 1`，permit 交给 `SlotReleaseGuard` / `SlotGuardBody` |
 | 队列满 | 返回/换号前不消耗 RPM |
 | 槽位等待超时 | 返回/换号前不消耗 RPM |
+| 管理员缩小并发 | 已有请求不被中断；后台 shrinker 在 permit 释放后吞掉多余内部单位 |
 | 非粘性 RPM 饱和 | 释放已获槽位，排除账号并重新选号 |
 | 粘性 RPM 饱和 | 保持粘性账号等待；超时后返回本地 429 |
 
 ### 5. Good/Base/Bad Cases
 
 - Good：请求 A 占满账号槽位，请求 B 在 FIFO 队列等待；B 等待期间 RPM 不变，A 释放后 B 获得槽位并通过 RPM admission 才递增。
+- Good：账号并发为 5 时内部容量为 10；9 个 Haiku 占 9 单位后，新 Opus/普通请求需要 2 单位，必须等待。
 - Base：`rpm_limit = 0` 时保持不限 RPM，槽位顺序仍由 `AccountQueue` 控制。
+- Bad：把 `slots` 容量直接改成 `2 × concurrency` 却仍让每个请求只 acquire 1 个 permit，会让所有请求都变成半槽。
 - Bad：在 `queue.acquire(...)` 前调用 `acquire_account_rpm(...)`，会让排队中或最终超时/队列满的请求提前消耗 RPM。
 
 ### 6. Tests Required
@@ -79,6 +93,11 @@ src/tlsfp/
 - 覆盖等待中请求不增加 `get_account_rpm_status(...).current`。
 - 覆盖等待请求获得槽位并通过 RPM admission 后才递增。
 - 覆盖 `QueueFull` 和 `Timeout` 不消耗 RPM。
+- 覆盖普通请求占 2 单位、两个 Haiku 共享 1 个标准槽位、混合请求按内部单位满载。
+- 覆盖队首普通请求需要 2 单位时，后续 Haiku 不绕过队首请求。
+- 覆盖等待队列容量仍按请求数限制，不因 Haiku 半槽放大。
+- 覆盖缩容不强杀已有请求，并在释放后收敛到新的内部单位容量。
+- 覆盖管理 API 返回标准槽位和内部单位字段，前端类型与展示同步。
 - 保留非粘性 RPM 饱和换号、粘性 RPM 饱和等待/拒绝、429 后释放槽位的回归测试。
 
 ### 7. Wrong vs Correct
@@ -87,14 +106,27 @@ src/tlsfp/
 
 ```rust
 account_svc.acquire_account_rpm(&account, sticky, &session_hash).await?;
-let permit = queue.acquire(SLOT_WAIT_TIMEOUT).await?;
+let permit = queue
+    .acquire(SLOT_WAIT_TIMEOUT, DEFAULT_REQUEST_SLOT_UNITS)
+    .await?;
+```
+
+```rust
+let slots = Semaphore::new((account.concurrency * SLOT_UNIT_SCALE) as usize);
+let permit = slots.acquire_owned().await?;
 ```
 
 #### Correct
 
 ```rust
-let permit = queue.acquire(SLOT_WAIT_TIMEOUT).await?;
+let slot_units = request_slot_units(&path, &body_map);
+let permit = queue.acquire(SLOT_WAIT_TIMEOUT, slot_units).await?;
 account_svc.acquire_account_rpm(&account, sticky, &session_hash).await?;
+```
+
+```rust
+let slots = Semaphore::new((account.concurrency * SLOT_UNIT_SCALE) as usize);
+let permit = slots.acquire_many_owned(slot_units).await?;
 ```
 
 ## Scenario: OAuth Usage Scoped 模型窗口
