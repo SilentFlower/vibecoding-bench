@@ -1477,3 +1477,38 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 43: cc2api Haiku 半槽并发与展示
+
+**Date**: 2026-07-06
+**Task**: cc2api Haiku 半槽并发与展示
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+实现 cc2api Haiku 半槽并发计量，保持普通并发配置语义不变；同步管理 API、账号卡片并发 tooltip、测试和后端服务规范。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8f4a58a` | (see git log) |
+| `8fc69f9` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
