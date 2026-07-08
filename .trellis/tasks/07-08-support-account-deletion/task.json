@@ -1,0 +1,44 @@
+{
+  "id": "support-account-deletion",
+  "name": "support-account-deletion",
+  "title": "支持删除账号",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-07-08",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "last_push_snapshot": {
+    "snapshot_at": "2026-07-08T01:55:09.103206+00:00",
+    "completed_steps": [
+      "数据层账号软删除",
+      "账号删除/恢复",
+      "可用账号入口收口",
+      "OAuth 刷新边界",
+      "前端删除提示调整",
+      "检查与验证"
+    ],
+    "next_step": "finish-work 归档任务",
+    "branch": "main",
+    "pushed_commits": {
+      "vibecoding-bench": "b2233c4"
+    },
+    "push_mode": "push",
+    "notes": "普通 push：业务代码已提交并推送，下一步执行 finish-work 归档任务；用户要求随后执行镜像构建推送与远程部署。"
+  }
+}
