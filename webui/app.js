@@ -157,10 +157,7 @@ async function renderAccounts() {
       return;
     }
     if (id && confirm(`删除账号 #${id}?`)) {
-      const result = await API(`/accounts/${id}`, { method: 'DELETE' });
-      if (result.disabled) {
-        alert('账号仍有关联任务或运行记录，已改为停用。');
-      }
+      await API(`/accounts/${id}`, { method: 'DELETE' });
       await renderAccounts();
     }
   };

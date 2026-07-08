@@ -601,6 +601,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   upstream_socks5_user TEXT,
   upstream_socks5_pass TEXT,
   enabled INTEGER DEFAULT 1,
+  deleted_at REAL,
   created_at REAL DEFAULT (julianday('now'))
 );
 
@@ -715,6 +716,7 @@ def init_db() -> None:
         with conn:
             conn.executescript(_SCHEMA)
             _ensure_column(conn, "accounts", "upstream_proxy_scheme", "TEXT DEFAULT 'socks5'")
+            _ensure_column(conn, "accounts", "deleted_at", "REAL")
             _ensure_column(conn, "tasks", "batch_id", "INTEGER")
             _ensure_column(conn, "tasks", "topic_id", "INTEGER")
             _ensure_column(conn, "tasks", "status", "TEXT DEFAULT 'active'")
@@ -838,6 +840,73 @@ def _account_reference_counts(conn: sqlite3.Connection, account_id: int) -> dict
         ).fetchone()
         counts[table] = int(row["n"] if row else 0)
     return counts
+
+
+def _account_is_available(account: dict) -> bool:
+    """
+    判断账号是否仍允许参与新运行或凭据刷新。
+
+    :param account: accounts 表行
+    :return: 启用且未软删除时返回 True
+    """
+    return int(account.get("enabled") or 0) == 1 and account.get("deleted_at") is None
+
+
+def _get_available_account(conn: sqlite3.Connection, account_id: int) -> Optional[sqlite3.Row]:
+    """
+    读取允许参与新运行和凭据刷新的账号。
+
+    :param conn: 当前数据库连接
+    :param account_id: accounts.id
+    :return: 可用账号行；不存在、停用或软删除时返回 None
+    """
+    return conn.execute(
+        "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL",
+        (account_id,),
+    ).fetchone()
+
+
+def _restore_deleted_account(
+    conn: sqlite3.Connection,
+    account_id: int,
+    name: str,
+    proxy_scheme: str,
+    upstream_socks5_host: Optional[str],
+    upstream_socks5_port: Optional[int],
+    upstream_socks5_user: Optional[str],
+    upstream_socks5_pass: Optional[str],
+    enabled: int,
+) -> int:
+    """
+    恢复同名软删除账号，保留历史 account_id 引用。
+
+    :param conn: 当前数据库连接
+    :param account_id: 要恢复的 accounts.id
+    :param name: 账号 profile 名
+    :param proxy_scheme: 上游代理协议
+    :param upstream_socks5_host: 上游代理 host
+    :param upstream_socks5_port: 上游代理端口
+    :param upstream_socks5_user: 上游代理用户名
+    :param upstream_socks5_pass: 上游代理密码
+    :param enabled: 恢复后的启用状态
+    :return: 恢复后的账号 ID
+    """
+    conn.execute(
+        "UPDATE accounts SET profile_path=?, upstream_proxy_scheme=?, "
+        "upstream_socks5_host=?, upstream_socks5_port=?, upstream_socks5_user=?, "
+        "upstream_socks5_pass=?, enabled=?, deleted_at=NULL WHERE id=?",
+        (
+            f"profiles/{name}",
+            proxy_scheme,
+            upstream_socks5_host,
+            upstream_socks5_port,
+            upstream_socks5_user,
+            upstream_socks5_pass,
+            enabled,
+            account_id,
+        ),
+    )
+    return account_id
 
 
 def _infer_deleted_account_id(conn: sqlite3.Connection, account_name: str) -> Optional[int]:
@@ -1870,6 +1939,8 @@ JS
         :param account: accounts 表行
         :return: 发生刷新并成功回写时返回 True
         """
+        if not _account_is_available(account):
+            return False
         if not account.get("upstream_socks5_host"):
             raise ValueError("account has no upstream proxy configured")
         acc_name = account["name"]
@@ -2545,7 +2616,7 @@ class OAuthRefreshScheduler:
         conn = get_db()
         try:
             rows = conn.execute(
-                "SELECT * FROM accounts WHERE enabled=1 ORDER BY id"
+                "SELECT * FROM accounts WHERE enabled=1 AND deleted_at IS NULL ORDER BY id"
             ).fetchall()
             accounts = [dict(r) for r in rows]
         except Exception:
@@ -2805,10 +2876,11 @@ class Scheduler:
                 if not batch_row:
                     return
                 account_row = conn.execute(
-                    "SELECT * FROM accounts WHERE id=?",
+                    "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL",
                     (batch_row["account_id"],),
                 ).fetchone()
                 if not account_row:
+                    self._pause_batch_for_unavailable_account(batch_id)
                     return
                 items = conn.execute(
                     "SELECT bi.*, t.no AS topic_no, t.title, t.description "
@@ -2891,12 +2963,20 @@ class Scheduler:
                         "SELECT status FROM task_batch_items WHERE id=?",
                         (item["id"],),
                     ).fetchone()
+                    current_account = _get_available_account(conn, int(account["id"]))
                     if (
                         not current_batch
                         or current_batch["status"] != "active"
                         or not current_item
                         or current_item["status"] not in ("pending", "paused")
                     ):
+                        return None
+                    if not current_account:
+                        conn.execute(
+                            "UPDATE task_batches SET status='paused', next_launch_at=NULL, "
+                            "updated_at=julianday('now') WHERE id=? AND status='active'",
+                            (batch["id"],),
+                        )
                         return None
                     cur = conn.execute(
                         "INSERT INTO tasks(topic_no, title, prompt, account_id, batch_id, "
@@ -2924,6 +3004,25 @@ class Scheduler:
                         (task_id, run_id, item["id"]),
                     )
                     return task_id
+            finally:
+                conn.close()
+
+    def _pause_batch_for_unavailable_account(self, batch_id: int) -> None:
+        """
+        账号被删除或停用后暂停批次，避免后台继续投放新 run。
+
+        :param batch_id: task_batches.id
+        :return: None
+        """
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    conn.execute(
+                        "UPDATE task_batches SET status='paused', next_launch_at=NULL, "
+                        "updated_at=julianday('now') WHERE id=? AND status='active'",
+                        (batch_id,),
+                    )
             finally:
                 conn.close()
 
@@ -3482,6 +3581,23 @@ def create_account(body: AccountIn):
         conn = get_db()
         try:
             with conn:
+                soft_deleted_row = conn.execute(
+                    "SELECT id FROM accounts WHERE name=? AND deleted_at IS NOT NULL",
+                    (body.name,),
+                ).fetchone()
+                if soft_deleted_row:
+                    account_id = _restore_deleted_account(
+                        conn,
+                        int(soft_deleted_row["id"]),
+                        body.name,
+                        proxy_scheme,
+                        body.upstream_socks5_host,
+                        body.upstream_socks5_port,
+                        body.upstream_socks5_user,
+                        body.upstream_socks5_pass,
+                        int(body.enabled),
+                    )
+                    return {"id": account_id, "restored": True}
                 restored_account_id = _infer_deleted_account_id(conn, body.name)
                 columns = (
                     "id, name, profile_path, upstream_proxy_scheme, "
@@ -3520,7 +3636,9 @@ def list_accounts():
     """返回账号列表，并补充 OAuth token 状态。"""
     conn = get_db()
     try:
-        rows = conn.execute("SELECT * FROM accounts ORDER BY id").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM accounts WHERE deleted_at IS NULL ORDER BY id"
+        ).fetchall()
         accounts = []
         for row in rows:
             account = dict(row)
@@ -3536,24 +3654,30 @@ def list_accounts():
 
 @app.delete("/api/accounts/{aid}")
 def delete_account(aid: int):
-    """删除无历史引用账号；已有任务/运行引用时只停用账号行。"""
+    """删除账号；已有任务/运行引用时软删除并退出可用集合。"""
     with _db_lock:
         conn = get_db()
         try:
             with conn:
-                row = conn.execute("SELECT * FROM accounts WHERE id=?", (aid,)).fetchone()
+                row = conn.execute(
+                    "SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL",
+                    (aid,),
+                ).fetchone()
                 if not row:
                     raise HTTPException(404, "account not found")
                 counts = _account_reference_counts(conn, aid)
                 if sum(counts.values()) > 0:
-                    # 任务、批次和 run 都按 account_id 保存历史引用；硬删账号会让
-                    # OAuth 后台刷新器看不到账号，并留下无法恢复的孤儿任务。
-                    conn.execute("UPDATE accounts SET enabled=0 WHERE id=?", (aid,))
-                    return {"ok": True, "deleted": False, "disabled": True, "references": counts}
+                    # 任务、批次和 run 都按 account_id 保存历史引用；软删除能保留
+                    # 历史语义，同时让后台刷新器和新运行入口都不再选中该账号。
+                    conn.execute(
+                        "UPDATE accounts SET enabled=0, deleted_at=? WHERE id=?",
+                        (time.time(), aid),
+                    )
+                    return {"ok": True, "deleted": True, "soft_deleted": True, "references": counts}
                 conn.execute("DELETE FROM accounts WHERE id=?", (aid,))
         finally:
             conn.close()
-    return {"ok": True, "deleted": True, "disabled": False}
+    return {"ok": True, "deleted": True, "soft_deleted": False}
 
 
 @app.post("/api/accounts/{aid}/quota")
@@ -3563,9 +3687,9 @@ def query_account_quota(aid: int):
         raise HTTPException(500, "runner not ready")
     conn = get_db()
     try:
-        row = conn.execute("SELECT * FROM accounts WHERE id=?", (aid,)).fetchone()
+        row = _get_available_account(conn, aid)
         if not row:
-            raise HTTPException(404, "account not found")
+            raise HTTPException(404, "account not found or disabled")
         account = dict(row)
     finally:
         conn.close()
@@ -3841,10 +3965,11 @@ def login_commit(sid: str, body: LoginStartIn):
                 except sqlite3.IntegrityError:
                     # 同名账号已存在 → 视为"重新登录"：覆盖代理配置，并重新启用账号。
                     conn.execute(
-                        "UPDATE accounts SET upstream_proxy_scheme=?, upstream_socks5_host=?, "
+                        "UPDATE accounts SET profile_path=?, upstream_proxy_scheme=?, upstream_socks5_host=?, "
                         "upstream_socks5_port=?, upstream_socks5_user=?, "
-                        "upstream_socks5_pass=?, enabled=1 WHERE name=?",
+                        "upstream_socks5_pass=?, enabled=1, deleted_at=NULL WHERE name=?",
                         (
+                            f"profiles/{name}",
                             proxy_scheme,
                             body.upstream_socks5_host,
                             body.upstream_socks5_port,
@@ -4022,6 +4147,9 @@ def create_task(body: TaskIn):
         conn = get_db()
         try:
             with conn:
+                account_row = _get_available_account(conn, body.account_id)
+                if not account_row:
+                    raise HTTPException(404, "account not found or disabled")
                 cur = conn.execute(
                     "INSERT INTO tasks(topic_no, title, prompt, account_id, topic_id, timeout_sec, repeat_n) "
                     "VALUES(?,?,?,?,?,?,?)",
@@ -4085,12 +4213,9 @@ def create_task_batch(body: BatchIn):
         raise HTTPException(400, "interval_max_sec must be >= interval_min_sec")
     conn = get_db()
     try:
-        account = conn.execute(
-            "SELECT * FROM accounts WHERE id=?",
-            (body.account_id,),
-        ).fetchone()
+        account = _get_available_account(conn, body.account_id)
         if not account:
-            raise HTTPException(404, "account not found")
+            raise HTTPException(404, "account not found or disabled")
         placeholders = ",".join("?" for _ in topic_ids)
         topics = conn.execute(
             f"SELECT * FROM topics WHERE id IN ({placeholders}) AND deleted_at IS NULL",
@@ -4105,6 +4230,9 @@ def create_task_batch(body: BatchIn):
         conn = get_db()
         try:
             with conn:
+                account_row = _get_available_account(conn, body.account_id)
+                if not account_row:
+                    raise HTTPException(404, "account not found or disabled")
                 cur = conn.execute(
                     "INSERT INTO task_batches(account_id, name, concurrency, interval_min_sec, "
                     "interval_max_sec, timeout_sec) VALUES(?,?,?,?,?,?)",
@@ -4259,13 +4387,15 @@ def resume_task_batch(batch_id: int):
         try:
             with conn:
                 row = conn.execute(
-                    "SELECT id, status FROM task_batches WHERE id=? AND deleted_at IS NULL",
+                    "SELECT id, status, account_id FROM task_batches WHERE id=? AND deleted_at IS NULL",
                     (batch_id,),
                 ).fetchone()
                 if not row:
                     raise HTTPException(404, "batch not found")
                 if row["status"] in ("done", "deleted"):
                     return {"ok": True, "resumed": False}
+                if not _get_available_account(conn, int(row["account_id"])):
+                    raise HTTPException(404, "account not found or disabled")
                 conn.execute(
                     "UPDATE task_batch_items SET task_id=NULL, run_id=NULL, status='pending', "
                     "updated_at=julianday('now') "
@@ -4299,7 +4429,7 @@ def start_capture_run(body: CaptureRunIn):
     conn = get_db()
     try:
         account_row = conn.execute(
-            "SELECT * FROM accounts WHERE id=? AND enabled=1",
+            "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL",
             (body.account_id,),
         ).fetchone()
         if not account_row:
@@ -4385,9 +4515,9 @@ def run_task(tid: int):
         if not task_row:
             raise HTTPException(404, "task not found")
         task = dict(task_row)
-        account_row = conn.execute("SELECT * FROM accounts WHERE id=?", (task["account_id"],)).fetchone()
+        account_row = _get_available_account(conn, int(task["account_id"]))
         if not account_row:
-            raise HTTPException(404, "account not found")
+            raise HTTPException(404, "account not found or disabled")
         account = dict(account_row)
     finally:
         conn.close()
@@ -4688,11 +4818,11 @@ def continue_run_start(rid: str):
         if run["status"] not in _TERMINAL_RUN_STATUSES:
             raise HTTPException(400, f"run {rid} is not completed")
         account_row = conn.execute(
-            "SELECT * FROM accounts WHERE id=?",
+            "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL",
             (run["account_id"],),
         ).fetchone()
         if not account_row:
-            raise HTTPException(404, "account not found")
+            raise HTTPException(404, "account not found or disabled")
         account = dict(account_row)
     finally:
         conn.close()

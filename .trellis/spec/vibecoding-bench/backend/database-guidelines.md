@@ -104,6 +104,73 @@ conn.execute(f"SELECT * FROM tasks WHERE id={tid}")
 
 ---
 
+## Account Soft Deletion Contract
+
+### 1. Scope / Trigger
+
+账号删除必须区分"无历史引用的物理删除"和"有历史引用的软删除"。只要账号被 `tasks`、`runs` 或 `task_batches` 引用,就不能直接硬删账号行,否则历史任务 / 运行记录会留下无法解释的 `account_id`。
+
+### 2. Signatures
+
+- DB: `accounts.deleted_at REAL`
+- 可用账号 SQL: `SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL`
+- 账号列表 API: `GET /api/accounts` 默认只返回 `deleted_at IS NULL`
+- 删除 API: `DELETE /api/accounts/{aid}` 无引用时物理删除;有引用时 `UPDATE accounts SET enabled=0, deleted_at=? WHERE id=?`
+
+### 3. Contracts
+
+- 软删除账号仍保留 `accounts.id` 和 `accounts.name`,用于历史任务 / 运行记录引用。
+- 软删除账号必须退出所有新工作入口:创建任务、创建批次、抓包 run、旧任务再次运行、继续对话、额度查询、后台 OAuth access token 刷新。
+- 同名重新添加 / 登录时,如果存在同名软删除账号,恢复原行并设置 `enabled=1, deleted_at=NULL`,避免 `accounts.name UNIQUE` 造成不可恢复的重复账号错误。
+- 前端依赖 `/api/accounts` 作为可选账号来源;后端过滤后,账号页和下拉应自然隐藏软删除账号。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|------|------|
+| 删除账号无 `tasks` / `runs` / `task_batches` 引用 | `DELETE FROM accounts WHERE id=?` |
+| 删除账号仍有历史引用 | `enabled=0, deleted_at=<now>` 并返回删除成功语义 |
+| 新工作入口收到软删除账号 ID | 返回 `404 account not found or disabled`,不启动 worker / sidecar |
+| 后台 OAuth refresh 扫描账号 | 只查询 `enabled=1 AND deleted_at IS NULL` |
+| 同名软删除账号重新添加 / 登录 | 恢复原 `accounts.id`,清空 `deleted_at` |
+
+### 5. Good/Base/Bad Cases
+
+**Good**:删除有历史 run 的账号后,账号页和任务下拉不再出现该账号,后台 refresh 不再读取它,历史运行列表仍可用 `acc#<id>` fallback 展示。
+
+**Base**:删除没有任何历史引用的测试账号时,直接物理删除账号行。
+
+**Bad**:只把 `enabled=0` 当删除。这样账号仍会出现在 `/api/accounts` 和前端下拉里,用户看到"已停用"但没有真正从视图移除。
+
+**Bad**:有历史引用时直接 `DELETE FROM accounts`。SQLite 默认不强制外键,这不会立刻报错,但会制造孤儿任务和运行记录。
+
+### 6. Tests Required
+
+- 旧 DB 启动后 `accounts.deleted_at` 会被 `init_db()` 幂等补列。
+- 删除有历史引用账号后,`/api/accounts` 不返回该账号,`_get_available_account()` 返回 `None`。
+- 软删除账号调用额度查询、创建任务、创建批次、抓包、旧任务 run、继续对话时返回 404,且不启动 worker / sidecar。
+- 同名重新添加 / 登录软删除账号时恢复原 `accounts.id`,并清空 `deleted_at`。
+- 删除无历史引用账号时,账号行被物理删除。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```python
+row = conn.execute("SELECT * FROM accounts WHERE id=?", (account_id,)).fetchone()
+```
+
+#### Correct
+
+```python
+row = conn.execute(
+    "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL",
+    (account_id,),
+).fetchone()
+```
+
+---
+
 ## Common Mistakes
 
 | 反模式 | 为什么不要 | 怎么改 |
