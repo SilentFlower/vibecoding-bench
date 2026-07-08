@@ -24,10 +24,10 @@
   "notes": "",
   "meta": {},
   "last_push_snapshot": {
-    "snapshot_at": "2026-07-02T17:07:40+08:00",
+    "snapshot_at": "2026-07-08T00:00:00+08:00",
     "branch": "main",
     "pushed_commits": {
-      "vibecoding-bench": "3fa32dc"
+      "vibecoding-bench": "22f9883"
     },
     "push_mode": "push",
     "completed_steps": [
@@ -35,10 +35,11 @@
       "Step 2 sidecar 环境变量集中化",
       "Step 3 sidecar 出站协议支持",
       "Step 4 WebUI 表单与粘贴解析",
-      "Step 5 文档和验证"
+      "Step 5 文档和验证",
+      "flower 更新检查 hook 接入"
     ],
-    "partial_step": "无",
     "next_step": "Phase 3.5 finish-work：记录 release operations、归档任务、记录 journal",
-    "notes": "check-all 已通过；已验证 py_compile、bash -n、node --check、git diff --check、SQLite 旧表补列和 URL 解析冒烟。commit 后发布需重建/redeploy orchestrator + sidecar。"
+    "partial_step": "无",
+    "notes": "check-all 已通过；已验证 py_compile、bash -n、node --check、git diff --check、SQLite 旧表补列和 URL 解析冒烟。本次额外接入 flower SessionStart 更新检查 hook 并精简 trellis 守卫文档。发布需重建/redeploy orchestrator + sidecar。"
   }
 }
