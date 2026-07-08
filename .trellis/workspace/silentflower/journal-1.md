@@ -1546,3 +1546,38 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 45: 支持账号软删除并部署
+
+**Date**: 2026-07-08
+**Task**: 支持账号软删除并部署
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+完成 vibecoding-bench 账号软删除：有关联账号删除后隐藏并排除新任务、quota、继续运行和后台 OAuth access token 刷新；无引用账号仍物理删除；同名重新添加恢复软删行。已构建并推送 DockerHub 三镜像 latest/d46ded4，远程实例切换 VIBEBENCH_TAG=d46ded4，拉取镜像并 force recreate orchestrator，HTTP 与日志验证通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b2233c4` | (see git log) |
+| `d46ded4` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
