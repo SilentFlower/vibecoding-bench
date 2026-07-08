@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md", "reason": "本任务新增 accounts.deleted_at 并调整账号删除 SQL，需要遵守 SQLite schema、幂等补列、_db_lock 和参数化查询约定。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/directory-structure.md", "reason": "后端仍在 orchestrator/main.py 单文件内按现有 accounts/tasks/runs 路由分节修改，不能提前拆包。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "账号删除、后台 OAuth 刷新和 quota 查询涉及 DB 写入、Docker 启动边界和用户可见错误，需要遵守后端质量约束。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/image-build-push.md", "reason": "该规范记录 OAuth access token 刷新和 profile 凭据回写边界，本任务必须确保删除账号不再进入刷新集合。"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/type-safety.md", "reason": "前端是原生 JavaScript，账号列表和删除提示调整需要保持 API 字段、escapeHTML 和表单数字转换约定。"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/component-guidelines.md", "reason": "账号页删除交互和依赖 /api/accounts 的下拉渲染需保持现有 render/onclick 覆盖式组件模式。"}

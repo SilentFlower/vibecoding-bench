@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md", "reason": "检查 schema 补列、软删除 SQL、写锁和连接关闭是否符合数据库约定。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "检查后端入口是否都拒绝已删除账号，且没有在锁内做长 IO 或泄漏 token。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/image-build-push.md", "reason": "检查 OAuth refresh、quota usage 和 profile 凭据回写是否排除软删除账号。"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/type-safety.md", "reason": "检查前端删除提示调整和账号下拉渲染是否保持字段一致与 escapeHTML 约束。"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md", "reason": "检查前端错误反馈、事件绑定、零构建和手测验收路径是否满足项目质量要求。"}
