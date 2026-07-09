@@ -1581,3 +1581,39 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 46: 完成 cc2api Fable sticky 满额切号
+
+**Date**: 2026-07-09
+**Task**: 完成 cc2api Fable sticky 满额切号
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+实现并推送 cc2api Fable 周配额耗尽时 sticky fallback：新增默认开启的 fable_sticky_quota_fallback_enabled 设置，支持管理端热刷新和 Settings 开关；账号选择会在 Fable sticky 账号明确满额时临时切换到可用 OAuth 账号，429 分类支持模型级重试且不污染账号全局冷却；补充后端、DB、前端构建验证和 service-architecture 规范，并归档任务。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5b76504` | (see git log) |
+| `954afa6` | (see git log) |
+| `ea78d71` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
