@@ -200,6 +200,105 @@ let Some(model) = item.get("scope").and_then(|scope| scope.get("model")) else {
 };
 ```
 
+## Scenario: Fable sticky 配额耗尽 fallback
+
+### 1. Scope / Trigger
+
+- Trigger：修改 `/v1/messages` 账号选择、sticky session、Fable 周配额识别、上游 429 分类、settings 热刷新或 Settings 页开关时适用。
+- 目标：当 sticky 账号的 Fable 模型级周配额明确耗尽时，只对当前 Fable 请求临时切到其他可用 OAuth 账号，避免会话持续命中满额账号；RPM 饱和仍保持旧 sticky 语义。
+
+### 2. Signatures
+
+- Setting key：`fable_sticky_quota_fallback_enabled`，默认常量 `DEFAULT_FABLE_STICKY_QUOTA_FALLBACK_ENABLED = "true"`。
+- Gateway 热缓存：`GatewayService::reload_fable_sticky_quota_fallback_enabled().await -> Result<(), AppError>`；启动时必须调用一次，管理端更新 setting 后也必须 reload。
+- 请求上下文：`AccountSelectionContext { fable_quota_fallback_enabled: bool, request_model: Option<String> }`。
+- 账号选择：`AccountService::select_account_with_selection_context(session_hash, exclude_ids, allowed_ids, context).await -> Result<SelectedAccount, AppError>`。
+- 429 分类：`AccountService::handle_rate_limit_with_context(account, retry_after_secs, body, usage, context).await -> Result<RateLimitDecision, AppError>`。
+- 账号可用性判断：`account_fable_quota_exhausted(account) -> bool`。
+- 新决策分支：`RateLimitDecision::RetryOtherAccount` 表示当前账号仅对本请求模型不可用，调用方可排除该账号后重试其他账号。
+
+### 3. Contracts
+
+- Gateway 只有在 `path == "/v1/messages"` 时才允许把 `fable_sticky_quota_fallback_enabled` 写入 `AccountSelectionContext`；`count_tokens`、bootstrap、usage poller、PrimePoller 不能因为该开关改变选号。
+- Fable 模型只匹配 `claude-fable-5` 或 `claude-fable-5[...]`。不要用包含匹配覆盖其他模型名。
+- Fable 配额耗尽必须同时满足：账号为 `AccountAuthType::Oauth`、`usage_data.seven_day_fable.utilization >= 100`、`resets_at` 是未来 RFC3339 时间。不要复用普通 usage 的 `USAGE_HIT_THRESHOLD = 97.0`。
+- SetupToken 即使缓存里有脏的 `seven_day_fable`，也必须保持旧 sticky 行为。
+- sticky 账号 Fable 耗尽时，只把该账号加入本轮 `runtime_exclude_ids`，并刷新原 sticky TTL；不要删除旧 sticky。只有替代账号真实承载请求后，才通过已有 `should_bind_session` / `bind_selected_session` 覆盖 sticky。
+- 非 sticky Fable 请求应优先过滤明确耗尽的账号；若所有候选都明确耗尽，返回 `AppError::TooManyRequests`，不要落到普通 `ServiceUnavailable("no available accounts")`。
+- sticky 账号 RPM 饱和不属于 Fable 配额耗尽 fallback，仍走 `acquire_account_rpm` 的等待或本地 429，不能换号破坏 prompt cache。
+- Fable OAuth 429 且开关启用时，先识别通用 `seven_day` / `five_hour` 窗口并写账号级冷却；若通用窗口未命中，则返回 `RateLimitDecision::RetryOtherAccount`，不要写账号全局 `rate_limit_reset_at`。
+- Fable OAuth 429 如果本地 usage 未显示满额，Gateway 只能触发已有节流保护的后台 usage refresh，不得同步等待 OAuth usage API。
+- 新增 `RateLimitDecision` 分支后，所有 `match RateLimitDecision` 的调用方必须显式处理 `RetryOtherAccount`，不能把它误当成 `Quarantined`。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 期望行为 |
+|------|----------|
+| 开关开启，sticky OAuth 账号 `seven_day_fable` 明确 100% 且 reset 在未来 | 本轮排除 sticky 账号，尝试选择替代账号 |
+| 开关关闭，同样的 sticky 账号满额 | 保持原 sticky 账号 |
+| Fable sticky 满额且没有替代账号 | 返回 `TooManyRequests`，旧 sticky 绑定保留 |
+| 非 sticky Fable 请求有满额和未满额候选 | 过滤满额账号，选择未满额账号 |
+| 所有候选 Fable 都明确满额 | 返回 `TooManyRequests` |
+| 非 Fable 模型请求 | 忽略 `seven_day_fable`，保持普通 sticky / 调度行为 |
+| SetupToken 账号带 `seven_day_fable` 脏缓存 | 忽略该窗口，保持 sticky |
+| sticky 账号 RPM 饱和 | 不触发 Fable fallback，保持等待/本地 429 |
+| Fable OAuth 429 命中 `seven_day` 或 `five_hour` | 写账号级冷却并返回 `Quarantined` |
+| Fable OAuth 429 未命中通用窗口 | 返回 `RetryOtherAccount`，不写全局冷却 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：用户会话 sticky 到账号 A，A 的 `seven_day_fable` 为 100% 且 3 天后 reset；同 token 允许账号 B，Gateway 对本次 Fable 请求选择 B，真实上游成功后把 session 绑定到 B。
+- Good：A 的普通周限额 `seven_day` 也为 100%；Fable 429 必须隔离 A 到通用 reset 时间，而不是继续换号重试导致所有模型都反复撞墙。
+- Base：没有 `request_model`、模型不是 Fable、或开关关闭时，`AccountSelectionContext::disabled()` 兼容旧行为。
+- Bad：把 `seven_day_fable.utilization >= 97` 当成耗尽，会过早打破 sticky 并降低 prompt cache 命中率。
+- Bad：发现 sticky Fable 满额后直接 `delete_session`，没有替代账号时用户后续非 Fable 请求也会丢失原 sticky。
+
+### 6. Tests Required
+
+- `tests/account_scheduler_test.rs` 覆盖：sticky Fable 满额选择替代账号、替代账号可重绑、无替代账号返回 429 且旧 sticky 保留、开关关闭保持原 sticky、非 Fable 请求不受影响、非 sticky Fable 过滤满额账号、SetupToken 忽略脏 Fable usage。
+- `src/service/account.rs` 单测覆盖：Fable OAuth 429 的 `RetryOtherAccount` 优先于 credit pass-through、cached Fable 未满仍可返回模型级重试、通用 `seven_day` / `five_hour` 仍走 `Quarantined`、SetupToken Fable credit 保持旧 `PassThrough`。
+- `src/store/db.rs` 单测覆盖：迁移会插入 `fable_sticky_quota_fallback_enabled` 默认值。
+- Settings 改动后必须运行 `cc2api/web` 的 `npm run build`，确保控件绑定和类型推断可构建。
+- 后端改动后至少运行 `cargo fmt --check`、`cargo test`；settings / handler / gateway 同时改动时再跑 `git diff --check`。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+if usage_hit(account.usage_data, "seven_day_fable", USAGE_HIT_THRESHOLD) {
+    self.cache.delete_session(session_hash).await?;
+    exclude_ids.push(account.id);
+}
+```
+
+```rust
+match rate_limit_decision {
+    RateLimitDecision::Quarantined | RateLimitDecision::RetryOtherAccount => return last_resp,
+    _ => {}
+}
+```
+
+#### Correct
+
+```rust
+if context.is_fable_quota_fallback_active() && account_fable_quota_exhausted(&account) {
+    runtime_exclude_ids.push(account.id);
+    let _ = self
+        .cache
+        .set_session_account_id(session_hash, account.id, STICKY_SESSION_TTL)
+        .await;
+}
+```
+
+```rust
+match rate_limit_decision {
+    RateLimitDecision::RetryOtherAccount => exclude_ids.push(account.id),
+    RateLimitDecision::Quarantined => return last_resp,
+    _ => {}
+}
+```
+
 ## 设置热刷新模式
 
 新增全局 setting 通常要经过这些位置：

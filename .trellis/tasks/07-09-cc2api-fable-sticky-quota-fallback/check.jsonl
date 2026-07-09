@@ -1,0 +1,5 @@
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"检查 Gateway 热路径、账号调度、RPM admission、sticky 会话和 OAuth usage scoped Fable 行为是否符合规范。"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"检查新增全局 setting 是否完整覆盖默认值、DB 默认插入、管理 API 校验、reload 和老库兼容。"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"检查 Settings 页面新增开关是否使用真实 key、控件值域正确、构建通过且未绕过 API client。"}
+{"file":".trellis/tasks/archive/2026-07/07-02-cc2api-rpm-after-queue-slot/brief.md","reason":"回归检查 sticky RPM 饱和不切号、非粘性 RPM 饱和可换号和槽位释放风险。"}
+{"file":".trellis/tasks/archive/2026-06/06-12-cc2api-2-1-173-packet-diff/research/cc2api-2-1-173-capture-diff.md","reason":"检查实现未改变 Fable 请求画像、CCH、beta、fallbacks 或 `[1m]` 归一边界。"}

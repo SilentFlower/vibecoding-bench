@@ -1,0 +1,5 @@
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"实现 Gateway 热路径、账号调度、RPM、sticky 会话、OAuth usage scoped Fable 窗口和 Fable 请求后 usage 刷新时必须遵守。"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"新增全局 setting 时必须同步默认值、DB 默认插入、管理 API 校验、Gateway 热缓存和前端 Settings。"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"实现 Settings 页面开关时必须遵守 settings UI、API client、类型同步和构建规则。"}
+{"file":".trellis/tasks/archive/2026-06/06-12-cc2api-2-1-173-packet-diff/research/cc2api-2-1-173-capture-diff.md","reason":"确认 Fable 主请求模型归一、Fable `[1m]` 与普通 Fable 的请求画像边界，避免误改协议画像。"}
+{"file":".trellis/tasks/archive/2026-07/07-02-cc2api-rpm-after-queue-slot/prd.md","reason":"保留粘性 RPM 饱和不切号、非粘性 RPM 饱和可换号的既有验收语义。"}
