@@ -1,5 +1,5 @@
 {
-  "flowerVersion": "0.4.8",
+  "flowerVersion": "0.4.11",
   "variant": "0.6",
   "version": "0.6.5",
   "skills": [
@@ -56,11 +56,6 @@
   "updateCheck": {
     "enabled": true,
     "policy": "ask",
-    "intervalHours": 8,
-    "lastCheckedAt": null,
-    "lastRemote": null,
-    "lastReleaseNotes": null,
-    "lastStatus": "offline",
-    "lastErrorCode": "fetch_failed"
+    "intervalHours": 8
   }
 }
