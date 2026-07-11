@@ -22,5 +22,29 @@
   "parent": null,
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {},
+  "last_push_snapshot": {
+    "snapshot_at": "2026-07-11T19:19:29Z",
+    "branch": {
+      "cc2api": "main",
+      "vibecoding-bench": "main"
+    },
+    "pushed_commits": {
+      "cc2api": "6c9b1cc",
+      "vibecoding-bench": "ac2a163"
+    },
+    "push_mode": "push",
+    "completed_steps": [
+      "Step 1 扩展账号模型与校验",
+      "Step 2 扩展数据库与 store",
+      "Step 3 扩展 cache 抽象",
+      "Step 4 接入 Gateway / Rewriter",
+      "Step 5 前端账号配置",
+      "Step 6 任务收敛",
+      "Phase 2.2 check-all",
+      "Phase 3.3 spec update"
+    ],
+    "next_step": "Phase 3.5 wrap-up / finish-work（需用户显式要求）",
+    "notes": "账号级上游 session 池已实现并通过 cargo fmt --check、cargo test、cargo test cch、web npm run build、git diff --check；本轮已推送业务代码和任务/spec 记录。"
+  }
 }
