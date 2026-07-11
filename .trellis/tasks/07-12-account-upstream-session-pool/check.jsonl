@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "检查实现是否遵守 Gateway 热路径、账号选择、RPM 和 body/header rewrite 顺序。"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "检查账号字段是否完成 model/store/schema/migration/API/frontend 同步。"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "检查测试覆盖、日志隐私和 stateful cache / 调度回归。"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "检查前端账号配置 UI、类型同步和构建验证。"}
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "检查 Claude Code 协议字段改写是否在 CCH/cc_version 前完成并保持 header/body 一致。"}

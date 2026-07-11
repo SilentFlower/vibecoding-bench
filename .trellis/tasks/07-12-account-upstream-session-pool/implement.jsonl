@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "约束 Gateway 热路径、账号调度、RPM admission 和 body rewrite 顺序。"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "约束账号字段、SQLite/PostgreSQL schema、migration、store、handler 和前端同步。"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "约束后端测试、敏感日志边界和账号调度/stateful cache 回归验证。"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "约束 Accounts 管理页、TypeScript 类型和前端构建规则。"}
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "约束 Claude Code metadata、CCH、cc_version 和协议画像改写顺序。"}
