@@ -1617,3 +1617,39 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 47: 账号级上游 session 池
+
+**Date**: 2026-07-12
+**Task**: 账号级上游 session 池
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+完成 cc2api 账号级上游 session 池：新增账号配置、SQLite/PostgreSQL 迁移、Redis/Memory 池状态、Gateway/Rewriter session 改写、遥测只读映射、本地 stateful cache 真实 session 隔离和 Accounts 管理 UI；通过 cargo fmt --check、cargo test、cargo test cch、web npm run build、git diff --check，并补充 backend code-spec 与 release 操作说明。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6c9b1cc` | (see git log) |
+| `ac2a163` | (see git log) |
+| `d9cffd2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
