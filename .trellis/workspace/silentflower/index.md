@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 47
+- **Total Sessions**: 48
 - **Last Active**: 2026-07-12
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1655 | Active |
+| `journal-1.md` | ~1690 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 48 | 2026-07-12 | 修复上游 session 池一致性问题 | `55efee7`, `994c2e9` | `main` |
 | 47 | 2026-07-12 | 账号级上游 session 池 | `6c9b1cc`, `ac2a163`, `d9cffd2` | `main` |
 | 46 | 2026-07-09 | 完成 cc2api Fable sticky 满额切号 | `5b76504`, `954afa6`, `ea78d71` | `main` |
 | 45 | 2026-07-08 | 支持账号软删除并部署 | `b2233c4`, `d46ded4` | `main` |
