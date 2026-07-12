@@ -22,5 +22,29 @@
   "parent": null,
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {},
+  "last_push_snapshot": {
+    "snapshot_at": "2026-07-12T03:10:42.017Z",
+    "branch": {
+      "cc2api": "main",
+      "vibecoding-bench": "main"
+    },
+    "pushed_commits": {
+      "cc2api": "55efee7",
+      "vibecoding-bench": "994c2e9"
+    },
+    "push_mode": "push",
+    "completed_steps": [
+      "Step 1 扩展池状态与接口",
+      "Step 2 修复 MemoryStore",
+      "Step 3 修复 Redis 原子脚本",
+      "Step 4 修复 Header 与遥测链路",
+      "Step 5 规格同步",
+      "Step 6 验证",
+      "Phase 2.2 check-all",
+      "Phase 3.3 spec update"
+    ],
+    "next_step": "Phase 3.5 wrap-up / finish-work（需用户显式要求）",
+    "notes": "业务代码与任务/spec 记录已提交并推送；cargo fmt、全量 cargo test、cargo test cch、Web build、diff 与敏感信息检查通过。Redis Lua 因当前环境无 redis-server，仅完成源码原子语义审查。"
+  }
 }
