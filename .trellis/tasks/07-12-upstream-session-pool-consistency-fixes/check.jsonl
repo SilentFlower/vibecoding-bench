@@ -1,0 +1,6 @@
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"检查显式映射、LRU 缩容、Gateway 顺序、header/body/telemetry 一致性和失败开放。"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"检查测试覆盖、全量 Rust 验证、敏感日志边界和跨实现一致性。"}
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"检查 Claude Code header 改写没有破坏 CCH、cc_version、beta 和 telemetry 画像。"}
+{"file":".trellis/tasks/07-12-upstream-session-pool-consistency-fixes/prd.md","reason":"对照三个缺陷、LRU 决策和验收标准进行实现正确性检查。"}
+{"file":".trellis/tasks/07-12-upstream-session-pool-consistency-fixes/design.md","reason":"核对 Redis/Memory 数据模型、原子算法、映射 TTL 和遥测只读语义。"}
+{"file":".trellis/tasks/07-12-upstream-session-pool-consistency-fixes/research/flow-session-header-body.md","reason":"检查 header 对齐范围符合正常请求抓包基线，且没有误改 warmup probe 特殊路径。"}

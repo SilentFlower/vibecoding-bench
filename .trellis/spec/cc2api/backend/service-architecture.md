@@ -48,7 +48,7 @@ src/tlsfp/
 - 账号默认值：默认关闭；推荐容量 `3`；默认 TTL `60` 分钟；默认策略 `mapped_request`。
 - 校验范围：容量允许 `0` 或 `1..=20`，`0` 等价关闭；TTL 允许 `5..=1440`；策略只允许 `mapped_request` / `owner_only`。
 - cache 入口：`CacheStore::resolve_upstream_session_pool(account_id, real_session_id, pool_size, ttl, refresh_policy, allow_insert).await -> Result<UpstreamSessionPoolResolve, AppError>`。
-- 状态入口：`CacheStore::get_upstream_session_pool_status(account_id, ttl).await -> Result<UpstreamSessionPoolStatus, AppError>`。
+- 状态入口：`CacheStore::get_upstream_session_pool_status(account_id, pool_size, ttl).await -> Result<UpstreamSessionPoolStatus, AppError>`。
 - Gateway 入口：`GatewayService::build_upstream_session_rewrite(account, path, body_map, client_type).await -> UpstreamSessionRewrite`。
 - Rewriter 入口：`Rewriter::rewrite_body_with_stateful_completion(..., upstream_session_rewrite, ...)`。
 - 管理端字段：`upstream_session_pool_active_count`、`upstream_session_pool_capacity`、`upstream_session_pool_oldest_last_seen_ms`、`upstream_session_pool_newest_last_seen_ms`。
@@ -58,13 +58,15 @@ src/tlsfp/
 - 上游 session 池只影响最终发往 Anthropic 的 Claude Code `/v1/messages` body/header；账号选择、sticky、RPM admission、队列和内部日志仍必须使用真实下游 session。
 - 池成员必须来自真实进入 gateway 的 Claude Code session id，不能随机预生成，也不能按时间窗口合成。
 - Gateway 必须先完成账号选择、并发槽位和 RPM admission，再解析 upstream session pool；解析结果进入 body rewrite，且必须早于 CCH、`cc_version` 和 `X-Claude-Code-Session-Id` 生成。
-- Redis 实现必须用 Lua 或等价原子机制覆盖懒清理、成员判断、容量判断、入池、稳定映射和 TTL 刷新；MemoryStore 必须用 mutex 保持同等语义。
-- 池满映射必须按活跃成员稳定排序后用 `stable_upstream_session_hash(real_session_id) % active_count` 选择，避免轮询导致同一真实 session 在请求间频繁切换上游 session。
+- Redis 实现必须用 Lua 或等价原子机制覆盖懒清理、LRU 容量收敛、成员判断、显式映射校验、入池和 TTL 刷新；MemoryStore 必须用 mutex 保持同等语义。
+- 首次池满映射按活跃成员稳定排序后用 `stable_upstream_session_hash(real_session_id) % active_count` 选择，并保存 `real_session_id -> upstream_session_id` 显式映射；只要目标仍活跃，成员集合变化不能让同一真实 session 重新取模。
+- 容量缩小时必须按 `(last_seen, session_id)` 从旧到新淘汰，下一次 resolve/status 后活跃成员数不得超过当前容量；指向过期或被淘汰目标的映射必须立即逻辑失效。
 - `mapped_request` 会刷新被借用 upstream session 的 `last_seen`；`owner_only` 只在真实 session 自己是池成员且发起请求时刷新。
 - Redis 或 cache 解析异常必须失败开放：记录脱敏 warn，保持真实 session 发上游，不阻断用户请求。
 - 本地 stateful message cache key 必须优先使用真实 session；共享 upstream session 不能让多个真实 session 共用本地 cache 状态。
-- 自动 message telemetry 必须从改写后的最终 body 构造 context，使 request/result event 使用 upstream session。
-- 客户端原生 event_logging 只能做只读 session 映射，`allow_insert=false`，不得因为遥测 payload 创建新的池成员；找不到映射、池为空或 cache 出错时失败开放。
+- 只有池解析结果满足 `real_session_id != upstream_session_id`、即 body session 确实改变时，才覆盖 `X-Claude-Code-Session-Id`；admitted/owner-hit 和 warmup 特殊路径不得被无条件规范化。
+- 自动 message telemetry 必须从改写后的最终 body 构造 context，使 request/result event 与实际覆盖后的 body/header 使用同一 upstream session。
+- 客户端原生 event_logging 只能只读复用已保存且目标仍活跃的 session 映射，`allow_insert=false`，不得创建成员、刷新 TTL 或按当前成员集合临时重新取模；找不到映射、池为空或 cache 出错时失败开放。
 - 日志只能输出短 session hash、账号 id、容量、动作和原因，不得输出完整 `metadata.user_id`、完整 session id 或完整请求体。
 - Accounts UI 必须同步 `web/src/api.ts` 类型和 `Accounts.vue` 表单/列表展示；保存前可做基础校验，但以后端校验为最终真相。
 
@@ -79,6 +81,9 @@ src/tlsfp/
 | 刷新策略未知 | 管理 API 返回 `BadRequest` |
 | 池未满且主请求带真实 session | 真实 session 入池并作为 upstream session |
 | 池已满且新真实 session 请求 | 请求继续，body/header 复用池内已有 upstream session |
+| 容量从 5 调小到 2 | 下一次 resolve/status 淘汰最久未活跃成员，活跃数收敛到 2 |
+| 已保存映射的其他成员加入或过期 | 目标仍活跃时继续复用原 upstream session，不重新取模 |
+| 已保存映射目标过期或被淘汰 | 旧映射失效；主请求可重新映射，event_logging 只读 lookup 返回无映射 |
 | Redis pool 解析失败 | 失败开放，记录脱敏 warn，使用真实 session 发上游 |
 | event_logging 只有根级 session 字段且无 `events` 数组 | 递归尝试只读映射，不能因为结构不标准而直接绕过 |
 | event_logging session 无映射或池为空 | 保持现有遥测改写行为，不创建池成员，不阻断请求 |
@@ -86,18 +91,21 @@ src/tlsfp/
 ### 5. Good/Base/Bad Cases
 
 - Good：账号容量为 3，前 3 个真实 session 进入后成为池成员，第 4 个真实 session 稳定映射到其中一个成员；sticky、RPM 和队列仍按第 4 个真实 session 计算。
+- Good：第 4 个真实 session 的显式映射目标仍活跃时，即使其他池成员发生增删，它仍复用原 upstream session；容量缩小时优先淘汰 `last_seen` 最旧成员。
 - Good：`mapped_request` 下借用请求会延长被借用 upstream session 的 TTL，减少上游会话边界变动；`owner_only` 下借用请求不刷新 TTL，便于池自然轮换。
 - Good：stateful cache 日志只输出短 hash，cache key 内部用真实 session 隔离，不把共享 upstream session 暴露到日志。
 - Base：功能关闭或容量为 0 时，rewriter 仍只改写 `device_id` / `account_uuid`，保留原始 session 语义。
 - Bad：在账号选择或 RPM admission 前用 upstream session 替换真实 session，会把多个下游 session 合并到同一个 sticky/RPM 维度。
 - Bad：event_logging 映射时使用 `allow_insert=true`，会让没有主请求的遥测 payload 扩大上游 session 池。
+- Bad：event_logging 没有显式映射时按当前成员重新取模，会让延迟遥测和对应主请求使用不同 upstream session。
+- Bad：无条件用 body session 覆盖所有 `/v1/messages` header，会抹平抓包中 warmup probe 的合法特殊行为。
 - Bad：stateful cache key 直接从最终 body 取 session，会让多个真实 session 因共享 upstream session 而污染本地 cache 状态。
 
 ### 6. Tests Required
 
-- `src/store/memory.rs` 单测覆盖：容量上限、稳定映射、只读 lookup 不创建成员、`mapped_request` 刷新借用成员、`owner_only` 不刷新借用成员、TTL 懒清理。
-- Redis Lua 变更需人工核对原子脚本，必要时补集成测试；至少确认并发入池不会超过容量。
-- `src/service/rewriter.rs` 单测覆盖：JSON/legacy `metadata.user_id.session_id` 改写、`X-Claude-Code-Session-Id` 与最终 body 对齐、stateful cache key 使用真实 session、event_logging 递归只读映射和无 `events` 数组路径。
+- `src/store/memory.rs` 单测覆盖：容量上限、LRU 缩容、显式映射在其他成员变化时稳定、目标失效、只读 lookup 不创建/不刷新/不重哈希、两种刷新策略和 TTL 懒清理。
+- Redis Lua 变更需人工核对原子脚本，必要时补集成测试；至少确认并发入池不超容量、缩容后不返回被淘汰目标、只读遥测不写状态。
+- Gateway/Rewriter 单测覆盖：JSON/legacy `metadata.user_id.session_id` 改写、只在池实际改变 session 时对齐 `X-Claude-Code-Session-Id`、自动 telemetry 与最终 body/header 一致、无改写时保留 header、stateful cache key 使用真实 session、event_logging 递归只读映射和无 `events` 数组路径。
 - `src/store/account_store.rs` / integration 测试覆盖账号字段 create/update/list round trip。
 - 管理端变更必须跑 `cd cc2api/web && npm run build`，确认 TypeScript 类型和 `Accounts.vue` 同步。
 - 完整检查至少跑 `cd cc2api && cargo fmt --check && cargo test`；协议改写触碰 CCH 顺序时额外跑 `cargo test cch`。

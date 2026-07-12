@@ -1,0 +1,5 @@
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"实现 Gateway 热路径、账号级上游 session 池、遥测和 stateful cache 隔离时遵守既有跨层契约。"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"补充 MemoryStore、Redis 语义、header/body 对齐和遥测回归测试，并执行 Rust 全量检查。"}
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"修改 Claude Code session header 时保持现有 header、CCH、cc_version、beta 和 telemetry 协议画像。"}
+{"file":".trellis/tasks/archive/2026-07/07-12-account-upstream-session-pool/design.md","reason":"复用原任务的池成员来源、刷新策略、失败开放、遥测和本地缓存隔离设计边界。"}
+{"file":".trellis/tasks/07-12-upstream-session-pool-consistency-fixes/research/flow-session-header-body.md","reason":"依据脱敏 flows 样本，只在池实际改变 body session 时对齐 header，并保留 warmup probe 特殊行为。"}
