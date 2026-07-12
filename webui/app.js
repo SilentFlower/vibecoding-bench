@@ -125,6 +125,7 @@ async function renderAccounts() {
       <td><strong>${escapeHTML(a.name)}</strong></td>
       <td><code>${escapeHTML(a.profile_path)}</code></td>
       <td>${renderProxyEndpoint(a)}</td>
+      <td>${renderAccountTimezone(a)}</td>
       <td>${renderOauthTokenStatus(a)}</td>
       <td>${a.enabled ? '✓' : '✗'}</td>
       <td>
@@ -133,7 +134,7 @@ async function renderAccounts() {
         <button class="btn btn-sm btn-danger" data-del="${a.id}">删除</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="7" class="muted empty-cell">暂无账号</td></tr>';
+  `).join('') || '<tr><td colspan="8" class="muted empty-cell">暂无账号</td></tr>';
 
   body.onclick = async (e) => {
     const id = e.target.dataset.del;
@@ -192,6 +193,15 @@ function renderProxyEndpoint(account) {
   const scheme = account.upstream_proxy_scheme || 'socks5';
   const port = account.upstream_socks5_port ? `:${escapeHTML(account.upstream_socks5_port)}` : '';
   return `<code>${escapeHTML(scheme)}://${escapeHTML(account.upstream_socks5_host)}${port}</code>`;
+}
+
+function renderAccountTimezone(account) {
+  const timezone = account.effective_timezone || account.timezone || '-';
+  const mode = account.timezone_mode === 'manual' ? 'manual' : 'auto';
+  return `
+    <code>${escapeHTML(timezone)}</code>
+    <div class="muted">${escapeHTML(mode)}</div>
+  `;
 }
 
 function openQuotaDetail(accountId, quota) {
@@ -300,6 +310,7 @@ function openAccLoginModal(account = null) {
   form.reset();
   state.accLogin = account ? { mode: 'relogin', accountId: account.id } : { mode: 'new' };
   form.elements.upstream_proxy_scheme.value = account?.upstream_proxy_scheme || 'socks5';
+  form.elements.timezone.value = account?.timezone || '';
   if (account) {
     form.elements.name.value = account.name || '';
     form.elements.upstream_socks5_host.value = account.upstream_socks5_host || '';

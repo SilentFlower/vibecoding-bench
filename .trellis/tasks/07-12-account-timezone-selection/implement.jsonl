@@ -1,0 +1,8 @@
+{"file": ".trellis/tasks/07-12-account-timezone-selection/prd.md", "reason": "任务需求、允许时区范围和验收标准。"}
+{"file": ".trellis/tasks/07-12-account-timezone-selection/design.md", "reason": "账号 timezone 数据模型、API 契约和 worker 环境设计。"}
+{"file": ".trellis/tasks/07-12-account-timezone-selection/implement.md", "reason": "实施顺序、验证命令和风险点。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md", "reason": "SQLite schema 新列、_ensure_column、写锁和兼容策略。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/directory-structure.md", "reason": "确认单文件 FastAPI 分节和账号路由放置方式。"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/component-guidelines.md", "reason": "WebUI 原生 modal 表单、事件绑定和列表渲染规范。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/remote-deploy.md", "reason": "远程部署和 worker 环境变量验证约束。"}
+{"file": ".trellis/tasks/archive/2026-05/05-25-account-env-fingerprint-isolation/design.md", "reason": "原账号指纹隔离设计，确认 TZ 派生和不加入 Asia/Shanghai 的背景。"}

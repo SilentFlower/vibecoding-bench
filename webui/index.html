@@ -77,7 +77,7 @@
         <table class="data">
           <thead><tr>
             <th>id</th><th>name</th><th>profile</th>
-            <th>upstream proxy</th><th>access token</th><th>on</th><th>op</th>
+            <th>upstream proxy</th><th>timezone</th><th>access token</th><th>on</th><th>op</th>
           </tr></thead>
           <tbody id="accounts-body"></tbody>
         </table>
@@ -370,6 +370,22 @@
         <label><span class="lbl">$ name</span>
           <span class="hint inline">本地账号标签（独一无二即可）</span>
           <input name="name" required pattern="[A-Za-z0-9_\-]+" placeholder="main" />
+        </label>
+        <label><span class="lbl">$ timezone</span>
+          <span class="hint inline">auto = 按账号名从内置池派生；不包含 Asia/Shanghai</span>
+          <select name="timezone">
+            <option value="">auto</option>
+            <option value="Asia/Tokyo">Asia/Tokyo</option>
+            <option value="Asia/Singapore">Asia/Singapore</option>
+            <option value="Asia/Seoul">Asia/Seoul</option>
+            <option value="Australia/Sydney">Australia/Sydney</option>
+            <option value="Europe/London">Europe/London</option>
+            <option value="Europe/Berlin">Europe/Berlin</option>
+            <option value="Europe/Paris">Europe/Paris</option>
+            <option value="America/Los_Angeles">America/Los_Angeles</option>
+            <option value="America/New_York">America/New_York</option>
+            <option value="America/Chicago">America/Chicago</option>
+          </select>
         </label>
         <label class="paste-helper">
           <span class="lbl">$ proxy_url <span class="muted">// paste &amp; auto-fill</span></span>

@@ -600,6 +600,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   upstream_socks5_port INTEGER,
   upstream_socks5_user TEXT,
   upstream_socks5_pass TEXT,
+  timezone TEXT,
   enabled INTEGER DEFAULT 1,
   deleted_at REAL,
   created_at REAL DEFAULT (julianday('now'))
@@ -716,6 +717,7 @@ def init_db() -> None:
         with conn:
             conn.executescript(_SCHEMA)
             _ensure_column(conn, "accounts", "upstream_proxy_scheme", "TEXT DEFAULT 'socks5'")
+            _ensure_column(conn, "accounts", "timezone", "TEXT")
             _ensure_column(conn, "accounts", "deleted_at", "REAL")
             _ensure_column(conn, "tasks", "batch_id", "INTEGER")
             _ensure_column(conn, "tasks", "topic_id", "INTEGER")
@@ -875,6 +877,7 @@ def _restore_deleted_account(
     upstream_socks5_port: Optional[int],
     upstream_socks5_user: Optional[str],
     upstream_socks5_pass: Optional[str],
+    timezone: Optional[str],
     enabled: int,
 ) -> int:
     """
@@ -888,13 +891,14 @@ def _restore_deleted_account(
     :param upstream_socks5_port: 上游代理端口
     :param upstream_socks5_user: 上游代理用户名
     :param upstream_socks5_pass: 上游代理密码
+    :param timezone: 账号显式时区；None 表示自动派生
     :param enabled: 恢复后的启用状态
     :return: 恢复后的账号 ID
     """
     conn.execute(
         "UPDATE accounts SET profile_path=?, upstream_proxy_scheme=?, "
         "upstream_socks5_host=?, upstream_socks5_port=?, upstream_socks5_user=?, "
-        "upstream_socks5_pass=?, enabled=?, deleted_at=NULL WHERE id=?",
+        "upstream_socks5_pass=?, timezone=?, enabled=?, deleted_at=NULL WHERE id=?",
         (
             f"profiles/{name}",
             proxy_scheme,
@@ -902,6 +906,7 @@ def _restore_deleted_account(
             upstream_socks5_port,
             upstream_socks5_user,
             upstream_socks5_pass,
+            timezone,
             enabled,
             account_id,
         ),
@@ -1330,6 +1335,51 @@ def derive_fingerprint(account_name: str) -> dict[str, str]:
     }
 
 
+def _normalize_account_timezone(value: Optional[str]) -> Optional[str]:
+    """
+    规范化账号显式时区，空值表示沿用账号名派生。
+
+    :param value: 前端或 DB 传入的时区值
+    :return: 允许列表内的 IANA 时区名；空值返回 None
+    """
+    if value is None:
+        return None
+    timezone = value.strip()
+    if not timezone:
+        return None
+    if timezone not in _TZ_POOL:
+        raise ValueError(
+            "invalid account timezone: must be one of "
+            + ", ".join(_TZ_POOL)
+        )
+    return timezone
+
+
+def _effective_account_timezone(
+    account_or_name: dict | str,
+    explicit_timezone: Optional[str] = None,
+) -> str:
+    """
+    计算账号实际用于 worker 环境变量的时区。
+
+    :param account_or_name: accounts 表行字典或账号名
+    :param explicit_timezone: 临时显式时区；None 时读取账号行 `timezone`
+    :return: 显式时区或账号名派生时区
+    """
+    if isinstance(account_or_name, str):
+        account_name = account_or_name
+        timezone = explicit_timezone
+    else:
+        account_name = str(account_or_name["name"])
+        timezone = (
+            explicit_timezone
+            if explicit_timezone is not None
+            else account_or_name.get("timezone")
+        )
+    normalized = _normalize_account_timezone(timezone)
+    return normalized or derive_fingerprint(account_name)["tz"]
+
+
 def _wait_sidecar_ready(client: "docker.DockerClient", sidecar_id: str) -> None:
     """
     等 sidecar 自己的透明代理与通用 DNS resolver 就绪。
@@ -1384,9 +1434,10 @@ class Runner:
         sidecar_name = f"bench-sidecar-{run_id}"
         worker_name = f"bench-worker-{run_id}"
         acc_name = account["name"]
-        # 账号派生指纹:同账号每次 run 拿到一致的 hostname/MAC/TZ/LANG/machine-id,
-        # 跨账号则不同,避免 Anthropic 端把多账号识别为同台机器
+        # 账号派生指纹:同账号每次 run 拿到一致的 hostname/MAC/LANG/machine-id,
+        # TZ 允许显式覆盖；未配置时仍按账号名派生,跨账号保持差异化。
         fp = derive_fingerprint(acc_name)
+        tz = _effective_account_timezone(account)
 
         # 容器内创建运行目录（docker 会按宿主路径挂载到子容器）
         (BENCH_DATA / "workspaces" / run_id).mkdir(parents=True, exist_ok=True)
@@ -1439,7 +1490,7 @@ class Runner:
             "CLAUDE_BUSY_INTERRUPT_GRACE_SEC": str(CLAUDE_BUSY_INTERRUPT_GRACE_SEC),
             "CLAUDE_API_STALL_RECOVERY_PROMPT": CLAUDE_API_STALL_RECOVERY_PROMPT,
             "OAUTH_REFRESH_BUFFER_SEC": str(OAUTH_REFRESH_BUFFER_SEC),
-            "TZ": fp["tz"],
+            "TZ": tz,
             "LANG": fp["lang"],
             "LC_ALL": fp["lang"],
         }
@@ -1612,6 +1663,7 @@ class Runner:
         worker_name = f"bench-continue-worker-{sid}"
         acc_name = account["name"]
         fp = derive_fingerprint(acc_name)
+        tz = _effective_account_timezone(account)
         CA_DIR.mkdir(parents=True, exist_ok=True)
         workspace_dir = WORKSPACES_DIR / run["id"]
         claude_home_dir = workspace_dir / ".claude-home"
@@ -1685,7 +1737,7 @@ class Runner:
                     "ACC_NAME": acc_name,
                     "CLAUDE_CODE_VERSION": claude_code_version,
                     "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
-                    "TZ": fp["tz"],
+                    "TZ": tz,
                     "LANG": fp["lang"],
                     "LC_ALL": fp["lang"],
                     "CONTINUE_SESSION_ID": session_id,
@@ -1712,6 +1764,7 @@ class Runner:
         worker_name = f"bench-quota-worker-{sid}"
         acc_name = account["name"]
         fp = derive_fingerprint(acc_name)
+        tz = _effective_account_timezone(account)
         temp_run_id = f"quota-{sid}"
         temp_workspace = WORKSPACES_DIR / temp_run_id
         temp_home = temp_workspace / ".claude-home"
@@ -1767,7 +1820,7 @@ class Runner:
                         "ACC_NAME": acc_name,
                         "CLAUDE_CODE_VERSION": claude_code_version,
                         "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
-                        "TZ": fp["tz"],
+                        "TZ": tz,
                         "LANG": fp["lang"],
                         "LC_ALL": fp["lang"],
                     },
@@ -1952,6 +2005,7 @@ JS
             sidecar_name = f"bench-oauth-refresh-sidecar-{sid}"
             worker_name = f"bench-oauth-refresh-worker-{sid}"
             fp = derive_fingerprint(acc_name)
+            tz = _effective_account_timezone(account)
             temp_run_id = f"oauth-refresh-{sid}"
             temp_workspace = WORKSPACES_DIR / temp_run_id
             temp_home = temp_workspace / ".claude-home"
@@ -2006,7 +2060,7 @@ JS
                         "ACC_NAME": acc_name,
                         "CLAUDE_CODE_VERSION": claude_code_version,
                         "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
-                        "TZ": fp["tz"],
+                        "TZ": tz,
                         "LANG": fp["lang"],
                         "LC_ALL": fp["lang"],
                     },
@@ -2242,11 +2296,27 @@ class LoginManager:
         except Exception:
             pass
 
-    def start(self, name: str, proxy: dict, force_reauth: bool = False) -> LoginSession:
+    def start(
+        self,
+        name: str,
+        proxy: dict,
+        force_reauth: bool = False,
+        timezone: Optional[str] = None,
+    ) -> LoginSession:
+        """
+        启动账号 OAuth 登录容器。
+
+        :param name: 账号 profile 名
+        :param proxy: 上游代理配置
+        :param force_reauth: 是否使用一次性 profile 副本强制重授权
+        :param timezone: 登录 worker 显式时区；None 表示按账号名自动派生
+        :return: 登录会话对象
+        """
         if not _ACC_NAME_RE.match(name):
             raise ValueError(
                 "invalid account name: must match [a-zA-Z0-9_-]+"
             )
+        tz = _effective_account_timezone(name, timezone)
         with self._lock:
             if name in self._name_locks:
                 raise ValueError(
@@ -2288,8 +2358,8 @@ class LoginManager:
             worker_name = f"bench-login-worker-{sid}"
             sidecar_id: Optional[str] = None
             worker_network: str = "bridge"
-            # login 模式与 task 模式共用同一派生指纹,确保 OAuth 时和后续 API
-            # 调用在 Anthropic 端看起来是同一台机器
+            # login 模式与 task 模式共用同一派生指纹；TZ 使用同一套显式优先规则，
+            # 确保 OAuth 时和后续 API 调用在 Anthropic 端看起来是同一台机器。
             fp = derive_fingerprint(name)
 
             # 有代理才起 sidecar；没填的话直走宿主默认网络（用户自担风险）
@@ -2340,7 +2410,7 @@ class LoginManager:
                     "HOME": WORKER_HOME,
                     "ACC_NAME": name,
                     "CLAUDE_CODE_VERSION": claude_code_version,
-                    "TZ": fp["tz"],
+                    "TZ": tz,
                     "LANG": fp["lang"],
                     "LC_ALL": fp["lang"],
                 },
@@ -3555,6 +3625,7 @@ class AccountIn(BaseModel):
     """账号创建请求体，包含兼容旧字段名的上游代理配置。"""
 
     name: str
+    timezone: Optional[str] = None
     upstream_proxy_scheme: Optional[str] = None
     upstream_socks5_host: Optional[str] = None
     upstream_socks5_port: Optional[int] = None
@@ -3575,6 +3646,7 @@ def create_account(body: AccountIn):
         )
     try:
         proxy_scheme = _normalize_upstream_proxy_scheme(body.upstream_proxy_scheme)
+        timezone = _normalize_account_timezone(body.timezone)
     except ValueError as e:
         raise HTTPException(400, str(e))
     with _db_lock:
@@ -3595,6 +3667,7 @@ def create_account(body: AccountIn):
                         body.upstream_socks5_port,
                         body.upstream_socks5_user,
                         body.upstream_socks5_pass,
+                        timezone,
                         int(body.enabled),
                     )
                     return {"id": account_id, "restored": True}
@@ -3602,13 +3675,13 @@ def create_account(body: AccountIn):
                 columns = (
                     "id, name, profile_path, upstream_proxy_scheme, "
                     "upstream_socks5_host, upstream_socks5_port, "
-                    "upstream_socks5_user, upstream_socks5_pass, enabled"
+                    "upstream_socks5_user, upstream_socks5_pass, timezone, enabled"
                 ) if restored_account_id is not None else (
                     "name, profile_path, upstream_proxy_scheme, "
                     "upstream_socks5_host, upstream_socks5_port, "
-                    "upstream_socks5_user, upstream_socks5_pass, enabled"
+                    "upstream_socks5_user, upstream_socks5_pass, timezone, enabled"
                 )
-                values_sql = "(?,?,?,?,?,?,?,?,?)" if restored_account_id is not None else "(?,?,?,?,?,?,?,?)"
+                values_sql = "(?,?,?,?,?,?,?,?,?,?)" if restored_account_id is not None else "(?,?,?,?,?,?,?,?,?)"
                 base_values = (
                     body.name,
                     f"profiles/{body.name}",
@@ -3617,6 +3690,7 @@ def create_account(body: AccountIn):
                     body.upstream_socks5_port,
                     body.upstream_socks5_user,
                     body.upstream_socks5_pass,
+                    timezone,
                     int(body.enabled),
                 )
                 values = ((restored_account_id,) + base_values) if restored_account_id is not None else base_values
@@ -3645,6 +3719,13 @@ def list_accounts():
             account["upstream_proxy_scheme"] = _normalize_upstream_proxy_scheme(
                 account.get("upstream_proxy_scheme")
             )
+            timezone = _normalize_account_timezone(account.get("timezone"))
+            account["timezone"] = timezone
+            account["effective_timezone"] = _effective_account_timezone(
+                account,
+                timezone,
+            )
+            account["timezone_mode"] = "manual" if timezone else "auto"
             account.update(_read_account_oauth_status(account["name"]))
             accounts.append(account)
         return accounts
@@ -3706,6 +3787,7 @@ class LoginStartIn(BaseModel):
     """添加账号第一步：起 login 会话，配置代理走 OAuth。"""
 
     name: str
+    timezone: Optional[str] = None
     upstream_proxy_scheme: Optional[str] = None
     upstream_socks5_host: Optional[str] = None
     upstream_socks5_port: Optional[int] = None
@@ -3721,6 +3803,7 @@ def login_start(body: LoginStartIn):
         raise HTTPException(500, "login manager not ready")
     try:
         proxy_scheme = _normalize_upstream_proxy_scheme(body.upstream_proxy_scheme)
+        timezone = _normalize_account_timezone(body.timezone)
         session = login_manager.start(
             body.name,
             {
@@ -3731,6 +3814,7 @@ def login_start(body: LoginStartIn):
                 "pass": body.upstream_socks5_pass,
             },
             body.force_reauth,
+            timezone,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -3877,6 +3961,7 @@ def login_commit(sid: str, body: LoginStartIn):
         raise HTTPException(400, "name mismatch with session")
     try:
         proxy_scheme = _normalize_upstream_proxy_scheme(body.upstream_proxy_scheme)
+        timezone = _normalize_account_timezone(body.timezone)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -3938,13 +4023,13 @@ def login_commit(sid: str, body: LoginStartIn):
                     columns = (
                         "id, name, profile_path, upstream_proxy_scheme, "
                         "upstream_socks5_host, upstream_socks5_port, "
-                        "upstream_socks5_user, upstream_socks5_pass, enabled"
+                        "upstream_socks5_user, upstream_socks5_pass, timezone, enabled"
                     ) if restored_account_id is not None else (
                         "name, profile_path, upstream_proxy_scheme, "
                         "upstream_socks5_host, upstream_socks5_port, "
-                        "upstream_socks5_user, upstream_socks5_pass, enabled"
+                        "upstream_socks5_user, upstream_socks5_pass, timezone, enabled"
                     )
-                    values_sql = "(?,?,?,?,?,?,?,?,?)" if restored_account_id is not None else "(?,?,?,?,?,?,?,?)"
+                    values_sql = "(?,?,?,?,?,?,?,?,?,?)" if restored_account_id is not None else "(?,?,?,?,?,?,?,?,?)"
                     values: tuple[object, ...]
                     base_values = (
                         name,
@@ -3954,6 +4039,7 @@ def login_commit(sid: str, body: LoginStartIn):
                         body.upstream_socks5_port,
                         body.upstream_socks5_user,
                         body.upstream_socks5_pass,
+                        timezone,
                         1,
                     )
                     values = ((restored_account_id,) + base_values) if restored_account_id is not None else base_values
@@ -3967,7 +4053,7 @@ def login_commit(sid: str, body: LoginStartIn):
                     conn.execute(
                         "UPDATE accounts SET profile_path=?, upstream_proxy_scheme=?, upstream_socks5_host=?, "
                         "upstream_socks5_port=?, upstream_socks5_user=?, "
-                        "upstream_socks5_pass=?, enabled=1, deleted_at=NULL WHERE name=?",
+                        "upstream_socks5_pass=?, timezone=?, enabled=1, deleted_at=NULL WHERE name=?",
                         (
                             f"profiles/{name}",
                             proxy_scheme,
@@ -3975,6 +4061,7 @@ def login_commit(sid: str, body: LoginStartIn):
                             body.upstream_socks5_port,
                             body.upstream_socks5_user,
                             body.upstream_socks5_pass,
+                            timezone,
                             name,
                         ),
                     )

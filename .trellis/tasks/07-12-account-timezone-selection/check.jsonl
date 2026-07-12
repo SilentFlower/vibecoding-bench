@@ -1,0 +1,6 @@
+{"file": ".trellis/tasks/07-12-account-timezone-selection/prd.md", "reason": "检查实现是否满足需求和验收标准。"}
+{"file": ".trellis/tasks/07-12-account-timezone-selection/design.md", "reason": "检查数据模型、API 契约和兼容性是否按设计实现。"}
+{"file": ".trellis/tasks/07-12-account-timezone-selection/implement.md", "reason": "检查实施清单和验证命令是否完成。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md", "reason": "检查 SQLite 新列、写入路径和连接关闭是否符合规范。"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/component-guidelines.md", "reason": "检查 WebUI 表单、列表渲染和 escapeHTML 使用。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/remote-deploy.md", "reason": "检查部署后 worker TZ 验证路径和远程兼容性。"}
