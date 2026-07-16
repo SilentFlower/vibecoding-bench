@@ -1688,3 +1688,44 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## 会话 49：账号时区选择与 Flower 工作流更新
+
+**日期**：2026-07-16
+**任务**：账号时区选择与 Flower 工作流更新
+**包**：vibecoding-bench
+**分支**：`main`
+
+### 摘要
+
+完成账号时区选择功能与 Flower 0.4.12-beta.2 工作流更新并推送；补充镜像发布和远程部署操作单，归档当前唯一活动任务。
+
+### 主要变更
+
+- 账号创建与重新登录支持显式时区选择，登录容器和任务 worker 使用账号有效时区。
+- Flower 工作流更新到 0.4.12-beta.2，并将旧 push snapshot 机制迁移为任务 progress。
+- 为账号时区任务补充镜像发布、远程升级、回滚和上线后验证操作单。
+- 将 `07-12-account-timezone-selection` 标记完成并移动到 2026-07 归档目录。
+
+### Git 提交
+
+| 哈希 | 消息 |
+|------|---------|
+| `4b02980` | `feat(account): 支持账号时区选择` |
+| `5b7e769` | `chore(trellis): 更新 Flower 工作流到 0.4.12-beta.2` |
+| `a21785e` | `chore(task): update account-timezone-selection progress` |
+
+### 验证
+
+- 任务实现阶段的检查记录和进度已确认完成。
+- 本次归档前确认 `main` 与 `origin/main` 同步、工作区无未提交业务代码、无冲突或未完成 Git 集成状态。
+- release、归档和 journal 变更通过 `git diff --check`。
+
+### 状态
+
+**已完成并归档**
+
+### 后续步骤
+
+- 按归档任务的 `release.md` 构建并推送三镜像，暂停远程运行任务后重新部署并验证账号时区。
