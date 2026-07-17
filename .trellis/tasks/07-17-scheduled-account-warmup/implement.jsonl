@@ -1,0 +1,11 @@
+{"file":".trellis/spec/vibecoding-bench/backend/database-guidelines.md","reason":"实现 accounts 养号字段、唯一绑定索引、幂等迁移和调度事务时必须遵循裸 SQLite 与 _db_lock 契约。"}
+{"file":".trellis/spec/vibecoding-bench/backend/error-handling.md","reason":"新增账号同步、绑定和后台调度错误需要区分 HTTPException、ValueError 与后台容错路径。"}
+{"file":".trellis/spec/vibecoding-bench/backend/quality-guidelines.md","reason":"约束后台线程、外部 HTTP IO、账号信号量、Docker 生命周期和中文公开 API 文档。"}
+{"file":".trellis/spec/vibecoding-bench/frontend/component-guidelines.md","reason":"Accounts 养号 modal、状态列和 Runs badge 必须复用现有原生 JS template/render/modal 模式。"}
+{"file":".trellis/spec/vibecoding-bench/frontend/state-management.md","reason":"新增 cc2api 账号摘要和养号状态要进入现有全局 state 并显式刷新。"}
+{"file":".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md","reason":"检查 escapeHTML、主题、响应式布局和零构建前端回归。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/image-build-push.md","reason":"managed OAuth worker 必须遵循 credentials 新鲜度、原子写入、401 恢复和敏感数据契约。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/remote-deploy.md","reason":"新增 cc2api 连接环境变量和远程 compose 配置需保持部署契约完整。"}
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"新增凭据解析接口会触及 AccountService OAuth 刷新锁和管理路由边界。"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"确认 cc2api Account 字段、SQLite/PostgreSQL 兼容和敏感字段同步边界。"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"Rust 测试、敏感 fixture、日志脱敏和全量 cargo test 的质量要求。"}

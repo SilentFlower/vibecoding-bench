@@ -22,6 +22,9 @@ import shutil
 import sqlite3
 import threading
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -68,6 +71,12 @@ _RUNTIME_EFFORT_SETTING_KEY = "claude_effort_level"
 _RUNTIME_CLAUDE_CODE_VERSION_SETTING_KEY = "claude_code_version"
 _CLAUDE_EFFORT_LEVELS = ("max", "xhigh", "high", "medium", "low")
 _UPSTREAM_PROXY_SCHEMES = ("http", "socks5", "socks5h")
+CC2API_BASE_URL = os.environ.get("CC2API_BASE_URL", "").strip().rstrip("/")
+CC2API_ADMIN_PASSWORD = os.environ.get("CC2API_ADMIN_PASSWORD", "")
+CC2API_REQUEST_TIMEOUT_SEC = float(os.environ.get("CC2API_REQUEST_TIMEOUT_SEC", "15"))
+WARMUP_SCHEDULER_TICK_SEC = float(os.environ.get("WARMUP_SCHEDULER_TICK_SEC", "30"))
+WARMUP_SYNC_RETRY_SEC = int(os.environ.get("WARMUP_SYNC_RETRY_SEC", "900"))
+_CC2API_SECRET_RE = re.compile(r"(?:sk|ant)-[A-Za-z0-9_\-]{12,}")
 
 
 def _normalize_claude_model_name(value: Optional[str], field_name: str) -> Optional[str]:
@@ -250,6 +259,9 @@ OAUTH_REFRESH_INTERVAL_SEC = 60
 OAUTH_REFRESH_BUFFER_SEC = 10 * 60
 _profile_locks: dict[str, threading.Lock] = {}
 _profile_locks_lock = threading.Lock()
+_oauth_owner_locks: dict[str, threading.Lock] = {}
+_oauth_owner_locks_lock = threading.Lock()
+_cc2api_binding_lock = threading.Lock()
 
 
 def _profile_lock(account_name: str) -> threading.Lock:
@@ -263,6 +275,19 @@ def _profile_lock(account_name: str) -> threading.Lock:
         if account_name not in _profile_locks:
             _profile_locks[account_name] = threading.Lock()
         return _profile_locks[account_name]
+
+
+def _oauth_owner_lock(account_name: str) -> threading.Lock:
+    """
+    获取账号 OAuth 所有权切换锁。
+
+    :param account_name: accounts.name 字段
+    :return: 串行化 worker 启动与 cc2api 绑定切换的账号级锁
+    """
+    with _oauth_owner_locks_lock:
+        if account_name not in _oauth_owner_locks:
+            _oauth_owner_locks[account_name] = threading.Lock()
+        return _oauth_owner_locks[account_name]
 
 
 def _usage_input_tokens(usage: dict) -> int:
@@ -512,6 +537,592 @@ def _read_account_oauth_status(account_name: str) -> dict[str, object]:
     return result
 
 
+# ============== cc2api 集成 ==============
+def _redact_cc2api_error(value: object) -> str:
+    """
+    生成可展示的 cc2api 错误摘要，同时移除可能混入的凭据。
+
+    :param value: 下游错误字段或异常文本
+    :return: 最长 300 字符的脱敏摘要
+    """
+    text = str(value or "cc2api 请求失败")
+    text = _CC2API_SECRET_RE.sub("***", text)
+    return text[:300]
+
+
+def _mask_email(value: object) -> str:
+    """
+    对账号邮箱做最小展示脱敏。
+
+    :param value: 原始邮箱
+    :return: 脱敏邮箱；格式异常时返回空字符串
+    """
+    email = str(value or "").strip()
+    if "@" not in email:
+        return ""
+    local, domain = email.split("@", 1)
+    if not local or not domain:
+        return ""
+    visible = local[:2]
+    return f"{visible}{'*' * max(3, len(local) - len(visible))}@{domain}"
+
+
+def _normalize_identity_value(value: object) -> str:
+    """
+    规范化账号身份匹配字段。
+
+    :param value: 邮箱或 UUID 原始值
+    :return: trim 后的小写字符串
+    """
+    return str(value or "").strip().lower()
+
+
+def _cc2api_error_detail_is_permanent(detail: str) -> bool:
+    """
+    从 cc2api 脱敏错误类别识别不应自动重试的凭据问题。
+
+    :param detail: cc2api 返回的错误摘要
+    :return: invalid_grant、账号状态或凭据结构错误返回 True
+    """
+    lowered = detail.lower()
+    return any(
+        marker in lowered
+        for marker in (
+            "invalid_grant",
+            "not found",
+            "不是 active",
+            "not active",
+            "不是 oauth",
+            "not oauth",
+            "refresh token is empty",
+            "refresh token 为空",
+            "credentials are incomplete",
+            "credentials missing",
+            "凭据不完整",
+            "凭据缺少",
+            "账号不存在",
+            "账号已禁用",
+            "账号不是 active",
+            "账号不是 oauth",
+        )
+    )
+
+
+class Cc2ApiClient:
+    """封装 orchestrator 到 cc2api 管理 API 的受信任调用。"""
+
+    def __init__(
+        self,
+        base_url: str,
+        admin_password: str,
+        timeout_sec: float,
+    ) -> None:
+        """
+        初始化 cc2api 客户端。
+
+        :param base_url: cc2api 根地址
+        :param admin_password: 管理 API Bearer 密码
+        :param timeout_sec: 单次请求超时秒数
+        :return: None
+        """
+        self.base_url = base_url.rstrip("/")
+        self.admin_password = admin_password
+        self.timeout_sec = max(1.0, float(timeout_sec))
+
+    def is_configured(self) -> bool:
+        """
+        判断 cc2api 集成是否具备最小配置。
+
+        :return: base URL 和管理密码都存在时返回 True
+        """
+        return bool(self.base_url and self.admin_password)
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        body: Optional[dict] = None,
+    ) -> dict:
+        """
+        发送管理 API JSON 请求。
+
+        :param method: HTTP 方法
+        :param path: 以 `/` 开头的管理 API 路径
+        :param body: 可选 JSON 请求体
+        :return: JSON object 响应
+        """
+        if not self.is_configured():
+            raise ValueError("cc2api 集成尚未配置")
+        payload = None
+        if body is not None:
+            payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        request = urllib.request.Request(
+            f"{self.base_url}{path}",
+            data=payload,
+            method=method,
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.admin_password}",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout_sec) as response:
+                raw = response.read(2 * 1024 * 1024)
+        except urllib.error.HTTPError as exc:
+            raw = exc.read(4096)
+            detail = f"HTTP {exc.code}"
+            try:
+                data = json.loads(raw.decode("utf-8", errors="replace"))
+                if isinstance(data, dict):
+                    detail = _redact_cc2api_error(data.get("error") or data.get("detail") or detail)
+            except json.JSONDecodeError:
+                pass
+            message = f"cc2api 请求失败：{detail}"
+            if _cc2api_error_detail_is_permanent(detail):
+                raise ValueError(message) from exc
+            if exc.code in (401, 403, 408, 429) or exc.code >= 500:
+                raise ConnectionError(message) from exc
+            raise ValueError(message) from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            raise ConnectionError("cc2api 请求失败：网络不可用") from exc
+
+        try:
+            data = json.loads(raw.decode("utf-8")) if raw else {}
+        except json.JSONDecodeError as exc:
+            raise ValueError("cc2api 响应不是有效 JSON") from exc
+        if not isinstance(data, dict):
+            raise ValueError("cc2api 响应必须是 JSON object")
+        return data
+
+    def list_accounts(self) -> list[dict]:
+        """
+        分页读取全部 cc2api 账号。
+
+        :return: cc2api Account object 列表
+        """
+        page = 1
+        accounts: list[dict] = []
+        while True:
+            data = self._request("GET", f"/admin/accounts?page={page}&page_size=100")
+            rows = data.get("data")
+            if not isinstance(rows, list):
+                raise ValueError("cc2api 账号列表响应无效")
+            accounts.extend(row for row in rows if isinstance(row, dict))
+            total_pages = int(data.get("total_pages") or 1)
+            if page >= total_pages:
+                return accounts
+            page += 1
+
+    def create_account(self, payload: dict) -> dict:
+        """
+        创建 cc2api OAuth 账号。
+
+        :param payload: cc2api CreateAccountRequest 字段
+        :return: 新建后的 Account object
+        """
+        return self._request("POST", "/admin/accounts", payload)
+
+    def resolve_credentials(
+        self,
+        account_id: int,
+        min_validity_seconds: int,
+        force_refresh: bool = False,
+    ) -> dict:
+        """
+        在 cc2api 账号锁内解析 OAuth 凭据。
+
+        :param account_id: cc2api 账号 ID
+        :param min_validity_seconds: AT 最小剩余有效期
+        :param force_refresh: 是否强制刷新一次
+        :return: AT、RT 和 expires_at 快照
+        """
+        data = self._request(
+            "POST",
+            f"/admin/accounts/{account_id}/oauth-credentials/resolve",
+            {
+                "min_validity_seconds": int(min_validity_seconds),
+                "force_refresh": bool(force_refresh),
+            },
+        )
+        if int(data.get("account_id") or 0) != int(account_id):
+            raise ValueError("cc2api 凭据账号 ID 不匹配")
+        access_token = data.get("access_token")
+        refresh_token = data.get("refresh_token")
+        expires_at = data.get("expires_at")
+        if not isinstance(access_token, str) or not access_token:
+            raise ValueError("cc2api 凭据缺少 access_token")
+        if not isinstance(refresh_token, str) or not refresh_token:
+            raise ValueError("cc2api 凭据缺少 refresh_token")
+        if not isinstance(expires_at, (int, float)):
+            raise ValueError("cc2api 凭据缺少 expires_at")
+        return {
+            "account_id": int(account_id),
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "expires_at": int(expires_at),
+        }
+
+    def refresh_usage(self, account_id: int) -> dict:
+        """
+        通过 cc2api 账号服务刷新 OAuth usage。
+
+        :param account_id: cc2api 账号 ID
+        :return: cc2api usage handler 响应
+        """
+        return self._request("POST", f"/admin/accounts/{account_id}/usage")
+
+
+cc2api_client = Cc2ApiClient(
+    CC2API_BASE_URL,
+    CC2API_ADMIN_PASSWORD,
+    CC2API_REQUEST_TIMEOUT_SEC,
+)
+
+
+def _read_bench_profile_identity(account_name: str) -> dict:
+    """
+    读取同步 cc2api 所需的 bench OAuth profile 字段。
+
+    :param account_name: bench accounts.name
+    :return: 经过结构校验的身份与凭据字段
+    """
+    profile_dir = PROFILES_DIR / account_name
+    credentials_path = profile_dir / ".credentials.json"
+    top_config_path = profile_dir / ".claude.json"
+    try:
+        credentials = json.loads(credentials_path.read_text(encoding="utf-8"))
+        top_config = json.loads(top_config_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError("bench profile 文件不完整") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("bench profile JSON 无效") from exc
+    oauth = credentials.get("claudeAiOauth") if isinstance(credentials, dict) else None
+    oauth_account = top_config.get("oauthAccount") if isinstance(top_config, dict) else None
+    if not isinstance(oauth, dict) or not isinstance(oauth_account, dict):
+        raise ValueError("bench profile OAuth 身份信息不完整")
+    access_token = oauth.get("accessToken")
+    refresh_token = oauth.get("refreshToken")
+    expires_at = oauth.get("expiresAt")
+    email = oauth_account.get("emailAddress")
+    if not isinstance(access_token, str) or not access_token:
+        raise ValueError("bench profile 缺少 access token")
+    if not isinstance(refresh_token, str) or not refresh_token:
+        raise ValueError("bench profile 缺少 refresh token")
+    if not isinstance(expires_at, (int, float)):
+        raise ValueError("bench profile 缺少 expiresAt")
+    if not isinstance(email, str) or not email.strip():
+        raise ValueError("bench profile 缺少 emailAddress")
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "expires_at": int(expires_at),
+        "subscription_type": str(oauth.get("subscriptionType") or "").strip() or None,
+        "email": email.strip(),
+        "account_uuid": str(oauth_account.get("accountUuid") or "").strip() or None,
+        "organization_uuid": str(oauth_account.get("organizationUuid") or "").strip() or None,
+    }
+
+
+def _account_proxy_url(account: dict) -> str:
+    """
+    把 bench 分列代理配置转换为 cc2api proxy_url。
+
+    :param account: bench accounts 行
+    :return: 完整代理 URL；未配置代理时返回空字符串
+    """
+    host = str(account.get("upstream_socks5_host") or "").strip()
+    if not host:
+        return ""
+    scheme = _normalize_upstream_proxy_scheme(account.get("upstream_proxy_scheme"))
+    port = int(account.get("upstream_socks5_port") or 1080)
+    user = urllib.parse.quote(str(account.get("upstream_socks5_user") or ""), safe="")
+    password = urllib.parse.quote(str(account.get("upstream_socks5_pass") or ""), safe="")
+    auth = ""
+    if user:
+        auth = user
+        if password:
+            auth += f":{password}"
+        auth += "@"
+    return f"{scheme}://{auth}{host}:{port}"
+
+
+def _sync_cc2api_credentials_to_profile(account_name: str, snapshot: dict) -> None:
+    """
+    用 cc2api 最终凭据原子更新 bench profile。
+
+    :param account_name: bench 账号名
+    :param snapshot: `Cc2ApiClient.resolve_credentials` 返回值
+    :return: None
+    """
+    with _profile_lock(account_name):
+        _sync_cc2api_credentials_to_profile_locked(account_name, snapshot)
+
+
+def _sync_cc2api_credentials_to_profile_locked(
+    account_name: str,
+    snapshot: dict,
+) -> None:
+    """
+    在已持有 profile 锁时写入 cc2api 凭据。
+
+    :param account_name: bench 账号名
+    :param snapshot: `Cc2ApiClient.resolve_credentials` 返回值
+    :return: None
+    """
+    access_token = snapshot.get("access_token")
+    refresh_token = snapshot.get("refresh_token")
+    expires_at = snapshot.get("expires_at")
+    if not isinstance(access_token, str) or not access_token:
+        raise ValueError("cc2api 凭据缺少 access_token")
+    if not isinstance(refresh_token, str) or not refresh_token:
+        raise ValueError("cc2api 凭据缺少 refresh_token")
+    if not isinstance(expires_at, (int, float)):
+        raise ValueError("cc2api 凭据缺少 expires_at")
+    credentials_path = PROFILES_DIR / account_name / ".credentials.json"
+    try:
+        data = json.loads(credentials_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError("bench profile 缺少凭据文件") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("bench profile 凭据 JSON 无效") from exc
+    oauth = data.get("claudeAiOauth") if isinstance(data, dict) else None
+    if not isinstance(oauth, dict):
+        raise ValueError("bench profile 缺少 claudeAiOauth")
+    oauth["accessToken"] = access_token
+    oauth["refreshToken"] = refresh_token
+    oauth["expiresAt"] = int(expires_at)
+    tmp_path = credentials_path.with_name(
+        f"{credentials_path.name}.tmp.{uuid.uuid4().hex}"
+    )
+    fd: Optional[int] = None
+    try:
+        # 凭据临时文件从创建时就必须是 0600，避免原子替换前出现短暂明文暴露窗口。
+        fd = os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            fd = None
+            stream.write(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        tmp_path.replace(credentials_path)
+    finally:
+        if fd is not None:
+            os.close(fd)
+        try:
+            tmp_path.unlink()
+        except FileNotFoundError:
+            pass
+    _make_worker_owned(credentials_path)
+    os.chmod(credentials_path, 0o600)
+
+
+def _resolve_and_sync_cc2api_credentials(
+    account_name: str,
+    cc2api_account_id: int,
+    min_validity_seconds: int,
+    force_refresh: bool = False,
+) -> dict:
+    """
+    串行完成 cc2api 凭据解析与 profile 落盘。
+
+    :param account_name: bench 账号名
+    :param cc2api_account_id: cc2api 账号 ID
+    :param min_validity_seconds: access token 最小剩余有效期
+    :param force_refresh: 是否强制刷新一次
+    :return: cc2api 最终凭据快照
+    """
+    validity = max(60, min(7200, int(min_validity_seconds)))
+    with _profile_lock(account_name):
+        snapshot = cc2api_client.resolve_credentials(
+            int(cc2api_account_id),
+            validity,
+            force_refresh,
+        )
+        _sync_cc2api_credentials_to_profile_locked(account_name, snapshot)
+        return snapshot
+
+
+def _write_json_atomically(path: Path, payload: dict) -> None:
+    """
+    原子写入内部状态 JSON，避免 worker 读取半截标记文件。
+
+    :param path: 目标 JSON 路径
+    :param payload: 可 JSON 序列化的状态对象
+    :return: None
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f"{path.name}.tmp.{uuid.uuid4().hex}")
+    tmp_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    tmp_path.replace(path)
+    _make_worker_owned(path)
+
+
+def _cc2api_account_is_active_oauth(account: dict) -> bool:
+    """
+    判断 cc2api 账号是否可作为 bench 的 OAuth 凭据来源。
+
+    :param account: cc2api Account object
+    :return: active OAuth 账号返回 True
+    """
+    return (
+        str(account.get("status") or "").lower() == "active"
+        and str(account.get("auth_type") or "").lower() == "oauth"
+    )
+
+
+def _cc2api_account_summary(account: dict) -> dict:
+    """
+    生成允许返回 WebUI 的 cc2api 账号摘要。
+
+    :param account: cc2api Account object
+    :return: 不含 token、代理和设备画像的脱敏摘要
+    """
+    return {
+        "id": int(account.get("id") or 0),
+        "name": str(account.get("name") or ""),
+        "email_masked": _mask_email(account.get("email")),
+        "status": str(account.get("status") or ""),
+        "auth_type": str(account.get("auth_type") or ""),
+        "account_uuid_present": bool(_normalize_identity_value(account.get("account_uuid"))),
+    }
+
+
+def _validate_cc2api_identity(profile: dict, cc2api_account: dict) -> None:
+    """
+    校验显式选择的 cc2api 账号与 bench profile 属于同一身份。
+
+    :param profile: `_read_bench_profile_identity` 返回值
+    :param cc2api_account: cc2api Account object
+    :return: None
+    """
+    bench_uuid = _normalize_identity_value(profile.get("account_uuid"))
+    cc_uuid = _normalize_identity_value(cc2api_account.get("account_uuid"))
+    bench_email = _normalize_identity_value(profile.get("email"))
+    cc_email = _normalize_identity_value(cc2api_account.get("email"))
+    if bench_uuid:
+        if not cc_uuid or cc_uuid != bench_uuid:
+            raise ValueError("cc2api 账号 UUID 与 bench profile 不匹配")
+        return
+    if not bench_email or cc_email != bench_email:
+        raise ValueError("cc2api 账号邮箱与 bench profile 不匹配")
+
+
+def _find_cc2api_account_for_profile(profile: dict, accounts: list[dict]) -> Optional[dict]:
+    """
+    按 UUID 优先、邮箱兜底规则查找现有 cc2api 账号。
+
+    :param profile: `_read_bench_profile_identity` 返回值
+    :param accounts: cc2api 账号列表
+    :return: 唯一匹配账号；没有匹配时返回 None
+    """
+    bench_uuid = _normalize_identity_value(profile.get("account_uuid"))
+    bench_email = _normalize_identity_value(profile.get("email"))
+    if bench_uuid:
+        uuid_matches = [
+            account
+            for account in accounts
+            if _normalize_identity_value(account.get("account_uuid")) == bench_uuid
+        ]
+        if len(uuid_matches) > 1:
+            raise ValueError("多个 cc2api 账号使用了同一个 account UUID")
+        email_conflicts = [
+            account
+            for account in accounts
+            if _normalize_identity_value(account.get("email")) == bench_email
+            and _normalize_identity_value(account.get("account_uuid"))
+            and _normalize_identity_value(account.get("account_uuid")) != bench_uuid
+        ]
+        if email_conflicts:
+            raise ValueError("cc2api 中存在相同邮箱但 account UUID 不同的账号")
+        return uuid_matches[0] if uuid_matches else None
+
+    email_matches = [
+        account
+        for account in accounts
+        if _normalize_identity_value(account.get("email")) == bench_email
+    ]
+    if len(email_matches) > 1:
+        raise ValueError("多个 cc2api 账号使用了同一个邮箱")
+    return email_matches[0] if email_matches else None
+
+
+def _sync_bound_account_credentials_locked(
+    account: dict,
+    min_validity_seconds: int,
+    force_refresh: bool = False,
+) -> dict:
+    """
+    在已持有 OAuth owner lock 时解析并镜像绑定账号凭据。
+
+    :param account: bench accounts 行
+    :param min_validity_seconds: 本次运行要求的最小 AT 有效期
+    :param force_refresh: 是否要求 cc2api 强制刷新一次
+    :return: cc2api 最终凭据快照
+    """
+    cc2api_account_id = account.get("cc2api_account_id")
+    if cc2api_account_id is None:
+        raise ValueError("bench 账号尚未绑定 cc2api")
+    return _resolve_and_sync_cc2api_credentials(
+        str(account["name"]),
+        int(cc2api_account_id),
+        min_validity_seconds,
+        force_refresh,
+    )
+
+
+def _sync_bound_account_credentials(
+    account: dict,
+    min_validity_seconds: int,
+    force_refresh: bool = False,
+) -> dict:
+    """
+    在账号所有权锁内重读绑定并镜像 cc2api 最终凭据。
+
+    :param account: 调用方读取的 bench accounts 行
+    :param min_validity_seconds: 本次运行要求的最小 AT 有效期
+    :param force_refresh: 是否要求 cc2api 强制刷新一次
+    :return: cc2api 最终凭据快照
+    """
+    account_id = account.get("id")
+    account_name = str(account.get("name") or "")
+    expected_binding = account.get("cc2api_account_id")
+    if account_id is None or not account_name:
+        raise ValueError("bench 账号信息不完整")
+    if expected_binding is None:
+        raise ValueError("bench 账号尚未绑定 cc2api")
+
+    with _oauth_owner_lock(account_name):
+        conn = get_db()
+        try:
+            current_row = _get_available_account(conn, int(account_id))
+            if not current_row:
+                raise ValueError("bench 账号不存在或已停用")
+            current = dict(current_row)
+        finally:
+            conn.close()
+        current_binding = current.get("cc2api_account_id")
+        if current_binding is None or int(current_binding) != int(expected_binding):
+            raise ValueError("bench 账号的 cc2api 绑定已变化，请重试")
+        return _sync_bound_account_credentials_locked(
+            current,
+            min_validity_seconds,
+            force_refresh,
+        )
+
+
+def _cc2api_error_is_permanent(exc: Exception) -> bool:
+    """
+    区分需要暂停养号的永久错误与可重试网络错误。
+
+    :param exc: cc2api 调用异常
+    :return: 非网络类 ValueError 返回 True
+    """
+    return isinstance(exc, ValueError) and not isinstance(exc, ConnectionError)
+
+
 def _claude_exec_env(use_sidecar: bool, extra: Optional[dict[str, str]] = None) -> dict[str, str]:
     """
     生成 docker exec 启动 Claude 子命令时必须显式传入的环境变量。
@@ -601,6 +1212,16 @@ CREATE TABLE IF NOT EXISTS accounts (
   upstream_socks5_user TEXT,
   upstream_socks5_pass TEXT,
   timezone TEXT,
+  cc2api_account_id INTEGER,
+  warmup_enabled INTEGER DEFAULT 0,
+  warmup_interval_min_hours INTEGER DEFAULT 3,
+  warmup_interval_max_hours INTEGER DEFAULT 5,
+  warmup_next_run_at REAL,
+  warmup_last_attempt_at REAL,
+  warmup_last_run_id TEXT,
+  warmup_last_status TEXT,
+  warmup_last_error TEXT,
+  warmup_auth_failures INTEGER DEFAULT 0,
   enabled INTEGER DEFAULT 1,
   deleted_at REAL,
   created_at REAL DEFAULT (julianday('now'))
@@ -719,6 +1340,22 @@ def init_db() -> None:
             _ensure_column(conn, "accounts", "upstream_proxy_scheme", "TEXT DEFAULT 'socks5'")
             _ensure_column(conn, "accounts", "timezone", "TEXT")
             _ensure_column(conn, "accounts", "deleted_at", "REAL")
+            _ensure_column(conn, "accounts", "cc2api_account_id", "INTEGER")
+            _ensure_column(conn, "accounts", "warmup_enabled", "INTEGER DEFAULT 0")
+            _ensure_column(
+                conn, "accounts", "warmup_interval_min_hours", "INTEGER DEFAULT 3"
+            )
+            _ensure_column(
+                conn, "accounts", "warmup_interval_max_hours", "INTEGER DEFAULT 5"
+            )
+            _ensure_column(conn, "accounts", "warmup_next_run_at", "REAL")
+            _ensure_column(conn, "accounts", "warmup_last_attempt_at", "REAL")
+            _ensure_column(conn, "accounts", "warmup_last_run_id", "TEXT")
+            _ensure_column(conn, "accounts", "warmup_last_status", "TEXT")
+            _ensure_column(conn, "accounts", "warmup_last_error", "TEXT")
+            _ensure_column(
+                conn, "accounts", "warmup_auth_failures", "INTEGER DEFAULT 0"
+            )
             _ensure_column(conn, "tasks", "batch_id", "INTEGER")
             _ensure_column(conn, "tasks", "topic_id", "INTEGER")
             _ensure_column(conn, "tasks", "status", "TEXT DEFAULT 'active'")
@@ -732,6 +1369,10 @@ def init_db() -> None:
             _ensure_column(conn, "runs", "capture_summary_path", "TEXT")
             _ensure_column(conn, "runs", "capture_model_override", "TEXT")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_batch ON runs(batch_id)")
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_cc2api_account_id "
+                "ON accounts(cc2api_account_id) WHERE cc2api_account_id IS NOT NULL"
+            )
             _seed_topics_if_empty(conn)
     finally:
         conn.close()
@@ -1454,6 +2095,7 @@ class Runner:
         host_profile = HOST_BENCH_DATA / "profiles" / acc_name
         host_ca = HOST_BENCH_DATA / "ca"
         capture_full_http = bool(task.get("capture_full_http"))
+        managed_oauth = account.get("cc2api_account_id") is not None
         claude_code_version = effective_claude_code_version()
         sidecar_env = _sidecar_proxy_env(account)
         sidecar_env.update({
@@ -1494,6 +2136,16 @@ class Runner:
             "LANG": fp["lang"],
             "LC_ALL": fp["lang"],
         }
+        if managed_oauth:
+            worker_env["CC2API_MANAGED_OAUTH"] = "1"
+            for marker_name in (
+                ".cc2api-oauth-refresh-request.json",
+                ".cc2api-oauth-refresh-result.json",
+            ):
+                try:
+                    (WORKSPACES_DIR / run_id / marker_name).unlink()
+                except FileNotFoundError:
+                    pass
         model_override = task.get("model_override")
         if isinstance(model_override, str) and model_override:
             # 只给当前 worker 进程传一次性模型覆盖，避免污染账号 profile settings。
@@ -1649,6 +2301,72 @@ class Runner:
                 # 容器可能已经被 remove
                 pass
 
+    def watch_managed_oauth_refresh(
+        self,
+        run_id: str,
+        account: dict,
+        stop_event: threading.Event,
+    ) -> None:
+        """
+        监听 managed worker 的单次 401 刷新请求并交给 cc2api 处理。
+
+        :param run_id: 当前 runs.id
+        :param account: 已绑定 cc2api 的 bench accounts 行
+        :param stop_event: worker 收口后用于停止 watcher 的事件
+        :return: None
+        """
+        workspace = WORKSPACES_DIR / run_id
+        request_path = workspace / ".cc2api-oauth-refresh-request.json"
+        result_path = workspace / ".cc2api-oauth-refresh-result.json"
+        while not stop_event.wait(1):
+            if not request_path.exists():
+                continue
+            try:
+                _sync_bound_account_credentials(account, 600, force_refresh=True)
+                _write_json_atomically(result_path, {"ok": True})
+            except Exception as exc:
+                _write_json_atomically(
+                    result_path,
+                    {"ok": False, "error": _redact_cc2api_error(exc)},
+                )
+            return
+
+    def sync_managed_credentials_to_worker(self, worker_id: str) -> None:
+        """
+        把 profile 最新 AT 同步到 continue worker，并从运行副本移除 RT。
+
+        :param worker_id: continue worker 容器 ID
+        :return: None
+        """
+        script = """
+const fs = require('fs');
+const src = '/mnt/profile/.credentials.json';
+const dst = `${process.env.HOME}/.claude/.credentials.json`;
+const data = JSON.parse(fs.readFileSync(src, 'utf8'));
+const oauth = data && data.claudeAiOauth;
+if (!oauth || typeof oauth.accessToken !== 'string' || !oauth.accessToken) {
+  throw new Error('managed OAuth credentials invalid');
+}
+delete oauth.refreshToken;
+const tmp = `${dst}.tmp.${process.pid}`;
+fs.writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+fs.renameSync(tmp, dst);
+"""
+        api = self.client.api
+        ex = api.exec_create(
+            worker_id,
+            ["node", "-e", script],
+            stdout=True,
+            stderr=True,
+            user=WORKER_USER,
+            environment={"HOME": WORKER_HOME},
+            workdir=WORKER_HOME,
+        )
+        api.exec_start(ex["Id"])
+        inspected = api.exec_inspect(ex["Id"])
+        if inspected.get("ExitCode") not in (0, None):
+            raise ValueError("同步 managed OAuth 凭据到继续对话 worker 失败")
+
     def start_continue(self, sid: str, run: dict, account: dict, session_id: str) -> tuple[str, str]:
         """
         启动一个继续对话容器。
@@ -1668,6 +2386,16 @@ class Runner:
         workspace_dir = WORKSPACES_DIR / run["id"]
         claude_home_dir = workspace_dir / ".claude-home"
         profile_dir = PROFILES_DIR / acc_name
+        managed_oauth = account.get("cc2api_account_id") is not None
+        if managed_oauth:
+            for marker_name in (
+                ".cc2api-oauth-refresh-request.json",
+                ".cc2api-oauth-refresh-result.json",
+            ):
+                try:
+                    (workspace_dir / marker_name).unlink()
+                except FileNotFoundError:
+                    pass
         _copy_profile_whitelist_to_claude_home(profile_dir, claude_home_dir)
         top_config = claude_home_dir / ".claude.json"
         if top_config.exists():
@@ -1676,6 +2404,7 @@ class Runner:
 
         host_workspace = HOST_BENCH_DATA / "workspaces" / run["id"]
         host_claude_home = HOST_BENCH_DATA / "workspaces" / run["id"] / ".claude-home"
+        host_profile = HOST_BENCH_DATA / "profiles" / acc_name
         host_ca = HOST_BENCH_DATA / "ca"
         continue_capture_dirs = _resolve_capture_flows_dirs(run, ensure_exists=True)
         sidecar_volumes = {str(host_ca): {"bind": "/ca", "mode": "rw"}}
@@ -1729,6 +2458,11 @@ class Runner:
                     str(host_workspace): {"bind": "/workspace", "mode": "rw"},
                     str(host_claude_home): {"bind": f"{WORKER_HOME}/.claude", "mode": "rw"},
                     str(host_ca): {"bind": "/etc/mitm", "mode": "ro"},
+                    **(
+                        {str(host_profile): {"bind": "/mnt/profile", "mode": "rw"}}
+                        if managed_oauth
+                        else {}
+                    ),
                 },
                 environment={
                     "WORKER_MODE": "login",
@@ -1741,6 +2475,7 @@ class Runner:
                     "LANG": fp["lang"],
                     "LC_ALL": fp["lang"],
                     "CONTINUE_SESSION_ID": session_id,
+                    "CC2API_MANAGED_OAUTH": "1" if managed_oauth else "0",
                 },
             )
             worker_id = worker.id
@@ -2296,6 +3031,16 @@ class LoginManager:
         except Exception:
             pass
 
+    def has_active_name(self, name: str) -> bool:
+        """
+        判断账号名是否存在尚未收口的登录或重授权会话。
+
+        :param name: bench 账号名
+        :return: 存在活跃登录会话时返回 True
+        """
+        with self._lock:
+            return name in self._name_locks
+
     def start(
         self,
         name: str,
@@ -2562,6 +3307,19 @@ class ContinueManager:
         except Exception:
             pass
 
+    def has_active_account(self, account_id: int) -> bool:
+        """
+        判断账号是否存在活跃的继续对话 worker。
+
+        :param account_id: accounts.id
+        :return: 存在活跃 continue 会话时返回 True
+        """
+        with self._lock:
+            return any(
+                session.account_id == account_id
+                for session in self.sessions.values()
+            )
+
     def start(self, run: dict, account: dict) -> ContinueSession:
         """
         为一个完成 run 启动继续对话会话。
@@ -2696,13 +3454,32 @@ class OAuthRefreshScheduler:
         for account in accounts:
             if self._stop.is_set():
                 return
-            if not self._needs_refresh(account["name"]):
-                continue
-            try:
-                self.runner.refresh_account_oauth_token(account)
-            except Exception:
-                # 后台刷新失败不能拖垮 orchestrator；账号页会继续显示 expired/expiring。
-                pass
+            with _oauth_owner_lock(str(account["name"])):
+                conn = get_db()
+                try:
+                    current_row = _get_available_account(conn, int(account["id"]))
+                    if not current_row:
+                        continue
+                    current = dict(current_row)
+                finally:
+                    conn.close()
+                if current.get("cc2api_account_id") is not None:
+                    try:
+                        _sync_bound_account_credentials_locked(
+                            current,
+                            OAUTH_REFRESH_BUFFER_SEC,
+                        )
+                    except Exception:
+                        # cc2api 是绑定账号唯一凭据所有者；同步失败时不能降级成本地 RT 刷新。
+                        pass
+                    continue
+                if not self._needs_refresh(current["name"]):
+                    continue
+                try:
+                    self.runner.refresh_account_oauth_token(current)
+                except Exception:
+                    # 本地 RT 刷新也持有 owner lock，避免首次绑定读取到轮换前的旧 RT。
+                    pass
 
     def _needs_refresh(self, account_name: str) -> bool:
         """
@@ -3207,6 +3984,8 @@ class Scheduler:
         sem.acquire()
         sid: Optional[str] = None
         wid: Optional[str] = None
+        managed_refresh_stop = threading.Event()
+        managed_refresh_thread: Optional[threading.Thread] = None
         try:
             flows_path = FLOWS_DIR / account["name"] / str(task["id"]) / run_id
             capture_full_http = bool(task.get("capture_full_http"))
@@ -3216,17 +3995,68 @@ class Scheduler:
             if initial_state["status"] in ("stopping", "stopped"):
                 self._update_batch_item_for_run(run_id, "stopped")
                 return
-            self._update(
-                run_id,
-                status="running",
-                started_at=time.time(),
-                workspace_dir=str(WORKSPACES_DIR / run_id),
-                flows_dir=str(flows_path),
-                capture_summary_path=str(flows_path / "capture_index.json") if capture_full_http else None,
-            )
-            try:
-                sid, wid = self.runner.start_run(run_id, account, task)
+            with _oauth_owner_lock(str(account["name"])):
+                conn = get_db()
+                try:
+                    current_account_row = _get_available_account(conn, int(account["id"]))
+                    if not current_account_row:
+                        self._update(
+                            run_id,
+                            status="failed",
+                            error="账号不存在或已停用",
+                            ended_at=time.time(),
+                        )
+                        self._update_batch_item_for_run(run_id, "failed")
+                        return
+                    account = dict(current_account_row)
+                finally:
+                    conn.close()
+                if account.get("cc2api_account_id") is not None:
+                    timeout_sec = max(60, int(task.get("timeout_sec") or 1800))
+                    try:
+                        _sync_bound_account_credentials_locked(account, timeout_sec + 600)
+                    except Exception as exc:
+                        error = _redact_cc2api_error(exc)
+                        self._update(
+                            run_id,
+                            status="failed",
+                            error=error,
+                            ended_at=time.time(),
+                        )
+                        self._update_batch_item_for_run(run_id, "failed")
+                        if warmup_scheduler:
+                            warmup_scheduler.handle_run_sync_failure(run_id, account, exc)
+                        return
+                self._update(
+                    run_id,
+                    status="running",
+                    started_at=time.time(),
+                    workspace_dir=str(WORKSPACES_DIR / run_id),
+                    flows_dir=str(flows_path),
+                    capture_summary_path=str(flows_path / "capture_index.json") if capture_full_http else None,
+                )
+                if warmup_scheduler:
+                    warmup_scheduler.handle_run_started(run_id)
+                try:
+                    sid, wid = self.runner.start_run(run_id, account, task)
+                except Exception as exc:
+                    self._update(
+                        run_id,
+                        status="failed",
+                        error=str(exc),
+                        ended_at=time.time(),
+                    )
+                    self._update_batch_item_for_run(run_id, "failed")
+                    return
                 self._update(run_id, sidecar_container=sid, worker_container=wid)
+            try:
+                if account.get("cc2api_account_id") is not None:
+                    managed_refresh_thread = threading.Thread(
+                        target=self.runner.watch_managed_oauth_refresh,
+                        args=(run_id, account, managed_refresh_stop),
+                        daemon=True,
+                    )
+                    managed_refresh_thread.start()
                 run_state = self._get_run_state(run_id)
                 if run_state and run_state["status"] in ("stopping", "stopped"):
                     self.runner.persist_worker_profile(wid)
@@ -3267,9 +4097,17 @@ class Scheduler:
                 self._update(run_id, status=status, error=str(e), ended_at=time.time())
                 self._update_batch_item_for_run(run_id, status)
             finally:
+                managed_refresh_stop.set()
+                if managed_refresh_thread and managed_refresh_thread.is_alive():
+                    managed_refresh_thread.join(timeout=2)
                 self.runner.persist_worker_profile(wid)
                 self.runner.cleanup(sid, wid)
         finally:
+            if warmup_scheduler:
+                warmup_scheduler.handle_run_terminal(
+                    run_id,
+                    account.get("cc2api_account_id"),
+                )
             sem.release()
 
     def _update(self, run_id: str, **fields) -> None:
@@ -3317,17 +4155,483 @@ class Scheduler:
                 conn.close()
 
 
+class WarmupScheduler:
+    """按账号随机小时区间创建真实养号 run。"""
+
+    def __init__(self, scheduler: Scheduler) -> None:
+        """
+        初始化养号调度器。
+
+        :param scheduler: 现有真实 run 调度器
+        :return: None
+        """
+        self.scheduler = scheduler
+        self._stop = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+
+    def start(self) -> None:
+        """
+        恢复重启前的养号状态并启动后台扫描线程。
+
+        :return: None
+        """
+        if self._thread and self._thread.is_alive():
+            return
+        self._recover_stale_runs()
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        """
+        请求养号后台线程停止。
+
+        :return: None
+        """
+        self._stop.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=3)
+
+    def trigger_account(self, account_id: int, require_due: bool = False) -> dict:
+        """
+        原子认领账号并创建一次真实养号 task/run。
+
+        :param account_id: bench accounts.id
+        :param require_due: 是否要求 `warmup_next_run_at` 已到期
+        :return: 是否启动及新 run id
+        """
+        account = self._claim_account(account_id, require_due)
+        if not account:
+            return {"started": False, "run_id": None}
+        try:
+            _sync_bound_account_credentials(account, 2400)
+        except Exception as exc:
+            self._record_sync_failure(account, exc)
+            return {"started": False, "run_id": None}
+
+        topic = self._select_topic(account_id)
+        if not topic:
+            self._pause_account(
+                account,
+                "题库没有可用题目，养号已暂停",
+            )
+            return {"started": False, "run_id": None}
+
+        created = self._create_task_and_run(account, topic)
+        if not created:
+            return {"started": False, "run_id": None}
+        run_id, task_id = created
+        task = {
+            "id": task_id,
+            "prompt": build_topic_prompt(topic),
+            "timeout_sec": 1800,
+            "topic_id": topic["id"],
+        }
+        self.scheduler.submit(run_id, account, task)
+        return {"started": True, "run_id": run_id, "task_id": task_id}
+
+    def handle_run_started(self, run_id: str) -> None:
+        """
+        把已进入真实执行链路的养号 run 同步到账号最近状态。
+
+        :param run_id: runs.id
+        :return: None
+        """
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    run_row = conn.execute(
+                        "SELECT account_id, run_kind, status FROM runs WHERE id=?",
+                        (run_id,),
+                    ).fetchone()
+                    if (
+                        not run_row
+                        or run_row["run_kind"] != "warmup"
+                        or run_row["status"] != "running"
+                    ):
+                        return
+                    conn.execute(
+                        "UPDATE accounts SET warmup_last_status='running' "
+                        "WHERE id=? AND warmup_enabled=1 AND warmup_last_run_id=?",
+                        (run_row["account_id"], run_id),
+                    )
+            finally:
+                conn.close()
+
+    def handle_run_sync_failure(
+        self,
+        run_id: str,
+        account: dict,
+        exc: Exception,
+    ) -> None:
+        """
+        把养号 run 启动前的凭据同步失败写回账号调度状态。
+
+        :param run_id: 同步失败的 runs.id
+        :param account: worker 启动前锁内重读的 accounts 行
+        :param exc: cc2api 同步异常
+        :return: None
+        """
+        conn = get_db()
+        try:
+            run_row = conn.execute(
+                "SELECT account_id, run_kind FROM runs WHERE id=?",
+                (run_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        if (
+            not run_row
+            or run_row["run_kind"] != "warmup"
+            or int(run_row["account_id"]) != int(account["id"])
+        ):
+            return
+        self._record_sync_failure(account, exc)
+
+    def handle_run_terminal(
+        self,
+        run_id: str,
+        expected_cc2api_account_id: Optional[int] = None,
+    ) -> None:
+        """
+        在养号 run 终态后更新失败计数并安排下一次随机触发。
+
+        :param run_id: runs.id
+        :param expected_cc2api_account_id: 本次 run 启动时绑定的 cc2api 账号 ID
+        :return: None
+        """
+        conn = get_db()
+        try:
+            run_row = conn.execute(
+                "SELECT id, account_id, run_kind, status, error FROM runs WHERE id=?",
+                (run_id,),
+            ).fetchone()
+            if (
+                not run_row
+                or run_row["run_kind"] != "warmup"
+                or run_row["status"] not in _TERMINAL_RUN_STATUSES
+            ):
+                return
+            run = dict(run_row)
+        finally:
+            conn.close()
+
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    account_row = conn.execute(
+                        "SELECT * FROM accounts WHERE id=?",
+                        (run["account_id"],),
+                    ).fetchone()
+                    if not account_row:
+                        return
+                    account = dict(account_row)
+                    if (
+                        account.get("cc2api_account_id") is None
+                        or account.get("warmup_last_run_id") != run_id
+                    ):
+                        return
+                    if (
+                        expected_cc2api_account_id is not None
+                        and int(account["cc2api_account_id"])
+                        != int(expected_cc2api_account_id)
+                    ):
+                        # run 进入终态后可能立即发生改绑；旧 run 不能把认证结果写到新绑定上。
+                        return
+                    current_last_status = str(account.get("warmup_last_status") or "")
+                    currently_enabled = int(account.get("warmup_enabled") or 0) == 1
+                    if current_last_status == run["status"] and (
+                        account.get("warmup_next_run_at") is not None
+                        or not currently_enabled
+                    ):
+                        return
+                    if not currently_enabled and current_last_status in ("off", "paused"):
+                        return
+                    if (
+                        current_last_status == "sync_failed"
+                        and account.get("warmup_next_run_at") is not None
+                    ):
+                        # 排队后同步失败已经按临时故障安排短重试，不能再被普通 failed 终态覆盖。
+                        return
+
+                    auth_failures = int(account.get("warmup_auth_failures") or 0)
+                    enabled = currently_enabled
+                    error = _redact_cc2api_error(run.get("error")) if run.get("error") else None
+                    permanent_auth_error = bool(
+                        run["status"] == "auth_failed"
+                        and error
+                        and _cc2api_error_detail_is_permanent(error)
+                    )
+                    if permanent_auth_error:
+                        auth_failures += 1
+                        enabled = False
+                        error = f"cc2api 凭据错误，养号已自动暂停：{error}"
+                    elif run["status"] == "auth_failed":
+                        auth_failures += 1
+                        if auth_failures >= 3:
+                            enabled = False
+                            error = "连续 3 次养号认证失败，已自动暂停"
+                    else:
+                        auth_failures = 0
+                    next_run_at = self._next_run_at(account) if enabled else None
+                    last_status = run["status"] if enabled else "paused"
+                    conn.execute(
+                        "UPDATE accounts SET warmup_enabled=?, warmup_next_run_at=?, "
+                        "warmup_last_status=?, warmup_last_error=?, warmup_auth_failures=? "
+                        "WHERE id=? AND cc2api_account_id=?",
+                        (
+                            int(enabled),
+                            next_run_at,
+                            last_status,
+                            error,
+                            auth_failures,
+                            account["id"],
+                            account["cc2api_account_id"],
+                        ),
+                    )
+            finally:
+                conn.close()
+
+    def _loop(self) -> None:
+        while not self._stop.is_set():
+            self._tick()
+            self._stop.wait(max(1.0, WARMUP_SCHEDULER_TICK_SEC))
+
+    def _tick(self) -> None:
+        now = time.time()
+        conn = get_db()
+        try:
+            rows = conn.execute(
+                "SELECT id FROM accounts WHERE enabled=1 AND deleted_at IS NULL "
+                "AND warmup_enabled=1 AND cc2api_account_id IS NOT NULL "
+                "AND warmup_next_run_at IS NOT NULL AND warmup_next_run_at<=? ORDER BY id",
+                (now,),
+            ).fetchall()
+            account_ids = [int(row["id"]) for row in rows]
+        finally:
+            conn.close()
+        for account_id in account_ids:
+            if self._stop.is_set():
+                return
+            try:
+                self.trigger_account(account_id, require_due=True)
+            except Exception:
+                # 单账号异常不能中断其他账号扫描；具体错误在账号状态中收口。
+                continue
+
+    def _claim_account(self, account_id: int, require_due: bool) -> Optional[dict]:
+        now = time.time()
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    row = conn.execute(
+                        "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL "
+                        "AND warmup_enabled=1 AND cc2api_account_id IS NOT NULL",
+                        (account_id,),
+                    ).fetchone()
+                    if not row:
+                        return None
+                    account = dict(row)
+                    next_run_at = account.get("warmup_next_run_at")
+                    if require_due and (
+                        next_run_at is None or float(next_run_at) > now
+                    ):
+                        return None
+                    active = conn.execute(
+                        "SELECT id, status FROM runs WHERE account_id=? AND run_kind='warmup' "
+                        "AND status IN ('queued','running','stopping') "
+                        "ORDER BY created_at DESC LIMIT 1",
+                        (account_id,),
+                    ).fetchone()
+                    if active:
+                        conn.execute(
+                            "UPDATE accounts SET warmup_next_run_at=NULL, warmup_last_run_id=?, "
+                            "warmup_last_status=? WHERE id=?",
+                            (active["id"], active["status"], account_id),
+                        )
+                        return None
+                    conn.execute(
+                        "UPDATE accounts SET warmup_next_run_at=NULL, warmup_last_attempt_at=?, "
+                        "warmup_last_status='preparing', warmup_last_error=NULL WHERE id=?",
+                        (now, account_id),
+                    )
+                    account["warmup_next_run_at"] = None
+                    account["warmup_last_attempt_at"] = now
+                    return account
+            finally:
+                conn.close()
+
+    def _select_topic(self, account_id: int) -> Optional[dict]:
+        conn = get_db()
+        try:
+            topics = [
+                dict(row)
+                for row in conn.execute(
+                    "SELECT * FROM topics WHERE enabled=1 AND deleted_at IS NULL ORDER BY id"
+                ).fetchall()
+            ]
+            recent_rows = conn.execute(
+                "SELECT topic_id FROM runs WHERE account_id=? AND run_kind='warmup' "
+                "AND topic_id IS NOT NULL ORDER BY created_at DESC LIMIT 20",
+                (account_id,),
+            ).fetchall()
+        finally:
+            conn.close()
+        if not topics:
+            return None
+        recent_ids = [int(row["topic_id"]) for row in recent_rows]
+        recent_set = set(recent_ids)
+        candidates = [topic for topic in topics if int(topic["id"]) not in recent_set]
+        if not candidates and recent_ids:
+            # 题库不足时缩小窗口，但只要存在第二题就仍避免连续重复。
+            candidates = [topic for topic in topics if int(topic["id"]) != recent_ids[0]]
+        return random.choice(candidates or topics)
+
+    def _create_task_and_run(
+        self,
+        account: dict,
+        topic: dict,
+    ) -> Optional[tuple[str, int]]:
+        run_id = uuid.uuid4().hex[:12]
+        prompt = build_topic_prompt(topic)
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    current = conn.execute(
+                        "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL "
+                        "AND warmup_enabled=1 AND cc2api_account_id=?",
+                        (account["id"], account["cc2api_account_id"]),
+                    ).fetchone()
+                    if not current:
+                        return None
+                    active = conn.execute(
+                        "SELECT id FROM runs WHERE account_id=? AND run_kind='warmup' "
+                        "AND status IN ('queued','running','stopping') LIMIT 1",
+                        (account["id"],),
+                    ).fetchone()
+                    if active:
+                        return None
+                    cur = conn.execute(
+                        "INSERT INTO tasks(topic_no, title, prompt, account_id, topic_id, "
+                        "timeout_sec, repeat_n) VALUES(?,?,?,?,?,?,?)",
+                        (
+                            topic["no"],
+                            f"[warmup] {topic['title']}",
+                            prompt,
+                            account["id"],
+                            topic["id"],
+                            1800,
+                            1,
+                        ),
+                    )
+                    task_id = int(cur.lastrowid)
+                    conn.execute(
+                        "INSERT INTO runs(id, task_id, account_id, topic_id, status, run_kind) "
+                        "VALUES(?,?,?,?,?,?)",
+                        (run_id, task_id, account["id"], topic["id"], "queued", "warmup"),
+                    )
+                    conn.execute(
+                        "UPDATE accounts SET warmup_last_run_id=?, warmup_last_status='queued', "
+                        "warmup_last_error=NULL WHERE id=?",
+                        (run_id, account["id"]),
+                    )
+                    return run_id, task_id
+            finally:
+                conn.close()
+
+    def _record_sync_failure(self, account: dict, exc: Exception) -> None:
+        error = _redact_cc2api_error(exc)
+        permanent = _cc2api_error_is_permanent(exc)
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    conn.execute(
+                        "UPDATE accounts SET warmup_enabled=?, warmup_next_run_at=?, "
+                        "warmup_last_status=?, warmup_last_error=? "
+                        "WHERE id=? AND cc2api_account_id=?",
+                        (
+                            0 if permanent else 1,
+                            None if permanent else time.time() + WARMUP_SYNC_RETRY_SEC,
+                            "paused" if permanent else "sync_failed",
+                            error,
+                            account["id"],
+                            account["cc2api_account_id"],
+                        ),
+                    )
+            finally:
+                conn.close()
+
+    def _pause_account(self, account: dict, error: str) -> None:
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    conn.execute(
+                        "UPDATE accounts SET warmup_enabled=0, warmup_next_run_at=NULL, "
+                        "warmup_last_status='paused', warmup_last_error=? "
+                        "WHERE id=? AND cc2api_account_id=?",
+                        (
+                            _redact_cc2api_error(error),
+                            account["id"],
+                            account["cc2api_account_id"],
+                        ),
+                    )
+            finally:
+                conn.close()
+
+    def _next_run_at(self, account: dict) -> float:
+        low = max(1, int(account.get("warmup_interval_min_hours") or 3))
+        high = max(low, int(account.get("warmup_interval_max_hours") or low))
+        return time.time() + random.uniform(low * 3600, high * 3600)
+
+    def _recover_stale_runs(self) -> None:
+        stale_runs: list[tuple[str, Optional[int]]] = []
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    rows = conn.execute(
+                        "SELECT r.id, a.cc2api_account_id FROM runs r "
+                        "LEFT JOIN accounts a ON a.id=r.account_id "
+                        "WHERE r.run_kind='warmup' "
+                        "AND r.status IN ('queued','running','stopping')"
+                    ).fetchall()
+                    stale_runs = [
+                        (str(row["id"]), row["cc2api_account_id"])
+                        for row in rows
+                    ]
+                    run_ids = [run_id for run_id, _binding_id in stale_runs]
+                    if run_ids:
+                        placeholders = ",".join("?" for _ in run_ids)
+                        conn.execute(
+                            f"UPDATE runs SET status='failed', ended_at=?, "
+                            f"error='orchestrator 重启，旧养号 run 已收口' "
+                            f"WHERE id IN ({placeholders})",
+                            (time.time(), *run_ids),
+                        )
+            finally:
+                conn.close()
+        for run_id, binding_id in stale_runs:
+            self.handle_run_terminal(run_id, binding_id)
+
+
 # ============== FastAPI ==============
 runner: Optional[Runner] = None
 scheduler: Optional[Scheduler] = None
 login_manager: Optional[LoginManager] = None
 continue_manager: Optional[ContinueManager] = None
 oauth_refresh_scheduler: Optional[OAuthRefreshScheduler] = None
+warmup_scheduler: Optional[WarmupScheduler] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler
+    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler
     init_db()
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     FLOWS_DIR.mkdir(parents=True, exist_ok=True)
@@ -3338,14 +4642,17 @@ async def lifespan(app: FastAPI):
     login_manager = LoginManager(runner.client)
     continue_manager = ContinueManager(runner)
     oauth_refresh_scheduler = OAuthRefreshScheduler(runner)
+    warmup_scheduler = WarmupScheduler(scheduler)
     # 清掉上次进程残留的 login 容器，避免重启后僵尸容器堆积
     login_manager.cleanup_stale()
     continue_manager.cleanup_stale()
     oauth_refresh_scheduler.cleanup_stale()
     oauth_refresh_scheduler.start()
+    warmup_scheduler.start()
     try:
         yield
     finally:
+        warmup_scheduler.stop()
         oauth_refresh_scheduler.stop()
 
 
@@ -3634,6 +4941,76 @@ class AccountIn(BaseModel):
     enabled: bool = True
 
 
+class WarmupConfigIn(BaseModel):
+    """账号 cc2api 绑定与养号随机间隔配置。"""
+
+    cc2api_account_id: int
+    enabled: bool = False
+    interval_min_hours: int = 3
+    interval_max_hours: int = 5
+
+
+def _oauth_owner_transition_blocker(account: dict) -> Optional[str]:
+    """
+    查找会让 AT/RT 所有权切换不安全的活跃工作。
+
+    :param account: accounts 表行
+    :return: 阻塞原因；账号空闲时返回 None
+    """
+    conn = get_db()
+    try:
+        active_run = conn.execute(
+            "SELECT id, status FROM runs WHERE account_id=? "
+            "AND status IN ('queued','running','stopping') ORDER BY created_at LIMIT 1",
+            (account["id"],),
+        ).fetchone()
+    finally:
+        conn.close()
+    if active_run:
+        return f"run {active_run['id']} 当前为 {active_run['status']}"
+    if continue_manager and continue_manager.has_active_account(int(account["id"])):
+        return "账号存在活跃的继续对话会话"
+    if login_manager and login_manager.has_active_name(str(account["name"])):
+        return "账号存在活跃的登录或重授权会话"
+    return None
+
+
+def _require_oauth_owner_transition_idle(account: dict) -> None:
+    """
+    要求账号在 cc2api 绑定所有权切换前没有活跃 worker。
+
+    :param account: accounts 表行
+    :return: None
+    """
+    blocker = _oauth_owner_transition_blocker(account)
+    if blocker:
+        raise HTTPException(409, f"账号凭据所有权暂不能切换：{blocker}，请先停止并收口")
+
+
+def _require_cc2api_binding_available(
+    bench_account_id: int,
+    cc2api_account_id: int,
+) -> None:
+    """
+    要求 cc2api 账号尚未绑定到其他可见 bench 账号。
+
+    :param bench_account_id: 当前 bench accounts.id
+    :param cc2api_account_id: 待绑定的 cc2api 账号 ID
+    :return: None
+    """
+    conn = get_db()
+    try:
+        bound = conn.execute(
+            "SELECT id FROM accounts WHERE cc2api_account_id=? AND id!=? "
+            "AND deleted_at IS NULL LIMIT 1",
+            (cc2api_account_id, bench_account_id),
+        ).fetchone()
+    finally:
+        conn.close()
+    if bound:
+        raise HTTPException(409, "该 cc2api 账号已绑定其他 bench 账号")
+
+
 @app.post("/api/accounts")
 def create_account(body: AccountIn):
     """创建已有 profile 对应的账号记录。"""
@@ -3733,53 +5110,455 @@ def list_accounts():
         conn.close()
 
 
-@app.delete("/api/accounts/{aid}")
-def delete_account(aid: int):
-    """删除账号；已有任务/运行引用时软删除并退出可用集合。"""
+@app.get("/api/cc2api/accounts")
+def list_cc2api_accounts():
+    """
+    返回可绑定的 active OAuth cc2api 账号脱敏摘要。
+
+    :return: 不含任何凭据的账号摘要列表
+    """
+    try:
+        accounts = cc2api_client.list_accounts()
+    except ConnectionError as exc:
+        raise HTTPException(502, _redact_cc2api_error(exc))
+    except ValueError as exc:
+        raise HTTPException(400, _redact_cc2api_error(exc))
+    return [
+        _cc2api_account_summary(account)
+        for account in accounts
+        if _cc2api_account_is_active_oauth(account)
+    ]
+
+
+@app.post("/api/accounts/{aid}/cc2api/sync")
+def sync_account_to_cc2api(aid: int):
+    """
+    把单个 bench 账号安全创建或关联到 cc2api。
+
+    :param aid: bench accounts.id
+    :return: 绑定结果和脱敏 cc2api 账号摘要
+    """
+    conn = get_db()
+    try:
+        row = _get_available_account(conn, aid)
+        if not row:
+            raise HTTPException(404, "账号不存在或已停用")
+        account = dict(row)
+    finally:
+        conn.close()
+    with _oauth_owner_lock(str(account["name"])):
+        with _cc2api_binding_lock:
+            conn = get_db()
+            try:
+                current_row = _get_available_account(conn, aid)
+                if not current_row:
+                    raise HTTPException(404, "账号不存在或已停用")
+                account = dict(current_row)
+            finally:
+                conn.close()
+            existing_binding = account.get("cc2api_account_id")
+            if existing_binding is None:
+                _require_oauth_owner_transition_idle(account)
+            try:
+                profile = _read_bench_profile_identity(account["name"])
+            except ValueError as exc:
+                raise HTTPException(400, str(exc))
+            try:
+                cc2api_accounts = cc2api_client.list_accounts()
+                if existing_binding is not None:
+                    matched = next(
+                        (
+                            item
+                            for item in cc2api_accounts
+                            if int(item.get("id") or 0) == int(existing_binding)
+                        ),
+                        None,
+                    )
+                    if not matched:
+                        raise ValueError("当前绑定的 cc2api 账号不存在")
+                    created = False
+                else:
+                    matched = _find_cc2api_account_for_profile(profile, cc2api_accounts)
+                    created = matched is None
+                    if matched is None:
+                        matched = cc2api_client.create_account({
+                            "name": account["name"],
+                            "email": profile["email"],
+                            "auth_type": "oauth",
+                            "access_token": profile["access_token"],
+                            "refresh_token": profile["refresh_token"],
+                            "expires_at": profile["expires_at"],
+                            "proxy_url": _account_proxy_url(account),
+                            "account_uuid": profile.get("account_uuid"),
+                            "organization_uuid": profile.get("organization_uuid"),
+                            "subscription_type": profile.get("subscription_type"),
+                        })
+                if not _cc2api_account_is_active_oauth(matched):
+                    raise ValueError("匹配到的 cc2api 账号不是 active OAuth 账号")
+                _validate_cc2api_identity(profile, matched)
+                cc2api_account_id = int(matched.get("id") or 0)
+                if cc2api_account_id <= 0:
+                    raise ValueError("cc2api 账号 ID 无效")
+                _require_cc2api_binding_available(aid, cc2api_account_id)
+                _resolve_and_sync_cc2api_credentials(
+                    account["name"],
+                    cc2api_account_id,
+                    2400,
+                )
+            except ConnectionError as exc:
+                raise HTTPException(502, _redact_cc2api_error(exc))
+            except ValueError as exc:
+                raise HTTPException(409, _redact_cc2api_error(exc))
+
+            with _db_lock:
+                conn = get_db()
+                try:
+                    with conn:
+                        current = _get_available_account(conn, aid)
+                        if not current:
+                            raise HTTPException(404, "账号不存在或已停用")
+                        current_binding = current["cc2api_account_id"]
+                        if current_binding is not None and int(current_binding) != cc2api_account_id:
+                            raise HTTPException(409, "bench 账号已绑定其他 cc2api 账号")
+                        if current_binding is None:
+                            conn.execute(
+                                "UPDATE accounts SET cc2api_account_id=?, warmup_enabled=0, "
+                                "warmup_next_run_at=NULL, warmup_last_status='off', warmup_last_error=NULL "
+                                "WHERE id=?",
+                                (cc2api_account_id, aid),
+                            )
+                except sqlite3.IntegrityError:
+                    raise HTTPException(409, "该 cc2api 账号已绑定其他 bench 账号")
+                finally:
+                    conn.close()
+    return {
+        "ok": True,
+        "created": created,
+        "cc2api_account": _cc2api_account_summary(matched),
+    }
+
+
+@app.put("/api/accounts/{aid}/warmup")
+def update_account_warmup(aid: int, body: WarmupConfigIn):
+    """
+    显式绑定 cc2api 账号并保存养号随机间隔。
+
+    :param aid: bench accounts.id
+    :param body: cc2api 账号 ID、开关和小时区间
+    :return: 保存后的调度状态
+    """
+    low = int(body.interval_min_hours)
+    high = int(body.interval_max_hours)
+    if low < 1 or high < 1 or low > 720 or high > 720:
+        raise HTTPException(400, "养号间隔必须为 1-720 小时")
+    if high < low:
+        raise HTTPException(400, "最大养号间隔不能小于最小间隔")
+    conn = get_db()
+    try:
+        row = _get_available_account(conn, aid)
+        if not row:
+            raise HTTPException(404, "账号不存在或已停用")
+        account = dict(row)
+    finally:
+        conn.close()
+    with _oauth_owner_lock(str(account["name"])):
+        with _cc2api_binding_lock:
+            conn = get_db()
+            try:
+                current_row = _get_available_account(conn, aid)
+                if not current_row:
+                    raise HTTPException(404, "账号不存在或已停用")
+                account = dict(current_row)
+            finally:
+                conn.close()
+            binding_changes = account.get("cc2api_account_id") != body.cc2api_account_id
+            if binding_changes:
+                _require_oauth_owner_transition_idle(account)
+
+            enabled = bool(body.enabled)
+            if binding_changes or enabled:
+                try:
+                    profile = _read_bench_profile_identity(account["name"])
+                    cc2api_accounts = cc2api_client.list_accounts()
+                    selected = next(
+                        (
+                            item
+                            for item in cc2api_accounts
+                            if int(item.get("id") or 0) == int(body.cc2api_account_id)
+                        ),
+                        None,
+                    )
+                    if not selected or not _cc2api_account_is_active_oauth(selected):
+                        raise ValueError("选择的 cc2api 账号不可用")
+                    _validate_cc2api_identity(profile, selected)
+                    _require_cc2api_binding_available(aid, int(body.cc2api_account_id))
+                    _resolve_and_sync_cc2api_credentials(
+                        account["name"],
+                        int(body.cc2api_account_id),
+                        2400,
+                    )
+                except ConnectionError as exc:
+                    raise HTTPException(502, _redact_cc2api_error(exc))
+                except ValueError as exc:
+                    raise HTTPException(409, _redact_cc2api_error(exc))
+
+            next_run_at = time.time() + random.uniform(low * 3600, high * 3600) if enabled else None
+            with _db_lock:
+                conn = get_db()
+                try:
+                    with conn:
+                        current = _get_available_account(conn, aid)
+                        if not current:
+                            raise HTTPException(404, "账号不存在或已停用")
+                        active = conn.execute(
+                            "SELECT id, status FROM runs WHERE account_id=? AND run_kind='warmup' "
+                            "AND status IN ('queued','running','stopping') LIMIT 1",
+                            (aid,),
+                        ).fetchone()
+                        conn.execute(
+                            "UPDATE accounts SET cc2api_account_id=?, warmup_enabled=?, "
+                            "warmup_interval_min_hours=?, warmup_interval_max_hours=?, "
+                            "warmup_next_run_at=?, warmup_last_status=?, warmup_last_error=NULL, "
+                            "warmup_auth_failures=0 WHERE id=?",
+                            (
+                                int(body.cc2api_account_id),
+                                int(enabled),
+                                low,
+                                high,
+                                None if active else next_run_at,
+                                active["status"] if active and enabled else ("scheduled" if enabled else "off"),
+                                aid,
+                            ),
+                        )
+                except sqlite3.IntegrityError:
+                    raise HTTPException(409, "该 cc2api 账号已绑定其他 bench 账号")
+                finally:
+                    conn.close()
+    return {"ok": True, "enabled": enabled, "next_run_at": None if active else next_run_at}
+
+
+@app.post("/api/accounts/{aid}/warmup/run")
+def run_account_warmup_now(aid: int):
+    """
+    立即为已启用账号触发一次养号 run。
+
+    :param aid: bench accounts.id
+    :return: 是否成功创建 run 及最近养号状态
+    """
+    if not warmup_scheduler:
+        raise HTTPException(500, "养号调度器尚未就绪")
+    result = warmup_scheduler.trigger_account(aid)
+    if result.get("started"):
+        return result
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT warmup_last_status, warmup_last_error, warmup_last_run_id "
+            "FROM accounts WHERE id=? AND deleted_at IS NULL",
+            (aid,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "账号不存在")
+        return {**result, **dict(row)}
+    finally:
+        conn.close()
+
+
+@app.post("/api/accounts/{aid}/warmup/resume")
+def resume_account_warmup(aid: int):
+    """
+    清除暂停原因并重新安排账号下一次养号。
+
+    :param aid: bench accounts.id
+    :return: 新的下次触发时间
+    """
     with _db_lock:
         conn = get_db()
         try:
             with conn:
                 row = conn.execute(
-                    "SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL",
+                    "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL "
+                    "AND cc2api_account_id IS NOT NULL",
                     (aid,),
                 ).fetchone()
                 if not row:
-                    raise HTTPException(404, "account not found")
-                counts = _account_reference_counts(conn, aid)
-                if sum(counts.values()) > 0:
-                    # 任务、批次和 run 都按 account_id 保存历史引用；软删除能保留
-                    # 历史语义，同时让后台刷新器和新运行入口都不再选中该账号。
-                    conn.execute(
-                        "UPDATE accounts SET enabled=0, deleted_at=? WHERE id=?",
-                        (time.time(), aid),
-                    )
-                    return {"ok": True, "deleted": True, "soft_deleted": True, "references": counts}
-                conn.execute("DELETE FROM accounts WHERE id=?", (aid,))
+                    raise HTTPException(404, "已绑定账号不存在或已停用")
+                account = dict(row)
+                active = conn.execute(
+                    "SELECT id, status FROM runs WHERE account_id=? AND run_kind='warmup' "
+                    "AND status IN ('queued','running','stopping') LIMIT 1",
+                    (aid,),
+                ).fetchone()
+                next_run_at = None if active else warmup_scheduler._next_run_at(account) if warmup_scheduler else None
+                conn.execute(
+                    "UPDATE accounts SET warmup_enabled=1, warmup_next_run_at=?, "
+                    "warmup_last_status=?, warmup_last_error=NULL, warmup_auth_failures=0 WHERE id=?",
+                    (next_run_at, active["status"] if active else "scheduled", aid),
+                )
         finally:
             conn.close()
+    return {"ok": True, "next_run_at": next_run_at}
+
+
+@app.delete("/api/accounts/{aid}/cc2api-binding")
+def delete_account_cc2api_binding(aid: int):
+    """
+    解除 bench 与 cc2api 绑定并停止未来养号调度。
+
+    :param aid: bench accounts.id
+    :return: 解绑成功标记
+    """
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL",
+            (aid,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "账号不存在")
+        account = dict(row)
+    finally:
+        conn.close()
+    with _oauth_owner_lock(str(account["name"])):
+        conn = get_db()
+        try:
+            current = conn.execute(
+                "SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL",
+                (aid,),
+            ).fetchone()
+            if not current:
+                raise HTTPException(404, "账号不存在")
+            account = dict(current)
+        finally:
+            conn.close()
+        if account.get("cc2api_account_id") is not None:
+            _require_oauth_owner_transition_idle(account)
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    cur = conn.execute(
+                        "UPDATE accounts SET cc2api_account_id=NULL, warmup_enabled=0, "
+                        "warmup_next_run_at=NULL, warmup_last_status='off', warmup_last_error=NULL, "
+                        "warmup_auth_failures=0 WHERE id=? AND deleted_at IS NULL",
+                        (aid,),
+                    )
+                    if cur.rowcount == 0:
+                        raise HTTPException(404, "账号不存在")
+            finally:
+                conn.close()
+    return {"ok": True}
+
+
+@app.delete("/api/accounts/{aid}")
+def delete_account(aid: int):
+    """
+    删除账号；已有历史引用时软删除并退出可用集合。
+
+    :param aid: bench accounts.id
+    :return: 删除方式和历史引用计数
+    """
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL",
+            (aid,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "账号不存在")
+        account = dict(row)
+    finally:
+        conn.close()
+    with _oauth_owner_lock(str(account["name"])):
+        conn = get_db()
+        try:
+            current = conn.execute(
+                "SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL",
+                (aid,),
+            ).fetchone()
+            if not current:
+                raise HTTPException(404, "账号不存在")
+            account = dict(current)
+        finally:
+            conn.close()
+        if account.get("cc2api_account_id") is not None:
+            _require_oauth_owner_transition_idle(account)
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    current = conn.execute(
+                        "SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL",
+                        (aid,),
+                    ).fetchone()
+                    if not current:
+                        raise HTTPException(404, "账号不存在")
+                    counts = _account_reference_counts(conn, aid)
+                    if sum(counts.values()) > 0:
+                        # 任务、批次和 run 都按 account_id 保存历史引用；软删除能保留
+                        # 历史语义，同时让后台刷新器和新运行入口都不再选中该账号。
+                        conn.execute(
+                            "UPDATE accounts SET enabled=0, deleted_at=?, cc2api_account_id=NULL, "
+                            "warmup_enabled=0, warmup_next_run_at=NULL, warmup_last_status='off' "
+                            "WHERE id=?",
+                            (time.time(), aid),
+                        )
+                        return {
+                            "ok": True,
+                            "deleted": True,
+                            "soft_deleted": True,
+                            "references": counts,
+                        }
+                    conn.execute("DELETE FROM accounts WHERE id=?", (aid,))
+            finally:
+                conn.close()
     return {"ok": True, "deleted": True, "soft_deleted": False}
 
 
 @app.post("/api/accounts/{aid}/quota")
 def query_account_quota(aid: int):
-    """按账号代理查询 Claude Code 额度。"""
+    """
+    按账号代理或 cc2api 绑定链路查询 Claude Code 额度。
+
+    :param aid: bench accounts.id
+    :return: 前端可展示的标准化额度结果
+    """
     if not runner:
         raise HTTPException(500, "runner not ready")
     conn = get_db()
     try:
         row = _get_available_account(conn, aid)
         if not row:
-            raise HTTPException(404, "account not found or disabled")
+            raise HTTPException(404, "账号不存在或已停用")
         account = dict(row)
     finally:
         conn.close()
-    try:
-        return runner.query_quota(account)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    except Exception as e:
-        raise HTTPException(500, f"quota query failed: {e}")
+    with _oauth_owner_lock(str(account["name"])):
+        conn = get_db()
+        try:
+            current_row = _get_available_account(conn, aid)
+            if not current_row:
+                raise HTTPException(404, "账号不存在或已停用")
+            current = dict(current_row)
+        finally:
+            conn.close()
+        current_binding = current.get("cc2api_account_id")
+        if current_binding is not None:
+            try:
+                _sync_bound_account_credentials_locked(current, OAUTH_REFRESH_BUFFER_SEC)
+                raw = cc2api_client.refresh_usage(int(current_binding))
+                _sync_bound_account_credentials_locked(current, OAUTH_REFRESH_BUFFER_SEC)
+                return _format_quota_result(raw)
+            except ConnectionError as exc:
+                raise HTTPException(502, _redact_cc2api_error(exc))
+            except ValueError as exc:
+                raise HTTPException(400, _redact_cc2api_error(exc))
+        try:
+            return runner.query_quota(current)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        except Exception as exc:
+            raise HTTPException(500, f"额度查询失败：{exc}")
 
 
 # ---------- accounts: 内嵌 OAuth 登录（WebUI 用） ----------
@@ -3800,26 +5579,38 @@ class LoginStartIn(BaseModel):
 def login_start(body: LoginStartIn):
     """启动一个 OAuth 引导会话；前端拿到 session_id 后开 WS 拿 PTY"""
     if not login_manager:
-        raise HTTPException(500, "login manager not ready")
-    try:
-        proxy_scheme = _normalize_upstream_proxy_scheme(body.upstream_proxy_scheme)
-        timezone = _normalize_account_timezone(body.timezone)
-        session = login_manager.start(
-            body.name,
-            {
-                "scheme": proxy_scheme,
-                "host": body.upstream_socks5_host,
-                "port": body.upstream_socks5_port,
-                "user": body.upstream_socks5_user,
-                "pass": body.upstream_socks5_pass,
-            },
-            body.force_reauth,
-            timezone,
-        )
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    except Exception as e:
-        raise HTTPException(500, f"failed to start login session: {e}")
+        raise HTTPException(500, "登录管理器尚未就绪")
+    with _oauth_owner_lock(body.name):
+        conn = get_db()
+        try:
+            bound = conn.execute(
+                "SELECT id FROM accounts WHERE name=? AND deleted_at IS NULL "
+                "AND cc2api_account_id IS NOT NULL",
+                (body.name,),
+            ).fetchone()
+        finally:
+            conn.close()
+        if bound:
+            raise HTTPException(409, "账号已绑定 cc2api，请先解绑后再重新授权")
+        try:
+            proxy_scheme = _normalize_upstream_proxy_scheme(body.upstream_proxy_scheme)
+            timezone = _normalize_account_timezone(body.timezone)
+            session = login_manager.start(
+                body.name,
+                {
+                    "scheme": proxy_scheme,
+                    "host": body.upstream_socks5_host,
+                    "port": body.upstream_socks5_port,
+                    "user": body.upstream_socks5_user,
+                    "pass": body.upstream_socks5_pass,
+                },
+                body.force_reauth,
+                timezone,
+            )
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except Exception as e:
+            raise HTTPException(500, f"启动登录会话失败：{e}")
     return {
         "session_id": session.sid,
         "ws_path": f"/api/accounts/login/ws/{session.sid}",
@@ -3959,6 +5750,17 @@ def login_commit(sid: str, body: LoginStartIn):
         raise HTTPException(404, "session not found")
     if session.name != body.name:
         raise HTTPException(400, "name mismatch with session")
+    conn = get_db()
+    try:
+        bound = conn.execute(
+            "SELECT id FROM accounts WHERE name=? AND deleted_at IS NULL "
+            "AND cc2api_account_id IS NOT NULL",
+            (session.name,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if bound:
+        raise HTTPException(409, "账号已绑定 cc2api，请先解绑后再提交重授权")
     try:
         proxy_scheme = _normalize_upstream_proxy_scheme(body.upstream_proxy_scheme)
         timezone = _normalize_account_timezone(body.timezone)
@@ -4829,7 +6631,8 @@ def get_capture(rid: str):
 def stop_run(rid: str):
     """请求停止 queued/running run，并尽量先回写运行时凭据。"""
     if not runner:
-        raise HTTPException(500, "runner not ready")
+        raise HTTPException(500, "运行器尚未就绪")
+    warmup_binding_id: Optional[int] = None
     conn = get_db()
     try:
         row = conn.execute(
@@ -4837,12 +6640,19 @@ def stop_run(rid: str):
             (rid,),
         ).fetchone()
         if not row:
-            raise HTTPException(404, "run not found")
+            raise HTTPException(404, "运行记录不存在")
         run = dict(row)
+        if run.get("run_kind") == "warmup":
+            account_row = conn.execute(
+                "SELECT cc2api_account_id FROM accounts WHERE id=?",
+                (run["account_id"],),
+            ).fetchone()
+            if account_row:
+                warmup_binding_id = account_row["cc2api_account_id"]
     finally:
         conn.close()
     if run["status"] not in ("queued", "running"):
-        raise HTTPException(400, f"run {rid} is not queued/running")
+        raise HTTPException(400, f"运行 {rid} 当前不是 queued/running 状态")
     runner.persist_worker_profile(run.get("worker_container"))
     with _db_lock:
         conn = get_db()
@@ -4867,22 +6677,37 @@ def stop_run(rid: str):
                     )
         finally:
             conn.close()
+    if warmup_scheduler:
+        warmup_scheduler.handle_run_terminal(rid, warmup_binding_id)
     return {"ok": True}
 
 
 @app.delete("/api/runs/{rid}")
 def delete_run(rid: str):
-    """软删除 run；workspace/flow/transcript 保留。"""
+    """
+    软删除终态 run；workspace、flow 和 transcript 保留。
+
+    :param rid: runs.id
+    :return: 删除成功标记
+    """
     with _db_lock:
         conn = get_db()
         try:
             with conn:
+                row = conn.execute(
+                    "SELECT status FROM runs WHERE id=? AND deleted_at IS NULL",
+                    (rid,),
+                ).fetchone()
+                if not row:
+                    raise HTTPException(404, "运行记录不存在")
+                if row["status"] in ("queued", "running", "stopping"):
+                    raise HTTPException(409, f"运行 {rid} 仍处于 {row['status']} 状态，请先停止并收口")
                 cur = conn.execute(
                     "UPDATE runs SET deleted_at=? WHERE id=? AND deleted_at IS NULL",
                     (time.time(), rid),
                 )
                 if cur.rowcount == 0:
-                    raise HTTPException(404, "run not found")
+                    raise HTTPException(404, "运行记录不存在")
         finally:
             conn.close()
     return {"ok": True}
@@ -4892,7 +6717,7 @@ def delete_run(rid: str):
 def continue_run_start(rid: str):
     """启动 run 继续对话会话；前端随后连接返回的 WebSocket。"""
     if not continue_manager:
-        raise HTTPException(500, "continue manager not ready")
+        raise HTTPException(500, "继续对话管理器尚未就绪")
     conn = get_db()
     try:
         run_row = conn.execute(
@@ -4900,25 +6725,41 @@ def continue_run_start(rid: str):
             (rid,),
         ).fetchone()
         if not run_row:
-            raise HTTPException(404, "run not found")
+            raise HTTPException(404, "运行记录不存在")
         run = dict(run_row)
         if run["status"] not in _TERMINAL_RUN_STATUSES:
-            raise HTTPException(400, f"run {rid} is not completed")
+            raise HTTPException(400, f"运行 {rid} 尚未结束")
         account_row = conn.execute(
             "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL",
             (run["account_id"],),
         ).fetchone()
         if not account_row:
-            raise HTTPException(404, "account not found or disabled")
+            raise HTTPException(404, "账号不存在或已停用")
         account = dict(account_row)
     finally:
         conn.close()
-    try:
-        session = continue_manager.start(run, account)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    except Exception as e:
-        raise HTTPException(500, f"failed to start continue session: {e}")
+    with _oauth_owner_lock(str(account["name"])):
+        conn = get_db()
+        try:
+            current_account_row = _get_available_account(conn, int(account["id"]))
+            if not current_account_row:
+                raise HTTPException(404, "账号不存在或已停用")
+            account = dict(current_account_row)
+        finally:
+            conn.close()
+        if account.get("cc2api_account_id") is not None:
+            try:
+                _sync_bound_account_credentials_locked(account, 2400)
+            except ConnectionError as exc:
+                raise HTTPException(502, _redact_cc2api_error(exc))
+            except ValueError as exc:
+                raise HTTPException(400, _redact_cc2api_error(exc))
+        try:
+            session = continue_manager.start(run, account)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except Exception as e:
+            raise HTTPException(500, f"启动继续对话会话失败：{e}")
     return {
         "session_id": session.sid,
         "run_id": session.run_id,
@@ -4982,9 +6823,48 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
 
     loop = asyncio.get_event_loop()
     closed = asyncio.Event()
+    auth_tail = ""
+    auth_refresh_task: Optional[asyncio.Task] = None
+
+    async def recover_managed_oauth_once() -> None:
+        """首次检测到 continue 401 时交给 cc2api 刷新并提示 Claude 重试。"""
+        conn = get_db()
+        try:
+            account_row = _get_available_account(conn, session.account_id)
+            account = dict(account_row) if account_row else None
+        finally:
+            conn.close()
+        if not account or account.get("cc2api_account_id") is None:
+            return
+        try:
+            await asyncio.to_thread(
+                _sync_bound_account_credentials,
+                account,
+                600,
+                True,
+            )
+            await asyncio.to_thread(
+                continue_manager.runner.sync_managed_credentials_to_worker,
+                session.worker_id,
+            )
+            raw.send(b"\x03")
+            await asyncio.sleep(1)
+            raw.send(
+                "检测到认证失败，cc2api 已刷新凭据。请重试刚才失败的请求；若仍失败请停止。\r".encode(
+                    "utf-8"
+                )
+            )
+        except Exception as exc:
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.send_bytes(
+                    f"\r\n[bench] cc2api 凭据刷新失败：{_redact_cc2api_error(exc)}\r\n".encode(
+                        "utf-8"
+                    )
+                )
 
     async def pump_container_to_ws():
         """worker PTY → ws"""
+        nonlocal auth_tail, auth_refresh_task
         try:
             while not closed.is_set():
                 try:
@@ -4998,6 +6878,17 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
                 if websocket.client_state != WebSocketState.CONNECTED:
                     break
                 await websocket.send_bytes(data)
+                auth_tail = (auth_tail + data.decode("utf-8", errors="ignore"))[-6000:]
+                if auth_refresh_task is None and any(
+                    marker in auth_tail
+                    for marker in (
+                        "Please run /login",
+                        "API Error: 401",
+                        "Invalid authentication credentials",
+                        "OAuth token has expired",
+                    )
+                ):
+                    auth_refresh_task = asyncio.create_task(recover_managed_oauth_once())
         except Exception:
             pass
         finally:
@@ -5042,6 +6933,8 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
     try:
         await asyncio.gather(pump_container_to_ws(), pump_ws_to_container())
     finally:
+        if auth_refresh_task and not auth_refresh_task.done():
+            auth_refresh_task.cancel()
         try:
             raw.close()
         except Exception:

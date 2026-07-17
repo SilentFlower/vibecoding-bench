@@ -32,10 +32,38 @@ WORKER_MODE="${WORKER_MODE:-task}"
 CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.197}"
 CLAUDE_CODE_EFFORT_LEVEL="${CLAUDE_CODE_EFFORT_LEVEL:-max}"
 PROFILE_CLAUDE_CODE_EFFORT_LEVEL="${PROFILE_CLAUDE_CODE_EFFORT_LEVEL:-$CLAUDE_CODE_EFFORT_LEVEL}"
+CC2API_MANAGED_OAUTH="${CC2API_MANAGED_OAUTH:-0}"
 log() { echo "[entrypoint $(date +%H:%M:%S)] $*"; }
 CLAUDE_USER=node
 CLAUDE_HOME=/home/node
 CLAUDE_DIR="$CLAUDE_HOME/.claude"
+
+strip_managed_refresh_token() {
+  local path="${1:-$CLAUDE_DIR/.credentials.json}"
+  if [ "$CC2API_MANAGED_OAUTH" != "1" ] || [ ! -f "$path" ]; then
+    return 0
+  fi
+  node - "$path" <<'JS'
+const fs = require('fs');
+const path = process.argv[2];
+let data;
+try {
+  data = JSON.parse(fs.readFileSync(path, 'utf8'));
+} catch {
+  process.exit(1);
+}
+const oauth = data && data.claudeAiOauth;
+if (!oauth || typeof oauth !== 'object') {
+  process.exit(1);
+}
+delete oauth.refreshToken;
+const tmp = `${path}.tmp.${process.pid}`;
+fs.writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+fs.renameSync(tmp, path);
+JS
+  chown "$CLAUDE_USER:$CLAUDE_USER" "$path" 2>/dev/null || true
+  chmod 600 "$path" 2>/dev/null || true
+}
 
 ensure_claude_code_version() {
   # 镜像只内置一个默认版本；WebUI 可覆盖版本用于快速回退/验证。
@@ -244,7 +272,9 @@ persist_runtime_claude_state() {
   if [ ! -d /mnt/profile ] || [ ! -w /mnt/profile ]; then
     return 0
   fi
-  persist_local_credentials_to_profile_once >/dev/null 2>&1 || true
+  if [ "$CC2API_MANAGED_OAUTH" != "1" ]; then
+    persist_local_credentials_to_profile_once >/dev/null 2>&1 || true
+  fi
   if [ -f "$CLAUDE_HOME/.claude.json" ]; then
     patch_top_config_gates
     cp "$CLAUDE_HOME/.claude.json" /mnt/profile/.claude.json || true
@@ -293,11 +323,12 @@ sync_profile_credentials_once() {
   local dst="$CLAUDE_DIR/.credentials.json"
   [ -f "$src" ] || return 1
   set +e
-  node - "$src" "$dst" "$CLAUDE_USER" <<'JS'
+  node - "$src" "$dst" "$CC2API_MANAGED_OAUTH" <<'JS'
 const fs = require('fs');
 const path = require('path');
 const src = process.argv[2];
 const dst = process.argv[3];
+const managed = process.argv[4] === '1';
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -317,6 +348,9 @@ try {
   current = readJson(dst);
 } catch {}
 const sourceOauth = source.claudeAiOauth || {};
+if (managed) {
+  delete sourceOauth.refreshToken;
+}
 const currentOauth = current && current.claudeAiOauth ? current.claudeAiOauth : {};
 function expiresAt(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
@@ -367,6 +401,9 @@ JS
 }
 
 persist_local_credentials_to_profile_once() {
+  if [ "$CC2API_MANAGED_OAUTH" = "1" ]; then
+    return 0
+  fi
   local lock_path="/mnt/profile/.credentials.lock"
   [ -d /mnt/profile ] && [ -w /mnt/profile ] || return 1
   (
@@ -529,6 +566,10 @@ JS
 
 force_refresh_profile_credentials_once() {
   local reason="${1:-auth_error}"
+  if [ "$CC2API_MANAGED_OAUTH" = "1" ]; then
+    request_managed_profile_credentials_refresh "$reason"
+    return $?
+  fi
   local credentials_path="$CLAUDE_DIR/.credentials.json"
   [ -f "$credentials_path" ] || return 1
   local lock_path="/mnt/profile/.credentials.lock"
@@ -541,6 +582,61 @@ force_refresh_profile_credentials_once() {
     return $?
   fi
   force_refresh_profile_credentials_unlocked "$reason"
+}
+
+request_managed_profile_credentials_refresh() {
+  local reason="${1:-auth_error}"
+  local request_path="/workspace/.cc2api-oauth-refresh-request.json"
+  local result_path="/workspace/.cc2api-oauth-refresh-result.json"
+  local base_fingerprint=""
+  base_fingerprint="$(credential_fingerprint "$CLAUDE_DIR/.credentials.json" 2>/dev/null || true)"
+  rm -f "$result_path"
+  node - "$request_path" "$reason" <<'JS'
+const fs = require('fs');
+const path = process.argv[2];
+const reason = process.argv[3] || 'auth_error';
+const tmp = `${path}.tmp.${process.pid}`;
+fs.writeFileSync(tmp, `${JSON.stringify({reason}, null, 2)}\n`, 'utf8');
+fs.renameSync(tmp, path);
+JS
+  local wait_sec="${OAUTH_401_PROFILE_WAIT_SEC:-90}"
+  case "$wait_sec" in
+    ''|*[!0-9]*) wait_sec=90 ;;
+  esac
+  local deadline=$(( $(date +%s) + wait_sec ))
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    if [ -f "$result_path" ]; then
+      if node - "$result_path" <<'JS' >/dev/null 2>&1
+const fs = require('fs');
+const data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+process.exit(data && data.ok === true ? 0 : 1);
+JS
+      then
+        sync_profile_credentials_once >/dev/null 2>&1 || true
+        strip_managed_refresh_token "$CLAUDE_DIR/.credentials.json" >/dev/null 2>&1 || true
+        local current_fingerprint=""
+        current_fingerprint="$(credential_fingerprint "$CLAUDE_DIR/.credentials.json" 2>/dev/null || true)"
+        if [ -n "$current_fingerprint" ] && [ "$current_fingerprint" != "$base_fingerprint" ]; then
+          printf '%s\n' '{"refreshed":true,"owner":"cc2api"}'
+          return 0
+        fi
+      else
+        node - "$result_path" <<'JS'
+const fs = require('fs');
+try {
+  const data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+  process.stdout.write(JSON.stringify({error: String(data.error || 'cc2api 刷新凭据失败')}) + '\n');
+} catch {
+  process.stdout.write('{"error":"cc2api 刷新凭据失败"}\n');
+}
+JS
+        return 1
+      fi
+    fi
+    sleep 1
+  done
+  printf '%s\n' '{"error":"等待 cc2api 刷新凭据超时"}'
+  return 1
 }
 
 force_refresh_profile_credentials_unlocked() {
@@ -685,8 +781,11 @@ start_profile_credentials_sync() {
   fi
   (
     while true; do
-      persist_local_credentials_to_profile_once >/dev/null 2>&1 || true
+      if [ "$CC2API_MANAGED_OAUTH" != "1" ]; then
+        persist_local_credentials_to_profile_once >/dev/null 2>&1 || true
+      fi
       sync_profile_credentials_once >/dev/null 2>&1 || true
+      strip_managed_refresh_token "$CLAUDE_DIR/.credentials.json" >/dev/null 2>&1 || true
       sleep "$interval"
     done
   ) &
@@ -1335,6 +1434,7 @@ if [ "$WORKER_MODE" = "login" ]; then
     log "Restored top-level ~/.claude.json from profile"
   fi
   write_default_settings
+  strip_managed_refresh_token "$CLAUDE_DIR/.credentials.json" || true
   chown -R "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME" || true
   log "Login mode: idling; orchestrator will docker exec 'claude auth login' as $CLAUDE_USER."
   log "  profile dir contents at start:"
@@ -1379,6 +1479,7 @@ if [ -d /mnt/profile ]; then
 else
   log "WARN: no profile mounted at /mnt/profile, claude likely not authenticated"
 fi
+strip_managed_refresh_token "$CLAUDE_DIR/.credentials.json" || true
 chown -R "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME" /workspace || true
 
 # ---------- 3) 注入 settings 文件 ----------
@@ -1512,6 +1613,11 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
       refresh_result="$(force_refresh_profile_credentials_once "worker_401" 2>/tmp/oauth-refresh-stderr.log)" || refresh_status=$?
       if [ "$refresh_status" -ne 0 ]; then
         log "OAuth force refresh failed after auth error: ${refresh_result:-$(cat /tmp/oauth-refresh-stderr.log 2>/dev/null || true)}"
+        if [ "$CC2API_MANAGED_OAUTH" = "1" ]; then
+          echo "auth_error" > /tmp/claude-fatal-error
+          write_bench_status "auth_failed" "OAuth 认证失败: ${auth_marker}；cc2api 刷新失败：${refresh_result}"
+          break
+        fi
         if printf '%s' "$refresh_result" | grep -Eiq 'invalid_grant|"status"[[:space:]]*:[[:space:]]*(400|429)'; then
           echo "auth_error" > /tmp/claude-fatal-error
           write_bench_status "auth_failed" "OAuth 认证失败: ${auth_marker}；刷新失败：${refresh_result}"

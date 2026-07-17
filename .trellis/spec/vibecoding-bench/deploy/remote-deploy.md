@@ -154,6 +154,83 @@ worker 启动时会检查 `claude --version`；如果和当前生效版本不一
 
 ---
 
+## Scenario: cc2api 集成与养号调度环境
+
+### 1. Scope / Trigger
+
+- 远程启用/停用 bench 到 cc2api 的账号同步、managed OAuth 或定时养号时适用。
+- 该集成由 orchestrator 主动调用 cc2api 管理 API；worker 不直接持有 cc2api 管理密码。
+
+### 2. Signatures
+
+`.env` 与 Compose 必须支持：
+
+```text
+CC2API_BASE_URL=
+CC2API_ADMIN_PASSWORD=
+CC2API_REQUEST_TIMEOUT_SEC=15
+WARMUP_SCHEDULER_TICK_SEC=30
+WARMUP_SYNC_RETRY_SEC=900
+```
+
+其中 `CC2API_BASE_URL` 是 orchestrator 容器可访问的服务根地址，`CC2API_ADMIN_PASSWORD` 是 cc2api 管理端 Bearer 密码。
+
+### 3. Contracts
+
+- `CC2API_BASE_URL` 或 `CC2API_ADMIN_PASSWORD` 任一为空时，集成功能不可用，但现有未绑定账号、普通 run、抓包和 WebUI 必须继续工作。
+- 管理密码只注入 orchestrator；不得传给 worker/sidecar、返回 WebUI、写入 README 示例值、日志、task、workspace 或 transcript。
+- Compose 中本地与远程 orchestrator 必须同时透传五个变量，默认超时 15 秒、调度 tick 30 秒、临时同步失败 900 秒重试。
+- `CC2API_BASE_URL` 必须按容器网络视角填写。若 cc2api 在同一 Compose 网络，使用服务名和容器端口；若在宿主或外部主机，使用 orchestrator 容器真实可达地址，不能假设 `127.0.0.1` 指向宿主。
+- 修改这些环境变量后必须 `up -d --force-recreate orchestrator`；只改 WebUI 不需要 recreate，修改 worker managed 逻辑则还必须重建/发布 worker 镜像。
+- 远程恢复后已逾期养号账号最多认领一次；服务停机期间不累计补跑。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|------|------|
+| base URL 或管理密码为空 | cc2api 操作返回可见配置错误，普通功能不受影响 |
+| orchestrator 容器无法访问 base URL | 养号不建 run，15 分钟后重试 |
+| 管理密码错误 | 管理 API 失败；养号保持 `sync_failed` 重试，不得回显密码或 Authorization |
+| cc2api 返回永久凭据错误 | 账号养号立即暂停，不按 900 秒循环重试 |
+| 只执行 `docker compose restart` | 新环境不会可靠加载；必须 force-recreate |
+| 远程重启后 next 已逾期 | 单次认领并置空 next，避免重复补跑 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：orchestrator 与 cc2api 位于同一 Docker 网络，`CC2API_BASE_URL=http://claude-code-gateway:5674`，密码只存在 `.env`，Compose recreate 后账号页可列出脱敏账号。
+- Base：五个变量保持默认/空值，bench 继续作为独立服务运行，所有老账号保持未绑定。
+- Bad：把管理密码写进前端 JavaScript 或 worker environment；浏览器、容器 inspect 和 workspace 都会泄漏高权限凭据。
+- Bad：cc2api 跑在宿主机却填写 `http://127.0.0.1:5674`；orchestrator 容器会访问自己而不是宿主。
+
+### 6. Tests Required
+
+- `docker compose --env-file .env.example config --quiet` 和远程 compose 同命令通过，确认五个变量均被解析。
+- 在 orchestrator 容器内请求 `CC2API_BASE_URL/`，确认 DNS/端口可达；不得在输出中打印管理密码。
+- 错密码和不可达地址分别验证 502/`sync_failed` 分类，并断言错误中不含密码或 Authorization。
+- 重启 orchestrator 后检查已逾期账号只创建一个 warmup run，`warmup_next_run_at` 在认领时置空。
+- `docker inspect` worker/sidecar environment，断言不存在 `CC2API_ADMIN_PASSWORD`。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```bash
+CC2API_BASE_URL=http://127.0.0.1:5674
+CC2API_ADMIN_PASSWORD=plain-text-in-compose-file
+docker compose restart orchestrator
+```
+
+#### Correct
+
+```bash
+# 值保存在 gitignored .env；服务名按实际共享网络填写。
+CC2API_BASE_URL=http://claude-code-gateway:5674
+CC2API_ADMIN_PASSWORD=<强随机管理密码>
+docker compose -f docker-compose.remote.yml --env-file .env up -d --force-recreate orchestrator
+```
+
+---
+
 ## BENCH_PORT 选择
 
 宿主机上 8000 经常被别的服务占(我们实测撞上 `amazonq2api`)。**首次部署先扫端口**:

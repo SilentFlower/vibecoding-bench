@@ -74,10 +74,10 @@
         <button class="btn btn-primary" id="add-account">+ 添加账号</button>
       </header>
       <div class="table-frame">
-        <table class="data">
+        <table class="data accounts-table">
           <thead><tr>
             <th>id</th><th>name</th><th>profile</th>
-            <th>upstream proxy</th><th>timezone</th><th>access token</th><th>on</th><th>op</th>
+            <th>upstream proxy</th><th>timezone</th><th>access token</th><th>cc2api / warmup</th><th>on</th><th>op</th>
           </tr></thead>
           <tbody id="accounts-body"></tbody>
         </table>
@@ -315,6 +315,42 @@
         <button class="modal-close" id="modal-close" aria-label="close">×</button>
       </div>
       <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <!-- cc2api 绑定与养号配置 -->
+  <div class="modal hidden" id="warmup-modal">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-frame" aria-hidden="true">
+        <span class="frame-tl">┌</span><span class="frame-tr">┐</span>
+        <span class="frame-bl">└</span><span class="frame-br">┘</span>
+      </div>
+      <div class="modal-titlebar">
+        <span class="modal-titlebar-name">acc / warmup <span class="muted" id="warmup-modal-title"></span></span>
+        <button class="modal-close" data-close="#warmup-modal" aria-label="close">×</button>
+      </div>
+      <form id="warmup-form" class="form">
+        <input type="hidden" name="account_id" />
+        <label><span class="lbl">$ cc2api_account</span>
+          <select name="cc2api_account_id" required></select>
+        </label>
+        <div class="row warmup-interval-row">
+          <label><span class="lbl">$ min_hours</span>
+            <input name="interval_min_hours" type="number" min="1" max="720" required />
+          </label>
+          <label><span class="lbl">$ max_hours</span>
+            <input name="interval_max_hours" type="number" min="1" max="720" required />
+          </label>
+        </div>
+        <label class="toggle-line">
+          <input name="enabled" type="checkbox" />
+          <span>启用定时养号</span>
+        </label>
+        <div class="row-end">
+          <button type="button" class="btn" data-close="#warmup-modal">cancel</button>
+          <button type="submit" class="btn btn-primary">save</button>
+        </div>
+      </form>
     </div>
   </div>
 

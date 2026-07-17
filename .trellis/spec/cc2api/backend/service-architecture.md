@@ -423,6 +423,118 @@ match rate_limit_decision {
 }
 ```
 
+## Scenario: 受信任管理端解析 OAuth 凭据
+
+### 1. Scope / Trigger
+
+- 修改 `POST /admin/accounts/:id/oauth-credentials/resolve`、`AccountService` OAuth refresh 锁、usage 获取 token，或新增需要消费最终 AT/RT 的受信任服务时适用。
+- 该接口用于让外部 orchestrator 复用 cc2api 的单一 RT 刷新所有权，不是浏览器或普通网关 token 的公开接口。
+
+### 2. Signatures
+
+管理 API：
+
+```http
+POST /admin/accounts/:id/oauth-credentials/resolve
+Authorization: Bearer <admin password>
+Content-Type: application/json
+
+{
+  "min_validity_seconds": 2400,
+  "force_refresh": false
+}
+```
+
+响应：
+
+```json
+{
+  "account_id": 1,
+  "access_token": "<secret>",
+  "refresh_token": "<secret>",
+  "expires_at": 0
+}
+```
+
+service 入口：
+
+```rust
+AccountService::resolve_oauth_credentials(
+    id: i64,
+    min_validity_seconds: i64,
+    force_refresh: bool,
+) -> Result<OAuthCredentialSnapshot, AppError>
+```
+
+### 3. Contracts
+
+- handler 默认 `min_validity_seconds=2400`，只允许 `60..=7200`；`force_refresh` 默认 false。
+- 只接受 `status=active` 且 `auth_type=oauth` 的账号，AT、RT、`expires_at` 任一缺失都拒绝返回。
+- 每次 resolve 都必须获取 `oauth:refresh:account:<id>` cache lock，即使当前 AT 仍有效也不能走无锁快路径；这样返回快照不会与 Gateway、usage poller 或另一个 resolve 的 RT 轮换并发。
+- 获锁后重新读取账号；需要刷新时复用同一 refresh 实现并落库；返回前再次读取账号，确保 AT/RT/过期时间来自同一次最终存储状态。
+- `force_refresh=true` 只用于消费者已经观察到 401 的单次恢复。调用方不得用它做周期轮询，也不得自行拿响应 RT 调 OAuth endpoint。
+- 现有 `resolve_upstream_token` 继续允许刷新失败时使用仍有效 AT 的兼容 fallback；管理端 resolve 不允许返回不满足最小有效期的旧快照。
+- `refresh_usage` 通过同一 token resolve 链路获取 AT，避免 usage poller 与管理端消费者形成第二条无锁刷新路径。
+- tracing、错误和测试输出不得记录 AT、RT、Authorization、邮箱/UUID 的真实映射。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+|------|------|
+| `min_validity_seconds < 60` 或 `> 7200` | `BadRequest` |
+| 账号不存在 | 现有 store 的 not found 错误 |
+| 账号 disabled | `BadRequest`，提示不是 active |
+| SetupToken 账号 | `BadRequest`，提示不是 OAuth |
+| AT 剩余时间满足要求 | 仍获取账号锁，最终重读后原样返回 |
+| AT 临期或 `force_refresh=true` | 锁内刷新、落库、最终重读后返回 |
+| refresh token 缺失 | 更新 auth error，返回不可用错误 |
+| refresh 返回 `invalid_grant` | 返回错误，不使用旧 RT/AT 伪装成功 |
+| 等待锁超时 | `ServiceUnavailable`，不返回锁前快照 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：Gateway 正在轮换 RT，bench resolve 等待同一 lock；锁释放后重新读库并拿到新 AT/RT，而不是返回进入函数时的旧副本。
+- Base：AT 仍有 1 小时有效期，resolve 获取锁后不发 refresh 请求，只最终重读并返回当前快照。
+- Bad：先检查 `has_valid_oauth_access_token`，有效就直接返回；检查后到返回前另一个刷新者可能已经轮换 RT。
+- Bad：管理端 resolve 刷新失败后返回仍有效旧 AT；bench 会把不满足本次运行窗口的凭据当作已准备完成。
+
+### 6. Tests Required
+
+- handler 单测覆盖默认值、60/7200 边界和越界拒绝。
+- service 单测覆盖有效 AT 不刷新但仍返回完整快照、非 OAuth/disabled 拒绝。
+- 人工占用账号 refresh lock，启动 resolve 后断言其等待；更新 store 的 AT/RT 并释放锁，断言返回更新后的最终快照。
+- refresh 成功/失败路径断言 lock 总会释放，响应和日志不包含额外账号字段。
+- 完整改动至少运行 `cargo fmt --check` 和 `cargo test`。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+let account = self.store.get_by_id(id).await?;
+if account.has_valid_oauth_access_token(min_validity_seconds) {
+    return Ok(snapshot_from(account));
+}
+```
+
+#### Correct
+
+```rust
+let lock_key = format!("oauth:refresh:account:{}", id);
+let lock_owner = Uuid::new_v4().to_string();
+let acquired = self
+    .cache
+    .acquire_lock(&lock_key, &lock_owner, OAUTH_LOCK_TTL)
+    .await?;
+if acquired {
+    let result = self.resolve_oauth_credentials_locked(id, policy).await;
+    self.cache.release_lock(&lock_key, &lock_owner).await;
+    return result;
+}
+```
+
+有效 AT 也必须在同一账号锁内最终重读后返回。
+
 ## 设置热刷新模式
 
 新增全局 setting 通常要经过这些位置：

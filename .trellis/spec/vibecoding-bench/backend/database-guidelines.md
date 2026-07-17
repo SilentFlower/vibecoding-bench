@@ -171,6 +171,137 @@ row = conn.execute(
 
 ---
 
+## Scenario: cc2api 绑定与定时养号状态机
+
+### 1. Scope / Trigger
+
+- 修改 `accounts.cc2api_account_id`、`warmup_*` 字段、`runs.run_kind='warmup'`、养号认领/终态回调，或绑定账号 worker 启动顺序时适用。
+- 目标是让 cc2api 成为绑定账号 AT/RT 的唯一刷新所有者，同时保证调度跨重启恢复且同账号不会创建并行养号 run。
+
+### 2. Signatures
+
+账号绑定与调度字段：
+
+```text
+accounts.cc2api_account_id             INTEGER NULL UNIQUE
+accounts.warmup_enabled                INTEGER DEFAULT 0
+accounts.warmup_interval_min_hours     INTEGER DEFAULT 3
+accounts.warmup_interval_max_hours     INTEGER DEFAULT 5
+accounts.warmup_next_run_at            REAL NULL
+accounts.warmup_last_attempt_at        REAL NULL
+accounts.warmup_last_run_id            TEXT NULL
+accounts.warmup_last_status            TEXT NULL
+accounts.warmup_last_error             TEXT NULL
+accounts.warmup_auth_failures          INTEGER DEFAULT 0
+runs.run_kind                           TEXT; warmup 表示养号真实 run
+```
+
+进程内串行入口：
+
+```python
+_oauth_owner_lock(account_name)
+_profile_lock(account_name)
+_cc2api_binding_lock
+_require_cc2api_binding_available(bench_account_id, cc2api_account_id)
+WarmupScheduler.trigger_account(account_id, require_due=False)
+WarmupScheduler.handle_run_started(run_id)
+WarmupScheduler.handle_run_terminal(run_id, expected_cc2api_account_id=None)
+```
+
+### 3. Contracts
+
+- `init_db()` 必须先 `_ensure_column` 补齐所有绑定/养号列，再创建 `cc2api_account_id IS NOT NULL` 的唯一索引；旧账号默认未绑定且养号关闭。
+- 只要 `cc2api_account_id` 非空，即使 `warmup_enabled=0`，bench 后台和 worker 也不得使用 RT 本地刷新。
+- 绑定、改绑、解绑与 worker 创建共用 `_oauth_owner_lock(account_name)`；worker 必须在锁内重新读取账号、同步 cc2api 最终凭据并完成 `Runner.start_run`，绑定接口必须在同一把锁内检查 active run/continue/login 后再写 DB。
+- 不同 bench 账号的绑定或改绑还必须经过 `_cc2api_binding_lock` 串行化，并在 resolve/profile 写入前调用 `_require_cc2api_binding_available`。唯一索引是最终兜底，不能等 profile 已经写入其它账号的 AT/RT 后才依赖索引报错。
+- 已绑定账号调用“同步到 cc2api”时，当前 `accounts.cc2api_account_id` 是权威来源；只能校验并同步这个 ID。改绑必须走显式选择接口，不能重新按 profile 身份静默匹配到另一个 cc2api 账号。
+- `_oauth_owner_lock` 可以包住 cc2api HTTP 和 profile I/O，但不得包住 `_db_lock` 下的长事务；所有 cc2api HTTP 仍在 `_db_lock` 外执行。锁顺序固定为 `owner lock -> profile lock`，禁止反向获取。
+- 养号到期认领时把 `warmup_next_run_at=NULL`、状态写为 `preparing`；预同步成功后创建 queued run，但 queued run 拿到账号 semaphore 时必须再次同步，不能用“已准备”标记跳过。
+- `handle_run_started` 只把仍启用且 `warmup_last_run_id` 匹配的账号写为 `running`。用户已主动关闭时保持 `off`。
+- 终态后按配置随机写下一次时间；普通失败/超时/停止继续调度，连续 3 次 `auth_failed` 暂停，包含 `invalid_grant`、账号不存在/禁用或凭据结构错误的首个认证失败立即暂停。
+- 终态回调必须携带本次 run 启动时的 `expected_cc2api_account_id`，并在写入认证失败计数、暂停状态或下一次时间前确认当前绑定仍相同。run 写入终态后到回调执行前允许用户改绑，旧 run 不能污染新绑定的调度状态。
+- `stop_run` 把 run 写成 `stopped` 后必须立即调用终态 helper，不能等待原调度线程稍后收口。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 数据库行为 |
+|------|------------|
+| 同一 cc2api ID 绑定第二个 bench 账号 | profile 写入前返回 409；唯一索引继续做最终兜底 |
+| 已绑定账号同步时 profile 身份指向另一个 cc2api 账号 | 返回 409，原绑定和 profile AT/RT 保持不变 |
+| 绑定切换时存在 queued/running/stopping run | 拒绝切换，原绑定不变 |
+| 存在 active continue/login 会话 | 拒绝绑定切换或解绑 |
+| 到期账号已有 active warmup run | 不新建 run，账号最近状态指向已有 run |
+| 预同步成功但排队期间 RT 已轮换 | semaphore 后再次同步，worker 使用最终 AT/RT 快照 |
+| cc2api 临时网络失败 | 不建 task/run，状态 `sync_failed`，`now + WARMUP_SYNC_RETRY_SEC` 重试 |
+| 首次 `auth_failed` 含 `invalid_grant` | `warmup_enabled=0`、状态 `paused`、next 置空 |
+| 用户关闭养号后旧 run 收口 | 保持 `off`，不得改成 `paused` |
+| cc2api#7 的旧 run 终态前账号已改绑到 cc2api#8 | 旧回调直接返回，不修改 cc2api#8 的状态或失败计数 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：养号 run 排队 20 分钟后获得 semaphore，启动前重新 resolve；期间 cc2api 已轮换 RT，最终 profile 和 worker 都使用新快照。
+- Good：两个 bench 账号同时尝试绑定同一个 cc2api ID，绑定锁让其中一个先完成，另一个在 resolve 和 profile 写入前收到 409。
+- Base：未绑定老账号继续走原本本地 OAuth 刷新和普通 run 路径，所有新增列保持默认值。
+- Bad：在认领阶段同步一次后给 task 写 `credentials_prepared=true`，真正启动时跳过同步；排队期间轮换的 RT 会被遗漏。
+- Bad：解绑只检查一次 DB 后直接 UPDATE；检查与 worker 创建之间的竞态会同时产生 cc2api 和 Claude Code 两个 RT 刷新所有者。
+- Bad：已绑定账号点击同步时重新按 UUID/邮箱匹配，先写入新账号凭据，再由 DB 拒绝改绑；这会让 profile 与绑定 ID 短暂或长期不一致。
+- Bad：终态回调只检查 `warmup_last_run_id`，不检查 run 启动时的绑定 ID；旧 `invalid_grant` 可能暂停刚改绑的新账号。
+
+### 6. Tests Required
+
+- 旧 SQLite 幂等升级后断言新增列和唯一索引存在。
+- 并发模拟慢旧 resolve 与快新 resolve，断言 resolve + profile 写入整体串行且最终文件是新快照。
+- worker 创建阶段阻塞并并发解绑，断言解绑等待 owner lock，随后因 active run 返回 409。
+- 覆盖已绑定账号同步不会重新匹配其它 cc2api ID，错误前后 profile AT/RT 不变。
+- 覆盖重复绑定在 resolve/profile 写入前返回 409，且未调用 cc2api 凭据解析。
+- 覆盖 active run、continue、login 分别阻止绑定切换/解绑。
+- 覆盖 warmup 预同步后启动前再次同步、账号状态进入 `running`、停止后立即安排 next。
+- 覆盖首个永久认证错误立即暂停、第三个普通 `auth_failed` 暂停、用户关闭后终态保持 `off`。
+- 覆盖旧绑定 run 终态晚于改绑完成时，新的绑定状态、next 和认证失败计数均保持不变。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```python
+snapshot = cc2api_client.resolve_credentials(account_id, 2400)
+with _profile_lock(name):
+    write_profile(snapshot)
+```
+
+resolve 在锁外时，慢旧响应可能最后写回并覆盖新凭据。
+
+#### Correct
+
+```python
+with _profile_lock(name):
+    snapshot = cc2api_client.resolve_credentials(account_id, 2400)
+    write_profile_locked(snapshot)
+```
+
+绑定所有权切换还必须再包外层 `_oauth_owner_lock(name)`，并让 worker 启动使用同一把 owner lock。
+
+#### Wrong：终态回调使用当前绑定作为更新条件
+
+```python
+account = load_account(run["account_id"])
+update_warmup_state(account["cc2api_account_id"], run["status"])
+```
+
+run 进入终态后、回调执行前可能已经改绑；此时“当前绑定”不是该 run 的凭据所有者。
+
+#### Correct：用 run 启动时的绑定快照保护回调
+
+```python
+def handle_run_terminal(run_id, expected_cc2api_account_id):
+    account = load_account_for_update(run_id)
+    if account["cc2api_account_id"] != expected_cc2api_account_id:
+        return
+    update_warmup_state(account, run_id)
+```
+
+---
+
 ## Common Mistakes
 
 | 反模式 | 为什么不要 | 怎么改 |

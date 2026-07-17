@@ -377,6 +377,90 @@ profile settings 中不保存 `statusLine`;额度查询走 OAuth usage API 或�
 
 ---
 
+## Scenario: cc2api managed OAuth worker
+
+### 1. Scope / Trigger
+
+- 修改 `images/worker/entrypoint.sh` 的 credentials 同步、401 恢复、task/continue 启动环境，或 orchestrator 的 managed watcher 时适用。
+- 只要 bench 账号绑定了 `cc2api_account_id` 就进入 managed 模式，与是否开启定时养号无关。
+
+### 2. Signatures
+
+worker 环境和工作区标记：
+
+```text
+CC2API_MANAGED_OAUTH=1
+/workspace/.cc2api-oauth-refresh-request.json
+/workspace/.cc2api-oauth-refresh-result.json
+/workspace/.bench-status.json
+```
+
+orchestrator 入口：
+
+```python
+Runner.watch_managed_oauth_refresh(run_id, account, stop_event)
+Runner.sync_managed_credentials_to_worker(worker_id)
+_sync_bound_account_credentials(account, min_validity_seconds, force_refresh=False)
+```
+
+### 3. Contracts
+
+- 持久 profile 的 `.credentials.json` 保存 cc2api 当前完整 AT/RT，便于后续启动；复制进 task/continue worker 的运行副本必须删除 `refreshToken`。
+- managed 模式禁止 worker 调 OAuth token endpoint，也禁止 run home `.credentials.json` 反向覆盖 profile；`settings.json` 和 `.claude.json` 仍按白名单回写。
+- profile -> run home 同步只接受可解析 JSON 和有效 `claudeAiOauth.accessToken`，同步后再次删除运行副本 RT。
+- worker 首次检测到 401 时只写一次 refresh request 并等待 result；orchestrator watcher 调 cc2api `force_refresh=true`，原子更新 profile 后写 result。
+- watcher 成功后 worker 同步新 AT 并只注入一次重试提示；第二次 401 或 result 失败时写 `auth_failed` 并以 42 退出。
+- request/result/status 文件不得包含 AT、RT、管理密码、完整 prompt 或账号身份字段；错误只保留脱敏摘要。
+- managed 模式与普通模式必须在同一 entrypoint 中明确分支，不能让普通账号失去现有本地 RT 刷新和新鲜度回写能力。
+
+### 4. Validation & Error Matrix
+
+| 条件 | worker 行为 |
+|------|-------------|
+| `CC2API_MANAGED_OAUTH=1` 且 profile 有完整 AT/RT | run home 只保留 AT，不保留 RT |
+| managed 运行副本产生新的 credentials | 不回写 profile credentials |
+| 首次 401，watcher 成功写新 AT | 同步后注入一次重试提示 |
+| watcher 返回 `invalid_grant` | 写 `auth_failed`，不调用本地 refresh |
+| 第二次 401 | 直接 `auth_failed`，不再创建第二个 refresh request |
+| 普通未绑定账号 | 保持原本 profile/local 双向新鲜度同步与本地 refresh |
+
+### 5. Good/Base/Bad Cases
+
+- Good：worker 的运行副本没有 RT，401 时由 watcher 调 cc2api 刷新；新 AT 写入 profile 后同步到运行副本，任务只重试一次。
+- Base：未绑定账号不设置 `CC2API_MANAGED_OAUTH`，继续沿用原有 Claude Code RT 轮换链路。
+- Bad：仅在 `warmup_enabled=1` 时设置 managed 模式；关闭养号但仍绑定的账号会恢复本地 RT 刷新，破坏单一所有权。
+- Bad：managed worker 退出时把运行副本 credentials 覆盖 profile，可能把缺失 RT 或旧 AT 写回。
+
+### 6. Tests Required
+
+- `bash -n images/worker/entrypoint.sh`。
+- 用脱敏 profile fixture 启动 managed 分支，断言 run home `refreshToken` 被删除，profile RT 保持不变。
+- 模拟 profile AT 更新，断言 run home 接受新 AT 后仍无 RT。
+- 模拟 request/result 文件，断言 watcher 只调用一次 `force_refresh=true`，第二次 401 进入 `auth_failed`。
+- 覆盖 task、capture、continue 三条 worker 创建路径都按绑定状态注入 managed 环境。
+- 扫描 workspace/status/transcript，断言不出现脱敏 fixture 中的 AT/RT 原值。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```bash
+if [ "$WARMUP_ENABLED" = "1" ]; then
+  export CC2API_MANAGED_OAUTH=1
+fi
+```
+
+#### Correct
+
+```python
+if account.get("cc2api_account_id") is not None:
+    worker_env["CC2API_MANAGED_OAUTH"] = "1"
+```
+
+worker entrypoint 读取该变量后执行 `strip_managed_refresh_token`。是否 managed 只由绑定关系决定，养号开关只控制调度。
+
+---
+
 ## Recreate 协议(关键 ⚠)
 
 orchestrator 的 `main.py` 是 `COPY` 进镜像的(不是挂载),改了 main.py 后:

@@ -27,6 +27,7 @@ const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
 const state = {
   accounts: [],
+  cc2apiAccounts: [],
   topics: [],
   tasks: [],
   batches: [],
@@ -113,6 +114,43 @@ function renderOauthTokenStatus(a) {
   `;
 }
 
+function formatWarmupTime(value) {
+  if (typeof value !== 'number') return '-';
+  const date = new Date(value * 1000);
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
+}
+
+function renderWarmupStatus(account) {
+  if (account.cc2api_account_id == null) {
+    return '<span class="pill pill-queued">未绑定</span>';
+  }
+  const enabled = Number(account.warmup_enabled || 0) === 1;
+  const status = String(account.warmup_last_status || (enabled ? 'scheduled' : 'off'));
+  const statusClass = {
+    off: 'pill-queued',
+    scheduled: 'pill-success',
+    preparing: 'pill-running',
+    queued: 'pill-queued',
+    running: 'pill-running',
+    success: 'pill-success',
+    failed: 'pill-failed',
+    timeout: 'pill-timeout',
+    stopped: 'pill-timeout',
+    auth_failed: 'pill-failed',
+    sync_failed: 'pill-timeout',
+    paused: 'pill-failed',
+  }[status] || (enabled ? 'pill-success' : 'pill-queued');
+  const error = account.warmup_last_error
+    ? `<div class="warmup-error" title="${escapeHTML(account.warmup_last_error)}">${escapeHTML(account.warmup_last_error)}</div>`
+    : '';
+  return `
+    <div><code>cc#${escapeHTML(account.cc2api_account_id)}</code> <span class="pill ${statusClass}">${escapeHTML(status)}</span></div>
+    <div>${escapeHTML(account.warmup_interval_min_hours || 3)}-${escapeHTML(account.warmup_interval_max_hours || 5)}h</div>
+    <div class="muted">next ${escapeHTML(formatWarmupTime(account.warmup_next_run_at))}</div>
+    ${error}
+  `;
+}
+
 async function renderAccounts() {
   try {
     state.accounts = await API('/accounts');
@@ -127,19 +165,30 @@ async function renderAccounts() {
       <td>${renderProxyEndpoint(a)}</td>
       <td>${renderAccountTimezone(a)}</td>
       <td>${renderOauthTokenStatus(a)}</td>
+      <td class="warmup-status">${renderWarmupStatus(a)}</td>
       <td>${a.enabled ? '✓' : '✗'}</td>
-      <td>
+      <td><div class="op-actions account-actions">
         <button class="btn btn-sm" data-quota="${a.id}">额度</button>
-        <button class="btn btn-sm" data-relogin="${a.id}">重授权</button>
+        <button class="btn btn-sm" data-cc2-sync="${a.id}">同步</button>
+        <button class="btn btn-sm" data-warmup-config="${a.id}">养号</button>
+        ${a.cc2api_account_id != null && Number(a.warmup_enabled || 0) === 1 ? `<button class="btn btn-sm btn-primary" data-warmup-now="${a.id}">立即运行</button>` : ''}
+        ${a.cc2api_account_id != null && Number(a.warmup_enabled || 0) !== 1 ? `<button class="btn btn-sm" data-warmup-resume="${a.id}">恢复</button>` : ''}
+        ${a.cc2api_account_id == null ? `<button class="btn btn-sm" data-relogin="${a.id}">重授权</button>` : ''}
+        ${a.cc2api_account_id != null ? `<button class="btn btn-sm btn-danger" data-cc2-unbind="${a.id}">解绑</button>` : ''}
         <button class="btn btn-sm btn-danger" data-del="${a.id}">删除</button>
-      </td>
+      </div></td>
     </tr>
-  `).join('') || '<tr><td colspan="8" class="muted empty-cell">暂无账号</td></tr>';
+  `).join('') || '<tr><td colspan="9" class="muted empty-cell">暂无账号</td></tr>';
 
   body.onclick = async (e) => {
     const id = e.target.dataset.del;
     const quotaId = e.target.dataset.quota;
     const reloginId = e.target.dataset.relogin;
+    const syncId = e.target.dataset.cc2Sync;
+    const warmupConfigId = e.target.dataset.warmupConfig;
+    const warmupNowId = e.target.dataset.warmupNow;
+    const warmupResumeId = e.target.dataset.warmupResume;
+    const unbindId = e.target.dataset.cc2Unbind;
     if (quotaId) {
       e.target.disabled = true;
       try {
@@ -155,6 +204,63 @@ async function renderAccounts() {
     if (reloginId) {
       const account = state.accounts.find(a => String(a.id) === String(reloginId));
       if (account) openAccLoginModal(account);
+      return;
+    }
+    if (syncId) {
+      e.target.disabled = true;
+      try {
+        const result = await API(`/accounts/${syncId}/cc2api/sync`, { method: 'POST' });
+        alert(result.created ? '已创建 cc2api 账号并完成绑定' : '已关联现有 cc2api 账号并同步凭据');
+        await renderAccounts();
+      } catch (err) {
+        alert('同步 cc2api 失败: ' + err.message);
+      } finally {
+        e.target.disabled = false;
+      }
+      return;
+    }
+    if (warmupConfigId) {
+      const account = state.accounts.find(a => String(a.id) === String(warmupConfigId));
+      if (account) await openWarmupModal(account);
+      return;
+    }
+    if (warmupNowId) {
+      e.target.disabled = true;
+      try {
+        const result = await API(`/accounts/${warmupNowId}/warmup/run`, { method: 'POST' });
+        if (!result.started) {
+          alert(result.warmup_last_error || `未启动：${result.warmup_last_status || '账号当前不可认领'}`);
+        }
+        await renderAccounts();
+      } catch (err) {
+        alert('立即运行失败: ' + err.message);
+      } finally {
+        e.target.disabled = false;
+      }
+      return;
+    }
+    if (warmupResumeId) {
+      e.target.disabled = true;
+      try {
+        await API(`/accounts/${warmupResumeId}/warmup/resume`, { method: 'POST' });
+        await renderAccounts();
+      } catch (err) {
+        alert('恢复养号失败: ' + err.message);
+      } finally {
+        e.target.disabled = false;
+      }
+      return;
+    }
+    if (unbindId && confirm(`解绑账号 #${unbindId} 的 cc2api 账号并停止未来养号?`)) {
+      e.target.disabled = true;
+      try {
+        await API(`/accounts/${unbindId}/cc2api-binding`, { method: 'DELETE' });
+        await renderAccounts();
+      } catch (err) {
+        alert('解绑失败: ' + err.message);
+      } finally {
+        e.target.disabled = false;
+      }
       return;
     }
     if (id && confirm(`删除账号 #${id}?`)) {
@@ -184,6 +290,66 @@ async function renderAccounts() {
   $('#acc-login-cancel').onclick = () => endAccLogin({ alsoCloseModal: true });
   $('#acc-login-commit').onclick = () => commitAccLogin();
   $('#acc-modal-close').onclick = () => endAccLogin({ alsoCloseModal: true });
+  $('#warmup-form').onsubmit = saveWarmupConfig;
+}
+
+async function openWarmupModal(account) {
+  try {
+    state.cc2apiAccounts = await API('/cc2api/accounts');
+  } catch (e) {
+    return alert('加载 cc2api 账号失败: ' + e.message);
+  }
+  const form = $('#warmup-form');
+  form.account_id.value = account.id;
+  form.interval_min_hours.value = account.warmup_interval_min_hours || 3;
+  form.interval_max_hours.value = account.warmup_interval_max_hours || 5;
+  form.enabled.checked = Number(account.warmup_enabled || 0) === 1;
+  const options = state.cc2apiAccounts.map(item => `
+    <option value="${escapeHTML(item.id)}">#${escapeHTML(item.id)} ${escapeHTML(item.name || 'oauth')} · ${escapeHTML(item.email_masked || '-')}</option>
+  `).join('');
+  form.cc2api_account_id.innerHTML = options || (
+    account.cc2api_account_id != null
+      ? `<option value="${escapeHTML(account.cc2api_account_id)}">#${escapeHTML(account.cc2api_account_id)} 当前绑定</option>`
+      : '<option value="">暂无可用账号</option>'
+  );
+  if (account.cc2api_account_id != null) {
+    const exists = state.cc2apiAccounts.some(item => String(item.id) === String(account.cc2api_account_id));
+    if (!exists) {
+      form.cc2api_account_id.insertAdjacentHTML(
+        'afterbegin',
+        `<option value="${escapeHTML(account.cc2api_account_id)}">#${escapeHTML(account.cc2api_account_id)} 当前绑定</option>`,
+      );
+    }
+    form.cc2api_account_id.value = String(account.cc2api_account_id);
+  }
+  $('#warmup-modal-title').textContent = `#${account.id} ${account.name}`;
+  openModal('#warmup-modal');
+}
+
+async function saveWarmupConfig(e) {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const accountId = Number(form.account_id.value);
+  const payload = {
+    cc2api_account_id: Number(form.cc2api_account_id.value),
+    enabled: form.enabled.checked,
+    interval_min_hours: Number(form.interval_min_hours.value),
+    interval_max_hours: Number(form.interval_max_hours.value),
+  };
+  button.disabled = true;
+  try {
+    await API(`/accounts/${accountId}/warmup`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    closeModal('#warmup-modal');
+    await renderAccounts();
+  } catch (err) {
+    alert('保存养号配置失败: ' + err.message);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function renderProxyEndpoint(account) {
@@ -1133,11 +1299,13 @@ function paintRuns(runs) {
   body.innerHTML = runs.map(r => {
     const task = taskMap[r.task_id];
     const tname = task ? `#${task.topic_no} ${escapeHTML(task.title)}` : `task#${r.task_id}`;
-    const kind = (r.run_kind || 'normal') === 'capture'
+    const runKind = r.run_kind || 'normal';
+    const kind = runKind === 'capture'
       ? ' <span class="pill pill-capture">抓包</span>'
-      : '';
+      : (runKind === 'warmup' ? ' <span class="pill pill-warmup">养号</span>' : '');
     const dur = (r.started_at && r.ended_at) ? `${(r.ended_at - r.started_at).toFixed(0)}s` :
                 (r.started_at ? `${(Date.now()/1000 - r.started_at).toFixed(0)}s` : '-');
+    const terminal = ['success', 'failed', 'timeout', 'stopped', 'auth_failed'].includes(r.status);
     return `
       <tr>
         <td><code>${r.id}</code></td>
@@ -1149,8 +1317,8 @@ function paintRuns(runs) {
         <td><div class="op-actions run-actions">
           <button class="btn btn-sm" data-detail="${r.id}">详情</button>
           ${['queued', 'running'].includes(r.status) ? `<button class="btn btn-sm btn-danger" data-stop="${r.id}">停止</button>` : ''}
-          ${['success', 'failed', 'timeout', 'stopped', 'auth_failed'].includes(r.status) ? `<button class="btn btn-sm btn-primary" data-continue="${r.id}">继续</button>` : ''}
-          <button class="btn btn-sm btn-danger" data-del-run="${r.id}">删除</button>
+          ${terminal ? `<button class="btn btn-sm btn-primary" data-continue="${r.id}">继续</button>` : ''}
+          ${terminal ? `<button class="btn btn-sm btn-danger" data-del-run="${r.id}">删除</button>` : ''}
         </div></td>
       </tr>
     `;

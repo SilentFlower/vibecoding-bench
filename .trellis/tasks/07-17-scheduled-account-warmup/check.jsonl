@@ -1,0 +1,8 @@
+{"file":".trellis/spec/vibecoding-bench/backend/database-guidelines.md","reason":"复核旧库迁移、唯一绑定、短事务和软删除账号退出调度。"}
+{"file":".trellis/spec/vibecoding-bench/backend/quality-guidelines.md","reason":"复核后台线程、外部 IO 不持锁、Semaphore 释放和真实运行回归。"}
+{"file":".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md","reason":"复核原生 JS 语法、动态文本转义、双主题和移动端不溢出。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/image-build-push.md","reason":"重点审查 managed worker 是否彻底禁止本地 RT 刷新和旧凭据反向覆盖。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/remote-deploy.md","reason":"复核本地/远程 compose、env 示例和部署验证步骤。"}
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"复核 OAuth refresh 锁、账号状态、管理 API 和现有 Gateway 行为兼容。"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"复核 Account 字段读写与 SQLite/PostgreSQL 兼容性。"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"执行 Rust 全量测试并检查 token、邮箱、UUID、prompt 不进入日志和 fixture。"}

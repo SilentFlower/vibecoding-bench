@@ -432,6 +432,38 @@ table.data tbody tr:hover td code { color: var(--text); }
   width: auto;
   min-width: 1120px;
 }
+.accounts-table { min-width: 1500px; }
+.accounts-table th:nth-child(1),
+.accounts-table td:nth-child(1) { width: 3.5rem; }
+.accounts-table th:nth-child(2),
+.accounts-table td:nth-child(2) { width: 7rem; }
+.accounts-table th:nth-child(3),
+.accounts-table td:nth-child(3) { width: 10rem; }
+.accounts-table th:nth-child(4),
+.accounts-table td:nth-child(4) { width: 12rem; }
+.accounts-table th:nth-child(5),
+.accounts-table td:nth-child(5) { width: 9rem; }
+.accounts-table th:nth-child(6),
+.accounts-table td:nth-child(6) { width: 12rem; }
+.accounts-table th:nth-child(7),
+.accounts-table td:nth-child(7) { width: 16rem; }
+.accounts-table th:nth-child(8),
+.accounts-table td:nth-child(8) { width: 3.5rem; }
+.accounts-table th:nth-child(9),
+.accounts-table td:nth-child(9) { width: 25rem; }
+.accounts-table .warmup-status {
+  overflow: visible;
+  white-space: normal;
+  line-height: 1.55;
+}
+.warmup-error {
+  max-width: 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--failed);
+}
+.account-actions { min-width: 23rem; }
 .run-col-id { width: 7.5rem; }
 .run-col-task { width: 24rem; }
 .run-col-account { width: 7rem; }
@@ -658,6 +690,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .pill-active  { color: var(--running); }
 .pill-deleted { color: var(--queued); }
 .pill-capture { color: var(--amber); }
+.pill-warmup { color: var(--amber); }
 
 @keyframes pulse-cyan {
   0%, 100% { box-shadow: 0 0 12px var(--running-glow), inset 0 0 8px rgba(95,215,215,0.12); }
@@ -758,6 +791,15 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 }
 /* the form gets its own padding */
 .modal-card > .form { padding-bottom: 18px; }
+.warmup-interval-row { align-items: stretch; }
+.toggle-line {
+  display: flex;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+}
+.toggle-line input { width: 16px; height: 16px; }
 
 /* ===== detail panel ===== */
 #modal-content h3 {
@@ -1046,6 +1088,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   main { padding: 18px 14px 80px; }
   .view-title { font-size: 22px; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .warmup-interval-row { flex-direction: column; align-items: stretch; }
 }
 
 @media (prefers-reduced-motion: reduce) {

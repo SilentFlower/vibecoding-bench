@@ -1,0 +1,1458 @@
+"""定时养号和 cc2api 集成的后端回归测试。"""
+
+import json
+import sqlite3
+import stat
+import tempfile
+import threading
+import time
+import unittest
+from pathlib import Path
+from unittest.mock import Mock
+
+import main
+
+
+class ScheduledWarmupTests(unittest.TestCase):
+    """验证养号迁移、匹配、凭据同步和调度状态。"""
+
+    def setUp(self) -> None:
+        """为每个测试创建独立 SQLite 和 profile 目录。"""
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.originals = (
+            main.DB_PATH,
+            main.PROFILES_DIR,
+            main.TOPICS_FILE,
+        )
+        self.runtime_originals = (
+            main.cc2api_client,
+            main.runner,
+            main.login_manager,
+            main.continue_manager,
+            main.warmup_scheduler,
+        )
+        main.DB_PATH = self.base / "db.sqlite"
+        main.PROFILES_DIR = self.base / "profiles"
+        main.TOPICS_FILE = self.base / "missing-topics.md"
+
+    def tearDown(self) -> None:
+        """恢复模块全局路径并清理临时目录。"""
+        main.DB_PATH, main.PROFILES_DIR, main.TOPICS_FILE = self.originals
+        (
+            main.cc2api_client,
+            main.runner,
+            main.login_manager,
+            main.continue_manager,
+            main.warmup_scheduler,
+        ) = self.runtime_originals
+        self.tmp.cleanup()
+
+    def _run_queued_warmup_with_second_sync_error(
+        self,
+        sync_error: Exception,
+    ) -> tuple[dict, dict, float, Mock, Mock]:
+        """
+        创建养号 run，并让 worker 启动前的第二次凭据同步失败。
+
+        :param sync_error: 第二次 cc2api resolve 抛出的异常
+        :return: run、账号、失败前时间、runner mock 和 cc2api client mock
+        """
+        main.init_db()
+        profile_dir = main.PROFILES_DIR / "main"
+        profile_dir.mkdir(parents=True)
+        (profile_dir / ".credentials.json").write_text(
+            json.dumps({
+                "claudeAiOauth": {
+                    "accessToken": "old-access",
+                    "refreshToken": "old-refresh",
+                    "expiresAt": 1,
+                }
+            }),
+            encoding="utf-8",
+        )
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id, warmup_enabled, "
+                    "warmup_next_run_at) VALUES('main','profiles/main',7,1,?)",
+                    (time.time() - 1,),
+                )
+                conn.execute(
+                    "INSERT INTO topics(no, title, description, category) "
+                    "VALUES(1,'标准题目','只使用题库描述','测试')"
+                )
+        finally:
+            conn.close()
+        client = Mock()
+        client.resolve_credentials.side_effect = [
+            {
+                "account_id": 7,
+                "access_token": "prepared-access",
+                "refresh_token": "prepared-refresh",
+                "expires_at": int(time.time() * 1000) + 3600000,
+            },
+            sync_error,
+        ]
+        main.cc2api_client = client
+        submitter = Mock()
+        warmup = main.WarmupScheduler(submitter)
+        result = warmup.trigger_account(1, require_due=True)
+        self.assertTrue(result["started"])
+        run_id, account, task = submitter.submit.call_args.args
+
+        fake_runner = Mock()
+        main.warmup_scheduler = warmup
+        before = time.time()
+        main.Scheduler(fake_runner)._execute(run_id, account, task)
+
+        conn = main.get_db()
+        try:
+            run = dict(conn.execute(
+                "SELECT status, error FROM runs WHERE id=?",
+                (run_id,),
+            ).fetchone())
+            account_state = dict(conn.execute(
+                "SELECT warmup_enabled, warmup_last_status, warmup_last_error, "
+                "warmup_next_run_at FROM accounts WHERE id=1"
+            ).fetchone())
+        finally:
+            conn.close()
+        return run, account_state, before, fake_runner, client
+
+    def _prepare_syncable_unbound_account(self) -> Mock:
+        """
+        创建可执行首次 cc2api 同步的未绑定账号和脱敏客户端替身。
+
+        :return: 已配置 list/resolve 响应的 cc2api client mock
+        """
+        main.init_db()
+        profile_dir = main.PROFILES_DIR / "main"
+        profile_dir.mkdir(parents=True)
+        (profile_dir / ".credentials.json").write_text(
+            json.dumps({
+                "claudeAiOauth": {
+                    "accessToken": "bench-access",
+                    "refreshToken": "bench-refresh",
+                    "expiresAt": 1,
+                }
+            }),
+            encoding="utf-8",
+        )
+        (profile_dir / ".claude.json").write_text(
+            json.dumps({
+                "oauthAccount": {
+                    "emailAddress": "main@example.test",
+                    "accountUuid": "uuid-main",
+                    "organizationUuid": "org-main",
+                }
+            }),
+            encoding="utf-8",
+        )
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path) VALUES('main','profiles/main')"
+                )
+        finally:
+            conn.close()
+        client = Mock()
+        client.list_accounts.return_value = [{
+            "id": 7,
+            "name": "existing",
+            "email": "main@example.test",
+            "status": "active",
+            "auth_type": "oauth",
+            "account_uuid": "uuid-main",
+        }]
+        client.resolve_credentials.return_value = {
+            "account_id": 7,
+            "access_token": "cc2-access",
+            "refresh_token": "cc2-refresh",
+            "expires_at": int(time.time() * 1000) + 3600000,
+        }
+        main.cc2api_client = client
+        main.login_manager = None
+        main.continue_manager = None
+        return client
+
+    def test_old_database_upgrade_creates_binding_index_after_column(self) -> None:
+        """旧 accounts 表应先补绑定列，再创建唯一索引。"""
+        conn = sqlite3.connect(main.DB_PATH)
+        conn.executescript(
+            """
+            CREATE TABLE accounts (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT UNIQUE NOT NULL,
+              profile_path TEXT NOT NULL,
+              enabled INTEGER DEFAULT 1,
+              created_at REAL
+            );
+            """
+        )
+        conn.close()
+
+        main.init_db()
+        main.init_db()
+
+        conn = sqlite3.connect(main.DB_PATH)
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(accounts)")}
+        indexes = {row[1] for row in conn.execute("PRAGMA index_list(accounts)")}
+        conn.close()
+        self.assertIn("cc2api_account_id", columns)
+        self.assertIn("warmup_enabled", columns)
+        self.assertIn("idx_accounts_cc2api_account_id", indexes)
+
+    def test_cc2api_matching_prefers_uuid_and_rejects_email_conflict(self) -> None:
+        """UUID 存在时不能退回名称或冲突邮箱匹配。"""
+        profile = {
+            "account_uuid": "uuid-a",
+            "email": "masked@example.test",
+        }
+        matched = main._find_cc2api_account_for_profile(
+            profile,
+            [
+                {"id": 1, "account_uuid": "uuid-a", "email": "other@example.test"},
+                {"id": 2, "account_uuid": "uuid-b", "email": "second@example.test"},
+            ],
+        )
+        self.assertEqual(1, matched["id"])
+
+        with self.assertRaisesRegex(ValueError, "account UUID 不同"):
+            main._find_cc2api_account_for_profile(
+                profile,
+                [{"id": 3, "account_uuid": "uuid-b", "email": "masked@example.test"}],
+            )
+
+    def test_invalid_grant_is_classified_as_permanent(self) -> None:
+        """invalid_grant 即使由下游包装成 5xx 也不能进入定时重试。"""
+        self.assertTrue(
+            main._cc2api_error_detail_is_permanent(
+                "oauth refresh failed: invalid_grant"
+            )
+        )
+        self.assertFalse(
+            main._cc2api_error_detail_is_permanent("HTTP 503 upstream unavailable")
+        )
+
+    def test_cc2api_credentials_merge_preserves_profile_metadata(self) -> None:
+        """镜像 AT/RT 时应保留 claudeAiOauth 的其它字段。"""
+        profile_dir = main.PROFILES_DIR / "main"
+        profile_dir.mkdir(parents=True)
+        credentials_path = profile_dir / ".credentials.json"
+        credentials_path.write_text(
+            json.dumps({
+                "claudeAiOauth": {
+                    "accessToken": "old-access",
+                    "refreshToken": "old-refresh",
+                    "expiresAt": 1,
+                    "subscriptionType": "max",
+                    "scopes": ["user:inference"],
+                }
+            }),
+            encoding="utf-8",
+        )
+
+        main._sync_cc2api_credentials_to_profile(
+            "main",
+            {
+                "access_token": "new-access",
+                "refresh_token": "new-refresh",
+                "expires_at": 999999,
+            },
+        )
+
+        data = json.loads(credentials_path.read_text(encoding="utf-8"))
+        oauth = data["claudeAiOauth"]
+        self.assertEqual("new-access", oauth["accessToken"])
+        self.assertEqual("new-refresh", oauth["refreshToken"])
+        self.assertEqual(999999, oauth["expiresAt"])
+        self.assertEqual("max", oauth["subscriptionType"])
+        self.assertEqual(["user:inference"], oauth["scopes"])
+        self.assertEqual(0o600, stat.S_IMODE(credentials_path.stat().st_mode))
+
+    def test_resolve_and_profile_write_are_serialized_and_keep_latest_snapshot(self) -> None:
+        """慢返回的旧快照不得在并发同步时覆盖后发的新凭据。"""
+        profile_dir = main.PROFILES_DIR / "main"
+        profile_dir.mkdir(parents=True)
+        credentials_path = profile_dir / ".credentials.json"
+        credentials_path.write_text(
+            json.dumps({
+                "claudeAiOauth": {
+                    "accessToken": "initial-access",
+                    "refreshToken": "initial-refresh",
+                    "expiresAt": 1,
+                }
+            }),
+            encoding="utf-8",
+        )
+        first_entered = threading.Event()
+        second_entered = threading.Event()
+        release_first = threading.Event()
+        call_lock = threading.Lock()
+        call_count = 0
+
+        def resolve_credentials(*_args, **_kwargs):
+            """按调用顺序模拟慢旧响应和快新响应。"""
+            nonlocal call_count
+            with call_lock:
+                index = call_count
+                call_count += 1
+            if index == 0:
+                first_entered.set()
+                release_first.wait(2)
+                return {
+                    "account_id": 7,
+                    "access_token": "old-access",
+                    "refresh_token": "old-refresh",
+                    "expires_at": 100,
+                }
+            second_entered.set()
+            return {
+                "account_id": 7,
+                "access_token": "new-access",
+                "refresh_token": "new-refresh",
+                "expires_at": 200,
+            }
+
+        client = Mock()
+        client.resolve_credentials.side_effect = resolve_credentials
+        main.cc2api_client = client
+        errors: list[Exception] = []
+
+        def sync_once() -> None:
+            """在线程中执行一次完整 resolve + profile 写入。"""
+            try:
+                main._resolve_and_sync_cc2api_credentials("main", 7, 600)
+            except Exception as exc:
+                errors.append(exc)
+
+        first = threading.Thread(target=sync_once)
+        second = threading.Thread(target=sync_once)
+        first.start()
+        self.assertTrue(first_entered.wait(1))
+        second.start()
+        self.assertFalse(second_entered.wait(0.1))
+        release_first.set()
+        first.join(2)
+        second.join(2)
+
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+        self.assertEqual([], errors)
+        self.assertTrue(second_entered.is_set())
+        data = json.loads(credentials_path.read_text(encoding="utf-8"))
+        self.assertEqual("new-access", data["claudeAiOauth"]["accessToken"])
+        self.assertEqual("new-refresh", data["claudeAiOauth"]["refreshToken"])
+
+    def test_bound_account_refresh_scheduler_only_mirrors_cc2api(self) -> None:
+        """绑定账号后台刷新不得调用 bench 本地 RT 刷新路径。"""
+        main.init_db()
+        profile_dir = main.PROFILES_DIR / "main"
+        profile_dir.mkdir(parents=True)
+        (profile_dir / ".credentials.json").write_text(
+            json.dumps({
+                "claudeAiOauth": {
+                    "accessToken": "old-access",
+                    "refreshToken": "old-refresh",
+                    "expiresAt": 1,
+                }
+            }),
+            encoding="utf-8",
+        )
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id) "
+                    "VALUES('main','profiles/main',7)"
+                )
+        finally:
+            conn.close()
+        client = Mock()
+        client.resolve_credentials.return_value = {
+            "account_id": 7,
+            "access_token": "cc2-access",
+            "refresh_token": "cc2-refresh",
+            "expires_at": int(time.time() * 1000) + 3600000,
+        }
+        runner = Mock()
+        original_client = main.cc2api_client
+        main.cc2api_client = client
+        try:
+            main.OAuthRefreshScheduler(runner)._tick()
+        finally:
+            main.cc2api_client = original_client
+
+        client.resolve_credentials.assert_called_once()
+        runner.refresh_account_oauth_token.assert_not_called()
+        data = json.loads((profile_dir / ".credentials.json").read_text(encoding="utf-8"))
+        self.assertEqual("cc2-access", data["claudeAiOauth"]["accessToken"])
+
+    def test_unbound_refresh_scheduler_blocks_first_binding(self) -> None:
+        """未绑定账号的本地 RT 刷新完成前，首次绑定必须等待 owner lock。"""
+        client = self._prepare_syncable_unbound_account()
+        refresh_entered = threading.Event()
+        release_refresh = threading.Event()
+        runner = Mock()
+
+        def refresh_account_oauth_token(_account: dict) -> bool:
+            """阻塞本地刷新，暴露首次绑定必须等待的临界区。"""
+            refresh_entered.set()
+            release_refresh.wait(2)
+            return True
+
+        runner.refresh_account_oauth_token.side_effect = refresh_account_oauth_token
+        refresh_thread = threading.Thread(target=main.OAuthRefreshScheduler(runner)._tick)
+        refresh_thread.start()
+        self.assertTrue(refresh_entered.wait(1))
+
+        sync_results: list[dict] = []
+        sync_errors: list[Exception] = []
+
+        def sync_account() -> None:
+            """并发执行首次绑定并记录结果。"""
+            try:
+                sync_results.append(main.sync_account_to_cc2api(1))
+            except Exception as exc:
+                sync_errors.append(exc)
+
+        sync_thread = threading.Thread(target=sync_account)
+        sync_thread.start()
+        time.sleep(0.1)
+        self.assertTrue(sync_thread.is_alive())
+        client.list_accounts.assert_not_called()
+
+        release_refresh.set()
+        refresh_thread.join(2)
+        sync_thread.join(2)
+        self.assertFalse(refresh_thread.is_alive())
+        self.assertFalse(sync_thread.is_alive())
+        self.assertEqual([], sync_errors)
+        self.assertEqual(1, len(sync_results))
+        client.list_accounts.assert_called_once()
+
+    def test_unbound_quota_query_blocks_first_binding(self) -> None:
+        """未绑定 quota worker 结束前，首次绑定不得读取可能轮换前的旧 RT。"""
+        client = self._prepare_syncable_unbound_account()
+        quota_entered = threading.Event()
+        release_quota = threading.Event()
+        quota_runner = Mock()
+
+        def query_quota(_account: dict) -> dict:
+            """阻塞额度查询，模拟其中可能发生的本地 RT 轮换。"""
+            quota_entered.set()
+            release_quota.wait(2)
+            return {"ok": True}
+
+        quota_runner.query_quota.side_effect = query_quota
+        main.runner = quota_runner
+        quota_results: list[dict] = []
+        quota_errors: list[Exception] = []
+        sync_results: list[dict] = []
+        sync_errors: list[Exception] = []
+
+        def run_quota() -> None:
+            """在线程中执行未绑定账号额度查询。"""
+            try:
+                quota_results.append(main.query_account_quota(1))
+            except Exception as exc:
+                quota_errors.append(exc)
+
+        def sync_account() -> None:
+            """并发执行首次绑定并记录结果。"""
+            try:
+                sync_results.append(main.sync_account_to_cc2api(1))
+            except Exception as exc:
+                sync_errors.append(exc)
+
+        quota_thread = threading.Thread(target=run_quota)
+        quota_thread.start()
+        self.assertTrue(quota_entered.wait(1))
+        sync_thread = threading.Thread(target=sync_account)
+        sync_thread.start()
+        time.sleep(0.1)
+        self.assertTrue(sync_thread.is_alive())
+        client.list_accounts.assert_not_called()
+
+        release_quota.set()
+        quota_thread.join(2)
+        sync_thread.join(2)
+        self.assertFalse(quota_thread.is_alive())
+        self.assertFalse(sync_thread.is_alive())
+        self.assertEqual([], quota_errors)
+        self.assertEqual([], sync_errors)
+        self.assertEqual([{"ok": True}], quota_results)
+        self.assertEqual(1, len(sync_results))
+        client.list_accounts.assert_called_once()
+
+    def test_bound_sync_rejects_stale_binding_before_resolve(self) -> None:
+        """后台拿到旧绑定快照时不得覆盖新绑定账号的 profile。"""
+        main.init_db()
+        profile_dir = main.PROFILES_DIR / "main"
+        profile_dir.mkdir(parents=True)
+        credentials_path = profile_dir / ".credentials.json"
+        credentials_path.write_text(
+            json.dumps({
+                "claudeAiOauth": {
+                    "accessToken": "current-access",
+                    "refreshToken": "current-refresh",
+                    "expiresAt": 123,
+                }
+            }),
+            encoding="utf-8",
+        )
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id) "
+                    "VALUES('main','profiles/main',8)"
+                )
+        finally:
+            conn.close()
+        client = Mock()
+        main.cc2api_client = client
+
+        with self.assertRaisesRegex(ValueError, "绑定已变化"):
+            main._sync_bound_account_credentials(
+                {"id": 1, "name": "main", "cc2api_account_id": 7},
+                600,
+            )
+
+        client.resolve_credentials.assert_not_called()
+        data = json.loads(credentials_path.read_text(encoding="utf-8"))
+        self.assertEqual("current-access", data["claudeAiOauth"]["accessToken"])
+        self.assertEqual("current-refresh", data["claudeAiOauth"]["refreshToken"])
+
+    def test_temporary_cc2api_failure_schedules_fifteen_minute_retry(self) -> None:
+        """临时 cc2api 故障不得创建 run，应保留开关并安排重试。"""
+        main.init_db()
+        now = time.time()
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id, warmup_enabled, "
+                    "warmup_next_run_at) VALUES('main','profiles/main',7,1,?)",
+                    (now - 1,),
+                )
+        finally:
+            conn.close()
+        client = Mock()
+        client.resolve_credentials.side_effect = ConnectionError("network unavailable")
+        original_client = main.cc2api_client
+        main.cc2api_client = client
+        try:
+            result = main.WarmupScheduler(Mock()).trigger_account(1, require_due=True)
+        finally:
+            main.cc2api_client = original_client
+        self.assertFalse(result["started"])
+
+        conn = main.get_db()
+        try:
+            row = conn.execute(
+                "SELECT warmup_enabled, warmup_last_status, warmup_next_run_at FROM accounts WHERE id=1"
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(1, row["warmup_enabled"])
+        self.assertEqual("sync_failed", row["warmup_last_status"])
+        self.assertGreaterEqual(row["warmup_next_run_at"], now + main.WARMUP_SYNC_RETRY_SEC - 2)
+
+    def test_sync_links_existing_cc2api_account_without_create(self) -> None:
+        """匹配到现有 cc2api 账号时只关联并以 cc2api 凭据覆盖 bench。"""
+        main.init_db()
+        profile_dir = main.PROFILES_DIR / "main"
+        profile_dir.mkdir(parents=True)
+        (profile_dir / ".credentials.json").write_text(
+            json.dumps({
+                "claudeAiOauth": {
+                    "accessToken": "bench-old-access",
+                    "refreshToken": "bench-old-refresh",
+                    "expiresAt": 1,
+                }
+            }),
+            encoding="utf-8",
+        )
+        (profile_dir / ".claude.json").write_text(
+            json.dumps({
+                "oauthAccount": {
+                    "emailAddress": "main@example.test",
+                    "accountUuid": "uuid-main",
+                    "organizationUuid": "org-main",
+                }
+            }),
+            encoding="utf-8",
+        )
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path) VALUES('main','profiles/main')"
+                )
+        finally:
+            conn.close()
+        client = Mock()
+        client.list_accounts.return_value = [{
+            "id": 7,
+            "name": "existing",
+            "email": "main@example.test",
+            "status": "active",
+            "auth_type": "oauth",
+            "account_uuid": "uuid-main",
+        }]
+        client.resolve_credentials.return_value = {
+            "account_id": 7,
+            "access_token": "cc2-current-access",
+            "refresh_token": "cc2-current-refresh",
+            "expires_at": int(time.time() * 1000) + 3600000,
+        }
+        original_client = main.cc2api_client
+        main.cc2api_client = client
+        try:
+            result = main.sync_account_to_cc2api(1)
+            conn = main.get_db()
+            try:
+                initial = conn.execute(
+                    "SELECT warmup_enabled, warmup_last_status FROM accounts WHERE id=1"
+                ).fetchone()
+            finally:
+                conn.close()
+            self.assertEqual(0, initial["warmup_enabled"])
+            self.assertEqual("off", initial["warmup_last_status"])
+            scheduled_at = time.time() + 3600
+            conn = main.get_db()
+            try:
+                with conn:
+                    conn.execute(
+                        "UPDATE accounts SET warmup_enabled=1, warmup_next_run_at=?, "
+                        "warmup_last_status='scheduled' WHERE id=1",
+                        (scheduled_at,),
+                    )
+            finally:
+                conn.close()
+            repeated = main.sync_account_to_cc2api(1)
+        finally:
+            main.cc2api_client = original_client
+
+        self.assertFalse(result["created"])
+        self.assertFalse(repeated["created"])
+        client.create_account.assert_not_called()
+        conn = main.get_db()
+        try:
+            row = conn.execute(
+                "SELECT cc2api_account_id, warmup_enabled, warmup_next_run_at, "
+                "warmup_last_status FROM accounts WHERE id=1"
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(7, row["cc2api_account_id"])
+        self.assertEqual(1, row["warmup_enabled"])
+        self.assertEqual("scheduled", row["warmup_last_status"])
+        self.assertAlmostEqual(scheduled_at, row["warmup_next_run_at"], places=3)
+        data = json.loads((profile_dir / ".credentials.json").read_text(encoding="utf-8"))
+        self.assertEqual("cc2-current-refresh", data["claudeAiOauth"]["refreshToken"])
+
+    def test_bound_sync_does_not_rematch_or_overwrite_profile_before_rejecting(self) -> None:
+        """已绑定账号同步失败时不得先写入另一个 cc2api 账号的凭据。"""
+        main.init_db()
+        profile_dir = main.PROFILES_DIR / "main"
+        profile_dir.mkdir(parents=True)
+        credentials_path = profile_dir / ".credentials.json"
+        credentials_path.write_text(
+            json.dumps({
+                "claudeAiOauth": {
+                    "accessToken": "bound-access",
+                    "refreshToken": "bound-refresh",
+                    "expiresAt": 1,
+                }
+            }),
+            encoding="utf-8",
+        )
+        (profile_dir / ".claude.json").write_text(
+            json.dumps({
+                "oauthAccount": {
+                    "emailAddress": "other@example.test",
+                    "accountUuid": "uuid-other",
+                }
+            }),
+            encoding="utf-8",
+        )
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id) "
+                    "VALUES('main','profiles/main',7)"
+                )
+        finally:
+            conn.close()
+        client = Mock()
+        client.list_accounts.return_value = [{
+            "id": 8,
+            "name": "other",
+            "email": "other@example.test",
+            "account_uuid": "uuid-other",
+            "status": "active",
+            "auth_type": "oauth",
+        }]
+        client.resolve_credentials.return_value = {
+            "account_id": 8,
+            "access_token": "other-access",
+            "refresh_token": "other-refresh",
+            "expires_at": 9999999999999,
+        }
+        main.cc2api_client = client
+        main.login_manager = None
+        main.continue_manager = None
+
+        with self.assertRaises(main.HTTPException) as error:
+            main.sync_account_to_cc2api(1)
+
+        self.assertEqual(409, error.exception.status_code)
+        client.resolve_credentials.assert_not_called()
+        oauth = json.loads(credentials_path.read_text(encoding="utf-8"))["claudeAiOauth"]
+        self.assertEqual("bound-access", oauth["accessToken"])
+        self.assertEqual("bound-refresh", oauth["refreshToken"])
+
+    def test_sync_rejects_cc2api_id_already_bound_to_another_bench_account(self) -> None:
+        """重复绑定应在 resolve 和 profile 写入前拒绝。"""
+        client = self._prepare_syncable_unbound_account()
+        credentials_path = main.PROFILES_DIR / "main" / ".credentials.json"
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id) "
+                    "VALUES('other','profiles/other',7)"
+                )
+        finally:
+            conn.close()
+
+        with self.assertRaises(main.HTTPException) as error:
+            main.sync_account_to_cc2api(1)
+
+        self.assertEqual(409, error.exception.status_code)
+        client.resolve_credentials.assert_not_called()
+        oauth = json.loads(credentials_path.read_text(encoding="utf-8"))["claudeAiOauth"]
+        self.assertEqual("bench-access", oauth["accessToken"])
+        self.assertEqual("bench-refresh", oauth["refreshToken"])
+
+    def test_active_run_blocks_binding_change_and_unbind(self) -> None:
+        """queued/running/stopping run 存在时不得切换或解除凭据所有权。"""
+        main.init_db()
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id) "
+                    "VALUES('main','profiles/main',7)"
+                )
+                conn.execute(
+                    "INSERT INTO runs(id, task_id, account_id, status) "
+                    "VALUES('queued-run',1,1,'queued')"
+                )
+        finally:
+            conn.close()
+        main.login_manager = None
+        main.continue_manager = None
+
+        with self.assertRaises(main.HTTPException) as update_error:
+            main.update_account_warmup(
+                1,
+                main.WarmupConfigIn(
+                    cc2api_account_id=8,
+                    enabled=False,
+                    interval_min_hours=3,
+                    interval_max_hours=5,
+                ),
+            )
+        self.assertEqual(409, update_error.exception.status_code)
+
+        with self.assertRaises(main.HTTPException) as delete_error:
+            main.delete_account_cc2api_binding(1)
+        self.assertEqual(409, delete_error.exception.status_code)
+
+    def test_bound_account_delete_waits_for_owner_and_rejects_active_run(self) -> None:
+        """绑定账号删除必须等待 owner lock，并在存在活跃 run 时保持原账号。"""
+        main.init_db()
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id) "
+                    "VALUES('main','profiles/main',7)"
+                )
+                conn.execute(
+                    "INSERT INTO runs(id, task_id, account_id, status) "
+                    "VALUES('queued-run',1,1,'queued')"
+                )
+        finally:
+            conn.close()
+        main.login_manager = None
+        main.continue_manager = None
+        owner_lock = main._oauth_owner_lock("main")
+        delete_errors: list[Exception] = []
+
+        def delete_bound_account() -> None:
+            """并发删除绑定账号并记录业务拒绝。"""
+            try:
+                main.delete_account(1)
+            except Exception as exc:
+                delete_errors.append(exc)
+
+        owner_lock.acquire()
+        delete_thread = threading.Thread(target=delete_bound_account)
+        try:
+            delete_thread.start()
+            time.sleep(0.1)
+            self.assertTrue(delete_thread.is_alive())
+        finally:
+            owner_lock.release()
+        delete_thread.join(2)
+        self.assertFalse(delete_thread.is_alive())
+        self.assertEqual(1, len(delete_errors))
+        self.assertIsInstance(delete_errors[0], main.HTTPException)
+        self.assertEqual(409, delete_errors[0].status_code)
+
+        conn = main.get_db()
+        try:
+            account = conn.execute(
+                "SELECT deleted_at, cc2api_account_id FROM accounts WHERE id=1"
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertIsNone(account["deleted_at"])
+        self.assertEqual(7, account["cc2api_account_id"])
+
+    def test_unbound_account_delete_preserves_physical_and_soft_delete_semantics(self) -> None:
+        """未绑定账号加 owner lock 后仍按历史引用选择物理或软删除。"""
+        main.init_db()
+        conn = main.get_db()
+        try:
+            with conn:
+                first = conn.execute(
+                    "INSERT INTO accounts(name, profile_path) VALUES('first','profiles/first')"
+                )
+                first_id = int(first.lastrowid)
+        finally:
+            conn.close()
+
+        physical = main.delete_account(first_id)
+        self.assertFalse(physical["soft_deleted"])
+        conn = main.get_db()
+        try:
+            self.assertIsNone(conn.execute(
+                "SELECT id FROM accounts WHERE id=?",
+                (first_id,),
+            ).fetchone())
+            with conn:
+                second = conn.execute(
+                    "INSERT INTO accounts(name, profile_path) VALUES('second','profiles/second')"
+                )
+                second_id = int(second.lastrowid)
+                conn.execute(
+                    "INSERT INTO runs(id, task_id, account_id, status) "
+                    "VALUES('historical-run',1,?,'success')",
+                    (second_id,),
+                )
+        finally:
+            conn.close()
+
+        soft = main.delete_account(second_id)
+        self.assertTrue(soft["soft_deleted"])
+        conn = main.get_db()
+        try:
+            account = conn.execute(
+                "SELECT enabled, deleted_at FROM accounts WHERE id=?",
+                (second_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(0, account["enabled"])
+        self.assertIsNotNone(account["deleted_at"])
+
+    def test_active_run_cannot_be_deleted_or_hidden_from_owner_checks(self) -> None:
+        """活跃 run 不可软删除，历史脏数据也不能绕过所有权和养号检查。"""
+        main.init_db()
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id, warmup_enabled) "
+                    "VALUES('main','profiles/main',7,1)"
+                )
+                conn.execute(
+                    "INSERT INTO runs(id, task_id, account_id, status, run_kind) "
+                    "VALUES('active-warmup',1,1,'queued','warmup')"
+                )
+        finally:
+            conn.close()
+
+        with self.assertRaises(main.HTTPException) as delete_error:
+            main.delete_run("active-warmup")
+        self.assertEqual(409, delete_error.exception.status_code)
+
+        conn = main.get_db()
+        try:
+            with conn:
+                row = conn.execute(
+                    "SELECT deleted_at FROM runs WHERE id='active-warmup'"
+                ).fetchone()
+                self.assertIsNone(row["deleted_at"])
+                conn.execute(
+                    "UPDATE runs SET deleted_at=? WHERE id='active-warmup'",
+                    (time.time(),),
+                )
+        finally:
+            conn.close()
+        main.login_manager = None
+        main.continue_manager = None
+        blocker = main._oauth_owner_transition_blocker({"id": 1, "name": "main"})
+        self.assertIn("active-warmup", blocker)
+        claimed = main.WarmupScheduler(Mock())._claim_account(1, require_due=False)
+        self.assertIsNone(claimed)
+
+    def test_continue_and_login_sessions_block_unbind(self) -> None:
+        """继续对话或登录会话活跃时不得解绑 cc2api。"""
+        main.init_db()
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id) "
+                    "VALUES('main','profiles/main',7)"
+                )
+        finally:
+            conn.close()
+
+        continue_manager = Mock()
+        continue_manager.has_active_account.return_value = True
+        login_manager = Mock()
+        login_manager.has_active_name.return_value = False
+        main.continue_manager = continue_manager
+        main.login_manager = login_manager
+        with self.assertRaises(main.HTTPException) as continue_error:
+            main.delete_account_cc2api_binding(1)
+        self.assertEqual(409, continue_error.exception.status_code)
+
+        continue_manager.has_active_account.return_value = False
+        login_manager.has_active_name.return_value = True
+        with self.assertRaises(main.HTTPException) as login_error:
+            main.delete_account_cc2api_binding(1)
+        self.assertEqual(409, login_error.exception.status_code)
+
+    def test_bound_login_start_is_rejected_before_worker_creation(self) -> None:
+        """已绑定账号不能通过任何 login start 路径生成第二条 RT。"""
+        main.init_db()
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id) "
+                    "VALUES('main','profiles/main',7)"
+                )
+        finally:
+            conn.close()
+        login_manager = Mock()
+        main.login_manager = login_manager
+
+        with self.assertRaises(main.HTTPException) as error:
+            main.login_start(main.LoginStartIn(name="main"))
+
+        self.assertEqual(409, error.exception.status_code)
+        login_manager.start.assert_not_called()
+
+    def test_worker_start_and_unbind_are_serialized_by_owner_lock(self) -> None:
+        """worker 创建完成前解绑必须等待，随后因活跃 run 被拒绝。"""
+        main.init_db()
+        profile_dir = main.PROFILES_DIR / "main"
+        profile_dir.mkdir(parents=True)
+        (profile_dir / ".credentials.json").write_text(
+            json.dumps({
+                "claudeAiOauth": {
+                    "accessToken": "old-access",
+                    "refreshToken": "old-refresh",
+                    "expiresAt": 1,
+                }
+            }),
+            encoding="utf-8",
+        )
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id) "
+                    "VALUES('main','profiles/main',7)"
+                )
+                conn.execute(
+                    "INSERT INTO runs(id, task_id, account_id, status) "
+                    "VALUES('owner-run',1,1,'queued')"
+                )
+        finally:
+            conn.close()
+        client = Mock()
+        client.resolve_credentials.return_value = {
+            "account_id": 7,
+            "access_token": "cc2-access",
+            "refresh_token": "cc2-refresh",
+            "expires_at": int(time.time() * 1000) + 3600000,
+        }
+        main.cc2api_client = client
+        main.login_manager = None
+        main.continue_manager = None
+        main.warmup_scheduler = None
+
+        start_entered = threading.Event()
+        release_start = threading.Event()
+        release_wait = threading.Event()
+        fake_runner = Mock()
+
+        def start_run(*_args):
+            """阻塞 worker 创建，暴露所有权锁的临界区。"""
+            start_entered.set()
+            release_start.wait(2)
+            return "sidecar", "worker"
+
+        def wait_worker(_worker_id):
+            """保持 run 活跃，直到解绑线程完成检查。"""
+            release_wait.wait(2)
+            return 0
+
+        fake_runner.start_run.side_effect = start_run
+        fake_runner.wait_worker.side_effect = wait_worker
+        fake_runner.read_worker_status.return_value = {}
+        scheduler = main.Scheduler(fake_runner)
+        account = {"id": 1, "name": "main", "cc2api_account_id": 7}
+        task = {"id": 1, "timeout_sec": 1800}
+        worker_thread = threading.Thread(
+            target=scheduler._execute,
+            args=("owner-run", account, task),
+        )
+        worker_thread.start()
+        self.assertTrue(start_entered.wait(1))
+
+        unbind_errors: list[Exception] = []
+
+        def unbind() -> None:
+            """并发尝试解绑并记录业务拒绝。"""
+            try:
+                main.delete_account_cc2api_binding(1)
+            except Exception as exc:
+                unbind_errors.append(exc)
+
+        unbind_thread = threading.Thread(target=unbind)
+        unbind_thread.start()
+        time.sleep(0.1)
+        self.assertTrue(unbind_thread.is_alive())
+        release_start.set()
+        unbind_thread.join(2)
+        self.assertFalse(unbind_thread.is_alive())
+        self.assertEqual(1, len(unbind_errors))
+        self.assertIsInstance(unbind_errors[0], main.HTTPException)
+        self.assertEqual(409, unbind_errors[0].status_code)
+        release_wait.set()
+        worker_thread.join(2)
+        self.assertFalse(worker_thread.is_alive())
+
+        conn = main.get_db()
+        try:
+            row = conn.execute(
+                "SELECT cc2api_account_id FROM accounts WHERE id=1"
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(7, row["cc2api_account_id"])
+
+    def test_warmup_creates_real_run_with_topic_only_prompt(self) -> None:
+        """养号应创建真实 warmup run，且 prompt 不拼接账号信息。"""
+        main.init_db()
+        profile_dir = main.PROFILES_DIR / "main"
+        profile_dir.mkdir(parents=True)
+        (profile_dir / ".credentials.json").write_text(
+            json.dumps({
+                "claudeAiOauth": {
+                    "accessToken": "old-access",
+                    "refreshToken": "old-refresh",
+                    "expiresAt": 1,
+                }
+            }),
+            encoding="utf-8",
+        )
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id, warmup_enabled, "
+                    "warmup_next_run_at) VALUES('main','profiles/main',7,1,?)",
+                    (time.time() - 1,),
+                )
+                conn.execute(
+                    "INSERT INTO topics(no, title, description, category) "
+                    "VALUES(1,'标准题目','只使用题库描述','测试')"
+                )
+        finally:
+            conn.close()
+        client = Mock()
+        client.resolve_credentials.return_value = {
+            "account_id": 7,
+            "access_token": "cc2-access",
+            "refresh_token": "cc2-refresh",
+            "expires_at": int(time.time() * 1000) + 3600000,
+        }
+        run_scheduler = Mock()
+        original_client = main.cc2api_client
+        main.cc2api_client = client
+        try:
+            result = main.WarmupScheduler(run_scheduler).trigger_account(1, require_due=True)
+        finally:
+            main.cc2api_client = original_client
+        self.assertTrue(result["started"])
+
+        conn = main.get_db()
+        try:
+            run = conn.execute(
+                "SELECT * FROM runs WHERE id=?",
+                (result["run_id"],),
+            ).fetchone()
+            task = conn.execute(
+                "SELECT * FROM tasks WHERE id=?",
+                (result["task_id"],),
+            ).fetchone()
+        finally:
+            conn.close()
+        expected_prompt = main.build_topic_prompt({
+            "no": 1,
+            "title": "标准题目",
+            "description": "只使用题库描述",
+            "category": "测试",
+        })
+        self.assertEqual("warmup", run["run_kind"])
+        self.assertEqual("queued", run["status"])
+        self.assertEqual(expected_prompt, task["prompt"])
+        self.assertNotIn("main", task["prompt"])
+        run_scheduler.submit.assert_called_once()
+
+    def test_queued_warmup_syncs_again_before_start_and_reports_running(self) -> None:
+        """养号排队后拿到信号量时必须再次同步，并先展示 running。"""
+        main.init_db()
+        profile_dir = main.PROFILES_DIR / "main"
+        profile_dir.mkdir(parents=True)
+        credentials_path = profile_dir / ".credentials.json"
+        credentials_path.write_text(
+            json.dumps({
+                "claudeAiOauth": {
+                    "accessToken": "initial-access",
+                    "refreshToken": "initial-refresh",
+                    "expiresAt": 1,
+                }
+            }),
+            encoding="utf-8",
+        )
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id, warmup_enabled, "
+                    "warmup_next_run_at) VALUES('main','profiles/main',7,1,?)",
+                    (time.time() - 1,),
+                )
+                conn.execute(
+                    "INSERT INTO topics(no, title, description, category) "
+                    "VALUES(1,'标准题目','只使用题库描述','测试')"
+                )
+        finally:
+            conn.close()
+        client = Mock()
+        client.resolve_credentials.side_effect = [
+            {
+                "account_id": 7,
+                "access_token": "prepared-access",
+                "refresh_token": "prepared-refresh",
+                "expires_at": int(time.time() * 1000) + 3600000,
+            },
+            {
+                "account_id": 7,
+                "access_token": "start-access",
+                "refresh_token": "start-refresh",
+                "expires_at": int(time.time() * 1000) + 7200000,
+            },
+        ]
+        main.cc2api_client = client
+        submitter = Mock()
+        warmup = main.WarmupScheduler(submitter)
+        result = warmup.trigger_account(1, require_due=True)
+        self.assertTrue(result["started"])
+        submitter.submit.assert_called_once()
+        run_id, account, task = submitter.submit.call_args.args
+        self.assertNotIn("cc2api_credentials_prepared", task)
+
+        observed_statuses: list[str] = []
+        fake_runner = Mock()
+
+        def start_run(*_args):
+            """记录真实 worker 创建时账号页已经同步到的养号状态。"""
+            conn = main.get_db()
+            try:
+                row = conn.execute(
+                    "SELECT warmup_last_status FROM accounts WHERE id=1"
+                ).fetchone()
+                observed_statuses.append(str(row["warmup_last_status"]))
+            finally:
+                conn.close()
+            return "sidecar", "worker"
+
+        fake_runner.start_run.side_effect = start_run
+        fake_runner.wait_worker.return_value = 0
+        fake_runner.read_worker_status.return_value = {}
+        main.warmup_scheduler = warmup
+        main.Scheduler(fake_runner)._execute(run_id, account, task)
+
+        self.assertEqual(2, client.resolve_credentials.call_count)
+        self.assertEqual(["running"], observed_statuses)
+        data = json.loads(credentials_path.read_text(encoding="utf-8"))
+        self.assertEqual("start-access", data["claudeAiOauth"]["accessToken"])
+        self.assertEqual("start-refresh", data["claudeAiOauth"]["refreshToken"])
+
+    def test_queued_warmup_temporary_sync_failure_keeps_short_retry(self) -> None:
+        """排队后二次同步临时失败时应保留 15 分钟短重试。"""
+        run, account, before, fake_runner, client = self._run_queued_warmup_with_second_sync_error(
+            ConnectionError("network unavailable")
+        )
+
+        self.assertEqual("failed", run["status"])
+        self.assertEqual(1, account["warmup_enabled"])
+        self.assertEqual("sync_failed", account["warmup_last_status"])
+        self.assertGreaterEqual(
+            account["warmup_next_run_at"],
+            before + main.WARMUP_SYNC_RETRY_SEC - 2,
+        )
+        self.assertLessEqual(
+            account["warmup_next_run_at"],
+            before + main.WARMUP_SYNC_RETRY_SEC + 2,
+        )
+        fake_runner.start_run.assert_not_called()
+        self.assertEqual(2, client.resolve_credentials.call_count)
+
+    def test_queued_warmup_permanent_sync_failure_pauses_immediately(self) -> None:
+        """排队后二次同步遇到永久凭据错误时应立即暂停养号。"""
+        run, account, _before, fake_runner, client = self._run_queued_warmup_with_second_sync_error(
+            ValueError("cc2api 请求失败：OAuth 刷新失败: invalid_grant")
+        )
+
+        self.assertEqual("failed", run["status"])
+        self.assertEqual(0, account["warmup_enabled"])
+        self.assertEqual("paused", account["warmup_last_status"])
+        self.assertIsNone(account["warmup_next_run_at"])
+        self.assertIn("invalid_grant", account["warmup_last_error"])
+        fake_runner.start_run.assert_not_called()
+        self.assertEqual(2, client.resolve_credentials.call_count)
+
+    def test_first_invalid_grant_auth_failure_pauses_warmup(self) -> None:
+        """首个包含 invalid_grant 的 auth_failed 就应立即暂停养号。"""
+        main.init_db()
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id, warmup_enabled, "
+                    "warmup_last_run_id, warmup_last_status, warmup_auth_failures) "
+                    "VALUES('main','profiles/main',7,1,'warmup-run','running',0)"
+                )
+                conn.execute(
+                    "INSERT INTO runs(id, task_id, account_id, status, run_kind, error) "
+                    "VALUES('warmup-run',1,1,'auth_failed','warmup',"
+                    "'OAuth 认证失败；cc2api 刷新失败：invalid_grant')"
+                )
+        finally:
+            conn.close()
+
+        scheduler = main.WarmupScheduler(object())
+        scheduler.handle_run_terminal("warmup-run")
+
+        conn = main.get_db()
+        try:
+            row = conn.execute(
+                "SELECT warmup_enabled, warmup_last_status, warmup_last_error, "
+                "warmup_auth_failures, warmup_next_run_at FROM accounts WHERE id=1"
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(0, row["warmup_enabled"])
+        self.assertEqual("paused", row["warmup_last_status"])
+        self.assertEqual(1, row["warmup_auth_failures"])
+        self.assertIsNone(row["warmup_next_run_at"])
+        self.assertIn("invalid_grant", row["warmup_last_error"])
+
+    def test_stopping_warmup_immediately_schedules_next_run(self) -> None:
+        """停止养号 run 后应立即写终态并安排下一次随机触发。"""
+        main.init_db()
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id, warmup_enabled, "
+                    "warmup_last_run_id, warmup_last_status) "
+                    "VALUES('main','profiles/main',7,1,'warmup-run','running')"
+                )
+                conn.execute(
+                    "INSERT INTO runs(id, task_id, account_id, status, run_kind) "
+                    "VALUES('warmup-run',1,1,'running','warmup')"
+                )
+        finally:
+            conn.close()
+        main.runner = Mock()
+        main.warmup_scheduler = main.WarmupScheduler(Mock())
+        before = time.time()
+
+        main.stop_run("warmup-run")
+
+        conn = main.get_db()
+        try:
+            run = conn.execute(
+                "SELECT status FROM runs WHERE id='warmup-run'"
+            ).fetchone()
+            account = conn.execute(
+                "SELECT warmup_last_status, warmup_next_run_at FROM accounts WHERE id=1"
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual("stopped", run["status"])
+        self.assertEqual("stopped", account["warmup_last_status"])
+        self.assertGreater(account["warmup_next_run_at"], before)
+
+    def test_disabled_warmup_run_terminal_keeps_off_status(self) -> None:
+        """用户主动关闭养号后，活跃 run 收口不能把 off 改成 paused。"""
+        main.init_db()
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id, warmup_enabled, "
+                    "warmup_last_run_id, warmup_last_status) "
+                    "VALUES('main','profiles/main',7,0,'warmup-run','off')"
+                )
+                conn.execute(
+                    "INSERT INTO runs(id, task_id, account_id, status, run_kind) "
+                    "VALUES('warmup-run',1,1,'success','warmup')"
+                )
+        finally:
+            conn.close()
+
+        main.WarmupScheduler(object()).handle_run_terminal("warmup-run")
+
+        conn = main.get_db()
+        try:
+            row = conn.execute(
+                "SELECT warmup_enabled, warmup_last_status, warmup_next_run_at "
+                "FROM accounts WHERE id=1"
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(0, row["warmup_enabled"])
+        self.assertEqual("off", row["warmup_last_status"])
+        self.assertIsNone(row["warmup_next_run_at"])
+
+    def test_old_warmup_terminal_does_not_update_new_cc2api_binding(self) -> None:
+        """旧绑定的养号终态不得把认证失败写到新 cc2api 绑定上。"""
+        main.init_db()
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id, warmup_enabled, "
+                    "warmup_next_run_at, warmup_last_run_id, warmup_last_status) "
+                    "VALUES('main','profiles/main',8,1,?,'warmup-run','scheduled')",
+                    (time.time() + 3600,),
+                )
+                conn.execute(
+                    "INSERT INTO runs(id, task_id, account_id, status, run_kind, error) "
+                    "VALUES('warmup-run',1,1,'auth_failed','warmup','OAuth invalid_grant')"
+                )
+        finally:
+            conn.close()
+
+        main.WarmupScheduler(Mock()).handle_run_terminal("warmup-run", 7)
+
+        conn = main.get_db()
+        try:
+            row = conn.execute(
+                "SELECT cc2api_account_id, warmup_enabled, warmup_last_status, "
+                "warmup_auth_failures FROM accounts WHERE id=1"
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(8, row["cc2api_account_id"])
+        self.assertEqual(1, row["warmup_enabled"])
+        self.assertEqual("scheduled", row["warmup_last_status"])
+        self.assertEqual(0, row["warmup_auth_failures"])
+
+    def test_topic_selection_excludes_recent_twenty_when_candidate_exists(self) -> None:
+        """养号抽题应优先排除账号最近 20 道题。"""
+        main.init_db()
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id, warmup_enabled) "
+                    "VALUES('main','profiles/main',7,1)"
+                )
+                for no in range(1, 22):
+                    conn.execute(
+                        "INSERT INTO topics(no, title, description, category) VALUES(?,?,?,?)",
+                        (no, f"topic-{no}", "description", "category"),
+                    )
+                for index in range(1, 21):
+                    conn.execute(
+                        "INSERT INTO runs(id, task_id, account_id, topic_id, status, run_kind, created_at) "
+                        "VALUES(?,?,?,?,?,?,?)",
+                        (f"run-{index}", index, 1, index, "success", "warmup", float(index)),
+                    )
+        finally:
+            conn.close()
+
+        scheduler = main.WarmupScheduler(object())
+        topic = scheduler._select_topic(1)
+        self.assertEqual(21, topic["id"])
+
+    def test_third_auth_failure_pauses_warmup(self) -> None:
+        """连续第三次 auth_failed 应关闭养号并保留暂停原因。"""
+        main.init_db()
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id, warmup_enabled, "
+                    "warmup_last_run_id, warmup_last_status, warmup_auth_failures) "
+                    "VALUES('main','profiles/main',7,1,'warmup-run','running',2)"
+                )
+                conn.execute(
+                    "INSERT INTO runs(id, task_id, account_id, status, run_kind, error) "
+                    "VALUES('warmup-run',1,1,'auth_failed','warmup','OAuth 认证失败')"
+                )
+        finally:
+            conn.close()
+
+        scheduler = main.WarmupScheduler(object())
+        scheduler.handle_run_terminal("warmup-run")
+
+        conn = main.get_db()
+        try:
+            row = conn.execute(
+                "SELECT warmup_enabled, warmup_last_status, warmup_last_error, "
+                "warmup_auth_failures, warmup_next_run_at FROM accounts WHERE id=1"
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(0, row["warmup_enabled"])
+        self.assertEqual("paused", row["warmup_last_status"])
+        self.assertEqual(3, row["warmup_auth_failures"])
+        self.assertIsNone(row["warmup_next_run_at"])
+        self.assertIn("连续 3 次", row["warmup_last_error"])
+
+
+if __name__ == "__main__":
+    unittest.main()

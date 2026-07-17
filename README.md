@@ -50,10 +50,10 @@ open http://localhost:8000
 
 | 页 | 用途 |
 |---|---|
-| **账号** | 添加在 init-account.sh 已建好 profile 的账号，配置上游 HTTP/SOCKS5 代理 |
+| **账号** | 添加 OAuth profile、配置上游代理、单账号同步/绑定 cc2api，并设置随机间隔养号 |
 | **题库** | 300 题；点击卡片 → 查看 / 编辑 topic，批量任务页可多选派发 |
 | **任务** | 列表 + ▶ 运行（按 repeat_n 提交多次）|
-| **运行** | SSE 实时列表 + 默认模型 / 思考预算配置 + 详情：transcript / 产物文件树 / token 统计；也可启动单次完整 HTTP 抓包 run |
+| **运行** | SSE 实时列表 + 默认模型 / 思考预算配置 + 详情：transcript / 产物文件树 / token 统计；显示抓包和养号 run 标识 |
 
 ## 关键决策（已锁定 PRD）
 
@@ -100,9 +100,27 @@ bench/
 
 ## P1 范围 vs 后续
 
-**P1 已实现**：账号 CRUD、题库解析、topic 持久化维护、任务批量创建/运行、单账号 2 并发调度、sidecar+worker 编排、TLS MITM + flow 落盘、token 统计、SSE 实时状态、详情面板、单 topic + 单账号完整 HTTP 抓包分析 run。
+**P1 已实现**：账号 CRUD、题库解析、topic 持久化维护、任务批量创建/运行、单账号 2 并发调度、sidecar+worker 编排、TLS MITM + flow 落盘、token 统计、SSE 实时状态、详情面板、单 topic + 单账号完整 HTTP 抓包分析 run，以及 cc2api 单账号同步和定时养号。
 
-**待 P2**：多账号管理 UI、循环跑（题库扫完再来一轮）、按账号统计仪表盘、mitmproxy flow 在 WebUI 内浏览、失败重试策略、Stop hook 检测的更精细判定。
+**待 P2**：多账号批量同步、按账号统计仪表盘、mitmproxy flow 在 WebUI 内浏览、失败重试策略、Stop hook 检测的更精细判定。
+
+## cc2api 绑定与定时养号
+
+在 `.env` 中配置 `CC2API_BASE_URL` 和 `CC2API_ADMIN_PASSWORD` 后，账号页可以把单个现有 bench OAuth profile 同步到 cc2api，或显式选择同一身份的 active OAuth 账号进行绑定。同步匹配优先使用 `accountUuid`；bench profile 缺少 UUID 时才按邮箱匹配，账号名称不参与匹配。
+
+绑定账号由 cc2api 单独持有并刷新 AT/RT。bench 在每次 run 前解析 cc2api 最新凭据；worker 运行副本会移除 RT，401 时只请求 cc2api 强制刷新一次，不能再走本地 refresh。绑定期间必须先解绑才能使用 bench 的重授权入口。
+
+养号按账号配置最小/最大小时间隔。每次到期从当前有效题库随机抽题，优先排除该账号最近 20 个养号题目，创建真实 `run_kind=warmup` task/run 并继续受账号并发限制。临时 cc2api 故障按 `WARMUP_SYNC_RETRY_SEC` 重试；连续 3 次 `auth_failed` 或永久凭据错误会自动暂停。
+
+下例假设 orchestrator 与 cc2api 已加入同一个 Docker network，且 cc2api 的服务名为 `claude-code-gateway`。若不共享网络，请改成 orchestrator 容器实际可达的外部地址。
+
+```env
+CC2API_BASE_URL=http://claude-code-gateway:5674
+CC2API_ADMIN_PASSWORD=<admin-password>
+CC2API_REQUEST_TIMEOUT_SEC=15
+WARMUP_SCHEDULER_TICK_SEC=30
+WARMUP_SYNC_RETRY_SEC=900
+```
 
 **待 P3（评测）**：自动跑产物里的测试 / lint / 起 dev server 截图 / LLM-as-judge。
 
@@ -138,5 +156,5 @@ data/flows/<account>/<task_id>/<run_id>/
 - **默认模型**：普通 run 和批量 run 默认使用 WebUI「运行」页保存的模型；未保存页面覆盖值时回退到 `CLAUDE_DEFAULT_MODEL=opus[1m]`。如果某个模型临时不可用，优先在页面改成 `sonnet[1m]`、`haiku` 或完整模型 ID，新启动的普通 / 批量 run 立即生效；清空页面覆盖后才回退到 `.env`。完整 HTTP 抓包 run 不受页面配置或 `CLAUDE_DEFAULT_MODEL` 影响，只在抓包页填写 `model_override` 时覆盖当前抓包 run。
 
 - **Claude Code 版本**：新启动的 task / 抓包 / 登录 / quota worker 使用 WebUI「运行」页保存的版本；未保存页面覆盖值时回退到 `CLAUDE_CODE_VERSION=2.1.197`。版本覆盖会在 worker 启动时检查 `claude --version`，不一致则安装指定 `@anthropic-ai/claude-code` 版本。清空页面覆盖后才回退到 `.env`。
-- **OAuth 401 / token 刷新竞态**：orchestrator 后台刷新器会更新账号 profile，运行中的 worker 会按 `OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC` 做 profile / 本地凭证的新鲜度同步。若 Claude 仍返回 401，worker 会锁住该账号 profile，用当前 refreshToken 强制刷新一次并回写新 AT/RT，再提示 Claude 重试一次；同账号多个并行 run 会串行化刷新，多个账号互不影响。刷新失败或再次 401 会标记 `auth_failed`，不会继续等到普通 timeout。
+- **OAuth 401 / token 刷新竞态**：未绑定账号保留原有 profile 新鲜度同步和一次本地强制 refresh。绑定 cc2api 的账号只镜像 cc2api 凭据，worker 不持有 RT、不反向覆盖 credentials；首次 401 会请求 orchestrator 让 cc2api 强制刷新并只重试一次，再次失败标记 `auth_failed`。
 - **磁盘占用 / 敏感数据**：普通 run 默认 `SAVE_FULL_FLOWS=0`，只保留 `stats.jsonl`；完整抓包 run 会保存请求体和响应体全文、`.flow` 和索引，体积更大且包含高敏数据；默认 `CLEAN_WORKSPACE_DEPS=1` 会在 run 结束后清理 workspace 里的 `node_modules`、`.venv` 等依赖目录。
