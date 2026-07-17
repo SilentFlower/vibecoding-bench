@@ -1729,3 +1729,38 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### 后续步骤
 
 - 按归档任务的 `release.md` 构建并推送三镜像，暂停远程运行任务后重新部署并验证账号时区。
+
+
+## Session 50: 完成定时养号与 cc2api 托管 OAuth 部署
+
+**Date**: 2026-07-17
+**Task**: 完成定时养号与 cc2api 托管 OAuth 部署
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+完成单账号 cc2api 绑定、managed OAuth、定时真实养号、Accounts/Runs UI 与双系统部署；全量检查通过，待继续观察首个真实养号终态和实际 401 恢复。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3f99fd6` | (see git log) |
+| `33a46f5` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
