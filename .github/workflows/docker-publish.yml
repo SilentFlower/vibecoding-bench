@@ -1,0 +1,76 @@
+name: 构建并发布 Docker 镜像
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAMESPACE: ghcr.io/silentflower
+
+jobs:
+  publish:
+    name: 发布 ${{ matrix.image }}
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: orchestrator
+            context: ./orchestrator
+            dockerfile: ./orchestrator/Dockerfile
+          - image: worker
+            context: ./images/worker
+            dockerfile: ./images/worker/Dockerfile
+          - image: sidecar
+            context: ./images/sidecar
+            dockerfile: ./images/sidecar/Dockerfile
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v6
+
+      - name: 配置 QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: 配置 Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 生成镜像元数据
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_NAMESPACE }}/vibebench-${{ matrix.image }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=,format=short
+        env:
+          DOCKER_METADATA_SHORT_SHA_LENGTH: 7
+
+      - name: 构建并推送镜像
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          cache-from: type=gha,scope=vibebench-${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=vibebench-${{ matrix.image }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

@@ -1,25 +1,25 @@
-# Image Build & DockerHub Push
+# Image Build & GHCR Push
 
-> 三镜像构建 + 双 tag 发布的可执行流程。
+> GitHub Actions 三镜像多架构构建 + GHCR 双 tag 发布的可执行流程。
 
 ---
 
 ## Scope / Trigger
 
-任何动到下列文件 → 必须重建 + 重推对应镜像:
+每次 push 到 `main` 都触发 `.github/workflows/docker-publish.yml`,并构建 + 推送全部三个镜像。下表只说明哪些文件会改变对应镜像内容:
 
 | 改了 | 重建 |
 |------|------|
 | `orchestrator/main.py` 或 `orchestrator/requirements.txt` 或 `orchestrator/Dockerfile` | orchestrator |
 | `images/worker/entrypoint.sh` 或 `images/worker/Dockerfile` | worker |
 | `images/sidecar/start.sh` / `recorder.py` / `Dockerfile` | sidecar |
-| `webui/*` 或 `topics.md` | **不需要重建**(都是 bind mount,远程 git pull 即可) |
+| `webui/*` 或 `topics.md` | **不改变镜像内容**(都是 bind mount,远程 git pull 即可;workflow 仍按 main push 契约发布三件套 tag) |
 
 ---
 
 ## 命名 & Tag 契约(锁定)
 
-镜像 namespace:`huajiwuyan/vibebench-{orchestrator,worker,sidecar}`
+镜像 namespace:`ghcr.io/silentflower/vibebench-{orchestrator,worker,sidecar}`
 
 每次发版 **同时打两个 tag**:
 
@@ -32,41 +32,75 @@
 
 ---
 
-## 完整命令序列
+## GitHub Actions 发布流程
 
-### Step 1: 构建本地镜像
+### Trigger
+
+- push 到 `main`:自动发布。
+- `workflow_dispatch`:只允许选择 `main` ref;其它 ref 的发布 job 会跳过,防止功能分支覆盖 `latest`。
+- concurrency group 为 `docker-publish-${{ github.ref }}`,同 ref 的新运行取消旧运行。
+
+### Permissions / Auth
+
+workflow 只申请:
+
+```yaml
+permissions:
+  contents: read
+  packages: write
+```
+
+GHCR 登录只使用 `${{ github.actor }}` + `${{ secrets.GITHUB_TOKEN }}`。禁止新增 Docker Hub token、GHCR PAT 或把 token 写入文件 / 日志。
+
+### Build Matrix
+
+matrix 固定包含 orchestrator / worker / sidecar,每项都构建 `linux/amd64,linux/arm64`。使用当前官方主版本:
+
+- `actions/checkout@v6`
+- `docker/setup-qemu-action@v4`
+- `docker/setup-buildx-action@v4`
+- `docker/login-action@v4`
+- `docker/metadata-action@v6`
+- `docker/build-push-action@v7`
+
+每个镜像使用独立 `type=gha,scope=vibebench-<image>` cache,写入使用 `mode=max`。
+
+### First Publish: Package Visibility
+
+GHCR 新 package 首次发布默认 private。首次 workflow 成功后,必须在 GitHub package settings 把以下三个 package 分别改成 public:
+
+- `vibebench-orchestrator`
+- `vibebench-worker`
+- `vibebench-sidecar`
+
+公开后远程主机才能匿名 pull。package 公开后不能再改回 private;workflow 不负责自动修改可见性。
+
+### Local Build Smoke
+
+本地构建只用于开发验证,不再承担正式发布:
 
 ```bash
-# orchestrator(默认 service,无 profile)
 docker compose build orchestrator
-
-# worker 或 sidecar(在 build profile 下)
-docker compose --profile build build worker-image     # 改了 worker 才跑
-docker compose --profile build build sidecar-image    # 改了 sidecar 才跑
+docker compose --profile build build worker-image
+docker compose --profile build build sidecar-image
 ```
 
-### Step 2: 打 tag
+worker 镜像约 1.37 GB(node:22 基础大),arm64 通过 QEMU 构建会明显更慢。后续 workflow 依赖 GHA cache 复用未变化层。
+
+### Compose Image Wiring
+
+`docker-compose.remote.yml` 只有 orchestrator 是 Compose service。worker / sidecar 由 orchestrator 通过 Docker SDK 启动,镜像地址分别来自 orchestrator environment 的 `WORKER_IMAGE` / `SIDECAR_IMAGE`。
+
+因此 `docker compose ... config --images` 只输出 orchestrator 是正常行为,不能据此误判 worker / sidecar 镜像未配置。完整验证必须同时检查:
 
 ```bash
-SHA=$(git rev-parse --short HEAD)
-for img in orchestrator worker sidecar; do
-  docker tag vibebench-$img:latest huajiwuyan/vibebench-$img:latest
-  docker tag vibebench-$img:latest huajiwuyan/vibebench-$img:$SHA
-done
+docker compose -f docker-compose.remote.yml --env-file .env.example config --quiet
+docker compose -f docker-compose.remote.yml --env-file .env.example config --images
+docker compose -f docker-compose.remote.yml --env-file .env.example config \
+  | grep -E 'WORKER_IMAGE:|SIDECAR_IMAGE:'
 ```
 
-> 即使 worker/sidecar 没改,也打新 sha tag,保证三件套 sha 对齐。Docker push 会复用已上传层,新 tag 推送只是 manifest 更新,秒级。
-
-### Step 3: Push DockerHub
-
-```bash
-for img in orchestrator worker sidecar; do
-  docker push huajiwuyan/vibebench-$img:latest
-  docker push huajiwuyan/vibebench-$img:$SHA
-done
-```
-
-worker 镜像 ~1.37 GB(node:22 基础大),首次推全量约 5–15 分钟视带宽。后续推增量,只传改了的层(几十 MB)。
+三处值必须使用同一个 `VIBEBENCH_TAG`,并分别指向 `ghcr.io/silentflower/vibebench-{orchestrator,worker,sidecar}`。
 
 ---
 
@@ -478,31 +512,35 @@ webui/ 和 topics.md 是 bind mount → **改它们不需要 recreate**,远程 g
 
 | 操作 | 错误现象 | 根因 | 修复 |
 |------|---------|------|------|
-| `docker push` 401 | `denied: requested access to the resource is denied` | 未 `docker login` 或登错 namespace | `docker login`,确认 `~/.docker/config.json` 的 username |
-| 远程 pull 慢/卡 | worker 1.37 GB 一直 0% | DockerHub 限流 / 网络慢 | 给 docker daemon 配镜像加速器 |
+| Actions push 403 | `permission_denied: write_package` | workflow 缺 `packages: write`,或 package 未关联当前仓库 | 检查 permissions、OCI source label 与 package 的 Actions access |
+| 远程匿名 pull 403 | `denied` / `unauthorized` | 新 GHCR package 仍是 private | 在三个 package settings 中分别改为 public |
+| 远程 pull 慢/卡 | worker 1.37 GB 一直 0% | GHCR 网络慢 / worker 镜像层较大 | 检查远程到 `ghcr.io` 的网络与代理配置,等待大层下载 |
 | recreate 后还是旧行为 | 改了代码但容器内仍是旧版 | 用了 `restart` 不是 `--force-recreate`,或镜像 tag 没动 | `docker compose pull` + `up -d --force-recreate` |
-| 三镜像版本错配 | worker 调用 sidecar 接口字段对不上 | 只 push 了改的镜像,sha tag 不对齐 | 三镜像全部打同一 sha,即使没改 |
+| 三镜像版本错配 | worker 调用 sidecar 接口字段对不上 | workflow 有 matrix 项失败,却部署了部分更新的 `latest` | 只部署三个 matrix 项全部成功的短 SHA tag |
 
 ---
 
 ## Good / Base / Bad Cases
 
-**Good**:改 orchestrator 一处 → build orchestrator → 三镜像全部 retag 新 sha → push 三镜像 latest + sha(worker/sidecar 因为内容没变,push 只是 manifest 更新,~1s 完成) → 远程 `pull && up -d --force-recreate`。
+**Good**:改 orchestrator 一处 → push `main` → workflow 三个 matrix 项全部成功并发布同一短 SHA + latest → 远程锁定该短 SHA → `pull && up -d --force-recreate`。
 
-**Base**:只改 orchestrator → 只 build + push orchestrator(latest + sha) → 远程 pull orchestrator + recreate。worker/sidecar sha 滞后一个版本但 `:latest` 仍可拉。**注意**:这种情况下 sha tag 不再三件套配套,回滚 `:某 sha` 时可能只能找到 orchestrator,worker/sidecar 那个 sha 不存在 → 部署要求 sha 配套时 fallback `:latest` 或上一个有配套的 sha。
+**Base**:只改 `webui/` 或 `topics.md` → workflow 仍发布三镜像同一新 tag,但镜像内容层可复用缓存;远程仍必须 `git pull`,因为实际前端 / 题库来自 bind mount。
 
-**Bad**:只 build 不 push,远程拉不到新版;或 push 了忘记远程 recreate,远程仍跑旧容器;或 recreate 时忘了先 pull,daemon 拿不到新镜像(本地无该 tag)直接报错。
+**Bad**:workflow 有一个 matrix 项失败仍部署 `latest`;或首次发布后没有把 package 改为 public,远程匿名 pull 直接失败;或 pull 后只 `restart`,远程仍跑旧容器。
 
 ---
 
-## Tests Required(手动验)
+## Tests Required
 
-发布完成后,**远程** 跑以下断言:
+workflow / GHCR 发布完成后至少断言:
 
-1. `docker images huajiwuyan/vibebench-orchestrator` 包含新 sha tag
-2. `docker inspect vibebench-orchestrator --format='{{.Image}}'` 与刚 pull 的 image ID 一致
-3. `curl http://<host>:<port>/api/auth/me` 返回符合新版本的 contract(如 `auth_required` 字段)
-4. orchestrator 日志末尾出现 `Application startup complete` 且无 ERROR
+1. `docker compose ... config --quiet` 通过;`config --images` 输出 GHCR orchestrator;完整 `config` 中 `WORKER_IMAGE` / `SIDECAR_IMAGE` 输出对应 GHCR 地址和同一 tag。
+2. Actions 页面三个 matrix 项全部成功。
+3. `docker buildx imagetools inspect ghcr.io/silentflower/vibebench-orchestrator:<sha>` 显示 `linux/amd64` 与 `linux/arm64`;worker / sidecar 同样检查。
+4. 三个 package 均存在 `latest` 和同一个原始 7 位短 SHA tag。
+5. 使用未登录 GHCR 的 Docker config 能匿名 pull 三个 public package。
+6. 远程 `docker inspect vibebench-orchestrator --format='{{.Config.Image}}'` 是目标 GHCR 短 SHA 地址。
+7. `curl http://<host>:<port>/api/auth/me` 返回符合新版本的 contract,orchestrator 日志末尾出现 `Application startup complete` 且无 ERROR。
 
 ---
 
@@ -523,22 +561,21 @@ docker compose build orchestrator
 docker compose up -d --force-recreate orchestrator
 ```
 
-### ❌ Wrong: 只 push 改了的镜像 sha tag
+### ❌ Wrong: 手工只 push 改了的镜像 sha tag
 
 ```bash
-docker push huajiwuyan/vibebench-orchestrator:158b462
+docker push ghcr.io/silentflower/vibebench-orchestrator:158b462
 # worker/sidecar 还停在 9787fc1 — sha 配套缺失
 ```
 
-### ✅ Correct: 三件套对齐 sha tag
+### ✅ Correct: 由 workflow 发布三件套对齐 sha tag
 
 ```bash
-SHA=158b462
-docker tag vibebench-worker:latest  huajiwuyan/vibebench-worker:$SHA
-docker tag vibebench-sidecar:latest huajiwuyan/vibebench-sidecar:$SHA
-docker push huajiwuyan/vibebench-worker:$SHA       # ~1s (内容未变,manifest only)
-docker push huajiwuyan/vibebench-sidecar:$SHA      # ~1s
-docker push huajiwuyan/vibebench-orchestrator:$SHA # 正常推
+git push origin main
+# 等待 docker-publish.yml 的 orchestrator / worker / sidecar 三个 matrix 项全部成功。
+docker buildx imagetools inspect ghcr.io/silentflower/vibebench-orchestrator:158b462
+docker buildx imagetools inspect ghcr.io/silentflower/vibebench-worker:158b462
+docker buildx imagetools inspect ghcr.io/silentflower/vibebench-sidecar:158b462
 ```
 
 ---
@@ -549,6 +586,7 @@ docker push huajiwuyan/vibebench-orchestrator:$SHA # 正常推
 |--------|------|--------|
 | `docker compose restart` 当作"重启加载新镜像" | 改代码不生效 | `up -d --force-recreate` |
 | 单 tag(只 latest) | 想回滚找不到旧版 | 每发版必打 `:<git-sha>` |
-| 忘记三镜像 sha 对齐 | 用 `:某 sha` 拉时缺其中两个 | 即使没改也 retag + push(秒级,值得) |
-| 推完忘 git push | 镜像有了但 GitHub 还是旧 commit,sha tag 找不到对应源码 | push 镜像前/后 `git push origin <branch>`,顺序无所谓但都要做 |
+| workflow matrix 未全绿就部署 latest | 三镜像可能短暂错配 | 只部署三个 matrix 项全部成功的短 SHA |
+| 首次发布忘记公开 package | 远程匿名 pull 403 | 把三个 GHCR package 分别改为 public |
+| 手工 push 单个镜像 | 用 `:某 sha` 拉时缺其中两个 | 正式发布只走 main 的 GitHub Actions matrix |
 | 在 build profile 之外去 build worker/sidecar | `service "worker-image" not found` | 加 `--profile build` |

@@ -37,12 +37,18 @@ repo 里有两个:
 | 文件 | image 来源 | 用法 |
 |------|-----------|------|
 | `docker-compose.yml` | 本地 build(`build: ./orchestrator`) | 本地开发 |
-| `docker-compose.remote.yml` | DockerHub pull(`image: huajiwuyan/vibebench-*`) | 远程部署 |
+| `docker-compose.remote.yml` | GHCR 匿名 pull(`image: ghcr.io/silentflower/vibebench-*`) | 远程部署 |
 
 远程用法二选一:
 
 1. **显式 `-f`**:`docker compose -f docker-compose.remote.yml --env-file .env up -d`
 2. **覆盖默认**:`cp docker-compose.remote.yml docker-compose.yml`,以后 `docker compose up -d` 直跑 —— 但 git pull 时这个本地改动会冲突,处理见下方 [Pull 冲突协议](#pull-冲突协议)
+
+### GHCR 可见性前置条件
+
+GitHub Actions 首次发布后,三个 GHCR package 默认 private。仓库 owner 必须在 package settings 中把 `vibebench-orchestrator`、`vibebench-worker`、`vibebench-sidecar` 分别改为 public。远程部署不保存 GHCR PAT,因此 package 未公开时 `docker compose pull` 会返回 `denied` / `unauthorized`。
+
+package 公开后不能再改回 private。首次上线前要在未登录 GHCR 的主机验证三个镜像均可匿名 pull。
 
 ---
 
@@ -262,7 +268,7 @@ nano .env
 
 mkdir -p data
 
-# 用 remote.yml 拉 DockerHub 镜像 + 启动
+# 用 remote.yml 匿名拉取 GHCR 镜像 + 启动
 docker compose -f docker-compose.remote.yml --env-file .env pull
 docker compose -f docker-compose.remote.yml --env-file .env up -d
 
@@ -402,6 +408,7 @@ ssh server 'cd /root/vibecoding-bench && scripts/sync-topics-db.py --topics topi
 | 浏览器看到 401 弹框/JSON | 启用了 auth,正常 | 输入 WEBUI_USER/PASS |
 | 升级后浏览器仍旧 UI | 浏览器缓存了旧 webui | Ctrl+F5 强刷 |
 | `git pull` 报 unstaged changes | 用户改过 docker-compose.yml | 按 [Pull 冲突协议](#pull-冲突协议) 处理 |
+| `docker compose pull` 返回 `denied` / `unauthorized` | GHCR package 仍是 private,或镜像地址拼错 | 把三个 package 设为 public,并核对 `ghcr.io/silentflower/vibebench-*` |
 | 设置 `CLAUDE_DEFAULT_MODEL` 后普通 run 仍旧模型 | WebUI 页面覆盖值优先，或只改了 `.env` 但用了 `restart` / 未 recreate | 先在运行页清空覆盖值；若仍不生效，再 `docker compose ... up -d --force-recreate orchestrator` |
 | WebUI 保存默认模型失败 | 模型名含非法字符或超过 128 字符 | 改成 `[A-Za-z0-9._\-\[\]]+` 范围内的模型名 |
 | 抓包 run 未填 `model_override` 却被全局模型影响 | 说明实现错误：抓包 run 不应收到页面覆盖值或全局 `CLAUDE_MODEL_OVERRIDE` | 检查 `capture_full_http` 分支和 worker 环境变量 |
