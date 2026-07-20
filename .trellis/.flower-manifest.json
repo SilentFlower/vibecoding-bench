@@ -1,5 +1,5 @@
 {
-  "flowerVersion": "0.5.0-beta.3",
+  "flowerVersion": "0.5.0-beta.4",
   "variant": "0.6",
   "version": "0.6.5",
   "skills": [
@@ -57,7 +57,7 @@
   ],
   "patches": {
     "schemaVersion": 1,
-    "catalogHash": "sha256:61feb8673df5b7c0ada042a8d039b3e2003bf2a28d305fd8473ff0c1acafcd7d",
+    "catalogHash": "sha256:13105779fa2eb7f2b8ceab1bd185c5439a41bc29f020f224e33013fcc5614e6f",
     "applied": [
       {
         "id": "trellis-finish-work-exact-bookkeeping",
@@ -242,6 +242,14 @@
         "target": ".trellis/workflow.md",
         "status": "applied",
         "resultHash": "sha256:fa94b0b4d0bca7a1c0f2c8003348ee6a0d26429ad58f261a5b11d2102c8f0a9e"
+      },
+      {
+        "id": "active-task-clear-session-fallback",
+        "patch": "workflow-state-missing-task",
+        "bundle": "intent-routing",
+        "target": ".trellis/scripts/common/active_task.py",
+        "status": "applied",
+        "resultHash": "sha256:fbbef48d67aa3710a3dae9e8747d6b2b0a0f9782925b7b229e17917bcec50f94"
       },
       {
         "id": "inject-workflow-state-shared-runtime",
