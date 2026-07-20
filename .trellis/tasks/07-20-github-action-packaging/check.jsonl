@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/vibecoding-bench/deploy/index.md", "reason": "核对交付流程总览是否已从人工 Docker Hub 发布迁移到 GitHub Actions + GHCR。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/image-build-push.md", "reason": "检查三镜像、双 tag、平台矩阵和构建边界是否满足锁定契约。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/remote-deploy.md", "reason": "检查远程 Compose、匿名 pull、升级与回滚说明是否一致。"}

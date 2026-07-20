@@ -1,0 +1,48 @@
+{
+  "id": "github-action-packaging",
+  "name": "github-action-packaging",
+  "title": "将 vibecoding-bench 打包改造为 GitHub Action",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-07-20",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-07-19T19:06:16Z",
+      "contextKey": "codex_019f7bc4-e34c-7c60-b83f-29db1a149557",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "93b016079c7ace0b3a1124161e873cf4f07d02ff",
+        "status": []
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-07-20T08:23:09+08:00",
+    "completedSteps": [
+      "完成 GitHub Actions 多架构镜像发布工作流与 GHCR 切换",
+      "完成 workflow、Compose 与 Dockerfile 本地质量检查",
+      "更新部署文档与 Trellis 规范"
+    ],
+    "partialStep": null,
+    "nextStep": "验证首次 GitHub Actions 运行，并将三个 GHCR Packages 设置为 Public",
+    "notes": "首次发布后需在 GitHub Packages 设置中手动公开 orchestrator、worker、sidecar 三个包。"
+  }
+}
