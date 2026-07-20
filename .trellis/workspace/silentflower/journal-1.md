@@ -1764,3 +1764,38 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 51: 将三镜像发布迁移到 GitHub Actions 与 GHCR
+
+**Date**: 2026-07-20
+**Task**: 将三镜像发布迁移到 GitHub Actions 与 GHCR
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+新增 main 自动触发的三镜像多架构 GHCR 发布 workflow，迁移远程 Compose、文档与部署规范并完成本地检查；首次触发因 GitHub Actions 官方故障以 startup_failure 结束，已记录恢复后重跑、公开三个 Package、匿名拉取和远程升级操作，并归档当前任务。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dd954ce` | (see git log) |
+| `71ead6f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
