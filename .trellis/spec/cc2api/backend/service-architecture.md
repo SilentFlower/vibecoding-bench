@@ -257,7 +257,7 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 
 ### 1. Scope / Trigger
 
-- Trigger：修改 `service::oauth::fetch_usage`、`AccountService::refresh_usage`、`UsagePollerService`、`web/src/api.ts`、`Accounts.vue` 中 OAuth usage 解析或展示时适用。
+- Trigger：修改 `service::oauth::fetch_usage`、`GatewayService` 被动用量采集、`AccountService::refresh_usage`、`UsagePollerService`、`web/src/api.ts`、`Accounts.vue` 中 usage 解析或展示时适用。
 - 背景：Claude Code 新版 usage API 可能把模型专属周用量放在 `limits[]` 的 scoped 结构里，而不是顶层 `seven_day_<model>` 字段。
 
 ### 2. Signatures
@@ -265,6 +265,8 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 - 上游接口：`GET https://api.anthropic.com/api/oauth/usage`
 - 后端入口：`service::oauth::fetch_usage(token, proxy_url).await -> Result<serde_json::Value, AppError>`
 - 账号刷新：`AccountService::refresh_usage(id).await -> Result<serde_json::Value, AppError>`
+- 被动解析：`gateway::extract_passive_usage(headers) -> Option<serde_json::Value>`
+- 被动写入：`AccountService::update_passive_usage(id, partial, UsageObservationKind).await -> Result<(), AppError>`
 - 管理端接口：`POST /admin/accounts/:id/usage -> { status: "ok", usage }`
 - 前端类型：`UsageData` 包含 `five_hour`、`seven_day`、`seven_day_sonnet`、`seven_day_fable`、`limits`
 
@@ -278,7 +280,10 @@ let permit = slots.acquire_many_owned(slot_units).await?;
   - `resets_at` 为字符串时保留，否则写 `null`
 - 后端归一化只能补稳定字段，不得删除 `limits`、`spend`、`extra_usage` 等原始字段，方便排查上游变化。
 - 前端展示应优先读取稳定字段；为了兼容旧缓存，也可从 `usage_data.limits` 回退提取 Fable。
-- Fable 周用量不能从普通 `anthropic-ratelimit-unified-*` 响应头可靠推导。OAuth 账号的 Fable `/v1/messages` 成功响应必须在 body EOF 后异步触发一次 usage API 刷新，并按账号做短间隔节流；该刷新不得阻塞 Gateway 热路径，也不得对 SetupToken、`count_tokens`、bootstrap 或非 Fable 请求触发。
+- Gateway 必须从 Anthropic unified 响应头被动解析 `5h`、`7d` 与 Fable 专属 `7d_oi`；`7d_oi` 归一化为稳定字段 `seven_day_fable`。窗口必须同时具备合法 `utilization` 与未来合理范围内的 `reset`，缺失或异常时不得覆盖已有数据。
+- 普通业务请求无论成功或 429 都不得调用 usage API。主动查询只允许两个显式入口：`auto_poll_usage=true` 的 active OAuth 账号由 `UsagePollerService` 定时刷新，以及管理员手动调用 `/admin/accounts/:id/usage`。
+- 成功响应、PrimePoller 成功和显式 usage 查询使用 `UsageObservationKind::Allowed`；429 使用按窗口构造的 `RejectedWindows`。窗口 `status=rejected` 时视为拒绝，`status=allowed` 时明确视为允许；缺少明确状态时才用 `surpassed-threshold=true/正数` 或 `utilization >= 1.0` 兜底。旧 reset 已到期、新 reset 已推进，且窗口本身未被拒绝时，若旧值和新值仍处于 97% 以上高位，必须保存新 reset 并把首次新周期 utilization 归零；只有真实拒绝窗口保留高位值。
+- 被动与主动写入都必须保留本次观察未包含的窗口和扩展字段，包括 `seven_day_sonnet`、`limits`、`spend`、`extra_usage`。
 
 ### 4. Validation & Error Matrix
 
@@ -289,22 +294,32 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 | Fable scoped 项 `percent` 非数字 | 不补窗口，避免 UI 展示脏值 |
 | Fable scoped 项 `resets_at: null` | 窗口保留 `resets_at: null`，前端显示 `—` |
 | 顶层已有 `seven_day_fable` 对象 | 保留顶层对象，不用 `limits` 覆盖 |
-| Fable OAuth `/v1/messages` 2xx 响应 body EOF | 延迟异步刷新 usage；同账号短时间重复请求只刷新一次 |
-| Fable SetupToken / 非 Fable / `count_tokens` / 非 2xx 响应 | 不触发请求后 usage API 刷新 |
+| 成功响应携带完整 `7d_oi` | 被动写入 `seven_day_fable`，不调用 usage API |
+| 429 携带完整 `7d_oi` 且该窗口 `status=rejected` | 按拒绝样本持久化；Fable 耗尽只影响 Fable 模型族 |
+| 5h 触发 429，7d/Fable 窗口为 `status=allowed` 且携带跨周期高位值 | 仅 5h 参与限流；7d/Fable 保存新 reset 并将首次 utilization 归零 |
+| 旧 99%/100% reset 已到期，成功样本给出新 reset 但仍是高位 | 新 reset 保留，首次 utilization 写 0 |
+| 同一新 reset 的后续完整样本 | 按响应头真实值正常更新 |
+| `auto_poll_usage=false` | 后台 poller 不查询该账号 usage |
+| 管理员手动刷新或 `auto_poll_usage=true` | 允许主动查询 usage，结果仍经过 rollover 合并 |
 | 上游返回 401/403/429 | 维持现有 `AppError` 分类，不吞错误体 |
 
 ### 5. Good/Base/Bad Cases
 
 - Good：usage 先返回 session/weekly all 两个 `scope: null` limit，后返回 Fable scoped limit；解析器跳过前两项并补出 `seven_day_fable`。
-- Good：OAuth Fable 流式响应完整结束后，Gateway 后台延迟刷新该账号 usage；并发多个 Fable 请求只由节流窗口内的第一个刷新，避免打爆 usage 端点。
-- Base：只返回传统 `five_hour` / `seven_day`；UI 继续显示基础用量，Fable 为 0 或空状态。
+- Good：Fable 成功响应带 `7d_oi utilization/reset`，Gateway 收到响应头后异步写入 `seven_day_fable`，整个请求生命周期不访问 usage API。
+- Good：旧 7d 为 99% 且 reset 已过期，下一次成功响应把 reset 推到下周但仍回 99%；合并层保存新 reset 并返回 0%，后续同 reset 的真实样本可继续更新。
+- Base：只返回传统 `five_hour` / `seven_day`；保留已有 Fable 数据，不主动补查。
 - Bad：直接假设 `limits[0]` 就是 Fable，或遇到第一个 `scope: null` 用 `?` 提前返回，导致真实 Fable 项被漏掉。
-- Bad：在收到响应头时同步调用 usage API，既可能早于上游计量落库，也会阻塞 Gateway 热路径。
+- Bad：在 Fable body EOF 或 429 后自动调用 usage API，绕过 `auto_poll_usage` 显式开关。
+- Bad：只看新 reset 在未来就相信仍为 99%/100% 的成功样本，会把上一周期用量重新带入新周期。
 
 ### 6. Tests Required
 
 - `service::oauth` 单测覆盖：前置 `scope: null` 项、Fable scoped 项、已有顶层 `seven_day_fable` 不覆盖、非 Fable scoped 项忽略。
-- `service::gateway` / `service::account` 单测覆盖：只有 OAuth Fable `/v1/messages` 成功响应触发刷新条件；账号级请求后 usage 刷新节流生效。
+- `service::gateway` 单测覆盖：5h/7d/7d_oi 完整解析、秒/毫秒 reset、缺失字段、非法数值和异常时间。
+- `service::account` 单测覆盖：Allowed rollover 高位清零、已下降值采用、同周期后续更新、RejectedWindows 仅保留明确拒绝窗口高位及未观察字段不丢失。
+- `service::gateway` 单测覆盖：429 按窗口 `status` 判定拒绝，显式 `allowed` 优先于高位 utilization，缺少 status 时兼容数值型 `surpassed-threshold`。
+- 静态搜索必须确认 `refresh_usage` 只由 usage poller 和管理端手动接口等显式入口调用，不存在 Gateway 请求后刷新链路。
 - `cc2api/web` 构建必须通过 `npm run build`，确保 `UsageData` 类型与 `Accounts.vue` 展示同步。
 - 改动 `fetch_usage` 后至少跑 `cargo test`，确认账号调度和 usage 相关共享测试不回归。
 
@@ -351,7 +366,7 @@ let Some(model) = item.get("scope").and_then(|scope| scope.get("model")) else {
 - 非 sticky Fable 请求应优先过滤明确耗尽的账号；若所有候选都明确耗尽，返回 `AppError::TooManyRequests`，不要落到普通 `ServiceUnavailable("no available accounts")`。
 - sticky 账号 RPM 饱和不属于 Fable 配额耗尽 fallback，仍走 `acquire_account_rpm` 的等待或本地 429，不能换号破坏 prompt cache。
 - Fable OAuth 429 且开关启用时，先识别通用 `seven_day` / `five_hour` 窗口并写账号级冷却；若通用窗口未命中，则返回 `RateLimitDecision::RetryOtherAccount`，不要写账号全局 `rate_limit_reset_at`。
-- Fable OAuth 429 如果本地 usage 未显示满额，Gateway 只能触发已有节流保护的后台 usage refresh，不得同步等待 OAuth usage API。
+- Fable OAuth 429 如果本地 usage 未显示满额，Gateway 只能使用本次 429 的 `7d_oi` 响应头做被动采集和模型级换号，不得触发 usage API。
 - 新增 `RateLimitDecision` 分支后，所有 `match RateLimitDecision` 的调用方必须显式处理 `RetryOtherAccount`，不能把它误当成 `Quarantined`。
 
 ### 4. Validation & Error Matrix
