@@ -1,0 +1,5 @@
+{"file":".trellis/spec/vibecoding-bench/deploy/image-build-push.md","reason":"核对 OAuth scope、401、并发 RT 轮换和 worker 镜像契约"}
+{"file":".trellis/spec/vibecoding-bench/backend/quality-guidelines.md","reason":"后台线程、DB 写入、资源释放、测试和代码评审要求"}
+{"file":".trellis/spec/vibecoding-bench/backend/database-guidelines.md","reason":"检查 schema 幂等、参数化 SQL 和 _db_lock 使用"}
+{"file":".trellis/spec/vibecoding-bench/backend/logging-guidelines.md","reason":"检查状态与错误摘要无敏感数据泄漏"}
+{"file":".trellis/spec/vibecoding-bench/deploy/remote-deploy.md","reason":"核对远程部署和部署后验证步骤"}

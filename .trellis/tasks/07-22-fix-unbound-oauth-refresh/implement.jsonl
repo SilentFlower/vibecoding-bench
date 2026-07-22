@@ -1,0 +1,5 @@
+{"file":".trellis/spec/vibecoding-bench/deploy/image-build-push.md","reason":"未绑定账号后台刷新、worker 401 恢复、sidecar 网络和凭据新鲜度契约"}
+{"file":".trellis/spec/vibecoding-bench/backend/database-guidelines.md","reason":"accounts 兼容列、_ensure_column、_db_lock 和状态持久化约束"}
+{"file":".trellis/spec/vibecoding-bench/backend/error-handling.md","reason":"后台单账号失败容错、清理路径与可见错误边界"}
+{"file":".trellis/spec/vibecoding-bench/backend/logging-guidelines.md","reason":"刷新失败摘要不得泄漏 AT/RT、Authorization、代理密码或完整响应"}
+{"file":".trellis/spec/vibecoding-bench/deploy/remote-deploy.md","reason":"镜像发布后的远程 pull、force-recreate 和安全验证流程"}
