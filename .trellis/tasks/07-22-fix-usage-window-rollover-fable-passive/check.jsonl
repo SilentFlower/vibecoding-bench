@@ -1,0 +1,4 @@
+{"file":".trellis/tasks/07-22-fix-usage-window-rollover-fable-passive/research/fable-passive-quota.md","reason":"核对实现是否符合已验证的 7d_oi 被动采集证据与限制"}
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"检查 Gateway、主动 usage 边界和模型级限流是否符合项目契约"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"执行格式、单测、完整测试和敏感信息检查"}
+{"file":".trellis/spec/cc2api/protocol/index.md","reason":"检查响应头解析不会破坏现有 Anthropic 协议转发"}

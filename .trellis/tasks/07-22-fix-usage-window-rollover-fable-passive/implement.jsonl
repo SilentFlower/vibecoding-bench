@@ -1,0 +1,4 @@
+{"file":".trellis/tasks/07-22-fix-usage-window-rollover-fable-passive/research/fable-passive-quota.md","reason":"7d_oi 响应头、sub2api 被动采集实现和公开资料核验结论"}
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"Gateway 热路径、usage poller、Fable scoped 配额与 429 调度契约"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"Rust 后端测试、网关回归与敏感数据边界"}
+{"file":".trellis/spec/cc2api/protocol/index.md","reason":"Anthropic 响应头协议兼容和 Gateway 转发边界"}

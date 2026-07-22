@@ -1,0 +1,49 @@
+{
+  "id": "fix-usage-window-rollover-fable-passive",
+  "name": "fix-usage-window-rollover-fable-passive",
+  "title": "修复用量窗口跨周期并研究 Fable 被动配额",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-07-22",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-07-22T15:06:04Z",
+      "contextKey": "codex_019f8a45-0424-73c1-84b6-c3dc3a79a816",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "d73237e3dd6d0e25bf29eec8119b1e1922137d02",
+        "status": []
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-07-22T15:58:28.372Z",
+    "completedSteps": [
+      "实现 5h、7d、7d_oi 被动采集与 rollover 合并",
+      "删除 Fable 请求后的隐式 usage 刷新",
+      "修复 429 按窗口拒绝与限流分类",
+      "通过定向测试、完整 cargo test 与 full Check-All"
+    ],
+    "partialStep": null,
+    "nextStep": "执行任务收尾与归档",
+    "notes": "代码、规范和子模块指针已完成普通提交与推送。"
+  }
+}
