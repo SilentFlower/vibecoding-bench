@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 51
-- **Last Active**: 2026-07-20
+- **Total Sessions**: 52
+- **Last Active**: 2026-07-23
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1801 | Active |
+| `journal-1.md` | ~1836 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 52 | 2026-07-23 | 修复用量窗口跨周期与 Fable 被动配额 | `003d0c6`, `e512af1` | `main` |
 | 51 | 2026-07-20 | 将三镜像发布迁移到 GitHub Actions 与 GHCR | `dd954ce`, `71ead6f` | `main` |
 | 50 | 2026-07-17 | 完成定时养号与 cc2api 托管 OAuth 部署 | `3f99fd6`, `33a46f5` | `main` |
 | 49 | 2026-07-16 | 账号时区选择与 Flower 工作流更新 | `4b02980`, `5b7e769`, `a21785e` | `main` |

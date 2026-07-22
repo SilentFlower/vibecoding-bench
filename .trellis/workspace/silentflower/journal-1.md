@@ -1799,3 +1799,38 @@ cc2api 增加 cache_control TTL 改写与 Claude Code messages 缓存断点稳�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 52: 修复用量窗口跨周期与 Fable 被动配额
+
+**Date**: 2026-07-23
+**Task**: 修复用量窗口跨周期与 Fable 被动配额
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+修复 5h、7d 与 Fable 7d_oi 窗口跨周期残留高值；429 改为按窗口判定拒绝；移除普通 Fable 请求后的隐式 usage 查询，并完成测试、检查与推送。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `003d0c6` | (see git log) |
+| `e512af1` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
