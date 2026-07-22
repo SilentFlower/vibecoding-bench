@@ -1,8 +1,11 @@
 """定时养号和 cc2api 集成的后端回归测试。"""
 
 import json
+import os
+import re
 import sqlite3
 import stat
+import subprocess
 import tempfile
 import threading
 import time
@@ -47,6 +50,120 @@ class ScheduledWarmupTests(unittest.TestCase):
             main.warmup_scheduler,
         ) = self.runtime_originals
         self.tmp.cleanup()
+
+    def _oauth_refresh_node_scripts(self) -> list[tuple[str, str]]:
+        """
+        读取两个生产刷新入口实际执行的 Node 脚本。
+
+        :return: `(入口名, Node 源码)` 列表
+        """
+        runner = object.__new__(main.Runner)
+        runner.client = Mock()
+        runner.client.api.exec_create.return_value = {"Id": "oauth-exec"}
+        runner.client.api.exec_start.return_value = b'{"skipped":true}'
+        runner.client.api.exec_inspect.return_value = {"ExitCode": 0}
+        runner._exec_oauth_refresh_probe("worker-id")
+        shell_script = runner.client.api.exec_create.call_args.args[1][2]
+        orchestrator_match = re.search(
+            r"node - <<'JS'\n(?P<script>.*?)\nJS\n?$",
+            shell_script,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(orchestrator_match)
+
+        entrypoint = (
+            Path(__file__).resolve().parents[1] / "images" / "worker" / "entrypoint.sh"
+        ).read_text(encoding="utf-8")
+        worker_match = re.search(
+            r"force_refresh_profile_credentials_unlocked\(\) \{.*?"
+            r"node - \"\$credentials_path\" \"\$CLAUDE_CODE_VERSION\" \"\$reason\" <<'JS'\n"
+            r"(?P<script>.*?)\nJS\n",
+            entrypoint,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(worker_match)
+        return [
+            ("orchestrator", orchestrator_match.group("script")),
+            ("worker", worker_match.group("script")),
+        ]
+
+    def _run_oauth_refresh_node_script(
+        self,
+        entrypoint: str,
+        script: str,
+        credentials: dict,
+        response_body: dict,
+        response_status: int = 200,
+        retry_after: str = "",
+    ) -> tuple[subprocess.CompletedProcess[str], dict, dict]:
+        """
+        用本地伪造 fetch 执行生产 Node 刷新脚本。
+
+        :param entrypoint: `orchestrator` 或 `worker`
+        :param script: 待执行的生产 Node 源码
+        :param credentials: 初始 `.credentials.json`
+        :param response_body: token endpoint JSON 响应
+        :param response_status: HTTP 状态码
+        :param retry_after: 可选 Retry-After 响应头
+        :return: 子进程结果、捕获到的请求体和执行后的凭据
+        """
+        case_dir = self.base / f"oauth-node-{entrypoint}-{time.time_ns()}"
+        home_dir = case_dir / "home"
+        credentials_path = home_dir / ".claude" / ".credentials.json"
+        credentials_path.parent.mkdir(parents=True)
+        credentials_path.write_text(
+            json.dumps(credentials, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        capture_path = case_dir / "request.json"
+        preload_path = case_dir / "preload.js"
+        preload_path.write_text(
+            """
+const fs = require('fs');
+global.fetch = async (_url, options) => {
+  fs.writeFileSync(process.env.OAUTH_TEST_CAPTURE_PATH, options.body, 'utf8');
+  const status = Number(process.env.OAUTH_TEST_RESPONSE_STATUS || '200');
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: {
+      get: (name) => name.toLowerCase() === 'retry-after'
+        ? (process.env.OAUTH_TEST_RETRY_AFTER || '')
+        : null,
+    },
+    text: async () => process.env.OAUTH_TEST_RESPONSE_BODY,
+  };
+};
+""".strip(),
+            encoding="utf-8",
+        )
+        env = dict(os.environ)
+        env.update({
+            "HOME": str(home_dir),
+            "OAUTH_TEST_CAPTURE_PATH": str(capture_path),
+            "OAUTH_TEST_RESPONSE_STATUS": str(response_status),
+            "OAUTH_TEST_RETRY_AFTER": retry_after,
+            "OAUTH_TEST_RESPONSE_BODY": json.dumps(response_body, ensure_ascii=False),
+        })
+        command = ["node", "--require", str(preload_path), "-"]
+        if entrypoint == "worker":
+            command.extend([str(credentials_path), "2.1.197", "test"])
+        completed = subprocess.run(
+            command,
+            input=script,
+            text=True,
+            capture_output=True,
+            env=env,
+            timeout=10,
+            check=False,
+        )
+        request_body = (
+            json.loads(capture_path.read_text(encoding="utf-8"))
+            if capture_path.exists()
+            else {}
+        )
+        updated_credentials = json.loads(credentials_path.read_text(encoding="utf-8"))
+        return completed, request_body, updated_credentials
 
     def _run_queued_warmup_with_second_sync_error(
         self,
@@ -203,7 +320,151 @@ class ScheduledWarmupTests(unittest.TestCase):
         conn.close()
         self.assertIn("cc2api_account_id", columns)
         self.assertIn("warmup_enabled", columns)
+        self.assertIn("oauth_refresh_last_attempt_at", columns)
+        self.assertIn("oauth_refresh_last_status", columns)
+        self.assertIn("oauth_refresh_last_error", columns)
         self.assertIn("idx_accounts_cc2api_account_id", indexes)
+
+    def test_oauth_refresh_scripts_reuse_existing_scopes_and_write_tokens(self) -> None:
+        """两个刷新入口都只能发送已有 scope，并正确写回服务端结果。"""
+        original_scopes = [
+            "user:profile",
+            "user:inference",
+            "user:sessions:claude_code",
+            "user:mcp_servers",
+            "user:file_upload",
+        ]
+        for entrypoint, script in self._oauth_refresh_node_scripts():
+            with self.subTest(entrypoint=entrypoint):
+                completed, request_body, updated = self._run_oauth_refresh_node_script(
+                    entrypoint,
+                    script,
+                    {
+                        "claudeAiOauth": {
+                            "accessToken": "old-access",
+                            "refreshToken": "old-refresh",
+                            "expiresAt": 1,
+                            "scopes": original_scopes,
+                        }
+                    },
+                    {
+                        "access_token": "new-access",
+                        "refresh_token": "new-refresh",
+                        "expires_in": 3600,
+                        "scope": "user:inference user:profile user:inference",
+                    },
+                )
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertEqual(" ".join(original_scopes), request_body["scope"])
+                self.assertNotIn("user:design:read", request_body["scope"])
+                self.assertNotIn("user:design:write", request_body["scope"])
+                oauth = updated["claudeAiOauth"]
+                self.assertEqual("new-access", oauth["accessToken"])
+                self.assertEqual("new-refresh", oauth["refreshToken"])
+                self.assertGreater(oauth["expiresAt"], int(time.time() * 1000))
+                self.assertEqual(
+                    ["user:inference", "user:profile"],
+                    oauth["scopes"],
+                )
+
+    def test_oauth_refresh_scripts_normalize_or_omit_scope(self) -> None:
+        """空值和重复 scope 应归一化，没有有效 scope 时必须省略字段。"""
+        for entrypoint, script in self._oauth_refresh_node_scripts():
+            with self.subTest(entrypoint=entrypoint, case="normalize"):
+                completed, request_body, updated = self._run_oauth_refresh_node_script(
+                    entrypoint,
+                    script,
+                    {
+                        "claudeAiOauth": {
+                            "accessToken": "old-access",
+                            "refreshToken": "old-refresh",
+                            "expiresAt": 1,
+                            "scopes": [
+                                " user:profile ",
+                                "",
+                                "user:profile",
+                                None,
+                                "user:inference",
+                            ],
+                        }
+                    },
+                    {"access_token": "new-access", "expires_in": 3600},
+                )
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertEqual(
+                    "user:profile user:inference",
+                    request_body["scope"],
+                )
+                self.assertEqual(
+                    [" user:profile ", "", "user:profile", None, "user:inference"],
+                    updated["claudeAiOauth"]["scopes"],
+                )
+
+            with self.subTest(entrypoint=entrypoint, case="omit"):
+                completed, request_body, updated = self._run_oauth_refresh_node_script(
+                    entrypoint,
+                    script,
+                    {
+                        "claudeAiOauth": {
+                            "accessToken": "old-access",
+                            "refreshToken": "old-refresh",
+                            "expiresAt": 1,
+                            "scopes": ["", "   ", None],
+                        }
+                    },
+                    {"access_token": "new-access", "expires_in": 3600},
+                )
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertNotIn("scope", request_body)
+                self.assertEqual(
+                    ["", "   ", None],
+                    updated["claudeAiOauth"]["scopes"],
+                )
+
+            with self.subTest(entrypoint=entrypoint, case="missing"):
+                completed, request_body, updated = self._run_oauth_refresh_node_script(
+                    entrypoint,
+                    script,
+                    {
+                        "claudeAiOauth": {
+                            "accessToken": "old-access",
+                            "refreshToken": "old-refresh",
+                            "expiresAt": 1,
+                        }
+                    },
+                    {"access_token": "new-access", "expires_in": 3600},
+                )
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertNotIn("scope", request_body)
+                self.assertNotIn("scopes", updated["claudeAiOauth"])
+
+    def test_oauth_refresh_scripts_redact_token_endpoint_error(self) -> None:
+        """token endpoint 失败输出不得包含响应描述中的敏感值。"""
+        for entrypoint, script in self._oauth_refresh_node_scripts():
+            with self.subTest(entrypoint=entrypoint):
+                completed, _request_body, _updated = self._run_oauth_refresh_node_script(
+                    entrypoint,
+                    script,
+                    {
+                        "claudeAiOauth": {
+                            "accessToken": "old-access",
+                            "refreshToken": "old-refresh",
+                            "expiresAt": 1,
+                            "scopes": ["user:profile"],
+                        }
+                    },
+                    {
+                        "error": "invalid_scope",
+                        "error_description": "Bearer sensitive-token-value",
+                    },
+                    response_status=400,
+                    retry_after="17",
+                )
+                self.assertEqual(1, completed.returncode)
+                self.assertIn("HTTP 400", completed.stdout)
+                self.assertIn("invalid_scope", completed.stdout)
+                self.assertIn("retry_after_sec=17", completed.stdout)
+                self.assertNotIn("sensitive-token-value", completed.stdout)
 
     def test_cc2api_matching_prefers_uuid_and_rejects_email_conflict(self) -> None:
         """UUID 存在时不能退回名称或冲突邮箱匹配。"""
@@ -390,6 +651,90 @@ class ScheduledWarmupTests(unittest.TestCase):
         runner.refresh_account_oauth_token.assert_not_called()
         data = json.loads((profile_dir / ".credentials.json").read_text(encoding="utf-8"))
         self.assertEqual("cc2-access", data["claudeAiOauth"]["accessToken"])
+
+    def test_oauth_refresh_error_summary_only_keeps_safe_fields(self) -> None:
+        """后台错误摘要只保留状态、OAuth 错误码和 retry-after。"""
+        cases = [
+            (
+                "HTTP 400 invalid_scope Bearer access-secret refreshToken=refresh-secret",
+                ["HTTP 400", "invalid_scope"],
+            ),
+            (
+                "HTTP 400 invalid_grant Cookie=session-secret",
+                ["HTTP 400", "invalid_grant"],
+            ),
+            (
+                "HTTP 429 invalid_request retry_after_sec=60 proxy-pass=secret",
+                ["HTTP 429", "invalid_request", "retry_after_sec=60"],
+            ),
+        ]
+        for raw, expected in cases:
+            with self.subTest(raw=raw):
+                summary = main._oauth_refresh_error_summary(RuntimeError(raw))
+                for value in expected:
+                    self.assertIn(value, summary)
+                self.assertNotIn("secret", summary)
+
+    def test_unbound_refresh_failure_is_recorded_and_next_account_continues(self) -> None:
+        """一个未绑定账号刷新失败后应落安全状态，并继续刷新后续账号。"""
+        main.init_db()
+        for name in ("first", "second"):
+            profile_dir = main.PROFILES_DIR / name
+            profile_dir.mkdir(parents=True)
+            (profile_dir / ".credentials.json").write_text(
+                json.dumps({
+                    "claudeAiOauth": {
+                        "accessToken": f"{name}-access",
+                        "refreshToken": f"{name}-refresh",
+                        "expiresAt": 1,
+                        "scopes": ["user:profile"],
+                    }
+                }),
+                encoding="utf-8",
+            )
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path) "
+                    "VALUES('first','profiles/first')"
+                )
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path, oauth_refresh_last_status, "
+                    "oauth_refresh_last_error) "
+                    "VALUES('second','profiles/second','failed','old-safe-error')"
+                )
+        finally:
+            conn.close()
+        runner = Mock()
+        runner.refresh_account_oauth_token.side_effect = [
+            RuntimeError(
+                "OAuth token 刷新失败: HTTP 400; invalid_scope; "
+                "Bearer access-secret; refreshToken=refresh-secret"
+            ),
+            True,
+        ]
+
+        main.OAuthRefreshScheduler(runner)._tick()
+
+        self.assertEqual(2, runner.refresh_account_oauth_token.call_count)
+        conn = main.get_db()
+        try:
+            rows = conn.execute(
+                "SELECT name, oauth_refresh_last_attempt_at, oauth_refresh_last_status, "
+                "oauth_refresh_last_error FROM accounts ORDER BY id"
+            ).fetchall()
+        finally:
+            conn.close()
+        self.assertEqual("failed", rows[0]["oauth_refresh_last_status"])
+        self.assertIsNotNone(rows[0]["oauth_refresh_last_attempt_at"])
+        self.assertIn("HTTP 400", rows[0]["oauth_refresh_last_error"])
+        self.assertIn("invalid_scope", rows[0]["oauth_refresh_last_error"])
+        self.assertNotIn("access-secret", rows[0]["oauth_refresh_last_error"])
+        self.assertNotIn("refresh-secret", rows[0]["oauth_refresh_last_error"])
+        self.assertEqual("success", rows[1]["oauth_refresh_last_status"])
+        self.assertIsNotNone(rows[1]["oauth_refresh_last_attempt_at"])
+        self.assertIsNone(rows[1]["oauth_refresh_last_error"])
 
     def test_unbound_refresh_scheduler_blocks_first_binding(self) -> None:
         """未绑定账号的本地 RT 刷新完成前，首次绑定必须等待 owner lock。"""

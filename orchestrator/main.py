@@ -1222,6 +1222,9 @@ CREATE TABLE IF NOT EXISTS accounts (
   warmup_last_status TEXT,
   warmup_last_error TEXT,
   warmup_auth_failures INTEGER DEFAULT 0,
+  oauth_refresh_last_attempt_at REAL,
+  oauth_refresh_last_status TEXT,
+  oauth_refresh_last_error TEXT,
   enabled INTEGER DEFAULT 1,
   deleted_at REAL,
   created_at REAL DEFAULT (julianday('now'))
@@ -1356,6 +1359,9 @@ def init_db() -> None:
             _ensure_column(
                 conn, "accounts", "warmup_auth_failures", "INTEGER DEFAULT 0"
             )
+            _ensure_column(conn, "accounts", "oauth_refresh_last_attempt_at", "REAL")
+            _ensure_column(conn, "accounts", "oauth_refresh_last_status", "TEXT")
+            _ensure_column(conn, "accounts", "oauth_refresh_last_error", "TEXT")
             _ensure_column(conn, "tasks", "batch_id", "INTEGER")
             _ensure_column(conn, "tasks", "topic_id", "INTEGER")
             _ensure_column(conn, "tasks", "status", "TEXT DEFAULT 'active'")
@@ -2843,21 +2849,56 @@ const path = require('path');
 
 const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
-const SCOPES = [
-  'user:profile',
-  'user:inference',
-  'user:sessions:claude_code',
-  'user:mcp_servers',
-  'user:file_upload',
-  'user:design:read',
-  'user:design:write',
-];
 const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
 const refreshBufferMs = Number(process.env.OAUTH_REFRESH_BUFFER_SEC || '600') * 1000;
 const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.197';
 
 function emit(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
+}
+
+function normalizeScopes(value) {
+  const items = Array.isArray(value)
+    ? value
+    : (typeof value === 'string' ? value.split(/\s+/) : []);
+  const seen = new Set();
+  const scopes = [];
+  for (const item of items) {
+    if (typeof item !== 'string') {
+      continue;
+    }
+    const scope = item.trim();
+    if (!scope || seen.has(scope)) {
+      continue;
+    }
+    seen.add(scope);
+    scopes.push(scope);
+  }
+  return scopes;
+}
+
+function oauthErrorCode(text) {
+  try {
+    const payload = JSON.parse(text);
+    const code = payload && typeof payload.error === 'string'
+      ? payload.error.trim()
+      : '';
+    return /^[A-Za-z0-9_.:-]{1,80}$/.test(code) ? code : '';
+  } catch {
+    return '';
+  }
+}
+
+function oauthErrorSummary(status, text, retryAfter) {
+  const parts = [`OAuth token 刷新失败: HTTP ${status}`];
+  const code = oauthErrorCode(text);
+  if (code) {
+    parts.push(code);
+  }
+  if (Number.isFinite(retryAfter)) {
+    parts.push(`retry_after_sec=${retryAfter}`);
+  }
+  return parts.join('; ');
 }
 
 async function main() {
@@ -2883,26 +2924,32 @@ async function main() {
   if (typeof oauth.refreshToken !== 'string' || !oauth.refreshToken) {
     throw new Error('OAuth refreshToken 为空，请重新登录账号');
   }
+  const requestBody = {
+    grant_type: 'refresh_token',
+    refresh_token: oauth.refreshToken,
+    client_id: CLIENT_ID,
+  };
+  const scopes = normalizeScopes(oauth.scopes);
+  if (scopes.length) {
+    // OAuth refresh 只能沿用现有授权，不能借刷新请求扩大 scope。
+    requestBody.scope = scopes.join(' ');
+  }
   const response = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     },
-    body: JSON.stringify({
-      grant_type: 'refresh_token',
-      refresh_token: oauth.refreshToken,
-      client_id: CLIENT_ID,
-      scope: SCOPES.join(' '),
-    }),
+    body: JSON.stringify(requestBody),
   });
   const text = await response.text();
   if (!response.ok) {
     const retryAfter = Number.parseInt(response.headers.get('retry-after') || '', 10);
     emit({
-      error: `OAuth token 刷新失败: HTTP ${response.status} ${text.slice(0, 500)}`,
+      error: oauthErrorSummary(response.status, text, retryAfter),
       status: response.status,
       retry_after_sec: Number.isFinite(retryAfter) ? retryAfter : null,
+      oauth_error: oauthErrorCode(text) || null,
     });
     process.exit(1);
   }
@@ -2919,6 +2966,10 @@ async function main() {
   oauth.refreshToken = typeof payload.refresh_token === 'string' && payload.refresh_token
     ? payload.refresh_token
     : oauth.refreshToken;
+  const responseScopes = normalizeScopes(payload.scope);
+  if (responseScopes.length) {
+    oauth.scopes = responseScopes;
+  }
   const expiresIn = Number.isFinite(Number(payload.expires_in))
     ? Number(payload.expires_in)
     : 3600;
@@ -3387,6 +3438,73 @@ class ContinueManager:
                 del self._run_locks[s.run_id]
 
 
+def _oauth_refresh_error_summary(error: object) -> str:
+    """
+    把后台 OAuth 刷新异常收敛成不含凭据的安全摘要。
+
+    :param error: 原始异常或错误对象
+    :return: 仅包含固定错误类别、HTTP 状态、OAuth 错误码和 retry-after 的摘要
+    """
+    raw = str(error)
+    parts = ["OAuth token 刷新失败"]
+    status_match = re.search(r"\bHTTP\s+(\d{3})\b", raw, re.IGNORECASE)
+    if status_match:
+        parts.append(f"HTTP {status_match.group(1)}")
+    code_match = re.search(
+        r"\b(invalid_scope|invalid_grant|invalid_request|temporarily_unavailable|"
+        r"server_error|unsupported_grant_type)\b",
+        raw,
+        re.IGNORECASE,
+    )
+    if code_match:
+        parts.append(code_match.group(1).lower())
+    retry_match = re.search(r"\bretry_after_sec=(\d+)\b", raw, re.IGNORECASE)
+    if retry_match:
+        parts.append(f"retry_after_sec={retry_match.group(1)}")
+    if len(parts) == 1:
+        lowered = raw.lower()
+        if "refresh token" in lowered and ("为空" in raw or "missing" in lowered):
+            parts.append("refresh_token_missing")
+        elif ".credentials.json" in raw or "claudeaioauth" in lowered:
+            parts.append("credentials_invalid")
+        elif "upstream proxy" in lowered:
+            parts.append("proxy_missing")
+        elif "响应不是 json" in raw.lower() or "缺少 access_token" in raw.lower():
+            parts.append("invalid_response")
+        else:
+            parts.append("internal_error")
+    return "; ".join(parts)
+
+
+def _record_oauth_refresh_attempt(
+    account_id: int,
+    status: str,
+    error: Optional[str] = None,
+) -> None:
+    """
+    持久化未绑定账号最后一次真实 OAuth 刷新尝试的安全状态。
+
+    :param account_id: accounts.id
+    :param status: `success` 或 `failed`
+    :param error: 已脱敏错误摘要；成功时传 None
+    :return: None
+    """
+    if status not in {"success", "failed"}:
+        raise ValueError("OAuth 刷新状态无效")
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "UPDATE accounts SET oauth_refresh_last_attempt_at=?, "
+                    "oauth_refresh_last_status=?, oauth_refresh_last_error=? "
+                    "WHERE id=? AND cc2api_account_id IS NULL AND deleted_at IS NULL",
+                    (time.time(), status, error if status == "failed" else None, account_id),
+                )
+        finally:
+            conn.close()
+
+
 class OAuthRefreshScheduler:
     """后台定时刷新账号 OAuth access token。"""
 
@@ -3437,7 +3555,11 @@ class OAuthRefreshScheduler:
     def _loop(self) -> None:
         # 启动后立即 tick 一次，避免服务重启时 profile 已过期还要等 60 秒。
         while not self._stop.is_set():
-            self._tick()
+            try:
+                self._tick()
+            except Exception:
+                # 任意一次 tick 的意外异常都不能永久杀死后台刷新线程。
+                pass
             self._stop.wait(OAUTH_REFRESH_INTERVAL_SEC)
 
     def _tick(self) -> None:
@@ -3457,10 +3579,14 @@ class OAuthRefreshScheduler:
             with _oauth_owner_lock(str(account["name"])):
                 conn = get_db()
                 try:
-                    current_row = _get_available_account(conn, int(account["id"]))
-                    if not current_row:
+                    try:
+                        current_row = _get_available_account(conn, int(account["id"]))
+                        if not current_row:
+                            continue
+                        current = dict(current_row)
+                    except Exception:
+                        # 单账号重读失败时跳过本账号，后续账号仍需继续扫描。
                         continue
-                    current = dict(current_row)
                 finally:
                     conn.close()
                 if current.get("cc2api_account_id") is not None:
@@ -3473,13 +3599,31 @@ class OAuthRefreshScheduler:
                         # cc2api 是绑定账号唯一凭据所有者；同步失败时不能降级成本地 RT 刷新。
                         pass
                     continue
-                if not self._needs_refresh(current["name"]):
+                try:
+                    needs_refresh = self._needs_refresh(current["name"])
+                except Exception:
+                    continue
+                if not needs_refresh:
                     continue
                 try:
-                    self.runner.refresh_account_oauth_token(current)
-                except Exception:
+                    refreshed = self.runner.refresh_account_oauth_token(current)
+                except Exception as exc:
                     # 本地 RT 刷新也持有 owner lock，避免首次绑定读取到轮换前的旧 RT。
-                    pass
+                    try:
+                        _record_oauth_refresh_attempt(
+                            int(current["id"]),
+                            "failed",
+                            _oauth_refresh_error_summary(exc),
+                        )
+                    except Exception:
+                        # 状态落库失败不能覆盖原刷新异常或中断后续账号。
+                        pass
+                    continue
+                if refreshed:
+                    try:
+                        _record_oauth_refresh_attempt(int(current["id"]), "success")
+                    except Exception:
+                        pass
 
     def _needs_refresh(self, account_name: str) -> bool:
         """

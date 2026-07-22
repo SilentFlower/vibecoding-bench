@@ -268,6 +268,8 @@ task 运行期间必须双向但按新鲜度同步 credentials:
 
 运行中检测到 401 / OAuth 认证错误时,worker 先同步 profile credentials,再在 worker→sidecar→账号上游代理链路内用当前 `refreshToken` 强制 refresh 一次。refresh 成功后原子回写 profile,并向 Claude TUI 注入一次重试提示。refresh 返回 `invalid_grant` / 429 / 其它非 2xx 时,错误消息要带 HTTP 状态与 retry-after 摘要;如果后台刷新器在 `OAUTH_401_PROFILE_WAIT_SEC` 内写入更新 credentials,可同步后重试一次,否则 worker 写 `/workspace/.bench-status.json` 为 `{"status":"auth_failed","error":"..."}` 并以退出码 `42` 结束。
 
+OAuth refresh 只能沿用 `.credentials.json` 中 `claudeAiOauth.scopes` 已有授权:仅保留非空字符串、按首次出现顺序去重,有有效 scope 时才写请求字段;缺失或无有效 scope 时必须省略 `scope`,交给服务端沿用原 grant。禁止在 refresh 时硬编码或追加新权限,尤其不能无条件请求 `user:design:read` / `user:design:write`,否则旧账号会返回 `invalid_scope`。服务端响应包含有效 scope 时归一化写回;未返回 scope 时保留原凭据值,不能清空。后台未绑定账号真实刷新尝试必须在 accounts 中记录最后时间、`success` / `failed` 和脱敏摘要;摘要只允许 HTTP 状态、OAuth 短错误码、retry-after 和固定本地错误类别,不得落 AT、RT、Authorization、Cookie、代理密码或完整响应正文。单账号失败不得终止后续账号扫描或后台线程。
+
 查询 OAuth usage API 前必须确认 sidecar 的通用 DNS resolver 已可用。sidecar/unbound 配的是通配 `forward-zone "."`,所以 readiness probe 应验证一个稳定探针域名能解析,不能把每个业务目标域名硬编码成白名单。orchestrator 可以用 `docker exec` 进 sidecar 等 `/tmp/sidecar-ready` 或通用探针解析成功,但不能用 orchestrator/宿主机网络代替 sidecar 解析。usage probe 必须在 worker 容器内按同一套 `expiresAt` 规则刷新 access token,再读 `.credentials.json` 调 usage API。实际 API URL 请求还必须有限重试,覆盖 resolver 刚启动后的瞬时 `Temporary failure in name resolution`。
 
 不能用宿主机网络或宿主 DNS 作为 OAuth refresh / usage 的 fallback。账号相关请求和域名解析都必须留在 worker→sidecar→账号上游代理链路里,否则会从宿主原始 IP 泄漏域名查询或 HTTPS 出口。

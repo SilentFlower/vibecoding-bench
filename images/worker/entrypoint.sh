@@ -651,18 +651,53 @@ const claudeCodeVersion = process.argv[3] || '2.1.197';
 const reason = process.argv[4] || 'auth_error';
 const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
-const SCOPES = [
-  'user:profile',
-  'user:inference',
-  'user:sessions:claude_code',
-  'user:mcp_servers',
-  'user:file_upload',
-  'user:design:read',
-  'user:design:write',
-];
 
 function emit(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
+}
+
+function normalizeScopes(value) {
+  const items = Array.isArray(value)
+    ? value
+    : (typeof value === 'string' ? value.split(/\s+/) : []);
+  const seen = new Set();
+  const scopes = [];
+  for (const item of items) {
+    if (typeof item !== 'string') {
+      continue;
+    }
+    const scope = item.trim();
+    if (!scope || seen.has(scope)) {
+      continue;
+    }
+    seen.add(scope);
+    scopes.push(scope);
+  }
+  return scopes;
+}
+
+function oauthErrorCode(text) {
+  try {
+    const payload = JSON.parse(text);
+    const code = payload && typeof payload.error === 'string'
+      ? payload.error.trim()
+      : '';
+    return /^[A-Za-z0-9_.:-]{1,80}$/.test(code) ? code : '';
+  } catch {
+    return '';
+  }
+}
+
+function oauthErrorSummary(status, text, retryAfter) {
+  const parts = [`OAuth token 刷新失败: HTTP ${status}`];
+  const code = oauthErrorCode(text);
+  if (code) {
+    parts.push(code);
+  }
+  if (Number.isFinite(retryAfter)) {
+    parts.push(`retry_after_sec=${retryAfter}`);
+  }
+  return parts.join('; ');
 }
 
 async function main() {
@@ -679,26 +714,32 @@ async function main() {
   if (typeof oauth.refreshToken !== 'string' || !oauth.refreshToken) {
     throw new Error('OAuth refreshToken 为空，请重新登录账号');
   }
+  const requestBody = {
+    grant_type: 'refresh_token',
+    refresh_token: oauth.refreshToken,
+    client_id: CLIENT_ID,
+  };
+  const scopes = normalizeScopes(oauth.scopes);
+  if (scopes.length) {
+    // OAuth refresh 只能沿用现有授权，不能借刷新请求扩大 scope。
+    requestBody.scope = scopes.join(' ');
+  }
   const response = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     },
-    body: JSON.stringify({
-      grant_type: 'refresh_token',
-      refresh_token: oauth.refreshToken,
-      client_id: CLIENT_ID,
-      scope: SCOPES.join(' '),
-    }),
+    body: JSON.stringify(requestBody),
   });
   const text = await response.text();
   if (!response.ok) {
     const retryAfter = Number.parseInt(response.headers.get('retry-after') || '', 10);
     emit({
-      error: `OAuth token 刷新失败: HTTP ${response.status} ${text.slice(0, 500)}`,
+      error: oauthErrorSummary(response.status, text, retryAfter),
       status: response.status,
       retry_after_sec: Number.isFinite(retryAfter) ? retryAfter : null,
+      oauth_error: oauthErrorCode(text) || null,
       reason,
     });
     process.exit(1);
@@ -716,9 +757,10 @@ async function main() {
   oauth.refreshToken = typeof payload.refresh_token === 'string' && payload.refresh_token
     ? payload.refresh_token
     : oauth.refreshToken;
-  oauth.scopes = Array.isArray(payload.scope)
-    ? payload.scope
-    : String(payload.scope || '').split(/\s+/).filter(Boolean);
+  const responseScopes = normalizeScopes(payload.scope);
+  if (responseScopes.length) {
+    oauth.scopes = responseScopes;
+  }
   oauth.subscriptionType = payload.subscription_type || oauth.subscriptionType;
   oauth.rateLimitTier = payload.rate_limit_tier || oauth.rateLimitTier;
   const expiresIn = Number.isFinite(Number(payload.expires_in))
