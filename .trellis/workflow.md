@@ -163,6 +163,16 @@ For a new request, infer `discuss`, `inspect`, `direct_edit`, `task_plan`, or
 active-task state, and the latest explicit switch. High-confidence reversible
 steps proceed without a mechanical task-creation question.
 
+Repair authorization and permission to skip task planning are separate. If the
+repair scope is unknown, use `inspect` first and reclassify from evidence before
+editing.
+
+`direct_edit` requires known, bounded, local, low-risk, reversible scope and
+simple validation. Permission/authentication/data-scope/security, shared
+contracts, cross-package/layer or multi-entry behavior, database/migration/
+configuration/release/external effects, historical regressions, systematic
+validation, or unknown scope are `task_plan` signals.
+
 Clear complex implementation intent authorizes creating a planning task and
 entering `trellis-brainstorm`; it never authorizes `task.py start` or
 implementation. Ask one focused question only when ambiguity changes material
@@ -172,6 +182,10 @@ The latest explicit switch wins for the current request. `discuss` / `inspect`
 route silently; entering untracked `direct_edit`, creating/resuming a task, or
 switching intent gets one non-blocking status line. New unrelated requests
 return to automatic inference instead of inheriting a session-wide mode.
+
+Selecting a repair (`fix item 1`, `change that`, `修一下`, `改一下`) is not a
+no-task switch. Only an explicit current-request workflow instruction such as
+`直接做` / `不要任务` may override automatic `task_plan`.
 
 If the latest switch leaves an auto-created planning task for untracked work,
 run `task_intent.py discard --task <current-task>` before changing route. Proceed
@@ -185,6 +199,14 @@ structured blocker. Never force-delete or silently leave a dormant planning task
 `task.py create` only creates the planning workspace. A default `prd.md` does not mean requirements are ready.
 
 Before `task.py start`, unclear scope, unresolved decisions, or non-testable acceptance criteria must return to `trellis-brainstorm`.
+
+#### Task Brief Handoff
+
+Before Phase 1.4, use `trellis-task-brief` to refresh `<task>/brief.md`, display it in full, and wait for user confirmation before `task.py start`.
+
+Implementation intent before that handoff authorizes planning only, not review confirmation.
+
+`brief.md` is derived; `prd.md` / `design.md` / `implement.md` remain authoritative.
 
 #### Project Knowledge Discovery
 
@@ -208,19 +230,14 @@ If nothing matches, continue normally. Skip pure Q&A, simple read-only inspectio
 opening local tools, or trivial edits unless project conventions or local SOPs may
 change the approach.
 
-#### Task Brief Handoff
-
-Before Phase 1.4 `task.py start`, use `trellis-task-brief` to refresh `<task>/brief.md` from latest task artifacts, display it in chat, and wait for user confirmation.
-
-`brief.md` is derived; `prd.md` / `design.md` / `implement.md` remain authoritative.
-
-Before the first implement route, restate existing `<task>/brief.md` in chat. If missing, read task artifacts and suggest backfilling brief; do not invent one from memory.
-
 #### Flower Update Confirmation
 
 If `<flower-update>` has `priority: blocking_confirmation_required`, handle it first: briefly show `release_notes` when present, show `recommended_command`, and ask before running it.
 
-If `<flower-update-result>` requests `run_trellis_push_confirmation`, enter `trellis-push` planning with update changes as default candidates; still require file-list and commit-message confirmation.
+If `<flower-update-result>` requests `run_trellis_push_confirmation`, load and follow
+`trellis-push` before any Git inspection or plan; never replace it with a hand-written
+Git summary. Use update changes as default candidates and wait for file-list and
+commit-message confirmation.
 
 #### Active Task Scope Guard
 
@@ -307,9 +324,10 @@ Phase 3: Finish  → verify, update spec, commit, and wrap up
 
 <!-- BEGIN skill-garden patch workflow-request-triage v0.6 -->
 - Infer `discuss`, `inspect`, `direct_edit`, `task_plan`, or `workflow_action` from the current request, its scope, risk, side effects, active-task state, and the latest explicit switch. Do not classify from one keyword alone.
+- For repairs, inspect unknown scope before applying the hub's `direct_edit` / `task_plan` boundary.
 - High-confidence reversible steps proceed without a mechanical task-creation question. Explicit complex implementation intent authorizes creating a planning task and entering `trellis-brainstorm`; it does not authorize `task.py start` or implementation.
 - Ask one question only when ambiguity changes material side effects, or when destructive, production, database, credential, external-system, or permission boundaries require confirmation.
-- The latest explicit `走任务` / `不要任务` / `先讨论` / `直接做` / `先别做` style instruction wins for the current request. New unrelated requests return to automatic inference.
+- The current explicit workflow switch wins; repair selection does not. Unrelated requests reset inference.
 <!-- END skill-garden patch workflow-request-triage v0.6 -->
 
 ### Planning Artifacts
@@ -333,6 +351,7 @@ Create new children with `task.py create "<title>" --slug <name> --parent <paren
 [workflow-state:no_task]
 <!-- BEGIN skill-garden patch workflow-state-no-task v0.6 -->
 No active task. Infer the current request intent before acting.
+Repair intent alone is not a no-task switch; inspect unknown scope and reclassify before edits.
 Handle `discuss` and `inspect` silently. For `workflow_action`, load the named Trellis capability directly. For non-destructive `direct_edit`, state once that task/progress will not be recorded and proceed.
 For high-confidence complex implementation, create an auto-routed planning task through `task_intent.py create`, show one non-blocking switch hint, and enter `trellis-brainstorm`. Ask only for material ambiguity or independent safety gates.
 <!-- END skill-garden patch workflow-state-no-task v0.6 -->
@@ -624,20 +643,21 @@ Skip this step. Context is loaded directly by the `trellis-before-dev` skill in 
 
 [/codex-inline, Kilo, Antigravity, Devin]
 
+<!-- BEGIN skill-garden patch workflow-phase-1-activate v0.6 -->
 #### 1.4 Activate task `[required · once]`
 
-After artifact review, flip the task status to `in_progress`:
+Before changing task status, load `trellis-task-brief`, refresh `<task>/brief.md`, display the full brief in chat, then stop the current turn and wait for planning review confirmation. Earlier implementation intent is not confirmation.
+
+Lightweight tasks need `prd.md`; complex tasks also need `design.md` and `implement.md`. Sub-agent routes require real entries in both JSONL manifests.
+
+Only after the user confirms the displayed brief in a later message, run:
 
 ```bash
 python3 ./.trellis/scripts/task.py start <task-dir>
 ```
 
-For lightweight tasks, `prd.md` can be enough. For complex tasks, `prd.md`, `design.md`, and `implement.md` must exist and be reviewed before start. On sub-agent-dispatch platforms, `implement.jsonl` and `check.jsonl` must both have real curated entries before start. Runtime consumers tolerate missing or seed-only manifests for compatibility, but that tolerance is not a planning-ready state.
-
-After this command succeeds, the breadcrumb auto-switches to `[workflow-state:in_progress]`, and the rest of Phase 2 / 3 follows.
-
-If `task.py start` errors with a session-identity message (no context key from hook input, `TRELLIS_CONTEXT_ID`, or platform-native session env), follow the hint in the error to set up session identity, then retry.
-
+If start rejects a missing or stale brief, repeat the brief handoff. Follow any session-identity hint; after success, enter `trellis-route(target=implement)`.
+<!-- END skill-garden patch workflow-phase-1-activate v0.6 -->
 #### 1.5 Completion criteria
 
 | Condition | Required |
