@@ -15,7 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-_CAT_RE = re.compile(r"^##\s+[一二三四五六七八九十]+、(.+?)（")
+# 分类标题如「## 十一、开发者工具与工程平台（40 题）」；编号段需兼容十一及以上
+_CAT_RE = re.compile(r"^##\s+[一二三四五六七八九十百零\d]+、(.+?)（")
 _ITEM_RE = re.compile(r"^-\s+\[[ x]\]\s+(\d+)\.\s+\*\*(.+?)\*\*[:：]?\s*(.*)$")
 
 
@@ -76,12 +77,23 @@ def validate_topics(topics: list[Topic]) -> None:
     duplicates = sorted({no for no in numbers if numbers.count(no) > 1})
     if duplicates:
         raise SystemExit(f"题目编号重复: {duplicates}")
-    expected = list(range(1, max(numbers or [0]) + 1))
-    if numbers != expected:
-        raise SystemExit(f"题目编号不连续: 期望 1..{len(expected)}，实际 {numbers[:5]}...{numbers[-5:]}")
-    missing = [topic.no for topic in topics if not topic.title or not topic.description or not topic.category]
-    if missing:
-        raise SystemExit(f"题目字段缺失: {missing}")
+    # 按分类追加新题时，文档内编号可能不是从头到尾递增；只需集合覆盖 1..N
+    expected = set(range(1, max(numbers or [0]) + 1))
+    actual = set(numbers)
+    if actual != expected:
+        missing = sorted(expected - actual)
+        extra = sorted(actual - expected)
+        raise SystemExit(
+            f"题目编号不完整: 期望 1..{max(expected or [0])} 共 {len(expected)} 条，"
+            f"实际 {len(actual)} 条；缺失 {missing[:10]}{'...' if len(missing) > 10 else ''}；"
+            f"多余 {extra[:10]}{'...' if len(extra) > 10 else ''}"
+        )
+    missing_fields = [
+        topic.no for topic in topics
+        if not topic.title or not topic.description or not topic.category
+    ]
+    if missing_fields:
+        raise SystemExit(f"题目字段缺失: {missing_fields}")
 
 
 def connect_db(path: Path) -> sqlite3.Connection:

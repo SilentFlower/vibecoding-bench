@@ -56,7 +56,7 @@ const state = {
 1. **跨 tab 复用**:`accounts` 在 accounts / tasks / runs 三个 tab 都要用 → 全局
 2. **SSE 推送后异步覆盖**:`runs` 由 `/api/runs/stream` 异步覆盖 + UI 也读 → 全局
 3. **跨函数寿命**:OAuth 两步流的 ws / term 由 `attachAccLoginTerminal` 创建、由 `endAccLogin` 释放 → 全局
-4. **持久化 / 长寿命缓存**:`topics`(300 道题,一次加载后基本不变)→ 全局
+4. **持久化 / 长寿命缓存**:`topics`(seed 全量题,当前 600 道,一次加载后基本不变)→ 全局
 
 **其余一律用局部变量**:render 内的中间计算、modal 内的 form 数据、单次按钮点击的临时数据。
 

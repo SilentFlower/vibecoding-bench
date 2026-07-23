@@ -1401,7 +1401,7 @@ def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) 
 
 
 # ============== Topics（SQLite 为主，topics.md 首次 seed）==============
-_CAT_RE = re.compile(r"^##\s+[一二三四五六七八九十]+、(.+?)（")
+_CAT_RE = re.compile(r"^##\s+[一二三四五六七八九十百零\d]+、(.+?)（")
 _ITEM_RE = re.compile(r"^-\s+\[[ x]\]\s+(\d+)\.\s+\*\*(.+?)\*\*[:：]?\s*(.*)$")
 
 

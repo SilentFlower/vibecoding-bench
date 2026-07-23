@@ -344,8 +344,14 @@ scripts/sync-topics-db.py \
 同步策略按 `topics.no` upsert:
 - 已存在编号 → `UPDATE title/description/category/enabled/deleted_at/updated_at`,保留原 `id`
 - 不存在编号 → `INSERT`
-- 不删除额外编号;例如远程本地自定义的 `no > 200` 默认保留
+- 不删除额外编号;例如远程本地自定义的 `no > 当前 seed 最大编号` 默认保留
 - `--apply` 前自动备份 DB 到同目录 `db.sqlite.bak-YYYYMMDD-HHMMSS`
+
+解析契约(与 `orchestrator/main.py` 的 `load_seed_topics` 对齐):
+- 分类标题:`## <中文序号>、<分类名>（N 题）`;`_CAT_RE` 序号段须兼容 **十一及以上**(字符类含 `一二三四五六七八九十百零` 与可选数字),不能只写到「十」
+- 条目:`- [ ] N. **标题**：描述`(冒号全半角均可)
+- 扩容写法允许**按分类块末尾追加**新编号(文档内 `no` 不必从头到尾递增);例如一类内可出现 `…10 → 301…310 → 11…`
+- 校验只要求编号集合完整覆盖 `1..max(no)` 且无重复,不要求文件内顺序等于 `1,2,3,…`
 
 ### 4. Validation & Error Matrix
 
@@ -353,7 +359,7 @@ scripts/sync-topics-db.py \
 |------|------|
 | `topics.md` 解析不到任何题 | 退出并提示“题库为空” |
 | 编号重复 | 退出并列出重复编号 |
-| 编号不连续 | 退出并提示期望范围和实际首尾 |
+| 编号集合不完整 | 退出并提示期望 `1..N`、实际条数,以及缺失/多余编号样例(不是“文档顺序不连续”错误) |
 | 标题 / 描述 / 分类为空 | 退出并列出缺失编号 |
 | DB 文件不存在 | 退出并提示数据库不存在,避免 `sqlite3.connect` 创建空库 |
 | DB 未初始化 `topics` 表 | 退出并提示先启动 orchestrator 初始化 schema |
@@ -361,21 +367,22 @@ scripts/sync-topics-db.py \
 
 ### 5. Good / Base / Bad Cases
 
-**Good**:远程更新题库后,先 `scripts/sync-topics-db.py --topics topics.md --db data/db.sqlite` 看计划,确认无误再 `--apply`,最后登录 API 验证 `/api/topics` 数量。
+**Good**:远程更新题库后,先 `scripts/sync-topics-db.py --topics topics.md --db data/db.sqlite` 看计划,确认无误再 `--apply`,最后登录 API 验证 `/api/topics` 数量与 `MAX(no)`。
 
-**Base**:本地开发只想校验 `topics.md`,跑 `scripts/sync-topics-db.py --validate-only`。
+**Base**:本地开发只想校验 `topics.md`,跑 `scripts/sync-topics-db.py --validate-only`(集合 `1..N` 完整即可;按类追加后顺序非递增也通过)。
 
 **Bad**:只 scp 新 `topics.md` 到远程就以为 WebUI 会变。远程 DB 已有 `topics` 表时 seed 不会再执行,页面仍是旧题库。
 
 ### 6. Tests Required
 
-- `scripts/sync-topics-db.py --topics topics.md --validate-only` 断言题目数量和编号连续。
-- 用临时 SQLite 建 `topics` 表,插入 `no=1` 旧题和 `no=201` 自定义题,跑 dry-run + `--apply`,断言:
+- `scripts/sync-topics-db.py --topics topics.md --validate-only` 断言:解析条数 = `max(no)`,`set(no) == {1..max}`,无空字段。
+- 用临时 Markdown 模拟“分类内插入更高编号再接回旧序列”(如 `1,2,10,301,11`),断言 validate 通过;故意缺号 `1,2,4` 时 validate 失败。
+- 用临时 SQLite 建 `topics` 表,插入 `no=1` 旧题和 `no=601` 自定义题,跑 dry-run + `--apply`,断言:
   - `no=1` 被更新但 `id` 保留
-  - `no=200` 被插入
-  - `no=201` 被保留
+  - 新增 seed 编号被插入
+  - `no=601` 被保留
   - 生成 `.bak-YYYYMMDD-HHMMSS` 备份
-- 远程同步后登录 API,断言 `/api/topics` 至少返回 200 条且包含 1-200。
+- 远程同步后断言 SQLite `enabled` 条数与 seed 目标一致,且 `MAX(no)` 等于 seed 最大编号(当前仓库 seed 为 600)。
 
 ### 7. Wrong vs Correct
 
@@ -386,13 +393,28 @@ scp topics.md server:/root/vibecoding-bench/topics.md
 # 误以为已 seed 过的远程 DB 会自动刷新
 ```
 
+```python
+# 分类正则只到「十」,「十一、…」匹配失败 → 后续题目 category 为空或串类
+_CAT_RE = re.compile(r"^##\s+[一二三四五六七八九十]+、(.+?)（")
+# validate 要求 numbers == list(range(1,N+1)) 文件顺序,会误杀「按类追加」题库
+if numbers != list(range(1, max(numbers) + 1)):
+    raise SystemExit("题目编号不连续")
+```
+
 #### Correct
 
 ```bash
 scp topics.md server:/root/vibecoding-bench/topics.md
 scp scripts/sync-topics-db.py server:/root/vibecoding-bench/scripts/sync-topics-db.py
-ssh server 'cd /root/vibecoding-bench && scripts/sync-topics-db.py --topics topics.md --db data/db.sqlite'
-ssh server 'cd /root/vibecoding-bench && scripts/sync-topics-db.py --topics topics.md --db data/db.sqlite --apply'
+ssh server 'cd /root/vibecoding-bench && python3 scripts/sync-topics-db.py --topics topics.md --db data/db.sqlite'
+ssh server 'cd /root/vibecoding-bench && python3 scripts/sync-topics-db.py --topics topics.md --db data/db.sqlite --apply'
+```
+
+```python
+_CAT_RE = re.compile(r"^##\s+[一二三四五六七八九十百零\d]+、(.+?)（")
+# 只校验集合覆盖 1..max(no)
+if set(numbers) != set(range(1, max(numbers or [0]) + 1)):
+    raise SystemExit("题目编号不完整")
 ```
 
 ---
