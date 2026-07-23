@@ -1,0 +1,6 @@
+{"file": ".trellis/tasks/07-23-expand-topics-to-600/prd.md", "reason": "验收标准：600条、去重、禁区口径、远程同步"}
+{"file": ".trellis/tasks/07-23-expand-topics-to-600/design.md", "reason": "按类追加编号、sync 脚本与远程备份策略"}
+{"file": ".trellis/tasks/07-23-expand-topics-to-600/implement.md", "reason": "实现与验证清单"}
+{"file": ".trellis/tasks/07-23-expand-topics-to-600/research/remote-sync-log.md", "reason": "远程备份路径与同步结果"}
+{"file": ".trellis/tasks/07-23-expand-topics-to-600/research/existing-300-titles.md", "reason": "旧题审计与去重基线"}
+{"file": ".trellis/tasks/07-23-expand-topics-to-600/research/new-301-600.json", "reason": "新增题结构化清单"}

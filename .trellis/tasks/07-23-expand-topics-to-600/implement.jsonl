@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/07-23-expand-topics-to-600/prd.md", "reason": "需求与配额、禁区口径"}
+{"file": ".trellis/tasks/07-23-expand-topics-to-600/design.md", "reason": "topics.md 结构、sync upsert 流程"}
+{"file": ".trellis/tasks/07-23-expand-topics-to-600/implement.md", "reason": "分步落地与校验命令"}
+{"file": ".trellis/tasks/07-23-expand-topics-to-600/research/existing-300-titles.md", "reason": "去重对照清单"}

@@ -1,0 +1,40 @@
+{
+  "id": "expand-topics-to-600",
+  "name": "expand-topics-to-600",
+  "title": "扩充题库到600条并同步远程",
+  "description": "将 topics.md 从300扩充到600，策略A加厚现有分类；排除生物/金融/敏感题材；同步远程 SQLite；审计并记录现有敏感题。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-07-23",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-07-23T01:30:00Z",
+    "completedSteps": [
+      "题库扩至600",
+      "本地校验与禁区去重",
+      "远程upsert同步",
+      "Check-All修复近重",
+      "spec契约更新",
+      "业务commit+push"
+    ],
+    "partialStep": null,
+    "nextStep": "可选：远程开600题batch或 /trellis:finish-work 结案",
+    "notes": "远程备份 db.sqlite.bak-20260723-005928 / 011618；cc2api dirty 未纳入"
+  }
+}
