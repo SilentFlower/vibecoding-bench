@@ -550,20 +550,20 @@ if acquired {
 
 有效 AT 也必须在同一账号锁内最终重读后返回。
 
-## Scenario: 下游 Session 首次 Hello 代理探测
+## Scenario: 有效上游 Session 首次 Hello 代理探测
 
 ### 1. Scope / Trigger
 
-- Trigger：修改 Claude Code `/v1/messages` 首次连通性检查、账号代理网络路径、Session 去重、CacheStore/Redis singleflight、严格模式或对应 Settings 时适用。
-- 目标：新的真实下游 Session 第一次准备进入上游转发链路时，通过最终选中账号的 `proxy_url` 匿名探测 Anthropic Hello；同一活跃 Session、账号和代理路径只探测一次。
+- Trigger：修改 Claude Code `/v1/messages` 首次连通性检查、账号代理网络路径、上游 Session 池解析、Session 去重、CacheStore/Redis singleflight、严格模式或对应 Settings 时适用。
+- 目标：新的有效上游 Session 第一次准备承载上游请求时，通过最终选中账号的 `proxy_url` 匿名探测 Anthropic Hello；同一活跃上游 Session、账号和代理路径只探测一次。
 - 公开 `GET/HEAD /api/hello` 仍是无状态本地健康端点，不进入账号选择或代理探测；完整 wire 画像见 `../protocol/claude-code-profile-upgrade.md`。
 
 ### 2. Signatures
 
-- 服务入口：`SessionHelloProbeService::ensure_ready(account, real_session_id, config).await -> SessionHelloProbeDecision`。
+- 服务入口：`SessionHelloProbeService::ensure_ready(account, real_session_id, upstream_session_id, config).await -> SessionHelloProbeDecision`。
 - 决策：`Proceed`、`BlockFailure`、`BlockTimeout`、`BlockUnavailable`。
 - CacheStore：`get_session_hello_probe_state(key, success_ttl)`、`set_session_hello_probe_state(key, state, ttl)`，并复用 owner 语义的 `acquire_lock/release_lock`。
-- 状态 key：`session_hello_probe:v1:<account_id>:<sha256(real_session_id)>:<sha256(proxy_url)>`。
+- 状态 key：`session_hello_probe:v1:<account_id>:<sha256(upstream_session_id)>:<sha256(proxy_url)>`。
 - 全局 settings：
   - `session_hello_probe_enabled=false`
   - `session_hello_probe_strict=false`
@@ -574,13 +574,16 @@ if acquired {
 ### 3. Contracts
 
 - 仅当 path 精确为 `/v1/messages`、客户端为 Claude Code、原始 body 能提取非空真实 Session，且请求已经选定账号并完成本轮 slot/RPM admission 时调用探测。
+- Gateway 必须先解析账号级上游 Session 池，再调用探测；探测使用最终改写后的有效上游 Session 去重。池关闭或解析失败时回退到真实下游 Session，不得因池故障阻断原有业务转发。
 - assistant prefill、warmup、classifier、event logging、count tokens、普通 API 客户端和其它本地响应不得创建探测状态。
 - 探测请求固定为匿名 `HEAD https://api.anthropic.com/api/hello`，header 为 `User-Agent: Bun/1.4.0`、`Accept: */*`、`Accept-Encoding: gzip, deflate, br, zstd`、`Connection: keep-alive`；不得添加 query、body、Authorization、Cookie、billing header 或用户数据。
 - 非空 `Account.proxy_url` 必须先通过 `reqwest::Proxy::all` 校验，再交给 `tlsfp::get_request_client`；无效代理不得静默直连。空代理允许直连。
 - 只有 HTTP 200 为成功。成功状态命中时原子续期，形成滑动空闲 TTL；`failure` / `timeout` 使用固定冷却，不因读取续期。
 - 状态不存在时，leader 获取 `:lock` 后执行网络请求并写状态；follower 轮询同一状态并复用结果。RedisStore 必须保证跨进程去重，MemoryStore 只保证单进程。
+- leader 写状态失败时不得立即释放锁，应让锁按 TTL 自然过期以吸收当前并发波次；已经等待过该 leader 的 follower 即使随后拿到锁也不得再次发包，非严格模式开放、严格模式返回 503。新的后续请求可在锁释放或过期后恢复探测。
+- MemoryStore 必须按固定间隔惰性清理所有过期探测状态，不能只清理当前访问键，也不能在每次读写时全表扫描。
 - 探测不得再次执行账号 RPM admission，也不得写业务 usage 或自动 telemetry。账号 retry 从 A 切到 B 时，B 的账号 id 生成新 key，必须在 B 承载业务请求前重新判断。
-- 日志只允许账号 id、Session 短 hash、`proxy_configured`、`source=network|cache|follower`、耗时、HTTP status 和结果类别；网络结果允许使用 `info`，缓存不可用或 follower 等待超时使用 `warn`。不得输出完整 Session、代理 URL、请求/响应 body 或凭据。
+- 日志只允许账号 id、真实下游 Session 短 hash、有效上游 Session 短 hash、`proxy_configured`、`source=network|cache|follower`、耗时、HTTP status 和结果类别；网络结果允许使用 `info`，缓存不可用或 follower 等待超时使用 `warn`。不得输出完整 Session、代理 URL、请求/响应 body 或凭据。
 - Settings 必须同步默认常量、数据库缺失键插入、管理 API GET/PUT 校验、Gateway 热加载和前端控件；功能关闭时从属控件禁用但保留已保存值。
 
 ### 4. Validation & Error Matrix
@@ -592,12 +595,12 @@ if acquired {
 | HTTP 非 200、代理或网络错误 | 写 `failure` 冷却并继续 | 复用冷却并返回 Anthropic 形状 502 |
 | 探测超过总超时 | 写 `timeout` 冷却并继续 | 复用冷却并返回 Anthropic 形状 504 |
 | cache 读写或锁失败 | 记录脱敏 `warn`，不发无去重探测并继续 | 返回 Anthropic 形状 503 |
-| follower 等待后仍无结果 | 允许锁过期后恢复竞争；最终失败开放 | 返回 503，不永久等待 |
+| follower 等待后仍无结果 | 本请求不重复发包并开放；新请求可在锁过期后恢复 | 返回 503，不永久等待或重复发包 |
 | 同 Session 切换账号或账号修改代理 | 使用新 key 重新探测 | 同左 |
 
 ### 5. Good/Base/Bad Cases
 
-- Good：两个实例同时收到同一 Session 的首请求，Redis 只允许一个 leader 发 Hello，follower 复用 `success`；两个业务请求各自只执行原有一次 RPM admission。
+- Good：两个实例同时收到映射到同一有效上游 Session 的首请求，Redis 只允许一个 leader 发 Hello，follower 复用 `success`；两个业务请求各自只执行原有一次 RPM admission。
 - Good：账号 A 的业务请求返回可重试错误后切换到 B，A/B 各有一个独立探测结果，B 完成自己的探测后才转发业务请求。
 - Base：功能默认关闭；升级旧数据库时只插入缺失 setting，不覆盖管理员已有值，热路径保持升级前行为。
 - Bad：直接按 Session 记一个永久布尔值；这会忽略账号/代理变化并无限增长。
@@ -608,9 +611,10 @@ if acquired {
 
 - 请求构造测试断言精确 method、URL、headers、空 body，以及无 Authorization、Cookie、billing header；配置有效代理时必须由本地 mock proxy 实际收到请求。
 - Probe service 覆盖 200、非 200、超时、无效代理不直连、缓存故障的严格/非严格决策、失败冷却复用和状态 key 不泄漏原值。
-- MemoryStore 覆盖成功滑动续期、失败固定冷却和并发首请求只发一次。
+- MemoryStore 覆盖成功滑动续期、失败固定冷却、未再次访问的过期键会被低频惰性清理，以及并发首请求只发一次。
+- Probe service 覆盖 leader 写缓存失败时 follower 不重复探测，并验证锁到期后的新请求可以恢复探测。
 - Redis 集成测试必须连接真实 Redis，使用两个独立 RedisStore/服务实例并发断言只产生一次网络探测，同时验证成功续期与失败不续期。
-- Gateway 集成测试覆盖账号 A retry 到 B 时 Hello 调用为 2 次、两个账号 RPM 各只增加 1；触发函数覆盖 count tokens、API 客户端和缺失 Session 不进入探测。
+- Gateway 集成测试覆盖账号 A retry 到 B 时 Hello 调用为 2 次、两个账号 RPM 各只增加 1；共享有效上游 Session 只探测一次；池关闭或解析失败时回退真实 Session；非严格失败继续业务、严格失败不发送业务请求；本地拦截、count tokens、API 客户端和缺失 Session 不进入探测。
 - Settings 覆盖默认值、布尔/数值范围、保存后热加载；前端运行 `npm run build`。
 - 完整验证运行 `cargo fmt --check`、`cargo test`、`cargo test cch`、`git diff --check`，并静态扫描日志不得包含完整代理地址、Session 或凭据。
 
