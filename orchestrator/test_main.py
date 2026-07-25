@@ -147,7 +147,7 @@ global.fetch = async (_url, options) => {
         })
         command = ["node", "--require", str(preload_path), "-"]
         if entrypoint == "worker":
-            command.extend([str(credentials_path), "2.1.197", "test"])
+            command.extend([str(credentials_path), "2.1.220", "test"])
         completed = subprocess.run(
             command,
             input=script,

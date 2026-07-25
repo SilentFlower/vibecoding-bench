@@ -21,6 +21,7 @@ src/service/version_profile.rs
 src/service/rewriter.rs
 src/service/telemetry.rs
 src/service/gateway.rs
+src/handler/router.rs
 src/store/db.rs
 src/store/settings_store.rs
 web/src/components/Settings.vue
@@ -52,6 +53,13 @@ settings.claude_code_version_profile
 settings.allowed_claude_code_versions
 ```
 
+`/api/hello` response signature：
+
+```http
+GET /api/hello  -> 200 application/json, body={"message": "hello"}, Content-Length=20
+HEAD /api/hello -> 200 application/json, empty body, Content-Length=20
+```
+
 抓包目录约定：
 
 ```text
@@ -81,6 +89,19 @@ data/flows/<account>/<topic_id>/<run_id>/
 - 字符索引必须按 JavaScript UTF-16 code unit 语义。
 - `messages[0].content` 是数组时，Claude Code 主请求可能先放环境上下文 text block，再放真实用户 prompt text block；后缀文本源应取首条 user message 的最后一个 text block，而不是第一个 text block。
 - Haiku/title 这类只有一个 text block 的请求仍取唯一 text block。
+
+`2.1.220` identity 契约：
+
+| 字段 | 值 |
+|------|----|
+| `version` / `version_base` | `2.1.220` |
+| `build_time` | `2026-07-24T22:17:45Z` |
+| `User-Agent` | `claude-code/2.1.220` |
+| `X-Stainless-Package-Version` | `0.94.0` |
+| `X-Stainless-Runtime` | `node` |
+| `X-Stainless-Runtime-Version` | `v26.3.0` |
+| GrowthBook / hello UA | `Bun/1.4.0` |
+| 默认允许范围 | `2.1.89-2.1.220` |
 
 CCH 契约：
 
@@ -119,7 +140,10 @@ Fable body 契约：
 
 - `model=claude-fable-5`。
 - `max_tokens=64000` 默认只在缺失时补齐，不覆盖用户已有值。
-- `fallbacks:[{"model":"claude-opus-4-8"}]` 只在缺失时补齐，不重复追加，不覆盖用户已有字段。
+- `fallbacks` 必须来自选中的版本画像，只在缺失时补齐，不重复追加，不覆盖用户已有字段。
+  - `2.1.220` 使用 `[{"model":"claude-opus-5"}]`。
+  - `2.1.197` 及旧回滚画像保留 `[{"model":"claude-opus-4-8"}]`。
+- `2.1.220` Fable 顶层字段顺序为 `model,messages,system,tools,metadata,max_tokens,thinking,context_management,fallbacks,output_config,diagnostics,stream`；旧画像保留旧顺序。
 - `fallbacks` 必须发送给上游，但不参与 `2.1.172` CCH 输入。
 
 Bootstrap 契约：
@@ -128,8 +152,16 @@ Bootstrap 契约：
 - 改写后的响应返回未压缩 JSON 时必须移除或重算 `Content-Encoding`、`Content-Length`、`Transfer-Encoding`，避免客户端按旧压缩头解释。
 - Fable 能力由全局设置控制：
   - `bootstrap_model_options_mode=passthrough`：不改上游。
-  - `configured`：可注入 `client_data.cedar_lagoon`、`additional_model_options`，Fable query 时 `cwk_cfg_key="marigold"`。
-  - `hide_fable`：隐藏 Fable 入口并清空 `marigold`。
+  - `configured`：可按版本画像注入 `client_data.cedar_basin`、`client_data.cedar_lagoon`、`additional_model_options`；2.1.220 的 Fable query 使用 `cwk_cfg_key="marigold"`，Opus 5 query 使用 `cwk_cfg_key="belladonna"`。
+  - `hide_fable`：隐藏 Fable 入口并清空 `marigold`，但不得误清除 Opus 5 的合法 `belladonna`。
+
+`/api/hello` 边界契约：
+
+- cc2api 必须在管理路由和鉴权 fallback 之前注册公开的 `GET/HEAD /api/hello`。
+- GET 返回精确 JSON `{"message": "hello"}`；HEAD 返回相同 representation 的 `Content-Type` 和 `Content-Length: 20`，但 body 必须为空。
+- 该端点是无状态连通性端点，不读取 gateway token，不选择账号，不占用 RPM/并发，不生成 telemetry，也不代理到上游。
+- Claude Code `2.1.220` 的 hello 预检固定访问 `https://api.anthropic.com/api/hello`，不使用 `ANTHROPIC_BASE_URL`；模型请求才使用配置的 base URL。
+- 因此当前不得为 new-api 添加同名本地响应、渠道选择或故障转移。只有后续版本抓包证明 hello 开始使用 `ANTHROPIC_BASE_URL` 时，才重新评估透传策略。
 
 Telemetry 契约：
 
@@ -152,6 +184,9 @@ Telemetry 契约：
 | `cc_version` 主请求按第一个 text block 计算不命中 | 检查首条 user message 是否有多个 text block；按最后一个 text block 复算 |
 | Fable 带 `[1m]` 时 beta 顺序与抓包不同 | 先按目标版本抓包判断是否应有 `context-1m-2025-08-07`；若应有，再整理到 `oauth` 后面 |
 | bootstrap response 有 gzip | 先解码再改 JSON，返回时修正压缩/长度相关 header |
+| 未携带 token 请求 `GET/HEAD /api/hello` | 返回 200；HEAD body 为空且 `Content-Length=20` |
+| 未携带 token 请求其他 fallback 路径 | 保持原 gateway token 鉴权，不得因 hello 公开而放宽 |
+| 讨论让 new-api 透传 hello | 先用目标版本探针验证是否使用 `ANTHROPIC_BASE_URL`；固定官方域名时不新增路由 |
 | 老库保留旧默认 `claude_code_version_profile` | 若 `allowed_claude_code_versions` 也是旧默认范围，迁移 profile 和 allowed range 到当前默认；若 allowed range 是管理员自定义值，则保留显式回滚 |
 | 远程部署后账号仍是旧版本 | 检查迁移是否执行；直接查 volume 内 SQLite/Postgres 的 `canonical_env` |
 | 抓包分析需要保存到仓库 | 禁止提交完整 `http_capture.jsonl`、token、Cookie、Authorization、邮箱、完整 prompt/响应正文 |
@@ -170,6 +205,8 @@ Telemetry 契约：
 
 **Bad**：把 `context-1m-2025-08-07` 放进 Fable 必需 beta，导致无 1M 设置时也开启 1M beta。
 
+**Bad**：因为模型请求链路是 `Claude Code -> new-api -> cc2api`，就假设 hello 也会使用同一 base URL，并在 new-api 中臆造渠道路由。
+
 ### 6. Tests Required
 
 - `cargo fmt --check`
@@ -181,7 +218,9 @@ Telemetry 契约：
   - `fable_messages_headers_use_fallback_beta_without_context_1m`
   - `fable_context_1m_beta_keeps_claude_code_order_when_allowed`
   - bootstrap gzip 解码和 configured/hide_fable 行为
+  - assembled Router 中无 token 的 GET/HEAD hello 返回 200，HEAD body 为空且长度为 20，其他 fallback 路径仍返回 401
   - telemetry 中 Fable `betas`、`model`，以及不无条件写 `flags=model`
+  - TokenTester 按账号选中画像生成 2.1.220/旧回滚 profile 的 UA、Stainless package/runtime 和 beta
   - 旧默认 `claude_code_version_profile` + 旧默认 `allowed_claude_code_versions` 会升级到当前默认
   - 自定义 `allowed_claude_code_versions` 下的旧 profile 作为显式回滚保留
 - 抓包回归：
@@ -230,6 +269,19 @@ claude-code-20250219,oauth-2025-04-20,...,cache-diagnosis-2026-04-07,context-1m-
 
 ```text
 claude-code-20250219,oauth-2025-04-20,context-1m-2025-08-07,interleaved-thinking-2025-05-14,...
+```
+
+#### Wrong: 假设 hello 跟随模型 base URL
+
+```text
+Claude Code -> ANTHROPIC_BASE_URL -> new-api -> /api/hello 渠道选择
+```
+
+#### Correct: 先按目标版本验证真实请求边界
+
+```text
+Claude Code 2.1.220 hello -> https://api.anthropic.com/api/hello
+Claude Code 2.1.220 messages -> ANTHROPIC_BASE_URL -> new-api -> cc2api
 ```
 
 ---

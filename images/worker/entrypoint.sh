@@ -29,7 +29,7 @@
 set -euo pipefail
 
 WORKER_MODE="${WORKER_MODE:-task}"
-CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.197}"
+CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.220}"
 CLAUDE_CODE_EFFORT_LEVEL="${CLAUDE_CODE_EFFORT_LEVEL:-max}"
 PROFILE_CLAUDE_CODE_EFFORT_LEVEL="${PROFILE_CLAUDE_CODE_EFFORT_LEVEL:-$CLAUDE_CODE_EFFORT_LEVEL}"
 CC2API_MANAGED_OAUTH="${CC2API_MANAGED_OAUTH:-0}"
@@ -647,7 +647,7 @@ force_refresh_profile_credentials_unlocked() {
   node - "$credentials_path" "$CLAUDE_CODE_VERSION" "$reason" <<'JS'
 const fs = require('fs');
 const path = process.argv[2];
-const claudeCodeVersion = process.argv[3] || '2.1.197';
+const claudeCodeVersion = process.argv[3] || '2.1.220';
 const reason = process.argv[4] || 'auth_error';
 const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';

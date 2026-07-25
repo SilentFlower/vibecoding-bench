@@ -186,9 +186,9 @@ WORKER_HOME = "/home/node"
 WORKER_UID = 1000
 WORKER_GID = 1000
 CLAUDE_CODE_VERSION = _normalize_claude_code_version(
-    os.environ.get("CLAUDE_CODE_VERSION") or "2.1.197",
+    os.environ.get("CLAUDE_CODE_VERSION") or "2.1.220",
     "CLAUDE_CODE_VERSION",
-) or "2.1.197"
+) or "2.1.220"
 CLAUDE_CODE_EFFORT_LEVEL = _normalize_claude_effort_level(
     os.environ.get("CLAUDE_CODE_EFFORT_LEVEL") or "max",
     "CLAUDE_CODE_EFFORT_LEVEL",
@@ -2612,7 +2612,7 @@ const path = require('path');
 
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
 const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
-const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.197';
+const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.220';
 
 function emit(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
@@ -2851,7 +2851,7 @@ const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
 const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
 const refreshBufferMs = Number(process.env.OAUTH_REFRESH_BUFFER_SEC || '600') * 1000;
-const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.197';
+const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.220';
 
 function emit(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
