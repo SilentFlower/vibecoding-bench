@@ -1,0 +1,5 @@
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"约束 Gateway 账号选择、admission、sticky、RPM、CacheStore/Redis 与真实下游 session 的执行顺序。"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"约束 Settings 管理 API、真实 setting key、控件类型、校验和运维后台布局。"}
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"提供 2.1.220 hello wire headers、公开 /api/hello 边界和 new-api 不透传结论。"}
+{"file":".trellis/tasks/07-25-cc2api-2-1-220-upgrade/research/capture-summary.md","reason":"记录真实 HEAD /api/hello 的无鉴权、空 body、Bun/1.4.0 与响应特征。"}
+{"file":".trellis/tasks/07-25-cc2api-2-1-220-upgrade/research/new-api-edge.md","reason":"记录 Claude Code hello 固定官方域名、模型请求才使用 ANTHROPIC_BASE_URL 的实验边界。"}

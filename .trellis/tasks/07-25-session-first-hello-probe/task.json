@@ -1,0 +1,48 @@
+{
+  "id": "session-first-hello-probe",
+  "name": "session-first-hello-probe",
+  "title": "新增下游 Session 首次 Hello 代理探测",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-07-25",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-07-25T06:22:59Z",
+      "contextKey": "codex_019f972f-912a-72e0-8555-51dfcec97ce9",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "552d44c175d6bc56f1cc35be5e2bbfbab7f87e3c",
+        "status": []
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-07-25T15:30:00+08:00",
+    "completedSteps": [
+      "完成 Session 首次 Hello 代理探测后端、缓存与 Settings 前端实现",
+      "补齐真实代理、超时、缓存故障、Redis 多实例和账号换号测试",
+      "通过 Check-All、全量验证并更新 code-spec"
+    ],
+    "partialStep": null,
+    "nextStep": "部署到 cc2api.env，保持非严格模式进行验证",
+    "notes": "功能和严格模式默认关闭；Rust 全量 467 项、CCH 15 项、前端构建及真实 Redis 验证通过。"
+  }
+}

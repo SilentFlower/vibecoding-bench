@@ -1,0 +1,4 @@
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"检查 probe 是否保持账号选择、slot/RPM、sticky、CacheStore 和日志敏感信息契约。"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"检查 Settings 前后端 keys、控件、范围校验和热加载是否一致。"}
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"检查模拟 HEAD 的 wire 契约及公开 /api/hello/new-api 边界未回归。"}
+{"file":".trellis/tasks/07-25-cc2api-2-1-220-upgrade/research/capture-summary.md","reason":"用原始抓包摘要核对请求方法、headers、无 body/Authorization 和 HTTP 200 成功条件。"}
