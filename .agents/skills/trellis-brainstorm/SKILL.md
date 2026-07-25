@@ -27,6 +27,8 @@ Use this skill during Phase 1 planning to turn the user's request into clear req
 
 <!-- BEGIN skill-garden patch brainstorm-planning-authorization v0.6 -->
 Use this skill after the user explicitly requests task planning, or after clear complex implementation intent authorizes creating a planning workspace. This authorization covers planning only; it never authorizes `task.py start` or implementation.
+
+Before choosing an approach for non-trivial project work, follow the workflow `Request Triage` Project Knowledge Discovery contract and return here with the matched project-local SOPs and specs.
 <!-- END skill-garden patch brainstorm-planning-authorization v0.6 -->
 
 <!-- BEGIN skill-garden patch brainstorm-auto-task-create v0.6 -->
@@ -190,4 +192,6 @@ Planning readiness does not authorize `task.py start` or implementation.
 Once the Quality Bar is satisfied, load `trellis-task-brief`, refresh `brief.md` from the final planning artifacts, display the full brief in chat, and end the current turn. Wait for the user's planning review confirmation before running `task.py start` or beginning implementation.
 
 Implementation intent expressed before the final artifacts and full brief are shown authorizes planning only; it cannot be reused as the final review confirmation.
+
+For `## Open Questions`, use Markdown checkbox state rather than placeholder prose: unresolved items are `- [ ]`; resolved items move into requirements/decisions or are removed; when no open questions remain, remove the section or leave it empty. Do not write bare placeholders such as `- None`, `- TBD`, or `- 已确认` because historical bare list items require an explicit auto-loop semantic review.
 <!-- END skill-garden patch brainstorm-planning-handoff v0.6 -->
