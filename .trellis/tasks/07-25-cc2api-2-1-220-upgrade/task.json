@@ -1,0 +1,53 @@
+{
+  "id": "cc2api-2-1-220-upgrade",
+  "name": "cc2api-2-1-220-upgrade",
+  "title": "升级 cc2api 至 Claude Code 2.1.220",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-07-25",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-07-25T03:39:29Z",
+      "contextKey": "codex_019f972f-912a-72e0-8555-51dfcec97ce9",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "b1c2a6f361b4e4f17127145aa20ace81ddc4ccfd",
+        "status": [
+          {
+            "status": " M",
+            "path": "cc2api"
+          }
+        ]
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-07-25T13:54:47+08:00",
+    "completedSteps": [
+      "完成 Claude Code 2.1.220 协议画像、回滚兼容和 bench 默认版本升级",
+      "完成全量 Check-All、修复复检和 code-spec 更新",
+      "提交并推送 cc2api 与 vibecoding-bench 业务变更"
+    ],
+    "partialStep": null,
+    "nextStep": "按需执行远程部署与数据库版本分布验收；完成后归档任务",
+    "notes": "本任务未执行远程部署；new-api 业务代码保持不变。"
+  }
+}

@@ -1,0 +1,7 @@
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"检查 2.1.220 实现是否满足 profile、beta、billing、bootstrap、telemetry 和迁移契约。"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"检查旧默认迁移是否成对、幂等并保护管理员自定义。"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"检查格式、全量测试、定向协议测试与敏感数据边界。"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"检查 Settings fallback/default 与构建是否同步。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/remote-deploy.md","reason":"检查 bench worker、compose、orchestrator 和文档默认版本是否一致。"}
+{"file":".trellis/tasks/07-25-cc2api-2-1-220-upgrade/research/capture-summary.md","reason":"逐项对照脱敏抓包结论，确认未凭空引入未观察到的协议变化。"}
+{"file":".trellis/tasks/07-25-cc2api-2-1-220-upgrade/research/new-api-edge.md","reason":"检查本地探针结论与实现边界一致：模型请求进入 new-api，hello 固定访问官方域名，new-api 业务代码不变。"}

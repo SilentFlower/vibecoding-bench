@@ -1,0 +1,9 @@
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"Claude Code 版本画像升级契约，覆盖真实抓包、beta、cc_version、CCH、bootstrap、telemetry 和账号迁移。"}
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"约束 Gateway 热路径、请求最终 body、CCH 计算顺序和服务分层。"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"约束全局 settings 默认值、精确旧值迁移以及 SQLite/PostgreSQL 兼容。"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"约束 Rust 全量/定向测试和抓包敏感数据边界。"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"约束 Settings 默认画像同步和前端构建。"}
+{"file":".trellis/spec/cc2api/deploy/deploy-guidelines.md","reason":"约束子模块交付、版本画像部署准备和 DB 验证要求。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/remote-deploy.md","reason":"约束 worker 兜底 Claude Code 版本、compose 和 WebUI 覆盖优先级。"}
+{"file":".trellis/tasks/07-25-cc2api-2-1-220-upgrade/research/capture-summary.md","reason":"本任务 2.1.220 Opus/Fable 脱敏抓包结论和精确协议差异。"}
+{"file":".trellis/tasks/07-25-cc2api-2-1-220-upgrade/research/new-api-edge.md","reason":"记录模型请求进入 new-api、hello 固定访问官方域名的本地探针与抓包证据。"}
