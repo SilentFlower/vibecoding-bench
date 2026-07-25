@@ -1,4 +1,4 @@
-# 下游 Session 首次 Hello 代理探测 - 实施计划
+# 有效上游 Session 首次 Hello 代理探测 - 实施计划
 
 ## 1. CacheStore 状态契约
 
@@ -19,7 +19,7 @@
 
 1. 在 `GatewayService` 注入 probe service 与热配置，更新 main/router/test assembly。
 2. 启动时加载 probe settings，增加 `reload_session_hello_probe_config()`。
-3. 在真实 Claude Code `/v1/messages` admission 后、改写/token/转发前调用 `ensure_ready`。
+3. 在真实 Claude Code `/v1/messages` admission 后先解析上游 session 池，再用最终上游 session 调用 `ensure_ready`；池关闭或解析失败时回退真实 session。
 4. 严格失败构造 Anthropic-compatible 502/503/504；非严格失败继续现有链路。
 5. 保持公开 `/api/hello`、count tokens、本地拦截、RPM 次数、sticky 绑定与 telemetry 语义不变。
 
@@ -49,7 +49,7 @@
 
 1. 发布镜像并 recreate cc2api。
 2. 默认功能关闭完成健康检查。
-3. 在目标环境只开启 `session_hello_probe_enabled`，严格模式保持关闭；验证首个 session/account 产生一次探测、后续多轮只命中 cache。
+3. 在目标环境只开启 `session_hello_probe_enabled`，严格模式保持关闭；验证首个上游 session/account 产生一次探测、多个下游 session 复用该上游 session 时只命中 cache。
 4. 观察首请求延迟与失败日志；异常时直接关闭功能热回滚。
 
 ## 风险与回滚点

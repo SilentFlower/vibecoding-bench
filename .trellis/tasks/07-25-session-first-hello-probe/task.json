@@ -35,14 +35,16 @@
     }
   },
   "progress": {
-    "updatedAt": "2026-07-25T15:30:00+08:00",
+    "updatedAt": "2026-07-25T16:58:20+08:00",
     "completedSteps": [
       "完成 Session 首次 Hello 代理探测后端、缓存与 Settings 前端实现",
       "补齐真实代理、超时、缓存故障、Redis 多实例和账号换号测试",
-      "通过 Check-All、全量验证并更新 code-spec"
+      "通过 Check-All、全量验证并更新 code-spec",
+      "已部署上一版 cc2api.env，完成数据库备份、健康检查与非严格模式启用",
+      "完成有效上游 Session 去重、MemoryStore 过期清理、缓存写失败 singleflight 兜底及完整重检"
     ],
     "partialStep": null,
-    "nextStep": "部署到 cc2api.env，保持非严格模式进行验证",
-    "notes": "功能和严格模式默认关闭；Rust 全量 467 项、CCH 15 项、前端构建及真实 Redis 验证通过。"
+    "nextStep": "部署最新 cc2api 镜像到 cc2api.env，并使用真实 Claude Code 新 Session 验证 network/cache 日志与账号代理路径",
+    "notes": "Rust 427 个单测和 49 个集成测试、CCH 15 项、前端构建及真实 Redis 验证通过；当前远程仍运行修复前镜像，功能保持非严格模式，部署后需重新核对探测日志。"
   }
 }

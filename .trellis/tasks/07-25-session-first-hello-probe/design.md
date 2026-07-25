@@ -1,4 +1,4 @@
-# 下游 Session 首次 Hello 代理探测 - 技术设计
+# 有效上游 Session 首次 Hello 代理探测 - 技术设计
 
 ## 1. 边界与数据流
 
@@ -10,13 +10,14 @@
 读取请求并识别真实 session
   -> 账号选择
   -> 并发槽位与业务 RPM admission
-  -> SessionHelloProbeService.ensure_ready(account, real_session_id)
+  -> 解析账号级上游 session 池
+  -> SessionHelloProbeService.ensure_ready(account, real_session_id, upstream_session_id)
   -> 请求体/header 改写与 token 解析
   -> sticky 绑定
   -> 业务请求转发
 ```
 
-探测放在 admission 后，保证使用本轮准备承载请求的账号并受现有账号并发保护；探测本身不再执行额外 RPM admission。严格模式失败时，槽位 guard 正常释放，业务请求不发上游。
+探测放在 admission 和上游 session 池解析后，保证使用本轮准备承载请求的账号及最终有效上游 session，并受现有账号并发保护；探测本身不再执行额外 RPM admission。严格模式失败时，槽位 guard 正常释放，业务请求不发上游，但已解析的轻量 session 池映射允许保留，供后续重试稳定复用。
 
 ## 2. 设置契约
 
@@ -43,6 +44,7 @@ pub async fn ensure_ready(
     &self,
     account: &Account,
     real_session_id: &str,
+    upstream_session_id: &str,
     config: SessionHelloProbeConfig,
 ) -> SessionHelloProbeDecision
 ```
@@ -70,10 +72,10 @@ Connection: keep-alive
 状态 key：
 
 ```text
-session_hello_probe:v1:<account_id>:<sha256(real_session_id)>:<sha256(proxy_url)>
+session_hello_probe:v1:<account_id>:<sha256(upstream_session_id)>:<sha256(proxy_url)>
 ```
 
-完整 session 与代理地址不得进入 Redis key、内存 key 或日志。代理配置变化会自然生成新 key并重新探测。
+完整 session 与代理地址不得进入 Redis key、内存 key 或日志。上游 session 池关闭或解析失败时 `upstream_session_id=real_session_id`；代理配置、账号或最终上游映射变化会自然生成新 key并重新探测。
 
 `CacheStore` 增加专用状态读写接口，状态只包含 `success`、`failure`、`timeout`：
 
@@ -96,7 +98,7 @@ Gateway 仅在以下条件全部满足时调用探测：
 - 请求未被 assistant prefill、warmup、classifier、telemetry 或其他本地路径提前返回；
 - 已选定账号并通过本轮 admission。
 
-429/auth retry 切换账号时，新账号 id 形成新 key，业务请求在该账号上转发前必须重新走状态判断。探测成功不提前提交 sticky 绑定；sticky 仍在现有“真正准备发上游”位置写入。
+Gateway 在探测前调用 `build_upstream_session_rewrite`，优先使用池解析结果中的 `upstream_session_id`，无结果时回退真实 session。多个真实 session 映射到同一上游 session 时共享探测状态。429/auth retry 切换账号时，新账号 id 及其独立上游映射形成新 key，业务请求在该账号上转发前必须重新走状态判断。探测成功不提前提交 sticky 绑定；sticky 仍在现有“真正准备发上游”位置写入。
 
 ## 6. 错误与日志
 
@@ -108,7 +110,7 @@ Gateway 仅在以下条件全部满足时调用探测：
 | cache 读写/锁失败 | 告警并继续，不发无去重探测 | 返回 503 |
 | follower 等待 leader 无结果且锁到期 | 重新竞争一次或按失败处理 | 返回 503，不永久等待 |
 
-日志字段限于 `account_id`、session 短 hash、`proxy_configured`、`source=network|cache|follower`、耗时、HTTP status、结果类别；成功、失败和超时结果允许统一使用 `info`，缓存不可用和 follower 等待超时继续使用 `warn`。不得输出完整 session、代理 URL、请求/响应 body 或任何凭据。
+日志字段限于 `account_id`、下游/上游 session 短 hash、`proxy_configured`、`source=network|cache|follower`、耗时、HTTP status、结果类别；成功、失败和超时结果允许统一使用 `info`，缓存不可用和 follower 等待超时继续使用 `warn`。不得输出完整 session、代理 URL、请求/响应 body 或任何凭据。
 
 ## 7. 兼容、上线与回滚
 
@@ -123,5 +125,5 @@ Gateway 仅在以下条件全部满足时调用探测：
 - MemoryStore 覆盖成功滑动 TTL、失败固定冷却、锁 owner、leader/follower、锁过期恢复。
 - Redis 脚本覆盖并发 claim、成功续期、失败不续期和多实例只发一次。
 - Probe service 使用本地 mock endpoint/proxy 覆盖直连、账号代理、200、非 200、超时和 cache 故障。
-- Gateway 覆盖功能关闭、本地拦截不触发、同 session 多轮不重复、并发首轮、账号 retry 新 key、严格/非严格状态码、无额外 RPM admission。
+- Gateway 覆盖功能关闭、本地拦截不触发、多个下游 session 复用同一上游 session 只探测一次、池关闭回退真实 session、并发首轮、账号 retry 新 key、严格/非严格状态码、无额外 RPM admission。
 - Router settings 覆盖默认值、范围校验和热加载；Vue 构建覆盖控件 load/save。
