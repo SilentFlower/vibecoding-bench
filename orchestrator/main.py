@@ -5336,6 +5336,7 @@ def sync_account_to_cc2api(aid: int):
                             "account_uuid": profile.get("account_uuid"),
                             "organization_uuid": profile.get("organization_uuid"),
                             "subscription_type": profile.get("subscription_type"),
+                            "allow_fast_mode": False,
                         })
                 if not _cc2api_account_is_active_oauth(matched):
                     raise ValueError("匹配到的 cc2api 账号不是 active OAuth 账号")

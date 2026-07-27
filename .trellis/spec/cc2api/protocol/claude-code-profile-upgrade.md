@@ -299,6 +299,138 @@ Claude Code 2.1.220 messages -> ANTHROPIC_BASE_URL -> new-api -> cc2api
 
 ---
 
+## Scenario: Claude Fast Mode 账号级透传控制
+
+### 1. Scope / Trigger
+
+- Trigger: 新增或修改 `fast-mode-2026-02-01`、账号级 beta 放行开关、`/v1/messages` / `count_tokens` beta 合并，或 bench 创建 cc2api 账号的同步契约。
+- 本场景属于跨层契约：账号模型、SQLite/PostgreSQL schema、Store、管理 API、Accounts UI、协议重写和 bench 同步必须保持一致。
+- Fast Mode 的产品语义是“允许透传客户端已有 token”，不是由 cc2api 主动开启。
+
+### 2. Signatures
+
+账号与数据库字段：
+
+```text
+Account.allow_fast_mode: bool
+accounts.allow_fast_mode INTEGER NOT NULL DEFAULT 0
+```
+
+管理 API 字段：
+
+```json
+{
+  "allow_fast_mode": false
+}
+```
+
+协议 token 与入口：
+
+```text
+fast-mode-2026-02-01
+POST /v1/messages
+POST /v1/messages/count_tokens
+```
+
+关键代码入口：
+
+```text
+src/model/account.rs
+src/store/db.rs
+src/store/account_store.rs
+src/handler/router.rs
+src/service/rewriter.rs
+src/service/gateway.rs
+web/src/api.ts
+web/src/components/Accounts.vue
+orchestrator/main.py::sync_account_to_cc2api
+```
+
+### 3. Contracts
+
+- `allow_fast_mode` 默认必须为 `false`：Rust serde 缺省、管理 API 创建缺省、SQLite/PostgreSQL 建表和旧库迁移、前端新建表单都必须一致。
+- 当 `allow_fast_mode=false` 时，按逗号拆分并精确删除完整 token `fast-mode-2026-02-01`；不得使用子串替换，其他 beta token 保持原始相对顺序。
+- 当 `allow_fast_mode=true` 时，只保留客户端显式携带的 Fast Mode token；版本画像和网关不得主动注入该 token。
+- `/v1/messages` 与 `/v1/messages/count_tokens` 必须复用同一账号 beta 过滤策略；`count_tokens` 过滤后仍必须合并 `token-counting-2024-11-01`。
+- `context-1m-2025-08-07` 继续由 `allow_1m_models` 控制，Fast Mode 改动不得扩大或收窄现有 1M 白名单。
+- 要求精确 beta 画像、不会合并客户端 beta 的特殊请求保持现有 required beta，不因账号开关主动增删 Fast Mode。
+- 过滤发生在最终上游 header 生成之前；不得修改请求体、CCH、`cc_version` 或默认版本画像。
+- bench 首次创建 cc2api 账号时，payload 必须显式发送 `"allow_fast_mode": false`，不能只依赖 cc2api 默认值。
+- bench 匹配既有账号或已绑定账号时，只校验身份、绑定并同步 OAuth 凭据；不得调用账号配置更新接口覆盖 `allow_fast_mode`。该配置的唯一权威来源是 cc2api，bench 数据库不复制该字段。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 期望 |
+|------|------|
+| 客户端携带 Fast Mode，账号字段缺失或为 `false` | 最终 `anthropic-beta` 不包含完整 Fast Mode token |
+| 客户端携带 Fast Mode，账号字段为 `true` | 最终 header 保留该 token，且只出现一次 |
+| 客户端携带 `fast-mode-2026-02-01-extra` | 不得误删，精确匹配只删除完整 token |
+| 客户端未携带 Fast Mode，账号字段为 `true` | 不主动注入 Fast Mode |
+| Fast Mode 与 1M token 同时出现 | 两个策略分别判断，保留 token 的相对顺序和 1M 抓包顺序整理规则 |
+| `count_tokens` 默认禁止 Fast Mode | Fast Mode 被删除，`token-counting-2024-11-01` 仍存在 |
+| 旧数据库新增列 | 历史账号得到 `0`，升级后默认禁止 |
+| bench 创建新 cc2api 账号 | create payload 明确包含 `allow_fast_mode=false` |
+| bench 匹配既有 cc2api 账号 | 不创建账号、不更新账号配置，管理员原值保持不变 |
+
+### 5. Good/Base/Bad Cases
+
+**Good**：管理员在 Accounts 页面为单个账号显式开启；只有客户端同时携带 Fast Mode token 时，上游请求才包含该 token。
+
+**Base**：新账号、旧库迁移账号和 bench 首次同步账号全部默认禁止，普通请求的其他 beta、CCH 和 `cc_version` 保持不变。
+
+**Bad**：把 Fast Mode 加进版本画像 required beta，导致管理员只是允许透传却变成所有请求主动开启。
+
+**Bad**：bench 每次同步都更新 `allow_fast_mode=false`，覆盖管理员在 cc2api 中的显式放行。
+
+**Bad**：使用 `replace("fast-mode-2026-02-01", "")`，误伤前后缀相似 token 或留下无效分隔符。
+
+### 6. Tests Required
+
+- Rewriter：默认删除、显式允许、精确 token 匹配、未携带时不注入、与 `context-1m` 组合后其他客户端 token 顺序稳定。
+- Count tokens：默认删除与显式允许各一例，并断言 `token-counting-2024-11-01` 保留。
+- Store/DB：新账号默认 `false`、旧 SQLite 行迁移后为 `0`、更新为 `true` 后读取和列表返回正确。
+- 管理 API：创建 payload 缺省时响应为 `false`，PUT 更新为 `true` 后 GET/list 往返一致。
+- 前端：`cd cc2api/web && npm run build`，并确认新建默认“禁止”、编辑回填和保存 payload 一致。
+- bench：首次创建 payload 明确包含 `allow_fast_mode=false`；匹配既有账号和重复同步不调用创建或账号配置更新接口。
+- 回归门禁：`cargo fmt --check`、`cargo test`、`cargo test cch`、orchestrator 单元测试。
+
+### 7. Wrong vs Correct
+
+#### Wrong: 账号允许后主动注入 Fast Mode
+
+```rust
+if account.allow_fast_mode {
+    required_beta.push_str(",fast-mode-2026-02-01");
+}
+```
+
+#### Correct: 只过滤或保留客户端已有 token
+
+```rust
+let filtered = if account.allow_fast_mode {
+    incoming_beta.to_string()
+} else {
+    strip_beta_token(incoming_beta, "fast-mode-2026-02-01")
+};
+```
+
+#### Wrong: bench 同步既有账号时重置管理员配置
+
+```python
+cc2api_client.update_account(account_id, {"allow_fast_mode": False})
+```
+
+#### Correct: 只在首次创建时显式关闭
+
+```python
+cc2api_client.create_account({
+    "email": profile["email"],
+    "allow_fast_mode": False,
+})
+```
+
+---
+
 ## Scenario: Claude Code currentDate 风险治理
 
 ### 1. Scope / Trigger

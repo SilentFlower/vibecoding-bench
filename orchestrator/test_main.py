@@ -1001,6 +1001,80 @@ global.fetch = async (_url, options) => {
         data = json.loads((profile_dir / ".credentials.json").read_text(encoding="utf-8"))
         self.assertEqual("cc2-current-refresh", data["claudeAiOauth"]["refreshToken"])
 
+    def test_sync_creates_cc2api_account_with_fast_mode_disabled(self) -> None:
+        """首次同步创建 cc2api 账号时必须显式禁止客户端 Fast Mode。"""
+        main.init_db()
+        profile_dir = main.PROFILES_DIR / "main"
+        profile_dir.mkdir(parents=True)
+        (profile_dir / ".credentials.json").write_text(
+            json.dumps({
+                "claudeAiOauth": {
+                    "accessToken": "bench-access",
+                    "refreshToken": "bench-refresh",
+                    "expiresAt": 1,
+                }
+            }),
+            encoding="utf-8",
+        )
+        (profile_dir / ".claude.json").write_text(
+            json.dumps({
+                "oauthAccount": {
+                    "emailAddress": "main@example.test",
+                    "accountUuid": "uuid-main",
+                    "organizationUuid": "org-main",
+                }
+            }),
+            encoding="utf-8",
+        )
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path) VALUES('main','profiles/main')"
+                )
+        finally:
+            conn.close()
+
+        client = Mock()
+        client.list_accounts.return_value = []
+        client.create_account.return_value = {
+            "id": 7,
+            "name": "main",
+            "email": "main@example.test",
+            "status": "active",
+            "auth_type": "oauth",
+            "account_uuid": "uuid-main",
+            "allow_fast_mode": False,
+        }
+        client.resolve_credentials.return_value = {
+            "account_id": 7,
+            "access_token": "cc2-current-access",
+            "refresh_token": "cc2-current-refresh",
+            "expires_at": int(time.time() * 1000) + 3600000,
+        }
+        main.cc2api_client = client
+        main.login_manager = None
+        main.continue_manager = None
+
+        result = main.sync_account_to_cc2api(1)
+
+        self.assertTrue(result["created"])
+        payload = client.create_account.call_args.args[0]
+        self.assertIs(payload["allow_fast_mode"], False)
+        conn = main.get_db()
+        try:
+            row = conn.execute(
+                "SELECT cc2api_account_id, warmup_enabled, warmup_last_status "
+                "FROM accounts WHERE id=1"
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(7, row["cc2api_account_id"])
+        self.assertEqual(0, row["warmup_enabled"])
+        self.assertEqual("off", row["warmup_last_status"])
+        data = json.loads((profile_dir / ".credentials.json").read_text(encoding="utf-8"))
+        self.assertEqual("cc2-current-refresh", data["claudeAiOauth"]["refreshToken"])
+
     def test_bound_sync_does_not_rematch_or_overwrite_profile_before_rejecting(self) -> None:
         """已绑定账号同步失败时不得先写入另一个 cc2api 账号的凭据。"""
         main.init_db()
