@@ -1,0 +1,7 @@
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"审查数据库迁移、账号字段读写和 API/UI 同步完整性。"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"执行 Rust 质量门、网关回归和敏感边界检查。"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"审查前端类型、表单默认值、保存回填和构建结果。"}
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"审查 beta 精确过滤、顺序稳定及 CCH/版本画像不回归。"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"反向检查每个消费者是否完整接入 allow_fast_mode。"}
+{"file":".trellis/spec/vibecoding-bench/backend/database-guidelines.md","reason":"审查 bench 首次创建、既有绑定和配置所有权不变量。"}
+{"file":".trellis/spec/vibecoding-bench/backend/quality-guidelines.md","reason":"执行 orchestrator 回归测试和 Python 代码质量检查。"}

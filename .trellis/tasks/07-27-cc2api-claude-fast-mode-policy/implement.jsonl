@@ -1,0 +1,8 @@
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"约束 Gateway 热路径、分层边界和账号字段跨层修改。"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"约束 SQLite/PostgreSQL 双栈迁移、账号字段 Store/API/UI 同步。"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"规定 Rust 格式、单测和网关回归验证要求。"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"约束 Account 类型、Accounts.vue 表单与前端构建。"}
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"约束 anthropic-beta 顺序、画像边界及 CCH/cc_version 不变量。"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"检查账号字段从数据库到请求重写和前端的完整数据流。"}
+{"file":".trellis/spec/vibecoding-bench/backend/database-guidelines.md","reason":"约束 bench 与 cc2api 账号绑定、同步所有权和既有账号不重匹配语义。"}
+{"file":".trellis/spec/vibecoding-bench/backend/quality-guidelines.md","reason":"约束 orchestrator Python 实现、测试和外部调用边界。"}

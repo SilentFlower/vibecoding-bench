@@ -1,0 +1,50 @@
+{
+  "id": "cc2api-claude-fast-mode-policy",
+  "name": "cc2api-claude-fast-mode-policy",
+  "title": "为 cc2api 增加 Claude Fast Mode 可配置控制",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-07-27",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-07-27T04:25:35Z",
+      "contextKey": "codex_019fa1ce-c9b2-78f0-b4e0-e0bd69439abc",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "71e75479a722740ecd50f1513fd6a64d950e5e03",
+        "status": []
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-07-27T13:00:00+08:00",
+    "completedSteps": [
+      "完成 cc2api 账号级 Fast Mode 默认禁止与显式放行",
+      "完成消息与 count_tokens beta 精确过滤",
+      "完成 bench 新建账号显式禁用且既有账号配置不覆盖",
+      "完成 Rust、前端、orchestrator 全量验证与协议规范沉淀",
+      "完成 cc2api 远程部署验证"
+    ],
+    "partialStep": null,
+    "nextStep": "部署 vibecoding-bench orchestrator 后执行 finish-work 归档任务",
+    "notes": "cc2api commit 917a6e1 已推送并部署；父仓业务 commit e0b3a39 已推送。"
+  }
+}
