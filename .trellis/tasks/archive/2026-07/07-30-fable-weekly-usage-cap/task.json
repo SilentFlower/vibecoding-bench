@@ -3,7 +3,7 @@
   "name": "fable-weekly-usage-cap",
   "title": "控制 cc2api Fable 周额度使用上限",
   "description": "",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "vibecoding-bench",
@@ -11,7 +11,7 @@
   "creator": "silentflower",
   "assignee": "silentflower",
   "createdAt": "2026-07-30",
-  "completedAt": null,
+  "completedAt": "2026-07-30",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
@@ -33,5 +33,14 @@
         "status": []
       }
     }
+  },
+  "progress": {
+    "updatedAt": "2026-07-30T04:22:23Z",
+    "completedSteps": [
+      "auto-loop: 本地提交完成 69a97db"
+    ],
+    "partialStep": null,
+    "nextStep": "auto-loop 已本地提交；需要用户显式运行 finish-work/archive 或继续后续人工流程",
+    "notes": "run_id=auto-20260730040337; task=.trellis/tasks/07-30-fable-weekly-usage-cap; commit=69a97db28ab6430b5b6a251be0419b10c0e46d05; status=completed"
   }
 }
