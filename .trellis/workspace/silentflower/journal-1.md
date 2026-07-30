@@ -1903,3 +1903,38 @@ topics.md 300→600；sync 脚本改为集合校验并兼容十一+分类；远�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 55: 完成 Fable 周用量上限控制
+
+**Date**: 2026-07-30
+**Task**: 完成 Fable 周用量上限控制
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+为 cc2api 增加全局 Fable 周用量百分比上限，默认 50%，支持管理端校验与热刷新；完成调度边界测试、规范同步、release 审计和任务归档。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `69a97db28ab6430b5b6a251be0419b10c0e46d05` | (see git log) |
+| `f7cecbc6edab79ffe7352cfe11e946b7e08dab4b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

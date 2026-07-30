@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 54
-- **Last Active**: 2026-07-27
+- **Total Sessions**: 55
+- **Last Active**: 2026-07-30
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1905 | Active |
+| `journal-1.md` | ~1940 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 55 | 2026-07-30 | 完成 Fable 周用量上限控制 | `69a97db28ab6430b5b6a251be0419b10c0e46d05`,  `f7cecbc6edab79ffe7352cfe11e946b7e08dab4b` | `main` |
 | 54 | 2026-07-27 | 完成 cc2api Claude Fast Mode 账号策略并部署 | `917a6e1`, `e0b3a39` | `main` |
 | 53 | 2026-07-23 | 扩充题库到600并同步远程、开7-19训练batch | `68ca264` | `main` |
 | 52 | 2026-07-23 | 修复用量窗口跨周期与 Fable 被动配额 | `003d0c6`, `e512af1` | `main` |
