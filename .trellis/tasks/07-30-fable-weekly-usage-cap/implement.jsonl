@@ -1,0 +1,3 @@
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"实现 Fable sticky、账号候选过滤、429 分类与 Gateway 热路径时遵循既有可执行契约。"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"新增全局 setting 时同步默认值、数据库补齐、管理 API 校验、内存 reload 和前端控件。"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"在 Settings.vue 增加数字设置控件、前端校验和保存逻辑时遵循管理后台约定。"}

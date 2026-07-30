@@ -339,73 +339,85 @@ let Some(model) = item.get("scope").and_then(|scope| scope.get("model")) else {
 };
 ```
 
-## Scenario: Fable sticky 配额耗尽 fallback
+## Scenario: Fable 周用量上限 fallback
 
 ### 1. Scope / Trigger
 
-- Trigger：修改 `/v1/messages` 账号选择、sticky session、Fable 周配额识别、上游 429 分类、settings 热刷新或 Settings 页开关时适用。
-- 目标：当 sticky 账号的 Fable 模型级周配额明确耗尽时，只对当前 Fable 请求临时切到其他可用 OAuth 账号，避免会话持续命中满额账号；RPM 饱和仍保持旧 sticky 语义。
+- Trigger：修改 `/v1/messages` 账号选择、sticky session、Fable 周用量识别、上游 429 分类、settings 热刷新或 Settings 页 Fable 控件时适用。
+- 目标：当 OAuth 账号最近观测的 Fable 周用量达到管理员设置的全局上限时，不再向该账号分配新的 Fable 请求；低于上限的账号仍使用原 sticky、RPM 和综合评分，不做主动均衡。
 
 ### 2. Signatures
 
-- Setting key：`fable_sticky_quota_fallback_enabled`，默认常量 `DEFAULT_FABLE_STICKY_QUOTA_FALLBACK_ENABLED = "true"`。
-- Gateway 热缓存：`GatewayService::reload_fable_sticky_quota_fallback_enabled().await -> Result<(), AppError>`；启动时必须调用一次，管理端更新 setting 后也必须 reload。
-- 请求上下文：`AccountSelectionContext { fable_quota_fallback_enabled: bool, request_model: Option<String> }`。
+- Setting keys：`fable_sticky_quota_fallback_enabled=true`、`fable_weekly_usage_limit_percent=50`；百分比只允许 `1..=100` 的整数字符串。
+- 默认常量：`DEFAULT_FABLE_STICKY_QUOTA_FALLBACK_ENABLED`、`DEFAULT_FABLE_WEEKLY_USAGE_LIMIT_PERCENT`。
+- Gateway 热缓存：`reload_fable_sticky_quota_fallback_enabled()` 与 `reload_fable_weekly_usage_limit_percent()`；启动时必须各调用一次，管理端更新对应 setting 后必须 reload。
+- 请求上下文：`AccountSelectionContext { fable_quota_fallback_enabled: bool, fable_weekly_usage_limit_percent: u32, request_model: Option<String> }`。
 - 账号选择：`AccountService::select_account_with_selection_context(session_hash, exclude_ids, allowed_ids, context).await -> Result<SelectedAccount, AppError>`。
 - 429 分类：`AccountService::handle_rate_limit_with_context(account, retry_after_secs, body, usage, context).await -> Result<RateLimitDecision, AppError>`。
-- 账号可用性判断：`account_fable_quota_exhausted(account) -> bool`。
+- 账号可用性判断：`account_fable_weekly_usage_limit_reached(account, limit_percent) -> bool`。
 - 新决策分支：`RateLimitDecision::RetryOtherAccount` 表示当前账号仅对本请求模型不可用，调用方可排除该账号后重试其他账号。
 
 ### 3. Contracts
 
-- Gateway 只有在 `path == "/v1/messages"` 时才允许把 `fable_sticky_quota_fallback_enabled` 写入 `AccountSelectionContext`；`count_tokens`、bootstrap、usage poller、PrimePoller 不能因为该开关改变选号。
+- Gateway 只有在 `path == "/v1/messages"` 时才允许启用 Fable fallback；`count_tokens`、bootstrap、usage poller、PrimePoller 和其它入口必须保持 disabled 语义。
 - Fable 模型只匹配 `claude-fable-5` 或 `claude-fable-5[...]`。不要用包含匹配覆盖其他模型名。
-- Fable 配额耗尽必须同时满足：账号为 `AccountAuthType::Oauth`、`usage_data.seven_day_fable.utilization >= 100`、`resets_at` 是未来 RFC3339 时间。不要复用普通 usage 的 `USAGE_HIT_THRESHOLD = 97.0`。
+- Fable 周用量达到上限必须同时满足：账号为 `AccountAuthType::Oauth`、`usage_data.seven_day_fable.utilization >= context.fable_weekly_usage_limit_percent`、`resets_at` 是未来 RFC3339 时间。不要复用普通 usage 的 `USAGE_HIT_THRESHOLD = 97.0`。
+- `utilization` 缺失或不是数字、`resets_at` 缺失/非法/已过期时视为未达到上限，避免脏缓存误伤账号。
 - SetupToken 即使缓存里有脏的 `seven_day_fable`，也必须保持旧 sticky 行为。
-- sticky 账号 Fable 耗尽时，只把该账号加入本轮 `runtime_exclude_ids`，并刷新原 sticky TTL；不要删除旧 sticky。只有替代账号真实承载请求后，才通过已有 `should_bind_session` / `bind_selected_session` 覆盖 sticky。
-- 非 sticky Fable 请求应优先过滤明确耗尽的账号；若所有候选都明确耗尽，返回 `AppError::TooManyRequests`，不要落到普通 `ServiceUnavailable("no available accounts")`。
-- sticky 账号 RPM 饱和不属于 Fable 配额耗尽 fallback，仍走 `acquire_account_rpm` 的等待或本地 429，不能换号破坏 prompt cache。
+- sticky 账号达到上限时，只把该账号加入本轮 `runtime_exclude_ids`，并刷新原 sticky TTL；不要删除旧 sticky。只有替代账号真实承载请求后，才通过已有 `should_bind_session` / `bind_selected_session` 覆盖 sticky。
+- 非 sticky Fable 请求应先过滤达到上限的账号；若所有允许候选都达到上限，返回包含配置百分比的 `AppError::TooManyRequests`，不要落到普通 `ServiceUnavailable("no available accounts")` 或回退到已达上限账号。
+- 低于上限的候选继续使用现有 API Token allow/block、优先级、通用 7d/5h、并发和 RPM 逻辑；不得按 `seven_day_fable` 排序、加权或主动均衡。
+- 请求开始前低于上限即可执行；单次请求使实际用量轻微越线是允许的，只有 usage 被动/主动写回后的后续请求才按新观测值过滤，不预测单次请求成本。
+- sticky 账号 RPM 饱和不属于 Fable 周用量 fallback，仍走 `acquire_account_rpm` 的等待或本地 429，不能换号破坏 prompt cache。
 - Fable OAuth 429 且开关启用时，先识别通用 `seven_day` / `five_hour` 窗口并写账号级冷却；若通用窗口未命中，则返回 `RateLimitDecision::RetryOtherAccount`，不要写账号全局 `rate_limit_reset_at`。
-- Fable OAuth 429 如果本地 usage 未显示满额，Gateway 只能使用本次 429 的 `7d_oi` 响应头做被动采集和模型级换号，不得触发 usage API。
+- Fable 429 如需返回 Fable reset 信息，必须使用同一请求上下文阈值；本地 usage 未达到上限时，Gateway 只能使用本次 429 的 `7d_oi` 响应头做被动采集和模型级换号，不得触发 usage API。
 - 新增 `RateLimitDecision` 分支后，所有 `match RateLimitDecision` 的调用方必须显式处理 `RetryOtherAccount`，不能把它误当成 `Quarantined`。
+- 新 setting 必须同步默认常量、SQLite/PostgreSQL 共用的缺失键插入、管理 API GET/PUT 校验、Gateway 启动加载/保存后热刷新和 Settings 数字控件；非法存量值在 service reload 时回退默认 `50`，热路径不得 panic。
+- 设置为 `100` 可恢复此前明确 100% 才过滤的阈值语义；关闭 `fable_sticky_quota_fallback_enabled` 可完全停用本规则，且二者都应热生效。
 
 ### 4. Validation & Error Matrix
 
 | 条件 | 期望行为 |
 |------|----------|
-| 开关开启，sticky OAuth 账号 `seven_day_fable` 明确 100% 且 reset 在未来 | 本轮排除 sticky 账号，尝试选择替代账号 |
-| 开关关闭，同样的 sticky 账号满额 | 保持原 sticky 账号 |
-| Fable sticky 满额且没有替代账号 | 返回 `TooManyRequests`，旧 sticky 绑定保留 |
-| 非 sticky Fable 请求有满额和未满额候选 | 过滤满额账号，选择未满额账号 |
-| 所有候选 Fable 都明确满额 | 返回 `TooManyRequests` |
+| 开关开启、阈值 50，sticky OAuth usage 为 50% 且 reset 在未来 | 本轮排除 sticky 账号，尝试选择替代账号 |
+| 开关开启、阈值 50，sticky OAuth usage 为 49% | 保持原 sticky 账号 |
+| 开关关闭，同样的 sticky 账号 usage 为 100% | 保持原 sticky 账号 |
+| Fable sticky 达到上限且没有替代账号 | 返回 `TooManyRequests`，旧 sticky 绑定保留 |
+| 非 sticky 候选分别为 50% 和 49% | 过滤 50% 账号，49% 账号进入既有评分 |
+| 所有允许候选都达到上限 | 返回包含阈值的 `TooManyRequests` |
+| 阈值 100，usage 为 99% / 100% | 99% 允许，100% 过滤 |
 | 非 Fable 模型请求 | 忽略 `seven_day_fable`，保持普通 sticky / 调度行为 |
 | SetupToken 账号带 `seven_day_fable` 脏缓存 | 忽略该窗口，保持 sticky |
+| Fable 窗口缺失、非法或 reset 已过期 | 视为未达到上限 |
 | sticky 账号 RPM 饱和 | 不触发 Fable fallback，保持等待/本地 429 |
 | Fable OAuth 429 命中 `seven_day` 或 `five_hour` | 写账号级冷却并返回 `Quarantined` |
 | Fable OAuth 429 未命中通用窗口 | 返回 `RetryOtherAccount`，不写全局冷却 |
+| setting 为 `0`、`101`、小数或文本 | 管理 API 返回 `BadRequest`，旧配置不变 |
 
 ### 5. Good/Base/Bad Cases
 
-- Good：用户会话 sticky 到账号 A，A 的 `seven_day_fable` 为 100% 且 3 天后 reset；同 token 允许账号 B，Gateway 对本次 Fable 请求选择 B，真实上游成功后把 session 绑定到 B。
+- Good：阈值为 50，用户会话 sticky 到账号 A，A 的 `seven_day_fable` 为 50% 且 3 天后 reset；同 token 允许 49% 的账号 B，Gateway 对本次请求选择 B，真实上游成功后把 session 绑定到 B。
 - Good：A 的普通周限额 `seven_day` 也为 100%；Fable 429 必须隔离 A 到通用 reset 时间，而不是继续换号重试导致所有模型都反复撞墙。
-- Base：没有 `request_model`、模型不是 Fable、或开关关闭时，`AccountSelectionContext::disabled()` 兼容旧行为。
-- Bad：把 `seven_day_fable.utilization >= 97` 当成耗尽，会过早打破 sticky 并降低 prompt cache 命中率。
-- Bad：发现 sticky Fable 满额后直接 `delete_session`，没有替代账号时用户后续非 Fable 请求也会丢失原 sticky。
+- Base：没有 `request_model`、模型不是 Fable、开关关闭或 Fable 窗口无效时，`AccountSelectionContext::disabled()` / 窗口校验保持旧行为。
+- Bad：继续把固定 `100` 写死在账号 helper 中，会让管理员保存的百分比只在 UI 显示而不影响调度。
+- Bad：把通用 `USAGE_HIT_THRESHOLD = 97.0` 当成 Fable 上限，或根据预估消耗提前留缓冲，都会绕过管理员设置的明确控制线。
+- Bad：发现 sticky Fable 达到上限后直接 `delete_session`，没有替代账号时用户后续非 Fable 请求也会丢失原 sticky。
 
 ### 6. Tests Required
 
-- `tests/account_scheduler_test.rs` 覆盖：sticky Fable 满额选择替代账号、替代账号可重绑、无替代账号返回 429 且旧 sticky 保留、开关关闭保持原 sticky、非 Fable 请求不受影响、非 sticky Fable 过滤满额账号、SetupToken 忽略脏 Fable usage。
-- `src/service/account.rs` 单测覆盖：Fable OAuth 429 的 `RetryOtherAccount` 优先于 credit pass-through、cached Fable 未满仍可返回模型级重试、通用 `seven_day` / `five_hour` 仍走 `Quarantined`、SetupToken Fable credit 保持旧 `PassThrough`。
-- `src/store/db.rs` 单测覆盖：迁移会插入 `fable_sticky_quota_fallback_enabled` 默认值。
-- Settings 改动后必须运行 `cc2api/web` 的 `npm run build`，确保控件绑定和类型推断可构建。
+- `tests/account_scheduler_test.rs` 覆盖：49% 保持 sticky、50% 选择替代账号、替代账号可重绑、无替代账号返回 429 且旧 sticky 保留、非 sticky 过滤、所有候选达到上限、开关关闭、阈值 100、非 Fable 和 SetupToken。
+- `src/service/account.rs` 单测覆盖：配置阈值比较、未来/过期/缺失/非法窗口、SetupToken 忽略，以及 Fable OAuth 429 的 `RetryOtherAccount`、通用 `seven_day` / `five_hour` `Quarantined` 和 credit 行为。
+- `src/store/db.rs` / `src/handler/router.rs` / `src/service/gateway.rs` 覆盖：默认 key 为 `50`、非法值拒绝、合法保存后热刷新、非法存量值 reload 回退默认。
+- Settings 改动后必须运行 `cc2api/web` 的 `npm run build`，确保数字控件、校验和 `SettingsMap` 可构建。
 - 后端改动后至少运行 `cargo fmt --check`、`cargo test`；settings / handler / gateway 同时改动时再跑 `git diff --check`。
+- 静态搜索确认普通 Gateway 请求没有新增 `refresh_usage` 调用，且未在账号评分中引入 `seven_day_fable`。
 
 ### 7. Wrong vs Correct
 
 #### Wrong
 
 ```rust
-if usage_hit(account.usage_data, "seven_day_fable", USAGE_HIT_THRESHOLD) {
+if check_usage_window(&account.usage_data, "seven_day_fable", 100.0).is_some() {
     self.cache.delete_session(session_hash).await?;
     exclude_ids.push(account.id);
 }
@@ -421,7 +433,12 @@ match rate_limit_decision {
 #### Correct
 
 ```rust
-if context.is_fable_quota_fallback_active() && account_fable_quota_exhausted(&account) {
+if context.is_fable_quota_fallback_active()
+    && account_fable_weekly_usage_limit_reached(
+        &account,
+        context.fable_weekly_usage_limit_percent,
+    )
+{
     runtime_exclude_ids.push(account.id);
     let _ = self
         .cache

@@ -1,0 +1,4 @@
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"检查 Fable 模型范围、sticky 保留、候选过滤、RPM 与 429 行为是否保持契约。"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"检查新 setting 的默认值、迁移、校验、热刷新和 UI 是否完整同步。"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"执行 Rust 全量测试、settings/调度定向覆盖、错误体与热路径质量审查。"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"检查 Settings 页面控件、类型、鉴权 API 路径和前端构建。"}
