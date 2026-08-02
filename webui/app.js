@@ -768,6 +768,7 @@ function openTaskModal(topicNo) {
   form.account_id.innerHTML = state.accounts
     .map(a => `<option value="${a.id}">${escapeHTML(a.name)}</option>`).join('');
   form.prompt.value = '';
+  form.prompt_mode.value = 'natural';
   openModal('#task-modal');
 
   form.onsubmit = async (e) => {
@@ -777,6 +778,7 @@ function openTaskModal(topicNo) {
       topic_no: Number(fd.get('topic_no')),
       account_id: Number(fd.get('account_id')),
       prompt: fd.get('prompt') || null,
+      prompt_mode: fd.get('prompt_mode') || 'natural',
       timeout_sec: Number(fd.get('timeout_sec')),
       repeat_n: Number(fd.get('repeat_n')),
     };
@@ -873,6 +875,7 @@ async function renderTasks() {
       account_id: Number(fd.get('account_id')),
       topic_ids: topicIds,
       prompt: fd.get('prompt') || null,
+      prompt_mode: fd.get('prompt_mode') || 'natural',
       concurrency: Number(fd.get('concurrency')),
       interval_min_sec: Number(fd.get('interval_min_sec')),
       interval_max_sec: Number(fd.get('interval_max_sec')),
@@ -1267,6 +1270,7 @@ function bindCaptureForm() {
       topic_id: Number(fd.get('topic_id')),
       timeout_sec: Number(fd.get('timeout_sec')),
       prompt: fd.get('prompt') || null,
+      prompt_mode: fd.get('prompt_mode') || 'canonical',
       model_override: (fd.get('model_override') || '').trim() || null,
     };
     btn.disabled = true;

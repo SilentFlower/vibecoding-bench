@@ -11,9 +11,98 @@ import threading
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
+
+from pydantic import ValidationError
 
 import main
+
+
+class TopicPromptTests(unittest.TestCase):
+    """验证 topic prompt 模式、自然模板和覆盖优先级。"""
+
+    def setUp(self) -> None:
+        """
+        准备各测试复用的标准 topic。
+
+        :return: None
+        """
+        self.topic = {
+            "no": 1,
+            "title": "标准题目",
+            "description": "只使用题库描述",
+            "category": "测试",
+        }
+
+    def test_canonical_prompt_is_stable(self) -> None:
+        """
+        规范模式应保持固定结构，适合正式 benchmark 对比。
+
+        :return: None
+        """
+        expected = (
+            "题目：标准题目\n"
+            "分类：测试\n"
+            "描述：只使用题库描述\n\n"
+            "请在当前目录下实现一个可运行的 MVP。\n"
+            "完成后请说明启动方式、验证方式和主要取舍。"
+        )
+        self.assertEqual(expected, main.build_topic_prompt(self.topic, "canonical"))
+        self.assertEqual(expected, main.build_topic_prompt(self.topic, "canonical"))
+
+    def test_natural_templates_are_distinct_and_keep_contract(self) -> None:
+        """
+        自然模板应结构不同，但都保留 topic 内容和交付说明。
+
+        :return: None
+        """
+        prompts: list[str] = []
+        for template in main._NATURAL_TOPIC_PROMPT_TEMPLATES:
+            with patch.object(main.random, "choice", return_value=template):
+                prompts.append(main.build_topic_prompt(self.topic, "natural"))
+
+        self.assertGreaterEqual(len(prompts), 5)
+        self.assertEqual(len(prompts), len(set(prompts)))
+        for prompt in prompts:
+            self.assertIn("标准题目", prompt)
+            self.assertIn("只使用题库描述", prompt)
+            self.assertIn("测试", prompt)
+            self.assertIn("启动", prompt)
+            self.assertIn("验证", prompt)
+            self.assertIn("取舍", prompt)
+
+    def test_prompt_mode_defaults_and_validation(self) -> None:
+        """
+        三个请求 DTO 的默认模式应匹配各自运行场景，并拒绝非法值。
+
+        :return: None
+        """
+        self.assertEqual("natural", main.TaskIn(topic_no=1, account_id=1).prompt_mode)
+        self.assertEqual(
+            "natural",
+            main.BatchIn(account_id=1, topic_ids=[1]).prompt_mode,
+        )
+        self.assertEqual(
+            "canonical",
+            main.CaptureRunIn(account_id=1, topic_id=1).prompt_mode,
+        )
+        with self.assertRaises(ValidationError):
+            main.TaskIn(topic_no=1, account_id=1, prompt_mode="invalid")
+
+    def test_prompt_override_bypasses_mode_renderer(self) -> None:
+        """
+        自定义 prompt 必须原样优先，不能再进入自然模板处理。
+
+        :return: None
+        """
+        with patch.object(main, "build_topic_prompt") as builder:
+            prompt = main._resolve_topic_prompt(
+                self.topic,
+                "完全自定义的 prompt",
+                "natural",
+            )
+        self.assertEqual("完全自定义的 prompt", prompt)
+        builder.assert_not_called()
 
 
 class ScheduledWarmupTests(unittest.TestCase):
@@ -1543,15 +1632,12 @@ global.fetch = async (_url, options) => {
             ).fetchone()
         finally:
             conn.close()
-        expected_prompt = main.build_topic_prompt({
-            "no": 1,
-            "title": "标准题目",
-            "description": "只使用题库描述",
-            "category": "测试",
-        })
         self.assertEqual("warmup", run["run_kind"])
         self.assertEqual("queued", run["status"])
-        self.assertEqual(expected_prompt, task["prompt"])
+        submitted_task = run_scheduler.submit.call_args.args[2]
+        self.assertEqual(task["prompt"], submitted_task["prompt"])
+        self.assertIn("标准题目", task["prompt"])
+        self.assertIn("只使用题库描述", task["prompt"])
         self.assertNotIn("main", task["prompt"])
         run_scheduler.submit.assert_called_once()
 

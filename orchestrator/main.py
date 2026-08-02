@@ -28,7 +28,7 @@ import urllib.request
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 import docker
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -1780,22 +1780,90 @@ def save_runtime_claude_code_version_setting(value: Optional[str]) -> Optional[s
             conn.close()
 
 
-def build_topic_prompt(topic: dict) -> str:
+TopicPromptMode = Literal["natural", "canonical"]
+
+_NATURAL_TOPIC_PROMPT_TEMPLATES = (
+    (
+        "我想做一个「{title}」。这是一个{category}方向的项目，主要需求是：{description}\n\n"
+        "请直接在当前目录做出可运行的版本。完成后告诉我怎么启动、如何验证，"
+        "以及实现里有哪些主要取舍。"
+    ),
+    (
+        "请帮我在当前目录实现「{title}」的首个可用版本。\n\n"
+        "这是一个{category}方向的项目，我关心的能力是：{description}\n\n"
+        "先保证核心流程能够实际运行，最后简要说明启动方法、验证结果和关键取舍。"
+    ),
+    (
+        "现在需要做一个{title}，使用场景归在{category}。需求大致是：{description}\n\n"
+        "请把能运行的 MVP 直接落到当前目录，并附上启动方式、验证方式和主要取舍。"
+    ),
+    (
+        "有个小项目想请你直接实现：{title}。\n\n"
+        "目标：{description}\n"
+        "分类：{category}\n\n"
+        "以当前目录中的可运行 MVP 为交付，完成后说明如何启动、如何验证，"
+        "以及你做出的主要取舍。"
+    ),
+    (
+        "{description}\n\n"
+        "请围绕这个需求在当前目录完成一个可运行的「{title}」MVP（{category}）。"
+        "做完后给出启动步骤、验证方式和关键取舍。"
+    ),
+    (
+        "我需要一个能实际演示的「{title}」（{category}），核心诉求如下：\n"
+        "{description}\n\n"
+        "请在当前目录直接完成 MVP。最后告诉我启动方式、验证情况，"
+        "以及为控制范围做了哪些主要取舍。"
+    ),
+)
+
+
+def build_topic_prompt(
+    topic: dict,
+    mode: TopicPromptMode = "natural",
+) -> str:
     """
-    按 topic 生成默认 Claude prompt。
+    按 topic 和表达模式生成默认 Claude prompt。
 
     :param topic: topic 行字典
+    :param mode: `natural` 随机选择自然表达，`canonical` 使用稳定规范模板
     :return: 默认 prompt 文本
     """
     category = (topic.get("category") or "未分类").strip()
     description = (topic.get("description") or "").strip()
-    return (
-        f"题目：{topic['title']}\n"
-        f"分类：{category}\n"
-        f"描述：{description}\n\n"
-        "请在当前目录下实现一个可运行的 MVP。\n"
-        "完成后请说明启动方式、验证方式和主要取舍。"
+    title = str(topic["title"]).strip()
+    if mode == "canonical":
+        return (
+            f"题目：{title}\n"
+            f"分类：{category}\n"
+            f"描述：{description}\n\n"
+            "请在当前目录下实现一个可运行的 MVP。\n"
+            "完成后请说明启动方式、验证方式和主要取舍。"
+        )
+    if mode != "natural":
+        raise ValueError(f"不支持的 topic prompt 模式：{mode}")
+    template = random.choice(_NATURAL_TOPIC_PROMPT_TEMPLATES)
+    return template.format(
+        title=title,
+        category=category,
+        description=description,
     )
+
+
+def _resolve_topic_prompt(
+    topic: dict,
+    prompt_override: Optional[str],
+    mode: TopicPromptMode,
+) -> str:
+    """
+    解析任务最终使用的 prompt，自定义文本始终优先。
+
+    :param topic: topic 行字典
+    :param prompt_override: 用户提交的完整 prompt 覆盖
+    :param mode: 未覆盖时使用的默认 prompt 表达模式
+    :return: 应持久化并下发给 worker 的最终 prompt
+    """
+    return prompt_override or build_topic_prompt(topic, mode)
 
 
 def normalize_claude_model_override(value: Optional[str]) -> Optional[str]:
@@ -4361,13 +4429,14 @@ class WarmupScheduler:
             )
             return {"started": False, "run_id": None}
 
-        created = self._create_task_and_run(account, topic)
+        prompt = build_topic_prompt(topic, "natural")
+        created = self._create_task_and_run(account, topic, prompt)
         if not created:
             return {"started": False, "run_id": None}
         run_id, task_id = created
         task = {
             "id": task_id,
-            "prompt": build_topic_prompt(topic),
+            "prompt": prompt,
             "timeout_sec": 1800,
             "topic_id": topic["id"],
         }
@@ -4638,9 +4707,17 @@ class WarmupScheduler:
         self,
         account: dict,
         topic: dict,
+        prompt: str,
     ) -> Optional[tuple[str, int]]:
+        """
+        为养号创建 task 和 run，并保存已生成的 prompt。
+
+        :param account: 已认领的账号行
+        :param topic: 本次养号选择的 topic 行
+        :param prompt: 已生成且将实际下发给 worker 的 prompt
+        :return: `(run_id, task_id)`；账号状态失效或已有运行时返回 None
+        """
         run_id = uuid.uuid4().hex[:12]
-        prompt = build_topic_prompt(topic)
         with _db_lock:
             conn = get_db()
             try:
@@ -6124,19 +6201,43 @@ def delete_topic(topic_id: int):
 
 # ---------- tasks ----------
 class TaskIn(BaseModel):
+    """
+    创建单个 topic 任务的请求体。
+
+    :param topic_no: topic 编号
+    :param account_id: 执行账号 ID
+    :param prompt: 可选完整 prompt 覆盖
+    :param prompt_mode: 默认 prompt 的表达模式
+    :param timeout_sec: 单次运行超时秒数
+    :param repeat_n: 运行次数
+    """
+
     topic_no: int
     account_id: int
     prompt: Optional[str] = None
+    prompt_mode: TopicPromptMode = "natural"
     timeout_sec: int = 1800
     repeat_n: int = 1
 
 
 class BatchIn(BaseModel):
-    """按账号批量调度 topic 的请求体"""
+    """
+    按账号批量调度 topic 的请求体。
+
+    :param account_id: 执行账号 ID
+    :param topic_ids: 需要运行的 topic ID 列表
+    :param prompt: 可选批次统一 prompt 覆盖
+    :param prompt_mode: 默认 prompt 的表达模式
+    :param concurrency: 批次并发数
+    :param interval_min_sec: 相邻投放的最小间隔秒数
+    :param interval_max_sec: 相邻投放的最大间隔秒数
+    :param timeout_sec: 单项运行超时秒数
+    """
 
     account_id: int
     topic_ids: list[int]
     prompt: Optional[str] = None
+    prompt_mode: TopicPromptMode = "natural"
     concurrency: int = 2
     interval_min_sec: int = 0
     interval_max_sec: int = 0
@@ -6150,6 +6251,7 @@ class CaptureRunIn(BaseModel):
     :param account_id: 账号 ID
     :param topic_id: topic ID
     :param prompt: 可选 prompt 覆盖
+    :param prompt_mode: 默认 prompt 的表达模式
     :param timeout_sec: 本次 run 超时时间
     :param model_override: 本次抓包 run 的 Claude Code `--model` 覆盖
     """
@@ -6159,12 +6261,19 @@ class CaptureRunIn(BaseModel):
     account_id: int
     topic_id: int
     prompt: Optional[str] = None
+    prompt_mode: TopicPromptMode = "canonical"
     timeout_sec: int = 1800
     model_override: Optional[str] = None
 
 
 @app.post("/api/tasks")
 def create_task(body: TaskIn):
+    """
+    创建单个 topic 任务定义并返回任务 ID。
+
+    :param body: 单任务创建参数
+    :return: 包含新任务 ID 的响应字典
+    """
     conn = get_db()
     try:
         topic_row = conn.execute(
@@ -6176,7 +6285,7 @@ def create_task(body: TaskIn):
         topic = dict(topic_row)
     finally:
         conn.close()
-    prompt = body.prompt or build_topic_prompt(topic)
+    prompt = _resolve_topic_prompt(topic, body.prompt, body.prompt_mode)
     with _db_lock:
         conn = get_db()
         try:
@@ -6234,7 +6343,12 @@ def delete_task(tid: int):
 
 @app.post("/api/task-batches")
 def create_task_batch(body: BatchIn):
-    """创建账号维度 topic 批次，并启动后台随机间隔调度。"""
+    """
+    创建账号维度 topic 批次，并启动后台随机间隔调度。
+
+    :param body: 批次创建参数
+    :return: 包含新批次 ID 的响应字典
+    """
     if not scheduler:
         raise HTTPException(500, "scheduler not ready")
     topic_ids = [int(tid) for tid in body.topic_ids if int(tid) > 0]
@@ -6285,7 +6399,7 @@ def create_task_batch(body: BatchIn):
                 random.shuffle(topics)
                 for topic_row in topics:
                     topic = dict(topic_row)
-                    prompt = body.prompt or build_topic_prompt(topic)
+                    prompt = _resolve_topic_prompt(topic, body.prompt, body.prompt_mode)
                     conn.execute(
                         "INSERT INTO task_batch_items(batch_id, topic_id, prompt) VALUES(?,?,?)",
                         (batch_id, topic["id"], prompt),
@@ -6479,7 +6593,7 @@ def start_capture_run(body: CaptureRunIn):
     finally:
         conn.close()
 
-    prompt = body.prompt or build_topic_prompt(topic)
+    prompt = _resolve_topic_prompt(topic, body.prompt, body.prompt_mode)
     run_id = uuid.uuid4().hex[:12]
     with _db_lock:
         conn = get_db()

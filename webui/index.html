@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=20260802-prompt-mode" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -132,8 +132,15 @@
             <input name="interval_max_sec" type="number" min="0" value="0" />
           </label>
         </div>
+        <fieldset class="prompt-mode-field">
+          <legend class="lbl">$ prompt_mode</legend>
+          <div class="segmented-control">
+            <label><input type="radio" name="prompt_mode" value="natural" checked /><span>自然</span></label>
+            <label><input type="radio" name="prompt_mode" value="canonical" /><span>规范</span></label>
+          </div>
+        </fieldset>
         <label><span class="lbl">$ prompt_override</span>
-          <span class="hint inline">留空则每个 topic 使用精简默认 prompt</span>
+          <span class="hint inline">留空则每个 topic 使用所选模式生成 prompt</span>
           <textarea name="prompt" rows="4" placeholder="可选：给本批次所有 topic 使用同一段 prompt"></textarea>
         </label>
         <div class="batch-toolbar">
@@ -275,6 +282,13 @@
             <option value="claude-fable-5"></option>
           </datalist>
         </label>
+        <fieldset class="prompt-mode-field">
+          <legend class="lbl">$ prompt_mode</legend>
+          <div class="segmented-control">
+            <label><input type="radio" name="prompt_mode" value="natural" /><span>自然</span></label>
+            <label><input type="radio" name="prompt_mode" value="canonical" checked /><span>规范</span></label>
+          </div>
+        </fieldset>
         <label><span class="lbl">$ prompt 覆盖</span>
           <span class="hint inline">留空则使用该 topic 默认 prompt；抓包 run 会保存请求体和响应体全文。</span>
           <textarea name="prompt" rows="3" placeholder="可选：覆盖本次抓包运行的 prompt"></textarea>
@@ -496,8 +510,15 @@
         <label><span class="lbl">$ account</span>
           <select name="account_id" required></select>
         </label>
+        <fieldset class="prompt-mode-field">
+          <legend class="lbl">$ prompt_mode</legend>
+          <div class="segmented-control">
+            <label><input type="radio" name="prompt_mode" value="natural" checked /><span>自然</span></label>
+            <label><input type="radio" name="prompt_mode" value="canonical" /><span>规范</span></label>
+          </div>
+        </fieldset>
         <label><span class="lbl">$ prompt</span>
-          <span class="hint inline">留空则用题目标题 + 描述自动生成</span>
+          <span class="hint inline">留空则按所选模式自动生成</span>
           <textarea name="prompt" rows="6" placeholder="# 自由输入完整 prompt …"></textarea>
         </label>
         <div class="row">
@@ -576,6 +597,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20260611-model-override"></script>
+  <script src="app.js?v=20260802-prompt-mode"></script>
 </body>
 </html>
