@@ -60,14 +60,14 @@
     }
   },
   "progress": {
-    "updatedAt": "2026-08-02T00:57:55.222656Z",
+    "updatedAt": "2026-08-02T02:27:05Z",
     "completedSteps": [
-      "实现 natural/canonical Topic prompt 模式与三个 WebUI 选择控件",
-      "修正养号 prompt 单次生成并完成 40 个后端单元测试、浏览器检查和 Full Check-All",
-      "写入 Topic prompt 跨层 code-spec 并推送业务变更"
+      "升级 natural-v2 为分类风格与片段组合生成",
+      "接入 12 候选 × 64 历史 × 4-gram 低相似选择到单任务、批次、养号和 natural 抓包",
+      "完成 45 项后端回归、性能复测、Full Check-All、code-spec 同步并推送业务变更"
     ],
     "partialStep": null,
     "nextStep": "按需运行 trellis-finish-work 完成任务归档与会话收尾",
-    "notes": ""
+    "notes": "真实 helper 约 2.95ms/item，600 题约 1.77 秒。"
   }
 }

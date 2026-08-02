@@ -5,3 +5,6 @@
 {"file":".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md","reason":"分段控件需保持零构建、双主题、无圆角、可访问性和移动端不溢出。"}
 {"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"prompt_mode 跨越 WebUI、API、持久化、调度和 worker，需要逐层核对数据流。"}
 {"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"所有创建入口必须复用同一个 build_topic_prompt 生成器，避免模板逻辑分叉。"}
+{"file":".trellis/spec/vibecoding-bench/backend/database-guidelines.md","reason":"近期 prompt 指纹从 tasks 与 task_batch_items 做只读参数化查询，不新增 schema 或写锁。"}
+{"file":".trellis/spec/vibecoding-bench/backend/topic-prompt-contract.md","reason":"扩展自然模式时保持 canonical、自定义覆盖、单次生成持久化和 worker 原样下发契约。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/image-build-push.md","reason":"确认 worker 必须原样注入 TASK_PROMPT，不能在镜像层补充公共交付要求。"}

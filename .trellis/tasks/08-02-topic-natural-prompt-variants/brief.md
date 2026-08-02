@@ -1,43 +1,43 @@
-# Brief — Topic 自然提示词变体
+# Brief — Topic 自然提示词变体 natural-v2
 
 ## Goal
 
-- 降低默认 topic prompt 在批量运行中的固定语言特征，同时保持题目语义、任务可追溯性和正式 benchmark 的可比性。
+- 把自然模式从 6 个完整模板升级为低指纹的组合式生成，同时保持题目语义、交付强度、可追溯性和 canonical benchmark 可比性。
 
 ## Scope
 
-- 在后端提供 `natural` 与 `canonical` 两种 prompt 模式，并由单一 `build_topic_prompt()` 入口生成。
-- 普通单任务、批次和养号默认自然模式；抓包默认规范模式。
-- 单任务、批次和抓包 WebUI 增加“自然 / 规范”模式选择，并同步 `prompt_mode` API 字段。
-- 自然模式提供至少 5 个结构不同但语义等价的人工模板；规范模式保持当前固定文本。
-- 修正养号链路重复生成 prompt 的问题，确保数据库记录与 worker 实际下发完全一致。
-- 增加后端单元测试和前端语法、双主题及表单契约验证。
+- 用分类风格、需求表达、可运行交付、结果说明和布局片段组合自然 prompt，不新增用户可见模式。
+- 将 21 个现有题库分类归并为工程、产品、数据/AI、创意和通用回退风格，规则只改变语气。
+- 每个自然 prompt 随机抽取 12 个不同候选；每个候选都包含 title、category、description，并保留可运行、启动、验证和主要取舍四类语义。
+- 把 topic 专属字段替换为占位符，生成 4 字符 n-gram 指纹，与最多 64 条近期持久化 prompt 比较，选择最大相似度最低的候选。
+- 从现有 `tasks.prompt` 和 `task_batch_items.prompt` 只读加载近期样本；批次只查询一次，并用 `deque(maxlen=64)` 加入本批次已选指纹。
+- 单任务、批次、养号和显式 natural 抓包接入相似度过滤；canonical 和自定义 prompt 继续短路，不读取历史。
+- 更新后端单元测试，覆盖组合空间、分类映射、语义完整性、归一化、低相似选择、近期查询、批次窗口和既有回归契约。
 
 ## Non-Goals
 
-- 不重写 `topics.md` 中的 600 条题目正文。
-- 不接入外部模型实时改写 prompt。
-- 不修改 worker 的超时收尾、认证恢复或工具权限提示词。
-- 不新增数据库列，不为历史 task/run 回填变体元数据。
+- 不使用外部 LLM、embedding、向量数据库或逐题人工变体。
+- 不新增数据库列、迁移、变体 ID、模式元数据或历史回填。
+- 不修改 WebUI 字段与默认值、`topics.md`、worker 原样注入和调度 payload 结构。
+- 不把公共完成协议移到 worker，也不保证统计意义上的绝对不可识别。
 
 ## Key Context
 
-- 实际 prompt 已保存在 `tasks.prompt` 和 `task_batch_items.prompt`，无需新增 schema；创建后必须复用持久化文本。
-- 自定义 `prompt` 覆盖始终优先，不参与模式渲染。
-- 自然模板只能调整信息组织和措辞，不能增加技术栈、架构、依赖或超时策略要求。
-- `prompt_mode` 由 Pydantic 在 API 边界校验，前端字段名和默认值必须与三个请求 DTO 一致。
-- 养号当前先持久化一次、下发前又生成一次；随机模板会暴露该一致性缺陷。
-- 前端保持原生 HTML/CSS/JavaScript 零构建架构，分段控件遵循终端实验室双主题、无圆角和稳定尺寸约束。
+- `images/worker/entrypoint.sh` 会原样注入 `TASK_PROMPT`，部署规范禁止 worker 追加 bench 完成协议，因此自然候选必须自行保留完整交付语义。
+- 最终 prompt 仍只生成一次并持久化；`tasks.prompt` / `task_batch_items.prompt` 是调度、恢复和查看的唯一事实来源。
+- 相似度查询是无 `_db_lock` 的参数化只读 SQL；自定义覆盖和 canonical 不承担该开销。
+- 性能预算固定为 12 候选 × 64 历史 × 4-gram；真实 helper 本地复测约 2.95ms/item，100 item 约 0.30 秒，600 item 约 1.77 秒。
+- 查询为空、候选平分或历史包含自定义/canonical prompt 都不能阻塞任务创建。
 
 ## Acceptance
 
-- 至少 5 种自然模板可被选择，结构明显不同且保留现有交付语义。
-- 规范模式对同一输入稳定，正式 benchmark 可显式选择。
-- 单任务、批次、养号和抓包使用约定默认模式，自定义 prompt 行为不变。
-- 养号持久化 prompt 与 `scheduler.submit()` 下发 prompt 完全一致。
-- 三个 WebUI 表单均能提交正确的 `prompt_mode`，默认值与后端一致。
-- Python 编译、后端单元测试和 JavaScript 语法检查通过，浏览器双主题和窄屏检查无异常。
+- 自然模式不再暴露少量固定整段模板或唯一收尾句，且所有候选语义完整、表达自然。
+- 21 个现有分类全部映射到已定义风格或通用回退，未知分类也能生成。
+- topic 专属文本被正确归一化，高相似历史存在时选择器优先返回低相似候选。
+- 批次只读取一次历史，比较窗口始终不超过 64，并包含本批次近期已选 prompt。
+- canonical 文本逐字不变，自定义覆盖、DTO/WebUI 默认值和养号存储/下发一致性无回归。
+- 无 schema、worker、题库同步或外部依赖变更；Python 编译、后端单测、JS 语法和 Full Check-All 通过。
 
 ## Next Step
 
-- 完成 Check-All 修复重检；严格通过后等待用户回复 `继续`，再进入 `trellis-update-spec`。
+- Full Check-All 通过后进入 `trellis-update-spec`，同步 topic prompt 的 natural-v2 可执行契约。

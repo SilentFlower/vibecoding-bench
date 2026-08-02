@@ -2,32 +2,37 @@
 
 ## Implementation Checklist
 
-- [x] 在 `orchestrator/main.py` 定义 prompt 模式类型与自然模板集合，扩展 `build_topic_prompt()` 支持 `natural` / `canonical`。
-- [x] 为 `TaskIn`、`BatchIn`、`CaptureRunIn` 增加 `prompt_mode`，同步各创建路由的默认生成逻辑。
-- [x] 修正养号链路为单次生成 prompt，并确保数据库持久化文本与 `scheduler.submit()` 下发文本相同。
-- [x] 在 `webui/index.html` 的单任务、批次、抓包表单增加自然/规范分段控件。
-- [x] 在 `webui/app.js` 同步提交 `prompt_mode` 字段，并在重复打开单任务弹窗时恢复自然默认值。
-- [x] 在 `webui/style.css` 增加遵循双主题、无圆角和稳定尺寸约束的分段控件样式。
-- [x] 在 `orchestrator/test_main.py` 增加规范模式稳定性、自然模板差异、DTO 默认值/非法值和养号持久化一致性回归测试。
-- [x] 搜索全部 `build_topic_prompt()` 调用点，确认每条链路显式或按约定使用正确模式。
+- [x] 在 `orchestrator/main.py` 用分类风格、需求片段、交付片段、结果片段和布局片段替换完整自然模板集合。
+- [x] 增加分类风格解析、12 候选组合、topic 字段归一化、4 字符 n-gram 相似度和低相似候选选择 helper。
+- [x] 增加只读近期 prompt 指纹查询，覆盖非批次 tasks 与 task batch items，不修改 schema。
+- [x] 扩展 `build_topic_prompt()` / `_resolve_topic_prompt()` 的可选近期指纹参数，保持 canonical 和自定义覆盖短路。
+- [x] 单任务、批次、养号和显式 natural 抓包接入最多 64 条近期指纹；批次只查询一次，并用固定长度 deque 逐项追加已选指纹。
+- [x] 更新 `orchestrator/test_main.py`，覆盖组合空间、四类交付语义、21 分类映射、归一化、低相似选择、近期查询和批次内去同构。
+- [x] 保留并回归 DTO 默认值、非法模式、canonical 稳定、自定义覆盖和养号存储/下发一致性测试。
+- [x] 搜索全部 `build_topic_prompt()`、`_resolve_topic_prompt()` 和 prompt 持久化调用点，确认无遗漏和重复生成。
 
 ## Validation
 
 - `python3 -m py_compile orchestrator/main.py orchestrator/test_main.py`
 - `cd orchestrator && python3 -m unittest test_main.py`
 - `node --check webui/app.js`
-- 搜索 `prompt_mode`，核对三个 DTO、三个 WebUI 表单及对应请求体字段一致。
-- 搜索 `build_topic_prompt(`，核对单任务、批次、养号、抓包没有重复生成或遗漏模式。
-- 浏览器检查单任务/批次默认“自然”、抓包默认“规范”，暗色和亮色主题下控件无溢出。
+- `git diff --check`
+- 遍历 `load_seed_topics()` 的分类集合，确认全部映射到已定义风格。
+- 构造高相似/低相似候选，确认选择器稳定选择较低风险候选。
+- 构造批次多 topic，确认后续 item 的比较样本包含本批次已生成 prompt。
+- 对真实 helper 做聚焦微基准，确认 `12 × 64` 比较保持毫秒级且批次窗口不会超过 64。
+- 核对 canonical 输出与第一阶段文本逐字一致。
+- 进入 Full Check-All，反向检查 WebUI -> DTO -> 生成器 -> SQLite -> Scheduler -> worker 数据流。
 
 ## Risk And Rollback Points
 
-- 自然模板随机选择会让未持久化的重复调用结果不同，因此所有创建链路必须生成一次后复用。
-- 自定义 prompt 必须保持最高优先级，不能被 mode 包装或改写。
-- 不修改数据库 schema；若实现过程中发现需要新增列，应回到规划阶段重新评审，而不是直接扩展范围。
-- 前端是零构建原生 JS，字段名必须与 Pydantic DTO 完全一致。
+- 片段组合可能产生语法不顺或信息重复；测试必须抽样多个组合并检查精确语义标记，人工复核代表性分类输出。
+- 相似度归一化顺序错误会残留 topic 正文，必须按字段长度降序替换并单测标题包含于描述的情况。
+- 批次若每项重复查询历史或无限追加比较样本会放大开销；必须创建前读取一次，并使用 `deque(maxlen=64)` 滚动更新。
+- 相似度只是择优，不得因查询为空或候选分数相同阻塞任务创建。
+- 不修改 schema；若实现需要持久化组合 ID 或模式，应回到规划重新评审。
 
 ## Review Gates
 
-- 实现前确认 `brief.md` 与三件套一致并完成 planning review。
+- 实现前刷新 `brief.md` 并完成第二阶段 planning review。
 - 实现后先跑聚焦测试，再进入 Trellis Check-All。
