@@ -10,6 +10,7 @@ import tempfile
 import threading
 import time
 import unittest
+from collections import deque
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -19,7 +20,7 @@ import main
 
 
 class TopicPromptTests(unittest.TestCase):
-    """验证 topic prompt 模式、自然模板和覆盖优先级。"""
+    """验证 topic prompt 模式、自然组合、相似度窗口和覆盖优先级。"""
 
     def setUp(self) -> None:
         """
@@ -50,26 +51,230 @@ class TopicPromptTests(unittest.TestCase):
         self.assertEqual(expected, main.build_topic_prompt(self.topic, "canonical"))
         self.assertEqual(expected, main.build_topic_prompt(self.topic, "canonical"))
 
-    def test_natural_templates_are_distinct_and_keep_contract(self) -> None:
+    def test_natural_candidates_are_distinct_and_keep_contract(self) -> None:
         """
-        自然模板应结构不同，但都保留 topic 内容和交付说明。
+        自然候选应结构不同，但都保留 topic 内容和四类交付语义。
 
         :return: None
         """
-        prompts: list[str] = []
-        for template in main._NATURAL_TOPIC_PROMPT_TEMPLATES:
-            with patch.object(main.random, "choice", return_value=template):
-                prompts.append(main.build_topic_prompt(self.topic, "natural"))
+        prompts = main._build_natural_topic_prompt_candidates(self.topic)
 
-        self.assertGreaterEqual(len(prompts), 5)
+        self.assertEqual(main._NATURAL_TOPIC_PROMPT_CANDIDATE_COUNT, len(prompts))
         self.assertEqual(len(prompts), len(set(prompts)))
         for prompt in prompts:
             self.assertIn("标准题目", prompt)
             self.assertIn("只使用题库描述", prompt)
             self.assertIn("测试", prompt)
-            self.assertIn("启动", prompt)
-            self.assertIn("验证", prompt)
-            self.assertIn("取舍", prompt)
+            self.assertTrue(any(
+                marker in prompt
+                for marker in ("当前工作区", "现有目录", "这个工作区", "当前项目", "手头目录")
+            ))
+            self.assertTrue(any(
+                marker in prompt
+                for marker in ("启动命令", "怎么运行", "运行步骤", "使用命令", "跑起来")
+            ))
+            self.assertTrue(any(
+                marker in prompt
+                for marker in ("实际验证", "自测", "检查结果", "测试情况", "实际检查")
+            ))
+            self.assertTrue(any(
+                marker in prompt
+                for marker in ("取舍", "留到后续", "权衡", "舍弃", "范围是怎样控制")
+            ))
+
+    def test_all_seed_categories_map_to_defined_styles(self) -> None:
+        """
+        题库全部 21 个分类都应命中已定义风格，而不是落入兜底。
+
+        :return: None
+        """
+        topics_path = Path(__file__).resolve().parents[1] / "topics.md"
+        with patch.object(main, "TOPICS_FILE", topics_path):
+            categories = {topic["category"] for topic in main.load_seed_topics()}
+
+        self.assertEqual(21, len(categories))
+        self.assertNotIn("generic", {
+            main._topic_prompt_style(category)
+            for category in categories
+        })
+        self.assertEqual("engineering", main._topic_prompt_style("命令行工具"))
+        self.assertEqual("product", main._topic_prompt_style("个人效率 Web 应用"))
+        self.assertEqual("data_ai", main._topic_prompt_style("AI 集成应用"))
+        self.assertEqual("creative", main._topic_prompt_style("小游戏"))
+
+    def test_topic_content_is_removed_before_fingerprint_comparison(self) -> None:
+        """
+        不同 topic 套用相同包装时应得到同一个公共措辞指纹。
+
+        :return: None
+        """
+        left_topic = {
+            "title": "标准题目",
+            "description": "标准题目需要处理甲数据",
+            "category": "命令行工具",
+        }
+        right_topic = {
+            "title": "替代题目",
+            "description": "替代题目需要处理乙数据",
+            "category": "小游戏",
+        }
+        left_prompt = "想做标准题目，分类命令行工具。需求：标准题目需要处理甲数据。完成后说明验证。"
+        right_prompt = "想做替代题目，分类小游戏。需求：替代题目需要处理乙数据。完成后说明验证。"
+
+        self.assertEqual(
+            main._topic_prompt_fingerprint(left_prompt, left_topic),
+            main._topic_prompt_fingerprint(right_prompt, right_topic),
+        )
+
+    def test_natural_mode_selects_candidate_with_lower_recent_similarity(self) -> None:
+        """
+        自然模式应避开与近期公共包装完全相同的候选。
+
+        :return: None
+        """
+        close_prompt = (
+            "想做标准题目，分类测试。需求：只使用题库描述。"
+            "请在当前工作区完成，最后说明启动、验证和取舍。"
+        )
+        distant_prompt = (
+            "标准题目这件事先按测试场景落地。只使用题库描述。"
+            "代码放进现有目录并跑通，收尾列出用法、自测结果和范围权衡。"
+        )
+        recent = deque([
+            main._topic_prompt_fingerprint(close_prompt, self.topic),
+        ], maxlen=64)
+        with patch.object(
+            main,
+            "_build_natural_topic_prompt_candidates",
+            return_value=[close_prompt, distant_prompt],
+        ):
+            selected = main.build_topic_prompt(self.topic, "natural", recent)
+
+        self.assertEqual(distant_prompt, selected)
+
+    def test_recent_prompt_history_reads_both_sources_and_caps_window(self) -> None:
+        """
+        近期窗口应读取普通任务和批次项，并只保留最新 64 条。
+
+        :return: None
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "db.sqlite"
+            topics_path = Path(tmp) / "missing-topics.md"
+            with (
+                patch.object(main, "DB_PATH", db_path),
+                patch.object(main, "TOPICS_FILE", topics_path),
+            ):
+                main.init_db()
+                conn = main.get_db()
+                try:
+                    with conn:
+                        conn.execute(
+                            "INSERT INTO accounts(name, profile_path) VALUES('main','profiles/main')"
+                        )
+                        topic_id = int(conn.execute(
+                            "INSERT INTO topics(no, title, description, category) "
+                            "VALUES(1,'标准题目','只使用题库描述','测试')"
+                        ).lastrowid)
+                        for index in range(65):
+                            conn.execute(
+                                "INSERT INTO tasks(topic_no, title, prompt, account_id, topic_id, created_at) "
+                                "VALUES(1,'标准题目',?,1,?,?)",
+                                (f"普通历史 {index}", topic_id, 1000 + index),
+                            )
+                        batch_id = int(conn.execute(
+                            "INSERT INTO task_batches(account_id, name, created_at) "
+                            "VALUES(1,'test batch',2000)"
+                        ).lastrowid)
+                        conn.execute(
+                            "INSERT INTO task_batch_items(batch_id, topic_id, prompt, created_at) "
+                            "VALUES(?,?,?,?)",
+                            (batch_id, topic_id, "最新批次历史", 2001),
+                        )
+                    fingerprints = main._load_recent_topic_prompt_fingerprints(conn)
+                finally:
+                    conn.close()
+
+        self.assertEqual(64, len(fingerprints))
+        self.assertEqual(64, fingerprints.maxlen)
+        self.assertEqual(
+            main._topic_prompt_fingerprint("最新批次历史", self.topic),
+            fingerprints[-1],
+        )
+
+    def test_batch_loads_history_once_and_extends_it_per_item(self) -> None:
+        """
+        批量自然模式应只查一次历史，并让后续项比较本批次已选 prompt。
+
+        :return: None
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "db.sqlite"
+            topics_path = Path(tmp) / "missing-topics.md"
+            scheduler = Mock()
+            with (
+                patch.object(main, "DB_PATH", db_path),
+                patch.object(main, "TOPICS_FILE", topics_path),
+                patch.object(main, "scheduler", scheduler),
+            ):
+                main.init_db()
+                conn = main.get_db()
+                try:
+                    with conn:
+                        conn.execute(
+                            "INSERT INTO accounts(name, profile_path) VALUES('main','profiles/main')"
+                        )
+                        topic_ids = [int(conn.execute(
+                            "INSERT INTO topics(no, title, description, category) VALUES(?,?,?,?)",
+                            (index, f"题目 {index}", f"描述 {index}", "测试"),
+                        ).lastrowid) for index in range(1, 4)]
+                finally:
+                    conn.close()
+                history_sizes: list[int] = []
+
+                def resolve_prompt(
+                    topic: dict,
+                    prompt_override: str | None,
+                    mode: main.TopicPromptMode,
+                    recent_fingerprints: deque[frozenset[str]] | None,
+                ) -> str:
+                    """
+                    记录每个批次项生成时可见的历史窗口长度。
+
+                    :param topic: 当前 topic
+                    :param prompt_override: 自定义 prompt 覆盖
+                    :param mode: 默认 prompt 模式
+                    :param recent_fingerprints: 当前历史指纹窗口
+                    :return: 可持久化的测试 prompt
+                    """
+                    history_sizes.append(len(recent_fingerprints or ()))
+                    return f"批次 prompt {topic['id']}"
+
+                with (
+                    patch.object(
+                        main,
+                        "_load_recent_topic_prompt_fingerprints",
+                        return_value=deque(maxlen=64),
+                    ) as loader,
+                    patch.object(main, "_resolve_topic_prompt", side_effect=resolve_prompt),
+                ):
+                    result = main.create_task_batch(main.BatchIn(
+                        account_id=1,
+                        topic_ids=topic_ids,
+                    ))
+                conn = main.get_db()
+                try:
+                    item_count = conn.execute(
+                        "SELECT COUNT(*) AS n FROM task_batch_items WHERE batch_id=?",
+                        (result["id"],),
+                    ).fetchone()["n"]
+                finally:
+                    conn.close()
+
+        loader.assert_called_once()
+        self.assertEqual([0, 1, 2], history_sizes)
+        self.assertEqual(3, item_count)
+        scheduler.submit_batch.assert_called_once_with(result["id"])
 
     def test_prompt_mode_defaults_and_validation(self) -> None:
         """
@@ -103,6 +308,12 @@ class TopicPromptTests(unittest.TestCase):
             )
         self.assertEqual("完全自定义的 prompt", prompt)
         builder.assert_not_called()
+        self.assertFalse(main._should_load_topic_prompt_history(
+            "完全自定义的 prompt",
+            "natural",
+        ))
+        self.assertFalse(main._should_load_topic_prompt_history(None, "canonical"))
+        self.assertTrue(main._should_load_topic_prompt_history(None, "natural"))
 
 
 class ScheduledWarmupTests(unittest.TestCase):

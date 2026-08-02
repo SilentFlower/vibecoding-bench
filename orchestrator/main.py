@@ -26,9 +26,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal, Optional, Sequence
 
 import docker
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -1782,56 +1783,312 @@ def save_runtime_claude_code_version_setting(value: Optional[str]) -> Optional[s
 
 TopicPromptMode = Literal["natural", "canonical"]
 
-_NATURAL_TOPIC_PROMPT_TEMPLATES = (
+_NATURAL_TOPIC_PROMPT_CANDIDATE_COUNT = 12
+_NATURAL_TOPIC_PROMPT_HISTORY_LIMIT = 64
+_NATURAL_TOPIC_PROMPT_NGRAM_SIZE = 4
+
+_NATURAL_TOPIC_PROMPT_STYLE_KEYWORDS = (
+    ("data_ai", ("AI 集成", "AI Agent", "数据可视化", "数据运营", "Dashboard")),
+    ("creative", ("小游戏", "内容创作", "教育", "创意")),
     (
-        "我想做一个「{title}」。这是一个{category}方向的项目，主要需求是：{description}\n\n"
-        "请直接在当前目录做出可运行的版本。完成后告诉我怎么启动、如何验证，"
-        "以及实现里有哪些主要取舍。"
+        "engineering",
+        ("命令行", "自动化与脚本", "开发者工具", "硬件", "边缘", "安全", "运维"),
     ),
     (
-        "请帮我在当前目录实现「{title}」的首个可用版本。\n\n"
-        "这是一个{category}方向的项目，我关心的能力是：{description}\n\n"
-        "先保证核心流程能够实际运行，最后简要说明启动方法、验证结果和关键取舍。"
-    ),
-    (
-        "现在需要做一个{title}，使用场景归在{category}。需求大致是：{description}\n\n"
-        "请把能运行的 MVP 直接落到当前目录，并附上启动方式、验证方式和主要取舍。"
-    ),
-    (
-        "有个小项目想请你直接实现：{title}。\n\n"
-        "目标：{description}\n"
-        "分类：{category}\n\n"
-        "以当前目录中的可运行 MVP 为交付，完成后说明如何启动、如何验证，"
-        "以及你做出的主要取舍。"
-    ),
-    (
-        "{description}\n\n"
-        "请围绕这个需求在当前目录完成一个可运行的「{title}」MVP（{category}）。"
-        "做完后给出启动步骤、验证方式和关键取舍。"
-    ),
-    (
-        "我需要一个能实际演示的「{title}」（{category}），核心诉求如下：\n"
-        "{description}\n\n"
-        "请在当前目录直接完成 MVP。最后告诉我启动方式、验证情况，"
-        "以及为控制范围做了哪些主要取舍。"
+        "product",
+        ("Web", "浏览器插件", "协作", "商业", "行业", "团队知识", "社区运营"),
     ),
 )
+
+_NATURAL_TOPIC_PROMPT_STYLE_OPENERS = {
+    "engineering": (
+        "想做个「{title}」，属于{category}这类工具。",
+        "这次要实现的是「{title}」，方向归在{category}。",
+        "手头需要一个{category}项目：「{title}」。",
+        "先做一个能用的「{title}」，场景是{category}。",
+    ),
+    "product": (
+        "想把一个{category}方向的想法做成「{title}」。",
+        "这次准备落地「{title}」，它属于{category}场景。",
+        "有个产品需求叫「{title}」，主要面向{category}。",
+        "先做「{title}」的首版，定位是{category}。",
+    ),
+    "data_ai": (
+        "需要做一个「{title}」，用于{category}方向的数据或智能处理。",
+        "这次的数据或智能项目是「{title}」，归在{category}。",
+        "想把「{title}」这个{category}需求先跑通。",
+        "准备实现一个{category}项目，名字是「{title}」。",
+    ),
+    "creative": (
+        "想做一个可以实际体验的「{title}」，属于{category}。",
+        "这次先把「{title}」这个{category}创意做出来。",
+        "有个{category}方向的小项目：「{title}」。",
+        "准备实现「{title}」，先做成能演示的{category}作品。",
+    ),
+    "generic": (
+        "我想实现「{title}」，项目分类是{category}。",
+        "这次要做的项目叫「{title}」，属于{category}。",
+        "有个需求想直接落地：「{title}」（{category}）。",
+        "先完成一个「{title}」，场景归在{category}。",
+    ),
+}
+
+_NATURAL_TOPIC_PROMPT_REQUIREMENTS = (
+    "主要要解决的是：{description}",
+    "核心需求大致是：{description}",
+    "希望它能覆盖这些事情：{description}",
+    "具体想实现的能力包括：{description}",
+    "需求可以概括为：{description}",
+)
+
+_NATURAL_TOPIC_PROMPT_DELIVERIES = (
+    "请先在当前工作区把核心流程真正跑通，交付一个可以实际运行的首版。",
+    "代码直接落在现有目录，先做到主要流程可以实际使用。",
+    "先把能启动演示的版本完成在这个工作区里。",
+    "以当前项目中能够跑起来的首版为交付。",
+    "请在手头目录完成可运行版本，优先保证核心流程闭环。",
+)
+
+_NATURAL_TOPIC_PROMPT_REPORTS = (
+    "完成后附上启动命令、实际验证过的场景，以及控制范围时做出的取舍。",
+    "最后写清怎么运行、哪些输入输出已经自测，还有哪些能力被有意留到后续。",
+    "交付时说明运行步骤、检查结果和实现中的关键权衡。",
+    "收尾时给出使用命令、测试情况，并解释首版舍弃了什么。",
+    "做完后告诉我如何把它跑起来、实际检查了哪些路径，以及范围是怎样控制的。",
+)
+
+_NATURAL_TOPIC_PROMPT_LAYOUTS = (
+    "{opening}\n\n{requirement}\n\n{delivery} {report}",
+    "{requirement}\n\n{opening}\n\n{delivery}\n{report}",
+    "{opening} {requirement}\n\n{delivery}\n\n{report}",
+    "{opening}\n{requirement}\n\n{delivery}\n\n{report}",
+    "{opening}\n\n{requirement} {delivery}\n\n{report}",
+)
+
+
+def _topic_prompt_values(topic: dict) -> tuple[str, str, str]:
+    """
+    读取生成 prompt 使用的标准 topic 字段。
+
+    :param topic: topic 行字典
+    :return: `(title, category, description)`
+    """
+    title = str(topic["title"]).strip()
+    category = str(topic.get("category") or "未分类").strip()
+    description = str(topic.get("description") or "").strip()
+    return title, category, description
+
+
+def _topic_prompt_style(category: str) -> str:
+    """
+    把题库分类映射到自然 prompt 的表达风格。
+
+    :param category: topic 分类
+    :return: 已定义的风格名称；未命中时返回 `generic`
+    """
+    for style, keywords in _NATURAL_TOPIC_PROMPT_STYLE_KEYWORDS:
+        if any(keyword.casefold() in category.casefold() for keyword in keywords):
+            return style
+    return "generic"
+
+
+def _build_natural_topic_prompt_candidates(topic: dict) -> list[str]:
+    """
+    从独立片段组合出一组语义等价的自然 prompt 候选。
+
+    :param topic: topic 行字典
+    :return: 不重复的自然 prompt 候选列表
+    """
+    title, category, description = _topic_prompt_values(topic)
+    openers = _NATURAL_TOPIC_PROMPT_STYLE_OPENERS[_topic_prompt_style(category)]
+    fragment_groups = (
+        openers,
+        _NATURAL_TOPIC_PROMPT_REQUIREMENTS,
+        _NATURAL_TOPIC_PROMPT_DELIVERIES,
+        _NATURAL_TOPIC_PROMPT_REPORTS,
+        _NATURAL_TOPIC_PROMPT_LAYOUTS,
+    )
+    signature_count = 1
+    for group in fragment_groups:
+        signature_count *= len(group)
+    selected_indexes = random.sample(
+        range(signature_count),
+        k=min(_NATURAL_TOPIC_PROMPT_CANDIDATE_COUNT, signature_count),
+    )
+    candidates: list[str] = []
+    for selected_index in selected_indexes:
+        offsets: list[int] = []
+        # 直接解码组合索引，避免每个 topic 都先构造完整的笛卡尔积。
+        for group in reversed(fragment_groups):
+            selected_index, offset = divmod(selected_index, len(group))
+            offsets.append(offset)
+        opening, requirement, delivery, report, layout = (
+            group[offset]
+            for group, offset in zip(fragment_groups, reversed(offsets))
+        )
+        candidates.append(layout.format(
+            opening=opening.format(title=title, category=category),
+            requirement=requirement.format(description=description),
+            delivery=delivery,
+            report=report,
+        ))
+    return list(dict.fromkeys(candidates))
+
+
+def _normalize_topic_prompt_fingerprint(prompt: str, topic: dict) -> str:
+    """
+    弱化 topic 专属文本，保留公共包装措辞用于相似度比较。
+
+    :param prompt: 已生成或已持久化的 prompt
+    :param topic: prompt 对应的 topic 行字典
+    :return: 去除空白和标点后的归一化文本
+    """
+    title, category, description = _topic_prompt_values(topic)
+    normalized = str(prompt)
+    # 长字段先替换，避免标题同时出现在描述中时留下正文碎片。
+    topic_values = sorted(
+        {value for value in (description, title, category) if value},
+        key=len,
+        reverse=True,
+    )
+    for value in topic_values:
+        normalized = normalized.replace(value, "topic内容")
+    return re.sub(r"[\W_]+", "", normalized.casefold())
+
+
+def _topic_prompt_ngrams(text: str) -> frozenset[str]:
+    """
+    生成固定长度字符 n-gram 集合。
+
+    :param text: 已归一化的 prompt 文本
+    :return: 用于 Jaccard 比较的 n-gram 集合
+    """
+    if not text:
+        return frozenset()
+    if len(text) <= _NATURAL_TOPIC_PROMPT_NGRAM_SIZE:
+        return frozenset({text})
+    return frozenset(
+        text[index:index + _NATURAL_TOPIC_PROMPT_NGRAM_SIZE]
+        for index in range(len(text) - _NATURAL_TOPIC_PROMPT_NGRAM_SIZE + 1)
+    )
+
+
+def _topic_prompt_fingerprint(prompt: str, topic: dict) -> frozenset[str]:
+    """
+    生成已弱化 topic 正文的 prompt 指纹。
+
+    :param prompt: prompt 文本
+    :param topic: prompt 对应的 topic 行字典
+    :return: 归一化后的 n-gram 集合
+    """
+    return _topic_prompt_ngrams(_normalize_topic_prompt_fingerprint(prompt, topic))
+
+
+def _topic_prompt_similarity(
+    left: frozenset[str],
+    right: frozenset[str],
+) -> float:
+    """
+    计算两个 prompt 指纹的 Jaccard 相似度。
+
+    :param left: 左侧 prompt 指纹
+    :param right: 右侧 prompt 指纹
+    :return: 0 到 1 的相似度
+    """
+    if not left or not right:
+        return 0.0
+    if len(left) > len(right):
+        left, right = right, left
+    # 只遍历较小集合计数交集，避免每次比较都分配临时交集和并集。
+    overlap = sum(1 for gram in left if gram in right)
+    return overlap / (len(left) + len(right) - overlap)
+
+
+def _select_low_similarity_topic_prompt(
+    topic: dict,
+    candidates: Sequence[str],
+    recent_fingerprints: Sequence[frozenset[str]],
+) -> str:
+    """
+    从候选中选择与近期公共措辞最不相似的一条。
+
+    :param topic: 当前 topic 行字典
+    :param candidates: 自然 prompt 候选
+    :param recent_fingerprints: 近期持久化 prompt 的指纹
+    :return: 最大历史相似度最低的候选；平分时随机选择
+    """
+    if not candidates:
+        raise ValueError("自然 prompt 候选不能为空")
+    if not recent_fingerprints:
+        return random.choice(list(candidates))
+    scored: list[tuple[float, str]] = []
+    for candidate in candidates:
+        fingerprint = _topic_prompt_fingerprint(candidate, topic)
+        max_similarity = max(
+            _topic_prompt_similarity(fingerprint, recent)
+            for recent in recent_fingerprints
+        )
+        scored.append((max_similarity, candidate))
+    best_score = min(score for score, _ in scored)
+    return random.choice([
+        candidate
+        for score, candidate in scored
+        if score == best_score
+    ])
+
+
+def _load_recent_topic_prompt_fingerprints(
+    conn: sqlite3.Connection,
+    limit: int = _NATURAL_TOPIC_PROMPT_HISTORY_LIMIT,
+) -> deque[frozenset[str]]:
+    """
+    从现有 task 与 batch item 读取近期 topic prompt 指纹。
+
+    :param conn: 当前 SQLite 连接
+    :param limit: 最大指纹数量
+    :return: 从旧到新排列的固定长度指纹窗口
+    """
+    safe_limit = max(1, int(limit))
+    rows = conn.execute(
+        "SELECT prompt, title, description, category FROM ("
+        "SELECT ta.prompt, tp.title, tp.description, tp.category, "
+        "ta.created_at, ta.id AS source_id "
+        "FROM tasks ta JOIN topics tp ON ta.topic_id=tp.id "
+        "WHERE ta.batch_id IS NULL "
+        "UNION ALL "
+        "SELECT bi.prompt, tp.title, tp.description, tp.category, "
+        "bi.created_at, bi.id AS source_id "
+        "FROM task_batch_items bi JOIN topics tp ON bi.topic_id=tp.id"
+        ") recent ORDER BY created_at DESC, source_id DESC LIMIT ?",
+        (safe_limit,),
+    ).fetchall()
+    fingerprints: deque[frozenset[str]] = deque(maxlen=safe_limit)
+    for row in reversed(rows):
+        fingerprints.append(_topic_prompt_fingerprint(
+            row["prompt"],
+            {
+                "title": row["title"],
+                "description": row["description"],
+                "category": row["category"],
+            },
+        ))
+    return fingerprints
 
 
 def build_topic_prompt(
     topic: dict,
     mode: TopicPromptMode = "natural",
+    recent_fingerprints: Optional[Sequence[frozenset[str]]] = None,
 ) -> str:
     """
     按 topic 和表达模式生成默认 Claude prompt。
 
     :param topic: topic 行字典
     :param mode: `natural` 随机选择自然表达，`canonical` 使用稳定规范模板
+    :param recent_fingerprints: 近期 prompt 指纹；仅用于自然模式降低重复措辞
     :return: 默认 prompt 文本
     """
-    category = (topic.get("category") or "未分类").strip()
-    description = (topic.get("description") or "").strip()
-    title = str(topic["title"]).strip()
+    title, category, description = _topic_prompt_values(topic)
     if mode == "canonical":
         return (
             f"题目：{title}\n"
@@ -1842,11 +2099,11 @@ def build_topic_prompt(
         )
     if mode != "natural":
         raise ValueError(f"不支持的 topic prompt 模式：{mode}")
-    template = random.choice(_NATURAL_TOPIC_PROMPT_TEMPLATES)
-    return template.format(
-        title=title,
-        category=category,
-        description=description,
+    candidates = _build_natural_topic_prompt_candidates(topic)
+    return _select_low_similarity_topic_prompt(
+        topic,
+        candidates,
+        recent_fingerprints or (),
     )
 
 
@@ -1854,6 +2111,7 @@ def _resolve_topic_prompt(
     topic: dict,
     prompt_override: Optional[str],
     mode: TopicPromptMode,
+    recent_fingerprints: Optional[Sequence[frozenset[str]]] = None,
 ) -> str:
     """
     解析任务最终使用的 prompt，自定义文本始终优先。
@@ -1861,9 +2119,24 @@ def _resolve_topic_prompt(
     :param topic: topic 行字典
     :param prompt_override: 用户提交的完整 prompt 覆盖
     :param mode: 未覆盖时使用的默认 prompt 表达模式
+    :param recent_fingerprints: 近期 prompt 指纹；仅在默认自然模式下使用
     :return: 应持久化并下发给 worker 的最终 prompt
     """
-    return prompt_override or build_topic_prompt(topic, mode)
+    return prompt_override or build_topic_prompt(topic, mode, recent_fingerprints)
+
+
+def _should_load_topic_prompt_history(
+    prompt_override: Optional[str],
+    mode: TopicPromptMode,
+) -> bool:
+    """
+    判断当前请求是否需要读取近期自然 prompt 指纹。
+
+    :param prompt_override: 用户提交的完整 prompt 覆盖
+    :param mode: 未覆盖时使用的默认 prompt 表达模式
+    :return: 仅默认自然模式返回 True
+    """
+    return not prompt_override and mode == "natural"
 
 
 def normalize_claude_model_override(value: Optional[str]) -> Optional[str]:
@@ -4429,7 +4702,12 @@ class WarmupScheduler:
             )
             return {"started": False, "run_id": None}
 
-        prompt = build_topic_prompt(topic, "natural")
+        conn = get_db()
+        try:
+            recent_fingerprints = _load_recent_topic_prompt_fingerprints(conn)
+        finally:
+            conn.close()
+        prompt = build_topic_prompt(topic, "natural", recent_fingerprints)
         created = self._create_task_and_run(account, topic, prompt)
         if not created:
             return {"started": False, "run_id": None}
@@ -6283,9 +6561,19 @@ def create_task(body: TaskIn):
         if not topic_row:
             raise HTTPException(404, f"topic {body.topic_no} not found")
         topic = dict(topic_row)
+        recent_fingerprints = (
+            _load_recent_topic_prompt_fingerprints(conn)
+            if _should_load_topic_prompt_history(body.prompt, body.prompt_mode)
+            else None
+        )
     finally:
         conn.close()
-    prompt = _resolve_topic_prompt(topic, body.prompt, body.prompt_mode)
+    prompt = _resolve_topic_prompt(
+        topic,
+        body.prompt,
+        body.prompt_mode,
+        recent_fingerprints,
+    )
     with _db_lock:
         conn = get_db()
         try:
@@ -6371,8 +6659,27 @@ def create_task_batch(body: BatchIn):
         ).fetchall()
         if len(topics) != len(set(topic_ids)):
             raise HTTPException(404, "one or more topics not found")
+        topics = [dict(topic) for topic in topics]
+        recent_fingerprints = (
+            _load_recent_topic_prompt_fingerprints(conn)
+            if _should_load_topic_prompt_history(body.prompt, body.prompt_mode)
+            else None
+        )
     finally:
         conn.close()
+    # 相似度计算是纯 CPU 工作，提前在写锁外完成，避免阻塞其他任务落库。
+    random.shuffle(topics)
+    prepared_items: list[tuple[dict, str]] = []
+    for topic in topics:
+        prompt = _resolve_topic_prompt(
+            topic,
+            body.prompt,
+            body.prompt_mode,
+            recent_fingerprints,
+        )
+        prepared_items.append((topic, prompt))
+        if recent_fingerprints is not None:
+            recent_fingerprints.append(_topic_prompt_fingerprint(prompt, topic))
     name = f"batch acc#{body.account_id} · {len(topic_ids)} topics"
     with _db_lock:
         conn = get_db()
@@ -6394,12 +6701,8 @@ def create_task_batch(body: BatchIn):
                     ),
                 )
                 batch_id = int(cur.lastrowid)
-                # 批次执行顺序在创建时随机化；之后由 item id 固化顺序，便于运行追踪和恢复。
-                topics = list(topics)
-                random.shuffle(topics)
-                for topic_row in topics:
-                    topic = dict(topic_row)
-                    prompt = _resolve_topic_prompt(topic, body.prompt, body.prompt_mode)
+                # prepared_items 的随机顺序由 item id 固化，便于运行追踪和恢复。
+                for topic, prompt in prepared_items:
                     conn.execute(
                         "INSERT INTO task_batch_items(batch_id, topic_id, prompt) VALUES(?,?,?)",
                         (batch_id, topic["id"], prompt),
@@ -6590,10 +6893,20 @@ def start_capture_run(body: CaptureRunIn):
             raise HTTPException(404, "topic not found")
         account = dict(account_row)
         topic = dict(topic_row)
+        recent_fingerprints = (
+            _load_recent_topic_prompt_fingerprints(conn)
+            if _should_load_topic_prompt_history(body.prompt, body.prompt_mode)
+            else None
+        )
     finally:
         conn.close()
 
-    prompt = _resolve_topic_prompt(topic, body.prompt, body.prompt_mode)
+    prompt = _resolve_topic_prompt(
+        topic,
+        body.prompt,
+        body.prompt_mode,
+        recent_fingerprints,
+    )
     run_id = uuid.uuid4().hex[:12]
     with _db_lock:
         conn = get_db()
