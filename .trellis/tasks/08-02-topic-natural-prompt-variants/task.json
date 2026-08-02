@@ -1,0 +1,73 @@
+{
+  "id": "topic-natural-prompt-variants",
+  "name": "topic-natural-prompt-variants",
+  "title": "Topic 自然提示词变体",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-08-02",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-08-01T19:40:46Z",
+      "contextKey": "codex_019fbed2-5e97-7fc1-952f-92423caa9dc6",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "8183211c2f9d6a2b1fce45119b4e83d2859623c2",
+        "status": [],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "8183211c2f9d6a2b1fce45119b4e83d2859623c2",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "8726a028bb7bdf2cce58bdaa9afb13cf71b551e1c93e7a36245ce964224565ab"
+          },
+          {
+            "root": "cc2api",
+            "head": "f7cecbc6edab79ffe7352cfe11e946b7e08dab4b",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "5321388524dd7881df11662b1a54454ce7726ca91ec01c2bd56dabc89e19cd3a"
+          }
+        ],
+        "fingerprint": "229554bcb5b087c78c2258f815292b8831c12d7d0f4a70b3d7e069d6d6c9c780"
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-08-02T00:57:55.222656Z",
+    "completedSteps": [
+      "实现 natural/canonical Topic prompt 模式与三个 WebUI 选择控件",
+      "修正养号 prompt 单次生成并完成 40 个后端单元测试、浏览器检查和 Full Check-All",
+      "写入 Topic prompt 跨层 code-spec 并推送业务变更"
+    ],
+    "partialStep": null,
+    "nextStep": "按需运行 trellis-finish-work 完成任务归档与会话收尾",
+    "notes": ""
+  }
+}

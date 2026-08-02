@@ -1,0 +1,5 @@
+{"file":".trellis/spec/vibecoding-bench/backend/quality-guidelines.md","reason":"复核全部生成调用点、公开函数文档、测试覆盖和 prompt 不进入日志。"}
+{"file":".trellis/spec/vibecoding-bench/frontend/type-safety.md","reason":"复核三个表单提交字段与 Pydantic DTO 名称、默认值完全一致。"}
+{"file":".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md","reason":"复核分段控件双主题、稳定尺寸、无圆角、语义元素和零构建约束。"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"反向检查 natural/canonical 从 UI 到 worker 的全链路和值一致性。"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"检查自然模板与规范模板是否只有单一实现来源，避免多入口复制。"}

@@ -1,0 +1,7 @@
+{"file":".trellis/spec/vibecoding-bench/backend/quality-guidelines.md","reason":"实现 FastAPI DTO、单一 prompt 生成入口、后台养号一致性和中文公开 API 文档时遵循后端质量契约。"}
+{"file":".trellis/spec/vibecoding-bench/backend/error-handling.md","reason":"prompt_mode 由 Pydantic 边界校验，自定义 prompt 与后台路径保持现有错误处理方式。"}
+{"file":".trellis/spec/vibecoding-bench/frontend/component-guidelines.md","reason":"三个表单的模式控件必须贴合现有原生 HTML、modal 和 render 结构。"}
+{"file":".trellis/spec/vibecoding-bench/frontend/type-safety.md","reason":"新增 prompt_mode 字段需要同步 Pydantic DTO、FormData 和原生 JavaScript 请求体。"}
+{"file":".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md","reason":"分段控件需保持零构建、双主题、无圆角、可访问性和移动端不溢出。"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"prompt_mode 跨越 WebUI、API、持久化、调度和 worker，需要逐层核对数据流。"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"所有创建入口必须复用同一个 build_topic_prompt 生成器，避免模板逻辑分叉。"}
