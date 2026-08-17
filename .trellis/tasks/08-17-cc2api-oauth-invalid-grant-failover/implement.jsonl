@@ -1,0 +1,2 @@
+{"file": ".trellis/tasks/08-17-cc2api-oauth-invalid-grant-failover/research/root-cause-and-contracts.md", "reason": "实现 Token 预解析永久错误分类、账号停用与同请求切号的已确认根因和边界"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "实现阶段遵守 Rust 测试、错误体与敏感数据边界"}

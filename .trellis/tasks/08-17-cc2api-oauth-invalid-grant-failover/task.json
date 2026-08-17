@@ -1,0 +1,39 @@
+{
+  "id": "cc2api-oauth-invalid-grant-failover",
+  "name": "cc2api-oauth-invalid-grant-failover",
+  "title": "修复 cc2api OAuth 永久失效账号自动停用与切号",
+  "description": "修复 OAuth Token 预解析遇到 invalid_grant 时账号仍保持 active、同一请求不切号的问题，并补齐永久错误分类与回归测试。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "cc2api/backend",
+  "package": "cc2api",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-08-17",
+  "completedAt": "2026-08-17",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-08-17T10:32:44+08:00",
+    "completedSteps": [
+      "完成 OAuth 永久凭据错误分类与脱敏",
+      "完成永久失效账号原子停用和 messages/count_tokens 同请求切号",
+      "补齐临时错误、缺失 RT、sticky、全账号失效和混合 429 回归测试",
+      "通过 Full Check-All 并更新 cc2api 后端服务架构规范",
+      "完成 cc2api 与父仓业务提交及推送"
+    ],
+    "partialStep": null,
+    "nextStep": "等待用户显式运行 trellis-finish-work 完成归档",
+    "notes": "全量 cargo test 506 项通过；业务代码提交和父仓同步提交已推送。"
+  }
+}
