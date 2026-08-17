@@ -505,7 +505,7 @@ AccountService::resolve_oauth_credentials(
 - 每次 resolve 都必须获取 `oauth:refresh:account:<id>` cache lock，即使当前 AT 仍有效也不能走无锁快路径；这样返回快照不会与 Gateway、usage poller 或另一个 resolve 的 RT 轮换并发。
 - 获锁后重新读取账号；需要刷新时复用同一 refresh 实现并落库；返回前再次读取账号，确保 AT/RT/过期时间来自同一次最终存储状态。
 - `force_refresh=true` 只用于消费者已经观察到 401 的单次恢复。调用方不得用它做周期轮询，也不得自行拿响应 RT 调 OAuth endpoint。
-- 现有 `resolve_upstream_token` 继续允许刷新失败时使用仍有效 AT 的兼容 fallback；管理端 resolve 不允许返回不满足最小有效期的旧快照。
+- `resolve_upstream_token` 只允许临时刷新失败时使用仍有效 AT 的兼容 fallback；永久凭据错误不得回退。管理端 resolve 不允许返回不满足最小有效期的旧快照。
 - `refresh_usage` 通过同一 token resolve 链路获取 AT，避免 usage poller 与管理端消费者形成第二条无锁刷新路径。
 - tracing、错误和测试输出不得记录 AT、RT、Authorization、邮箱/UUID 的真实映射。
 
@@ -519,8 +519,8 @@ AccountService::resolve_oauth_credentials(
 | SetupToken 账号 | `BadRequest`，提示不是 OAuth |
 | AT 剩余时间满足要求 | 仍获取账号锁，最终重读后原样返回 |
 | AT 临期或 `force_refresh=true` | 锁内刷新、落库、最终重读后返回 |
-| refresh token 缺失 | 更新 auth error，返回不可用错误 |
-| refresh 返回 `invalid_grant` | 返回错误，不使用旧 RT/AT 伪装成功 |
+| refresh token 缺失 | 更新 auth error，返回 `PermanentCredential` |
+| refresh 返回 `invalid_grant` | 返回 `PermanentCredential`，不使用旧 RT/AT 伪装成功 |
 | 等待锁超时 | `ServiceUnavailable`，不返回锁前快照 |
 
 ### 5. Good/Base/Bad Cases
@@ -566,6 +566,101 @@ if acquired {
 ```
 
 有效 AT 也必须在同一账号锁内最终重读后返回。
+
+## Scenario: OAuth Token 预解析永久凭据错误停用与切号
+
+### 1. Scope / Trigger
+
+- 修改 OAuth token endpoint 错误分类、`AccountService::resolve_upstream_token`、Gateway 请求转发前 Token 预解析，或账号认证失败停用逻辑时适用。
+- 目标是在账号级凭据已确定永久失效时停用当前账号并在同一请求内切号，同时避免 OAuth endpoint 临时故障触发批量误停或逐账号放大。
+
+### 2. Signatures
+
+```rust
+AppError::PermanentCredential(String)
+
+oauth::refresh_oauth_token_at(
+    refresh_token: &str,
+    proxy_url: &str,
+    token_url: &str,
+) -> Result<RefreshedOAuthTokens, AppError>
+
+AccountService::resolve_upstream_token(id: i64) -> Result<String, AppError>
+AccountStore::disable_for_auth_failure(id: i64, reason: &str) -> Result<(), AppError>
+```
+
+- Gateway 适用入口为 `/v1/messages` 与 `/v1/messages/count_tokens`。
+- `PermanentCredential` 的外部 HTTP 映射保持 503；所有候选耗尽时返回 Anthropic `api_error` 形状的通用 503。
+
+### 3. Contracts
+
+- OAuth 非 2xx 响应只读取最多 4 KiB 错误体，并只接受最长 64 字符、由 ASCII 字母数字、`_`、`-` 组成的短 `error` 码。不得记录 `error_description`、完整响应正文、AT、RT、Authorization、Cookie 或代理密码。
+- 仅客户端错误且状态不是 429、短错误码为 `invalid_grant` 时返回 `PermanentCredential`。429、5xx、网络/超时、响应解析失败和其他错误码保持临时错误；临时 HTTP 状态优先于响应体中的 `invalid_grant` 文本。
+- OAuth 账号缺少 refresh token 时必须在有效 AT 快路径之前返回 `PermanentCredential`；有效 AT 不能掩盖已无法续期的账号状态。
+- 永久凭据错误必须保留到 Gateway，不得包装回普通 `ServiceUnavailable`，也不得使用仍有效旧 AT fallback。临时错误可继续复用尚未过期的 AT，并且不得切换到其他账号放大 token endpoint 故障。
+- 只有 Gateway 请求调度路径负责停用账号；管理端 resolve、usage、telemetry 和后台任务可观察该错误，但不得仅因一次解析调用自行修改账号状态。
+- Gateway 收到 `PermanentCredential` 后必须先调用 `disable_for_auth_failure`。该存储入口用一条 SQL 原子写入 `status=disabled`、相同的 `auth_error` / `disable_reason`，并清空 `rate_limited_at` / `rate_limit_reset_at`；写入失败必须向上返回，不能继续假装账号已被隔离。
+- 停用成功后把账号加入本轮 `exclude_ids`；`/v1/messages` 还必须显式释放当前 slot，再继续账号选择。sticky 选择必须服从同一排除集合，同一请求内每个永久失效账号最多探测一次。
+- 永久凭据排除必须使用独立状态判断，并在候选耗尽时优先于历史 429 返回通用 503；不得改变普通 401 恢复失败与历史 429 的既有优先级。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 分类 | Gateway 行为 |
+|------|------|--------------|
+| HTTP 400，`error=invalid_grant` | `PermanentCredential` | 原子停用、排除并切号 |
+| refresh token 缺失，即使 AT 仍有效 | `PermanentCredential` | 不调用 token endpoint，原子停用并切号 |
+| HTTP 429，即使正文含 `invalid_grant` | 临时错误 | 不停用、不跨账号重试；有效 AT 可 fallback |
+| HTTP 5xx，即使正文含 `invalid_grant` | 临时错误 | 不停用；有效 AT 可 fallback |
+| 网络、超时或响应解析失败 | 临时错误 | 不停用；无有效 AT 时保持当前失败语义 |
+| 首账号永久失效、后续账号可用 | 永久错误已隔离 | 当前请求由后续账号完成，不向客户端泄漏前一账号错误 |
+| 所有候选永久失效 | 永久错误已隔离 | 返回通用 Anthropic 503，每个账号最多探测一次 |
+| 先收到 429、后遇永久凭据错误 | 永久错误已隔离 | 返回通用 503，不返回旧 429 |
+| 账号停用 SQL 失败 | 存储失败 | 立即返回错误，不继续切号 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：高优先级 OAuth 账号刷新返回 `invalid_grant`，Gateway 原子停用并排除该账号，释放 slot 后由第二账号完成原请求；后续请求不再调度失效账号。
+- Base：token endpoint 返回 503，旧 AT 仍有效；请求继续使用旧 AT，账号保持 active，备用账号不参与本次请求。
+- Bad：根据完整错误字符串包含 `invalid_grant` 决定停号；429/5xx 代理错误可能夹带该文本，造成批量误停。
+- Bad：先检查 AT 有效期再检查 RT 是否存在；缺失 RT 的历史账号会继续被调度，直到 AT 过期后才暴露故障。
+- Bad：永久错误切号后仍优先返回之前缓存的 429，客户端会看到错误的失败原因，且无法确认永久失效账号已被隔离。
+
+### 6. Tests Required
+
+- OAuth 分类单测覆盖：标准 400 `invalid_grant`、错误描述脱敏、429/5xx 携带 `invalid_grant` 仍为临时错误、未知错误码保持临时错误。
+- AccountService 单测覆盖：有效 AT 不能绕过缺失 RT、永久错误不 fallback、临时错误仍可 fallback、管理端凭据快照保留永久错误类别。
+- Gateway 回归覆盖：普通 `/v1/messages`、sticky、`count_tokens` 的停用切号；缺失 RT；所有账号永久失效；先 429 后永久失效；5xx 和网络失败不误停、不切号。
+- Store 测试断言 `disable_for_auth_failure` 同时写入 disabled、两类原因并清空两个限流时间。
+- 完整验证至少运行 `cargo fmt --check`、OAuth/账号/Gateway 定向测试、`cargo test` 和双仓 `git diff --check`。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+let token = account_svc.resolve_upstream_token(account.id).await?;
+```
+
+该写法把永久凭据错误直接返回给客户端，账号仍保持 active 并在后续请求中反复入选。
+
+#### Correct
+
+```rust
+match account_svc.resolve_upstream_token(account.id).await {
+    Ok(token) => token,
+    Err(AppError::PermanentCredential(reason)) => {
+        account_svc
+            .disable_for_auth_failure(account.id, &reason)
+            .await?;
+        exclude_ids.push(account.id);
+        drop(slot_guard);
+        continue;
+    }
+    Err(error) => return Err(error),
+}
+```
+
+永久错误只在确认停用成功后切号；临时错误沿用原失败或有效 AT fallback 语义。
 
 ## Scenario: 有效上游 Session 首次 Hello 代理探测
 
