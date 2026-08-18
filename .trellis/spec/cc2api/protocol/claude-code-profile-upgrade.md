@@ -286,6 +286,122 @@ Claude Code 2.1.220 messages -> ANTHROPIC_BASE_URL -> new-api -> cc2api
 
 ---
 
+## Scenario: Auto Mode classifier 版本化协议
+
+### 1. Scope / Trigger
+
+- Trigger：修改 `GatewayService` 对 Claude Code Auto Mode classifier 的识别条件、本地拦截顺序、Legacy Block / Severity 协议选择或 mock response 时适用。
+- 目标：兼容新旧 Claude Code classifier，同时避免被审计 transcript 中的 XML 示例污染协议选择。
+
+### 2. Signatures
+
+- 检测入口：`detect_auto_mode_classifier_request(path, body, client_type) -> Option<WarmupInterceptType>`。
+- 协议入口：`auto_mode_classifier_protocol(body) -> Option<AutoModeClassifierProtocol>`。
+- Stage 1：`max_tokens` 在 `64..=2304`；Stage 2：`max_tokens` 在 `4096..=8192`。
+- 公共请求特征：Claude Code、非流 `/v1/messages`、最后一条消息为 `user`、最后一条消息包含闭合的 `<transcript>...</transcript>`。
+
+### 3. Contracts
+
+| 协议 | 可信输出格式 | `mock_allow` | `mock_block` |
+|------|--------------|--------------|--------------|
+| Legacy Block | system 或 transcript 外指令同时定义 `<block>yes</block>` 与 `<block>no</block>` | `<block>no</block>` | `<block>yes</block><reason>blocked by local policy</reason>` |
+| Severity | system 或 transcript 外指令定义完整 `<severity>...</severity>` 格式 | `<severity>0</severity>` | `<severity>100</severity>` |
+
+- 协议只能由 `system` 或最后一条 user message 中 transcript 外的 classifier 指令确定；被审计 transcript 内的标签属于不可信内容。
+- 不依赖整句 prompt 精确匹配，可信区域只要求协议自身的完整输出标记，避免文案微调导致漏命中。
+- 可信区域同时出现两套完整协议、协议标记不完整或 transcript 未闭合时，必须视为非强命中并透传上游。
+- 本地 mock response 必须保持 Anthropic message JSON 形状，`cache_creation_input_tokens` 与 `cache_read_input_tokens` 均为 `0`，并在账号选择、RPM 和并发槽位获取前返回。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 期望行为 |
+|------|----------|
+| Legacy Block system，transcript 内出现 Severity 示例 | 仍选择 Legacy Block |
+| Severity system，transcript 内出现 Legacy Block 示例 | 仍选择 Severity |
+| system 无协议，只有 transcript 内存在协议标签 | 不命中 classifier，透传上游 |
+| transcript 后的可信指令定义单一协议 | 按该协议命中，不要求 system 精确文案 |
+| 可信区域同时定义 Legacy Block 和 Severity | 不猜测协议，透传上游 |
+| transcript 缺少开始或结束标签 | 不命中 classifier，透传上游 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：旧版 Block classifier 的 transcript 正在讨论 `<severity>0</severity>`，仍返回 `<block>no</block>`。
+- Good：新版 Severity classifier 的 transcript 包含旧版 block 示例，仍返回 `<severity>0</severity>`。
+- Base：可信 system 或 transcript 后置指令只定义一套完整协议，按 Stage token 范围正常识别。
+- Bad：扫描 `request_text_items(body)` 的全部文本并让 Severity 固定优先，会让用户内容改变本地安全响应协议。
+- Bad：硬编码完整 system prompt 文案，会因 Claude Code 轻微改词而漏掉真实 classifier。
+
+### 6. Tests Required
+
+- `auto_mode_classifier_detects_severity_stage1` / `auto_mode_classifier_detects_severity_stage2`：新版协议仍覆盖两个 Stage。
+- `auto_mode_classifier_detects_protocol_from_post_transcript_instruction`：system 无协议标记时，可信后置指令仍可命中。
+- `auto_mode_classifier_uses_block_protocol_when_transcript_mentions_severity`：transcript 不覆盖旧版协议。
+- `auto_mode_classifier_uses_severity_protocol_when_transcript_mentions_block`：transcript 不覆盖新版协议。
+- `auto_mode_classifier_ignores_protocol_markers_only_inside_transcript`：普通用户内容不能制造 classifier 命中。
+- `auto_mode_classifier_ignores_conflicting_trusted_protocol_markers`：可信区域冲突时失败开放。
+- 完整验证运行 `cargo fmt --check`、`cargo test`、`cargo test cch`。
+
+### 7. Wrong vs Correct
+
+#### Wrong: 从全部请求文本猜测协议
+
+```rust
+for text in request_text_items(body) {
+    has_severity |= text.contains("<severity>");
+}
+if has_severity {
+    return Some(AutoModeClassifierProtocol::Severity);
+}
+```
+
+transcript 是被审计的用户输入，里面的示例标签不能决定本地 mock response 格式。
+
+#### Correct: 只读取可信 classifier 指令
+
+```rust
+for text in system_text_items(body) {
+    observe_protocol_markers(text);
+}
+let last_message_content = body
+    .get("messages")
+    .and_then(|messages| messages.as_array())
+    .and_then(|messages| messages.last())
+    .and_then(|message| message.get("content"));
+let mut inside_transcript = false;
+for text in content_text_items(last_message_content) {
+    let mut remaining = text;
+    loop {
+        if inside_transcript {
+            let Some(close_index) = remaining.find("</transcript>") else {
+                break;
+            };
+            inside_transcript = false;
+            remaining = &remaining[close_index + "</transcript>".len()..];
+            continue;
+        }
+        let Some(open_index) = remaining.find("<transcript>") else {
+            observe_protocol_markers(remaining);
+            break;
+        };
+        observe_protocol_markers(&remaining[..open_index]);
+        inside_transcript = true;
+        remaining = &remaining[open_index + "<transcript>".len()..];
+    }
+}
+match (
+    has_block_yes && has_block_no,
+    has_severity_open && has_severity_close,
+) {
+    (true, false) => Some(AutoModeClassifierProtocol::Block),
+    (false, true) => Some(AutoModeClassifierProtocol::Severity),
+    _ => None,
+}
+```
+
+协议冲突或证据不足时透传上游，既不误拦截，也不向客户端返回错误协议。
+
+---
+
 ## Common Mistakes
 
 | 反模式 | 现象 | 怎么改 |
