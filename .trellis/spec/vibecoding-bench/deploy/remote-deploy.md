@@ -610,6 +610,112 @@ log=$(docker inspect -f '{{.LogPath}}' docker-claude-code-gateway-1)
 
 ---
 
+## Scenario: vibecoding-bench 与 cc2api 联合回滚
+
+### 1. Scope / Trigger
+
+- 同一发布批次同时升级 vibecoding-bench worker 的 Claude Code CLI 和 cc2api 的版本画像或允许范围，且需要把两套服务回滚到旧版本时适用。
+- 单服务回滚仍按各自部署流程执行；只要旧 cc2api 的允许上限可能低于当前 worker CLI，就必须使用本场景的联合回滚顺序。
+- 回滚操作必须由故障处置明确授权，日常验证只能在临时副本中演练，不得为了测试触发生产回滚。
+
+### 2. Signatures
+
+联合回滚依赖以下配置和持久化键：
+
+```text
+vibecoding-bench SQLite:
+  app_settings.key = 'claude_code_version'
+
+cc2api SQLite:
+  settings.key = 'claude_code_version_profile'
+  settings.key = 'allowed_claude_code_versions'
+
+部署配置:
+  VIBEBENCH_TAG=<旧镜像 tag>
+  CLAUDE_CODE_VERSION=<兼容旧网关的 CLI 版本>
+```
+
+SQLite 回滚前快照必须使用数据库 API，不能直接复制在线数据库文件：
+
+```bash
+sqlite3 "$db_path" ".backup '$snapshot_path'"
+sqlite3 "$db_path" ".restore '$rollback_backup'"
+```
+
+### 3. Contracts
+
+- 回滚前先确定 `rollback_cli_version`：它必须落在旧 cc2api 的 `allowed_claude_code_versions` 范围内，并优先等于旧 worker 镜像内实际执行 `claude --version` 的结果。
+- WebUI 保存的 `app_settings.claude_code_version` 优先于 `.env` 的 `CLAUDE_CODE_VERSION`。恢复旧 vibecoding-bench 数据库后，必须显式把页面覆盖值固定为 `rollback_cli_version`；只修改 `.env` 不能保证旧 worker 使用兼容版本。
+- 顺序固定为：确认无活跃 run 和残留 worker/sidecar -> 停止 orchestrator -> 快照当前 bench 数据库与部署配置 -> 恢复旧 bench 数据库并固定 CLI 页面覆盖值 -> 校验旧 Compose、旧 worker 镜像和 CLI 版本但保持 orchestrator 停止 -> 确认 cc2api 连接进入低窗口 -> 停止并快照当前 cc2api 数据库 -> 恢复旧 cc2api 数据库和镜像 -> 校验旧网关版本画像及允许范围 -> 最后启动并校验旧 orchestrator。
+- 不得先回滚 cc2api，除非已经证明所有可能连入的 worker CLI 均不高于旧网关允许上限；否则会制造旧网关拒绝新 worker 的版本断层。
+- 两套 SQLite 在 `.restore` 前都必须创建当前状态快照，并执行 `PRAGMA integrity_check`。快照目录权限设为 `700`，数据库快照权限设为 `600`，便于回滚失败后恢复到操作前状态。
+- 回滚不得删除 Docker volume、bench `data/`、账号 profile 或 workspace。旧镜像、旧 Compose、旧数据库备份任一缺失时停止操作并回报，不得用猜测值继续。
+- cc2api 切换期间 orchestrator 必须保持停止；只有旧网关 HTTP 健康、版本画像和允许范围均匹配 `rollback_cli_version` 后才能重新启动。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 处理 |
+|------|------|
+| 存在活跃 run 或 worker/sidecar | 停止回滚，先等待或按故障流程终止任务并确认容器清零 |
+| bench / cc2api 回滚备份完整性失败 | 不执行 `.restore`，保留当前服务状态并修复备份 |
+| 恢复后的 WebUI CLI 覆盖值高于旧网关上限 | 保持 orchestrator 停止，将覆盖值固定为 `rollback_cli_version` 后重验 |
+| 旧 worker 镜像不存在或 `claude --version` 不匹配 | 不启动 orchestrator，先恢复正确镜像或重新选择兼容版本 |
+| cc2api established 连接数不为低窗口 | 暂停网关切换，等待连接释放或取得明确故障处置授权 |
+| 旧 cc2api HTTP 健康检查失败 | 不启动 orchestrator，优先恢复刚创建的 cc2api 操作前快照 |
+| 旧 cc2api 画像或允许范围不包含回滚 CLI | 不启动 orchestrator，修正旧网关配置或选择范围内 CLI 后重验 |
+| 最终 orchestrator HTTP 健康检查失败 | 保留旧网关运行，检查 bench 配置；必要时用 bench 操作前快照恢复 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：先把 bench 恢复到与旧网关兼容的 CLI 页面覆盖值，验证旧 worker 实际版本，再切换旧网关，最后启动 orchestrator；两套数据库都有可校验的操作前快照。
+- Base：只回滚 vibecoding-bench，cc2api 允许范围仍覆盖旧 worker CLI；按 bench 单服务流程处理，无需停止网关。
+- Bad：先恢复旧 cc2api，再让仍使用新 CLI 的 worker 继续连入；请求会因版本不在旧允许范围而失败。
+- Bad：直接 `.restore` 覆盖当前数据库且没有操作前快照；回滚脚本中途失败后无法恢复到开始操作时的状态。
+
+### 6. Tests Required
+
+联合回滚操作单至少完成以下非破坏性验证：
+
+1. 对完整回滚脚本执行 `bash -n`；有 `shellcheck` 时同时通过静态检查。
+2. 从两套生产备份各复制一份到临时目录，分别演练 `.backup`、`.restore` 和 `PRAGMA integrity_check`，不得操作在线数据库。
+3. 在 bench 临时数据库中写入 `app_settings.claude_code_version=rollback_cli_version`，重新读取并确认生效。
+4. 运行旧 worker 镜像的 `claude --version`，断言等于 `rollback_cli_version`。
+5. 使用旧 `.env` 和 Compose 执行 `docker compose config`，确认 orchestrator、worker、sidecar 均解析为预期旧镜像。
+6. 对操作单做顺序断言：停止 orchestrator 和固定 CLI 必须早于停止 cc2api，启动 orchestrator 必须晚于旧网关全部验证。
+7. 生产执行后分别验证 cc2api 与 orchestrator HTTP 状态，并确认新建 worker 的 CLI 版本位于旧网关允许范围内。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```bash
+stop_cc2api
+sqlite3 "$cc2api_db" ".restore '$old_cc2api_db'"
+start_cc2api
+rollback_vibebench
+```
+
+该顺序会先缩窄网关允许范围，而且覆盖当前数据库前没有可恢复快照。
+
+#### Correct
+
+```bash
+assert_no_active_runs_or_workers
+stop_orchestrator
+snapshot_and_restore_bench
+pin_webui_cli_override "$rollback_cli_version"
+validate_old_worker_cli
+
+wait_for_cc2api_low_connections
+stop_cc2api
+snapshot_and_restore_cc2api
+start_and_validate_old_cc2api
+
+start_and_validate_old_orchestrator
+```
+
+---
+
 ## Wrong vs Correct
 
 ### ❌ Wrong:HOST_BENCH_DATA 写容器内路径
