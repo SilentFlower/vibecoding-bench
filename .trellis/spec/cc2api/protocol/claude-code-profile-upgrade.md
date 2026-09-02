@@ -1,6 +1,6 @@
 # Claude Code Profile Upgrade
 
-> 记录 `cc2api` 升级 Claude Code 版本画像时必须执行的协议契约。目标是让未来从 `2.1.172` 升到新版本时，不再只改版本号而漏掉 CCH、`cc_version`、beta 顺序、bootstrap 和账号迁移。
+> 记录 `cc2api` 升级 Claude Code 版本画像时必须执行的协议契约。目标是让未来升级默认画像时，不再只改版本号而漏掉 CCH、`cc_version`、模型子画像、beta 顺序、bootstrap、超时诊断和账号迁移。
 
 ---
 
@@ -21,6 +21,7 @@ src/service/version_profile.rs
 src/service/rewriter.rs
 src/service/telemetry.rs
 src/service/gateway.rs
+src/service/session_hello_probe.rs
 src/handler/router.rs
 src/store/db.rs
 src/store/settings_store.rs
@@ -51,6 +52,8 @@ accounts.canonical_env.build_time
 accounts.canonical_env.node_version
 settings.claude_code_version_profile
 settings.allowed_claude_code_versions
+settings.allow_system_role_models
+settings.bootstrap_additional_model_options
 ```
 
 `/api/hello` response signature：
@@ -82,6 +85,9 @@ data/flows/<account>/<topic_id>/<run_id>/
 - `claude_cli_user_agent(version)`
 - `claude_code_user_agent(version)`
 - `DEFAULT_ALLOWED_CLAUDE_CODE_VERSIONS_SETTING`
+- `RequestProfile::fable_model(model_id)`
+- `CchProfile`
+- `FableFallbackProfile`
 
 `cc_version` 后缀契约：
 
@@ -89,6 +95,22 @@ data/flows/<account>/<topic_id>/<run_id>/
 - 字符索引必须按 JavaScript UTF-16 code unit 语义。
 - `messages[0].content` 是数组时，Claude Code 主请求可能先放环境上下文 text block，再放真实用户 prompt text block；后缀文本源应取首条 user message 的最后一个 text block，而不是第一个 text block。
 - Haiku/title 这类只有一个 text block 的请求仍取唯一 text block。
+
+`2.1.257` identity 契约：
+
+| 字段 | 值 |
+|------|----|
+| `version` / `version_base` | `2.1.257` |
+| `build_time` | `2026-09-01T05:28:54Z` |
+| `User-Agent` | `claude-code/2.1.257` |
+| `X-Stainless-Package-Version` | `0.112.1` |
+| `X-Stainless-Runtime` | `node` |
+| `X-Stainless-Runtime-Version` | `v26.3.0` |
+| GrowthBook / session hello UA | `Bun/1.4.1` |
+| 默认允许范围 | `2.1.89-2.1.257` |
+
+`2.1.220` 必须作为独立回滚画像保留，不能复用 2.1.257 的 Stainless、Bun、CCH 或
+Fable 5.1 子画像。
 
 `2.1.220` identity 契约：
 
@@ -106,12 +128,18 @@ data/flows/<account>/<topic_id>/<run_id>/
 CCH 契约：
 
 - seed 不是默认可变项；升级时先用旧 seed 复算，不命中再尝试找 seed。
-- `2.1.156` / `2.1.169` / `2.1.172` seed 均为 `0x4D659218E32A3268`。
+- `2.1.156`、`2.1.169`、`2.1.172`、`2.1.173`、`2.1.185`、`2.1.187`、
+  `2.1.195`、`2.1.197`、`2.1.220`、`2.1.257` 使用 seed
+  `0x4D659218E32A3268`；不能因版本号变化直接更换 seed。
 - `2.1.169`：在最终 body 字节上把真实 `cch=<5hex>` 替回 `cch=00000` 后计算，保留完整 body。
 - `2.1.172`：在最终 body 字节上替回 `cch=00000` 后，再做 top-level 规范化：
   - `model` 字段保留 key 和空字符串值，排除原模型值。
   - 删除 top-level `max_tokens` 字段。
   - 删除 top-level `fallbacks` 字段。
+- `2.1.257`：同样清空 top-level `model` 并删除 top-level `max_tokens`，但
+  `fallbacks` 必须按最终精确模型决定：
+  - `model=claude-fable-5-1` 时保留 `fallbacks="default"` 参与 CCH。
+  - 其他模型仍删除 top-level `fallbacks`。
 - CCH 输入裁剪必须只作用 top-level JSON 字段，不能误删 tool schema、message content 或嵌套对象里的同名字段。
 - 不要先 `serde_json` 反序列化再重新序列化后计算 CCH；字段顺序、转义和空格变化会改变结果。
 
@@ -128,6 +156,8 @@ claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,redact-thi
 - Fable `[1m]` 的主请求画像必须按目标版本抓包判断，不能只从 CLI model 后缀推断：
   - `2.1.172` 抓包中，Fable `[1m]` 主请求包含 `context-1m-2025-08-07`，顺序如下。
   - `2.1.173` 抓包中，Fable `[1m]` 主请求不包含 `context-1m-2025-08-07`，只在 telemetry 启动配置里体现 `cli_flag=claude-fable-5[1m]`。
+  - `2.1.257` 的 `claude-fable-5-1[1m]` 入口解析后的 message 请求使用精确模型
+    `claude-fable-5-1`，不自动携带 `context-1m-2025-08-07`。
   - 账号 `allow_1m_models` 只控制客户端已有 `context-1m-2025-08-07` 是否透传，不应自动给 Fable 主请求注入 1M beta。
 
 `2.1.172` Fable `[1m]` 主请求顺序：
@@ -138,13 +168,35 @@ claude-code-20250219,oauth-2025-04-20,context-1m-2025-08-07,interleaved-thinking
 
 Fable body 契约：
 
-- `model=claude-fable-5`。
+- `claude-fable-5` 与 `claude-fable-5-1` 是两个精确模型画像；wire 改写不能用宽泛
+  `claude-fable-*` 前缀把二者合并。
 - `max_tokens=64000` 默认只在缺失时补齐，不覆盖用户已有值。
 - `fallbacks` 必须来自选中的版本画像，只在缺失时补齐，不重复追加，不覆盖用户已有字段。
+  - `2.1.257` 的 `claude-fable-5-1` 使用字符串 `"default"`。
+  - `2.1.257` 的 `claude-fable-5` 仍使用 `[{"model":"claude-opus-5"}]`。
   - `2.1.220` 使用 `[{"model":"claude-opus-5"}]`。
   - `2.1.197` 及旧回滚画像保留 `[{"model":"claude-opus-4-8"}]`。
+- `2.1.257` 的 `claude-fable-5-1` 缺少 thinking 时补 `{"type":"adaptive"}`，并只在
+  display 缺失时补 `"display":"updates"`；不得覆盖客户端已有 thinking 字段。
+- `2.1.257` Fable 5.1 beta 顺序必须使用画像常量，其中包含
+  `server-side-fallback-2026-07-01` 和 `thinking-display-updates-2026-08-18`，且不包含
+  `redact-thinking-2026-02-12`；Fable 5 继续使用旧 beta 顺序。
 - `2.1.220` Fable 顶层字段顺序为 `model,messages,system,tools,metadata,max_tokens,thinking,context_management,fallbacks,output_config,diagnostics,stream`；旧画像保留旧顺序。
-- `fallbacks` 必须发送给上游，但不参与 `2.1.172` CCH 输入。
+- Fable 5.1 的 `fallbacks="default"` 必须发送给上游并参与 2.1.257 CCH；旧画像是否裁剪
+  fallback 由各自 `CchProfile` 决定。
+
+Haiku 2.1.257 子画像契约：
+
+- 只在模型 ID 包含 `haiku` 时分类；probe 为 `tools` 空、`max_tokens=1`、非流式。
+- title 为 `tools` 空、`max_tokens=32000`，并命中结构化 title schema 或历史 title
+  prompt marker。结构化分支还要求流式、`thinking.type=disabled`，且
+  `output_config.format` 的任一嵌套对象同时声明唯一 required `title` 和
+  `properties.title`。
+- 为兼容已存在的 title 变体，历史 prompt marker 分支不额外强制 `stream=true`，schema
+  检测也保留递归查找；这是已接受的兼容宽度，不能在缺少新抓包回归时擅自收窄。
+- non-stream aux 为 `tools` 空、`max_tokens=1024`、非流式；其余 Haiku 请求归为 main。
+- main 有 `diagnostics` 时使用完整 Haiku main beta；无 `diagnostics` 时省略
+  `claude-code-20250219`；probe、title、non-stream aux 各使用画像中的独立窄 beta。
 
 Bootstrap 契约：
 
@@ -153,7 +205,11 @@ Bootstrap 契约：
 - Fable 能力由全局设置控制：
   - `bootstrap_model_options_mode=passthrough`：不改上游。
   - `configured`：可按版本画像注入 `client_data.cedar_basin`、`client_data.cedar_lagoon`、`additional_model_options`；2.1.220 的 Fable query 使用 `cwk_cfg_key="marigold"`，Opus 5 query 使用 `cwk_cfg_key="belladonna"`。
-  - `hide_fable`：隐藏 Fable 入口并清空 `marigold`，但不得误清除 Opus 5 的合法 `belladonna`。
+  - `2.1.257` configured 默认模型选项为 `claude-fable-5-1[1m]`，Fable query 使用
+    `cwk_cfg_key="sorrel"`，`client_data.cedar_basin="2027-08-31"`；Opus 5 仍使用
+    `belladonna`。
+  - `hide_fable`：隐藏 Fable 入口并仅清空所选画像的 Fable key（2.1.220 为
+    `marigold`，2.1.257 为 `sorrel`），但不得误清除 Opus 5 的合法 `belladonna`。
 
 `/api/hello` 边界契约：
 
@@ -162,6 +218,8 @@ Bootstrap 契约：
 - 该端点是无状态连通性端点，不读取 gateway token，不选择账号，不占用 RPM/并发，不生成 telemetry，也不代理到上游。
 - Claude Code `2.1.220` 的 hello 预检固定访问 `https://api.anthropic.com/api/hello`，不使用 `ANTHROPIC_BASE_URL`；模型请求才使用配置的 base URL。
 - 因此当前不得为 new-api 添加同名本地响应、渠道选择或故障转移。只有后续版本抓包证明 hello 开始使用 `ANTHROPIC_BASE_URL` 时，才重新评估透传策略。
+- session hello 代理探测的 UA 必须来自账号所选版本画像：2.1.257 使用 `Bun/1.4.1`，
+  2.1.220 回滚画像继续使用 `Bun/1.4.0`。
 
 Telemetry 契约：
 
@@ -174,7 +232,25 @@ Telemetry 契约：
 - 启动迁移必须把已有账号 `canonical_env.version/version_base/build_time/node_version` 更新到当前默认画像。
 - 启动迁移必须同时迁移旧默认 settings 组合：当 `settings.claude_code_version_profile` 仍是上一个默认 profile，且 `settings.allowed_claude_code_versions` 仍是对应旧默认范围时，必须把二者升级到当前默认画像。
 - 显式回滚 profile 只能在管理员自定义过 `allowed_claude_code_versions` 时保留；否则旧默认 profile 会让远程老库继续发送旧 UA / env 画像。
+- `allow_system_role_models` 默认包含 `claude-fable-5-1`；一次性迁移必须按逗号列表精确
+  去重后追加，并保留管理员自定义模型。
+- `bootstrap_additional_model_options` 只在仍等于旧 Fable 5 默认 JSON 时迁移到 Fable
+  5.1 默认值；自定义 JSON 保留。
+- 不迁移 `allow_1m_models`、`rewrite_disabled_thinking_models` 或
+  `intercept_assistant_prefill_models`。
 - 远程部署后必须查 DB 版本分布，不能只依赖日志判断。
+
+流式超时诊断契约：
+
+- `stable_upstream_stream` 必须接收脱敏后的 upstream request ID，优先取 `request-id`，
+  再取 `x-request-id`；超过 128 字符或包含非 `[A-Za-z0-9_.-]` 字符时只记录短 SHA256。
+- `chunk_count=0` 超时记录 `upstream_first_byte_timeout`，错误文本为
+  `upstream first byte timeout`；已收到真实 chunk 后超时记录
+  `upstream_stream_idle_timeout`，错误文本为 `upstream stream idle timeout`。
+- 两类日志都记录 account、upstream request ID、`wait_ms`、`chunk_count` 和
+  `max_gap_ms`，不得记录请求正文、Authorization、Cookie 或账号邮箱。
+- keepalive 只能在 `first_chunk_seen=true` 后注入，不能用伪造 SSE 掩盖上游首字节卡死，
+  也不能重置真实上游 chunk 的静默超时。
 
 ### 4. Validation & Error Matrix
 
@@ -183,6 +259,11 @@ Telemetry 契约：
 | 新版本抓包 CCH 不命中旧 seed | 先尝试输入规范化差异；只有多组样本都不命中时再逆向 seed |
 | `cc_version` 主请求按第一个 text block 计算不命中 | 检查首条 user message 是否有多个 text block；按最后一个 text block 复算 |
 | Fable 带 `[1m]` 时 beta 顺序与抓包不同 | 先按目标版本抓包判断是否应有 `context-1m-2025-08-07`；若应有，再整理到 `oauth` 后面 |
+| 2.1.257 Fable 5.1 CCH 不命中 | 确认清空 `model`、删除 `max_tokens`，但保留 top-level `fallbacks="default"` |
+| Fable 5.1 被套用 Fable 5 fallback/beta | 检查 `RequestProfile::fable_model` 是否按精确模型 ID 命中，不能使用 family 前缀选择 wire 画像 |
+| Haiku title 分类出现历史变体 | 保留结构化 schema 和旧 prompt marker 两条路径；没有新抓包证据时不收窄旧兼容分支 |
+| 上游返回 200 headers 后一直无 SSE body | 等待历史 upstream idle timeout；记录 `upstream_first_byte_timeout`，不要提前注入 keepalive |
+| 已收到 SSE chunk 后长时间静默 | 记录 `upstream_stream_idle_timeout`；keepalive 可维持下游连接，但不得重置上游 idle timeout |
 | bootstrap response 有 gzip | 先解码再改 JSON，返回时修正压缩/长度相关 header |
 | 未携带 token 请求 `GET/HEAD /api/hello` | 返回 200；HEAD body 为空且 `Content-Length=20` |
 | 未携带 token 请求其他 fallback 路径 | 保持原 gateway token 鉴权，不得因 hello 公开而放宽 |
@@ -195,6 +276,9 @@ Telemetry 契约：
 
 **Good**：升级版本前先收集 baseline 和目标版本的 Opus/Fable/Haiku 抓包，离线复算 `cc_version` 与 CCH，确认 beta 顺序，再改 profile 和测试。
 
+**Good**：Fable 5 与 Fable 5.1 使用两个精确子画像，只在共享周配额判断中把已知 ID 和
+`[suffix]` 形式归到 `seven_day_fable`。
+
 **Base**：只升级一个 patch 版本，也必须至少验证 `/v1/messages` header、body keys、billing header、bootstrap 和 telemetry metadata 是否变化。
 
 **Bad**：只把 `DEFAULT_CLAUDE_CODE_VERSION` 改成新版本，未同步 `User-Agent`、账号迁移、CCH 输入 profile 和 beta 顺序。
@@ -204,6 +288,12 @@ Telemetry 契约：
 **Bad**：看到 Fable 抓包里有 `flags=model`，就把它硬编码成所有 Fable telemetry 字段。
 
 **Bad**：把 `context-1m-2025-08-07` 放进 Fable 必需 beta，导致无 1M 设置时也开启 1M beta。
+
+**Bad**：为了消除理论误判，在没有覆盖历史 title 变体的抓包和测试时收窄 Haiku 兼容
+marker，导致原有标题生成请求落回通用 beta。
+
+**Bad**：把 200 response headers 当成流已成功；没有首个 SSE chunk 时仍可能在客户端
+watchdog 前后报 `No response from API`。
 
 **Bad**：因为模型请求链路是 `Claude Code -> new-api -> cc2api`，就假设 hello 也会使用同一 base URL，并在 new-api 中臆造渠道路由。
 
@@ -217,16 +307,26 @@ Telemetry 契约：
   - `cc_version_suffix_source_uses_last_user_text_block`
   - `fable_messages_headers_use_fallback_beta_without_context_1m`
   - `fable_context_1m_beta_keeps_claude_code_order_when_allowed`
+  - Fable 5.1 使用 `fallbacks="default"`、64000、adaptive display updates 和独立 beta，
+    2.1.220 不识别该新画像
+  - 2.1.257 CCH 对 Fable 5.1 保留 top-level fallback，对其他模型删除 fallback
+  - Haiku probe、结构化/旧 marker title、main 有无 diagnostics、non-stream aux 的 beta
+    分类；保留兼容宽度的反例必须有回归断言
+  - Fable 5/5.1 与 `[suffix]` 命中 `seven_day_fable`，相似 preview 模型不命中
+  - system-role 和 bootstrap 默认迁移只追加/替换历史默认，三个明确不迁移列表保持原值
+  - 首字节 timeout、首 chunk 后 idle timeout、首 chunk 前无 keepalive、request ID 脱敏
   - bootstrap gzip 解码和 configured/hide_fable 行为
   - assembled Router 中无 token 的 GET/HEAD hello 返回 200，HEAD body 为空且长度为 20，其他 fallback 路径仍返回 401
   - telemetry 中 Fable `betas`、`model`，以及不无条件写 `flags=model`
-  - TokenTester 按账号选中画像生成 2.1.220/旧回滚 profile 的 UA、Stainless package/runtime 和 beta
+  - TokenTester 按账号选中画像生成 2.1.257、2.1.220 和旧回滚 profile 的 UA、Stainless package/runtime 和 beta
   - 旧默认 `claude_code_version_profile` + 旧默认 `allowed_claude_code_versions` 会升级到当前默认
   - 自定义 `allowed_claude_code_versions` 下的旧 profile 作为显式回滚保留
 - 抓包回归：
   - 169 baseline CCH 命中旧完整 body 规则。
   - 172 Opus CCH 命中 `model + max_tokens` 排除规则。
   - 172 Fable CCH 命中 `model + max_tokens + fallbacks` 排除规则。
+  - 257 Opus、Fable 5.1、Haiku 样本的 `cc_version` 与 CCH 全量命中；Fable 5.1 的
+    `fallbacks="default"` 保留参与 hash。
 - Fable `[1m]` 抓包 beta 是否包含 `context-1m-2025-08-07`、以及包含时的顺序，与目标版本代码输出完全一致。
 - 远程部署验收：
   - `docker compose pull` 后必须 `up -d --force-recreate`。
@@ -270,6 +370,26 @@ claude-code-20250219,oauth-2025-04-20,...,cache-diagnosis-2026-04-07,context-1m-
 ```text
 claude-code-20250219,oauth-2025-04-20,context-1m-2025-08-07,interleaved-thinking-2025-05-14,...
 ```
+
+#### Wrong: 用 Fable family 前缀选择 wire 画像
+
+```rust
+if model.starts_with("claude-fable-") {
+    apply_fable_5_profile(body);
+}
+```
+
+这会把 `claude-fable-5-1` 错写成 Fable 5 的 fallback、beta 和 CCH 输入。
+
+#### Correct: 版本画像内按精确模型 ID 查找
+
+```rust
+if let Some(fable) = request_profile.fable_model(model) {
+    apply_fable_profile(body, fable);
+}
+```
+
+family 判断只用于已确认共享的 `seven_day_fable` 配额；wire profile 仍由精确 ID 决定。
 
 #### Wrong: 假设 hello 跟随模型 base URL
 
