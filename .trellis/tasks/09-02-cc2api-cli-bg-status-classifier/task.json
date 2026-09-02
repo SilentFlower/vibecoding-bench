@@ -1,0 +1,38 @@
+{
+  "id": "cc2api-cli-bg-status-classifier",
+  "name": "cc2api-cli-bg-status-classifier",
+  "title": "适配 Claude Code 后台状态分类请求",
+  "description": "为 cli-bg 状态分类请求增加放行/模拟全局模式，默认放行并绕过会触发上游 429 的正文改写，随后通过 cc2api 代理链路仿真验证。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "cc2api",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-09-02",
+  "completedAt": "2026-09-02",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "09-02-upgrade-claude-code-2-1-257",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-09-02T23:41:16+08:00",
+    "completedSteps": [
+      "完成 cli-bg 强特征识别、passthrough identity-only 旁路与 mock 响应",
+      "修复状态分类优先级、命中请求日志脱敏与账号代理 fail-closed",
+      "完成 Rust/前端完整验证并更新后端服务架构规范",
+      "提交并推送 cc2api 与父仓业务变更"
+    ],
+    "partialStep": null,
+    "nextStep": "等待镜像构建后部署，并完成生产账号代理链路非 429 验收",
+    "notes": "部署前检查低连接窗口；验收使用固定账号的一次性 token，结束后删除 token、恢复日志设置并保持 passthrough。"
+  }
+}

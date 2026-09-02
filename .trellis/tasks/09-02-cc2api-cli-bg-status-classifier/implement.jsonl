@@ -1,0 +1,9 @@
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复用既有 classifier、mock envelope 与 settings 模式，避免重复协议逻辑。"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"约束 DB、管理 API、Gateway 热缓存与 Settings UI 的全链路一致性。"}
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"约束 /v1/messages 热路径、账号 admission、本地拦截和正文改写顺序。"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"约束 setting 默认值、迁移、校验、reload 和前端同步。"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"约束 Settings 枚举控件与字符串保存契约。"}
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"保持 Claude Code 2.1.257 header、CCH 与请求画像边界。"}
+{"file":".trellis/spec/cc2api/deploy/deploy-guidelines.md","reason":"约束镜像发布、低连接部署、敏感信息和生产验收。"}
+{"file":".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-capture-summary.md","reason":"复用 Fable 5.1 抓包、CCH、1M 与 no-response 已确认结论。"}
+{"file":".trellis/tasks/09-02-cc2api-cli-bg-status-classifier/research/cli-bg-status-classifier-design-audit.md","reason":"实现前复核 detector、identity-only 旁路、mock schema 与账号代理验收边界。"}

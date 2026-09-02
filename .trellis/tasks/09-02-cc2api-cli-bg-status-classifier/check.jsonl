@@ -1,0 +1,6 @@
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"执行 Rust、settings、CCH、日志敏感信息和完整回归检查。"}
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"核对本地 mock 不消耗 admission，passthrough 保持代理链路。"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"核对默认、迁移、非法值和热刷新。"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"核对 Settings UI 类型、key 和构建。"}
+{"file":".trellis/spec/cc2api/deploy/deploy-guidelines.md","reason":"核对远程健康、连接数、镜像、DB setting 与日志边界。"}
+{"file":".trellis/tasks/09-02-cc2api-cli-bg-status-classifier/research/cli-bg-status-classifier-design-audit.md","reason":"按研究结论复核误命中、正文旁路和生产账号代理验证。"}
