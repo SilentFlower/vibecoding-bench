@@ -27,3 +27,26 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 59: 完成 cli-bg 状态分类适配
+
+**Date**: 2026-09-03
+**Task**: 完成 cli-bg 状态分类适配
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+完成 Claude Code cli-bg 状态分类强特征识别、放行与模拟模式、代理失败关闭及日志脱敏；代码和任务记录已推送，待按 release.md 部署并完成生产非 429 验收。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b8d0ef3` | (see git log) |
+| `b8766e9` | (see git log) |
+
+### Status
+
+[OK] **Completed**
