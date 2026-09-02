@@ -1,0 +1,37 @@
+{
+  "id": "vibecoding-bench-claude-code-2-1-257-runtime",
+  "name": "vibecoding-bench-claude-code-2-1-257-runtime",
+  "title": "升级 vibecoding-bench 到 Claude Code 2.1.257",
+  "description": "同步 worker、容器、orchestrator、WebUI 与示例配置的 Claude Code 默认版本。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-09-02",
+  "completedAt": "2026-09-02",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "09-02-upgrade-claude-code-2-1-257",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-09-02T05:55:18Z",
+    "completedSteps": [
+      "升级 vibecoding-bench 默认 Claude Code 版本至 2.1.257",
+      "完成所有 worker 创建路径的版本传递测试和配置校验",
+      "通过 Check-All 与规范复核"
+    ],
+    "partialStep": null,
+    "nextStep": "进入发布子任务执行镜像构建、推送与线上验证",
+    "notes": "业务提交 9ed24dd 已推送；生产 WebUI 保存值继续由发布子任务核对。"
+  }
+}

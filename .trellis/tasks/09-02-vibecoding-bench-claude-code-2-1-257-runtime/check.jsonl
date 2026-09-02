@@ -1,0 +1,4 @@
+{"file":".trellis/spec/vibecoding-bench/backend/quality-guidelines.md","reason":"检查 orchestrator 测试、默认值与异常行为不回归。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/image-build-push.md","reason":"检查镜像预装、运行覆盖和 Compose 镜像契约。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/remote-deploy.md","reason":"检查文档、配置和远程验收步骤同步。"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"检查 UI、API、环境、容器和文档中的版本数据流一致。"}

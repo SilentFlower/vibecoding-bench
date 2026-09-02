@@ -1,0 +1,4 @@
+{"file":".trellis/spec/vibecoding-bench/backend/quality-guidelines.md","reason":"约束 orchestrator 配置、测试和错误处理质量。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/image-build-push.md","reason":"定义 worker 预装版本、运行时覆盖和三镜像构建契约。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/remote-deploy.md","reason":"定义远程 .env、WebUI 覆盖优先级和 worker 版本验收。"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"避免在多个 worker 创建路径重复实现版本选择逻辑。"}
