@@ -80,9 +80,9 @@ CLAUDE_DEFAULT_MODEL=opus[1m]
 # WebUI「运行」页保存的页面覆盖值优先于这里。
 CLAUDE_CODE_EFFORT_LEVEL=max
 
-# 可选:新启动 worker 的 Claude Code CLI 兜底版本(默认 2.1.220);
+# 可选:新启动 worker 的 Claude Code CLI 兜底版本(默认 2.1.257);
 # WebUI「运行」页保存的页面覆盖值优先于这里。
-CLAUDE_CODE_VERSION=2.1.220
+CLAUDE_CODE_VERSION=2.1.257
 ```
 
 ### HOST_BENCH_DATA 怎么填(最常错)
@@ -150,9 +150,9 @@ worker 启动时会检查 `claude --version`；如果和当前生效版本不一
 
 | 场景 | 行为 |
 |------|------|
-| 未配置 `CLAUDE_CODE_VERSION` | 新 worker 使用 `2.1.220` |
+| 未配置 `CLAUDE_CODE_VERSION` | 新 worker 使用 `2.1.257` |
 | 配置 `CLAUDE_CODE_VERSION=2.1.169` | 页面未覆盖时，新 worker 使用 `2.1.169` |
-| WebUI 运行页保存 `2.1.169` | 新启动的 task / 抓包 / 登录 / quota worker 使用 `2.1.169`，即使 `.env` 仍是 `2.1.220` |
+| WebUI 运行页保存 `2.1.169` | 新启动的 task / 抓包 / 登录 / quota worker 使用 `2.1.169`，即使 `.env` 仍是 `2.1.257` |
 | WebUI 运行页清空覆盖值 | 新 worker 回退到 `.env` 的 `CLAUDE_CODE_VERSION` |
 | 指定不存在的版本 | worker 启动安装失败，run 明确失败，不静默回退 |
 

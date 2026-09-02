@@ -229,7 +229,7 @@ task 模式环境变量:
 | `CLAUDE_BUSY_INTERRUPT_GRACE_SEC` | 否 | 发送中断后等待 TUI 回到输入状态的秒数,默认 8 |
 | `CLAUDE_API_STALL_RECOVERY_PROMPT` | 否 | API 卡死自动续跑提示;留空使用 worker 内置中文提示 |
 | `COMPLETION_IDLE_SEC` | 否 | JSONL 稳定窗口,默认 10 秒 |
-| `CLAUDE_CODE_VERSION` | 否 | 本次 worker 应使用的 Claude Code CLI 版本,默认 2.1.185;启动时若镜像内版本不一致,worker 会安装指定版本 |
+| `CLAUDE_CODE_VERSION` | 否 | 本次 worker 应使用的 Claude Code CLI 版本,默认 2.1.257;启动时若镜像内版本不一致,worker 会安装指定版本 |
 
 ### 3. Contracts
 

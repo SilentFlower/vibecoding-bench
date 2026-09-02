@@ -316,6 +316,232 @@ class TopicPromptTests(unittest.TestCase):
         self.assertTrue(main._should_load_topic_prompt_history(None, "natural"))
 
 
+class ClaudeCodeVersionTests(unittest.TestCase):
+    """验证 Claude Code 默认版本、页面覆盖和各类 worker 的版本传递。"""
+
+    def setUp(self) -> None:
+        """
+        准备独立 SQLite、profile 和 worker 目录。
+
+        :return: None
+        """
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.originals = (
+            main.DB_PATH,
+            main.BENCH_DATA,
+            main.HOST_BENCH_DATA,
+            main.PROFILES_DIR,
+            main.FLOWS_DIR,
+            main.WORKSPACES_DIR,
+            main.CA_DIR,
+            main.TOPICS_FILE,
+        )
+        main.DB_PATH = self.base / "db.sqlite"
+        main.BENCH_DATA = self.base
+        main.HOST_BENCH_DATA = self.base
+        main.PROFILES_DIR = self.base / "profiles"
+        main.FLOWS_DIR = self.base / "flows"
+        main.WORKSPACES_DIR = self.base / "workspaces"
+        main.CA_DIR = self.base / "ca"
+        main.TOPICS_FILE = self.base / "missing-topics.md"
+        main.init_db()
+        profile_dir = main.PROFILES_DIR / "main"
+        profile_dir.mkdir(parents=True)
+        (profile_dir / ".credentials.json").write_text(
+            json.dumps({
+                "claudeAiOauth": {
+                    "accessToken": "test-access",
+                    "refreshToken": "test-refresh",
+                    "expiresAt": 1,
+                }
+            }),
+            encoding="utf-8",
+        )
+
+    def tearDown(self) -> None:
+        """
+        恢复模块全局目录并清理临时数据。
+
+        :return: None
+        """
+        (
+            main.DB_PATH,
+            main.BENCH_DATA,
+            main.HOST_BENCH_DATA,
+            main.PROFILES_DIR,
+            main.FLOWS_DIR,
+            main.WORKSPACES_DIR,
+            main.CA_DIR,
+            main.TOPICS_FILE,
+        ) = self.originals
+        self.tmp.cleanup()
+
+    def _docker_client(self) -> tuple[Mock, list[tuple[str, dict]]]:
+        """
+        创建记录容器启动参数的 Docker client mock。
+
+        :return: Docker client mock 和 `(image, kwargs)` 调用列表
+        """
+        client = Mock()
+        calls: list[tuple[str, dict]] = []
+
+        def run(image: str, **kwargs) -> Mock:
+            """
+            记录容器创建参数并返回带稳定 ID 的 mock。
+
+            :param image: 容器镜像名
+            :param kwargs: docker SDK 创建参数
+            :return: 带 ID 的容器 mock
+            """
+            container = Mock()
+            container.id = f"container-{len(calls) + 1}"
+            calls.append((image, kwargs))
+            return container
+
+        client.containers.run.side_effect = run
+        return client, calls
+
+    def _assert_worker_version(self, calls: list[tuple[str, dict]], label: str) -> None:
+        """
+        断言指定路径创建的 worker 显式携带 2.1.257。
+
+        :param calls: Docker client mock 记录的容器创建参数
+        :param label: 失败时标识当前 worker 路径
+        :return: None
+        """
+        worker_calls = [kwargs for image, kwargs in calls if image == main.WORKER_IMAGE]
+        self.assertEqual(1, len(worker_calls), label)
+        self.assertEqual(
+            "2.1.257",
+            worker_calls[0]["environment"]["CLAUDE_CODE_VERSION"],
+            label,
+        )
+
+    def test_runtime_version_setting_override_and_reset(self) -> None:
+        """
+        无覆盖、保存覆盖和清空覆盖应按既定优先级返回版本。
+
+        :return: None
+        """
+        self.assertEqual("2.1.257", main.CLAUDE_CODE_VERSION)
+        self.assertEqual({
+            "configured_version": None,
+            "env_default_version": "2.1.257",
+            "effective_version": "2.1.257",
+        }, main.get_claude_code_version())
+
+        overridden = main.update_claude_code_version(
+            main.ClaudeCodeVersionIn(claude_code_version="2.1.220")
+        )
+        self.assertEqual("2.1.220", overridden["configured_version"])
+        self.assertEqual("2.1.257", overridden["env_default_version"])
+        self.assertEqual("2.1.220", overridden["effective_version"])
+
+        reset = main.update_claude_code_version(
+            main.ClaudeCodeVersionIn(claude_code_version=None)
+        )
+        self.assertIsNone(reset["configured_version"])
+        self.assertEqual("2.1.257", reset["env_default_version"])
+        self.assertEqual("2.1.257", reset["effective_version"])
+
+    def test_all_worker_creation_paths_receive_effective_version(self) -> None:
+        """
+        task、抓包、继续、quota、OAuth refresh 和 login worker 都应显式传版本。
+
+        :return: None
+        """
+        account = {
+            "name": "main",
+            "enabled": 1,
+            "deleted_at": None,
+            "upstream_socks5_host": "proxy.example.com",
+            "upstream_socks5_port": 1080,
+        }
+        with (
+            patch.object(main, "effective_claude_code_version", return_value="2.1.257"),
+            patch.object(main, "_wait_sidecar_ready"),
+        ):
+            for capture_full_http, label in ((False, "task"), (True, "capture")):
+                with self.subTest(worker=label):
+                    client, calls = self._docker_client()
+                    runner = object.__new__(main.Runner)
+                    runner.client = client
+                    runner.start_run(
+                        f"{label}-run",
+                        account,
+                        {
+                            "id": 1,
+                            "prompt": "test prompt",
+                            "timeout_sec": 60,
+                            "capture_full_http": capture_full_http,
+                        },
+                    )
+                    self._assert_worker_version(calls, label)
+
+            client, calls = self._docker_client()
+            runner = object.__new__(main.Runner)
+            runner.client = client
+            runner.start_continue(
+                "continue-session",
+                {"id": "continue-run", "run_kind": "normal"},
+                account,
+                "claude-session",
+            )
+            self._assert_worker_version(calls, "continue")
+
+            client, calls = self._docker_client()
+            runner = object.__new__(main.Runner)
+            runner.client = client
+            with (
+                patch.object(runner, "cleanup"),
+                patch.object(runner, "_exec_oauth_refresh_probe", return_value={"skipped": True}),
+                patch.object(runner, "_exec_quota_probe", return_value={}),
+            ):
+                runner.query_quota(account)
+            self._assert_worker_version(calls, "quota")
+
+            client, calls = self._docker_client()
+            runner = object.__new__(main.Runner)
+            runner.client = client
+            with (
+                patch.object(runner, "cleanup"),
+                patch.object(runner, "_exec_oauth_refresh_probe", return_value={"refreshed": True}),
+            ):
+                self.assertTrue(runner.refresh_account_oauth_token(account))
+            self._assert_worker_version(calls, "oauth-refresh")
+
+            client, calls = self._docker_client()
+            login_manager = main.LoginManager(client)
+            login_manager.start("login-account", {}, timezone="Asia/Singapore")
+            self._assert_worker_version(calls, "login")
+
+    def test_entrypoint_keeps_strict_version_fallback_and_install(self) -> None:
+        """
+        entrypoint 的 shell/Node fallback 必须一致，非法或安装不匹配仍失败。
+
+        :return: None
+        """
+        entrypoint = (
+            Path(__file__).resolve().parents[1] / "images" / "worker" / "entrypoint.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            'CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.257}"',
+            entrypoint,
+        )
+        self.assertIn("process.argv[3] || '2.1.257'", entrypoint)
+        ensure_match = re.search(
+            r"ensure_claude_code_version\(\) \{(?P<body>.*?)\n\}",
+            entrypoint,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(ensure_match)
+        ensure_body = ensure_match.group("body")
+        self.assertIn('npm install -g "@anthropic-ai/claude-code@$desired"', ensure_body)
+        self.assertIn("Invalid CLAUDE_CODE_VERSION", ensure_body)
+        self.assertIn("Claude Code version mismatch after install", ensure_body)
+
+
 class ScheduledWarmupTests(unittest.TestCase):
     """验证养号迁移、匹配、凭据同步和调度状态。"""
 
@@ -447,7 +673,7 @@ global.fetch = async (_url, options) => {
         })
         command = ["node", "--require", str(preload_path), "-"]
         if entrypoint == "worker":
-            command.extend([str(credentials_path), "2.1.220", "test"])
+            command.extend([str(credentials_path), "2.1.257", "test"])
         completed = subprocess.run(
             command,
             input=script,
