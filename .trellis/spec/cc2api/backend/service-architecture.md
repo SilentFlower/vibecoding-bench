@@ -689,7 +689,7 @@ match account_svc.resolve_upstream_token(account.id).await {
 - Gateway 必须先解析账号级上游 Session 池，再调用探测；探测使用最终改写后的有效上游 Session 去重。池关闭或解析失败时回退到真实下游 Session，不得因池故障阻断原有业务转发。
 - assistant prefill、warmup、classifier、event logging、count tokens、普通 API 客户端和其它本地响应不得创建探测状态。
 - 探测请求固定为匿名 `HEAD https://api.anthropic.com/api/hello`，header 为 `User-Agent: Bun/1.4.0`、`Accept: */*`、`Accept-Encoding: gzip, deflate, br, zstd`、`Connection: keep-alive`；不得添加 query、body、Authorization、Cookie、billing header 或用户数据。
-- 非空 `Account.proxy_url` 必须先通过 `reqwest::Proxy::all` 校验，再交给 `tlsfp::get_request_client`；无效代理不得静默直连。空代理允许直连。
+- 非空 `Account.proxy_url` 必须由 `tlsfp::get_request_client` 内部通过 `reqwest::Proxy::all` 校验并应用；客户端创建失败时返回错误，无效代理不得静默直连。空代理允许直连。
 - 只有 HTTP 200 为成功。成功状态命中时原子续期，形成滑动空闲 TTL；`failure` / `timeout` 使用固定冷却，不因读取续期。
 - 状态不存在时，leader 获取 `:lock` 后执行网络请求并写状态；follower 轮询同一状态并复用结果。RedisStore 必须保证跨进程去重，MemoryStore 只保证单进程。
 - leader 写状态失败时不得立即释放锁，应让锁按 TTL 自然过期以吸收当前并发波次；已经等待过该 leader 的 follower 即使随后拿到锁也不得再次发包，非严格模式开放、严格模式返回 503。新的后续请求可在锁释放或过期后恢复探测。
@@ -735,26 +735,99 @@ match account_svc.resolve_upstream_token(account.id).await {
 #### Wrong
 
 ```rust
-let client = get_request_client(&account.proxy_url);
+let client = make_request_client(&account.proxy_url)
+    .unwrap_or_else(|_| reqwest::Client::new());
 let response = client.head(HELLO_URL).send().await?;
 account_svc.acquire_account_rpm(&account, sticky, session_hash).await?;
 ```
 
-无效代理可能被 client builder 忽略，而且探测后再次 admission 会把一轮业务请求计成两次 RPM。
+代理或 TLS 客户端构建失败时退回默认客户端会绕过账号代理，而且探测后再次 admission 会把一轮业务请求计成两次 RPM。
 
 #### Correct
 
 ```rust
-let state = if !account.proxy_url.is_empty()
-    && reqwest::Proxy::all(&account.proxy_url).is_err()
-{
-    SessionHelloProbeState::Failure
-} else {
-    run_anonymous_head(&account.proxy_url, config.timeout).await
+let state = match get_request_client(&account.proxy_url) {
+    Ok(client) => run_anonymous_head(client, config.timeout).await,
+    Err(_) => SessionHelloProbeState::Failure,
 };
 ```
 
-Gateway 在既有 admission 后调用 `ensure_ready`；服务内部先拒绝无效代理，再执行匿名 HEAD、状态缓存和 singleflight，不执行第二次 RPM admission。
+Gateway 在既有 admission 后调用 `ensure_ready`；共享 client factory 负责代理失败关闭，服务再执行匿名 HEAD、状态缓存和 singleflight，不执行第二次 RPM admission。
+
+## Scenario: Claude Code `cli-bg` 状态分类旁路
+
+### 1. Scope / Trigger
+
+- Trigger：修改 Claude Code 后台 Agent 状态分类请求的识别、请求体改写、模拟响应、请求日志、账号代理或对应 Settings 时适用。
+- 目标：只对已确认的 Fable 5.1 `cli-bg` 辅助请求提供默认放行和显式模拟，同时保持普通 `/v1/messages`、旧 Auto Mode classifier 和账号调度行为不变。
+
+### 2. Signatures
+
+- setting：`intercept_cli_bg_status_classifier_mode=passthrough|mock`，默认 `passthrough`。
+- detector：`is_cli_bg_status_classifier_request(path, headers, body, client_type) -> bool`。
+- identity-only 改写：`Rewriter::rewrite_claude_code_identity_only(body, account, upstream_session_rewrite) -> Vec<u8>`。
+- TLS 客户端：`tlsfp::get_request_client(proxy_url) -> Result<reqwest::Client, reqwest::Error>`。
+- mock 外层返回 Anthropic Message envelope，`content[0].text` 是可二次解析的 `state/detail/tempo/needs/output` JSON。
+
+### 3. Contracts
+
+- detector 必须同时匹配精确 `/v1/messages`、`ClientType::ClaudeCode`、原始 `x-app=cli-bg`、精确 `claude-fable-5-1`、非流式、`max_tokens=3072`、唯一 ephemeral system text block 和唯一 user 状态文本。Fable 5、`[1m]`、普通主请求和旧 XML classifier 不得命中。
+- `passthrough` 命中后仍走账号选择、sticky、RPM/concurrency、OAuth、2.1.257 header、账号代理/TLS、401、signature/429 retry 和响应透传；首次上游请求体只允许账号 metadata 与 upstream session identity 映射，不运行缓存断点、TTL、thinking、body order 或 CCH 通用改写。
+- `passthrough` 必须保留原始 `x-app=cli-bg`、system/message/cache_control/thinking 形状。命中后全文请求、429 请求和非流式响应捕获全部禁用，只保留尺寸、短 hash、重试次数与 `proxy_configured` 等脱敏摘要。
+- `mock` 必须在 session hash、账号选择、RPM 和并发槽之前返回，不得访问上游或消耗账号额度。
+- mock 分类优先级固定为：API/auth/infra 错误 -> blocked；Agent 明确自动复查/继续执行 -> working；无自动复查的用户门槛 -> blocked；明确 failed/done；最后回退 `Current state`，未知值保守返回 working。
+- 非空代理由共享 TLS client factory 强制解析和应用；代理或客户端构建失败必须向调用方返回错误，所有 gateway、OAuth、Hello、Prime 和 telemetry 调用点都不得自行退回直连客户端。错误日志不得包含代理 URL 或其中的凭据。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+|------|------|
+| 强特征命中 + `passthrough` | identity-only 改写后经账号代理转发，禁用全文捕获 |
+| 强特征命中 + `mock` | 本地 HTTP 200 Message envelope，不进入账号和上游链路 |
+| 任一 detector 条件不满足 | 使用普通请求链路和管理员现有改写设置 |
+| `Awaiting your go` 且声明 `Next check` | working，Agent 仍持有下一步 |
+| 需要用户选择修复、环境或提交位置且无自动复查 | blocked |
+| API/auth/infra 错误同时声明重试或复查 | blocked，硬错误优先 |
+| 非空代理无法解析或客户端构建失败 | 返回受控错误，不连接目标上游，不退回直连 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：上游地址设为不可达域名，账号配置本地 mock HTTP proxy；请求只有经过该代理才能获得 200，并且 proxy 收到 `x-app=cli-bg` 和 identity-only body。
+- Good：全文非流/429 日志全局开启时，命中的 `cli-bg` 仍只写安全摘要；其它普通请求继续遵守管理员日志设置。
+- Base：setting 缺失时默认 `passthrough`；旧数据库只补缺失 key，管理员已有合法值不被覆盖。
+- Bad：只按模型或 `max_tokens` 判断，导致普通 Fable 5.1 主请求绕过正文改写。
+- Bad：代理解析失败后创建默认 `reqwest::Client`，会从宿主机直连并暴露与账号不一致的网络/TLS 特征。
+
+### 6. Tests Required
+
+- detector 覆盖完整正例，以及 path、UA、x-app、model、stream、max_tokens、system/user marker、Fable 5、`[1m]` 和旧 classifier 负例。
+- identity-only 测试断言 system ephemeral 无新增 `ttl`、messages 无新增 cache_control、thinking/fallbacks 保持原形，metadata/session 按账号映射。
+- mock 测试覆盖四状态 schema、API/auth 硬阻塞、自动复查优先级、用户门槛、可选追加任务和未知状态回退。
+- 代理集成测试必须让不可达 upstream 通过本地 mock proxy 成功；非法代理测试必须返回错误并断言可达 upstream 零请求。
+- TLS client factory 覆盖相同代理复用、不同代理隔离、关闭连接池和非法代理不缓存直连客户端。
+- 完整验证运行 `cargo fmt --check`、classifier/settings/CCH 定向测试、`cargo test`、前端 `npm run build` 和敏感内容扫描。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+let client = reqwest::Proxy::all(proxy_url)
+    .ok()
+    .and_then(|proxy| builder.proxy(proxy).build().ok())
+    .unwrap_or_else(reqwest::Client::new);
+```
+
+代理配置或指纹客户端构建失败会被吞掉，随后从宿主机直连；同一辅助请求还可能进入通用正文和全文日志链路。
+
+#### Correct
+
+```rust
+let client = get_request_client(&account.proxy_url)
+    .map_err(|_| AppError::BadGateway("upstream request client unavailable".into()))?;
+```
+
+共享 client factory 只缓存成功构建的客户端，非空代理失败立即向上传播；Gateway 对命中的 `cli-bg` 单独选择 identity-only 改写和 summary-only 日志策略。
 
 ## 设置热刷新模式
 
