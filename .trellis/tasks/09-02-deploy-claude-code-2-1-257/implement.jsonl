@@ -1,0 +1,4 @@
+{"file":".trellis/spec/cc2api/deploy/deploy-guidelines.md","reason":"定义 cc2api 镜像、连接数、数据库迁移和健康验证流程。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/image-build-push.md","reason":"定义三镜像工作流、SHA tag 和 digest 核验。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/remote-deploy.md","reason":"定义远程 Compose、版本环境、连接预检和回滚流程。"}
+{"file":".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-online-compatibility-audit.md","reason":"提供生产 settings、1M allowlist、配额和流式超时基线。"}

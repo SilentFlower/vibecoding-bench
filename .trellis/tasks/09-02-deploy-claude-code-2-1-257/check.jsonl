@@ -1,0 +1,5 @@
+{"file":".trellis/spec/cc2api/deploy/deploy-guidelines.md","reason":"检查 cc2api 发布、DB 迁移、日志和回滚证据。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/image-build-push.md","reason":"检查 GHCR 镜像、tag/digest 和三镜像一致性。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/remote-deploy.md","reason":"检查远程健康、挂载、环境版本和回滚步骤。"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"检查代码、配置、DB、容器和线上行为闭环。"}
+{"file":".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-online-compatibility-audit.md","reason":"对照生产自定义设置、1M 策略与超时基线未被破坏。"}

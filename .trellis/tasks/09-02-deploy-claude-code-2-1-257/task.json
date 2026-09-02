@@ -1,0 +1,36 @@
+{
+  "id": "deploy-claude-code-2-1-257",
+  "name": "deploy-claude-code-2-1-257",
+  "title": "发布并验证 Claude Code 2.1.257 升级",
+  "description": "在两个实现子任务通过检查后执行镜像发布、线上迁移与运行验证。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-09-02",
+  "completedAt": "2026-09-02",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "09-02-upgrade-claude-code-2-1-257",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-09-02T00:00:00+08:00",
+    "completedSteps": [
+      "完成生产发布与线上验证",
+      "完成联合回滚契约沉淀并通过 Check-All"
+    ],
+    "partialStep": null,
+    "nextStep": "等待 finish-work 归档",
+    "notes": "Claude Code 2.1.257 已部署；cc2api、orchestrator、worker、Fable 5.1 流式请求及非破坏性回滚演练均已验证。"
+  }
+}
