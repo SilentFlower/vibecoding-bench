@@ -1973,3 +1973,26 @@ topics.md 300→600；sync 脚本改为集合校验并兼容十一+分类；远�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 57: 完成 cc2api Claude Code 2.1.257 协议适配
+
+**Date**: 2026-09-02
+**Task**: 完成 cc2api Claude Code 2.1.257 协议适配
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+基于真实抓包完成 2.1.257 默认画像、Fable 5.1、Haiku、CCH、设置迁移和首字节超时诊断适配；全量验证通过，CHK-001 作为 Haiku 历史兼容宽度由用户接受，后续交由部署任务执行线上验收。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `84b0016` | (see git log) |
+| `c17660b` | (see git log) |
+
+### Status
+
+[OK] **Completed**
