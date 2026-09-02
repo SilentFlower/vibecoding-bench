@@ -1,0 +1,35 @@
+{
+  "id": "cc2api-claude-code-2-1-257-protocol",
+  "name": "cc2api-claude-code-2-1-257-protocol",
+  "title": "适配 cc2api Claude Code 2.1.257 协议",
+  "description": "基于真实抓包新增 2.1.257 画像，并分别适配 Opus、Fable 5、Fable 5.1 与 Haiku 请求子画像。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "cc2api",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-09-02",
+  "completedAt": "2026-09-02",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "09-02-upgrade-claude-code-2-1-257",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-09-02T12:19:18+08:00",
+    "completedSteps": [
+      "完成 Claude Code 2.1.257 画像、Fable 5.1、Haiku、CCH、设置迁移与首字节超时诊断适配，并通过全量验证和规范更新"
+    ],
+    "partialStep": null,
+    "nextStep": "进入部署任务，执行线上账号画像分布与首字节超时日志验收",
+    "notes": "Check-All 通过；CHK-001 已由用户接受风险，保留 Haiku 历史兼容匹配宽度。"
+  }
+}

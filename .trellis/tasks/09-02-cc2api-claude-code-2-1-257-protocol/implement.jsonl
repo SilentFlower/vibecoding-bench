@@ -1,0 +1,7 @@
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"定义版本画像、CCH、beta、bootstrap、迁移和回滚的协议契约。"}
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"约束 gateway、rewriter、账号调度与模型限制的职责边界。"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"约束 settings、账号 canonical env 和保留自定义值的数据库迁移。"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"定义 Rust、数据库、网关与前端验证要求。"}
+{"file":".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-capture-summary.md","reason":"提供 Fable 5.1、CCH、beta、首字节卡死和 [1m] 入口的脱敏证据。"}
+{"file":".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/haiku-capture-summary.md","reason":"提供 Haiku 四类请求的结构与 beta 证据。"}
+{"file":".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-online-compatibility-audit.md","reason":"提供线上 system-role、配额、1M allowlist 和流式超时配置审计。"}

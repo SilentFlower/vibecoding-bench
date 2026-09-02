@@ -1,0 +1,6 @@
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"检查实现是否逐项满足真实抓包画像且旧 profile 可回滚。"}
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"检查模型分类、配额、超时诊断和网关边界没有职责漂移。"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"检查迁移幂等、保留自定义值且未误改账号 1M 策略。"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"检查格式、测试、前端构建与敏感信息边界。"}
+{"file":".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-capture-summary.md","reason":"对照 Fable 5.1 wire profile、CCH、[1m] 和 no-response 证据。"}
+{"file":".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/haiku-capture-summary.md","reason":"对照 Haiku 请求分类和 beta 证据。"}
