@@ -16,9 +16,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       python3 python3-pip python3-venv pipx \
       build-essential pkg-config \
       git curl wget unzip \
-      ca-certificates \
+      ca-certificates locales \
       tmux jq ripgrep \
       tini \
+    && sed -i \
+      -e 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' \
+      -e 's/^# *ja_JP.UTF-8 UTF-8/ja_JP.UTF-8 UTF-8/' \
+      -e 's/^# *ko_KR.UTF-8 UTF-8/ko_KR.UTF-8 UTF-8/' \
+      -e 's/^# *de_DE.UTF-8 UTF-8/de_DE.UTF-8 UTF-8/' \
+      -e 's/^# *fr_FR.UTF-8 UTF-8/fr_FR.UTF-8 UTF-8/' \
+      /etc/locale.gen \
+    && locale-gen \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装 Claude Code CLI。版本要和 orchestrator/worker 里 usage 请求的 UA 保持一致。

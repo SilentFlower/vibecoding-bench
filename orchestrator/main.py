@@ -252,6 +252,11 @@ _DEFAULT_CLAUDE_SETTINGS: dict[str, object] = {
 _DEFAULT_CLAUDE_TOP_CONFIG: dict[str, object] = {
     "hasCompletedOnboarding": True,
     "bypassPermissionsModeAccepted": True,
+    "projects": {
+        "/workspace": {
+            "hasTrustDialogAccepted": True,
+        },
+    },
 }
 _PROFILE_SYNC_FILES = (".credentials.json", "settings.json", ".claude.json")
 _PROFILE_CONFIG_SYNC_FILES = ("settings.json", ".claude.json")
@@ -359,7 +364,7 @@ def _persist_default_claude_settings(profile_dir: Path) -> None:
 
 def _persist_default_claude_top_config(profile_dir: Path) -> None:
     """
-    补齐顶层 `~/.claude.json` 里的本地 onboarding / bypassPermissions gate。
+    补齐顶层 `~/.claude.json` 里的本地启动 gate。
 
     :param profile_dir: `data/profiles/<account>` 对应目录
     :return: None
@@ -379,8 +384,7 @@ def _persist_default_claude_top_config(profile_dir: Path) -> None:
         return
     if not isinstance(existing, dict):
         return
-    merged = dict(existing)
-    merged.update(_DEFAULT_CLAUDE_TOP_CONFIG)
+    merged = _merge_claude_top_config(existing, _DEFAULT_CLAUDE_TOP_CONFIG)
     tmp_path = profile_dir / ".claude.json.tmp"
     tmp_path.write_text(
         json.dumps(merged, ensure_ascii=False, indent=2) + "\n",
@@ -388,6 +392,27 @@ def _persist_default_claude_top_config(profile_dir: Path) -> None:
     )
     tmp_path.replace(top_config_path)
     _make_worker_owned(top_config_path)
+
+
+def _merge_claude_top_config(
+    existing: object,
+    defaults: dict[str, object],
+) -> dict[str, object]:
+    """
+    递归补齐 Claude 顶层配置，并保留账号身份及已有项目状态。
+
+    :param existing: 现有 `~/.claude.json` 解析结果
+    :param defaults: 项目要求写入的顶层默认值
+    :return: 合并后的顶层配置
+    """
+    merged = dict(existing) if isinstance(existing, dict) else {}
+    for key, value in defaults.items():
+        old_value = merged.get(key)
+        if isinstance(old_value, dict) and isinstance(value, dict):
+            merged[key] = _merge_claude_top_config(old_value, value)
+        else:
+            merged[key] = value
+    return merged
 
 
 def _make_worker_owned(path: Path) -> None:
@@ -3722,7 +3747,10 @@ class ContinueManager:
         """
         session_id = _find_latest_claude_session_id(run["id"])
         if not session_id:
-            raise ValueError(f"run {run['id']} has no Claude session jsonl")
+            raise ValueError(
+                f"运行 {run['id']} 未创建 Claude 会话，无法继续；"
+                "该 run 没有可恢复记录，请重新运行任务"
+            )
         with self._lock:
             if run["id"] in self._run_locks:
                 raise ValueError(f"continue session already active for run {run['id']}")

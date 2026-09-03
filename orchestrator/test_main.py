@@ -541,6 +541,81 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         self.assertIn("Invalid CLAUDE_CODE_VERSION", ensure_body)
         self.assertIn("Claude Code version mismatch after install", ensure_body)
 
+    def test_first_run_gates_include_workspace_trust_without_overwriting_profile(self) -> None:
+        """
+        补齐目录信任时应保留身份字段、其他项目和 `/workspace` 既有状态。
+
+        :return: None
+        """
+        profile_dir = main.PROFILES_DIR / "main"
+        top_config_path = profile_dir / ".claude.json"
+        top_config_path.write_text(
+            json.dumps({
+                "oauthAccount": {"accountUuid": "account-uuid"},
+                "projects": {
+                    "/workspace": {
+                        "allowedTools": ["Bash"],
+                        "hasTrustDialogAccepted": False,
+                    },
+                    "/another-project": {"hasTrustDialogAccepted": False},
+                },
+            }),
+            encoding="utf-8",
+        )
+
+        main._persist_default_claude_top_config(profile_dir)
+
+        persisted = json.loads(top_config_path.read_text(encoding="utf-8"))
+        self.assertEqual("account-uuid", persisted["oauthAccount"]["accountUuid"])
+        self.assertEqual(["Bash"], persisted["projects"]["/workspace"]["allowedTools"])
+        self.assertTrue(persisted["projects"]["/workspace"]["hasTrustDialogAccepted"])
+        self.assertFalse(
+            persisted["projects"]["/another-project"]["hasTrustDialogAccepted"]
+        )
+        self.assertTrue(persisted["hasCompletedOnboarding"])
+        self.assertTrue(persisted["bypassPermissionsModeAccepted"])
+
+    def test_entrypoint_has_workspace_trust_gate_fallback(self) -> None:
+        """
+        profile 预置未生效时，entrypoint 仍应识别并通过目录信任菜单。
+
+        :return: None
+        """
+        entrypoint = (
+            Path(__file__).resolve().parents[1] / "images" / "worker" / "entrypoint.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"hasTrustDialogAccepted": true', entrypoint)
+        self.assertIn(
+            "Quick safety check: Is this a project you created or one you trust?",
+            entrypoint,
+        )
+        self.assertIn('tmux send-keys -t "$SESSION" Down Enter', entrypoint)
+
+    def test_worker_image_generates_all_fingerprint_locales(self) -> None:
+        """
+        worker 镜像应生成账号指纹池可能选中的全部 locale。
+
+        :return: None
+        """
+        dockerfile = (
+            Path(__file__).resolve().parents[1] / "images" / "worker" / "Dockerfile"
+        ).read_text(encoding="utf-8")
+        self.assertRegex(dockerfile, r"ca-certificates\s+locales")
+        self.assertIn("locale-gen", dockerfile)
+        for locale_name in main._LANG_POOL:
+            self.assertIn(f"{locale_name} UTF-8", dockerfile)
+
+    def test_continue_without_session_reports_actionable_error(self) -> None:
+        """
+        首次启动失败且无 JSONL 时，应明确提示重新运行而不是暴露内部文件名。
+
+        :return: None
+        """
+        manager = main.ContinueManager(Mock())
+
+        with self.assertRaisesRegex(ValueError, "没有可恢复记录.*重新运行任务"):
+            manager.start({"id": "missing-session"}, {"id": 1})
+
 
 class ScheduledWarmupTests(unittest.TestCase):
     """验证养号迁移、匹配、凭据同步和调度状态。"""

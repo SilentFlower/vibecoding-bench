@@ -123,22 +123,30 @@ JS
 
 patch_top_config_gates() {
   # 这些 gate 属于顶层 ~/.claude.json，不属于 ~/.claude/settings.json。
-  # 旧 profile 缺字段时，交互 TUI 会重走 onboarding 或 bypassPermissions 确认页。
+  # 旧 profile 缺字段时，交互 TUI 会重走 onboarding、目录信任或权限确认页。
   local path="$CLAUDE_HOME/.claude.json"
   if [ ! -f "$path" ]; then
     return 0
   fi
-  jq '. + {
-    "hasCompletedOnboarding": true,
-    "bypassPermissionsModeAccepted": true
-  }' "$path" > "$path.tmp" && mv "$path.tmp" "$path"
+  jq '
+    (.projects | if type == "object" then . else {} end) as $projects |
+    ($projects["/workspace"] | if type == "object" then . else {} end) as $workspace |
+    . + {
+      "hasCompletedOnboarding": true,
+      "bypassPermissionsModeAccepted": true,
+      "projects": ($projects + {
+        "/workspace": ($workspace + {"hasTrustDialogAccepted": true})
+      })
+    }
+  ' "$path" > "$path.tmp" && mv "$path.tmp" "$path"
 }
 
 handle_claude_startup_gates() {
-  # Claude 2.x 的首次启动主题菜单和 bypassPermissions 免责声明都可能拦在首屏。
+  # Claude 2.x 的主题、目录信任和 bypassPermissions 菜单都可能拦在首屏。
   # prompt 注入前只检测当前可见 pane；不能用 scrollback，否则菜单清掉后
   # 旧文本还在历史里，会误判为仍卡在 first-run。
   local theme_sent=0
+  local trust_sent=0
   local bypass_sent=0
   local clear_ticks=0
   local pane
@@ -152,6 +160,16 @@ handle_claude_startup_gates() {
         log "Detected Claude first-run theme menu; accepting default dark theme"
         tmux send-keys -t "$SESSION" Enter
         theme_sent=1
+      fi
+      clear_ticks=0
+      sleep 1
+      continue
+    fi
+    if printf '%s' "$pane" | grep -q "Quick safety check: Is this a project you created or one you trust?"; then
+      if [ "$trust_sent" -eq 0 ]; then
+        log "Detected Claude workspace trust menu; trusting /workspace"
+        tmux send-keys -t "$SESSION" Down Enter
+        trust_sent=1
       fi
       clear_ticks=0
       sleep 1
@@ -172,7 +190,7 @@ handle_claude_startup_gates() {
       echo "auth/onboarding gate" > /tmp/claude-startup-gate
       return 1
     fi
-    if [ "$theme_sent" -eq 1 ] || [ "$bypass_sent" -eq 1 ]; then
+    if [ "$theme_sent" -eq 1 ] || [ "$trust_sent" -eq 1 ] || [ "$bypass_sent" -eq 1 ]; then
       clear_ticks=$((clear_ticks + 1))
       if [ "$clear_ticks" -ge 3 ]; then
         log "Claude startup gates cleared"
@@ -187,7 +205,7 @@ handle_claude_startup_gates() {
     fi
     return 0
   done
-  if [ "$theme_sent" -eq 1 ] || [ "$bypass_sent" -eq 1 ]; then
+  if [ "$theme_sent" -eq 1 ] || [ "$trust_sent" -eq 1 ] || [ "$bypass_sent" -eq 1 ]; then
     log "WARN: Claude startup gate did not clear; skip prompt injection"
     return 1
   fi
