@@ -754,27 +754,34 @@ let state = match get_request_client(&account.proxy_url) {
 
 Gateway 在既有 admission 后调用 `ensure_ready`；共享 client factory 负责代理失败关闭，服务再执行匿名 HEAD、状态缓存和 singleflight，不执行第二次 RPM admission。
 
-## Scenario: Claude Code `cli-bg` 状态分类旁路
+## Scenario: Claude Code 状态分类旁路与归因补齐
 
 ### 1. Scope / Trigger
 
 - Trigger：修改 Claude Code 后台 Agent 状态分类请求的识别、请求体改写、模拟响应、请求日志、账号代理或对应 Settings 时适用。
-- 目标：只对已确认的 Fable 5.1 `cli-bg` 辅助请求提供默认放行和显式模拟，同时保持普通 `/v1/messages`、旧 Auto Mode classifier 和账号调度行为不变。
+- 目标：保留 Fable 5.1 `cli-bg` 请求的窄范围模拟能力，并为 Claude Code 非 Haiku 状态分类请求提供默认关闭的 billing/CCH 与官方身份块补齐；普通 `/v1/messages`、Haiku、旧 Auto Mode classifier 和账号调度行为必须保持不变。
 
 ### 2. Signatures
 
 - setting：`intercept_cli_bg_status_classifier_mode=passthrough|mock`，默认 `passthrough`。
-- detector：`is_cli_bg_status_classifier_request(path, headers, body, client_type) -> bool`。
+- setting：`intercept_cli_bg_status_classifier_identity_injection_enabled=true|false`，默认 `false`。
+- runtime config：`CliBgStatusClassifierConfig { mode, identity_injection_enabled }`。
+- 窄 detector：`is_cli_bg_status_classifier_request(path, headers, body, client_type) -> bool`。
+- 通用 detector：`detect_claude_code_status_classifier_request(path, headers, body, client_type) -> Option<CliStatusClassifierMatch>`。
 - identity-only 改写：`Rewriter::rewrite_claude_code_identity_only(body, account, upstream_session_rewrite) -> Vec<u8>`。
+- 归因补齐：`Rewriter::rewrite_claude_code_status_classifier_attribution(body, account, upstream_session_rewrite) -> Vec<u8>`。
 - TLS 客户端：`tlsfp::get_request_client(proxy_url) -> Result<reqwest::Client, reqwest::Error>`。
 - mock 外层返回 Anthropic Message envelope，`content[0].text` 是可二次解析的 `state/detail/tempo/needs/output` JSON。
 
 ### 3. Contracts
 
-- detector 必须同时匹配精确 `/v1/messages`、`ClientType::ClaudeCode`、原始 `x-app=cli-bg`、精确 `claude-fable-5-1`、非流式、`max_tokens=3072`、唯一 ephemeral system text block 和唯一 user 状态文本。Fable 5、`[1m]`、普通主请求和旧 XML classifier 不得命中。
-- `passthrough` 命中后仍走账号选择、sticky、RPM/concurrency、OAuth、2.1.257 header、账号代理/TLS、401、signature/429 retry 和响应透传；首次上游请求体只允许账号 metadata 与 upstream session identity 映射，不运行缓存断点、TTL、thinking、body order 或 CCH 通用改写。
-- `passthrough` 必须保留原始 `x-app=cli-bg`、system/message/cache_control/thinking 形状。命中后全文请求、429 请求和非流式响应捕获全部禁用，只保留尺寸、短 hash、重试次数与 `proxy_configured` 等脱敏摘要。
-- `mock` 必须在 session hash、账号选择、RPM 和并发槽之前返回，不得访问上游或消耗账号额度。
+- 窄 detector 必须同时匹配精确 `/v1/messages`、`ClientType::ClaudeCode`、原始 `x-app=cli-bg`、精确 `claude-fable-5-1`、`stream=false`、`max_tokens=3072`、唯一 ephemeral classifier system text block 和唯一 user 状态文本。只有该 detector 可以选择 `mock`；Fable 5、`[1m]`、普通主请求和旧 XML classifier 不得进入模拟链路。
+- 通用 detector 必须匹配精确 `/v1/messages`、`ClientType::ClaudeCode`、原始 `x-app=cli|cli-bg`、`stream` 缺失或为 `false`、非空模型、唯一 classifier block 和唯一 user 状态文本。system 只允许至多一个严格 billing block、至多一个精确官方身份块和唯一 ephemeral classifier block；未知、重复或形状异常的 block 必须拒绝。通用 detector 不得硬编码模型名或 `max_tokens`。
+- 归因补齐仅在 `mode=passthrough`、`identity_injection_enabled=true`、通用 detector 命中且模型不是 Haiku 时执行。开关关闭时必须完整保留既有链路；Haiku 在开关切换前后的上游请求体必须一致，也不得新增身份块。
+- billing 缺失时使用共享 Claude Code API billing builder 插入 billing 并计算有效 CCH；已有 billing 且包含 CCH 时按最终请求体刷新 CCH；已有 billing 但没有 CCH 时保留原 block，不擅自增加 CCH。最终 system 顺序固定为 billing、identity、classifier，CCH 只能基于最终序列化正文计算。
+- 归因补齐只允许账号 metadata、upstream session identity、billing、identity 和 CCH 变化，不运行 expansion、缓存断点、TTL、thinking、字段顺序或其它通用正文改写；结构异常时失败开放并返回原正文。
+- 窄 detector 命中 `passthrough` 且未执行归因补齐时，继续使用 identity-only 改写。所有 passthrough 请求仍走账号选择、sticky、RPM/concurrency、OAuth、2.1.257 header、账号代理/TLS、Session Hello、401、signature/429 retry 和响应透传；不得因为识别成 classifier 而跳过 Session Hello。
+- classifier 命中后全文请求、429 请求和非流式响应捕获全部禁用，只保留尺寸、短 hash、重试次数与 `proxy_configured` 等脱敏摘要。`mock` 必须在 session hash、账号选择、RPM 和并发槽之前返回，不访问上游或消耗账号额度。
 - mock 分类优先级固定为：API/auth/infra 错误 -> blocked；Agent 明确自动复查/继续执行 -> working；无自动复查的用户门槛 -> blocked；明确 failed/done；最后回退 `Current state`，未知值保守返回 working。
 - 非空代理由共享 TLS client factory 强制解析和应用；代理或客户端构建失败必须向调用方返回错误，所有 gateway、OAuth、Hello、Prime 和 telemetry 调用点都不得自行退回直连客户端。错误日志不得包含代理 URL 或其中的凭据。
 
@@ -782,9 +789,13 @@ Gateway 在既有 admission 后调用 `ensure_ready`；共享 client factory 负
 
 | 条件 | 结果 |
 |------|------|
-| 强特征命中 + `passthrough` | identity-only 改写后经账号代理转发，禁用全文捕获 |
-| 强特征命中 + `mock` | 本地 HTTP 200 Message envelope，不进入账号和上游链路 |
+| 窄 detector 命中 + `mock` | 本地 HTTP 200 Message envelope，不进入账号和上游链路 |
+| 窄 detector 命中 + `passthrough` + 注入关闭 | identity-only 改写后经账号代理转发，保留 Session Hello，禁用全文捕获 |
+| 通用 detector 命中 + 注入开启 + 非 Haiku | 补齐 billing/identity，按 billing 原状态计算或刷新 CCH，经账号代理转发 |
+| 通用 detector 命中 + 注入开启 + Haiku | 使用开关开启前的既有请求链路，上游正文不得因本开关变化 |
 | 任一 detector 条件不满足 | 使用普通请求链路和管理员现有改写设置 |
+| 已有 billing+CCH | 保留 billing 内容并按最终正文刷新 CCH |
+| 已有 billing 但无 CCH | 保留原 billing，不自动增加 CCH |
 | `Awaiting your go` 且声明 `Next check` | working，Agent 仍持有下一步 |
 | 需要用户选择修复、环境或提交位置且无自动复查 | blocked |
 | API/auth/infra 错误同时声明重试或复查 | blocked，硬错误优先 |
@@ -792,22 +803,52 @@ Gateway 在既有 admission 后调用 `ensure_ready`；共享 client factory 负
 
 ### 5. Good/Base/Bad Cases
 
-- Good：上游地址设为不可达域名，账号配置本地 mock HTTP proxy；请求只有经过该代理才能获得 200，并且 proxy 收到 `x-app=cli-bg` 和 identity-only body。
-- Good：全文非流/429 日志全局开启时，命中的 `cli-bg` 仍只写安全摘要；其它普通请求继续遵守管理员日志设置。
-- Base：setting 缺失时默认 `passthrough`；旧数据库只补缺失 key，管理员已有合法值不被覆盖。
-- Bad：只按模型或 `max_tokens` 判断，导致普通 Fable 5.1 主请求绕过正文改写。
+- Good：非 Haiku 通用 classifier 在注入开启时，代理收到 billing、精确官方身份块、classifier 三段有序 system，且 CCH 对最终请求体有效。
+- Good：Haiku classifier 在开关开启和关闭时，代理收到的请求体逐字节一致；已有身份块不会重复插入。
+- Good：上游地址设为不可达域名，账号配置本地 mock HTTP proxy；passthrough 请求只有经过该代理才能获得 200。
+- Good：全文非流/429 日志全局开启时，classifier 仍只写安全摘要；其它普通请求继续遵守管理员日志设置。
+- Base：mode 缺失时默认 `passthrough`，注入开关缺失时默认 `false`；旧数据库只补缺失 key，管理员已有合法值不被覆盖。
+- Bad：用通用 detector 扩大 `mock` 命中范围，会把未经验证的模型或 `x-app=cli` 请求本地短路。
+- Bad：classifier 命中后跳过 Session Hello，会让默认关闭的注入开关也改变既有请求行为。
+- Bad：在 billing/identity/classifier 完成排序前计算 CCH，会生成与最终上游正文不一致的 attestation。
 - Bad：代理解析失败后创建默认 `reqwest::Client`，会从宿主机直连并暴露与账号不一致的网络/TLS 特征。
 
 ### 6. Tests Required
 
-- detector 覆盖完整正例，以及 path、UA、x-app、model、stream、max_tokens、system/user marker、Fable 5、`[1m]` 和旧 classifier 负例。
-- identity-only 测试断言 system ephemeral 无新增 `ttl`、messages 无新增 cache_control、thinking/fallbacks 保持原形，metadata/session 按账号映射。
+- 窄 detector 覆盖完整 Fable 5.1 正例，以及 path、UA、x-app、model、stream、max_tokens、system/user marker、Fable 5、`[1m]` 和旧 classifier 负例。
+- 通用 detector 覆盖 Fable、Opus、Sonnet 与真实 Haiku 形状正例，以及 stream、x-app、未知 system block、重复 billing/identity/classifier 和缺失 marker 负例。
+- 归因改写测试覆盖 billing 缺失、已有 billing+CCH、已有 billing 无 CCH、system 顺序、CCH 有效性、已有身份不重复和重复执行幂等。
+- Gateway 代理测试覆盖注入开关关闭/开启、Haiku 与基线正文一致、已有身份不重复、Session Hello 仍执行、窄 mock 本地返回和非法代理失败关闭。
 - mock 测试覆盖四状态 schema、API/auth 硬阻塞、自动复查优先级、用户门槛、可选追加任务和未知状态回退。
-- 代理集成测试必须让不可达 upstream 通过本地 mock proxy 成功；非法代理测试必须返回错误并断言可达 upstream 零请求。
 - TLS client factory 覆盖相同代理复用、不同代理隔离、关闭连接池和非法代理不缓存直连客户端。
-- 完整验证运行 `cargo fmt --check`、classifier/settings/CCH 定向测试、`cargo test`、前端 `npm run build` 和敏感内容扫描。
+- Settings 测试覆盖默认值、旧库迁移、GET/PUT 校验、mode 与注入开关独立热刷新；前端构建必须验证两个控件均可持久化。
+- 完整验证运行 `cargo fmt --check`、classifier/settings/CCH 定向测试、`cargo test`、前端 `npm run build`、`git diff --check` 和敏感内容扫描。
 
 ### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+if !is_cli_status_classifier {
+    if let Some(real_session_id) =
+        session_hello_probe_session_id(&path, client_type, &body_map)
+    {
+        // 执行既有 Session Hello 链路。
+    }
+}
+```
+
+分类识别只应选择日志、模拟或正文改写策略；用它改变既有 Session Hello 条件，会使默认关闭的注入开关也产生行为回归。
+
+#### Correct
+
+```rust
+if let Some(real_session_id) = session_hello_probe_session_id(&path, client_type, &body_map) {
+    // 执行既有 Session Hello 链路。
+}
+```
+
+Session Hello 继续由原有 probe 条件决定；classifier 配置只在同一既有代理链路内选择 mock、identity-only 或归因补齐。
 
 #### Wrong
 
@@ -827,7 +868,7 @@ let client = get_request_client(&account.proxy_url)
     .map_err(|_| AppError::BadGateway("upstream request client unavailable".into()))?;
 ```
 
-共享 client factory 只缓存成功构建的客户端，非空代理失败立即向上传播；Gateway 对命中的 `cli-bg` 单独选择 identity-only 改写和 summary-only 日志策略。
+共享 client factory 只缓存成功构建的客户端，非空代理失败立即向上传播；Gateway 对 classifier 单独选择正文改写和 summary-only 日志策略。
 
 ## 设置热刷新模式
 
