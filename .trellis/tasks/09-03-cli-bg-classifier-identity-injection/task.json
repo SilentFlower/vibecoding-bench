@@ -1,0 +1,196 @@
+{
+  "id": "cli-bg-classifier-identity-injection",
+  "name": "cli-bg-classifier-identity-injection",
+  "title": "为 cli-bg 分类请求增加可选身份块注入",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-09-03",
+  "completedAt": "2026-09-03",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-09-02T18:07:55Z",
+      "contextKey": "codex_01a05e4d-62cb-7350-94f9-6251751f4b2c",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "f185a75f1f3764f51596dced9ea672d9b2f1bd88",
+        "status": [
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-capture-summary.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-online-compatibility-audit.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/haiku-capture-summary.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/task.json"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "f185a75f1f3764f51596dced9ea672d9b2f1bd88",
+            "status": [
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-capture-summary.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-online-compatibility-audit.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/haiku-capture-summary.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/task.json"
+              }
+            ],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [
+              {
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/brief.md",
+                "sha256": "90991b4513c10220eec82418798d60e3abf2469daf0af65f41bda79a4b06a884"
+              },
+              {
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/check.jsonl",
+                "sha256": "e9883215a54c8fab3156c548e066aa092e48561246d767784a798d034b940826"
+              },
+              {
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/design.md",
+                "sha256": "e4483b8cf634535e548a727f901c1266ff91e04f84528424a1c5960c6271b096"
+              },
+              {
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/implement.jsonl",
+                "sha256": "e1dd4180e54e72345e5d702c26a509a80bbe2cd2258bc136f211b865f4579786"
+              },
+              {
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/implement.md",
+                "sha256": "24b683983565593a1c75762236958343417970f7577f661eb81cb99807187633"
+              },
+              {
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/prd.md",
+                "sha256": "6bdafb45739a02efd5ce961733ec1c36d9af2f236417e739554eca3d8419c338"
+              },
+              {
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-capture-summary.md",
+                "sha256": "c8db1191a85dc0bdb8a2d02f73af4caf0f7326009d3094acf695c4148a2075ec"
+              },
+              {
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-online-compatibility-audit.md",
+                "sha256": "0764988d02cf213df59d521f60801c16d61f5ca98a4a1e8bf29e1d7ae63d8a1b"
+              },
+              {
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/haiku-capture-summary.md",
+                "sha256": "ca4a1f26f4bd843b7262916eeb200bc55aa0c374fce7eab0839cd25d9514f051"
+              },
+              {
+                "path": ".trellis/tasks/09-02-upgrade-claude-code-2-1-257/task.json",
+                "sha256": "cf5df4db04099a3982c44f404df36a08af34414fd01c8af3a9c9095c81fefc54"
+              }
+            ],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "870127e2939ac8d6fa104daf2bcef90c087c0644206864dfbc45f6d6fd42d631"
+          },
+          {
+            "root": "cc2api",
+            "head": "b8d0ef3e74294827f5bc6cdc369b4859a5f320b0",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "b9c865e5b14bb644d24e83b38350c70928640bcdb190b705638e8d2496538016"
+          }
+        ],
+        "fingerprint": "8db5c6606f39031cc317cddf07009a145680fb71bfcdca415e24cec7730b66d2"
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-09-03T09:29:18+08:00",
+    "completedSteps": [
+      "完成 classifier detector 分层与可选身份归因补齐",
+      "完成设置迁移、管理 API、Gateway 热刷新与 Settings UI",
+      "完成 Rust 全量测试、前端构建与规范更新"
+    ],
+    "partialStep": null,
+    "nextStep": "运行 finish-work 归档任务，并在部署后验证真实上游 429",
+    "notes": "真实上游 429 是否消失需通过生产账号代理链路部署后验证。"
+  }
+}

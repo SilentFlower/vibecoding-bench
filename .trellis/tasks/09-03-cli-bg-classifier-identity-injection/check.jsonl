@@ -1,0 +1,7 @@
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"审查 detector、Gateway 分支、日志与真实代理链路"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"审查 setting 默认值、迁移、校验与热刷新"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"审查测试覆盖、格式化与构建证据"}
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"审查 2.1.257 billing/CCH 生成与刷新契约"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"审查独立开关交互与字符串配置契约"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"审查数据库到 UI 的完整数据流"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"审查共享 builder 与模型判断复用情况"}

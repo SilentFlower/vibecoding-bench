@@ -1,0 +1,7 @@
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"Gateway 请求识别、改写旁路、隐私捕获与账号代理链路约束"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"全局 setting 默认值、迁移与热刷新约束"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"Rust 定向测试、集成测试与全量验证要求"}
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"Claude Code 2.1.257 billing、CCH 与模型画像协议"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"Settings UI 控件、状态与文案约束"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"设置从数据库、API、Gateway 到前端的跨层一致性"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复用既有 billing builder、CCH 与 Haiku 判断逻辑"}
