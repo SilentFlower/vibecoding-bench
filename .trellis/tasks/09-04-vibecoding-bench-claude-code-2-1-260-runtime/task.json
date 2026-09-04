@@ -1,0 +1,38 @@
+{
+  "id": "vibecoding-bench-claude-code-2-1-260-runtime",
+  "name": "vibecoding-bench-claude-code-2-1-260-runtime",
+  "title": "升级并发布 vibecoding-bench Claude Code 2.1.260",
+  "description": "升级 bench 全部运行时默认值，修复 run 版本快照与继续对话版本漂移，并完成 bench 发布。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-09-04",
+  "completedAt": "2026-09-04",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "09-04-upgrade-claude-code-2-1-260",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-09-04T09:50:42+08:00",
+    "completedSteps": [
+      "同步 Claude Code 2.1.260 默认值",
+      "持久化 run 版本快照并修复继续对话漂移",
+      "完成测试、Check-All 与规范固化",
+      "提交并推送 bench 代码"
+    ],
+    "partialStep": null,
+    "nextStep": "等待三镜像发布并执行生产部署与抓包验收",
+    "notes": "上线后验证由发布流程承接：同 SHA 镜像、数据库备份与迁移、生产 run 与 continue 版本。"
+  }
+}

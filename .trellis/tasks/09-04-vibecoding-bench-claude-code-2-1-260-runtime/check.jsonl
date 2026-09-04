@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md", "reason": "检查新旧 SQLite、所有 run 入口和快照持久化一致性。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "检查 worker 创建、continue 回退和异常清理测试。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/image-build-push.md", "reason": "检查三镜像发布证据与 tag 一致性。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/remote-deploy.md", "reason": "检查生产版本、数据库快照、页面覆盖和回滚证据。"}
+{"file": ".trellis/tasks/09-04-vibecoding-bench-claude-code-2-1-260-runtime/research.md", "reason": "逐项验证根因中的读取链路已被版本快照替代。"}

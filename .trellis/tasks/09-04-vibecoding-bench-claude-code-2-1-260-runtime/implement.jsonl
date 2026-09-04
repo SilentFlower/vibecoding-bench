@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md", "reason": "约束 runs SQLite 幂等补列、事务、参数化 SQL 和兼容旧库。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "约束 orchestrator 单文件实现、容器生命周期和测试质量。"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md", "reason": "约束 WebUI 原生前端版本展示与回归检查。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/image-build-push.md", "reason": "约束三镜像同 SHA tag 构建与发布。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/remote-deploy.md", "reason": "约束生产备份、force recreate、版本核验与联合回滚。"}
+{"file": ".trellis/tasks/09-04-vibecoding-bench-claude-code-2-1-260-runtime/research.md", "reason": "记录继续对话版本漂移的代码证据、根因和修复边界。"}
