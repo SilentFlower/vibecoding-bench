@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "版本画像升级的核心协议、抓包、CCH、迁移和安全契约。"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "约束 gateway/rewriter/settings 热路径和画像消费者边界。"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "约束 SQLite/PostgreSQL 设置与账号条件迁移。"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "约束 Settings.vue 默认画像与 API 状态同步。"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "约束 Rust 测试、错误与敏感数据边界。"}

@@ -1,0 +1,38 @@
+{
+  "id": "cc2api-claude-code-2-1-260-protocol",
+  "name": "cc2api-claude-code-2-1-260-protocol",
+  "title": "适配 cc2api Claude Code 2.1.260 协议",
+  "description": "基于真实抓包新增 cc2api 2.1.260 默认画像、迁移和回归测试。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "cc2api",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-09-04",
+  "completedAt": "2026-09-04",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "09-04-upgrade-claude-code-2-1-260",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-09-05T06:03:42+08:00",
+    "completedSteps": [
+      "完成 Claude Code 2.1.260 独立版本画像与精确模型协议适配",
+      "修复 Claude Code 2.1.257 Fable 5 历史画像漂移",
+      "完成默认设置、账号 canonical env、前端和 README 升级",
+      "完成定向验证、全量测试与 Check-All"
+    ],
+    "partialStep": null,
+    "nextStep": "归档当前协议任务并进入 cc2api Claude Code 2.1.260 部署任务",
+    "notes": "cargo fmt、Haiku/DB 定向测试、cargo test cch、完整 cargo test 和 Web npm run build 均已通过。"
+  }
+}

@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "检查真实抓包映射、模型子画像、CCH 和旧画像回滚。"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "检查跨层数据流和热路径没有散落版本常量。"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "检查条件迁移不覆盖管理员自定义值。"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "检查全量 Rust、CCH 和敏感数据测试质量。"}
