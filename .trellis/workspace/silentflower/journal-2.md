@@ -50,3 +50,25 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 60: 修复 Claude 首次启动并归档 2.1.257 部署任务
+
+**Date**: 2026-09-04
+**Task**: 修复 Claude 首次启动并归档 2.1.257 部署任务
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+修复 worker 首次启动目录信任与 locale，完成 GitHub 构建和生产部署；归档已完成的 Claude Code 2.1.257 发布验证子任务。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9a352db 43cbaa5` | (see git log) |
+
+### Status
+
+[OK] **Completed**

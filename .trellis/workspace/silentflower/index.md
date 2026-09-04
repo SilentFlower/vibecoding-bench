@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 59
-- **Last Active**: 2026-09-03
+- **Total Sessions**: 60
+- **Last Active**: 2026-09-04
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~52 | Active |
+| `journal-2.md` | ~74 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 60 | 2026-09-04 | 修复 Claude 首次启动并归档 2.1.257 部署任务 | `9a352db` `43cbaa5` | `main` |
 | 59 | 2026-09-03 | 完成 cli-bg 状态分类适配 | `b8d0ef3`, `b8766e9` | `main` |
 | 58 | 2026-09-02 | 完成 vibecoding-bench Claude Code 2.1.257 运行时升级 | `9ed24dd` | `main` |
 | 57 | 2026-09-02 | 完成 cc2api Claude Code 2.1.257 协议适配 | `84b0016`, `c17660b` | `main` |
