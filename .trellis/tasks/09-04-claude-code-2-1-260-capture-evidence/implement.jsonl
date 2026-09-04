@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "规定真实抓包、模型子画像、cc_version、CCH、bootstrap 和敏感数据边界。"}
+{"file": ".trellis/tasks/archive/2026-09/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-capture-summary.md", "reason": "提供 2.1.257 Fable 5.1 多轮、CCH、beta 和首字节基线。"}
+{"file": ".trellis/tasks/archive/2026-09/09-02-upgrade-claude-code-2-1-257/research/haiku-capture-summary.md", "reason": "提供 2.1.257 Haiku probe、title、主请求和辅助请求基线。"}
+{"file": ".trellis/tasks/archive/2026-09/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-online-compatibility-audit.md", "reason": "提供精确模型画像和线上限制的反向覆盖清单。"}

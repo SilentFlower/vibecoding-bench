@@ -1,0 +1,37 @@
+{
+  "id": "claude-code-2-1-260-capture-evidence",
+  "name": "claude-code-2-1-260-capture-evidence",
+  "title": "采集 Claude Code 2.1.260 协议证据",
+  "description": "接收用户生产抓包 run，形成脱敏差异、CCH 与 cc_version 可复算证据。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-09-04",
+  "completedAt": "2026-09-04",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "09-04-upgrade-claude-code-2-1-260",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-09-04T16:14:01+08:00",
+    "completedSteps": [
+      "完成 Claude Code 2.1.260 抓包样本完整性与协议差异分析",
+      "生成脱敏 fixture 并复算 cc_version/CCH",
+      "完成 Check-All 并同步协议规范"
+    ],
+    "partialStep": null,
+    "nextStep": "启动 cc2api Claude Code 2.1.260 协议实现子任务",
+    "notes": "证据覆盖 Opus、Sonnet、Fable 5.1、Haiku；2.1.260 Fable 5 与 Fable 5.1[1m] 保持证据不足标记。"
+  }
+}
