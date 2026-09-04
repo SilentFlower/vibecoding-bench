@@ -152,3 +152,27 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 64: 完成 cc2api Claude Code 2.1.260 协议升级
+
+**Date**: 2026-09-05
+**Task**: 完成 cc2api Claude Code 2.1.260 协议升级
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+完成 2.1.260 协议画像、2.1.257 Fable 5 历史修复、设置迁移与全量验证，提交并推送双仓变更，生成上线审计并归档协议任务。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7aecda3` | (see git log) |
+| `c42d696` | (see git log) |
+| `9d2cb73` | (see git log) |
+
+### Status
+
+[OK] **Completed**
