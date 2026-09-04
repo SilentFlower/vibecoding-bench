@@ -130,3 +130,25 @@
 ### Next Steps
 
 - 部署生产 bench，验证三镜像、数据库补列和 run/continue 版本
+
+
+## Session 63: 完成 Claude Code 2.1.260 抓包证据归档
+
+**Date**: 2026-09-04
+**Task**: 完成 Claude Code 2.1.260 抓包证据归档
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+完成 2.1.260 Opus、Sonnet、Fable 5.1、Haiku 抓包分析，复算 cc_version/CCH，修正 2.1.257 Fable 5 历史契约并同步协议规范。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f38ffd7` | (see git log) |
+
+### Status
+
+[OK] **Completed**
