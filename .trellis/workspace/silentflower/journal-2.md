@@ -94,3 +94,39 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 62: 完成 vibecoding-bench Claude Code 2.1.260 运行时升级
+
+**Date**: 2026-09-04
+**Task**: 完成 vibecoding-bench Claude Code 2.1.260 运行时升级
+**Package**: vibecoding-bench
+**Branch**: `main`
+
+### Summary
+
+升级 bench 默认 CLI 版本到 2.1.260，持久化 run 版本快照并修复继续会话版本漂移；完成测试、规范固化、提交推送和发布审计。
+
+### Main Changes
+
+- 默认 Claude Code 版本整体升级为 2.1.260
+- run 创建时保存版本快照，继续对话复用原版本
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e6f1f0b` | (see git log) |
+| `b856d41` | (see git log) |
+
+### Testing
+
+- [OK] 后端完整测试 56/56 通过，版本专项测试 11/11 通过
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 部署生产 bench，验证三镜像、数据库补列和 run/continue 版本
