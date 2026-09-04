@@ -206,6 +206,12 @@ oauth-2025-04-20,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13
 Haiku main 无 diagnostics 时只移除 `claude-code-20250219`；probe、title 和 non-stream
 aux 继续使用 `2.1.257` 已确认的独立窄画像。
 
+- 当目标版本已经声明非空的精确 `main_models` 时，Haiku main 必须先通过
+  `RequestProfile::main_model(model_id)` 精确命中，才能使用该版本的 Haiku main beta；
+  未观察的 Haiku 模型回退版本级 `message_beta_tokens`，不能只因 ID 包含 `haiku` 就套用
+  新画像。probe、title 和 non-stream aux 属于已有独立证据的请求类型，仍可沿用现有
+  Haiku 分类；没有精确 `main_models` 的旧画像继续保持已验证的历史族分类行为。
+
 - Fable `[1m]` 的主请求画像必须按目标版本抓包判断，不能只从 CLI model 后缀推断：
   - `2.1.172` 抓包中，Fable `[1m]` 主请求包含 `context-1m-2025-08-07`，顺序如下。
   - `2.1.173` 抓包中，Fable `[1m]` 主请求不包含 `context-1m-2025-08-07`，只在 telemetry 启动配置里体现 `cli_flag=claude-fable-5[1m]`。
@@ -350,6 +356,7 @@ Telemetry 契约：
 | 2.1.260 Fable 5.1 CCH 不命中 | 保留 `fallbacks="default"`；不得沿用旧的“所有模型删除 fallback”裁剪 |
 | Fable 5.1 被套用 Fable 5 fallback/beta | 检查 `RequestProfile::fable_model` 是否按精确模型 ID 命中，不能使用 family 前缀选择 wire 画像 |
 | 2.1.260 主请求缺少 thinking display | 按精确模型补 display；Haiku 还必须保留 `budget_tokens=31999` 和 `type=enabled` |
+| 未观察 Haiku main 命中 2.1.260 Haiku beta | 新画像存在精确 `main_models` 时检查 `RequestProfile::main_model(model_id)`；未命中则回退版本级通用 beta |
 | bootstrap Sonnet 5 没有 `pewter` | 检查 cwk 是否按精确模型映射，不能只维护 Fable/Opus 两个 family key |
 | message beta 更新后普通 telemetry 丢失 redact | 将 base beta 与最终 message beta 分开维护，request 事件显式覆盖 |
 | Haiku title 分类出现历史变体 | 保留结构化 schema 和旧 prompt marker 两条路径；没有新抓包证据时不收窄旧兼容分支 |
@@ -370,6 +377,9 @@ Telemetry 契约：
 **Good**：Fable 5 与 Fable 5.1 使用两个精确子画像，只在共享周配额判断中把已知 ID 和
 `[suffix]` 形式归到 `seven_day_fable`。
 
+**Good**：Haiku probe/title/non-stream aux 继续使用已验证的请求类型分类；Haiku main 在
+新画像中只有精确模型 ID 命中时才使用新 beta，未知 Haiku 回退版本级通用画像。
+
 **Good**：抓包分析同时核对 raw flow 与 JSONL/index；结构化索引完整不等于没有未完成的
 零正文 message 或后台长连接尝试。
 
@@ -388,6 +398,9 @@ Telemetry 契约：
 
 **Bad**：为了消除理论误判，在没有覆盖历史 title 变体的抓包和测试时收窄 Haiku 兼容
 marker，导致原有标题生成请求落回通用 beta。
+
+**Bad**：看到模型 ID 包含 `haiku` 就给所有 Haiku main 套用最新 beta，导致未观察模型
+获得新 beta，却没有对应的 thinking、body 和 CCH 子画像。
 
 **Bad**：把 200 response headers 当成流已成功；没有首个 SSE chunk 时仍可能在客户端
 watchdog 前后报 `No response from API`。
@@ -410,7 +423,8 @@ watchdog 前后报 `No response from API`。
   - 2.1.257 CCH 对 Fable 5 与 Fable 5.1 保留 top-level fallback，对其他模型删除
     fallback；2.1.260 对 Fable 5.1 保留 fallback
   - Haiku probe、结构化/旧 marker title、main 有无 diagnostics、non-stream aux 的 beta
-    分类；保留兼容宽度的反例必须有回归断言
+    分类；保留兼容宽度的反例必须有回归断言；另需断言未观察 Haiku main 在存在精确
+    `main_models` 的新画像中回退版本级通用 beta
   - Fable 5/5.1 与 `[suffix]` 命中 `seven_day_fable`，相似 preview 模型不命中
   - bootstrap 按精确模型断言 2.1.257 Fable 5=`marigold`、Fable 5.1=`sorrel`，以及
     2.1.260 Opus 5=`belladonna`、Sonnet 5=`pewter`、Fable 5.1=`sorrel`、Haiku=`null`
@@ -495,6 +509,28 @@ if let Some(fable) = request_profile.fable_model(model) {
 ```
 
 family 判断只用于已确认共享的 `seven_day_fable` 配额；wire profile 仍由精确 ID 决定。
+
+#### Wrong: Haiku main 只按 family 选择最新 beta
+
+```rust
+if model_id.contains("haiku") {
+    return request_profile.haiku_main_beta_tokens;
+}
+```
+
+这会让未抓包的 Haiku 模型获得最新 beta，但其它主请求字段仍走通用画像。
+
+#### Correct: 新画像的 Haiku main 先精确命中
+
+```rust
+if let Some(main) = request_profile.main_model(model_id) {
+    return main.message_beta_tokens;
+}
+return request_profile.message_beta_tokens;
+```
+
+probe、title 和 non-stream aux 继续走各自已验证的独立窄画像；旧画像没有精确主模型表时
+保留历史兼容行为。
 
 #### Wrong: 假设 hello 跟随模型 base URL
 
