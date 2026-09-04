@@ -1,0 +1,374 @@
+{
+  "id": "capture-effort-snapshot",
+  "name": "capture-effort-snapshot",
+  "title": "抓包 run 独立选择并快照思考预算",
+  "description": "为抓包 run 增加独立思考预算选择，并让所有新 run 持久化预算快照，继续会话复用原快照。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-09-04",
+  "completedAt": "2026-09-04",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "09-04-upgrade-claude-code-2-1-260",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-09-04T04:39:05Z",
+      "contextKey": "codex_01a069e7-cbcf-7c42-89ea-474d8bcadd1d",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "e33b145498bfa1cae03b78d1c06518645e47175b",
+        "status": [
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/task.json"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "e33b145498bfa1cae03b78d1c06518645e47175b",
+            "status": [
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/task.json"
+              }
+            ],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [
+              {
+                "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/check.jsonl",
+                "sha256": "3093f066f0a66b26eef6cb9c283fba9cf11dda16db65496e94ca8062682b6d59"
+              },
+              {
+                "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/design.md",
+                "sha256": "727d90f7b7c8b6eab5739a4c0541908de5fc47740cb1170c30806d6a46020384"
+              },
+              {
+                "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/implement.jsonl",
+                "sha256": "ea23dc0805577cbf5939095b4f7b4fdccd7b5e3c78f05ee109cde02c9b278578"
+              },
+              {
+                "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/implement.md",
+                "sha256": "d273e47c71628810fb391187fab6421718dffc368827304ce89b7349e6c709b5"
+              },
+              {
+                "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/prd.md",
+                "sha256": "d92966f03522a444c1e1c258800f2e4296cc8d622f05a82f83d59978301230b9"
+              },
+              {
+                "path": ".trellis/tasks/09-04-cc2api-claude-code-2-1-260-protocol/task.json",
+                "sha256": "5c97cd89d83b62836453139907d2bac1e57fde3e2abc85758ec9d4d8bb6bc595"
+              },
+              {
+                "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/check.jsonl",
+                "sha256": "fbafa97b3971c4e7d27d593396a8a3363c6fef6faf488648b93f9fb868ee7554"
+              },
+              {
+                "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/design.md",
+                "sha256": "f47b13e9bccf86091513c10f915d5aaf03d357d074c0887dd87a2f1147ec4889"
+              },
+              {
+                "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/implement.jsonl",
+                "sha256": "039d0e26c7368d64f6431703a99d60db569588667a8d317f04037aa950c8ec9d"
+              },
+              {
+                "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/implement.md",
+                "sha256": "b88d397ee5e3c84b2e02d2ba3ca56a5decff429cf5c1749e0f6533fb0ca39a33"
+              },
+              {
+                "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/prd.md",
+                "sha256": "e3afcb7d1739dc5cc6577006ffadaec74cce4783ee05c9b55ad9a9ee2db86165"
+              },
+              {
+                "path": ".trellis/tasks/09-04-claude-code-2-1-260-capture-evidence/task.json",
+                "sha256": "8f45ac1029f73b5447d4baaf23ed6c90c6cdee1ac2485a2906403cd9eaaaeebc"
+              },
+              {
+                "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/check.jsonl",
+                "sha256": "16efde2da836ebbe70842be962dff7523e2041911dcb55ac8bc39ab512f64a23"
+              },
+              {
+                "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/design.md",
+                "sha256": "483e02d1bb3398bb1f4ae4fffc58c658e884b8105e34d85863f06988ffeb5ca9"
+              },
+              {
+                "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/implement.jsonl",
+                "sha256": "fc9b3634fbc795602ac082e6dffd660fef7394ddcd79b7fe1b33a087d2ba8473"
+              },
+              {
+                "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/implement.md",
+                "sha256": "36b689c6bc3ee2cbb7b1215716888f5103c173b8f079a2792b5f3dd230f3ab58"
+              },
+              {
+                "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/prd.md",
+                "sha256": "06a2551d77f8f42751f4a197148ffa2537fd29e687f6701101ce61b8a90f35f3"
+              },
+              {
+                "path": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/task.json",
+                "sha256": "12a4cf11cb78e30cbe78ee8cf2becdebf7762113411d96197017e5d81222132e"
+              },
+              {
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/brief.md",
+                "sha256": "aa23bf0be0ad7a165bfd649d7f3615073dabef9bfbfbf30643490b3c9dc95a55"
+              },
+              {
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/check.jsonl",
+                "sha256": "2317a86dd8b5bd1f20cbb11b6f4080d649a39b98da54e2b66fc38bd589e0a698"
+              },
+              {
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/design.md",
+                "sha256": "5c46f309ce6c955bf4928d9bc91631bb2830074dc0b895cada57b8538cf48bb8"
+              },
+              {
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/implement.jsonl",
+                "sha256": "1a756381c803f64abe3606caa40c5f19e64b5f5c3cf0e705f7760f00592f20e7"
+              },
+              {
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/implement.md",
+                "sha256": "42eb2ad8efcfb3a2b563d5f4a2a976ab27e1b36ec956feef06e43b9944d33272"
+              },
+              {
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/prd.md",
+                "sha256": "4918bf05003a3bab617ca965276c5a2e384127e19017ebfd84ba7c37908b390d"
+              },
+              {
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/task.json",
+                "sha256": "2981f94fa451c0924450007e6a35d138676ec03bf1c1064f62772562325932b7"
+              }
+            ],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "acb8a2a15c20b18961f53ab76fe9208a7278dc51b6f7ee50489362b042340f5b"
+          },
+          {
+            "root": "cc2api",
+            "head": "d33fbad0742172075136b0a41393e30954c26919",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "edc93be2308a1e05a70d8278a1578356fc2d1075f2578c19fec002799b360451"
+          }
+        ],
+        "fingerprint": "e4a5e4df2da5f4f03e181bc646c03848aef156e06c6ef17ea623ed029fab8185"
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-09-04T14:19:10+08:00",
+    "completedSteps": [
+      "完成抓包独立思考预算快照实现、测试与规范更新"
+    ],
+    "partialStep": null,
+    "nextStep": "由后续部署任务发布生产 bench 并执行真实抓包验证",
+    "notes": ""
+  }
+}

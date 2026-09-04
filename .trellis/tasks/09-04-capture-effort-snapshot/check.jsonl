@@ -1,0 +1,6 @@
+{"file":".trellis/spec/vibecoding-bench/backend/database-guidelines.md","reason":"核对 SQLite 幂等补列、四类 run 快照、调度 payload 与继续会话兼容契约"}
+{"file":".trellis/spec/vibecoding-bench/backend/error-handling.md","reason":"核对非法思考预算的 HTTP 400 与不创建资源行为"}
+{"file":".trellis/spec/vibecoding-bench/backend/quality-guidelines.md","reason":"核对后端测试、共享校验复用和跨层数据流质量要求"}
+{"file":".trellis/spec/vibecoding-bench/frontend/state-management.md","reason":"核对运行设置状态复用、抓包表单初始化与提交后重置行为"}
+{"file":".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md","reason":"核对响应式布局、转义、事件绑定和真实浏览器验收要求"}
+{"file":".trellis/spec/vibecoding-bench/frontend/type-safety.md","reason":"核对 CaptureRunIn、FormData 字段名和详情响应字段一致性"}
