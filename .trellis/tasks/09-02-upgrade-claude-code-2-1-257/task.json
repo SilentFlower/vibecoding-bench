@@ -1,0 +1,79 @@
+{
+  "id": "upgrade-claude-code-2-1-257",
+  "name": "upgrade-claude-code-2-1-257",
+  "title": "升级 cc2api 与 vibecoding-bench 到 Claude Code 2.1.257",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-09-02",
+  "completedAt": "2026-09-04",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "09-02-cc2api-claude-code-2-1-257-protocol",
+    "09-02-vibecoding-bench-claude-code-2-1-257-runtime",
+    "09-02-deploy-claude-code-2-1-257",
+    "09-02-cc2api-cli-bg-status-classifier"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-09-01T18:52:31Z",
+      "contextKey": "codex_01a05e4d-62cb-7350-94f9-6251751f4b2c",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "57c47d1a3fefff2daf6563cfa99619dbf7746226",
+        "status": [],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "57c47d1a3fefff2daf6563cfa99619dbf7746226",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "ac892142c715b86d112a4f174ff49f7726f11b26e4cfb3f9cfda622c15403e01"
+          },
+          {
+            "root": "cc2api",
+            "head": "54f3c52b9fe2d23504c66131883e94128018b441",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "47bc8bbb22e1b125478b68b3500d6a6a764ac21e8607a97775b7b753c689c9bb"
+          }
+        ],
+        "fingerprint": "e44e48d0ccf07a5c55a1abcee5e706c222fac5ac74410582a162f9d01a6f2421"
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-09-04T04:30:00+08:00",
+    "completedSteps": [
+      "四个子任务均完成并归档",
+      "cc2api 与 vibecoding-bench 2.1.257 协议、运行时和生产部署验收完成",
+      "cli-bg 状态分类兼容完成并验证",
+      "账号 allow_1m_models 保持不变，联合回滚证据可用"
+    ],
+    "partialStep": null,
+    "nextStep": "执行 finish-work release audit 与归档",
+    "notes": "父任务仅负责跨子任务契约和最终集成收口；业务实现、发布和线上验证均由四个子任务完成。"
+  }
+}

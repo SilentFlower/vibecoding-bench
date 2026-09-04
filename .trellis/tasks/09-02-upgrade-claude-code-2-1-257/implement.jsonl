@@ -1,0 +1,4 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"父任务需要维护协议、运行时、部署与数据库迁移之间的跨层契约。"}
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"约束 Claude Code 版本画像升级必须基于真实抓包并覆盖 CCH、beta、bootstrap 和迁移。"}
+{"file":".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/fable-5-1-capture-summary.md","reason":"提供 Fable 5.1、首字节超时与 [1m] 入口解析的脱敏证据。"}
+{"file":".trellis/tasks/09-02-upgrade-claude-code-2-1-257/research/haiku-capture-summary.md","reason":"提供 Haiku 2.1.257 请求分类、beta 与 CCH 结论。"}

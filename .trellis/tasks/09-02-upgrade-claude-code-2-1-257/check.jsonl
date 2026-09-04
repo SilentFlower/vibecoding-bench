@@ -1,0 +1,4 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"检查三个子任务之间的版本、配置、数据迁移与部署闭环。"}
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"检查协议画像与抓包证据一致且旧画像可回滚。"}
+{"file":".trellis/spec/cc2api/deploy/deploy-guidelines.md","reason":"检查 cc2api 镜像、数据库迁移和远程验收证据。"}
+{"file":".trellis/spec/vibecoding-bench/deploy/remote-deploy.md","reason":"检查三镜像部署、运行版本和远程回滚步骤。"}
