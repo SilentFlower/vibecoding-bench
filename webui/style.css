@@ -1141,6 +1141,8 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   main { padding: 18px 14px 80px; }
   .view-title { font-size: 22px; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .capture-panel > .row { flex-wrap: wrap; align-items: stretch; }
+  .capture-panel > .row > label { flex: 1 1 240px; min-width: 0; }
   .warmup-interval-row { flex-direction: column; align-items: stretch; }
 }
 

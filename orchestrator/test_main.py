@@ -424,6 +424,37 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             label,
         )
 
+    def _assert_worker_effort(
+        self,
+        calls: list[tuple[str, dict]],
+        label: str,
+        expected_effort: str,
+        expected_profile_effort: str | None = None,
+    ) -> None:
+        """
+        断言指定路径创建的 worker 显式携带目标思考预算。
+
+        :param calls: Docker client mock 记录的容器创建参数
+        :param label: 失败时标识当前 worker 路径
+        :param expected_effort: 期望传入 worker 的 run 思考预算
+        :param expected_profile_effort: 期望写回 profile 的兜底预算；None 表示不校验
+        :return: None
+        """
+        worker_calls = [kwargs for image, kwargs in calls if image == main.WORKER_IMAGE]
+        self.assertEqual(1, len(worker_calls), label)
+        environment = worker_calls[0]["environment"]
+        self.assertEqual(
+            expected_effort,
+            environment["CLAUDE_CODE_EFFORT_LEVEL"],
+            label,
+        )
+        if expected_profile_effort is not None:
+            self.assertEqual(
+                expected_profile_effort,
+                environment["PROFILE_CLAUDE_CODE_EFFORT_LEVEL"],
+                label,
+            )
+
     def test_runtime_version_setting_override_and_reset(self) -> None:
         """
         无覆盖、保存覆盖和清空覆盖应按既定优先级返回版本。
@@ -453,7 +484,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
 
     def test_run_workers_use_snapshot_and_ephemeral_workers_use_effective_version(self) -> None:
         """
-        run/continue worker 应使用快照，临时 worker 应使用启动时的有效版本。
+        run/continue worker 应使用身份快照，临时 worker 应使用启动时有效配置。
 
         :return: None
         """
@@ -466,9 +497,13 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         }
         with (
             patch.object(main, "effective_claude_code_version", return_value="2.1.257"),
+            patch.object(main, "effective_runtime_effort", return_value="medium"),
             patch.object(main, "_wait_sidecar_ready"),
         ):
-            for capture_full_http, label in ((False, "task"), (True, "capture")):
+            for capture_full_http, label, effort_level in (
+                (False, "task", "high"),
+                (True, "capture", "low"),
+            ):
                 with self.subTest(worker=label):
                     client, calls = self._docker_client()
                     runner = object.__new__(main.Runner)
@@ -482,9 +517,16 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                             "timeout_sec": 60,
                             "capture_full_http": capture_full_http,
                             "claude_code_version": "2.1.260",
+                            "claude_effort_level": effort_level,
                         },
                     )
                     self._assert_worker_version(calls, label)
+                    self._assert_worker_effort(
+                        calls,
+                        label,
+                        effort_level,
+                        main.CLAUDE_CODE_EFFORT_LEVEL,
+                    )
 
             client, calls = self._docker_client()
             runner = object.__new__(main.Runner)
@@ -496,11 +538,13 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                     "run_kind": "capture",
                     "flows_dir": str(main.FLOWS_DIR / "main" / "1" / "continue-run"),
                     "claude_code_version": "2.1.260",
+                    "claude_effort_level": "xhigh",
                 },
                 account,
                 "claude-session",
             )
             self._assert_worker_version(calls, "continue")
+            self._assert_worker_effort(calls, "continue", "xhigh")
 
             client, calls = self._docker_client()
             runner = object.__new__(main.Runner)
@@ -512,6 +556,11 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             ):
                 runner.query_quota(account)
             self._assert_worker_version(calls, "quota", "2.1.257")
+            self._assert_worker_effort(
+                calls,
+                "quota",
+                main.CLAUDE_CODE_EFFORT_LEVEL,
+            )
 
             client, calls = self._docker_client()
             runner = object.__new__(main.Runner)
@@ -522,15 +571,20 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             ):
                 self.assertTrue(runner.refresh_account_oauth_token(account))
             self._assert_worker_version(calls, "oauth-refresh", "2.1.257")
+            self._assert_worker_effort(
+                calls,
+                "oauth-refresh",
+                main.CLAUDE_CODE_EFFORT_LEVEL,
+            )
 
             client, calls = self._docker_client()
             login_manager = main.LoginManager(client)
             login_manager.start("login-account", {}, timezone="Asia/Singapore")
             self._assert_worker_version(calls, "login", "2.1.257")
 
-    def test_run_creation_paths_persist_and_submit_version_snapshot(self) -> None:
+    def test_run_creation_paths_persist_and_submit_runtime_identity_snapshot(self) -> None:
         """
-        普通、抓包、批次和养号 run 都应保存并向调度 payload 传递创建时版本。
+        普通、抓包、批次和养号 run 都应保存并提交创建时的运行身份。
 
         :return: None
         """
@@ -565,6 +619,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         api_scheduler = Mock()
         with (
             patch.object(main, "effective_claude_code_version", return_value="2.1.260"),
+            patch.object(main, "effective_runtime_effort", return_value="high"),
             patch.object(main, "scheduler", api_scheduler),
         ):
             normal_result = main.run_task(task_id)
@@ -572,6 +627,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                 account_id=account_id,
                 topic_id=topic_id,
                 prompt="抓包 prompt",
+                effort_level="low",
             ))
 
             batch_scheduler = main.Scheduler(Mock())
@@ -599,8 +655,9 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             )
 
         self.assertIsNotNone(warmup_created)
-        warmup_run_id, _warmup_task_id, warmup_version = warmup_created
+        warmup_run_id, _warmup_task_id, warmup_version, warmup_effort = warmup_created
         self.assertEqual("2.1.260", warmup_version)
+        self.assertEqual("high", warmup_effort)
         normal_run_id = normal_result["run_ids"][0]
         capture_run_id = capture_result["run_id"]
         batch_run_id = batch_scheduler.submit.call_args.args[0]
@@ -608,7 +665,8 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         conn = main.get_db()
         try:
             rows = conn.execute(
-                f"SELECT id, claude_code_version FROM runs WHERE id IN ({','.join('?' for _ in run_ids)})",
+                f"SELECT id, claude_code_version, claude_effort_level "
+                f"FROM runs WHERE id IN ({','.join('?' for _ in run_ids)})",
                 run_ids,
             ).fetchall()
         finally:
@@ -617,21 +675,100 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             {run_id: "2.1.260" for run_id in run_ids},
             {row["id"]: row["claude_code_version"] for row in rows},
         )
+        self.assertEqual(
+            {
+                normal_run_id: "high",
+                capture_run_id: "low",
+                batch_run_id: "high",
+                warmup_run_id: "high",
+            },
+            {row["id"]: row["claude_effort_level"] for row in rows},
+        )
         api_payloads = {
             call.args[0]: call.args[2]
             for call in api_scheduler.submit.call_args_list
         }
         self.assertEqual("2.1.260", api_payloads[normal_run_id]["claude_code_version"])
         self.assertEqual("2.1.260", api_payloads[capture_run_id]["claude_code_version"])
+        self.assertEqual("high", api_payloads[normal_run_id]["claude_effort_level"])
+        self.assertEqual("low", api_payloads[capture_run_id]["claude_effort_level"])
         self.assertEqual(
             "2.1.260",
             batch_scheduler.submit.call_args.args[2]["claude_code_version"],
         )
+        self.assertEqual(
+            "high",
+            batch_scheduler.submit.call_args.args[2]["claude_effort_level"],
+        )
         self.assertEqual("2.1.260", capture_result["claude_code_version"])
+        self.assertEqual("low", capture_result["claude_effort_level"])
+        self.assertEqual(
+            "low",
+            main.get_capture(capture_run_id)["claude_effort_level"],
+        )
 
-    def test_historical_run_version_is_backfilled_only_once(self) -> None:
+    def test_capture_effort_defaults_to_env_and_rejects_invalid_value(self) -> None:
         """
-        历史 NULL 快照首次继续时应补写，之后不再受全局版本变化影响。
+        抓包留空应忽略页面覆盖并回退 `.env`，非法值不得产生新记录。
+
+        :return: None
+        """
+        conn = main.get_db()
+        try:
+            with conn:
+                account_id = int(conn.execute(
+                    "INSERT INTO accounts(name, profile_path) "
+                    "VALUES('capture-effort','profiles/capture-effort')"
+                ).lastrowid)
+                topic_id = int(conn.execute(
+                    "INSERT INTO topics(no, title, description, category) "
+                    "VALUES(1,'抓包预算','验证抓包预算','测试')"
+                ).lastrowid)
+        finally:
+            conn.close()
+        main.save_runtime_effort_setting("low")
+        test_scheduler = Mock()
+        with (
+            patch.object(main, "scheduler", test_scheduler),
+            patch.object(main, "CLAUDE_CODE_EFFORT_LEVEL", "max"),
+        ):
+            result = main.start_capture_run(main.CaptureRunIn(
+                account_id=account_id,
+                topic_id=topic_id,
+                prompt="默认预算",
+            ))
+            with self.assertRaises(main.HTTPException) as raised:
+                main.start_capture_run(main.CaptureRunIn(
+                    account_id=account_id,
+                    topic_id=topic_id,
+                    prompt="非法预算",
+                    effort_level="extreme",
+                ))
+
+        self.assertEqual(400, raised.exception.status_code)
+        self.assertEqual("max", result["claude_effort_level"])
+        self.assertEqual(
+            "max",
+            test_scheduler.submit.call_args.args[2]["claude_effort_level"],
+        )
+        conn = main.get_db()
+        try:
+            run = conn.execute(
+                "SELECT claude_effort_level FROM runs WHERE id=?",
+                (result["run_id"],),
+            ).fetchone()
+            task_count = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+            run_count = conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
+        finally:
+            conn.close()
+        self.assertEqual("max", run["claude_effort_level"])
+        self.assertEqual(1, task_count)
+        self.assertEqual(1, run_count)
+        self.assertEqual(1, test_scheduler.submit.call_count)
+
+    def test_historical_run_identity_is_backfilled_only_once(self) -> None:
+        """
+        历史 NULL 快照首次继续时应补写，之后不再受全局配置变化影响。
 
         :return: None
         """
@@ -653,21 +790,82 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         finally:
             conn.close()
 
-        run = {"id": "legacy-run", "claude_code_version": None}
+        run = {
+            "id": "legacy-run",
+            "claude_code_version": None,
+            "claude_effort_level": None,
+        }
         with patch.object(main, "effective_claude_code_version", return_value="2.1.260"):
             self.assertEqual("2.1.260", main._ensure_run_claude_code_version(run))
         run["claude_code_version"] = None
         with patch.object(main, "effective_claude_code_version", return_value="2.1.257"):
             self.assertEqual("2.1.260", main._ensure_run_claude_code_version(run))
+        with patch.object(main, "CLAUDE_CODE_EFFORT_LEVEL", "high"):
+            self.assertEqual("high", main._ensure_run_claude_effort_level(run))
+        run["claude_effort_level"] = None
+        with patch.object(main, "CLAUDE_CODE_EFFORT_LEVEL", "low"):
+            self.assertEqual("high", main._ensure_run_claude_effort_level(run))
 
         conn = main.get_db()
         try:
             stored = conn.execute(
-                "SELECT claude_code_version FROM runs WHERE id='legacy-run'"
-            ).fetchone()["claude_code_version"]
+                "SELECT claude_code_version, claude_effort_level "
+                "FROM runs WHERE id='legacy-run'"
+            ).fetchone()
         finally:
             conn.close()
-        self.assertEqual("2.1.260", stored)
+        self.assertEqual("2.1.260", stored["claude_code_version"])
+        self.assertEqual("high", stored["claude_effort_level"])
+
+    def test_continue_endpoint_passes_backfilled_effort_snapshot(self) -> None:
+        """
+        继续接口应先补写历史预算，再把同一快照交给 continue manager。
+
+        :return: None
+        """
+        conn = main.get_db()
+        try:
+            with conn:
+                account_id = int(conn.execute(
+                    "INSERT INTO accounts(name, profile_path) "
+                    "VALUES('continue-effort','profiles/continue-effort')"
+                ).lastrowid)
+                task_id = int(conn.execute(
+                    "INSERT INTO tasks(topic_no, title, prompt, account_id) "
+                    "VALUES(1,'继续任务','继续 prompt',?)",
+                    (account_id,),
+                ).lastrowid)
+                conn.execute(
+                    "INSERT INTO runs(id, task_id, account_id, status, claude_code_version) "
+                    "VALUES('continue-effort-run',?,?,'success','2.1.260')",
+                    (task_id, account_id),
+                )
+        finally:
+            conn.close()
+
+        session = Mock()
+        session.sid = "continue-sid"
+        session.run_id = "continue-effort-run"
+        session.session_id = "claude-session"
+        manager = Mock()
+        manager.start.return_value = session
+        with (
+            patch.object(main, "continue_manager", manager),
+            patch.object(main, "CLAUDE_CODE_EFFORT_LEVEL", "xhigh"),
+        ):
+            result = main.continue_run_start("continue-effort-run")
+
+        passed_run = manager.start.call_args.args[0]
+        self.assertEqual("xhigh", passed_run["claude_effort_level"])
+        self.assertEqual("continue-sid", result["session_id"])
+        conn = main.get_db()
+        try:
+            stored = conn.execute(
+                "SELECT claude_effort_level FROM runs WHERE id='continue-effort-run'"
+            ).fetchone()["claude_effort_level"]
+        finally:
+            conn.close()
+        self.assertEqual("xhigh", stored)
 
     def test_new_run_after_setting_change_uses_new_snapshot(self) -> None:
         """
@@ -690,15 +888,22 @@ class ClaudeCodeVersionTests(unittest.TestCase):
 
         test_scheduler = Mock()
         with patch.object(main, "scheduler", test_scheduler):
-            with patch.object(main, "effective_claude_code_version", return_value="2.1.260"):
+            with (
+                patch.object(main, "effective_claude_code_version", return_value="2.1.260"),
+                patch.object(main, "effective_runtime_effort", return_value="high"),
+            ):
                 first_run_id = main.run_task(task_id)["run_ids"][0]
-            with patch.object(main, "effective_claude_code_version", return_value="2.1.257"):
+            with (
+                patch.object(main, "effective_claude_code_version", return_value="2.1.257"),
+                patch.object(main, "effective_runtime_effort", return_value="low"),
+            ):
                 second_run_id = main.run_task(task_id)["run_ids"][0]
 
         conn = main.get_db()
         try:
             rows = conn.execute(
-                "SELECT id, claude_code_version FROM runs WHERE id IN (?,?)",
+                "SELECT id, claude_code_version, claude_effort_level "
+                "FROM runs WHERE id IN (?,?)",
                 (first_run_id, second_run_id),
             ).fetchall()
         finally:
@@ -706,10 +911,13 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         versions = {row["id"]: row["claude_code_version"] for row in rows}
         self.assertEqual("2.1.260", versions[first_run_id])
         self.assertEqual("2.1.257", versions[second_run_id])
+        efforts = {row["id"]: row["claude_effort_level"] for row in rows}
+        self.assertEqual("high", efforts[first_run_id])
+        self.assertEqual("low", efforts[second_run_id])
 
-    def test_old_database_upgrade_adds_run_version_snapshot_column(self) -> None:
+    def test_old_database_upgrade_adds_run_identity_snapshot_columns(self) -> None:
         """
-        旧 runs 表重复升级后应幂等补齐 Claude Code 版本快照列。
+        旧 runs 表重复升级后应幂等补齐版本和思考预算快照列。
 
         :return: None
         """
@@ -719,6 +927,19 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             "CREATE TABLE runs(id TEXT PRIMARY KEY, task_id INTEGER NOT NULL, "
             "account_id INTEGER NOT NULL, status TEXT NOT NULL)"
         )
+        conn.execute(
+            "CREATE TABLE app_settings(key TEXT PRIMARY KEY, value TEXT NOT NULL, "
+            "updated_at REAL)"
+        )
+        conn.execute(
+            "INSERT INTO runs(id, task_id, account_id, status) "
+            "VALUES('preserved-run',7,9,'success')"
+        )
+        conn.execute(
+            "INSERT INTO app_settings(key, value) "
+            "VALUES('claude_effort_level','low')"
+        )
+        conn.commit()
         conn.close()
 
         with patch.object(main, "DB_PATH", old_db_path):
@@ -727,9 +948,55 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         conn = sqlite3.connect(old_db_path)
         try:
             columns = {row[1] for row in conn.execute("PRAGMA table_info(runs)")}
+            preserved_run = conn.execute(
+                "SELECT id, task_id, account_id, status, claude_effort_level "
+                "FROM runs WHERE id='preserved-run'"
+            ).fetchone()
+            preserved_setting = conn.execute(
+                "SELECT value FROM app_settings WHERE key='claude_effort_level'"
+            ).fetchone()
         finally:
             conn.close()
         self.assertIn("claude_code_version", columns)
+        self.assertIn("claude_effort_level", columns)
+        self.assertEqual(
+            ("preserved-run", 7, 9, "success", None),
+            preserved_run,
+        )
+        self.assertEqual(("low",), preserved_setting)
+
+    def test_capture_webui_exposes_independent_effort_selector_and_details(self) -> None:
+        """
+        抓包表单与详情页必须提交并展示独立思考预算字段。
+
+        :return: None
+        """
+        webui_dir = Path(__file__).resolve().parents[1] / "webui"
+        index_html = (webui_dir / "index.html").read_text(encoding="utf-8")
+        app_js = (webui_dir / "app.js").read_text(encoding="utf-8")
+        style_css = (webui_dir / "style.css").read_text(encoding="utf-8")
+        self.assertEqual(2, index_html.count('<select name="effort_level"></select>'))
+        self.assertIn("默认 .env (", app_js)
+        self.assertIn("effort_level: (fd.get('effort_level')", app_js)
+        self.assertIn('data-stat-key="claude_effort_level"', app_js)
+        capture_stats = re.search(
+            r"const captureStats = `(?P<body>.*?)`;",
+            app_js,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(capture_stats)
+        self.assertIn("capture.claude_effort_level", capture_stats.group("body"))
+        unavailable_branch = re.search(
+            r"if \(capture\.available === false\) \{\s*return `(?P<body>.*?)`;",
+            app_js,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(unavailable_branch)
+        self.assertIn("${captureStats}", unavailable_branch.group("body"))
+        self.assertIn(
+            ".capture-panel > .row { flex-wrap: wrap; align-items: stretch; }",
+            style_css,
+        )
 
     def test_entrypoint_keeps_strict_version_fallback_and_install(self) -> None:
         """
@@ -2342,7 +2609,11 @@ global.fetch = async (_url, options) => {
         original_client = main.cc2api_client
         main.cc2api_client = client
         try:
-            result = main.WarmupScheduler(run_scheduler).trigger_account(1, require_due=True)
+            with patch.object(main, "effective_runtime_effort", return_value="high"):
+                result = main.WarmupScheduler(run_scheduler).trigger_account(
+                    1,
+                    require_due=True,
+                )
         finally:
             main.cc2api_client = original_client
         self.assertTrue(result["started"])
@@ -2362,8 +2633,10 @@ global.fetch = async (_url, options) => {
         self.assertEqual("warmup", run["run_kind"])
         self.assertEqual("queued", run["status"])
         self.assertEqual("2.1.260", run["claude_code_version"])
+        self.assertEqual("high", run["claude_effort_level"])
         submitted_task = run_scheduler.submit.call_args.args[2]
         self.assertEqual("2.1.260", submitted_task["claude_code_version"])
+        self.assertEqual("high", submitted_task["claude_effort_level"])
         self.assertEqual(task["prompt"], submitted_task["prompt"])
         self.assertIn("标准题目", task["prompt"])
         self.assertIn("只使用题库描述", task["prompt"])

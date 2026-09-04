@@ -209,7 +209,7 @@
         </div>
         <div class="row">
           <label><span class="lbl">$ effort_level</span>
-            <span class="hint inline">页面保存后立即影响新启动的普通 / 批量 run；抓包 run 不受影响。</span>
+            <span class="hint inline">页面保存后立即影响新启动的普通 / 批量 run；抓包使用下方独立选择。</span>
             <select name="effort_level"></select>
           </label>
           <div class="runtime-model-status">
@@ -266,6 +266,10 @@
           </label>
           <label><span class="lbl">$ timeout_sec</span>
             <input name="timeout_sec" type="number" min="60" value="1800" />
+          </label>
+          <label><span class="lbl">$ effort_level</span>
+            <span class="hint inline">只覆盖当前抓包 run；默认使用 .env。</span>
+            <select name="effort_level"></select>
           </label>
         </div>
         <label><span class="lbl">$ model 覆盖</span>

@@ -302,12 +302,12 @@ def handle_run_terminal(run_id, expected_cc2api_account_id):
 
 ---
 
-## Scenario: run Claude Code 版本快照与继续对话
+## Scenario: run Claude Code 运行身份快照与继续对话
 
 ### 1. Scope / Trigger
 
-- 修改 `runs.claude_code_version`、Claude Code 版本运行时设置、普通/批量/养号/抓包 run 创建、调度 payload、worker 启动或继续对话时适用。
-- 版本属于 run 的可恢复执行身份。页面覆盖或 `.env` 是创建新 run 时的输入，不能在排队启动或继续历史会话时重新解释，否则同一会话会因全局设置变化漂移到另一个 CLI 版本。
+- 修改 `runs.claude_code_version`、`runs.claude_effort_level`、Claude Code 版本或思考预算运行时设置、普通/批量/养号/抓包 run 创建、调度 payload、worker 启动或继续对话时适用。
+- CLI 版本和思考预算共同属于 run 的可恢复执行身份。页面覆盖、抓包单次选择或 `.env` 只在创建新 run 时解析，不能在排队启动或继续历史会话时重新解释，否则同一会话会因全局设置变化产生漂移。
 
 ### 2. Signatures
 
@@ -315,15 +315,20 @@ def handle_run_terminal(run_id, expected_cc2api_account_id):
 
 ```text
 runs.claude_code_version TEXT NULL
+runs.claude_effort_level TEXT NULL
 init_db() -> _ensure_column(conn, "runs", "claude_code_version", "TEXT")
+init_db() -> _ensure_column(conn, "runs", "claude_effort_level", "TEXT")
 ```
 
-版本解析与 worker 边界：
+运行身份解析与 worker 边界：
 
 ```python
 effective_claude_code_version() -> str
+effective_runtime_effort() -> str
 _resolve_run_claude_code_version(value: Optional[str]) -> str
+_resolve_run_claude_effort_level(value: Optional[str]) -> str
 _ensure_run_claude_code_version(run: dict) -> str
+_ensure_run_claude_effort_level(run: dict) -> str
 Runner.start_run(run_id: str, account: dict, task: dict) -> tuple[str, str]
 Runner.start_continue(
     sid: str,
@@ -331,6 +336,7 @@ Runner.start_continue(
     account: dict,
     session_id: str,
 ) -> tuple[str, str]
+CaptureRunIn.effort_level: Optional[str]
 ```
 
 相关 API：
@@ -342,17 +348,21 @@ POST /api/runs/{rid}/continue/start
 GET  /api/runs
 GET  /api/runs/{rid}
 GET  /api/runs/{rid}/capture
+GET  /api/settings/runtime-effort
 ```
 
 ### 3. Contracts
 
-- 普通、批量、养号和抓包入口必须在创建每个 run 时调用一次 `effective_claude_code_version()`，把规范化结果同时写入 `runs.claude_code_version` 和该 run 的 scheduler task payload。新 run 的字段必须非空。
-- `Runner.start_run()` 必须优先读取 `task["claude_code_version"]`。从创建到真正取得 semaphore 期间，即使 WebUI 覆盖或 `.env` 改变，已排队 run 仍使用创建时快照。
-- 同一 task 再次运行会创建新的 run；新 run 使用再次运行时的当前有效版本，不继承旧 run 快照，也不修改旧 run。
-- `POST /api/runs/{rid}/continue/start` 必须在启动 worker 前调用 `_ensure_run_claude_code_version(run)`；`Runner.start_continue()` 只使用返回并写回 run 字典的快照，不得无条件调用当前全局有效版本。
-- 历史 run 允许 `claude_code_version IS NULL`。首次继续时，在 `_db_lock` 内重新读取数据库；若仍为空，则把当前有效版本通过 `WHERE id=? AND claude_code_version IS NULL` 补写一次。后续继续必须复用已补写值，即使第一次 worker 启动失败或全局版本再次改变。
-- `_resolve_run_claude_code_version()` 的空值回退只用于历史测试或旧内部调用兼容；所有生产 run 创建入口都必须显式传递快照，不能把该回退当作正常调度路径。
-- run 列表/详情通过现有 `SELECT *` 返回快照；抓包创建响应和抓包详情必须显式返回 `claude_code_version`，便于把运行目标版本与 flow 中观察到的 `cc_version` 分开核验。
+- 普通、批量和养号入口创建每个 run 时，版本取 `effective_claude_code_version()`，思考预算取 `effective_runtime_effort()`；两个规范化结果都必须同时写入 `runs` 和该 run 的 scheduler task payload，新 run 的两个字段必须非空。
+- 抓包入口的版本仍取 `effective_claude_code_version()`；思考预算取 `CaptureRunIn.effort_level`，空值必须回退进程启动时的 `.env` 常量 `CLAUDE_CODE_EFFORT_LEVEL`，不得读取 WebUI 普通/批量 run 的运行时覆盖。
+- 抓包页面必须从 `GET /api/settings/runtime-effort` 的 `allowed_efforts` 生成独立选择器，并提供“默认 `.env`”选项。该选择只覆盖当前抓包 run；窄屏布局必须换行，不能裁切选择器。
+- `Runner.start_run()` 必须读取 `task["claude_code_version"]` 和 `task["claude_effort_level"]`。从创建到真正取得 semaphore 期间，即使 WebUI 覆盖或 `.env` 改变，已排队 run 仍使用创建时快照。
+- 同一 task 再次运行会创建新的 run；新 run 使用再次运行时的当前有效运行身份，不继承旧 run 快照，也不修改旧 run。
+- `POST /api/runs/{rid}/continue/start` 必须在启动 worker 前依次调用 `_ensure_run_claude_code_version(run)` 和 `_ensure_run_claude_effort_level(run)`；`Runner.start_continue()` 只使用写回 run 字典的两个快照，不得无条件读取当前全局配置。
+- 历史 run 允许两个快照字段为 NULL。首次继续时，在 `_db_lock` 内重新读取数据库，并通过对应的 `WHERE id=? AND ... IS NULL` 条件各补写一次：版本取当前有效版本，思考预算取 `.env` 常量。后续继续必须复用已补写值，即使第一次 worker 启动失败或全局配置再次改变。
+- `_resolve_run_claude_code_version()` 和 `_resolve_run_claude_effort_level()` 的空值回退只用于历史测试或旧内部调用兼容；所有生产 run 创建入口都必须显式传递两个快照，不能把回退当作正常调度路径。
+- run 列表/详情通过现有 `SELECT *` 返回两个快照；抓包创建响应和抓包详情必须显式返回 `claude_code_version` 与 `claude_effort_level`。抓包索引暂不可用时，详情仍必须展示这两个运行身份字段。
+- worker 的 `CLAUDE_CODE_EFFORT_LEVEL` 必须使用 run 快照；`PROFILE_CLAUDE_CODE_EFFORT_LEVEL` 仍使用 `.env` 常量，二者不能混用。
 - 登录、额度查询和后台 OAuth refresh 是非 run 临时 worker，没有可恢复的 run 身份，应在各自启动时读取当前有效版本，不继承某个历史 run 的快照。
 - worker entrypoint 仍负责核对并安装精确版本；指定版本安装失败时 run 明确失败，不得静默退回镜像内版本。
 
@@ -360,32 +370,39 @@ GET  /api/runs/{rid}/capture
 
 | 条件 | 行为 |
 |------|------|
-| 新建普通/批量/养号/抓包 run | DB 行和 scheduler payload 保存同一个非空版本 |
-| run 排队后页面覆盖或 `.env` 改变 | 已排队 run 使用原快照；之后新建 run 使用新版本 |
-| 已有快照的 run 点击继续 | continue worker 使用原快照，不读取当前全局版本 |
-| 历史 run 快照为空 | 首次继续解析当前有效版本并原子补写；后续固定使用补写值 |
+| 新建普通/批量/养号 run | DB 行和 scheduler payload 保存同一组非空版本、当前有效思考预算 |
+| 新建抓包 run 并显式选择预算 | DB、scheduler payload、创建响应保存版本和所选预算 |
+| 抓包预算留空且页面有全局预算覆盖 | 抓包保存 `.env` 预算，忽略普通/批量 run 的页面覆盖 |
+| 抓包预算不是 `max/xhigh/high/medium/low` | 返回 400，不创建 task/run，不启动 worker |
+| run 排队后页面覆盖或 `.env` 改变 | 已排队 run 使用原运行身份；之后新建 run 才使用新配置 |
+| 已有快照的 run 点击继续 | continue worker 使用原版本和预算，不读取当前全局配置 |
+| 历史 run 两个快照为空 | 首次继续原子补写版本和 `.env` 预算；后续固定使用补写值 |
 | 并发触发同一历史 run 的首次继续 | `_db_lock` 内重新读取，只有第一个空值补写生效，后续读取已保存值 |
-| run 中保存的版本格式无效 | 继续接口返回 400，不启动 worker |
-| run 不存在、未结束或账号不可用 | 沿用 continue 接口的 404/400，不执行版本补写和 worker 启动 |
+| run 中保存的版本或思考预算格式无效 | 继续接口返回 400，不启动 worker |
+| run 不存在、未结束或账号不可用 | 沿用 continue 接口的 404/400，不执行快照补写和 worker 启动 |
 | worker 无法安装快照指定版本 | run/continue 明确失败，不降级到镜像默认版本 |
 
 ### 5. Good/Base/Bad Cases
 
-- Good：以 `2.1.260` 创建抓包 run，关闭 worker 后把页面设置改成 `2.1.257`；继续该 run 仍启动 `2.1.260`，随后新建的 run 使用 `2.1.257`。
-- Good：历史 NULL run 首次继续时当前版本为 `2.1.260`，即使启动失败并在第二次继续前把全局版本改成 `2.1.257`，第二次仍使用已补写的 `2.1.260`。
-- Base：页面没有覆盖值时，新 run 使用 `.env` 的 `CLAUDE_CODE_VERSION`；页面保存合法版本后，只有之后创建的新 run 使用覆盖值。
-- Bad：在 `Runner.start_run()` 或 `Runner.start_continue()` 中直接调用 `effective_claude_code_version()`。排队等待或关闭后继续会把可变全局配置误当成 run 身份。
-- Bad：只把版本放进内存 task payload，不写入 `runs`。进程重启或继续历史会话后无法恢复原版本。
-- Bad：历史 NULL run 每次继续都回退当前版本但不补写。相同 Claude session 会随页面设置反复漂移。
+- Good：以版本 `2.1.260`、预算 `high` 创建抓包 run，关闭 worker 后把页面设置改成版本 `2.1.257`、预算 `low`；继续该 run 仍启动 `2.1.260/high`。
+- Good：普通 run 使用页面预算 `low`，抓包选择器留空且 `.env` 为 `max`；抓包 DB、响应和 worker 都使用 `max`。
+- Good：历史 NULL run 首次继续时补写版本 `2.1.260` 和 `.env` 预算 `high`；即使启动失败并在第二次继续前改为 `2.1.257/low`，第二次仍使用已补写的 `2.1.260/high`。
+- Base：页面没有覆盖值时，普通/批量/养号 run 使用 `.env` 的版本和预算；页面保存合法覆盖后，只有之后创建的新 run 使用覆盖值。
+- Bad：在 `Runner.start_run()` 或 `Runner.start_continue()` 中直接调用当前有效配置函数。排队等待或关闭后继续会把可变全局配置误当成 run 身份。
+- Bad：抓包预算留空时调用 `effective_runtime_effort()`。这会把普通 run 的页面覆盖错误泄漏到协议抓包。
+- Bad：只把版本或预算放进内存 task payload，不写入 `runs`。进程重启或继续历史会话后无法恢复原运行身份。
+- Bad：历史 NULL run 每次继续都回退当前配置但不补写。相同 Claude session 会随页面设置反复漂移。
 
 ### 6. Tests Required
 
-- 新库断言 `_SCHEMA` 含 `runs.claude_code_version`；旧 SQLite 连续执行两次 `init_db()` 后断言列存在且数据完整。
-- 普通、批量、养号和抓包四类创建入口分别断言 DB 快照非空，并与 scheduler payload、抓包创建响应完全一致。
-- run 创建后修改 `effective_claude_code_version()` 的返回值，再启动 worker，断言环境变量 `CLAUDE_CODE_VERSION` 仍为创建快照。
-- 覆盖抓包 run 以 `2.1.260` 创建、当前全局改为 `2.1.257` 后继续，断言 continue worker 为 `2.1.260`。
-- 历史 NULL run 首次继续补写 `2.1.260`，全局改为 `2.1.257` 后再次调用，断言 DB 和返回值仍为 `2.1.260`。
-- 同一 task 在设置变化前后创建两个 run，断言旧 run 保留旧版本，新 run 保存新版本。
+- 新库断言 `_SCHEMA` 含两个快照列；旧 SQLite 连续执行两次 `init_db()` 后断言列存在，历史 run 和 `app_settings` 数据完整。
+- 普通、批量、养号和抓包四类创建入口分别断言 DB 的版本、预算快照非空，并与 scheduler payload、抓包创建响应完全一致。
+- run 创建后修改当前有效版本和预算，再启动 worker，断言 `CLAUDE_CODE_VERSION` 与 `CLAUDE_CODE_EFFORT_LEVEL` 仍为创建快照，且 `PROFILE_CLAUDE_CODE_EFFORT_LEVEL` 保持 `.env` 值。
+- 抓包显式预算、留空回退 `.env`、忽略页面预算覆盖和非法预算 400 都必须有测试；非法输入不得新增 task/run 或调用 scheduler。
+- 覆盖抓包 run 以 `2.1.260/high` 创建、当前全局改为 `2.1.257/low` 后继续，断言 continue worker 仍为 `2.1.260/high`。
+- 历史 NULL run 首次继续补写版本和 `.env` 预算，全局配置变化后再次调用，断言 DB 和返回值仍保持首次补写值。
+- 同一 task 在设置变化前后创建两个 run，断言旧 run 保留旧运行身份，新 run 保存新运行身份。
+- 前端静态契约测试必须覆盖抓包独立选择器、提交字段、run/抓包详情展示、索引不可用分支仍展示快照，以及 920px 以下表单换行规则。
 - 登录、额度查询和 OAuth refresh 测试断言它们使用各自启动时的当前有效版本，不受 run 快照约束。
 
 ### 7. Wrong vs Correct
@@ -410,19 +427,26 @@ def start_continue(self, sid, run, account, session_id):
 def continue_run_start(rid: str):
     run = dict(run_row)
     _ensure_run_claude_code_version(run)
+    _ensure_run_claude_effort_level(run)
     session = continue_manager.start(run, account)
 
 def start_continue(self, sid: str, run: dict, account: dict, session_id: str):
     claude_code_version = _resolve_run_claude_code_version(
         run.get("claude_code_version")
     )
+    claude_effort_level = _resolve_run_claude_effort_level(
+        run.get("claude_effort_level")
+    )
     worker = self.client.containers.run(
         WORKER_IMAGE,
-        environment={"CLAUDE_CODE_VERSION": claude_code_version},
+        environment={
+            "CLAUDE_CODE_VERSION": claude_code_version,
+            "CLAUDE_CODE_EFFORT_LEVEL": claude_effort_level,
+        },
     )
 ```
 
-先在持久化边界确保快照存在，再由 worker 启动边界消费同一个值，才能保证排队、进程重启和继续会话后的版本一致性。
+先在持久化边界确保两个快照都存在，再由 worker 启动边界消费同一组值，才能保证排队、进程重启和继续会话后的运行身份一致性。
 
 ---
 

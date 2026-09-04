@@ -939,6 +939,7 @@ function renderRunDetailShell(rid) {
         <div class="stat-box"><div class="stat-label">请求数</div><div class="stat-value" data-stat-key="requests">等待采集</div></div>
         <div class="stat-box"><div class="stat-label">退出码</div><div class="stat-value" data-stat-key="exit_code">-</div></div>
         <div class="stat-box"><div class="stat-label">Claude Code</div><div class="stat-value-sm" data-stat-key="claude_code_version">-</div></div>
+        <div class="stat-box"><div class="stat-label">思考预算</div><div class="stat-value-sm" data-stat-key="claude_effort_level">-</div></div>
         <div class="stat-box"><div class="stat-label">模型覆盖</div><div class="stat-value-sm" data-stat-key="model_override">默认</div></div>
       </div>
       <div class="hint inline hidden" id="run-detail-stats-error"></div>
@@ -997,20 +998,25 @@ function renderCaptureDetail(capture) {
   const fileRows = files.map(f => `
     <div class="file">${escapeHTML(f.path)}<span class="size">${formatSize(f.size || 0)}</span></div>
   `).join('') || '<div class="muted">暂无抓包文件</div>';
+  const captureStats = `
+    <div class="stats-grid capture-stats">
+      <div class="stat-box"><div class="stat-label">flows</div><div class="stat-value">${escapeHTML(index.total_flows ?? entries.length)}</div></div>
+      <div class="stat-box"><div class="stat-label">运行版本</div><div class="stat-value-sm">${escapeHTML(capture.claude_code_version || '-')}</div></div>
+      <div class="stat-box"><div class="stat-label">思考预算</div><div class="stat-value-sm">${escapeHTML(capture.claude_effort_level || '-')}</div></div>
+      <div class="stat-box"><div class="stat-label">cc_version</div><div class="stat-value-sm">${versions.length ? versions.map(escapeHTML).join('<br>') : '<span class="muted">未观察到</span>'}</div></div>
+      <div class="stat-box"><div class="stat-label">模式</div><div class="stat-value-sm">${escapeHTML(capture.mode || 'full_http')}</div></div>
+      <div class="stat-box"><div class="stat-label">model</div><div class="stat-value-sm">${capture.model_override ? escapeHTML(capture.model_override) : '<span class="muted">默认</span>'}</div></div>
+    </div>
+  `;
   if (capture.available === false) {
     return `
+      ${captureStats}
       <div class="muted">${escapeHTML(index.error || '等待抓包索引')}</div>
       <div class="file-tree capture-files">${fileRows}</div>
     `;
   }
   return `
-    <div class="stats-grid capture-stats">
-      <div class="stat-box"><div class="stat-label">flows</div><div class="stat-value">${escapeHTML(index.total_flows ?? entries.length)}</div></div>
-      <div class="stat-box"><div class="stat-label">运行版本</div><div class="stat-value-sm">${escapeHTML(capture.claude_code_version || '-')}</div></div>
-      <div class="stat-box"><div class="stat-label">cc_version</div><div class="stat-value-sm">${versions.length ? versions.map(escapeHTML).join('<br>') : '<span class="muted">未观察到</span>'}</div></div>
-      <div class="stat-box"><div class="stat-label">模式</div><div class="stat-value-sm">${escapeHTML(capture.mode || 'full_http')}</div></div>
-      <div class="stat-box"><div class="stat-label">model</div><div class="stat-value-sm">${capture.model_override ? escapeHTML(capture.model_override) : '<span class="muted">默认</span>'}</div></div>
-    </div>
+    ${captureStats}
     <div class="hint inline">完整请求体和响应体保存在 flows 目录；此处只展示脱敏索引。</div>
     <div class="file-tree capture-files">${fileRows}</div>
     <table class="data capture-table">
@@ -1037,6 +1043,7 @@ function updateRunDetailContent(rid, run, files, stats, transcript, transcriptSt
   setRunDetailText('[data-stat-key="requests"]', renderStatValue(stats, 'requests'));
   setRunDetailText('[data-stat-key="exit_code"]', escapeHTML(run.exit_code ?? '-'));
   setRunDetailText('[data-stat-key="claude_code_version"]', escapeHTML(run.claude_code_version || '-'));
+  setRunDetailText('[data-stat-key="claude_effort_level"]', escapeHTML(run.claude_effort_level || '-'));
   setRunDetailText('[data-stat-key="model_override"]', run.capture_model_override ? escapeHTML(run.capture_model_override) : '<span class="muted">默认</span>');
 
   const statsError = $('#run-detail-stats-error');
@@ -1262,6 +1269,13 @@ function bindCaptureForm() {
     .map(a => `<option value="${a.id}">${escapeHTML(a.name)}</option>`).join('');
   form.topic_id.innerHTML = state.topics
     .map(t => `<option value="${t.id}">#${t.no} ${escapeHTML(t.title)}</option>`).join('');
+  const effortSetting = state.runtimeEffort || {};
+  form.effort_level.innerHTML = [
+    `<option value="">默认 .env (${escapeHTML(effortSetting.env_default_effort || '-')})</option>`,
+    ...(effortSetting.allowed_efforts || [])
+      .map(v => `<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`),
+  ].join('');
+  form.effort_level.value = '';
   form.onsubmit = async (e) => {
     e.preventDefault();
     if (state.accounts.length === 0) return alert('请先添加账号');
@@ -1275,6 +1289,7 @@ function bindCaptureForm() {
       prompt: fd.get('prompt') || null,
       prompt_mode: fd.get('prompt_mode') || 'canonical',
       model_override: (fd.get('model_override') || '').trim() || null,
+      effort_level: (fd.get('effort_level') || '').trim() || null,
     };
     btn.disabled = true;
     try {
@@ -1284,6 +1299,7 @@ function bindCaptureForm() {
       });
       form.prompt.value = '';
       form.model_override.value = '';
+      form.effort_level.value = '';
       await Promise.all([
         API('/tasks').then(ts => { state.tasks = ts; }),
         API('/runs').then(rs => { state.runs = rs; }),
