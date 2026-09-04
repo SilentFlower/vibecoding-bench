@@ -29,7 +29,7 @@ services:
       # 远程必须用 GHCR 完整路径,否则 worker/sidecar 起不来
       WORKER_IMAGE: ghcr.io/silentflower/vibebench-worker:${VIBEBENCH_TAG:-latest}
       SIDECAR_IMAGE: ghcr.io/silentflower/vibebench-sidecar:${VIBEBENCH_TAG:-latest}
-      CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-2.1.257}
+      CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-2.1.260}
       CLAUDE_CODE_EFFORT_LEVEL: ${CLAUDE_CODE_EFFORT_LEVEL:-max}
       CLAUDE_DEFAULT_MODEL: ${CLAUDE_DEFAULT_MODEL:-opus[1m]}
       CC2API_BASE_URL: ${CC2API_BASE_URL:-}

@@ -402,18 +402,24 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         client.containers.run.side_effect = run
         return client, calls
 
-    def _assert_worker_version(self, calls: list[tuple[str, dict]], label: str) -> None:
+    def _assert_worker_version(
+        self,
+        calls: list[tuple[str, dict]],
+        label: str,
+        expected_version: str = "2.1.260",
+    ) -> None:
         """
-        断言指定路径创建的 worker 显式携带 2.1.257。
+        断言指定路径创建的 worker 显式携带目标版本。
 
         :param calls: Docker client mock 记录的容器创建参数
         :param label: 失败时标识当前 worker 路径
+        :param expected_version: 期望传入 worker 的 Claude Code 版本
         :return: None
         """
         worker_calls = [kwargs for image, kwargs in calls if image == main.WORKER_IMAGE]
         self.assertEqual(1, len(worker_calls), label)
         self.assertEqual(
-            "2.1.257",
+            expected_version,
             worker_calls[0]["environment"]["CLAUDE_CODE_VERSION"],
             label,
         )
@@ -424,30 +430,30 @@ class ClaudeCodeVersionTests(unittest.TestCase):
 
         :return: None
         """
-        self.assertEqual("2.1.257", main.CLAUDE_CODE_VERSION)
+        self.assertEqual("2.1.260", main.CLAUDE_CODE_VERSION)
         self.assertEqual({
             "configured_version": None,
-            "env_default_version": "2.1.257",
-            "effective_version": "2.1.257",
+            "env_default_version": "2.1.260",
+            "effective_version": "2.1.260",
         }, main.get_claude_code_version())
 
         overridden = main.update_claude_code_version(
             main.ClaudeCodeVersionIn(claude_code_version="2.1.220")
         )
         self.assertEqual("2.1.220", overridden["configured_version"])
-        self.assertEqual("2.1.257", overridden["env_default_version"])
+        self.assertEqual("2.1.260", overridden["env_default_version"])
         self.assertEqual("2.1.220", overridden["effective_version"])
 
         reset = main.update_claude_code_version(
             main.ClaudeCodeVersionIn(claude_code_version=None)
         )
         self.assertIsNone(reset["configured_version"])
-        self.assertEqual("2.1.257", reset["env_default_version"])
-        self.assertEqual("2.1.257", reset["effective_version"])
+        self.assertEqual("2.1.260", reset["env_default_version"])
+        self.assertEqual("2.1.260", reset["effective_version"])
 
-    def test_all_worker_creation_paths_receive_effective_version(self) -> None:
+    def test_run_workers_use_snapshot_and_ephemeral_workers_use_effective_version(self) -> None:
         """
-        task、抓包、继续、quota、OAuth refresh 和 login worker 都应显式传版本。
+        run/continue worker 应使用快照，临时 worker 应使用启动时的有效版本。
 
         :return: None
         """
@@ -475,6 +481,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                             "prompt": "test prompt",
                             "timeout_sec": 60,
                             "capture_full_http": capture_full_http,
+                            "claude_code_version": "2.1.260",
                         },
                     )
                     self._assert_worker_version(calls, label)
@@ -484,7 +491,12 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             runner.client = client
             runner.start_continue(
                 "continue-session",
-                {"id": "continue-run", "run_kind": "normal"},
+                {
+                    "id": "continue-run",
+                    "run_kind": "capture",
+                    "flows_dir": str(main.FLOWS_DIR / "main" / "1" / "continue-run"),
+                    "claude_code_version": "2.1.260",
+                },
                 account,
                 "claude-session",
             )
@@ -499,7 +511,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                 patch.object(runner, "_exec_quota_probe", return_value={}),
             ):
                 runner.query_quota(account)
-            self._assert_worker_version(calls, "quota")
+            self._assert_worker_version(calls, "quota", "2.1.257")
 
             client, calls = self._docker_client()
             runner = object.__new__(main.Runner)
@@ -509,12 +521,215 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                 patch.object(runner, "_exec_oauth_refresh_probe", return_value={"refreshed": True}),
             ):
                 self.assertTrue(runner.refresh_account_oauth_token(account))
-            self._assert_worker_version(calls, "oauth-refresh")
+            self._assert_worker_version(calls, "oauth-refresh", "2.1.257")
 
             client, calls = self._docker_client()
             login_manager = main.LoginManager(client)
             login_manager.start("login-account", {}, timezone="Asia/Singapore")
-            self._assert_worker_version(calls, "login")
+            self._assert_worker_version(calls, "login", "2.1.257")
+
+    def test_run_creation_paths_persist_and_submit_version_snapshot(self) -> None:
+        """
+        普通、抓包、批次和养号 run 都应保存并向调度 payload 传递创建时版本。
+
+        :return: None
+        """
+        conn = main.get_db()
+        try:
+            with conn:
+                account_id = int(conn.execute(
+                    "INSERT INTO accounts(name, profile_path, cc2api_account_id, warmup_enabled) "
+                    "VALUES('snapshot','profiles/snapshot',7,1)"
+                ).lastrowid)
+                topic_id = int(conn.execute(
+                    "INSERT INTO topics(no, title, description, category) "
+                    "VALUES(1,'版本快照','验证版本快照','测试')"
+                ).lastrowid)
+                task_id = int(conn.execute(
+                    "INSERT INTO tasks(topic_no, title, prompt, account_id, topic_id) "
+                    "VALUES(1,'普通任务','普通 prompt',?,?)",
+                    (account_id, topic_id),
+                ).lastrowid)
+                batch_id = int(conn.execute(
+                    "INSERT INTO task_batches(account_id, name) VALUES(?,'版本批次')",
+                    (account_id,),
+                ).lastrowid)
+                conn.execute(
+                    "INSERT INTO task_batch_items(batch_id, topic_id, prompt) "
+                    "VALUES(?,?,'批次 prompt')",
+                    (batch_id, topic_id),
+                )
+        finally:
+            conn.close()
+
+        api_scheduler = Mock()
+        with (
+            patch.object(main, "effective_claude_code_version", return_value="2.1.260"),
+            patch.object(main, "scheduler", api_scheduler),
+        ):
+            normal_result = main.run_task(task_id)
+            capture_result = main.start_capture_run(main.CaptureRunIn(
+                account_id=account_id,
+                topic_id=topic_id,
+                prompt="抓包 prompt",
+            ))
+
+            batch_scheduler = main.Scheduler(Mock())
+            batch_scheduler.submit = Mock()
+            batch_scheduler._wait_all_runs_finished = Mock()
+            batch_scheduler._finish_batch_when_done = Mock()
+            batch_scheduler._execute_batch(batch_id)
+
+            conn = main.get_db()
+            try:
+                account = dict(conn.execute(
+                    "SELECT * FROM accounts WHERE id=?",
+                    (account_id,),
+                ).fetchone())
+                topic = dict(conn.execute(
+                    "SELECT * FROM topics WHERE id=?",
+                    (topic_id,),
+                ).fetchone())
+            finally:
+                conn.close()
+            warmup_created = main.WarmupScheduler(Mock())._create_task_and_run(
+                account,
+                topic,
+                "养号 prompt",
+            )
+
+        self.assertIsNotNone(warmup_created)
+        warmup_run_id, _warmup_task_id, warmup_version = warmup_created
+        self.assertEqual("2.1.260", warmup_version)
+        normal_run_id = normal_result["run_ids"][0]
+        capture_run_id = capture_result["run_id"]
+        batch_run_id = batch_scheduler.submit.call_args.args[0]
+        run_ids = [normal_run_id, capture_run_id, batch_run_id, warmup_run_id]
+        conn = main.get_db()
+        try:
+            rows = conn.execute(
+                f"SELECT id, claude_code_version FROM runs WHERE id IN ({','.join('?' for _ in run_ids)})",
+                run_ids,
+            ).fetchall()
+        finally:
+            conn.close()
+        self.assertEqual(
+            {run_id: "2.1.260" for run_id in run_ids},
+            {row["id"]: row["claude_code_version"] for row in rows},
+        )
+        api_payloads = {
+            call.args[0]: call.args[2]
+            for call in api_scheduler.submit.call_args_list
+        }
+        self.assertEqual("2.1.260", api_payloads[normal_run_id]["claude_code_version"])
+        self.assertEqual("2.1.260", api_payloads[capture_run_id]["claude_code_version"])
+        self.assertEqual(
+            "2.1.260",
+            batch_scheduler.submit.call_args.args[2]["claude_code_version"],
+        )
+        self.assertEqual("2.1.260", capture_result["claude_code_version"])
+
+    def test_historical_run_version_is_backfilled_only_once(self) -> None:
+        """
+        历史 NULL 快照首次继续时应补写，之后不再受全局版本变化影响。
+
+        :return: None
+        """
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path) VALUES('legacy','profiles/legacy')"
+                )
+                task_id = int(conn.execute(
+                    "INSERT INTO tasks(topic_no, title, prompt, account_id) "
+                    "VALUES(1,'历史任务','历史 prompt',1)"
+                ).lastrowid)
+                conn.execute(
+                    "INSERT INTO runs(id, task_id, account_id, status) "
+                    "VALUES('legacy-run',?,1,'success')",
+                    (task_id,),
+                )
+        finally:
+            conn.close()
+
+        run = {"id": "legacy-run", "claude_code_version": None}
+        with patch.object(main, "effective_claude_code_version", return_value="2.1.260"):
+            self.assertEqual("2.1.260", main._ensure_run_claude_code_version(run))
+        run["claude_code_version"] = None
+        with patch.object(main, "effective_claude_code_version", return_value="2.1.257"):
+            self.assertEqual("2.1.260", main._ensure_run_claude_code_version(run))
+
+        conn = main.get_db()
+        try:
+            stored = conn.execute(
+                "SELECT claude_code_version FROM runs WHERE id='legacy-run'"
+            ).fetchone()["claude_code_version"]
+        finally:
+            conn.close()
+        self.assertEqual("2.1.260", stored)
+
+    def test_new_run_after_setting_change_uses_new_snapshot(self) -> None:
+        """
+        同一任务再次运行时应使用新设置，同时保留前一个 run 的旧快照。
+
+        :return: None
+        """
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO accounts(name, profile_path) VALUES('rerun','profiles/rerun')"
+                )
+                task_id = int(conn.execute(
+                    "INSERT INTO tasks(topic_no, title, prompt, account_id) "
+                    "VALUES(1,'重跑任务','重跑 prompt',1)"
+                ).lastrowid)
+        finally:
+            conn.close()
+
+        test_scheduler = Mock()
+        with patch.object(main, "scheduler", test_scheduler):
+            with patch.object(main, "effective_claude_code_version", return_value="2.1.260"):
+                first_run_id = main.run_task(task_id)["run_ids"][0]
+            with patch.object(main, "effective_claude_code_version", return_value="2.1.257"):
+                second_run_id = main.run_task(task_id)["run_ids"][0]
+
+        conn = main.get_db()
+        try:
+            rows = conn.execute(
+                "SELECT id, claude_code_version FROM runs WHERE id IN (?,?)",
+                (first_run_id, second_run_id),
+            ).fetchall()
+        finally:
+            conn.close()
+        versions = {row["id"]: row["claude_code_version"] for row in rows}
+        self.assertEqual("2.1.260", versions[first_run_id])
+        self.assertEqual("2.1.257", versions[second_run_id])
+
+    def test_old_database_upgrade_adds_run_version_snapshot_column(self) -> None:
+        """
+        旧 runs 表重复升级后应幂等补齐 Claude Code 版本快照列。
+
+        :return: None
+        """
+        old_db_path = self.base / "old-runs.sqlite"
+        conn = sqlite3.connect(old_db_path)
+        conn.execute(
+            "CREATE TABLE runs(id TEXT PRIMARY KEY, task_id INTEGER NOT NULL, "
+            "account_id INTEGER NOT NULL, status TEXT NOT NULL)"
+        )
+        conn.close()
+
+        with patch.object(main, "DB_PATH", old_db_path):
+            main.init_db()
+            main.init_db()
+        conn = sqlite3.connect(old_db_path)
+        try:
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(runs)")}
+        finally:
+            conn.close()
+        self.assertIn("claude_code_version", columns)
 
     def test_entrypoint_keeps_strict_version_fallback_and_install(self) -> None:
         """
@@ -526,10 +741,10 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             Path(__file__).resolve().parents[1] / "images" / "worker" / "entrypoint.sh"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            'CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.257}"',
+            'CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.260}"',
             entrypoint,
         )
-        self.assertIn("process.argv[3] || '2.1.257'", entrypoint)
+        self.assertIn("process.argv[3] || '2.1.260'", entrypoint)
         ensure_match = re.search(
             r"ensure_claude_code_version\(\) \{(?P<body>.*?)\n\}",
             entrypoint,
@@ -2146,7 +2361,9 @@ global.fetch = async (_url, options) => {
             conn.close()
         self.assertEqual("warmup", run["run_kind"])
         self.assertEqual("queued", run["status"])
+        self.assertEqual("2.1.260", run["claude_code_version"])
         submitted_task = run_scheduler.submit.call_args.args[2]
+        self.assertEqual("2.1.260", submitted_task["claude_code_version"])
         self.assertEqual(task["prompt"], submitted_task["prompt"])
         self.assertIn("标准题目", task["prompt"])
         self.assertIn("只使用题库描述", task["prompt"])

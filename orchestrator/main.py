@@ -187,9 +187,9 @@ WORKER_HOME = "/home/node"
 WORKER_UID = 1000
 WORKER_GID = 1000
 CLAUDE_CODE_VERSION = _normalize_claude_code_version(
-    os.environ.get("CLAUDE_CODE_VERSION") or "2.1.257",
+    os.environ.get("CLAUDE_CODE_VERSION") or "2.1.260",
     "CLAUDE_CODE_VERSION",
-) or "2.1.257"
+) or "2.1.260"
 CLAUDE_CODE_EFFORT_LEVEL = _normalize_claude_effort_level(
     os.environ.get("CLAUDE_CODE_EFFORT_LEVEL") or "max",
     "CLAUDE_CODE_EFFORT_LEVEL",
@@ -1336,6 +1336,7 @@ CREATE TABLE IF NOT EXISTS runs (
   capture_mode TEXT,
   capture_summary_path TEXT,
   capture_model_override TEXT,
+  claude_code_version TEXT,
   started_at REAL,
   ended_at REAL,
   stop_requested_at REAL,
@@ -1400,6 +1401,7 @@ def init_db() -> None:
             _ensure_column(conn, "runs", "capture_mode", "TEXT")
             _ensure_column(conn, "runs", "capture_summary_path", "TEXT")
             _ensure_column(conn, "runs", "capture_model_override", "TEXT")
+            _ensure_column(conn, "runs", "claude_code_version", "TEXT")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_batch ON runs(batch_id)")
             conn.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_cc2api_account_id "
@@ -1772,6 +1774,62 @@ def effective_claude_code_version() -> str:
     :return: WebUI 覆盖值优先，否则返回 `.env` 的 CLAUDE_CODE_VERSION
     """
     return get_runtime_claude_code_version_setting() or CLAUDE_CODE_VERSION
+
+
+def _resolve_run_claude_code_version(value: Optional[str]) -> str:
+    """
+    解析 run 已保存的 Claude Code 版本，兼容缺少快照的旧内部调用。
+
+    :param value: run 或调度 payload 中的版本快照
+    :return: 规范化后的快照；空值时返回当前有效版本
+    """
+    return (
+        _normalize_claude_code_version(value, "run.claude_code_version")
+        or effective_claude_code_version()
+    )
+
+
+def _ensure_run_claude_code_version(run: dict) -> str:
+    """
+    确保历史 run 在继续对话前拥有稳定的 Claude Code 版本快照。
+
+    :param run: `runs` 表行字典
+    :return: 已存在或刚补写的版本快照
+    """
+    version = _normalize_claude_code_version(
+        run.get("claude_code_version"),
+        "run.claude_code_version",
+    )
+    if version:
+        return version
+
+    fallback_version = effective_claude_code_version()
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                row = conn.execute(
+                    "SELECT claude_code_version FROM runs WHERE id=?",
+                    (run["id"],),
+                ).fetchone()
+                if not row:
+                    raise ValueError(f"运行 {run['id']} 不存在")
+                version = _normalize_claude_code_version(
+                    row["claude_code_version"],
+                    "run.claude_code_version",
+                )
+                if not version:
+                    # 历史行没有快照时只补写一次，避免后续页面配置变化再次影响该会话。
+                    version = fallback_version
+                    conn.execute(
+                        "UPDATE runs SET claude_code_version=? "
+                        "WHERE id=? AND claude_code_version IS NULL",
+                        (version, run["id"]),
+                    )
+        finally:
+            conn.close()
+    run["claude_code_version"] = version
+    return version
 
 
 def save_runtime_claude_code_version_setting(value: Optional[str]) -> Optional[str]:
@@ -2443,7 +2501,14 @@ class Runner:
         self.client = docker.from_env()
 
     def start_run(self, run_id: str, account: dict, task: dict) -> tuple[str, str]:
-        """启动 sidecar + worker，返回 (sidecar_id, worker_id)"""
+        """
+        启动一次 run 的 sidecar 和 worker。
+
+        :param run_id: runs.id
+        :param account: accounts 表行
+        :param task: 调度任务 payload，包含 run 创建时的版本快照
+        :return: `(sidecar_id, worker_id)`
+        """
         sidecar_name = f"bench-sidecar-{run_id}"
         worker_name = f"bench-worker-{run_id}"
         acc_name = account["name"]
@@ -2468,7 +2533,9 @@ class Runner:
         host_ca = HOST_BENCH_DATA / "ca"
         capture_full_http = bool(task.get("capture_full_http"))
         managed_oauth = account.get("cc2api_account_id") is not None
-        claude_code_version = effective_claude_code_version()
+        claude_code_version = _resolve_run_claude_code_version(
+            task.get("claude_code_version")
+        )
         sidecar_env = _sidecar_proxy_env(account)
         sidecar_env.update({
             "DNS_READY_HOST": DNS_READY_HOST,
@@ -2797,7 +2864,9 @@ fs.renameSync(tmp, dst);
                 "CAPTURE_TARGETS": "anthropic.com,claude.com",
                 "CAPTURE_MAX_BODY_BYTES": "0",
             })
-        claude_code_version = effective_claude_code_version()
+        claude_code_version = _resolve_run_claude_code_version(
+            run.get("claude_code_version")
+        )
 
         sidecar_id: Optional[str] = None
         worker_id: Optional[str] = None
@@ -2978,7 +3047,7 @@ const path = require('path');
 
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
 const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
-const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.257';
+const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.260';
 
 function emit(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
@@ -3217,7 +3286,7 @@ const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
 const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
 const refreshBufferMs = Number(process.env.OAUTH_REFRESH_BUFFER_SEC || '600') * 1000;
-const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.257';
+const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.260';
 
 function emit(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
@@ -4271,17 +4340,19 @@ class Scheduler:
                             break
                 item = dict(item_row)
                 run_id = uuid.uuid4().hex[:12]
-                task_id = self._create_batch_task_and_run(batch, account, item, run_id)
-                if task_id is None:
+                created = self._create_batch_task_and_run(batch, account, item, run_id)
+                if created is None:
                     if self._get_batch_status(batch_id) != "active":
                         break
                     continue
+                task_id, claude_code_version = created
                 task = {
                     "id": task_id,
                     "prompt": item["prompt"],
                     "timeout_sec": batch["timeout_sec"],
                     "batch_id": batch_id,
                     "topic_id": item["topic_id"],
+                    "claude_code_version": claude_code_version,
                 }
                 self.submit(run_id, account, task)
                 active_runs.append(run_id)
@@ -4301,7 +4372,7 @@ class Scheduler:
 
     def _create_batch_task_and_run(
         self, batch: dict, account: dict, item: dict, run_id: str
-    ) -> Optional[int]:
+    ) -> Optional[tuple[int, str]]:
         """
         为批次 item 创建兼容旧 runs 的 task + run。
 
@@ -4309,8 +4380,9 @@ class Scheduler:
         :param account: accounts 行
         :param item: task_batch_items 行
         :param run_id: 新 run id
-        :return: task id；批次已暂停或 item 已被其他线程处理时返回 None
+        :return: `(task_id, claude_code_version)`；批次已暂停或 item 已被其他线程处理时返回 None
         """
+        claude_code_version = effective_claude_code_version()
         with _db_lock:
             conn = get_db()
             try:
@@ -4354,16 +4426,24 @@ class Scheduler:
                     )
                     task_id = int(cur.lastrowid)
                     conn.execute(
-                        "INSERT INTO runs(id, task_id, account_id, batch_id, topic_id, status) "
-                        "VALUES(?,?,?,?,?,?)",
-                        (run_id, task_id, account["id"], batch["id"], item["topic_id"], "queued"),
+                        "INSERT INTO runs(id, task_id, account_id, batch_id, topic_id, status, "
+                        "claude_code_version) VALUES(?,?,?,?,?,?,?)",
+                        (
+                            run_id,
+                            task_id,
+                            account["id"],
+                            batch["id"],
+                            item["topic_id"],
+                            "queued",
+                            claude_code_version,
+                        ),
                     )
                     conn.execute(
                         "UPDATE task_batch_items SET task_id=?, run_id=?, status='queued', "
                         "updated_at=julianday('now') WHERE id=?",
                         (task_id, run_id, item["id"]),
                     )
-                    return task_id
+                    return task_id, claude_code_version
             finally:
                 conn.close()
 
@@ -4739,12 +4819,13 @@ class WarmupScheduler:
         created = self._create_task_and_run(account, topic, prompt)
         if not created:
             return {"started": False, "run_id": None}
-        run_id, task_id = created
+        run_id, task_id, claude_code_version = created
         task = {
             "id": task_id,
             "prompt": prompt,
             "timeout_sec": 1800,
             "topic_id": topic["id"],
+            "claude_code_version": claude_code_version,
         }
         self.scheduler.submit(run_id, account, task)
         return {"started": True, "run_id": run_id, "task_id": task_id}
@@ -5014,16 +5095,17 @@ class WarmupScheduler:
         account: dict,
         topic: dict,
         prompt: str,
-    ) -> Optional[tuple[str, int]]:
+    ) -> Optional[tuple[str, int, str]]:
         """
         为养号创建 task 和 run，并保存已生成的 prompt。
 
         :param account: 已认领的账号行
         :param topic: 本次养号选择的 topic 行
         :param prompt: 已生成且将实际下发给 worker 的 prompt
-        :return: `(run_id, task_id)`；账号状态失效或已有运行时返回 None
+        :return: `(run_id, task_id, claude_code_version)`；账号状态失效或已有运行时返回 None
         """
         run_id = uuid.uuid4().hex[:12]
+        claude_code_version = effective_claude_code_version()
         with _db_lock:
             conn = get_db()
             try:
@@ -5057,16 +5139,24 @@ class WarmupScheduler:
                     )
                     task_id = int(cur.lastrowid)
                     conn.execute(
-                        "INSERT INTO runs(id, task_id, account_id, topic_id, status, run_kind) "
-                        "VALUES(?,?,?,?,?,?)",
-                        (run_id, task_id, account["id"], topic["id"], "queued", "warmup"),
+                        "INSERT INTO runs(id, task_id, account_id, topic_id, status, run_kind, "
+                        "claude_code_version) VALUES(?,?,?,?,?,?,?)",
+                        (
+                            run_id,
+                            task_id,
+                            account["id"],
+                            topic["id"],
+                            "queued",
+                            "warmup",
+                            claude_code_version,
+                        ),
                     )
                     conn.execute(
                         "UPDATE accounts SET warmup_last_run_id=?, warmup_last_status='queued', "
                         "warmup_last_error=NULL WHERE id=?",
                         (run_id, account["id"]),
                     )
-                    return run_id, task_id
+                    return run_id, task_id, claude_code_version
             finally:
                 conn.close()
 
@@ -6905,6 +6995,7 @@ def start_capture_run(body: CaptureRunIn):
         raise HTTPException(500, "scheduler not ready")
     timeout_sec = max(60, int(body.timeout_sec or 1800))
     model_override = normalize_claude_model_override(body.model_override)
+    claude_code_version = effective_claude_code_version()
     conn = get_db()
     try:
         account_row = conn.execute(
@@ -6957,8 +7048,8 @@ def start_capture_run(body: CaptureRunIn):
                 flows_path = FLOWS_DIR / account["name"] / str(task_id) / run_id
                 conn.execute(
                     "INSERT INTO runs(id, task_id, account_id, topic_id, status, "
-                    "run_kind, capture_mode, capture_summary_path, capture_model_override) "
-                    "VALUES(?,?,?,?,?,?,?,?,?)",
+                    "run_kind, capture_mode, capture_summary_path, capture_model_override, "
+                    "claude_code_version) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (
                         run_id,
                         task_id,
@@ -6969,6 +7060,7 @@ def start_capture_run(body: CaptureRunIn):
                         "full_http",
                         str(flows_path / "capture_index.json"),
                         model_override,
+                        claude_code_version,
                     ),
                 )
         finally:
@@ -6982,6 +7074,7 @@ def start_capture_run(body: CaptureRunIn):
         "capture_full_http": True,
         "capture_mode": "full_http",
         "model_override": model_override,
+        "claude_code_version": claude_code_version,
     }
     scheduler.submit(run_id, account, task)
     return {
@@ -6989,12 +7082,19 @@ def start_capture_run(body: CaptureRunIn):
         "task_id": task_id,
         "capture_mode": "full_http",
         "model_override": model_override,
+        "claude_code_version": claude_code_version,
     }
 
 
 # ---------- runs ----------
 @app.post("/api/tasks/{tid}/run")
 def run_task(tid: int):
+    """
+    按任务配置创建并调度一个或多个新 run。
+
+    :param tid: tasks.id
+    :return: 新建 run id 列表
+    """
     conn = get_db()
     try:
         task_row = conn.execute(
@@ -7014,13 +7114,14 @@ def run_task(tid: int):
     run_ids: list[str] = []
     for _ in range(int(task.get("repeat_n", 1))):
         rid = uuid.uuid4().hex[:12]
+        claude_code_version = effective_claude_code_version()
         with _db_lock:
             conn = get_db()
             try:
                 with conn:
                     conn.execute(
-                        "INSERT INTO runs(id, task_id, account_id, batch_id, topic_id, status) "
-                        "VALUES(?,?,?,?,?,?)",
+                        "INSERT INTO runs(id, task_id, account_id, batch_id, topic_id, status, "
+                        "claude_code_version) VALUES(?,?,?,?,?,?,?)",
                         (
                             rid,
                             tid,
@@ -7028,13 +7129,16 @@ def run_task(tid: int):
                             task.get("batch_id"),
                             task.get("topic_id"),
                             "queued",
+                            claude_code_version,
                         ),
                     )
             finally:
                 conn.close()
         if not scheduler:
             raise HTTPException(500, "scheduler not ready")
-        scheduler.submit(rid, account, task)
+        run_task_payload = dict(task)
+        run_task_payload["claude_code_version"] = claude_code_version
+        scheduler.submit(rid, account, run_task_payload)
         run_ids.append(rid)
     return {"run_ids": run_ids}
 
@@ -7219,6 +7323,7 @@ def get_capture(rid: str):
         "run_id": rid,
         "mode": run.get("capture_mode") or "full_http",
         "model_override": run.get("capture_model_override"),
+        "claude_code_version": run.get("claude_code_version"),
         "available": bool(index.get("available")),
         "flows_dir": str(flows_dir),
         "index_path": str(index_path),
@@ -7315,7 +7420,12 @@ def delete_run(rid: str):
 
 @app.post("/api/runs/{rid}/continue/start")
 def continue_run_start(rid: str):
-    """启动 run 继续对话会话；前端随后连接返回的 WebSocket。"""
+    """
+    启动 run 继续对话会话，前端随后连接返回的 WebSocket。
+
+    :param rid: runs.id
+    :return: 继续会话 ID、Claude session ID 和 WebSocket 路径
+    """
     if not continue_manager:
         raise HTTPException(500, "继续对话管理器尚未就绪")
     conn = get_db()
@@ -7338,6 +7448,10 @@ def continue_run_start(rid: str):
         account = dict(account_row)
     finally:
         conn.close()
+    try:
+        _ensure_run_claude_code_version(run)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     with _oauth_owner_lock(str(account["name"])):
         conn = get_db()
         try:

@@ -938,6 +938,7 @@ function renderRunDetailShell(rid) {
         <div class="stat-box"><div class="stat-label">输出 token</div><div class="stat-value" data-stat-key="tokens_out">等待采集</div></div>
         <div class="stat-box"><div class="stat-label">请求数</div><div class="stat-value" data-stat-key="requests">等待采集</div></div>
         <div class="stat-box"><div class="stat-label">退出码</div><div class="stat-value" data-stat-key="exit_code">-</div></div>
+        <div class="stat-box"><div class="stat-label">Claude Code</div><div class="stat-value-sm" data-stat-key="claude_code_version">-</div></div>
         <div class="stat-box"><div class="stat-label">模型覆盖</div><div class="stat-value-sm" data-stat-key="model_override">默认</div></div>
       </div>
       <div class="hint inline hidden" id="run-detail-stats-error"></div>
@@ -1005,6 +1006,7 @@ function renderCaptureDetail(capture) {
   return `
     <div class="stats-grid capture-stats">
       <div class="stat-box"><div class="stat-label">flows</div><div class="stat-value">${escapeHTML(index.total_flows ?? entries.length)}</div></div>
+      <div class="stat-box"><div class="stat-label">运行版本</div><div class="stat-value-sm">${escapeHTML(capture.claude_code_version || '-')}</div></div>
       <div class="stat-box"><div class="stat-label">cc_version</div><div class="stat-value-sm">${versions.length ? versions.map(escapeHTML).join('<br>') : '<span class="muted">未观察到</span>'}</div></div>
       <div class="stat-box"><div class="stat-label">模式</div><div class="stat-value-sm">${escapeHTML(capture.mode || 'full_http')}</div></div>
       <div class="stat-box"><div class="stat-label">model</div><div class="stat-value-sm">${capture.model_override ? escapeHTML(capture.model_override) : '<span class="muted">默认</span>'}</div></div>
@@ -1034,6 +1036,7 @@ function updateRunDetailContent(rid, run, files, stats, transcript, transcriptSt
   setRunDetailText('[data-stat-key="tokens_out"]', renderStatValue(stats, 'tokens_out'));
   setRunDetailText('[data-stat-key="requests"]', renderStatValue(stats, 'requests'));
   setRunDetailText('[data-stat-key="exit_code"]', escapeHTML(run.exit_code ?? '-'));
+  setRunDetailText('[data-stat-key="claude_code_version"]', escapeHTML(run.claude_code_version || '-'));
   setRunDetailText('[data-stat-key="model_override"]', run.capture_model_override ? escapeHTML(run.capture_model_override) : '<span class="muted">默认</span>');
 
   const statsError = $('#run-detail-stats-error');
