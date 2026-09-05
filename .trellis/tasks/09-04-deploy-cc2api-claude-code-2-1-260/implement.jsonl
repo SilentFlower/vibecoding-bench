@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/cc2api/deploy/deploy-guidelines.md", "reason": "约束 cc2api 构建、镜像、数据库和远程部署。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/remote-deploy.md", "reason": "约束低连接窗口、bench/cc2api 联合回滚和页面覆盖。"}
+{"file": ".trellis/tasks/archive/2026-09/09-02-deploy-claude-code-2-1-257/research/deploy-evidence.md", "reason": "提供上一版本发布快照、digest、DB 和真实验收证据模板。"}

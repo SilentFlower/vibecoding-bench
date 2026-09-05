@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/cc2api/deploy/deploy-guidelines.md", "reason": "检查发布门禁、镜像 digest、DB 备份和部署后验证。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/remote-deploy.md", "reason": "检查联合回滚顺序、CLI 允许范围和 WebUI 覆盖。"}
+{"file": ".trellis/tasks/archive/2026-09/09-02-deploy-claude-code-2-1-257/research/deploy-evidence.md", "reason": "反向检查证据项完整且不泄露敏感数据。"}
+{"file": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/research/deploy-evidence.md", "reason": "本次原始部署结果、用户停测与实际使用反馈、证据边界和验收映射。"}
+{"file": ".trellis/tasks/09-04-deploy-cc2api-claude-code-2-1-260/research/rollback-plan.md", "reason": "核对 2.1.257 联合回滚顺序、2.1.260 现场快照的边界和剩余验证。"}

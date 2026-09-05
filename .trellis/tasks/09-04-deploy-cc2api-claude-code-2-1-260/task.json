@@ -1,0 +1,40 @@
+{
+  "id": "deploy-cc2api-claude-code-2-1-260",
+  "name": "deploy-cc2api-claude-code-2-1-260",
+  "title": "发布并验证 cc2api Claude Code 2.1.260",
+  "description": "在协议适配通过后发布 cc2api，核对跨项目版本一致性并保留回滚材料；按用户决定不做完整回滚演练。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "cc2api",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-09-04",
+  "completedAt": "2026-09-05",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "09-04-upgrade-claude-code-2-1-260",
+  "relatedFiles": [],
+  "notes": "2026-09-05 用户确认取消本次完整联合回滚演练要求，原 CHK-001 按范围调整关闭；保留未执行说明，不追加测试或生产操作，待记录提交归档。",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-09-05T08:03:16+08:00",
+    "completedSteps": [
+      "cc2api 2.1.260 精确镜像生产部署",
+      "HTTP、DB、2.1.260 身份迁移与自定义配置保留核验",
+      "原始部署证据及用户实际使用反馈已记录",
+      "按用户确认取消完整回滚演练要求并同步父子任务记录",
+      "CHK-001 按范围调整关闭，保留未执行说明",
+      "部署任务按用户确认的本次范围完成验收"
+    ],
+    "partialStep": null,
+    "nextStep": "等待用户明确归档部署任务，再汇总升级父任务结果；不追加模型测试、回滚演练或生产操作",
+    "notes": "完整联合回滚演练未执行，不记作验证通过；旧网关镜像、两套数据库备份及操作边界保留。现有部署证据和用户正常使用反馈作为本次收尾依据，不外推四模型、bootstrap/hello 和生产 continue 全部通过。当前部署任务完成，父任务保持原状态；尚未归档，项目通用部署规范不变。"
+  }
+}
