@@ -176,3 +176,40 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 65: 归档 cc2api Claude Code 2.1.260 部署任务
+
+**Date**: 2026-09-05
+**Task**: 归档 cc2api Claude Code 2.1.260 部署任务
+**Package**: cc2api
+**Branch**: `main`
+
+### Summary
+
+归档已部署的 cc2api 2.1.260 任务，保留版本迁移、自定义配置保留和用户真实使用正常的证据；完整回滚演练按用户决定不执行，未逐项覆盖的模型请求如实记录。
+
+### Main Changes
+
+- 部署任务完成态与记录已通过 afc2089 推送；本轮修正 release.md 中过期的生命周期说明并归档任务。
+- 保留升级父任务的 7 个未跟踪文件，不将父任务一并标记完成。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7aecda3` | (see git log) |
+| `c42d696` | (see git log) |
+| `afc2089` | (see git log) |
+
+### Testing
+
+- [OK] 仅进行决策审阅、发布记录与 Git 范围核对；本轮未追加业务测试、模型请求、生产 continue、部署或回滚。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 汇总 Claude Code 2.1.260 升级父任务结果，不重新追加模型验证或完整回滚演练。
