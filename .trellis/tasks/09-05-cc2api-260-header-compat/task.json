@@ -1,0 +1,162 @@
+{
+  "id": "cc2api-260-header-compat",
+  "name": "cc2api-260-header-compat",
+  "title": "修复 cc2api 260 标题 beta 与端点请求头画像",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "cc2api",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-09-05",
+  "completedAt": "2026-09-05",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-09-05T00:36:55Z",
+      "contextKey": "codex_01a06ef0-def9-73b0-ae67-965c4da5b17f",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "9b935ee47c34aeb7fd3230620a26438da91a2cb1",
+        "status": [
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/task.json"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "9b935ee47c34aeb7fd3230620a26438da91a2cb1",
+            "status": [
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/task.json"
+              }
+            ],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [
+              {
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/brief.md",
+                "sha256": "28c1d20f38ad8acf6d16fc24d45639b17aee3023016664063e7764955a032ace"
+              },
+              {
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/check.jsonl",
+                "sha256": "d299103860c3718ed920646644c44884aa81289957794b1455a8a6929cbd7b33"
+              },
+              {
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/design.md",
+                "sha256": "1bca72ad672027ac010a81666dd9faaefc2410c84f2c2677d77704ad1a89b514"
+              },
+              {
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/implement.jsonl",
+                "sha256": "1eb6d09432ef41acc3f251d2deeb71a70336bc1fa60a9905ce1737a72b45611a"
+              },
+              {
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/implement.md",
+                "sha256": "88d0315a43e2b95788c9cd218015e70732290a5d9d4d299079aaada3bdfdfc76"
+              },
+              {
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/prd.md",
+                "sha256": "88287860ef011632ac2d0ef1e423d15bfecff792528a9b883da8a7459f56f0fb"
+              },
+              {
+                "path": ".trellis/tasks/09-04-upgrade-claude-code-2-1-260/task.json",
+                "sha256": "1c4bccf0388a2eebc08b3d5a36ee94276f8065b912eba98f78a68bf058320673"
+              }
+            ],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "1bae74acf8047719d966de46313822b86b5a7bd586372652ed1eec55166704d0"
+          },
+          {
+            "root": "cc2api",
+            "head": "7aecda39da8719f6d61af07274038bb6eb1389e5",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "7509bfb707cf0784b42a77d561ce1804bda0843d6e2d7b8c08558572b769152e"
+          }
+        ],
+        "fingerprint": "e365856d15a1d4097683817203c9843bda53c140330684542b3a0ab91f1f2f6f"
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-09-05T06:17:45.492610+00:00",
+    "completedSteps": [
+      "完成标题 fallback beta 与后台端点 UA/beta 修复",
+      "通过协议、格式、CCH 和全量 Rust 验证",
+      "更新协议规范并推送子模块与父仓",
+      "通过 CI 构建并部署精确提交镜像",
+      "验证服务健康、数据库和配置一致性，保留回滚材料"
+    ],
+    "partialStep": null,
+    "nextStep": "已完成本次推送与部署；worker JWT/API 方案按后续需求单独处理",
+    "notes": "未进行主动模型探测；worker JWT 和 API 上下文/诊断/global cache 未实现。"
+  }
+}
