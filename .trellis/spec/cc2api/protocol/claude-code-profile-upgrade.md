@@ -86,6 +86,8 @@ data/flows/<account>/<topic_id>/<run_id>/
 - `claude_code_user_agent(version)`
 - `DEFAULT_ALLOWED_CLAUDE_CODE_VERSIONS_SETTING`
 - `RequestProfile::fable_model(model_id)`
+- `RequestProfile::haiku_title_optional_beta_tokens`
+- `EndpointProfile::header_profile` / `EndpointHeaderProfile`
 - `CchProfile`
 - `FableFallbackProfile`
 
@@ -275,6 +277,33 @@ Haiku 2.1.257 子画像契约：
 - main 有 `diagnostics` 时使用完整 Haiku main beta；无 `diagnostics` 时省略
   `claude-code-20250219`；probe、title、non-stream aux 各使用画像中的独立窄 beta。
 
+标题可选 beta 契约：
+
+- 2.1.257/2.1.260 的标题基础窄画像之外，只保留客户端已携带的
+  `server-side-fallback-2026-07-01`、`fallback-credit-2026-06-01`；按此顺序去重，
+  插入 `cache-diagnosis-2026-04-07` 前。没有携带时不主动开启。
+- token 按逗号拆分、去空白后精确匹配；旧日期、相似后缀和父模型的其他 beta 不合入。
+- 两种客户端入口共用最终规范化。旧画像的可选列表为空；probe 不保留这些 token。
+
+后台 UA/beta 契约：
+
+- 2.1.257/2.1.260 使用 `EndpointHeaderProfile::ClaudeCode21257`。下表的 12 类
+  路径来自 260 原始 flow；257 JSONL 可核对其中 10 类，stream/archive 不在该索引中。
+- `{id}` 必须是非空单一路径段，后缀精确匹配；相似路径、未知子路径、额外尾斜杠
+  不自动套用。旧画像使用 `Legacy`，保留既有行为。
+- 两种客户端入口都在通用 header 处理后应用下表；“无”表示删除传入 beta。
+
+| 路径 | User-Agent | anthropic-beta |
+| --- | --- | --- |
+| `/v1/code/sessions`、`/v1/code/sessions/{id}/bridge` | `claude-code/<version>` | 无 |
+| `/v1/code/sessions/{id}/worker`，以及其 `/events`、`/events/stream`、`/internal-events`、`/heartbeat` | `claude-code/<version>` | 无 |
+| `/v1/code/sessions/{id}/client/presence` | `axios/1.15.2` | 无 |
+| `/v1/sessions/{id}`、`/v1/sessions/{id}/archive` | `claude-code/<version>` | `ccr-byoc-2025-07-29` |
+| `/api/claude_code/notification/preferences` | `claude-cli/<version> (external, cli)` | `oauth-2025-04-20` |
+| `/v1/ultrareview/quota` | `claude-cli/<version> (external, cli)` | 无 |
+
+以上契约只覆盖 UA/beta，不代表 worker JWT、完整请求头顺序、响应或长连接代理已实现。
+
 Bootstrap 契约：
 
 - `/api/claude_cli/bootstrap` response 可能是 gzip；改写前必须按 `Content-Encoding` 解码 JSON。
@@ -360,6 +389,10 @@ Telemetry 契约：
 | bootstrap Sonnet 5 没有 `pewter` | 检查 cwk 是否按精确模型映射，不能只维护 Fable/Opus 两个 family key |
 | message beta 更新后普通 telemetry 丢失 redact | 将 base beta 与最终 message beta 分开维护，request 事件显式覆盖 |
 | Haiku title 分类出现历史变体 | 保留结构化 schema 和旧 prompt marker 两条路径；没有新抓包证据时不收窄旧兼容分支 |
+| 257/260 标题携带合法 fallback token | 仅保留已携带白名单 token，按抓包顺序放在 cache-diagnosis 前 |
+| 标题未携带 fallback 或只有相似未知 token | 输出基础窄 beta，不主动开启 fallback |
+| 已知 worker/presence/quota 路径携带主模型 beta | 输出端点专用 UA，删除 anthropic-beta |
+| 未知后台子路径或旧版本画像 | 保留既有处理，不能用宽泛前缀匹配扩大修正范围 |
 | 上游返回 200 headers 后一直无 SSE body | 等待历史 upstream idle timeout；记录 `upstream_first_byte_timeout`，不要提前注入 keepalive |
 | 已收到 SSE chunk 后长时间静默 | 记录 `upstream_stream_idle_timeout`；keepalive 可维持下游连接，但不得重置上游 idle timeout |
 | bootstrap response 有 gzip | 先解码再改 JSON，返回时修正压缩/长度相关 header |
@@ -382,6 +415,9 @@ Telemetry 契约：
 
 **Good**：抓包分析同时核对 raw flow 与 JSONL/index；结构化索引完整不等于没有未完成的
 零正文 message 或后台长连接尝试。
+
+**Good**：标题可选 token 的三种已观察组合由脱敏 fixture 固定预期；后台端点同时断言
+UA 和 beta，覆盖两种入口及无 beta 的删除行为。
 
 **Base**：只升级一个 patch 版本，也必须至少验证 `/v1/messages` header、body keys、billing header、bootstrap 和 telemetry metadata 是否变化。
 
@@ -425,6 +461,10 @@ watchdog 前后报 `No response from API`。
   - Haiku probe、结构化/旧 marker title、main 有无 diagnostics、non-stream aux 的 beta
     分类；保留兼容宽度的反例必须有回归断言；另需断言未观察 Haiku main 在存在精确
     `main_models` 的新画像中回退版本级通用 beta
+  - `claude-code-2.1.260-header-compat.json`：标题基础/credit/server-side+credit 三种变体，
+    重复、乱序、未知 token；257/260 两种入口一致，旧画像和 probe 保持窄集合
+  - 后台 12 类路径逐项核对 UA/beta，传入主模型 beta 不得污染无 beta 端点；
+    相似未知路径、空 session、尾斜杠和旧画像保持既有行为
   - Fable 5/5.1 与 `[suffix]` 命中 `seven_day_fable`，相似 preview 模型不命中
   - bootstrap 按精确模型断言 2.1.257 Fable 5=`marigold`、Fable 5.1=`sorrel`，以及
     2.1.260 Opus 5=`belladonna`、Sonnet 5=`pewter`、Fable 5.1=`sorrel`、Haiku=`null`
@@ -453,6 +493,19 @@ watchdog 前后报 `No response from API`。
   - DB 中 `accounts.canonical_env.version/version_base/build_time` 分布全部为目标默认值。
 
 ### 7. Wrong vs Correct
+
+#### Wrong: 标题精确画像始终删除全部客户端可选 beta
+
+```text
+标题携带 fallback-credit-2026-06-01 -> 仅输出固定基础 beta
+```
+
+#### Correct: 标题基础画像加版本化的已携带白名单
+
+```text
+标题携带 fallback-credit-2026-06-01 -> 基础 beta + credit（放在 cache-diagnosis 前）
+标题未携带可选 token -> 基础 beta
+```
 
 #### Wrong: `cc_version` 固定取第一个 text block
 
