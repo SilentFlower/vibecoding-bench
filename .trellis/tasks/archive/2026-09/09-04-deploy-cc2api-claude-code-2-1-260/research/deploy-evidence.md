@@ -84,7 +84,7 @@
 - HTTP `200`，DB `integrity_check=ok`；`runs.claude_code_version` 和 `runs.claude_effort_level` 均存在。
 - 22:28:45 UTC 的版本分布包括：2.1.260 `running=4`、`success=50`、`stopped=3`、`timeout=2`；历史 NULL 值仍保留，未做无依据批量回填。
 - 23:09 UTC 的自然运行汇总仍为 2.1.260。bench 请求直连 Anthropic，这些成功 run 不能证明请求经过 cc2api。
-- run 快照及 continue 逻辑沿用已完成的 [bench 运行时研究与回归记录](../../archive/2026-09/09-04-vibecoding-bench-claude-code-2-1-260-runtime/research.md)。本次未重新启动生产 continue，不能记录为本轮动态验收通过。
+- run 快照及 continue 逻辑沿用已完成的 [bench 运行时研究与回归记录](../../09-04-vibecoding-bench-claude-code-2-1-260-runtime/research.md)。本次未重新启动生产 continue，不能记录为本轮动态验收通过。
 
 ## 手工请求与用户反馈
 
@@ -105,7 +105,7 @@
 历史只读复查已确认：旧 cc2api 镜像仍存在；cc2api 备份 profile/range 为 `2.1.257 / 2.1.89-2.1.257`；两份 DB 备份完整性正常；配置备份比对正常；当前 Compose 可解析。
 首次从备份目录直接解析 Compose 因相对 `env_file` 路径失败；后续仅确认当前目录 Compose 与备份文件比对正常，不能把它描述为独立备份目录解析或完整恢复演练通过。
 
-将来确需联合回滚时，遵循 [操作与恢复边界](rollback-plan.md) 和 [部署规范](../../../spec/vibecoding-bench/deploy/remote-deploy.md)。
+将来确需联合回滚时，遵循 [操作与恢复边界](rollback-plan.md) 和 [部署规范](../../../../../spec/vibecoding-bench/deploy/remote-deploy.md)。
 本版本完整回滚脚本的静态验证、生产备份临时副本的 `.backup/.restore` 演练、旧 worker 实际 CLI 版本及三镜像追加解析均未执行。
 用户已明确本次不再补做这些演练，作为已知限制保留。该决定不授权实际回滚，也不改变将来故障处置时的前提要求。
 
