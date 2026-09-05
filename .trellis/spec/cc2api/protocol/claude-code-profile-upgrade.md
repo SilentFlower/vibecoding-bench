@@ -258,9 +258,21 @@ Fable body 契约：
 - Opus 5、Sonnet 5 主请求缺少 thinking 时补
   `{"type":"adaptive","display":"updates"}`，`max_tokens` 缺失时补 `64000`，并使用
   `output_config.effort=max`；不覆盖客户端已有 thinking、max_tokens 或 effort。
-- Haiku main 缺少 thinking 时补
-  `{"budget_tokens":31999,"type":"enabled","display":"updates"}`，`max_tokens` 缺失时
-  补 `32000`，不主动添加 `output_config`。
+- Haiku main 缺少 thinking 时，只有手动思考与请求参数兼容才补
+  `{"budget_tokens":31999,"type":"enabled","display":"updates"}`；`max_tokens` 缺失时
+  补 `32000`，不主动添加 `output_config`。自动补齐的预算取
+  `min(31999, max_tokens - 1)`，至少为 `1024`；输出上限不足时跳过思考注入，不扩大
+  调用方的 `max_tokens`。例如 `max_tokens=4096` 补预算 `4095`，`max_tokens=512`
+  保持无 thinking。调用方显式提供的预算、display 和其他参数保持原值。
+- API 主模型请求显式设置 `thinking.type=disabled` 时，不追加 display、budget 或
+  默认 effort，避免产生 disabled+display 或 Opus 5 disabled+max effort 冲突；
+  已有 `output_config` 保留。后续由管理员显式开启的 disabled 兼容改写继续独立生效。
+- Haiku 的 `tool_choice.type=any|tool` 与手动思考不兼容，必须保留工具策略并跳过
+  默认思考注入；`auto|none` 继续按合法预算补齐。该限制不套用到支持强制工具的
+  Opus 5 / Sonnet 5 adaptive 思考模式。
+- 上述兼容修正只应用于 API 模式且精确命中当前 `main_models` 的请求；Claude Code
+  原生路径、旧画像及既有 probe/title/aux 分类保持原行为。此处只保护默认字段补齐，
+  不负责修复调用方已经提交的非法参数组合。
 - thinking 字段顺序必须保持 Opus/Sonnet/Fable 5.1 为 `type,display`，Haiku 为
   `budget_tokens,type,display`；主请求顶层字段顺序继续保持抓包顺序。
 
@@ -384,7 +396,10 @@ Telemetry 契约：
 | 2.1.257 Fable 5 CCH 不命中 | 确认 fallback 是字符串 `"default"`、beta 使用 `server-side-fallback-2026-07-01`，并保留 fallback 参与 CCH |
 | 2.1.260 Fable 5.1 CCH 不命中 | 保留 `fallbacks="default"`；不得沿用旧的“所有模型删除 fallback”裁剪 |
 | Fable 5.1 被套用 Fable 5 fallback/beta | 检查 `RequestProfile::fable_model` 是否按精确模型 ID 命中，不能使用 family 前缀选择 wire 画像 |
-| 2.1.260 主请求缺少 thinking display | 按精确模型补 display；Haiku 还必须保留 `budget_tokens=31999` 和 `type=enabled` |
+| 2.1.260 主请求缺少 thinking display 且参数兼容 | 按精确模型补 display；Haiku 缺省输出上限时使用 `budget_tokens=31999` 和 `type=enabled` |
+| API Haiku 缺少 thinking，max_tokens=4096 / 512 | 分别补预算 `4095` / 跳过注入，输出上限保持不变 |
+| API 主模型显式 thinking.type=disabled | 不补 display、budget 或默认 effort，调用方原有配置保持不变 |
+| API Haiku 指定 tool_choice=any/tool 且未开启 thinking | 保留强制工具策略，不能自动开启 enabled thinking；Opus/Sonnet adaptive 不受此限制 |
 | 未观察 Haiku main 命中 2.1.260 Haiku beta | 新画像存在精确 `main_models` 时检查 `RequestProfile::main_model(model_id)`；未命中则回退版本级通用 beta |
 | bootstrap Sonnet 5 没有 `pewter` | 检查 cwk 是否按精确模型映射，不能只维护 Fable/Opus 两个 family key |
 | message beta 更新后普通 telemetry 丢失 redact | 将 base beta 与最终 message beta 分开维护，request 事件显式覆盖 |
@@ -445,6 +460,14 @@ watchdog 前后报 `No response from API`。
 
 ### 6. Tests Required
 
+- API 参数组合回归必须通过真实 `rewrite_body` 入口并指定精确模型 ID，不能只用
+  空请求或只断言字段存在：
+  - Haiku 输出上限覆盖 `512/1024/1025/2048/4096/8192/32000/64000` 和缺省，
+    自动预算满足 `1024 <= budget_tokens < max_tokens`，显式预算和 display 保留。
+  - Haiku、Opus 5、Sonnet 5 的 disabled 不增加任何 thinking 子字段或默认 effort；
+    覆盖调用方已有 effort 的保留行为。
+  - Haiku 的 `auto/none/any/tool` 分别组合 thinking 缺省和 disabled；Opus/Sonnet
+    adaptive 强制工具继续可用；2.1.257 API 及 2.1.260 原生 Claude Code 参数不变。
 - `cargo fmt --check`
 - `cargo test`
 - `cargo test cch`
