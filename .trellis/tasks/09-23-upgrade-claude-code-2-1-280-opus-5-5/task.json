@@ -3,7 +3,7 @@
   "name": "upgrade-claude-code-2-1-280-opus-5-5",
   "title": "升级 Claude Code 2.1.280 并支持 Opus 5.5",
   "description": "升级 vibecoding-bench 运行时与 cc2api 协议画像，基于真实抓包适配 Opus 5.5 并保留旧版本兼容。",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "vibecoding-bench",
@@ -11,7 +11,7 @@
   "creator": "silentflower",
   "assignee": "silentflower",
   "createdAt": "2026-09-23",
-  "completedAt": null,
+  "completedAt": "2026-09-22",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
@@ -835,13 +835,14 @@
     }
   },
   "progress": {
+    "updatedAt": "2026-09-23T03:40:00+08:00",
     "completedSteps": [
-      "vibecoding-bench 已升级到 Claude Code 2.1.280 并完成本地验证",
-      "bench 业务提交已推送到 main"
+      "vibecoding-bench 已升级并部署 Claude Code 2.1.280，完成 Opus 5.5 与六类模型真实抓包",
+      "cc2api 已实现 2.1.280 协议画像、CCH 嵌套 model 规则、迁移与管理页支持，并通过完整检查",
+      "GitHub Actions 镜像构建成功，生产 cc2api 已按不可变 digest 部署并完成健康、数据库和日志验证"
     ],
-    "partialStep": "等待 GitHub Actions 构建镜像并部署抓包环境",
-    "nextStep": "部署新 bench 镜像并采集 2.1.280/Opus 5.5 真实协议",
-    "notes": "cc2api 尚未修改，任务保持进行中。",
-    "updatedAt": "2026-09-22T17:23:00Z"
+    "partialStep": null,
+    "nextStep": "无",
+    "notes": "部署加载白名单时短暂重启切断一个流式连接，Claude Code 自动重试；重启后服务稳定且无持续错误。"
   }
 }

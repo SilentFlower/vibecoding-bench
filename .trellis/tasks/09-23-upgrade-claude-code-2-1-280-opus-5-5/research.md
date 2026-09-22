@@ -41,6 +41,46 @@ bench 默认 CLI 2.1.260、模型 `opus[1m]`，已有 run 版本快照。cc2api 
 
 上述离线观测仅证明 CLI 模型解析，不能用作 cc2api 的 OAuth header/body/CCH/bootstrap 画像来源。
 
-## 抓包环境缺口
+## 2026-09-23 真实 2.1.280 抓包
 
-只读检查发现本地数据库无账号，仅存 profile 凭据已过期。对文档记录的远程主机做 BatchMode SSH 读取时，主机密钥与 known_hosts 不一致而被拒绝。未绕过 SSH 校验、未修改 known_hosts。等待当前抓包实例地址或目标版本 run ID，cc2api 保持 2.1.260。
+bench 镜像经 GitHub Actions 构建并部署到现有环境后，使用独立账号取得 Opus 5.5、
+Sonnet 5、Fable 5.1、Haiku、Opus 4.8 和 Sonnet 4.5 样本。补充模型使用普通任务提示，
+未在提示词中暴露抓包、协议或字段验证意图。原始 flow/JSONL 仅保存在被忽略的
+`data/captures/2.1.280/`，任务文档不记录账号、凭据、真实正文或完整响应。
+
+| 模型 | max_tokens | thinking | effort | 初始 fallback | bootstrap cwk |
+| --- | ---: | --- | --- | --- | --- |
+| `claude-opus-5-5` | 128000 | adaptive + updates | max | 无；后续辅助请求可为 `default` | saffron |
+| `claude-sonnet-5` | 64000 | adaptive + updates | max | 无 | pewter |
+| `claude-fable-5-1` | 64000 | adaptive + updates | max | 无 | sorrel |
+| `claude-haiku-4-5-20251001` | 32000 | enabled 31999 + updates | 无 | 无 | null |
+| `claude-opus-4-8` | 64000 | adaptive + updates | max | 无 | null |
+| `claude-sonnet-4-5` | 32000 | enabled 31999 + updates | 无 | 无 | null |
+
+共同 identity：build time `2026-09-21T20:40:17Z`，CLI UA
+`claude-cli/2.1.280 (external, cli)`，telemetry UA `claude-code/2.1.280`，Stainless
+`0.112.1` / Node `v26.3.0`，GrowthBook/session UA `Bun/1.4.3`，timeout `600`。
+bootstrap 继续使用 `client_data.cedar_basin=2027-08-31` 和
+`claude-fable-5-1[1m]` 额外入口。Opus 5 未在本轮 2.1.280 样本中出现，代码只保留
+2.1.260 的历史兼容子画像，不将其写成 2.1.280 新证据。
+
+beta 的关键新增项为 `mid-conversation-tool-changes-2026-07-01`、
+`mid-conversation-system-clear-at-2026-08-21`、`thinking-binding-controls-2026-08-01`，
+Sonnet 5 / Opus 4.8 还带末尾 `message-threads-2026-08-12`。Opus 5.5 `[1m]` 仍把
+`context-1m-2025-08-07` 放在 oauth 后。出现 `fallbacks="default"` 的 Opus 5.5
+辅助请求同时加入 server-side-fallback/fallback-credit token；初始主请求不带这三项。
+
+## CCH 根因
+
+先以旧 seed `0x4D659218E32A3268` 复算未命中。随后对 2.1.280 可执行文件的原生 CCH
+路径做调试，确认 seed 没变，归一化规则变为：
+
+1. 把 billing header 中的 CCH 恢复为 `00000`。
+2. 清空序列化 JSON 中每个 key 字节精确等于 `"model"` 且 value 为字符串的字段，
+   不只顶层 model；advisor 工具定义中的嵌套 model 也会计入。
+3. 删除顶层 `max_tokens`，保留 fallback 与其他字节、顺序和转义。
+
+Opus/Fable 请求含 advisor 工具的嵌套 model，正是旧 cc2api 只清空顶层 model 后 CCH
+不一致的直接原因。用这条规则对已下载的 Opus 5.5、Sonnet 5、Fable 5.1、Haiku、
+Opus 4.8、Sonnet 4.5 所有 billing 请求复算，全部与原生 CCH 一致。调试使用的临时
+凭据副本和脚本已安全删除；提交内容只有脱敏结论与 synthetic fixture。
