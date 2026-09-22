@@ -231,8 +231,9 @@
         <div class="row">
           <label><span class="lbl">$ claude_code_version</span>
             <span class="hint inline">页面保存后立即影响新启动的 task / 抓包 / 登录容器；留空并保存则回退到 .env。</span>
-            <input name="claude_code_version" list="claude-code-version-options" placeholder="例如 2.1.260 或 2.1.220" />
+            <input name="claude_code_version" list="claude-code-version-options" placeholder="例如 2.1.280 或 2.1.260" />
             <datalist id="claude-code-version-options">
+              <option value="2.1.280"></option>
               <option value="2.1.260"></option>
               <option value="2.1.257"></option>
               <option value="2.1.220"></option>
@@ -274,8 +275,10 @@
         </div>
         <label><span class="lbl">$ model 覆盖</span>
           <span class="hint inline">只覆盖当前抓包 run；留空则沿用抓包默认模型，不受上方默认模型影响。</span>
-          <input name="model_override" list="claude-model-options" placeholder="例如 opus[1m] 或 claude-opus-4-8[1m]" />
+          <input name="model_override" list="claude-model-options" placeholder="例如 claude-opus-5-5 或 opus[1m]" />
           <datalist id="claude-model-options">
+            <option value="claude-opus-5-5"></option>
+            <option value="claude-opus-5-5[1m]"></option>
             <option value="opus"></option>
             <option value="opus[1m]"></option>
             <option value="sonnet"></option>

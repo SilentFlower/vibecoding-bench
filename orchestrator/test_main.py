@@ -461,26 +461,26 @@ class ClaudeCodeVersionTests(unittest.TestCase):
 
         :return: None
         """
-        self.assertEqual("2.1.260", main.CLAUDE_CODE_VERSION)
+        self.assertEqual("2.1.280", main.CLAUDE_CODE_VERSION)
         self.assertEqual({
             "configured_version": None,
-            "env_default_version": "2.1.260",
-            "effective_version": "2.1.260",
+            "env_default_version": "2.1.280",
+            "effective_version": "2.1.280",
         }, main.get_claude_code_version())
 
         overridden = main.update_claude_code_version(
             main.ClaudeCodeVersionIn(claude_code_version="2.1.220")
         )
         self.assertEqual("2.1.220", overridden["configured_version"])
-        self.assertEqual("2.1.260", overridden["env_default_version"])
+        self.assertEqual("2.1.280", overridden["env_default_version"])
         self.assertEqual("2.1.220", overridden["effective_version"])
 
         reset = main.update_claude_code_version(
             main.ClaudeCodeVersionIn(claude_code_version=None)
         )
         self.assertIsNone(reset["configured_version"])
-        self.assertEqual("2.1.260", reset["env_default_version"])
-        self.assertEqual("2.1.260", reset["effective_version"])
+        self.assertEqual("2.1.280", reset["env_default_version"])
+        self.assertEqual("2.1.280", reset["effective_version"])
 
     def test_run_workers_use_snapshot_and_ephemeral_workers_use_effective_version(self) -> None:
         """
@@ -496,7 +496,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             "upstream_socks5_port": 1080,
         }
         with (
-            patch.object(main, "effective_claude_code_version", return_value="2.1.257"),
+            patch.object(main, "effective_claude_code_version", return_value="2.1.280"),
             patch.object(main, "effective_runtime_effort", return_value="medium"),
             patch.object(main, "_wait_sidecar_ready"),
         ):
@@ -555,7 +555,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                 patch.object(runner, "_exec_quota_probe", return_value={}),
             ):
                 runner.query_quota(account)
-            self._assert_worker_version(calls, "quota", "2.1.257")
+            self._assert_worker_version(calls, "quota", "2.1.280")
             self._assert_worker_effort(
                 calls,
                 "quota",
@@ -570,7 +570,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                 patch.object(runner, "_exec_oauth_refresh_probe", return_value={"refreshed": True}),
             ):
                 self.assertTrue(runner.refresh_account_oauth_token(account))
-            self._assert_worker_version(calls, "oauth-refresh", "2.1.257")
+            self._assert_worker_version(calls, "oauth-refresh", "2.1.280")
             self._assert_worker_effort(
                 calls,
                 "oauth-refresh",
@@ -580,7 +580,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             client, calls = self._docker_client()
             login_manager = main.LoginManager(client)
             login_manager.start("login-account", {}, timezone="Asia/Singapore")
-            self._assert_worker_version(calls, "login", "2.1.257")
+            self._assert_worker_version(calls, "login", "2.1.280")
 
     def test_run_creation_paths_persist_and_submit_runtime_identity_snapshot(self) -> None:
         """
@@ -618,7 +618,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
 
         api_scheduler = Mock()
         with (
-            patch.object(main, "effective_claude_code_version", return_value="2.1.260"),
+            patch.object(main, "effective_claude_code_version", return_value="2.1.280"),
             patch.object(main, "effective_runtime_effort", return_value="high"),
             patch.object(main, "scheduler", api_scheduler),
         ):
@@ -627,6 +627,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                 account_id=account_id,
                 topic_id=topic_id,
                 prompt="抓包 prompt",
+                model_override="claude-opus-5-5",
                 effort_level="low",
             ))
 
@@ -656,7 +657,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
 
         self.assertIsNotNone(warmup_created)
         warmup_run_id, _warmup_task_id, warmup_version, warmup_effort = warmup_created
-        self.assertEqual("2.1.260", warmup_version)
+        self.assertEqual("2.1.280", warmup_version)
         self.assertEqual("high", warmup_effort)
         normal_run_id = normal_result["run_ids"][0]
         capture_run_id = capture_result["run_id"]
@@ -672,7 +673,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         finally:
             conn.close()
         self.assertEqual(
-            {run_id: "2.1.260" for run_id in run_ids},
+            {run_id: "2.1.280" for run_id in run_ids},
             {row["id"]: row["claude_code_version"] for row in rows},
         )
         self.assertEqual(
@@ -688,20 +689,22 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             call.args[0]: call.args[2]
             for call in api_scheduler.submit.call_args_list
         }
-        self.assertEqual("2.1.260", api_payloads[normal_run_id]["claude_code_version"])
-        self.assertEqual("2.1.260", api_payloads[capture_run_id]["claude_code_version"])
+        self.assertEqual("2.1.280", api_payloads[normal_run_id]["claude_code_version"])
+        self.assertEqual("2.1.280", api_payloads[capture_run_id]["claude_code_version"])
         self.assertEqual("high", api_payloads[normal_run_id]["claude_effort_level"])
         self.assertEqual("low", api_payloads[capture_run_id]["claude_effort_level"])
         self.assertEqual(
-            "2.1.260",
+            "2.1.280",
             batch_scheduler.submit.call_args.args[2]["claude_code_version"],
         )
         self.assertEqual(
             "high",
             batch_scheduler.submit.call_args.args[2]["claude_effort_level"],
         )
-        self.assertEqual("2.1.260", capture_result["claude_code_version"])
+        self.assertEqual("2.1.280", capture_result["claude_code_version"])
         self.assertEqual("low", capture_result["claude_effort_level"])
+        self.assertEqual("claude-opus-5-5", capture_result["model_override"])
+        self.assertEqual("claude-opus-5-5", api_payloads[capture_run_id]["model_override"])
         self.assertEqual(
             "low",
             main.get_capture(capture_run_id)["claude_effort_level"],
@@ -894,7 +897,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             ):
                 first_run_id = main.run_task(task_id)["run_ids"][0]
             with (
-                patch.object(main, "effective_claude_code_version", return_value="2.1.257"),
+                patch.object(main, "effective_claude_code_version", return_value="2.1.280"),
                 patch.object(main, "effective_runtime_effort", return_value="low"),
             ):
                 second_run_id = main.run_task(task_id)["run_ids"][0]
@@ -910,7 +913,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             conn.close()
         versions = {row["id"]: row["claude_code_version"] for row in rows}
         self.assertEqual("2.1.260", versions[first_run_id])
-        self.assertEqual("2.1.257", versions[second_run_id])
+        self.assertEqual("2.1.280", versions[second_run_id])
         efforts = {row["id"]: row["claude_effort_level"] for row in rows}
         self.assertEqual("high", efforts[first_run_id])
         self.assertEqual("low", efforts[second_run_id])
@@ -1008,10 +1011,10 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             Path(__file__).resolve().parents[1] / "images" / "worker" / "entrypoint.sh"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            'CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.260}"',
+            'CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.280}"',
             entrypoint,
         )
-        self.assertIn("process.argv[3] || '2.1.260'", entrypoint)
+        self.assertIn("process.argv[3] || '2.1.280'", entrypoint)
         ensure_match = re.search(
             r"ensure_claude_code_version\(\) \{(?P<body>.*?)\n\}",
             entrypoint,
@@ -2632,10 +2635,10 @@ global.fetch = async (_url, options) => {
             conn.close()
         self.assertEqual("warmup", run["run_kind"])
         self.assertEqual("queued", run["status"])
-        self.assertEqual("2.1.260", run["claude_code_version"])
+        self.assertEqual("2.1.280", run["claude_code_version"])
         self.assertEqual("high", run["claude_effort_level"])
         submitted_task = run_scheduler.submit.call_args.args[2]
-        self.assertEqual("2.1.260", submitted_task["claude_code_version"])
+        self.assertEqual("2.1.280", submitted_task["claude_code_version"])
         self.assertEqual("high", submitted_task["claude_effort_level"])
         self.assertEqual(task["prompt"], submitted_task["prompt"])
         self.assertIn("标准题目", task["prompt"])
