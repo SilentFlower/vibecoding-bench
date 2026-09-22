@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "版本画像、真实抓包与旧模型兼容契约"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "双数据库、旧默认组合迁移与自定义保护"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "Rust 质量和测试约束"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "管理页类型、设置与构建约束"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "worker 编排与验证约束"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md", "reason": "静态前端检查"}
+{"file": ".trellis/tasks/09-23-upgrade-claude-code-2-1-280-opus-5-5/research.md", "reason": "官方版本和本地现状、待补抓包证据"}
