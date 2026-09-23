@@ -1005,6 +1005,7 @@ function renderCaptureDetail(capture) {
       <div class="stat-box"><div class="stat-label">思考预算</div><div class="stat-value-sm">${escapeHTML(capture.claude_effort_level || '-')}</div></div>
       <div class="stat-box"><div class="stat-label">cc_version</div><div class="stat-value-sm">${versions.length ? versions.map(escapeHTML).join('<br>') : '<span class="muted">未观察到</span>'}</div></div>
       <div class="stat-box"><div class="stat-label">模式</div><div class="stat-value-sm">${escapeHTML(capture.mode || 'full_http')}</div></div>
+      <div class="stat-box"><div class="stat-label">权限模式</div><div class="stat-value-sm">${escapeHTML(capture.permission_mode || 'bypassPermissions')}</div></div>
       <div class="stat-box"><div class="stat-label">model</div><div class="stat-value-sm">${capture.model_override ? escapeHTML(capture.model_override) : '<span class="muted">默认</span>'}</div></div>
     </div>
   `;
@@ -1290,6 +1291,7 @@ function bindCaptureForm() {
       prompt_mode: fd.get('prompt_mode') || 'canonical',
       model_override: (fd.get('model_override') || '').trim() || null,
       effort_level: (fd.get('effort_level') || '').trim() || null,
+      permission_mode: fd.get('permission_mode') || 'bypassPermissions',
     };
     btn.disabled = true;
     try {
@@ -1300,6 +1302,7 @@ function bindCaptureForm() {
       form.prompt.value = '';
       form.model_override.value = '';
       form.effort_level.value = '';
+      form.permission_mode.value = 'bypassPermissions';
       await Promise.all([
         API('/tasks').then(ts => { state.tasks = ts; }),
         API('/runs').then(rs => { state.runs = rs; }),

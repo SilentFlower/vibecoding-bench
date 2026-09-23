@@ -306,8 +306,8 @@ def handle_run_terminal(run_id, expected_cc2api_account_id):
 
 ### 1. Scope / Trigger
 
-- 修改 `runs.claude_code_version`、`runs.claude_effort_level`、Claude Code 版本或思考预算运行时设置、普通/批量/养号/抓包 run 创建、调度 payload、worker 启动或继续对话时适用。
-- CLI 版本和思考预算共同属于 run 的可恢复执行身份。页面覆盖、抓包单次选择或 `.env` 只在创建新 run 时解析，不能在排队启动或继续历史会话时重新解释，否则同一会话会因全局设置变化产生漂移。
+- 修改 `runs.claude_code_version`、`runs.claude_effort_level`、`runs.capture_permission_mode`、Claude Code 版本/思考预算/抓包权限模式、普通/批量/养号/抓包 run 创建、调度 payload、worker 启动或继续对话时适用。
+- CLI 版本、思考预算和抓包权限模式共同属于 run 的可恢复执行身份。页面覆盖、抓包单次选择或 `.env` 只在创建新 run 时解析，不能在排队启动或继续历史会话时重新解释，否则同一会话会因全局设置变化产生漂移。
 
 ### 2. Signatures
 
@@ -316,8 +316,15 @@ def handle_run_terminal(run_id, expected_cc2api_account_id):
 ```text
 runs.claude_code_version TEXT NULL
 runs.claude_effort_level TEXT NULL
+runs.capture_permission_mode TEXT DEFAULT 'bypassPermissions'
 init_db() -> _ensure_column(conn, "runs", "claude_code_version", "TEXT")
 init_db() -> _ensure_column(conn, "runs", "claude_effort_level", "TEXT")
+init_db() -> _ensure_column(
+    conn,
+    "runs",
+    "capture_permission_mode",
+    "TEXT DEFAULT 'bypassPermissions'",
+)
 ```
 
 运行身份解析与 worker 边界：
@@ -327,6 +334,7 @@ effective_claude_code_version() -> str
 effective_runtime_effort() -> str
 _resolve_run_claude_code_version(value: Optional[str]) -> str
 _resolve_run_claude_effort_level(value: Optional[str]) -> str
+_resolve_capture_permission_mode(value: Optional[str]) -> str
 _ensure_run_claude_code_version(run: dict) -> str
 _ensure_run_claude_effort_level(run: dict) -> str
 Runner.start_run(run_id: str, account: dict, task: dict) -> tuple[str, str]
@@ -337,6 +345,9 @@ Runner.start_continue(
     session_id: str,
 ) -> tuple[str, str]
 CaptureRunIn.effort_level: Optional[str]
+CaptureRunIn.permission_mode: Literal["bypassPermissions", "auto"]
+worker env: CLAUDE_PERMISSION_MODE
+Claude CLI: --permission-mode <bypassPermissions|auto>
 ```
 
 相关 API：
@@ -355,14 +366,19 @@ GET  /api/settings/runtime-effort
 
 - 普通、批量和养号入口创建每个 run 时，版本取 `effective_claude_code_version()`，思考预算取 `effective_runtime_effort()`；两个规范化结果都必须同时写入 `runs` 和该 run 的 scheduler task payload，新 run 的两个字段必须非空。
 - 抓包入口的版本仍取 `effective_claude_code_version()`；思考预算取 `CaptureRunIn.effort_level`，空值必须回退进程启动时的 `.env` 常量 `CLAUDE_CODE_EFFORT_LEVEL`，不得读取 WebUI 普通/批量 run 的运行时覆盖。
+- 抓包入口的 `permission_mode` 只允许 `bypassPermissions` 与 `auto`，缺省为 `bypassPermissions`；选定值必须同时写入 `runs.capture_permission_mode` 和 scheduler task payload。普通、批量、养号、登录、quota 与 OAuth refresh 不提供 Auto 入口。
 - 抓包页面必须从 `GET /api/settings/runtime-effort` 的 `allowed_efforts` 生成独立选择器，并提供“默认 `.env`”选项。该选择只覆盖当前抓包 run；窄屏布局必须换行，不能裁切选择器。
-- `Runner.start_run()` 必须读取 `task["claude_code_version"]` 和 `task["claude_effort_level"]`。从创建到真正取得 semaphore 期间，即使 WebUI 覆盖或 `.env` 改变，已排队 run 仍使用创建时快照。
+- 抓包页面的权限模式选择器默认提交 `bypassPermissions`，抓包创建响应和抓包详情都返回实际 `permission_mode`；索引暂不可用时仍须展示该快照。
+- `Runner.start_run()` 必须读取 `task["claude_code_version"]`、`task["claude_effort_level"]` 和可选 `task["capture_permission_mode"]`，并分别注入 worker 环境；普通 run 缺少权限字段时固定回退 `bypassPermissions`。从创建到真正取得 semaphore 期间，即使 WebUI 覆盖或 `.env` 改变，已排队 run 仍使用创建时快照。
 - 同一 task 再次运行会创建新的 run；新 run 使用再次运行时的当前有效运行身份，不继承旧 run 快照，也不修改旧 run。
-- `POST /api/runs/{rid}/continue/start` 必须在启动 worker 前依次调用 `_ensure_run_claude_code_version(run)` 和 `_ensure_run_claude_effort_level(run)`；`Runner.start_continue()` 只使用写回 run 字典的两个快照，不得无条件读取当前全局配置。
+- `POST /api/runs/{rid}/continue/start` 必须在启动 worker 前依次调用 `_ensure_run_claude_code_version(run)` 和 `_ensure_run_claude_effort_level(run)`；`Runner.start_continue()` 只使用 run 字典中的三个快照，不得无条件读取当前全局配置。
+- continue worker 使用 `WORKER_MODE=login` 空转，真正恢复会话的是 WebSocket 路径里的独立 `claude --resume`。因此权限模式既要保存到 `ContinueSession` 并传入 exec 环境，也要在该命令上显式追加 `--permission-mode "$CLAUDE_PERMISSION_MODE"`；只给容器设置环境变量并不会自动改变 Claude CLI 权限模式。
 - 历史 run 允许两个快照字段为 NULL。首次继续时，在 `_db_lock` 内重新读取数据库，并通过对应的 `WHERE id=? AND ... IS NULL` 条件各补写一次：版本取当前有效版本，思考预算取 `.env` 常量。后续继续必须复用已补写值，即使第一次 worker 启动失败或全局配置再次改变。
+- 历史 run 的 `capture_permission_mode` 为空时解释为 `bypassPermissions`，无需把 Auto 推断或补写到旧会话。
 - `_resolve_run_claude_code_version()` 和 `_resolve_run_claude_effort_level()` 的空值回退只用于历史测试或旧内部调用兼容；所有生产 run 创建入口都必须显式传递两个快照，不能把回退当作正常调度路径。
-- run 列表/详情通过现有 `SELECT *` 返回两个快照；抓包创建响应和抓包详情必须显式返回 `claude_code_version` 与 `claude_effort_level`。抓包索引暂不可用时，详情仍必须展示这两个运行身份字段。
+- run 列表/详情通过现有 `SELECT *` 返回三个快照；抓包创建响应和抓包详情必须显式返回 `claude_code_version`、`claude_effort_level` 与 `permission_mode`。抓包索引暂不可用时，详情仍必须展示这些运行身份字段。
 - worker 的 `CLAUDE_CODE_EFFORT_LEVEL` 必须使用 run 快照；`PROFILE_CLAUDE_CODE_EFFORT_LEVEL` 仍使用 `.env` 常量，二者不能混用。
+- `auto` 只通过当前 Claude CLI 的 `--permission-mode auto` 生效。orchestrator 与 worker 写入账号 profile 的 `permissions.defaultMode` 必须继续保持 `bypassPermissions`，禁止把单次抓包模式持久化到后续普通 run。
 - 登录、额度查询和后台 OAuth refresh 是非 run 临时 worker，没有可恢复的 run 身份，应在各自启动时读取当前有效版本，不继承某个历史 run 的快照。
 - worker entrypoint 仍负责核对并安装精确版本；指定版本安装失败时 run 明确失败，不得静默退回镜像内版本。
 
@@ -372,10 +388,14 @@ GET  /api/settings/runtime-effort
 |------|------|
 | 新建普通/批量/养号 run | DB 行和 scheduler payload 保存同一组非空版本、当前有效思考预算 |
 | 新建抓包 run 并显式选择预算 | DB、scheduler payload、创建响应保存版本和所选预算 |
+| 新建抓包 run 未传权限模式 | DB、scheduler、worker 和响应均使用 `bypassPermissions` |
+| 新建抓包 run 选择 `auto` | DB 和 scheduler 保存 `auto`，worker 执行 `claude --permission-mode auto` |
+| 抓包权限模式不是 `bypassPermissions/auto` | Pydantic 拒绝请求，不创建 task/run，不启动 worker |
 | 抓包预算留空且页面有全局预算覆盖 | 抓包保存 `.env` 预算，忽略普通/批量 run 的页面覆盖 |
 | 抓包预算不是 `max/xhigh/high/medium/low` | 返回 400，不创建 task/run，不启动 worker |
 | run 排队后页面覆盖或 `.env` 改变 | 已排队 run 使用原运行身份；之后新建 run 才使用新配置 |
 | 已有快照的 run 点击继续 | continue worker 使用原版本和预算，不读取当前全局配置 |
+| Auto 抓包 run 点击继续 | `ContinueSession` 与真实 `claude --resume` 都使用原 `auto` 快照 |
 | 历史 run 两个快照为空 | 首次继续原子补写版本和 `.env` 预算；后续固定使用补写值 |
 | 并发触发同一历史 run 的首次继续 | `_db_lock` 内重新读取，只有第一个空值补写生效，后续读取已保存值 |
 | run 中保存的版本或思考预算格式无效 | 继续接口返回 400，不启动 worker |
@@ -386,20 +406,26 @@ GET  /api/settings/runtime-effort
 
 - Good：以版本 `2.1.260`、预算 `high` 创建抓包 run，关闭 worker 后把页面设置改成版本 `2.1.257`、预算 `low`；继续该 run 仍启动 `2.1.260/high`。
 - Good：普通 run 使用页面预算 `low`，抓包选择器留空且 `.env` 为 `max`；抓包 DB、响应和 worker 都使用 `max`。
+- Good：正式抓包选择 `auto` 后，首次 worker 和 WebSocket continue 的 Claude 命令都显式带 `--permission-mode auto`，账号 profile 仍保存 `bypassPermissions`。
 - Good：历史 NULL run 首次继续时补写版本 `2.1.260` 和 `.env` 预算 `high`；即使启动失败并在第二次继续前改为 `2.1.257/low`，第二次仍使用已补写的 `2.1.260/high`。
 - Base：页面没有覆盖值时，普通/批量/养号 run 使用 `.env` 的版本和预算；页面保存合法覆盖后，只有之后创建的新 run 使用覆盖值。
+- Base：历史抓包 run 没有权限模式列值时按 `bypassPermissions` 恢复，不猜测为 Auto。
 - Bad：在 `Runner.start_run()` 或 `Runner.start_continue()` 中直接调用当前有效配置函数。排队等待或关闭后继续会把可变全局配置误当成 run 身份。
 - Bad：抓包预算留空时调用 `effective_runtime_effort()`。这会把普通 run 的页面覆盖错误泄漏到协议抓包。
 - Bad：只把版本或预算放进内存 task payload，不写入 `runs`。进程重启或继续历史会话后无法恢复原运行身份。
 - Bad：历史 NULL run 每次继续都回退当前配置但不补写。相同 Claude session 会随页面设置反复漂移。
+- Bad：只把 `CLAUDE_PERMISSION_MODE=auto` 放进 continue 容器环境，仍执行原来的 `claude --resume`。continue worker 以 login 模式空转，真实 resume 命令不会自动消费 bench 自定义环境变量。
+- Bad：把 `auto` 写入账号 profile 的 `permissions.defaultMode`。这会让抓包结束后的普通、批量、养号或临时 worker 继承本次诊断策略。
 
 ### 6. Tests Required
 
-- 新库断言 `_SCHEMA` 含两个快照列；旧 SQLite 连续执行两次 `init_db()` 后断言列存在，历史 run 和 `app_settings` 数据完整。
+- 新库断言 `_SCHEMA` 含三个快照列；旧 SQLite 连续执行两次 `init_db()` 后断言列存在、历史权限模式为 `bypassPermissions`，历史 run 和 `app_settings` 数据完整。
 - 普通、批量、养号和抓包四类创建入口分别断言 DB 的版本、预算快照非空，并与 scheduler payload、抓包创建响应完全一致。
 - run 创建后修改当前有效版本和预算，再启动 worker，断言 `CLAUDE_CODE_VERSION` 与 `CLAUDE_CODE_EFFORT_LEVEL` 仍为创建快照，且 `PROFILE_CLAUDE_CODE_EFFORT_LEVEL` 保持 `.env` 值。
 - 抓包显式预算、留空回退 `.env`、忽略页面预算覆盖和非法预算 400 都必须有测试；非法输入不得新增 task/run 或调用 scheduler。
+- 抓包权限模式必须覆盖缺省、`auto`、非法值、DB/scheduler/创建响应/详情和 worker 环境；普通 run 必须继续回退 `bypassPermissions`。
 - 覆盖抓包 run 以 `2.1.260/high` 创建、当前全局改为 `2.1.257/low` 后继续，断言 continue worker 仍为 `2.1.260/high`。
+- 覆盖 Auto 抓包继续会话，断言 `ContinueSession.permission_mode` 与 WebSocket resume 命令都显式使用 `auto`。
 - 历史 NULL run 首次继续补写版本和 `.env` 预算，全局配置变化后再次调用，断言 DB 和返回值仍保持首次补写值。
 - 同一 task 在设置变化前后创建两个 run，断言旧 run 保留旧运行身份，新 run 保存新运行身份。
 - 前端静态契约测试必须覆盖抓包独立选择器、提交字段、run/抓包详情展示、索引不可用分支仍展示快照，以及 920px 以下表单换行规则。
@@ -437,16 +463,26 @@ def start_continue(self, sid: str, run: dict, account: dict, session_id: str):
     claude_effort_level = _resolve_run_claude_effort_level(
         run.get("claude_effort_level")
     )
+    permission_mode = _resolve_capture_permission_mode(
+        run.get("capture_permission_mode")
+    )
     worker = self.client.containers.run(
         WORKER_IMAGE,
         environment={
             "CLAUDE_CODE_VERSION": claude_code_version,
             "CLAUDE_CODE_EFFORT_LEVEL": claude_effort_level,
+            "CLAUDE_PERMISSION_MODE": permission_mode,
         },
+    )
+
+def continue_run_ws(...):
+    command = (
+        'claude --permission-mode "$CLAUDE_PERMISSION_MODE" '
+        '--resume "$CONTINUE_SESSION_ID"'
     )
 ```
 
-先在持久化边界确保两个快照都存在，再由 worker 启动边界消费同一组值，才能保证排队、进程重启和继续会话后的运行身份一致性。
+先在持久化边界确保快照存在，再由首次 worker 和真正的 resume 命令消费同一组值，才能保证排队、进程重启和继续会话后的运行身份一致性。
 
 ---
 

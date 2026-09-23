@@ -272,6 +272,13 @@
             <span class="hint inline">只覆盖当前抓包 run；默认使用 .env。</span>
             <select name="effort_level"></select>
           </label>
+          <label><span class="lbl">$ permission_mode</span>
+            <span class="hint inline">只覆盖当前抓包 run；Auto 用于官方服务端工具分类。</span>
+            <select name="permission_mode">
+              <option value="bypassPermissions" selected>bypassPermissions（默认）</option>
+              <option value="auto">auto</option>
+            </select>
+          </label>
         </div>
         <label><span class="lbl">$ model 覆盖</span>
           <span class="hint inline">只覆盖当前抓包 run；留空则沿用抓包默认模型，不受上方默认模型影响。</span>

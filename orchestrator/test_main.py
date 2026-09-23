@@ -278,7 +278,7 @@ class TopicPromptTests(unittest.TestCase):
 
     def test_prompt_mode_defaults_and_validation(self) -> None:
         """
-        三个请求 DTO 的默认模式应匹配各自运行场景，并拒绝非法值。
+        请求 DTO 的默认模式应匹配各自运行场景，并拒绝非法值。
 
         :return: None
         """
@@ -291,8 +291,18 @@ class TopicPromptTests(unittest.TestCase):
             "canonical",
             main.CaptureRunIn(account_id=1, topic_id=1).prompt_mode,
         )
+        self.assertEqual(
+            "bypassPermissions",
+            main.CaptureRunIn(account_id=1, topic_id=1).permission_mode,
+        )
         with self.assertRaises(ValidationError):
             main.TaskIn(topic_no=1, account_id=1, prompt_mode="invalid")
+        with self.assertRaises(ValidationError):
+            main.CaptureRunIn(
+                account_id=1,
+                topic_id=1,
+                permission_mode="invalid",
+            )
 
     def test_prompt_override_bypasses_mode_renderer(self) -> None:
         """
@@ -416,7 +426,9 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         :param expected_version: 期望传入 worker 的 Claude Code 版本
         :return: None
         """
-        worker_calls = [kwargs for image, kwargs in calls if image == main.WORKER_IMAGE]
+        worker_calls = [
+            kwargs for image, kwargs in calls if image == main.WORKER_IMAGE
+        ]
         self.assertEqual(1, len(worker_calls), label)
         self.assertEqual(
             expected_version,
@@ -454,6 +466,28 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                 environment["PROFILE_CLAUDE_CODE_EFFORT_LEVEL"],
                 label,
             )
+
+    def _assert_worker_permission_mode(
+        self,
+        calls: list[tuple[str, dict]],
+        label: str,
+        expected_mode: str,
+    ) -> None:
+        """
+        断言 run worker 显式携带权限模式快照。
+
+        :param calls: Docker client mock 记录的容器创建参数
+        :param label: 失败时标识当前 worker 路径
+        :param expected_mode: 期望传入 worker 的 Claude Code 权限模式
+        :return: None
+        """
+        worker_calls = [kwargs for image, kwargs in calls if image == main.WORKER_IMAGE]
+        self.assertEqual(1, len(worker_calls), label)
+        self.assertEqual(
+            expected_mode,
+            worker_calls[0]["environment"]["CLAUDE_PERMISSION_MODE"],
+            label,
+        )
 
     def test_runtime_version_setting_override_and_reset(self) -> None:
         """
@@ -500,9 +534,9 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             patch.object(main, "effective_runtime_effort", return_value="medium"),
             patch.object(main, "_wait_sidecar_ready"),
         ):
-            for capture_full_http, label, effort_level in (
-                (False, "task", "high"),
-                (True, "capture", "low"),
+            for capture_full_http, label, effort_level, permission_mode in (
+                (False, "task", "high", None),
+                (True, "capture", "low", "auto"),
             ):
                 with self.subTest(worker=label):
                     client, calls = self._docker_client()
@@ -518,6 +552,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                             "capture_full_http": capture_full_http,
                             "claude_code_version": "2.1.260",
                             "claude_effort_level": effort_level,
+                            "capture_permission_mode": permission_mode,
                         },
                     )
                     self._assert_worker_version(calls, label)
@@ -526,6 +561,11 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                         label,
                         effort_level,
                         main.CLAUDE_CODE_EFFORT_LEVEL,
+                    )
+                    self._assert_worker_permission_mode(
+                        calls,
+                        label,
+                        permission_mode or "bypassPermissions",
                     )
 
             client, calls = self._docker_client()
@@ -539,12 +579,14 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                     "flows_dir": str(main.FLOWS_DIR / "main" / "1" / "continue-run"),
                     "claude_code_version": "2.1.260",
                     "claude_effort_level": "xhigh",
+                    "capture_permission_mode": "auto",
                 },
                 account,
                 "claude-session",
             )
             self._assert_worker_version(calls, "continue")
             self._assert_worker_effort(calls, "continue", "xhigh")
+            self._assert_worker_permission_mode(calls, "continue", "auto")
 
             client, calls = self._docker_client()
             runner = object.__new__(main.Runner)
@@ -629,6 +671,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                 prompt="抓包 prompt",
                 model_override="claude-opus-5-5",
                 effort_level="low",
+                permission_mode="auto",
             ))
 
             batch_scheduler = main.Scheduler(Mock())
@@ -666,7 +709,8 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         conn = main.get_db()
         try:
             rows = conn.execute(
-                f"SELECT id, claude_code_version, claude_effort_level "
+                f"SELECT id, claude_code_version, claude_effort_level, "
+                f"capture_permission_mode "
                 f"FROM runs WHERE id IN ({','.join('?' for _ in run_ids)})",
                 run_ids,
             ).fetchall()
@@ -685,6 +729,15 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             },
             {row["id"]: row["claude_effort_level"] for row in rows},
         )
+        self.assertEqual(
+            {
+                normal_run_id: "bypassPermissions",
+                capture_run_id: "auto",
+                batch_run_id: "bypassPermissions",
+                warmup_run_id: "bypassPermissions",
+            },
+            {row["id"]: row["capture_permission_mode"] for row in rows},
+        )
         api_payloads = {
             call.args[0]: call.args[2]
             for call in api_scheduler.submit.call_args_list
@@ -693,6 +746,11 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         self.assertEqual("2.1.280", api_payloads[capture_run_id]["claude_code_version"])
         self.assertEqual("high", api_payloads[normal_run_id]["claude_effort_level"])
         self.assertEqual("low", api_payloads[capture_run_id]["claude_effort_level"])
+        self.assertNotIn("capture_permission_mode", api_payloads[normal_run_id])
+        self.assertEqual(
+            "auto",
+            api_payloads[capture_run_id]["capture_permission_mode"],
+        )
         self.assertEqual(
             "2.1.280",
             batch_scheduler.submit.call_args.args[2]["claude_code_version"],
@@ -703,11 +761,16 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         )
         self.assertEqual("2.1.280", capture_result["claude_code_version"])
         self.assertEqual("low", capture_result["claude_effort_level"])
+        self.assertEqual("auto", capture_result["permission_mode"])
         self.assertEqual("claude-opus-5-5", capture_result["model_override"])
         self.assertEqual("claude-opus-5-5", api_payloads[capture_run_id]["model_override"])
         self.assertEqual(
             "low",
             main.get_capture(capture_run_id)["claude_effort_level"],
+        )
+        self.assertEqual(
+            "auto",
+            main.get_capture(capture_run_id)["permission_mode"],
         )
 
     def test_capture_effort_defaults_to_env_and_rejects_invalid_value(self) -> None:
@@ -750,14 +813,20 @@ class ClaudeCodeVersionTests(unittest.TestCase):
 
         self.assertEqual(400, raised.exception.status_code)
         self.assertEqual("max", result["claude_effort_level"])
+        self.assertEqual("bypassPermissions", result["permission_mode"])
         self.assertEqual(
             "max",
             test_scheduler.submit.call_args.args[2]["claude_effort_level"],
         )
+        self.assertEqual(
+            "bypassPermissions",
+            test_scheduler.submit.call_args.args[2]["capture_permission_mode"],
+        )
         conn = main.get_db()
         try:
             run = conn.execute(
-                "SELECT claude_effort_level FROM runs WHERE id=?",
+                "SELECT claude_effort_level, capture_permission_mode "
+                "FROM runs WHERE id=?",
                 (result["run_id"],),
             ).fetchone()
             task_count = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
@@ -765,6 +834,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         finally:
             conn.close()
         self.assertEqual("max", run["claude_effort_level"])
+        self.assertEqual("bypassPermissions", run["capture_permission_mode"])
         self.assertEqual(1, task_count)
         self.assertEqual(1, run_count)
         self.assertEqual(1, test_scheduler.submit.call_count)
@@ -820,9 +890,9 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         self.assertEqual("2.1.260", stored["claude_code_version"])
         self.assertEqual("high", stored["claude_effort_level"])
 
-    def test_continue_endpoint_passes_backfilled_effort_snapshot(self) -> None:
+    def test_continue_endpoint_passes_run_identity_snapshot(self) -> None:
         """
-        继续接口应先补写历史预算，再把同一快照交给 continue manager。
+        继续接口应补写历史预算，并把原 run 的权限模式快照交给 manager。
 
         :return: None
         """
@@ -839,8 +909,9 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                     (account_id,),
                 ).lastrowid)
                 conn.execute(
-                    "INSERT INTO runs(id, task_id, account_id, status, claude_code_version) "
-                    "VALUES('continue-effort-run',?,?,'success','2.1.260')",
+                    "INSERT INTO runs(id, task_id, account_id, status, run_kind, "
+                    "capture_permission_mode, claude_code_version) "
+                    "VALUES('continue-effort-run',?,?,'success','capture','auto','2.1.260')",
                     (task_id, account_id),
                 )
         finally:
@@ -860,6 +931,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
 
         passed_run = manager.start.call_args.args[0]
         self.assertEqual("xhigh", passed_run["claude_effort_level"])
+        self.assertEqual("auto", passed_run["capture_permission_mode"])
         self.assertEqual("continue-sid", result["session_id"])
         conn = main.get_db()
         try:
@@ -869,6 +941,44 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         finally:
             conn.close()
         self.assertEqual("xhigh", stored)
+
+    def test_continue_manager_keeps_permission_mode_for_resume_command(self) -> None:
+        """
+        continue manager 与 WebSocket resume 命令都必须复用原 run 权限模式。
+
+        :return: None
+        """
+        runner = Mock()
+        runner.start_continue.return_value = ("sidecar-id", "worker-id")
+        manager = main.ContinueManager(runner)
+        run = {
+            "id": "continue-auto-run",
+            "capture_permission_mode": "auto",
+        }
+        account = {"id": 7}
+        with patch.object(
+            main,
+            "_find_latest_claude_session_id",
+            return_value="claude-session",
+        ):
+            session = manager.start(run, account)
+
+        self.assertEqual("auto", session.permission_mode)
+        runner.start_continue.assert_called_once_with(
+            session.sid,
+            run,
+            account,
+            "claude-session",
+        )
+        source = Path(main.__file__).read_text(encoding="utf-8")
+        self.assertIn(
+            'claude --permission-mode \\"$CLAUDE_PERMISSION_MODE\\" ',
+            source,
+        )
+        self.assertIn(
+            '"CLAUDE_PERMISSION_MODE": session.permission_mode',
+            source,
+        )
 
     def test_new_run_after_setting_change_uses_new_snapshot(self) -> None:
         """
@@ -920,7 +1030,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
 
     def test_old_database_upgrade_adds_run_identity_snapshot_columns(self) -> None:
         """
-        旧 runs 表重复升级后应幂等补齐版本和思考预算快照列。
+        旧 runs 表重复升级后应幂等补齐版本、预算和抓包权限快照列。
 
         :return: None
         """
@@ -952,7 +1062,8 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         try:
             columns = {row[1] for row in conn.execute("PRAGMA table_info(runs)")}
             preserved_run = conn.execute(
-                "SELECT id, task_id, account_id, status, claude_effort_level "
+                "SELECT id, task_id, account_id, status, claude_effort_level, "
+                "capture_permission_mode "
                 "FROM runs WHERE id='preserved-run'"
             ).fetchone()
             preserved_setting = conn.execute(
@@ -962,15 +1073,16 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             conn.close()
         self.assertIn("claude_code_version", columns)
         self.assertIn("claude_effort_level", columns)
+        self.assertIn("capture_permission_mode", columns)
         self.assertEqual(
-            ("preserved-run", 7, 9, "success", None),
+            ("preserved-run", 7, 9, "success", None, "bypassPermissions"),
             preserved_run,
         )
         self.assertEqual(("low",), preserved_setting)
 
     def test_capture_webui_exposes_independent_effort_selector_and_details(self) -> None:
         """
-        抓包表单与详情页必须提交并展示独立思考预算字段。
+        抓包表单与详情页必须提交并展示独立预算和权限模式字段。
 
         :return: None
         """
@@ -981,6 +1093,8 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         self.assertEqual(2, index_html.count('<select name="effort_level"></select>'))
         self.assertIn("默认 .env (", app_js)
         self.assertIn("effort_level: (fd.get('effort_level')", app_js)
+        self.assertIn('<select name="permission_mode">', index_html)
+        self.assertIn("permission_mode: fd.get('permission_mode')", app_js)
         self.assertIn('data-stat-key="claude_effort_level"', app_js)
         capture_stats = re.search(
             r"const captureStats = `(?P<body>.*?)`;",
@@ -989,6 +1103,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         )
         self.assertIsNotNone(capture_stats)
         self.assertIn("capture.claude_effort_level", capture_stats.group("body"))
+        self.assertIn("capture.permission_mode", capture_stats.group("body"))
         unavailable_branch = re.search(
             r"if \(capture\.available === false\) \{\s*return `(?P<body>.*?)`;",
             app_js,
@@ -1025,6 +1140,15 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         self.assertIn('npm install -g "@anthropic-ai/claude-code@$desired"', ensure_body)
         self.assertIn("Invalid CLAUDE_CODE_VERSION", ensure_body)
         self.assertIn("Claude Code version mismatch after install", ensure_body)
+        self.assertIn(
+            'CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-bypassPermissions}"',
+            entrypoint,
+        )
+        self.assertIn("bypassPermissions|auto)", entrypoint)
+        self.assertIn(
+            'claude_args=(claude --permission-mode "$CLAUDE_PERMISSION_MODE")',
+            entrypoint,
+        )
 
     def test_first_run_gates_include_workspace_trust_without_overwriting_profile(self) -> None:
         """

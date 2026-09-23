@@ -31,6 +31,7 @@ set -euo pipefail
 WORKER_MODE="${WORKER_MODE:-task}"
 CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.280}"
 CLAUDE_CODE_EFFORT_LEVEL="${CLAUDE_CODE_EFFORT_LEVEL:-max}"
+CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-bypassPermissions}"
 PROFILE_CLAUDE_CODE_EFFORT_LEVEL="${PROFILE_CLAUDE_CODE_EFFORT_LEVEL:-$CLAUDE_CODE_EFFORT_LEVEL}"
 CC2API_MANAGED_OAUTH="${CC2API_MANAGED_OAUTH:-0}"
 log() { echo "[entrypoint $(date +%H:%M:%S)] $*"; }
@@ -87,6 +88,18 @@ ensure_claude_code_version() {
     return 1
   fi
   log "Claude Code version $desired installed"
+}
+
+validate_claude_permission_mode() {
+  case "$CLAUDE_PERMISSION_MODE" in
+    bypassPermissions|auto)
+      return 0
+      ;;
+    *)
+      log "Invalid CLAUDE_PERMISSION_MODE: $CLAUDE_PERMISSION_MODE"
+      return 1
+      ;;
+  esac
 }
 
 write_default_settings() {
@@ -1506,6 +1519,7 @@ fi
 # ---------- 以下是 task 模式 ----------
 : "${TASK_PROMPT:?TASK_PROMPT required in task mode}"
 : "${RUN_ID:?RUN_ID required in task mode}"
+validate_claude_permission_mode
 TIMEOUT_SEC="${TIMEOUT_SEC:-1800}"
 trap cleanup_task_mode EXIT
 trap 'terminate_task_mode 143' TERM
@@ -1577,7 +1591,7 @@ rm -f /workspace/.bench-status.json /workspace/.bench-status.json.tmp
 
 start_profile_credentials_sync
 
-# ---------- 4) 启动 tmux + claude (node 用户 + bypassPermissions) ----------
+# ---------- 4) 启动 tmux + claude (node 用户 + run 权限模式快照) ----------
 # Claude Code 的 bypassPermissions 不能以 root 跑，所以入口脚本只用 root
 # 做 CA/DNS/文件属主准备，真正的 TUI 进程切到 node 用户、同一 HOME。
 #
@@ -1594,8 +1608,8 @@ wait_for_sidecar_dns || true
 check_claude_auth_status
 
 SESSION="claude-${RUN_ID}"
-log "Launching tmux session: $SESSION ($CLAUDE_USER bypassPermissions mode)"
-claude_args=(claude)
+log "Launching tmux session: $SESSION ($CLAUDE_USER $CLAUDE_PERMISSION_MODE mode)"
+claude_args=(claude --permission-mode "$CLAUDE_PERMISSION_MODE")
 if [ -n "${CLAUDE_MODEL_OVERRIDE:-}" ]; then
   # 后端已校验模型名字符集；这里用数组参数传递，避免把用户输入拼进 shell。
   claude_args+=(--model "$CLAUDE_MODEL_OVERRIDE")

@@ -1336,6 +1336,7 @@ CREATE TABLE IF NOT EXISTS runs (
   capture_mode TEXT,
   capture_summary_path TEXT,
   capture_model_override TEXT,
+  capture_permission_mode TEXT DEFAULT 'bypassPermissions',
   claude_code_version TEXT,
   claude_effort_level TEXT,
   started_at REAL,
@@ -1402,6 +1403,12 @@ def init_db() -> None:
             _ensure_column(conn, "runs", "capture_mode", "TEXT")
             _ensure_column(conn, "runs", "capture_summary_path", "TEXT")
             _ensure_column(conn, "runs", "capture_model_override", "TEXT")
+            _ensure_column(
+                conn,
+                "runs",
+                "capture_permission_mode",
+                "TEXT DEFAULT 'bypassPermissions'",
+            )
             _ensure_column(conn, "runs", "claude_code_version", "TEXT")
             _ensure_column(conn, "runs", "claude_effort_level", "TEXT")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_batch ON runs(batch_id)")
@@ -1923,6 +1930,24 @@ def save_runtime_claude_code_version_setting(value: Optional[str]) -> Optional[s
 
 
 TopicPromptMode = Literal["natural", "canonical"]
+CapturePermissionMode = Literal["bypassPermissions", "auto"]
+
+
+def _resolve_capture_permission_mode(value: Optional[str]) -> str:
+    """
+    解析抓包 run 保存的权限模式，兼容没有该快照的历史记录。
+
+    :param value: API、调度 payload 或 runs 行中的权限模式
+    :return: `bypassPermissions` 或 `auto`
+    """
+    mode = value.strip() if isinstance(value, str) else ""
+    if not mode:
+        return "bypassPermissions"
+    if mode not in ("bypassPermissions", "auto"):
+        raise ValueError(
+            "capture permission mode 无效：只允许 bypassPermissions, auto"
+        )
+    return mode
 
 _NATURAL_TOPIC_PROMPT_CANDIDATE_COUNT = 12
 _NATURAL_TOPIC_PROMPT_HISTORY_LIMIT = 64
@@ -2564,7 +2589,7 @@ class Runner:
 
         :param run_id: runs.id
         :param account: accounts 表行
-        :param task: 调度任务 payload，包含 run 创建时的版本和思考预算快照
+        :param task: 调度 payload，包含 run 创建时的版本、思考预算和权限模式快照
         :return: `(sidecar_id, worker_id)`
         """
         sidecar_name = f"bench-sidecar-{run_id}"
@@ -2597,6 +2622,9 @@ class Runner:
         claude_effort_level = _resolve_run_claude_effort_level(
             task.get("claude_effort_level")
         )
+        permission_mode = _resolve_capture_permission_mode(
+            task.get("capture_permission_mode")
+        )
         sidecar_env = _sidecar_proxy_env(account)
         sidecar_env.update({
             "DNS_READY_HOST": DNS_READY_HOST,
@@ -2618,6 +2646,7 @@ class Runner:
             "ACC_NAME": acc_name,
             "CLAUDE_CODE_VERSION": claude_code_version,
             "CLAUDE_CODE_EFFORT_LEVEL": claude_effort_level,
+            "CLAUDE_PERMISSION_MODE": permission_mode,
             "PROFILE_CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
             "CLEAN_WORKSPACE_DEPS": CLEAN_WORKSPACE_DEPS,
             "TIMEOUT_WRAPUP_SEC": str(TIMEOUT_WRAPUP_SEC),
@@ -2927,6 +2956,9 @@ fs.renameSync(tmp, dst);
         claude_effort_level = _resolve_run_claude_effort_level(
             run.get("claude_effort_level")
         )
+        permission_mode = _resolve_capture_permission_mode(
+            run.get("capture_permission_mode")
+        )
 
         sidecar_id: Optional[str] = None
         worker_id: Optional[str] = None
@@ -2972,6 +3004,7 @@ fs.renameSync(tmp, dst);
                     "ACC_NAME": acc_name,
                     "CLAUDE_CODE_VERSION": claude_code_version,
                     "CLAUDE_CODE_EFFORT_LEVEL": claude_effort_level,
+                    "CLAUDE_PERMISSION_MODE": permission_mode,
                     "TZ": tz,
                     "LANG": fp["lang"],
                     "LC_ALL": fp["lang"],
@@ -3533,10 +3566,20 @@ class LoginSession:
 
 
 class ContinueSession:
-    """单个 run 继续对话会话：一对 sidecar+worker + 元数据"""
+    """
+    单个 run 的继续对话会话，保存容器、Claude session 和权限模式快照。
+
+    :param sid: continue 会话 ID
+    :param run_id: 原 runs.id
+    :param account_id: 原 run 使用的账号 ID
+    :param sidecar_id: continue sidecar 容器 ID
+    :param worker_id: continue worker 容器 ID
+    :param session_id: Claude session ID
+    :param permission_mode: 原 run 的 Claude Code 权限模式
+    """
 
     __slots__ = ("sid", "run_id", "account_id", "sidecar_id", "worker_id",
-                 "session_id", "created_at")
+                 "session_id", "permission_mode", "created_at")
 
     def __init__(
         self,
@@ -3546,6 +3589,7 @@ class ContinueSession:
         sidecar_id: str,
         worker_id: str,
         session_id: str,
+        permission_mode: str,
     ) -> None:
         self.sid = sid
         self.run_id = run_id
@@ -3553,6 +3597,7 @@ class ContinueSession:
         self.sidecar_id = sidecar_id
         self.worker_id = worker_id
         self.session_id = session_id
+        self.permission_mode = permission_mode
         self.created_at = time.time()
 
 
@@ -3886,9 +3931,23 @@ class ContinueManager:
             sid = uuid.uuid4().hex[:12]
             self._run_locks[run["id"]] = sid
         try:
-            sidecar_id, worker_id = self.runner.start_continue(sid, run, account, session_id)
+            permission_mode = _resolve_capture_permission_mode(
+                run.get("capture_permission_mode")
+            )
+            sidecar_id, worker_id = self.runner.start_continue(
+                sid,
+                run,
+                account,
+                session_id,
+            )
             session = ContinueSession(
-                sid, run["id"], int(account["id"]), sidecar_id, worker_id, session_id
+                sid,
+                run["id"],
+                int(account["id"]),
+                sidecar_id,
+                worker_id,
+                session_id,
+                permission_mode,
             )
             with self._lock:
                 self.sessions[sid] = session
@@ -6717,6 +6776,7 @@ class CaptureRunIn(BaseModel):
     :param timeout_sec: 本次 run 超时时间
     :param model_override: 本次抓包 run 的 Claude Code `--model` 覆盖
     :param effort_level: 本次抓包 run 的思考预算；空值回退 `.env`
+    :param permission_mode: 本次抓包 run 的 Claude Code 权限模式
     """
 
     model_config = ConfigDict(protected_namespaces=())
@@ -6728,6 +6788,7 @@ class CaptureRunIn(BaseModel):
     timeout_sec: int = 1800
     model_override: Optional[str] = None
     effort_level: Optional[str] = None
+    permission_mode: CapturePermissionMode = "bypassPermissions"
 
 
 @app.post("/api/tasks")
@@ -7057,12 +7118,13 @@ def start_capture_run(body: CaptureRunIn):
     选择一个账号和 topic，启动完整 HTTP 抓包分析 run。
 
     :param body: 抓包 run 创建参数
-    :return: run id、task id 和抓包模式
+    :return: run id、task id、抓包模式、权限模式和运行身份快照
     """
     if not scheduler:
         raise HTTPException(500, "scheduler not ready")
     timeout_sec = max(60, int(body.timeout_sec or 1800))
     model_override = normalize_claude_model_override(body.model_override)
+    permission_mode = _resolve_capture_permission_mode(body.permission_mode)
     claude_code_version = effective_claude_code_version()
     try:
         claude_effort_level = _resolve_run_claude_effort_level(body.effort_level)
@@ -7121,7 +7183,8 @@ def start_capture_run(body: CaptureRunIn):
                 conn.execute(
                     "INSERT INTO runs(id, task_id, account_id, topic_id, status, "
                     "run_kind, capture_mode, capture_summary_path, capture_model_override, "
-                    "claude_code_version, claude_effort_level) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    "capture_permission_mode, claude_code_version, claude_effort_level) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                     (
                         run_id,
                         task_id,
@@ -7132,6 +7195,7 @@ def start_capture_run(body: CaptureRunIn):
                         "full_http",
                         str(flows_path / "capture_index.json"),
                         model_override,
+                        permission_mode,
                         claude_code_version,
                         claude_effort_level,
                     ),
@@ -7147,6 +7211,7 @@ def start_capture_run(body: CaptureRunIn):
         "capture_full_http": True,
         "capture_mode": "full_http",
         "model_override": model_override,
+        "capture_permission_mode": permission_mode,
         "claude_code_version": claude_code_version,
         "claude_effort_level": claude_effort_level,
     }
@@ -7156,6 +7221,7 @@ def start_capture_run(body: CaptureRunIn):
         "task_id": task_id,
         "capture_mode": "full_http",
         "model_override": model_override,
+        "permission_mode": permission_mode,
         "claude_code_version": claude_code_version,
         "claude_effort_level": claude_effort_level,
     }
@@ -7401,6 +7467,9 @@ def get_capture(rid: str):
         "run_id": rid,
         "mode": run.get("capture_mode") or "full_http",
         "model_override": run.get("capture_model_override"),
+        "permission_mode": _resolve_capture_permission_mode(
+            run.get("capture_permission_mode")
+        ),
         "claude_code_version": run.get("claude_code_version"),
         "claude_effort_level": run.get("claude_effort_level"),
         "available": bool(index.get("available")),
@@ -7564,7 +7633,13 @@ def continue_run_start(rid: str):
 
 @app.websocket("/api/run-continue/ws/{sid}")
 async def continue_run_ws(websocket: WebSocket, sid: str):
-    """PTY 桥：把 `claude --resume <session>` 双向接到浏览器 xterm。"""
+    """
+    按原 run 权限模式恢复 Claude 会话，并通过 PTY 双向连接浏览器 xterm。
+
+    :param websocket: 浏览器 WebSocket 连接
+    :param sid: continue 会话 ID
+    :return: None
+    """
     await websocket.accept()
     if not continue_manager:
         await websocket.close(code=4500)
@@ -7585,7 +7660,8 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
                 "-lc",
                 "if [ -f /workspace/.claude.json ] && [ ! -f \"$HOME/.claude.json\" ]; then "
                 "cp /workspace/.claude.json \"$HOME/.claude.json\"; fi; "
-                "claude --resume \"$CONTINUE_SESSION_ID\"",
+                "claude --permission-mode \"$CLAUDE_PERMISSION_MODE\" "
+                "--resume \"$CONTINUE_SESSION_ID\"",
             ],
             stdin=True,
             tty=True,
@@ -7595,6 +7671,7 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
                 "COLUMNS": "120",
                 "LINES": "36",
                 "CONTINUE_SESSION_ID": session.session_id,
+                "CLAUDE_PERMISSION_MODE": session.permission_mode,
             }),
             workdir="/workspace",
         )["Id"]

@@ -147,7 +147,7 @@ WARMUP_SYNC_RETRY_SEC=900
 
 ## 完整 HTTP 抓包分析 run
 
-运行页顶部的 `capture` 面板可以选择一个账号和一个 topic，启动一条专用抓包 run。该 run 复用普通 run 的账号 profile、上游代理、sidecar MITM 和 worker 执行流程，但会强制开启完整抓包，不受全局 `SAVE_FULL_FLOWS=0` 默认值影响。
+运行页顶部的 `capture` 面板可以选择一个账号和一个 topic，启动一条专用抓包 run。该 run 复用普通 run 的账号 profile、稳定指纹、上游代理、sidecar MITM 和 worker 执行流程，但会强制开启完整抓包，不受全局 `SAVE_FULL_FLOWS=0` 默认值影响。`permission_mode` 默认为 `bypassPermissions`；选择 `auto` 时只向本次 Claude CLI 进程传入 `--permission-mode auto`，用于观察官方 Auto Mode classifier 协议，不会修改账号 profile 的持久权限设置。
 
 输出目录：
 
@@ -160,6 +160,8 @@ data/flows/<account>/<task_id>/<run_id>/
 ```
 
 抓包 run 的 `http_capture.jsonl` 默认记录所有经过 sidecar MITM 的 HTTP flow，不只限于 Anthropic 域名；Datadog、Statsig、Sentry、WebSocket upgrade、额外遥测域名等请求只要走到 MITM，也会进入完整 JSONL。`capture_index.json` 会额外标记 `is_target`、`is_anthropic`、`is_telemetry_candidate`，便于从全量流量里筛 Anthropic 主链路和遥测候选。WebUI 详情页只展示脱敏索引；完整 `http_capture.jsonl` 会保存本地原文，可能包含 OAuth token、prompt、代码、响应内容、第三方请求内容等高敏数据，不要提交到 git，也不要暴露给不可信网络。
+
+Auto Mode 的官方协议样本必须通过上述正式抓包入口创建，保持 `worker → sidecar MITM → 账号既有代理 → api.anthropic.com` 链路。宿主机直连、手工 worker、临时容器或第三方网关产生的请求不属于可比较样本。
 
 如果对抓包 run 点击“继续”并在继续会话里执行 `/cost`、`/context` 等操作，continue sidecar 会继承完整抓包配置，并把后续 HTTP flow 追加写回同一个 run 的 flows 目录；普通非抓包 run 的继续会话仍不保存完整请求/响应正文。
 
