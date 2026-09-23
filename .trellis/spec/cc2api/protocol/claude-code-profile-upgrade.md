@@ -73,6 +73,16 @@ data/flows/<account>/<topic_id>/<run_id>/
 └── *.flow
 ```
 
+HTTP/1 大小写补丁的请求级接口（固定于 reqwest 0.12.4 / hyper 1.9.0）：
+
+```rust
+RequestBuilder::http1_header_casing<I, S>(self, names: I) -> RequestBuilder
+HeaderCaseMap::from_names<I, S>(names: I) -> Result<Self, InvalidHeaderName>
+// 两者约束：I: IntoIterator<Item = S>, S: AsRef<str>。
+```
+
+接口只保存头名拼写；头值仍由 `.header(name, value)` 提供，自动长度仍由最终 body 决定。
+
 ### 3. Contracts
 
 版本画像必须集中维护：
@@ -247,7 +257,10 @@ aux 继续使用 `2.1.257` 已确认的独立窄画像。
   effort 后加入 `dangerous-tool-use-2026-09-03`、在 display 后加入
   `afk-mode-2026-01-31`；普通请求继续使用基础 Opus 5.5 画像。
 - Sonnet 4.5 不含 mid-conversation-system、effort、per-turn 与 tool-changes，保留
-  thinking-binding/display，并在末尾追加 `message-threads-2026-08-12`。
+  thinking-binding/display。API 生成模式在末尾追加 `message-threads-2026-08-12`；原生
+  Claude Code 模式由客户端决定是否携带该 token，不从 `thread` 正文或模式推测开关。
+  `MainRequestProfile.client_optional_beta_tokens` 声明此差异：先从 required 集合移除，
+  再合并经过账号能力过滤的客户端 beta；不影响 1M/Fast、safeguard 或 count_tokens。
 - Haiku main 在 2.1.260 基础上于 display 前新增 `thinking-binding-controls-2026-08-01`；
   无 diagnostics 时仍只移除 `claude-code-20250219`。
 - 1M token 仍只在客户端传入且账号白名单允许时插入 oauth 后；仅当 endpoint 精确为
@@ -361,7 +374,8 @@ Haiku 2.1.257 子画像契约：
 
 后台 UA/beta 契约：
 
-- 2.1.257/2.1.260/2.1.280 使用 `EndpointHeaderProfile::ClaudeCode21257`。下表的 12 类
+- 2.1.257/2.1.260 使用 `EndpointHeaderProfile::ClaudeCode21257`；2.1.280 使用
+  `ClaudeCode21280`，继承下表并追加后面的 280 规则。下表的 12 类
   路径来自 260 原始 flow；257 JSONL 可核对其中 10 类，stream/archive 不在该索引中。
 - `{id}` 必须是非空单一路径段，后缀精确匹配；相似路径、未知子路径、额外尾斜杠
   不自动套用。旧画像使用 `Legacy`，保留既有行为。
@@ -377,6 +391,28 @@ Haiku 2.1.257 子画像契约：
 | `/v1/ultrareview/quota` | `claude-cli/<version> (external, cli)` | 无 |
 
 以上契约只覆盖 UA/beta，不代表 worker JWT、完整请求头顺序、响应或长连接代理已实现。
+
+2.1.280 非遥测补充契约（本地与正式抓包对照）：
+
+| 路径 | User-Agent | anthropic-beta / 专用请求头 |
+| --- | --- | --- |
+| `/api/frame/contract/latest` | `claude-cli/2.1.280 (external, cli)` | 精确 oauth；保留 `X-Frame-CP`、`X-Frame-Surface`、`X-Frame-Platform`、`X-Frame-Client-Version`、`X-Frame-Session-Id`，版本来自所选画像 |
+| `/v1/mcp/{id}` | `claude-code/2.1.280 (cli)` | 无 beta；保留 `X-Mcp-Client-Session-Id`、`mcp-method` |
+| `/api/organizations/{id}/model_selector/cc` | `claude-cli/2.1.280 (external, cli)` | 无 beta |
+| `/api/oauth/organizations/{id}/marketplaces`、`plugins/list-plugins`、`skills/list-skills`、`skills/{id}/download` | 同上 | 无 beta |
+
+- 新端点规则仍按非空路径段和精确后缀匹配，近似路径不放宽；旧版本 UA/beta 不套 280 规则。
+- 原生 `/v1/messages` 透传 `x-claude-code-request-class` 和
+  `x-claude-code-prev-tool-durations`；其它端点丢弃这两项，不在 API 请求中伪造工具耗时。
+  Frame/MCP 新增专用头也只在对应端点放行。
+- `/v1/mcp_servers` 的 280 capabilities 为 Base64 编码的
+  `{"roots":{"listChanged":true},"elicitation":{}}`；旧画像仍为 `roots:{}`。访问策略独立，不自动放行 axios。
+- HTTP/1 大小写必须检查实际 TCP 字节。`ordered_anthropic_headers` 给出顺序和拼写，业务
+  forwarding/count_tokens 再通过 `http1_header_casing` 显式传给固定版本的 reqwest/hyper
+  补丁；Content-Length 只指定名称拼写，长度由最终 body 自动生成。遥测 event_logging/eval
+  不启用，默认请求行为不变；HTTP/2 仍使用规范要求的小写名字。
+- 依赖补丁与来源见 `cc2api/vendor/README.md`。升级不得仅修改 HeaderMap 或使用全局
+  Title-Case 冒充精确混合大小写；克隆、重定向、代理及敏感头删除必须回归。
 
 Bootstrap 契约：
 
@@ -478,6 +514,10 @@ Telemetry 契约：
 | 标题未携带 fallback 或只有相似未知 token | 输出基础窄 beta，不主动开启 fallback |
 | 已知 worker/presence/quota 路径携带主模型 beta | 输出端点专用 UA，删除 anthropic-beta |
 | 未知后台子路径或旧版本画像 | 保留既有处理，不能用宽泛前缀匹配扩大修正范围 |
+| 原生 280 Sonnet 4.5 未传 message-threads beta，即使正文有 thread | 不主动补 token；显式传入则保留并去重 |
+| HTTP/1 casing 名称含空格、CRLF 或为空 | `from_names` 返回 InvalidHeaderName；reqwest 的 build/send 返回 builder 错误，不发起网络请求 |
+| 重定向跨地址，敏感头按原策略删除 | casing 映射不能恢复 Authorization；其余保留头继续使用指定拼写 |
+| 请求未显式启用 casing，或使用 HTTP/2 | 保持原网络栈的规范化行为，不能让前一个请求的选项泄漏到后续请求 |
 | 上游返回 200 headers 后一直无 SSE body | 等待历史 upstream idle timeout；记录 `upstream_first_byte_timeout`，不要提前注入 keepalive |
 | 已收到 SSE chunk 后长时间静默 | 记录 `upstream_stream_idle_timeout`；keepalive 可维持下游连接，但不得重置上游 idle timeout |
 | bootstrap response 有 gzip | 先解码再改 JSON，返回时修正压缩/长度相关 header |
@@ -503,6 +543,16 @@ Telemetry 契约：
 
 **Good**：标题可选 token 的三种已观察组合由脱敏 fixture 固定预期；后台端点同时断言
 UA 和 beta，覆盖两种入口及无 beta 的删除行为。
+
+**Good**：原生 Sonnet 4.5 请求带 `message-threads-2026-08-12` 时保留，未带时省略；
+不根据正文 `thread` 或猜测的 feature flag 补齐。API 生成模式继续使用默认 beta。
+
+**Base**：HTTP/1 业务请求把有序头名和 `Content-Length` 传给 `http1_header_casing`，
+再按同一列表设置头值；`Content-Length` 的值由发送库计算，测试读取原始 TCP 字节。
+
+**Bad → Correct**：仅调用 `.header("User-Agent", value)` 并断言 HeaderMap，不能证明
+实际发送大小写；应同时启用请求级 casing，并断言线上编码中的 `User-Agent` 大写和
+`anthropic-beta` 小写。不要用全局 Title-Case 覆盖所有头名。
 
 **Base**：只升级一个 patch 版本，也必须至少验证 `/v1/messages` header、body keys、billing header、bootstrap 和 telemetry metadata 是否变化。
 
@@ -531,6 +581,13 @@ watchdog 前后报 `No response from API`。
 **Bad**：因为模型请求链路是 `Claude Code -> new-api -> cc2api`，就假设 hello 也会使用同一 base URL，并在 new-api 中臆造渠道路由。
 
 ### 6. Tests Required
+
+- 280 非遥测请求头：messages 的 request-class/tool-duration 仅在精确 messages 路径
+  透传；Frame/MCP 专用头、后台 UA/beta、近似路径排除、旧版本 capabilities 均有正反例。
+- Sonnet 4.5：客户端带/不带 token、重复 token、正文有/无 thread、API 默认值，以及
+  Fast/1M 能力过滤分别断言；不得把 API 默认画像测试当作原生客户端透传测试。
+- `http1_header_casing_test` 与网关实际发送回归：混合大小写、相对顺序、自动长度、
+  clone/转换、重定向删除敏感头、HTTP 代理、非法名字和未启用请求的隔离；遥测路径保持原发送行为。
 
 - API 参数组合回归必须通过真实 `rewrite_body` 入口并指定精确模型 ID，不能只用
   空请求或只断言字段存在：
@@ -722,7 +779,8 @@ Claude Code 2.1.220 messages -> ANTHROPIC_BASE_URL -> new-api -> cc2api
 - 上游 SSE `message_delta.delta.safeguard_results` 必须按原始字节透传；工具关联位于
   `status.tool_uses` 对象的键中。网关不得解析、改写或本地生成分类结论。
 - Sonnet 4.5 的 2.1.280 抓包未出现 `safeguards` / `safeguard_results`，继续使用普通主请求
-  分支，但普通 beta 画像包含 `message-threads-2026-08-12`。
+  分支。普通 beta 的 API 默认画像包含 `message-threads-2026-08-12`，原生请求只在客户端
+  显式携带时保留；同版本成功样本存在带与不带两种形态。
 
 ### 3. Tests Required
 
