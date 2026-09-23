@@ -42,15 +42,15 @@
 
 ## Acceptance Criteria
 
-- [ ] 抓包 API 接受六种 CLI 权限模式，拒绝其他非法值；缺省行为仍为 `bypassPermissions`。
-- [ ] run 记录、调度 payload、worker 启动参数和 continue 路径使用同一个权限模式快照。
-- [ ] 普通、批量、养号、登录和 quota 路径仍使用原有权限模式。
-- [ ] WebUI 可以选择并显示六种权限模式，现有抓包表单字段保持可用。
-- [ ] 后端单测、worker shell 检查、前端 JS 检查和 Compose 检查通过。
-- [ ] 代码提交并推送后，GitHub Actions 构建成功，远端按不可变 tag/digest 部署并通过健康检查。
-- [ ] 完成 Opus 5.5 六模式以及 Opus 4.8/Sonnet 4.5 的 auto/plan 对照，明确每个分支是否出现 `safeguards`、`safeguard_results` 及 beta 差异。
-- [ ] cc2api 根据最终证据完成条件画像与透明透传测试，完整 Rust 测试通过。
-- [ ] 最终报告只展示脱敏协议摘要，并给出远端受限原始证据路径。
+- [x] 抓包 API 接受六种 CLI 权限模式，拒绝其他非法值；缺省行为仍为 `bypassPermissions`。
+- [x] run 记录、调度 payload、worker 启动参数和 continue 路径使用同一个权限模式快照。
+- [x] 普通、批量、养号、登录和 quota 路径仍使用原有权限模式。
+- [x] WebUI 可以选择并显示六种权限模式，现有抓包表单字段保持可用。
+- [x] 后端单测、worker shell 检查、前端 JS 检查和 Compose 检查通过。
+- [x] 代码提交并推送后，GitHub Actions 构建成功，远端按不可变 tag/digest 部署并通过健康检查。
+- [x] 完成 Opus 5.5 六模式以及 Opus 4.8/Sonnet 4.5 的 auto/plan 对照，明确每个分支是否出现 `safeguards`、`safeguard_results` 及 beta 差异。
+- [x] cc2api 根据最终证据完成条件画像与透明透传测试，完整 Rust 测试通过。
+- [x] 最终报告只展示脱敏协议摘要，并给出远端受限原始证据路径。
 
 ## Out of Scope
 

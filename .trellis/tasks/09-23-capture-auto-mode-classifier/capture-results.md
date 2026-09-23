@@ -28,3 +28,17 @@ api.anthropic.com` 链路生成。原始文件仅保存在远端受限目录，�
   `message_delta.delta.safeguard_results`，非空 `status.tool_uses` 的键能关联同请求 tool-use ID。
 - Sonnet 4.5 Auto/Plan 不含 safeguards 或 safeguard results，使用含
   `message-threads-2026-08-12` 的普通模型画像。
+
+## 构建与部署
+
+- `vibecoding-bench` 功能提交 `9fb297f`，六模式镜像构建 run `35813157934` 成功并已部署。
+- `cc2api` 协议提交 `ded49ec`，CI Docker run `35819194824` 成功；父仓固定提交为 `b79319c`。
+- 线上 `cc2api` 使用不可变摘要
+  `sha256:acc469852e98466ecd779f3d538f55674f7d53b9c269a8e44bb279bd222b2276`，镜像 revision
+  为 `ded49ecee38962972a56e4e77825b61b929dafb9`。部署前 5674 已建立连接数为 0。
+- 容器重建后 restart count 为 0，本机与外部 HTTP 均返回 200，最近 200 行日志没有
+  panic、fatal 或 error。
+- 数据库 4 个账号的 `version` / `version_base` 均为 `2.1.280`，`build_time` 均为
+  `2026-09-21T20:40:17Z`；默认 profile 为 `2.1.280`，允许范围为 `2.1.89-2.1.280`。
+- 远端部署前 compose 备份位于
+  `/root/claude-code-gateway/backups/deploy-20260923T0444Z-safeguards-ded49ec/docker-compose.yml`。

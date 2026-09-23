@@ -32,7 +32,7 @@
 
 - [x] 按最终矩阵定义模型级普通/Auto/Plan beta 画像，不从模式名推断未观察行为。
 - [x] 保留 `safeguards` 与未知 classifier context，原样转发 `safeguard_results` SSE。
-- [ ] 运行 `cargo fmt --check`、`cargo test`、`cargo test cch`，提交并等待镜像构建后部署。
+- [x] 运行 `cargo fmt --check`、`cargo test`、`cargo test cch`，提交并等待镜像构建后部署。
 
 ## 6. 脱敏证据摘要
 
