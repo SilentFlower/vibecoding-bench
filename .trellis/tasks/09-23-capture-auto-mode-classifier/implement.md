@@ -2,30 +2,37 @@
 
 ## 1. 正式抓包链路
 
-- [ ] 在 orchestrator 增加抓包权限模式类型、API 字段、run 列与幂等迁移。
-- [ ] 将权限模式快照传入 scheduler、worker 环境和 capture continue 路径。
-- [ ] 在 worker entrypoint 校验允许值，并向 Claude CLI 追加 `--permission-mode`；持久 profile 默认保持不变。
+- [x] 在 orchestrator 增加抓包权限模式类型、API 字段、run 列与幂等迁移。
+- [x] 将权限模式快照传入 scheduler、worker 环境和 capture continue 路径。
+- [x] 将 orchestrator、worker 与 WebUI 的允许值扩为 Claude Code 2.1.280 六种权限模式；持久 profile 默认保持不变。
 
 ## 2. WebUI 与文档
 
-- [ ] 抓包表单增加权限模式选择并提交字段。
-- [ ] 抓包详情显示实际权限模式。
-- [ ] 更新 README 的抓包说明和 Auto Mode 使用边界。
+- [x] 抓包表单增加权限模式选择并提交字段。
+- [x] 抓包详情显示实际权限模式。
+- [x] 更新表单与 README，完整说明六种权限模式和 Plan classifier 边界。
 
 ## 3. 验证
 
-- [ ] 补充 API 缺省、Auto、非法值、调度快照与 continue 继承测试。
-- [ ] 运行 orchestrator 单测、`bash -n images/worker/entrypoint.sh`、`node --check webui/app.js`。
-- [ ] 运行两份 Compose 配置检查和相关静态契约检查。
-- [ ] 执行 full Check-All，确认无未处理 CHK/FBK。
+- [x] 补充六模式 API、worker 校验、缺省、非法值、调度快照与 continue 继承测试。
+- [x] 运行 orchestrator 单测、`bash -n images/worker/entrypoint.sh`、`node --check webui/app.js`。
+- [x] 运行两份 Compose 配置检查和相关静态契约检查。
+- [x] 执行 full Check-All，确认无未处理 CHK/FBK。
 
 ## 4. 发布与抓包
 
 - [ ] 精确提交本任务文件并推送 main，等待 GitHub Actions 三镜像构建成功。
 - [ ] 依照远端部署 SOP 拉取提交 SHA 镜像并 recreate orchestrator，完成健康与版本检查。
-- [ ] 通过正式 capture API 创建 2.1.280 / Opus 5.5（必要时用受支持低额度模型复核）的 Auto run。
-- [ ] 核对 run 的指纹、OAuth profile、代理、sidecar 与目标 host，提取脱敏协议证据。
+- [ ] 通过正式 capture API 创建 2.1.280 / Opus 5.5 六模式矩阵，并创建 Opus 4.8、Sonnet 4.5 的 auto/plan 对照。
+- [ ] 核对每个 run 的指纹、OAuth profile、代理、sidecar 与目标 host，提取脱敏协议证据。
+- [ ] 对每条主请求复算 CCH 与 `cc_version`，比较 beta 顺序、body 字段和辅助请求，确认升级指南是否漂移。
 - [ ] 对额度、平台 rollout 或上游 unavailable 单独记录，不把它们误判为网关透传问题。
+
+## 5. cc2api 同步
+
+- [ ] 按最终矩阵定义模型级普通/Auto/Plan beta 画像，不从模式名推断未观察行为。
+- [ ] 保留 `safeguards` 与未知 classifier context，原样转发 `safeguard_results` SSE。
+- [ ] 运行 `cargo fmt --check`、`cargo test`、`cargo test cch`，提交并等待镜像构建后部署。
 
 ## 风险位置
 

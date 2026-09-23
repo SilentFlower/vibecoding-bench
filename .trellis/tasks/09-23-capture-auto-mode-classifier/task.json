@@ -1,9 +1,9 @@
 {
   "id": "capture-auto-mode-classifier",
   "name": "capture-auto-mode-classifier",
-  "title": "为正式抓包 run 增加 Auto Mode 协议抓取",
-  "description": "让 vibecoding-bench 的正式抓包 run 可按次选择 Claude Code auto 权限模式，完整复用 orchestrator 的账号指纹、OAuth profile、代理、sidecar 与 worker 链路，部署后抓取官方 safeguards/safeguard_results 对照。",
-  "status": "completed",
+  "title": "扩展正式抓包权限模式并核对 Auto Mode 协议",
+  "description": "让 vibecoding-bench 的正式抓包 run 可按次选择 Claude Code 2.1.280 的六种权限模式，完整复用 orchestrator 的账号指纹、OAuth profile、代理、sidecar 与 worker 链路，按模型矩阵核对 safeguards/safeguard_results、CCH 与 cc_version 后同步 cc2api。",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": "vibecoding-bench",
@@ -11,7 +11,7 @@
   "creator": "silentflower",
   "assignee": "silentflower",
   "createdAt": "2026-09-23",
-  "completedAt": "2026-09-23",
+  "completedAt": null,
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
@@ -835,15 +835,15 @@
     }
   },
   "progress": {
-    "updatedAt": "2026-09-23T09:30:00+08:00",
+    "updatedAt": "2026-09-23T11:09:05+08:00",
     "completedSteps": [
-      "完成 Auto Mode 正式抓包端到端快照实现",
-      "60 项后端测试与 Full Check-All 通过",
-      "更新跨层 Code-Spec",
-      "业务提交已推送 main"
+      "完成 bench 六模式抓包入口与跨层快照实现",
+      "60 项 orchestrator 测试与 Full Check-All 通过",
+      "沉淀正式协议抓包与漂移复核规范",
+      "bench 功能提交已推送 main"
     ],
     "partialStep": null,
-    "nextStep": "等待 GitHub Actions 构建后部署提交 SHA 镜像，并运行正式官方 Auto Mode 抓包",
-    "notes": "生产构建、远端部署和官方 safeguards/safeguard_results 样本按上线后验证继续执行。"
+    "nextStep": "等待 GitHub Actions 三镜像构建成功后部署提交 SHA，并按限频规范运行正式模式/模型矩阵",
+    "notes": "cc2api 协议草案保持未提交，待正式矩阵确认 safeguards、beta、CCH 与 cc_version 边界后收敛。"
   }
 }
