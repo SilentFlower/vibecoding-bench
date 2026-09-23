@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "父任务跨阶段维护抓包、画像、迁移和敏感数据契约。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/remote-deploy.md", "reason": "父任务维护 bench 先行发布与最终联合回滚顺序。"}
+{"file": ".trellis/tasks/archive/2026-09/09-04-vibecoding-bench-claude-code-2-1-260-runtime/research.md", "reason": "父任务纳入 run 版本快照与 continue 漂移根因。"}

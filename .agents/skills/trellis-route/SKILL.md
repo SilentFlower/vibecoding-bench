@@ -75,6 +75,8 @@ helper 只接受当前 session 或唯一 session fallback 的 `.trellis/.runtime
 
 helper 默认输出为精简 JSON，只包含 route 执行必需的 `status`、`origin`、`mode`、`source`/`reason` 等字段。需要排查完整 `decision`、session 文件、context key、任务路径、个人配置路径或写回标记时，在同一命令末尾加 `--verbose`；不要为了诊断信息额外读取 runtime 文件。
 
+auto-loop prepare 使用同一个 `resolve --target <implement|check> --read-only --task <repository-relative-task-path> [--auto-mode <runner-candidate>]` 预检。它仍按匹配任务的 runtime → prefs → runner 临时候选解析，但不写 session、不绑定任务、不扫描其它 run 借用授权；`--task` 只接受项目 `.trellis/tasks/` 内明确存在的非软链任务路径。预检结果不是实际执行决策；执行时仍通过普通 route 恢复并持久化。缺少 helper 或合法模式时 runner 保守要求相应 JSONL context。
+
 输出 `status=miss`、文件缺失、JSON 损坏、任务不匹配、source/mode 不合法、prefs 缺失或 prefs 值不合法时，忽略已有状态并继续 Step 2。不要删除不匹配 runtime 文件，避免误伤其他窗口。
 
 ---
@@ -227,7 +229,7 @@ Active task: <task path from task.py current>
 1. 读取 <task>/check.jsonl 及其列出的文件，再读取 prd.md、design.md（若存在）、implement.md（若存在）。
 2. 读取并遵循本地 trellis-check-all/SKILL.md；完成三件套实现、实现假设、完整性与规范三个维度。
 3. 先按本地 fallback findings 规则判定 `CHK-*` / `FBK-*`，再为两类问题分配 P0/P1/P2；已声明的兜底契约只影响证据和严重度，不改变 `FBK-*` 归属。具备具体位置、可达场景和问题证据时返回 `FBK-*`，不要求异常已实际发生；保护收益和验证方式属于报告完整度。提交前应完成但证据不足时标记阻断型部分验证；本质依赖部署后、生产环境或外部系统的验收返回 `[上线后验证]`，不得执行且不得误标为阻断。泛化建议不报告。低风险事实漂移使用 `DOC-*` 候选单独返回。
-4. 只读审查；禁止编辑、写文件、补测试或自修复。Step 3 只复用 trellis-check 的检查清单，忽略其自动修复指令；`DOC-*` 也只能返回候选，由主会话按 Check-All 规则决定是否写入。
+4. 只读审查；禁止编辑、写文件、补测试或自修复。按 Check-All profile 的共享验证清单复用源码和验证证据；`DOC-*` 也只能返回候选，由主会话按 Check-All 规则决定是否写入。
 5. 真正阻塞条件返回主会话，不替用户选择业务行为或修复范围。
 
 返回：统一 Check-All 结果、全部 `CHK-*`、`FBK-*`、`DOC-*` 候选、已执行验证和剩余风险。不要输出 commit/push 计划。

@@ -1,0 +1,68 @@
+{
+  "id": "upgrade-claude-code-2-1-260",
+  "name": "upgrade-claude-code-2-1-260",
+  "title": "升级 cc2api 与 vibecoding-bench 到 Claude Code 2.1.260",
+  "description": "先全量升级并发布 bench 2.1.260，完成真实抓包后适配并发布 cc2api，同时修复 run 继续对话版本漂移。",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-09-04",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "09-04-vibecoding-bench-claude-code-2-1-260-runtime",
+    "09-04-claude-code-2-1-260-capture-evidence",
+    "09-04-cc2api-claude-code-2-1-260-protocol",
+    "09-04-deploy-cc2api-claude-code-2-1-260",
+    "09-04-capture-effort-snapshot"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "2026-09-05 同步用户收尾决定：本次不做完整联合回滚演练，保留未执行说明，取消该项阻塞；不追加模型测试或生产操作。部署子任务待提交归档，父任务待结果汇总，未提前标记完成。",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-09-04T00:56:46Z",
+      "contextKey": "codex_01a069e7-cbcf-7c42-89ea-474d8bcadd1d",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "636b83dfd100ff3ef47dc7df036e4dea03af3436",
+        "status": [],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "636b83dfd100ff3ef47dc7df036e4dea03af3436",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "6bd3e17366dfaf007203fadf5e7ea3ff5401f36e7d85f814d269fb2454d15b4b"
+          },
+          {
+            "root": "cc2api",
+            "head": "d33fbad0742172075136b0a41393e30954c26919",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "edc93be2308a1e05a70d8278a1578356fc2d1075f2578c19fec002799b360451"
+          }
+        ],
+        "fingerprint": "0fd9a17bfc173600d9bda704761cf9d8c0d322039ffa6b12a62f808784b46427"
+      }
+    }
+  }
+}

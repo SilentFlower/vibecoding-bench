@@ -28,3 +28,10 @@ AGENTS.md
 # Local screenshots / playwright MCP dumps
 tlab-*.png
 .playwright-mcp/
+# BEGIN Flower shared records
+!/.flower/
+/.flower/*
+!/.flower/.gitignore
+!/.flower/plugins.json
+!/.flower/plugin-lock.json
+# END Flower shared records
