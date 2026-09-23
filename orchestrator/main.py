@@ -1930,7 +1930,22 @@ def save_runtime_claude_code_version_setting(value: Optional[str]) -> Optional[s
 
 
 TopicPromptMode = Literal["natural", "canonical"]
-CapturePermissionMode = Literal["bypassPermissions", "auto"]
+CapturePermissionMode = Literal[
+    "manual",
+    "acceptEdits",
+    "plan",
+    "auto",
+    "dontAsk",
+    "bypassPermissions",
+]
+_CAPTURE_PERMISSION_MODES = (
+    "manual",
+    "acceptEdits",
+    "plan",
+    "auto",
+    "dontAsk",
+    "bypassPermissions",
+)
 
 
 def _resolve_capture_permission_mode(value: Optional[str]) -> str:
@@ -1938,14 +1953,15 @@ def _resolve_capture_permission_mode(value: Optional[str]) -> str:
     解析抓包 run 保存的权限模式，兼容没有该快照的历史记录。
 
     :param value: API、调度 payload 或 runs 行中的权限模式
-    :return: `bypassPermissions` 或 `auto`
+    :return: Claude Code CLI 支持的规范权限模式
     """
     mode = value.strip() if isinstance(value, str) else ""
     if not mode:
         return "bypassPermissions"
-    if mode not in ("bypassPermissions", "auto"):
+    if mode not in _CAPTURE_PERMISSION_MODES:
         raise ValueError(
-            "capture permission mode 无效：只允许 bypassPermissions, auto"
+            "capture permission mode 无效：只允许 manual, acceptEdits, plan, "
+            "auto, dontAsk, bypassPermissions"
         )
     return mode
 

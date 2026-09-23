@@ -273,10 +273,14 @@
             <select name="effort_level"></select>
           </label>
           <label><span class="lbl">$ permission_mode</span>
-            <span class="hint inline">只覆盖当前抓包 run；Auto 用于官方服务端工具分类。</span>
+            <span class="hint inline">只覆盖当前抓包 run；Plan 在 Auto 可用时也可能调用分类器。</span>
             <select name="permission_mode">
               <option value="bypassPermissions" selected>bypassPermissions（默认）</option>
               <option value="auto">auto</option>
+              <option value="plan">plan</option>
+              <option value="manual">manual</option>
+              <option value="acceptEdits">acceptEdits</option>
+              <option value="dontAsk">dontAsk</option>
             </select>
           </label>
         </div>

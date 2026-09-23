@@ -295,6 +295,23 @@ class TopicPromptTests(unittest.TestCase):
             "bypassPermissions",
             main.CaptureRunIn(account_id=1, topic_id=1).permission_mode,
         )
+        for permission_mode in (
+            "manual",
+            "acceptEdits",
+            "plan",
+            "auto",
+            "dontAsk",
+            "bypassPermissions",
+        ):
+            with self.subTest(permission_mode=permission_mode):
+                self.assertEqual(
+                    permission_mode,
+                    main.CaptureRunIn(
+                        account_id=1,
+                        topic_id=1,
+                        permission_mode=permission_mode,
+                    ).permission_mode,
+                )
         with self.assertRaises(ValidationError):
             main.TaskIn(topic_no=1, account_id=1, prompt_mode="invalid")
         with self.assertRaises(ValidationError):
@@ -1095,6 +1112,16 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         self.assertIn("effort_level: (fd.get('effort_level')", app_js)
         self.assertIn('<select name="permission_mode">', index_html)
         self.assertIn("permission_mode: fd.get('permission_mode')", app_js)
+        for permission_mode in (
+            "manual",
+            "acceptEdits",
+            "plan",
+            "auto",
+            "dontAsk",
+            "bypassPermissions",
+        ):
+            with self.subTest(permission_mode=permission_mode):
+                self.assertIn(f'<option value="{permission_mode}"', index_html)
         self.assertIn('data-stat-key="claude_effort_level"', app_js)
         capture_stats = re.search(
             r"const captureStats = `(?P<body>.*?)`;",
@@ -1144,7 +1171,10 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             'CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-bypassPermissions}"',
             entrypoint,
         )
-        self.assertIn("bypassPermissions|auto)", entrypoint)
+        self.assertIn(
+            "manual|acceptEdits|plan|auto|dontAsk|bypassPermissions)",
+            entrypoint,
+        )
         self.assertIn(
             'claude_args=(claude --permission-mode "$CLAUDE_PERMISSION_MODE")',
             entrypoint,

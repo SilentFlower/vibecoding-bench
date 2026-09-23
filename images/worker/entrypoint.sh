@@ -92,7 +92,7 @@ ensure_claude_code_version() {
 
 validate_claude_permission_mode() {
   case "$CLAUDE_PERMISSION_MODE" in
-    bypassPermissions|auto)
+    manual|acceptEdits|plan|auto|dontAsk|bypassPermissions)
       return 0
       ;;
     *)

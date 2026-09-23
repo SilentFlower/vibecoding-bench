@@ -147,7 +147,9 @@ WARMUP_SYNC_RETRY_SEC=900
 
 ## 完整 HTTP 抓包分析 run
 
-运行页顶部的 `capture` 面板可以选择一个账号和一个 topic，启动一条专用抓包 run。该 run 复用普通 run 的账号 profile、稳定指纹、上游代理、sidecar MITM 和 worker 执行流程，但会强制开启完整抓包，不受全局 `SAVE_FULL_FLOWS=0` 默认值影响。`permission_mode` 默认为 `bypassPermissions`；选择 `auto` 时只向本次 Claude CLI 进程传入 `--permission-mode auto`，用于观察官方 Auto Mode classifier 协议，不会修改账号 profile 的持久权限设置。
+运行页顶部的 `capture` 面板可以选择一个账号和一个 topic，启动一条专用抓包 run。该 run 复用普通 run 的账号 profile、稳定指纹、上游代理、sidecar MITM 和 worker 执行流程，但会强制开启完整抓包，不受全局 `SAVE_FULL_FLOWS=0` 默认值影响。`permission_mode` 默认为 `bypassPermissions`，也可按次选择 `manual`、`acceptEdits`、`plan`、`auto` 或 `dontAsk`；所选值只通过 `--permission-mode` 传给本次 Claude CLI 进程，不会修改账号 profile 的持久权限设置。Auto 用于观察官方服务端工具分类，Plan 在 Auto 能力可用且保持默认配置时也可能调用同一分类器。
+
+升级 Claude Code 或 cc2api 协议画像时，应以当前镜像重新抓 `bypassPermissions` 基线，再串行抓取其他模式。每个 run 完全结束、worker/sidecar 清理后再等待至少 120 秒启动下一条；同时逐请求复算 CCH 与 `cc_version`，不能用不同 prompt 的 CCH 字面值差异直接推断 seed 漂移。
 
 输出目录：
 

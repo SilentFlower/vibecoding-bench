@@ -24,6 +24,7 @@
 | [Image Build & Push](./image-build-push.md) | 三镜像构建、双 tag 策略、Dockerfile COPY 与 recreate 协同 | Filled |
 | [Remote Deploy](./remote-deploy.md) | 4 件套部署清单、HOST_BENCH_DATA 解析、端口冲突、Security Group | Filled |
 | [Auth Design](./auth-design.md) | Cookie session 中间件契约、为什么不用 Basic Auth、WS 间接保护 | Filled |
+| [Claude Code 官方协议抓包](./official-protocol-capture.md) | 权限模式/模型矩阵、正式代理链路、限频、CCH 与 `cc_version` 漂移复核 | Filled |
 
 ---
 
@@ -33,6 +34,7 @@
 2. **代码改了要发新版**:读 [Image Build & Push](./image-build-push.md) 确认 workflow 双 tag 发布成功后再 recreate
 3. **远程重启 cc2api / claude-code-gateway**:读 [Remote Deploy](./remote-deploy.md) 的 `cc2api.env` 场景
 4. **加 / 改鉴权**:读 [Auth Design](./auth-design.md) 看中间件豁免规则与 API 契约
+5. **升级 Claude Code 或核对 cc2api wire 画像**:读 [Claude Code 官方协议抓包](./official-protocol-capture.md)，按正式链路生成当前版本基线和模式矩阵
 
 每个文件结尾的 **Common Mistakes** 是上次实际踩到的坑,新人先看那部分。
 
