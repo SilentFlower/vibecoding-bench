@@ -116,8 +116,10 @@ SSE: message_delta.delta.safeguard_results
    `safeguards`、`thread` 的存在性与结构。
 3. 按该请求最终 body 字节和目标版本规则复算 CCH。先使用升级指南记录的 seed；只有全部样本都不命中，
    才能研究 seed 变化。
-4. 按首条 user message 最后一个 text block 和 JavaScript UTF-16 code unit 语义复算
-   `cc_version` suffix；CCH 命中不能替代 suffix 验证。
+4. 初始请求按首条 user message 最后一个 text block 和 JavaScript UTF-16 code unit 语义复算
+   `cc_version` suffix；存在 `thread.previous_message_id` 的续轮校验三位小写十六进制形状与
+   同 run 稳定性，即使当前消息重新出现 text block 也不得按该文本复算。网关改写时应保留入站
+   billing block 的会话后缀。CCH 命中不能替代 suffix 验证。
 5. 记录 `cc_entrypoint`、请求类型、模型、权限模式与 tool-use ID；核对
    `safeguard_results` 是否位于 `message_delta.delta` 并能关联同一 tool-use ID。
 6. 单独识别 Haiku probe、title、bootstrap、telemetry 等辅助请求；它们不能被误判为 Auto classifier，
@@ -141,6 +143,7 @@ prompt、响应正文、组织 ID 或账号身份。
 | 账号或代理出口中途变化 | 当前模型组失去可比性，从新账号的新基线重启 |
 | CCH 字面值与另一 run 不同 | 先按各自最终 body 复算；不得直接判为 seed 漂移 |
 | CCH 命中但 `cc_version` 不命中 | 独立检查 suffix 文本源、UTF-16 索引、版本和 header 格式 |
+| 线程续轮带 text 但确定性 suffix 不命中 | 检查 `thread.previous_message_id`；存在时验形并检查同 run 后缀稳定性 |
 | 只有 Auto 出现 `safeguards` | 建立条件子画像，普通请求画像保持独立 |
 | Plan 出现 `safeguards` | 按实际 body 与 beta 建立 Plan/Auto 共用或独立画像，取决于逐字段证据 |
 | 模型不支持 Auto 且没有 safeguards | 记录为模型边界，不伪造或补齐 classifier 字段 |
@@ -156,6 +159,9 @@ prompt、响应正文、组织 ID 或账号身份。
 **Boundary**：Sonnet 在 `auto` 参数下没有 `safeguards`，但普通 beta 多出
 `message-threads-2026-08-12`。这属于模型普通画像漂移，不能因为启动参数为 `auto` 就加入
 `dangerous-tool-use` beta。
+
+**Boundary**：Sonnet 线程续轮在 `tool_result` 后重新带入 text block，但只要请求包含
+`thread.previous_message_id`，`cc_version` 仍复用会话级三位后缀；不得把当前 text 当作确定性来源。
 
 **Incorrect**：连续并发启动六个 run，用同一历史 `bypassPermissions` 样本做基线，并看到 CCH 值
 不同后直接更换 seed。

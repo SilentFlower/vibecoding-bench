@@ -21,18 +21,30 @@
 
 ## 4. 发布与抓包
 
-- [ ] 精确提交本任务文件并推送 main，等待 GitHub Actions 三镜像构建成功。
-- [ ] 依照远端部署 SOP 拉取提交 SHA 镜像并 recreate orchestrator，完成健康与版本检查。
-- [ ] 通过正式 capture API 创建 2.1.280 / Opus 5.5 六模式矩阵，并创建 Opus 4.8、Sonnet 4.5 的 auto/plan 对照。
-- [ ] 核对每个 run 的指纹、OAuth profile、代理、sidecar 与目标 host，提取脱敏协议证据。
-- [ ] 对每条主请求复算 CCH 与 `cc_version`，比较 beta 顺序、body 字段和辅助请求，确认升级指南是否漂移。
-- [ ] 对额度、平台 rollout 或上游 unavailable 单独记录，不把它们误判为网关透传问题。
+- [x] 精确提交本任务文件并推送 main，等待 GitHub Actions 三镜像构建成功。
+- [x] 依照远端部署 SOP 拉取提交 SHA 镜像并 recreate orchestrator，完成健康与版本检查。
+- [x] 通过正式 capture API 创建 2.1.280 / Opus 5.5 六模式矩阵，并创建 Opus 4.8、Sonnet 4.5 的 auto/plan 对照。
+- [x] 核对每个 run 的指纹、OAuth profile、代理、sidecar 与目标 host，提取脱敏协议证据。
+- [x] 对每条主请求复算 CCH 与 `cc_version`，比较 beta 顺序、body 字段和辅助请求，确认升级指南是否漂移。
+- [x] 对额度、平台 rollout 或上游 unavailable 单独记录，不把它们误判为网关透传问题。
 
 ## 5. cc2api 同步
 
-- [ ] 按最终矩阵定义模型级普通/Auto/Plan beta 画像，不从模式名推断未观察行为。
-- [ ] 保留 `safeguards` 与未知 classifier context，原样转发 `safeguard_results` SSE。
+- [x] 按最终矩阵定义模型级普通/Auto/Plan beta 画像，不从模式名推断未观察行为。
+- [x] 保留 `safeguards` 与未知 classifier context，原样转发 `safeguard_results` SSE。
 - [ ] 运行 `cargo fmt --check`、`cargo test`、`cargo test cch`，提交并等待镜像构建后部署。
+
+## 6. 脱敏证据摘要
+
+- Opus 5.5 六模式、Opus 4.8 Auto/Plan、Sonnet 4.5 Auto/Plan 共 10 个正式 run 全部成功，
+  目标请求均为 HTTP 200；run ID 与受限证据路径记录在 `capture-results.md`。
+- 全部 billing 请求使用 `cc_version=2.1.280`，CCH 按 `0x4D659218E32A3268` 和 2.1.280
+  全层级字符串 model 清空规则复算命中。
+- Opus 5.5/4.8 仅 Auto、Plan 包含 `dangerous_tool_use` safeguards；两种模式的精确 beta
+  相同，仅 `classifier_context.permission_mode` 分别为 `auto`、`plan`。
+- Sonnet 4.5 Auto/Plan 均不包含 safeguards，普通 beta 追加 `message-threads-2026-08-12`。
+- Sonnet 初始线程请求按最后一个 user text 确定性生成 `cc_version` 后缀；带
+  `thread.previous_message_id` 的续轮复用同一会话级三位小写十六进制后缀，即使当前消息重新带 text。
 
 ## 风险位置
 

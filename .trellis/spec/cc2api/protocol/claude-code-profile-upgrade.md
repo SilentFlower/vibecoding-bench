@@ -97,6 +97,10 @@ data/flows/<account>/<topic_id>/<run_id>/
 - 字符索引必须按 JavaScript UTF-16 code unit 语义。
 - `messages[0].content` 是数组时，Claude Code 主请求可能先放环境上下文 text block，再放真实用户 prompt text block；后缀文本源应取首条 user message 的最后一个 text block，而不是第一个 text block。
 - Haiku/title 这类只有一个 text block 的请求仍取唯一 text block。
+- `2.1.280` 带 `thread.previous_message_id` 的续轮请求复用入站 billing block 中已有的会话级
+  三位小写十六进制后缀；同一 run 的所有续轮保持一致。即使当前 user message 在
+  `tool_result` 后重新出现 text block，也不能按该文本生成确定性后缀。初始线程请求只有
+  `thread.type`，仍按最后一个 user text 确定性计算。
 
 `2.1.257` identity 契约：
 
@@ -235,10 +239,15 @@ aux 继续使用 `2.1.257` 已确认的独立窄画像。
   `thinking-binding-controls-2026-08-01`，不在基础画像中主动加入 fallback token。
 - Sonnet 5 不含 per-turn/tool-changes，包含 system-clear、thinking-binding，并在末尾追加
   `message-threads-2026-08-12`。
-- Opus 4.8 包含 tool-changes、system-clear、effort、thinking-binding 和末尾 message-threads，
-  不含 per-turn。
-- Sonnet 4.5 不含 mid-conversation-system、effort、per-turn、tool-changes 与 message-threads，
-  保留 thinking-binding/display。
+- Opus 4.8 普通请求包含 tool-changes、system-clear、effort、thinking-binding 和末尾
+  message-threads，不含 per-turn；带 `dangerous_tool_use` safeguard 的 Auto/Plan 请求改用专属
+  精确画像，移除 message-threads，并在 effort 后加入 `dangerous-tool-use-2026-09-03`、在
+  display 后加入 `afk-mode-2026-01-31`。
+- Opus 5.5 带 `dangerous_tool_use` safeguard 的 Auto/Plan 请求同样使用专属精确画像，在
+  effort 后加入 `dangerous-tool-use-2026-09-03`、在 display 后加入
+  `afk-mode-2026-01-31`；普通请求继续使用基础 Opus 5.5 画像。
+- Sonnet 4.5 不含 mid-conversation-system、effort、per-turn 与 tool-changes，保留
+  thinking-binding/display，并在末尾追加 `message-threads-2026-08-12`。
 - Haiku main 在 2.1.260 基础上于 display 前新增 `thinking-binding-controls-2026-08-01`；
   无 diagnostics 时仍只移除 `claude-code-20250219`。
 - 1M token 仍只在客户端传入且账号白名单允许时插入 oauth 后；仅当 endpoint 精确为
@@ -448,6 +457,7 @@ Telemetry 契约：
 |------|------|
 | 新版本抓包 CCH 不命中旧 seed | 先尝试输入规范化差异；只有多组样本都不命中时再逆向 seed |
 | `cc_version` 主请求按第一个 text block 计算不命中 | 检查首条 user message 是否有多个 text block；按最后一个 text block 复算 |
+| `cc_version` 在线程续轮按当前 text 复算不命中 | 检查 `thread.previous_message_id`；存在时校验三位小写十六进制形状、同 run 稳定性，并在网关改写时保留入站后缀 |
 | Fable 带 `[1m]` 时 beta 顺序与抓包不同 | 先按目标版本抓包判断是否应有 `context-1m-2025-08-07`；若应有，再整理到 `oauth` 后面 |
 | 2.1.257 Fable 5.1 CCH 不命中 | 确认清空 `model`、删除 `max_tokens`，但保留 top-level `fallbacks="default"` |
 | 2.1.257 Fable 5 CCH 不命中 | 确认 fallback 是字符串 `"default"`、beta 使用 `server-side-fallback-2026-07-01`，并保留 fallback 参与 CCH |
@@ -574,7 +584,9 @@ watchdog 前后报 `No response from API`。
   - 260 Opus、Sonnet、Fable 5.1、Haiku 共 117 条 billing 样本的 `cc_version` 与 CCH
     全量命中；删除 Fable 5.1 fallback 的错误算法必须全量不命中该模型样本。
   - 280 Opus 5.5、Sonnet 5、Fable 5.1、Haiku、Opus 4.8、Sonnet 4.5 的 billing 样本
-    全量命中“相同 seed + 所有精确字符串 model 清空 + 顶层 max_tokens 删除 + fallback 保留”规则。
+    全量命中“相同 seed + 所有精确字符串 model 清空 + 顶层 max_tokens 删除 + fallback 保留”规则；
+    初始请求的 `cc_version` 确定性复算命中，线程续轮后缀符合三位小写十六进制形状并在同一
+    run 内保持一致。
 - Fable `[1m]` 抓包 beta 是否包含 `context-1m-2025-08-07`、以及包含时的顺序，与目标版本代码输出完全一致。
 - 远程部署验收：
   - `docker compose pull` 后必须 `up -d --force-recreate`。
@@ -686,6 +698,39 @@ Claude Code -> ANTHROPIC_BASE_URL -> new-api -> /api/hello 渠道选择
 Claude Code 2.1.220 hello -> https://api.anthropic.com/api/hello
 Claude Code 2.1.220 messages -> ANTHROPIC_BASE_URL -> new-api -> cc2api
 ```
+
+---
+
+## Scenario: Auto/Plan 集成式 safeguards 协议
+
+### 1. Scope / Trigger
+
+- Trigger：Claude Code 2.1.280 的 `/v1/messages` 顶层包含 `safeguards` 数组，且其中存在
+  `type="dangerous_tool_use"` 时适用。
+- 目标：保持官方 Auto/Plan 请求体、精确 beta 顺序与流式分类结果；该协议与下方旧版独立
+  classifier 请求是两个并存的 wire 协议。
+
+### 2. Contracts
+
+- 仅 2.1.280 已抓包确认的 `claude-opus-5-5` 与 `claude-opus-4-8` 命中 integrated safeguard
+  子画像；`classifier_context.permission_mode` 可为 `auto` 或 `plan`，其他版本、模型或模式
+  不得仅凭名称推断支持。
+- `safeguards` 必须在请求体改写与 CCH 生成后保留，`classifier_context` 的未知字段不得删除、
+  重命名或自行补值。
+- 命中时 `anthropic-beta` 必须使用对应 safeguard 子画像的完整精确顺序，不合并客户端额外
+  token，也不动态加入 fallback token。
+- 上游 SSE `message_delta.delta.safeguard_results` 必须按原始字节透传；工具关联位于
+  `status.tool_uses` 对象的键中。网关不得解析、改写或本地生成分类结论。
+- Sonnet 4.5 的 2.1.280 抓包未出现 `safeguards` / `safeguard_results`，继续使用普通主请求
+  分支，但普通 beta 画像包含 `message-threads-2026-08-12`。
+
+### 3. Tests Required
+
+- `integrated_safeguards_use_exact_beta_and_survive_body_rewrite`：覆盖 Auto/Plan 两种
+  `permission_mode`、两个 Opus 精确模型、请求体保留、额外客户端 beta 不混入。
+- `sonnet_4_5_uses_observed_message_threads_beta_without_safeguards`：覆盖 Sonnet 普通分支。
+- `stable_stream_preserves_safeguard_results_event`：覆盖流式分类结果的字节级透传。
+- 完整验证运行 `cargo fmt --check`、`cargo test`、`cargo test cch`。
 
 ---
 
