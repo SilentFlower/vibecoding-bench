@@ -1,0 +1,76 @@
+{
+  "id": "fix-cc280-business-headers",
+  "name": "fix-cc280-business-headers",
+  "title": "修复 2.1.280 非遥测请求头与端点画像",
+  "description": "按用户确认修复 messages 请求头丢失、后台业务端点画像、HTTP/1 头大小写，并让原生 Sonnet 4.5 客户端决定 message-threads beta。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "cc2api",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-09-23",
+  "completedAt": "2026-09-23",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-09-23T06:52:41Z",
+      "contextKey": "codex_01a0ccd8-02c6-7e30-999f-a185b4f7a458",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "ffc144abd3519f04d95cf0dc4870f60935a20e84",
+        "status": [],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "ffc144abd3519f04d95cf0dc4870f60935a20e84",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "a1390003cb27b17ad0ffa410e30fb44c73fad2981d129838d3a6604ea1c886ed"
+          },
+          {
+            "root": "cc2api",
+            "head": "ded49ecee38962972a56e4e77825b61b929dafb9",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "492a76debb5ca4a4753cd2ac76eba215b9263ba4f22b718513dc8581bc787a5b"
+          }
+        ],
+        "fingerprint": "2407297aad69f806be517cee9e2437e5f6b6e094dfe76a2c86f173dfc1a9326b"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "四项非遥测修复与版本回归",
+      "592 项全量测试与 23 项 CCH 定向测试",
+      "213 条已有请求头抓包对照及原始 TCP 验证",
+      "内联 Check-All 全面检查与协议规范同步",
+      "cc2api 业务改动提交并推送",
+      "主仓规范与子模块指针提交并推送"
+    ],
+    "partialStep": null,
+    "nextStep": "按用户后续指令执行归档或部署验收",
+    "notes": "本地实现、验证及业务推送完成；生产部署与实际账号链路验收尚未执行。",
+    "updatedAt": "2026-09-23T07:39:05Z"
+  }
+}
