@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 65
-- **Last Active**: 2026-09-05
+- **Total Sessions**: 66
+- **Last Active**: 2026-09-23
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~215 | Active |
+| `journal-2.md` | ~240 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 66 | 2026-09-23 | 完成 Claude Code 2.1.280 权限模式抓包与 cc2api 协议同步 | `9fb297f`, `ded49ec`, `b79319c`, `52be30d` | `main` |
 | 65 | 2026-09-05 | 归档 cc2api Claude Code 2.1.260 部署任务 | `7aecda3`, `c42d696`, `afc2089` | `main` |
 | 64 | 2026-09-05 | 完成 cc2api Claude Code 2.1.260 协议升级 | `7aecda3`, `c42d696`, `9d2cb73` | `main` |
 | 63 | 2026-09-04 | 完成 Claude Code 2.1.260 抓包证据归档 | `f38ffd7` | `main` |
