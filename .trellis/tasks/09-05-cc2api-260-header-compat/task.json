@@ -158,5 +158,10 @@
     "partialStep": null,
     "nextStep": "已完成本次推送与部署；worker JWT/API 方案按后续需求单独处理",
     "notes": "未进行主动模型探测；worker JWT 和 API 上下文/诊断/global cache 未实现。"
+  },
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-09-24T03:18:56Z",
+    "blockers": []
   }
 }

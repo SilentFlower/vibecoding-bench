@@ -192,5 +192,10 @@
     "partialStep": null,
     "nextStep": "运行 finish-work 归档任务，并在部署后验证真实上游 429",
     "notes": "真实上游 429 是否消失需通过生产账号代理链路部署后验证。"
+  },
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-09-24T03:18:56Z",
+    "blockers": []
   }
 }

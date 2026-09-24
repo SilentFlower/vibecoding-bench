@@ -35,5 +35,10 @@
     "partialStep": null,
     "nextStep": "等待用户显式运行 trellis-finish-work 完成归档",
     "notes": "全量 cargo test 506 项通过；业务代码提交和父仓同步提交已推送。"
+  },
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-09-24T03:18:56Z",
+    "blockers": []
   }
 }

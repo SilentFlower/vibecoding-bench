@@ -64,5 +64,10 @@
         "fingerprint": "0fd9a17bfc173600d9bda704761cf9d8c0d322039ffa6b12a62f808784b46427"
       }
     }
+  },
+  "closeout": {
+    "status": "pending",
+    "closedAt": null,
+    "blockers": []
   }
 }
