@@ -1,0 +1,97 @@
+{
+  "id": "quota-exhaustion-guard",
+  "name": "quota-exhaustion-guard",
+  "title": "养号与任务的 5h/7d 额度耗尽保护",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-05",
+  "completedAt": "2026-10-06",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-06T10:33:28Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-04T16:58:06Z",
+      "contextKey": "codex_01a107b9-5e81-7ce0-bd1e-6c3414296c60",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "a3313db029df822c69fc791d92e01cdd6e210c31",
+        "status": [
+          {
+            "status": " M",
+            "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+          },
+          {
+            "status": " M",
+            "path": "cc2api"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "a3313db029df822c69fc791d92e01cdd6e210c31",
+            "status": [
+              {
+                "status": " M",
+                "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+              },
+              {
+                "status": " M",
+                "path": "cc2api"
+              }
+            ],
+            "worktreeDiffSha256": "2cb51cb92b9b8a14117438691441bcad5afb13d25095db1fa1e98aeb6aaf807f",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "b2926957fd0df90968a12549c5e23909d69bdfe8f2f2b697143a5dbd5f128a7f"
+          },
+          {
+            "root": "cc2api",
+            "head": "9819163dc2102401bf3ae8251fc2f29dc560f794",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "0c9537b27e6b5a7203f78cac9ce6e15198a0286bacc1eaaa7c8cc325e9312fd0"
+          }
+        ],
+        "fingerprint": "311cae0d88aea9bd25b00dd851908e6ff23d8b36f766eb9249e76d0ae2ab7f99"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "被动额度保护实现",
+      "Check-All 本地验收",
+      "项目规格更新",
+      "代码提交与推送"
+    ],
+    "partialStep": null,
+    "nextStep": "生产部署及线上验收，另行处理",
+    "notes": "107 项测试及浏览器验证通过；尚未部署生产；原有两处工作区变更保留。",
+    "updatedAt": "2026-10-06T10:33:28Z"
+  }
+}
