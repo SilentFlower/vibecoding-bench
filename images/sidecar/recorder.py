@@ -4,13 +4,16 @@ mitmproxy addon：抽取 Anthropic API 流量的 token / 状态码，按行落�
 """
 from __future__ import annotations
 import base64
+import hashlib
 import json
 import os
 import re
 import time
+from pathlib import Path
 from typing import Any
 
 from mitmproxy import http
+from quota_protocol import merge_quota_observation, quota_decision, quota_observation
 
 STATS_FILE = os.environ.get("STATS_FILE", "/flows/stats.jsonl")
 CAPTURE_FILE = os.environ.get("CAPTURE_FILE", "/flows/http_capture.jsonl")
@@ -391,12 +394,127 @@ def _write_capture_index(entry: dict[str, Any]) -> None:
 
 
 class Recorder:
+    """统计流量，并对已归属当前账号的模型请求执行被动额度门禁。"""
+
+    def __init__(self) -> None:
+        """初始化本次执行的额度观察。
+
+        :return: None
+        """
+        self.quota_source = os.environ.get("QUOTA_SOURCE", "")
+        self.quota_identity = os.environ.get("QUOTA_IDENTITY", "")
+        self.quota_state_file = os.environ.get("QUOTA_STATE_FILE", "")
+        self.quota_signal_file = os.environ.get("QUOTA_SIGNAL_FILE", "")
+        self.quota_file = os.environ.get("QUOTA_OBSERVATIONS_FILE", "")
+        self.quota_local: dict = {}
+        self.quota_cached: dict = {}
+        self.quota_state_valid = False
+
+    def _quota_state(self) -> dict:
+        try:
+            state = json.loads(Path(self.quota_state_file).read_text())
+            self.quota_state_valid = state.get("identity") == self.quota_identity
+            if self.quota_state_valid:
+                self.quota_cached = state
+            return self.quota_cached
+        except (OSError, ValueError, AttributeError):
+            self.quota_state_valid = False
+            return self.quota_cached
+
+    def _owns_model_request(self, flow: http.HTTPFlow, state: dict) -> bool:
+        if not self.quota_source or flow.request.path.split("?", 1)[0] != "/v1/messages":
+            return False
+        if not any(host.split(":", 1)[0] == "api.anthropic.com"
+                   for host in _flow_host_values(flow)):
+            return False
+        auth = _header_value(_headers_dict(flow.request.headers), "authorization")
+        if not auth.lower().startswith("bearer "):
+            return False
+        hashes = set(state.get("token_hashes") or [])
+        # 既有 OAuth 刷新可在一个请求内更换 AT；只读当前本地凭据，绝不刷新或记录明文。
+        try:
+            credentials = json.loads(Path(os.environ["QUOTA_CREDENTIALS_FILE"]).read_text())
+            token = credentials.get("claudeAiOauth", {}).get("accessToken")
+            if isinstance(token, str) and token:
+                hashes.add(hashlib.sha256(token.encode()).hexdigest())
+        except (OSError, ValueError, KeyError, AttributeError):
+            pass
+        return hashlib.sha256(auth[7:].strip().encode()).hexdigest() in hashes
+
+    def _pause_quota(self, decision: dict, status: str = "quota_wait") -> None:
+        if not self.quota_signal_file:
+            return
+        path = Path(self.quota_signal_file)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"source": self.quota_source, "status": status,
+                   "error": decision["message"], "resume_at": decision["resume_at"],
+                   "exhausted": decision["exhausted"], "quota_state": self.quota_local}
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False))
+        tmp.replace(path)
+
+    def _quota_gate(self, flow: http.HTTPFlow) -> None:
+        state = self._quota_state()
+        if not self._owns_model_request(flow, state):
+            return
+        if not self.quota_state_valid:
+            # 状态挂载失效时不把账号伪装成未知可用；此处是执行故障而非额度耗尽。
+            self._pause_quota({"message": "额度门禁不可读取，已停止当前执行", "resume_at": None, "exhausted": []}, "failed")
+            flow.response = http.Response.make(503, b'{"type":"error","error":{"type":"api_error","message":"quota guard unavailable"}}',
+                                               {"content-type": "application/json", "x-vibebench-quota-blocked": "1"})
+            return
+        merged = merge_quota_observation(state, self.quota_local) if self.quota_local else state
+        if self.quota_local.get("account_error"):
+            merged["account_error"] = self.quota_local["account_error"]
+        decision = quota_decision(merged, time.time())
+        if merged.get("account_error"):
+            decision.update(blocked=True, retry_ready=False, resume_at=None, exhausted=[],
+                            message=f"{merged['account_error']}：账号异常，需人工处理")
+        if not decision["blocked"] and (not decision["retry_ready"]
+                or state.get("recovery_source") == self.quota_source):
+            return
+        self._pause_quota(decision)
+        flow.response = http.Response.make(429, json.dumps({
+            "type": "error", "error": {"type": "rate_limit_error",
+            "message": decision["message"] or "等待账号原任务更新额度"},
+        }).encode(), {"content-type": "application/json", "x-vibebench-quota-blocked": "1"})
+
+    def responseheaders(self, flow: http.HTTPFlow) -> None:
+        """
+        流响应尚未完成时就采集额度头，避免 CLI 已开始重试而主服务尚未收到正文。
+
+        :param flow: mitmproxy 流
+        :return: None
+        """
+        state = self._quota_state()
+        if not self._owns_model_request(flow, state) or flow.response.headers.get("x-vibebench-quota-blocked"):
+            return
+        headers = {key.lower(): value for key, value in _headers_dict(flow.response.headers).items()
+                   if key.lower().startswith("anthropic-ratelimit-unified-") or key.lower() == "retry-after"}
+        now = time.time()
+        observation = quota_observation(headers, flow.response.status_code, now)
+        self.quota_local = merge_quota_observation(self.quota_local, observation)
+        try:
+            _jsonl_append(self.quota_file, {"source": self.quota_source, "identity": self.quota_identity,
+                                          "ts": now, "status": flow.response.status_code, "headers": headers})
+        except OSError:
+            # 观察文件故障也必须终止请求；控制文件带归一化补证，避免清容器时丢掉 reset。
+            pass
+        finally:
+            if any(value.get("rejected") for key, value in observation["windows"].items()
+                   if key in ("five_hour", "seven_day")):
+                self._pause_quota(quota_decision(merge_quota_observation(state, self.quota_local), now))
+
     def requestheaders(self, flow: http.HTTPFlow) -> None:
         """
         在请求阶段先落一条记录。
 
         响应解析失败或长流被中断时仍能统计请求数，避免 UI 永远显示 0。
+
+        :param flow: mitmproxy 流
+        :return: None
         """
+        self._quota_gate(flow)
         if not _should_record(flow):
             return
         try:
@@ -415,11 +533,31 @@ class Recorder:
             pass
 
     def response(self, flow: http.HTTPFlow) -> None:
+        """
+        保存原有响应统计，并以有限错误码补充明确账号停用事实。
+
+        :param flow: mitmproxy 流
+        :return: None
+        """
         if not _should_record(flow):
             return
         try:
             host = _record_host(flow)
             body = flow.response.get_text(strict=False) or ""
+            if self._owns_model_request(flow, self._quota_state()) and flow.response.status_code in (401, 403):
+                data = _safe_json_loads(body)
+                error = data.get("error") if isinstance(data, dict) else None
+                detail = str(error.get("message") or "").lower() if isinstance(error, dict) else ""
+                if isinstance(error, dict) and (error.get("type") == "account_on_hold" or any(marker in detail for marker in (
+                    "account_on_hold", "account is on hold", "account has been suspended", "organization has been disabled",
+                ))):
+                    self.quota_local["account_error"] = "account_on_hold"
+                    try:
+                        _jsonl_append(self.quota_file, {"source": self.quota_source, "identity": self.quota_identity,
+                            "ts": time.time(), "status": flow.response.status_code, "headers": {}, "account_error": "account_on_hold"})
+                    finally:
+                        # 封号信号必须自带有限分类；日志故障或随后的清理不能丢失永久停止事实。
+                        self._pause_quota({"message": "account_on_hold：账号被上游停用", "resume_at": None, "exhausted": []})
             usage: dict[str, Any] | None = None
             content_type = (flow.response.headers.get("content-type") or "").lower()
             if "event-stream" in content_type or body.startswith("event:"):

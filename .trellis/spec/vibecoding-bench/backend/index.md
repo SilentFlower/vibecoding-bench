@@ -6,7 +6,7 @@
 
 ## Overview
 
-本项目后端是一个**单进程 FastAPI 服务**(`orchestrator/main.py`),用 docker SDK 编排 worker + sidecar 容器,数据落 SQLite。无 ORM、无 migration 系统、无任务队列、无单元测试 —— P1 阶段刻意保持极简。
+本项目后端是一个**单进程 FastAPI 服务**(`orchestrator/main.py`),用 docker SDK 编排 worker + sidecar 容器,数据落 SQLite。无 ORM、无独立 migration 系统、无外部任务队列；数据库幂等升级与额度保护在模块内实现，并有 unittest 回归覆盖。
 
 所有规范文件:
 - **诚实描述代码实际是什么样**,而非"理想中应该是什么样"
@@ -20,7 +20,7 @@
 | Guide | Description | Status |
 |-------|-------------|--------|
 | [Directory Structure](./directory-structure.md) | 单文件 main.py 内部分节 + 何时拆包 | Filled |
-| [Database Guidelines](./database-guidelines.md) | 裸 sqlite3、_SCHEMA、_db_lock、参数化、无 migration | Filled |
+| [Database Guidelines](./database-guidelines.md) | 裸 sqlite3、幂等升级、绑定/运行快照、被动额度等待与原任务恢复 | Filled |
 | [Error Handling](./error-handling.md) | HTTPException + 清理路径吞异常的两套策略 | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | 禁用模式 / 必用模式 / 真跑验收 / Review 清单 | Filled |
 | [Logging Guidelines](./logging-guidelines.md) | P1 不写 log,uvicorn + stats.jsonl 兜底 | Filled |

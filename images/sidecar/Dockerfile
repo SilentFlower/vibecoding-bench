@@ -35,6 +35,7 @@ RUN set -eux; \
 WORKDIR /sidecar
 COPY start.sh /sidecar/start.sh
 COPY recorder.py /sidecar/recorder.py
+COPY quota_protocol.py /sidecar/quota_protocol.py
 RUN chmod +x /sidecar/start.sh
 
 EXPOSE 8080

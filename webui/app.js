@@ -131,6 +131,7 @@ function renderWarmupStatus(account) {
     scheduled: 'pill-success',
     preparing: 'pill-running',
     queued: 'pill-queued',
+    quota_wait: 'pill-quota_wait',
     running: 'pill-running',
     success: 'pill-success',
     failed: 'pill-failed',
@@ -144,7 +145,7 @@ function renderWarmupStatus(account) {
     ? `<div class="warmup-error" title="${escapeHTML(account.warmup_last_error)}">${escapeHTML(account.warmup_last_error)}</div>`
     : '';
   return `
-    <div><code>cc#${escapeHTML(account.cc2api_account_id)}</code> <span class="pill ${statusClass}">${escapeHTML(status)}</span></div>
+    <div><code>cc#${escapeHTML(account.cc2api_account_id)}</code> <span class="pill ${statusClass}">${escapeHTML(status === 'quota_wait' ? '额度等待' : status)}</span></div>
     <div>${escapeHTML(account.warmup_interval_min_hours || 3)}-${escapeHTML(account.warmup_interval_max_hours || 5)}h</div>
     <div class="muted">next ${escapeHTML(formatWarmupTime(account.warmup_next_run_at))}</div>
     ${error}
@@ -164,7 +165,7 @@ async function renderAccounts() {
       <td><code>${escapeHTML(a.profile_path)}</code></td>
       <td>${renderProxyEndpoint(a)}</td>
       <td>${renderAccountTimezone(a)}</td>
-      <td>${renderOauthTokenStatus(a)}</td>
+      <td>${renderOauthTokenStatus(a)}${renderPassiveQuota(a.passive_quota)}</td>
       <td class="warmup-status">${renderWarmupStatus(a)}</td>
       <td>${a.enabled ? '✓' : '✗'}</td>
       <td><div class="op-actions account-actions">
@@ -370,6 +371,27 @@ function renderAccountTimezone(account) {
   `;
 }
 
+/**
+ * 显示已观察到的额度；渲染过程不触发主动查询。
+ * @param {Object} quota 被动额度摘要
+ * @return {string} 已转义的 HTML
+ */
+function renderPassiveQuota(quota) {
+  if (quota?.account_error) return `<div class="passive-quota">${escapeHTML(quota.message)}</div>`;
+  if (!quota?.known) return '<div class="passive-quota muted">被动额度：未知</div>';
+  const source = quota.source === 'manual' ? '额度记录（手动更新）' : '被动额度';
+  const windows = ['five_hour', 'seven_day'].map(key => {
+    const window = quota.windows?.[key];
+    const name = key === 'five_hour' ? '5h' : '7d';
+    if (!window) return `${name} 未知`;
+    const expired = window.reset_at && window.reset_at <= Date.now() / 1000;
+    return `${name} ${window.utilization == null ? '用量未知' : `${Number(window.utilization).toFixed(1)}%`}${expired ? '（窗口已到期）' : ''}`;
+  }).join(' · ');
+  const reason = quota.message ? `<div>${escapeHTML(quota.message)}</div>` : '';
+  const resume = quota.exhausted?.length ? `<div>${quota.resume_at ? `恢复机会 ${escapeHTML(formatWarmupTime(quota.resume_at))}` : '暂无可信恢复时间'}</div>` : '';
+  return `<div class="passive-quota muted">${source}：${escapeHTML(windows)}<div>观察于 ${escapeHTML(formatWarmupTime(quota.observed_at))}</div>${reason}${resume}</div>`;
+}
+
 function openQuotaDetail(accountId, quota) {
   endRunDetail();
   const row = state.accounts.find(a => String(a.id) === String(accountId));
@@ -550,7 +572,7 @@ async function attachAccLoginTerminal(wsPath) {
   state.accLogin.onResize = termState.onResize;
 }
 
-async function attachTerminal(hostSelector, wsPath) {
+async function attachTerminal(hostSelector, wsPath, initialStatus = 'running') {
   if (typeof Terminal === 'undefined') {
     await new Promise(r => {
       const t = setInterval(() => {
@@ -585,6 +607,7 @@ async function attachTerminal(hostSelector, wsPath) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const ws = new WebSocket(`${proto}//${location.host}${wsPath}`);
   ws.binaryType = 'arraybuffer';
+  let inputAllowed = hostSelector !== '#continue-xterm' && initialStatus === 'running';
 
   ws.onopen = () => {
     ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
@@ -597,17 +620,23 @@ async function attachTerminal(hostSelector, wsPath) {
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === 'error') term.write(`\r\n\x1b[31m[orchestrator] ${msg.msg}\x1b[0m\r\n`);
+        if (msg.type === 'quota_state') {
+          inputAllowed = msg.status === 'running';
+          const status = $('#continue-quota-status');
+          if (status) status.textContent = inputAllowed ? '可继续输入' : `${msg.message || '额度等待'}${msg.resume_at ? `；恢复机会 ${formatWarmupTime(msg.resume_at)}` : '；暂无可信恢复时间'}`;
+        }
       } catch { term.write(e.data); }
     }
   };
   ws.onclose = () => {
+    inputAllowed = false;
     term.write('\r\n\x1b[90m[ws closed]\x1b[0m\r\n');
   };
   ws.onerror = () => {
     term.write(`\r\n\x1b[31m[ws error]\x1b[0m\r\n`);
   };
   term.onData((data) => {
-    if (ws.readyState === WebSocket.OPEN) {
+    if (inputAllowed && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'input', data }));
     }
   });
@@ -815,7 +844,7 @@ async function renderTasks() {
     <tr>
       <td>${b.id}</td>
       <td>${escapeHTML(accMap[b.account_id] || `acc#${b.account_id}`)}</td>
-      <td><span class="pill pill-${b.status}">${escapeHTML(b.status)}</span></td>
+      <td><span class="pill pill-${b.status}">${escapeHTML(b.status === 'quota_wait' ? '额度等待' : b.status)}</span>${b.status === 'quota_wait' ? renderPassiveQuota(b.passive_quota) : ''}</td>
       <td>${b.done_count || 0}/${b.item_count || 0}</td>
       <td>${b.concurrency}</td>
       <td>${b.interval_min_sec}-${b.interval_max_sec}s</td>
@@ -912,7 +941,7 @@ function updateBatchSelectedCount() {
 }
 
 function renderBatchActions(batch) {
-  const pauseButton = batch.status === 'active'
+  const pauseButton = ['active', 'quota_wait'].includes(batch.status)
     ? `<button class="btn btn-sm btn-danger" data-pause-batch="${batch.id}">暂停</button>`
     : '';
   const resumeButton = ['paused', 'stopped'].includes(batch.status)
@@ -961,7 +990,7 @@ function renderRunDetailShell(rid) {
     </div>
 
     <div class="detail-section hidden" id="run-detail-error-section">
-      <h4>错误</h4>
+      <h4 id="run-detail-error-title">错误</h4>
       <pre id="run-detail-error"></pre>
     </div>
   `;
@@ -1036,7 +1065,8 @@ function updateRunDetailContent(rid, run, files, stats, transcript, transcriptSt
   if (statusEl) {
     const nextClass = `pill pill-${safeStatus}`;
     if (statusEl.className !== nextClass) statusEl.className = nextClass;
-    if (statusEl.textContent !== run.status) statusEl.textContent = run.status;
+    const label = run.status === 'quota_wait' ? '额度等待' : run.status;
+    if (statusEl.textContent !== label) statusEl.textContent = label;
   }
 
   setRunDetailText('[data-stat-key="tokens_in"]', renderStatValue(stats, 'tokens_in'));
@@ -1045,7 +1075,8 @@ function updateRunDetailContent(rid, run, files, stats, transcript, transcriptSt
   setRunDetailText('[data-stat-key="exit_code"]', escapeHTML(run.exit_code ?? '-'));
   setRunDetailText('[data-stat-key="claude_code_version"]', escapeHTML(run.claude_code_version || '-'));
   setRunDetailText('[data-stat-key="claude_effort_level"]', escapeHTML(run.claude_effort_level || '-'));
-  setRunDetailText('[data-stat-key="model_override"]', run.capture_model_override ? escapeHTML(run.capture_model_override) : '<span class="muted">默认</span>');
+  const executionModel = run.execution_model ?? run.capture_model_override;
+  setRunDetailText('[data-stat-key="model_override"]', executionModel ? escapeHTML(executionModel) : '<span class="muted">默认</span>');
 
   const statsError = $('#run-detail-stats-error');
   if (statsError) {
@@ -1086,7 +1117,10 @@ function updateRunDetailContent(rid, run, files, stats, transcript, transcriptSt
   const errorPre = $('#run-detail-error');
   if (errorSection && errorPre) {
     errorSection.classList.toggle('hidden', !run.error);
-    if (run.error && errorPre.textContent !== run.error) errorPre.textContent = run.error;
+    const waiting = run.status === 'quota_wait';
+    $('#run-detail-error-title').textContent = waiting ? '额度等待' : '错误';
+    const message = waiting ? `${run.error || '额度等待'}\n${run.quota_resume_at ? `恢复机会 ${formatWarmupTime(run.quota_resume_at)}` : '暂无可信恢复时间'}\n观察于 ${formatWarmupTime(run.passive_quota?.observed_at)}` : run.error;
+    if (message && errorPre.textContent !== message) errorPre.textContent = message;
   }
   detail.rendered = true;
 }
@@ -1329,7 +1363,7 @@ function paintRuns(runs) {
     const kind = runKind === 'capture'
       ? ' <span class="pill pill-capture">抓包</span>'
       : (runKind === 'warmup' ? ' <span class="pill pill-warmup">养号</span>' : '');
-    const dur = (r.started_at && r.ended_at) ? `${(r.ended_at - r.started_at).toFixed(0)}s` :
+    const dur = r.status === 'quota_wait' ? (r.quota_resume_at ? `恢复 ${formatWarmupTime(r.quota_resume_at)}` : '等待可信恢复时间') : (r.started_at && r.ended_at) ? `${(r.ended_at - r.started_at).toFixed(0)}s` :
                 (r.started_at ? `${(Date.now()/1000 - r.started_at).toFixed(0)}s` : '-');
     const terminal = ['success', 'failed', 'timeout', 'stopped', 'auth_failed'].includes(r.status);
     return `
@@ -1337,12 +1371,12 @@ function paintRuns(runs) {
         <td><code>${r.id}</code></td>
         <td>${tname}${kind}</td>
         <td>${escapeHTML(accMap[r.account_id] || `acc#${r.account_id}`)}</td>
-        <td><span class="pill pill-${r.status}">${escapeHTML(r.status)}</span></td>
+        <td><span class="pill pill-${r.status}" title="${escapeHTML(r.status === 'quota_wait' ? r.error || '额度等待' : '')}">${escapeHTML(r.status === 'quota_wait' ? '额度等待' : r.status)}</span></td>
         <td>${dur}</td>
         <td>${r.exit_code ?? '-'}</td>
         <td><div class="op-actions run-actions">
           <button class="btn btn-sm" data-detail="${r.id}">详情</button>
-          ${['queued', 'running'].includes(r.status) ? `<button class="btn btn-sm btn-danger" data-stop="${r.id}">停止</button>` : ''}
+          ${['queued', 'running', 'quota_wait'].includes(r.status) ? `<button class="btn btn-sm btn-danger" data-stop="${r.id}">停止</button>` : ''}
           ${terminal ? `<button class="btn btn-sm btn-primary" data-continue="${r.id}">继续</button>` : ''}
           ${terminal ? `<button class="btn btn-sm btn-danger" data-del-run="${r.id}">删除</button>` : ''}
         </div></td>
@@ -1377,7 +1411,7 @@ function paintRuns(runs) {
 }
 
 function isLiveRunStatus(status) {
-  return ['queued', 'running', 'stopping'].includes(status);
+  return ['queued', 'running', 'stopping', 'quota_wait'].includes(status);
 }
 
 function endRunDetail() {
@@ -1480,15 +1514,22 @@ async function openRunDetail(rid) {
 
 async function startContinueRun(rid) {
   const resp = await API(`/runs/${rid}/continue/start`, { method: 'POST' });
-  state.continueRun = {
+  const current = state.continueRun = {
     sid: resp.session_id,
     runId: rid,
   };
   $('#continue-run-id').textContent = rid;
   $('#continue-session-id').textContent = resp.claude_session_id || '-';
   $('#continue-modal-title').textContent = rid;
+  $('#continue-quota-status').textContent = resp.status === 'quota_wait' ? resp.quota?.message || '额度等待' : '可继续输入';
   openModal('#continue-modal');
-  const termState = await attachTerminal('#continue-xterm', resp.ws_path);
+  const termState = await attachTerminal('#continue-xterm', resp.ws_path, resp.status || 'running');
+  if (state.continueRun !== current) {
+    termState.ws.close();
+    termState.term.dispose();
+    window.removeEventListener('resize', termState.onResize);
+    return;
+  }
   state.continueRun.term = termState.term;
   state.continueRun.fit = termState.fit;
   state.continueRun.ws = termState.ws;

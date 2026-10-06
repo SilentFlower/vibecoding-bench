@@ -934,6 +934,7 @@ classify_claude_completion() {
   local idle_sec="$1"
   python3 - "$CLAUDE_DIR/projects/-workspace" "$idle_sec" <<'PY'
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -1002,6 +1003,12 @@ if time.time() - latest_stat.st_mtime < idle_sec:
     sys.exit(1)
 
 with latest_path.open("r", encoding="utf-8", errors="replace") as handle:
+    # 自动恢复沿用同一会话，只判本次启动后新增的消息。
+    try:
+        baseline = json.loads(Path(os.environ.get("COMPLETION_BASELINE", "/tmp/claude-completion-baseline.json")).read_text())
+        handle.seek(int(baseline.get(str(latest_path), 0)))
+    except (OSError, ValueError, TypeError):
+        pass
     for line in handle:
         line = line.strip()
         if not line:
@@ -1026,6 +1033,31 @@ if role != "assistant":
 if is_synthetic_api_timeout(latest_entry, text):
     print("fatal_api_timeout")
     sys.exit(3)
+synthetic = latest_entry.get("isApiErrorMessage") is True or (
+    isinstance(latest_entry.get("message"), dict)
+    and latest_entry["message"].get("model") == "<synthetic>"
+)
+if synthetic:
+    error = str(latest_entry.get("error") or "").lower()
+    lowered = text.lower()
+    if error == "account_on_hold" or "account is on hold" in lowered or "account has been suspended" in lowered:
+        print("fatal_account_on_hold")
+        sys.exit(2)
+    if error == "invalid_grant":
+        print("fatal_invalid_grant")
+        sys.exit(2)
+    if any(marker in lowered for marker in ("api error: 401", "please run /login", "invalid authentication", "oauth token has expired")):
+        print("fatal_auth_error")
+        sys.exit(2)
+    if error == "rate_limit" and any(marker in lowered for marker in (
+        "session limit", "weekly limit", "usage limit", "5-hour", "5 hour", "7-day", "额度耗尽",
+        "you've hit your limit", "you have hit your limit",
+    )):
+        print("seven_day" if "weekly" in lowered or "7-day" in lowered else "five_hour"
+              if "session limit" in lowered or "5-hour" in lowered or "5 hour" in lowered else "unknown")
+        sys.exit(4)
+    print("fatal_api_error")
+    sys.exit(5)
 if content_has_tool_use(content):
     sys.exit(1)
 if stop_reason == "tool_use":
@@ -1045,6 +1077,40 @@ if any(marker in text for marker in auth_error_markers):
     sys.exit(2)
 
 print("complete")
+PY
+}
+
+handle_completion_failure() {
+  # 合成错误必须优先于退出码 0，额度等待不能走认证重试或超时收尾。
+  case "$1" in
+    4)
+      touch /tmp/claude-quota-wait
+      write_bench_status "quota_wait" "被动识别额度耗尽:$(cat /tmp/claude-completion-state)"
+      return 0 ;;
+    5)
+      touch /tmp/claude-api-fatal-error
+      write_bench_status "failed" "Claude 返回合成 API 错误，未完成原任务"
+      return 0 ;;
+  esac
+  return 1
+}
+
+check_quota_pause() {
+  [ -n "${QUOTA_SIGNAL_FILE:-}" ] && [ -f "$QUOTA_SIGNAL_FILE" ] || return 1
+  python3 - "$QUOTA_SIGNAL_FILE" "${QUOTA_SOURCE:-}" <<'PY'
+import json
+import sys
+from pathlib import Path
+try:
+    data = json.loads(Path(sys.argv[1]).read_text())
+    if data.get("source") != sys.argv[2] or data.get("status") not in ("quota_wait", "failed"):
+        sys.exit(1)
+    target = Path("/workspace/.bench-status.json")
+    tmp = target.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False))
+    tmp.replace(target)
+except (OSError, ValueError, AttributeError):
+    sys.exit(1)
 PY
 }
 
@@ -1539,7 +1605,14 @@ trap 'terminate_task_mode 130' INT
 mkdir -p "$CLAUDE_DIR"
 if [ -d /mnt/profile ]; then
   log "Copying account profile from /mnt/profile -> $CLAUDE_DIR"
-  cp -a /mnt/profile/. "$CLAUDE_DIR/"
+  if [ -n "${RESUME_SESSION_ID:-}" ]; then
+    # 原 run 的 projects/session 已落盘；恢复只同步账号配置，不能覆盖会话历史。
+    for profile_file in .credentials.json .claude.json settings.json; do
+      [ ! -f "/mnt/profile/$profile_file" ] || cp -a "/mnt/profile/$profile_file" "$CLAUDE_DIR/"
+    done
+  else
+    cp -a /mnt/profile/. "$CLAUDE_DIR/"
+  fi
   # 历史 telemetry / backups 不让重放
   rm -rf "$CLAUDE_DIR/telemetry" "$CLAUDE_DIR/backups"
   # 把顶层 .claude.json 还原到 $HOME/.claude.json(claude 只在 $HOME 根读它)
@@ -1588,6 +1661,17 @@ rm -f /tmp/claude-fatal-error /tmp/claude-api-fatal-error /tmp/claude-completion
 rm -f /tmp/claude-auth-recovered-once /tmp/claude-wrapup-sent
 rm -f /tmp/claude-api-stall-recoveries /tmp/claude-api-stall-last-recovery /tmp/claude-busy-interrupts
 rm -f /workspace/.bench-status.json /workspace/.bench-status.json.tmp
+export COMPLETION_BASELINE=/tmp/claude-completion-baseline.json
+python3 - "$CLAUDE_DIR/projects/-workspace" "$COMPLETION_BASELINE" <<'PY'
+import json
+import sys
+from pathlib import Path
+Path(sys.argv[2]).write_text(json.dumps({str(path): path.stat().st_size for path in Path(sys.argv[1]).glob("*.jsonl")}))
+initial = Path("/workspace/.bench-session-baseline.json")
+if not initial.exists():
+    # 账号 profile 可能含旧项目；只有本 run 新增内容的主会话才可恢复。
+    initial.write_text(json.dumps({path.name: path.stat().st_size for path in Path(sys.argv[1]).glob("*.jsonl")}))
+PY
 
 start_profile_credentials_sync
 
@@ -1610,6 +1694,10 @@ check_claude_auth_status
 SESSION="claude-${RUN_ID}"
 log "Launching tmux session: $SESSION ($CLAUDE_USER $CLAUDE_PERMISSION_MODE mode)"
 claude_args=(claude --permission-mode "$CLAUDE_PERMISSION_MODE")
+if [ -n "${RESUME_SESSION_ID:-}" ]; then
+  claude_args+=(--resume "$RESUME_SESSION_ID")
+  TASK_PROMPT="请从当前会话和文件状态继续完成原任务，不要重新开始。"
+fi
 if [ -n "${CLAUDE_MODEL_OVERRIDE:-}" ]; then
   # 后端已校验模型名字符集；这里用数组参数传递，避免把用户输入拼进 shell。
   claude_args+=(--model "$CLAUDE_MODEL_OVERRIDE")
@@ -1654,6 +1742,24 @@ capture_transcript_snapshot
 while [ "$(date +%s)" -lt "$deadline" ]; do
   now=$(date +%s)
   capture_transcript_snapshot
+  if check_quota_pause; then
+    if python3 -c 'import json; import sys; sys.exit(0 if json.load(open("/workspace/.bench-status.json"))["status"] == "quota_wait" else 1)'; then
+      touch /tmp/claude-quota-wait
+    else
+      touch /tmp/claude-api-fatal-error
+    fi
+    break
+  fi
+  early_status=0
+  classify_claude_completion 0 >/tmp/claude-completion-state 2>/dev/null || early_status=$?
+  if handle_completion_failure "$early_status"; then
+    break
+  fi
+  if [ "$early_status" -eq 2 ] && { [ "$(cat /tmp/claude-completion-state)" = "fatal_account_on_hold" ] || [ "$(cat /tmp/claude-completion-state)" = "fatal_invalid_grant" ]; }; then
+    touch /tmp/claude-fatal-error
+    write_bench_status "auth_failed" "$(cat /tmp/claude-completion-state)：账号认证异常，需人工处理"
+    break
+  fi
   if [ "$TIMEOUT_WRAPUP_SEC" -gt 0 ] 2>/dev/null \
     && [ ! -f /tmp/claude-wrapup-sent ] \
     && [ $(( deadline - now )) -le "$TIMEOUT_WRAPUP_SEC" ]; then
@@ -1737,6 +1843,9 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
   fi
   completion_status=0
   classify_claude_completion "$COMPLETION_IDLE_SEC" >/tmp/claude-completion-state 2>/dev/null || completion_status=$?
+  if handle_completion_failure "$completion_status"; then
+    break
+  fi
   if [ "$completion_status" -eq 0 ]; then
     completion_done=1
     break
@@ -1753,6 +1862,9 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
   if [ -f /tmp/claude-exited ]; then
     completion_status=0
     classify_claude_completion 0 >/tmp/claude-completion-state 2>/dev/null || completion_status=$?
+    if handle_completion_failure "$completion_status"; then
+      break
+    fi
     if [ "$completion_status" -eq 0 ]; then
       completion_done=1
     fi
@@ -1772,9 +1884,10 @@ done
 capture_transcript_snapshot
 persist_runtime_claude_state
 tmux kill-session -t "$SESSION" 2>/dev/null || true
-if [ "$completion_done" -ne 1 ] && [ ! -f /tmp/claude-fatal-error ]; then
+if [ "$completion_done" -ne 1 ] && [ ! -f /tmp/claude-fatal-error ] && [ ! -f /tmp/claude-quota-wait ] && [ ! -f /tmp/claude-api-fatal-error ]; then
   completion_status=0
   classify_claude_completion 0 >/tmp/claude-completion-state 2>/dev/null || completion_status=$?
+  handle_completion_failure "$completion_status" || true
   if [ "$completion_status" -eq 0 ]; then
     completion_done=1
   elif [ "$completion_status" -eq 2 ]; then
@@ -1785,7 +1898,10 @@ if [ "$completion_done" -ne 1 ] && [ ! -f /tmp/claude-fatal-error ]; then
   fi
 fi
 
-if [ "$completion_done" -eq 1 ]; then
+if [ -f /tmp/claude-quota-wait ]; then
+  log "额度耗尽，保留原任务等待恢复"
+  exit 43
+elif [ "$completion_done" -eq 1 ]; then
   log "Claude finished with final assistant message"
   exit 0
 elif [ -f /tmp/claude-fatal-error ]; then

@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Literal, Optional, Sequence
 
 import docker
+from docker.errors import NotFound
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -39,6 +40,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
+
+from quota_protocol import merge_quota_observation, quota_decision, quota_observation
 
 
 # ============== 配置 ==============
@@ -615,6 +618,7 @@ def _cc2api_error_detail_is_permanent(detail: str) -> bool:
         marker in lowered
         for marker in (
             "invalid_grant",
+            "account_on_hold",
             "not found",
             "不是 active",
             "not active",
@@ -1339,6 +1343,10 @@ CREATE TABLE IF NOT EXISTS runs (
   capture_permission_mode TEXT DEFAULT 'bypassPermissions',
   claude_code_version TEXT,
   claude_effort_level TEXT,
+  execution_model TEXT,
+  quota_attempt INTEGER NOT NULL DEFAULT 0,
+  quota_resume_at REAL,
+  quota_identity TEXT,
   started_at REAL,
   ended_at REAL,
   stop_requested_at REAL,
@@ -1352,6 +1360,21 @@ CREATE INDEX IF NOT EXISTS idx_runs_task    ON runs(task_id);
 CREATE INDEX IF NOT EXISTS idx_topics_no    ON topics(no);
 CREATE INDEX IF NOT EXISTS idx_batches_account ON task_batches(account_id);
 CREATE INDEX IF NOT EXISTS idx_batch_items_batch ON task_batch_items(batch_id);
+CREATE TABLE IF NOT EXISTS account_quota_states (
+  account_id INTEGER PRIMARY KEY,
+  identity TEXT NOT NULL,
+  state_json TEXT NOT NULL DEFAULT '{}',
+  recovery_source TEXT,
+  updated_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS quota_observation_cursors (
+  source TEXT PRIMARY KEY,
+  account_id INTEGER NOT NULL,
+  identity TEXT NOT NULL,
+  path TEXT NOT NULL,
+  file_identity TEXT,
+  byte_offset INTEGER NOT NULL DEFAULT 0
+);
 """
 
 _db_lock = threading.Lock()
@@ -1411,6 +1434,10 @@ def init_db() -> None:
             )
             _ensure_column(conn, "runs", "claude_code_version", "TEXT")
             _ensure_column(conn, "runs", "claude_effort_level", "TEXT")
+            _ensure_column(conn, "runs", "execution_model", "TEXT")
+            _ensure_column(conn, "runs", "quota_attempt", "INTEGER NOT NULL DEFAULT 0")
+            _ensure_column(conn, "runs", "quota_resume_at", "REAL")
+            _ensure_column(conn, "runs", "quota_identity", "TEXT")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_batch ON runs(batch_id)")
             conn.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_cc2api_account_id "
@@ -2592,12 +2619,690 @@ def _wait_sidecar_ready(client: "docker.DockerClient", sidecar_id: str) -> None:
         f"{last_output[-1000:]}"
     )
 
+# ============== 被动额度状态 ==============
+def _quota_identity(account: dict) -> str:
+    """读取稳定账号身份；不把轮换中的 AT/RT 当成新账号。"""
+    identity = {"account_id": int(account["id"]), "binding": account.get("cc2api_account_id")}
+    try:
+        top = json.loads((PROFILES_DIR / account["name"] / ".claude.json").read_text())
+        oauth = top.get("oauthAccount") or {}
+        if not oauth.get("accountUuid"):
+            raise ValueError("账号身份暂不可读")
+        identity.update(uuid=oauth.get("accountUuid"), org=oauth.get("organizationUuid"))
+    except (OSError, ValueError, AttributeError):
+        # 临时文件不可读时沿用同一绑定的已知身份，不能意外清空耗尽证据。
+        conn = get_db()
+        try:
+            row = conn.execute("SELECT identity FROM account_quota_states WHERE account_id=?",
+                               (account["id"],)).fetchone()
+            previous = json.loads(row["identity"]) if row else {}
+            if all(previous.get(key) == value for key, value in identity.items()):
+                return row["identity"] if row else json.dumps(identity, sort_keys=True)
+        finally:
+            conn.close()
+    return json.dumps(identity, sort_keys=True)
+
+
+def _write_quota_json(path: Path, payload: dict) -> None:
+    """原子发布内部额度文件，目录挂载使替换后的文件对子容器可见。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + f".{uuid.uuid4().hex}.tmp")
+    try:
+        temporary.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+class QuotaGuard:
+    """
+    消费真实响应并维护账号共用的额度门禁，不执行主动查询。
+
+    :param runner: 既有容器运行器
+    """
+
+    def __init__(self, runner: Runner) -> None:
+        """
+        初始化消费锁与后台停止信号。
+
+        :param runner: 既有运行器，仅用于恢复收口
+        :return: None
+        """
+        self.runner = runner
+        self._lock = threading.RLock()
+        self._stop = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+
+    def snapshot(self, account: dict) -> dict:
+        """
+        读取被动状态及当前等待判定。
+
+        :param account: 账号行
+        :return: 不含凭据的额度摘要
+        """
+        identity = _quota_identity(account)
+        conn = get_db()
+        try:
+            row = conn.execute("SELECT * FROM account_quota_states WHERE account_id=?",
+                               (account["id"],)).fetchone()
+            state = json.loads(row["state_json"]) if row and row["identity"] == identity else {}
+            recovery_source = row["recovery_source"] if row and row["identity"] == identity else None
+        finally:
+            conn.close()
+        decision = quota_decision(state, time.time())
+        if state.get("account_error"):
+            decision.update(blocked=True, retry_ready=False, resume_at=None, exhausted=[],
+                            message=f"{state['account_error']}：账号异常，需重新授权或人工核实")
+        return {**state, **decision, "source": state.get("source") or "passive", "identity": identity,
+                "recovery_source": recovery_source, "known": bool(state.get("windows"))}
+
+    def _publish(self, account: dict) -> dict:
+        """发布最新门禁和本地 AT 哈希；此文件不进入 API 响应。"""
+        snapshot = self.snapshot(account)
+        path = BENCH_DATA / "quota" / str(account["id"]) / "state.json"
+        hashes = set()
+        try:
+            previous = json.loads(path.read_text())
+            if previous.get("identity") == snapshot["identity"]:
+                hashes.update(previous.get("token_hashes", []))
+        except (OSError, ValueError):
+            pass
+        try:
+            credentials = json.loads((PROFILES_DIR / account["name"] / ".credentials.json").read_text())
+            token = (credentials.get("claudeAiOauth") or {}).get("accessToken")
+            if isinstance(token, str) and token:
+                hashes.add(hashlib.sha256(token.encode()).hexdigest())
+        except (OSError, ValueError, AttributeError):
+            pass
+        _write_quota_json(path, {**snapshot, "token_hashes": sorted(hashes)})
+        return snapshot
+
+    def admit(self, account: dict, source: str) -> bool:
+        """
+        认领启动机会；到期只放行一个已有正常执行，等待其真实响应。
+
+        :param account: 锁内重读的账号行
+        :param source: 执行来源及代次
+        :return: 是否可以创建正式 worker
+        """
+        with self._lock:
+            self.consume(account)
+            snapshot = self.snapshot(account)
+            if snapshot["blocked"]:
+                self._publish(account)
+                return False
+            if snapshot["retry_ready"]:
+                with _db_lock:
+                    conn = get_db()
+                    try:
+                        with conn:
+                            row = conn.execute("SELECT recovery_source FROM account_quota_states "
+                                               "WHERE account_id=? AND identity=?",
+                                               (account["id"], snapshot["identity"])).fetchone()
+                            if row and row["recovery_source"] not in (None, source):
+                                return False
+                            conn.execute("UPDATE account_quota_states SET recovery_source=? "
+                                         "WHERE account_id=? AND identity=?",
+                                         (source, account["id"], snapshot["identity"]))
+                    finally:
+                        conn.close()
+            self._publish(account)
+            return True
+
+    def release(self, account: dict, source: str) -> None:
+        """
+        执行退出后释放恢复认领，旧代次不能释放新执行的认领。
+
+        :param account: 执行使用的账号
+        :param source: 本次执行来源
+        :return: None
+        """
+        with self._lock:
+            with _db_lock:
+                conn = get_db()
+                try:
+                    with conn:
+                        conn.execute("UPDATE account_quota_states SET recovery_source=NULL "
+                                     "WHERE account_id=? AND recovery_source=?", (account["id"], source))
+                finally:
+                    conn.close()
+            self._publish(account)
+
+    def prepare(self, account: dict, source: str, flows: Path, control: Path) -> dict:
+        """
+        登记观察来源并创建只读门禁挂载；不创建任何探测流量。
+
+        :param account: 当前账号
+        :param source: run/continue 及其代次
+        :param flows: 本次观察所在目录
+        :param control: 本次执行独立控制目录
+        :return: sidecar 的内部环境变量
+        """
+        with self._lock:
+            flows.mkdir(parents=True, exist_ok=True)
+            control.mkdir(parents=True, exist_ok=True)
+            snapshot = self._publish(account)
+            path = flows / "passive-quota.jsonl"
+            offset = path.stat().st_size if path.exists() else 0
+            with _db_lock:
+                conn = get_db()
+                try:
+                    with conn:
+                        conn.execute("INSERT OR IGNORE INTO quota_observation_cursors"
+                                     "(source,account_id,identity,path,byte_offset) VALUES(?,?,?,?,?)",
+                                     (source, account["id"], snapshot["identity"], str(path), offset))
+                finally:
+                    conn.close()
+            return {"QUOTA_SOURCE": source, "QUOTA_IDENTITY": snapshot["identity"],
+                    "QUOTA_STATE_FILE": "/quota-account/state.json",
+                    "QUOTA_SIGNAL_FILE": "/quota-control/pause.json",
+                    "QUOTA_OBSERVATIONS_FILE": "/flows/passive-quota.jsonl",
+                    "QUOTA_CREDENTIALS_FILE": "/quota-credentials/.credentials.json"}
+
+    def _observe(self, account: dict, identity: str, observation: dict,
+                 cursor: Optional[tuple[str, str, int]] = None) -> None:
+        """在一个短事务中提交窗口和游标，允许响应只清理已到期的旧拒绝。"""
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    row = conn.execute("SELECT * FROM account_quota_states WHERE account_id=?",
+                                       (account["id"],)).fetchone()
+                    existing = json.loads(row["state_json"]) if row and row["identity"] == identity else {}
+                    state = merge_quota_observation(existing, observation)
+                    if float(observation["observed_at"]) >= float(existing.get("observed_at") or 0):
+                        state["source"] = observation.get("origin") or "passive"
+                    if observation.get("account_error") in ("account_on_hold", "invalid_grant"):
+                        state["account_error"] = observation["account_error"]
+                    observed = float(observation["observed_at"])
+                    if observation.get("allowed"):
+                        for key, window in state.get("windows", {}).items():
+                            if (key not in observation.get("windows", {})
+                                    and float(window.get("observed_at") or 0) < observed
+                                    and (window.get("reset_at") is None or window["reset_at"] <= observed)):
+                                window["exhausted"] = False
+                                window["rejected"] = False
+                                window["observed_at"] = observed
+                    recovery = row["recovery_source"] if row and row["identity"] == identity else None
+                    decision = quota_decision(state, observed)
+                    if observation.get("allowed") and not decision["blocked"] and not decision["retry_ready"]:
+                        recovery = None
+                    conn.execute("INSERT INTO account_quota_states(account_id,identity,state_json,"
+                                 "recovery_source,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(account_id) "
+                                 "DO UPDATE SET identity=excluded.identity,state_json=excluded.state_json,"
+                                 "recovery_source=excluded.recovery_source,updated_at=excluded.updated_at",
+                                 (account["id"], identity, json.dumps(state), recovery, time.time()))
+                    if cursor:
+                        source, file_identity, offset = cursor
+                        conn.execute("UPDATE quota_observation_cursors SET file_identity=?,byte_offset=? "
+                                     "WHERE source=?", (file_identity, offset, source))
+            finally:
+                conn.close()
+
+    def consume(self, account: dict) -> None:
+        """
+        消费该账号登记的真实响应，半行留待下轮，旧身份样本忽略。
+
+        :param account: 当前账号行
+        :return: None
+        """
+        with self._lock:
+            identity = _quota_identity(account)
+            conn = get_db()
+            try:
+                rows = conn.execute("SELECT * FROM quota_observation_cursors WHERE account_id=? AND identity=?",
+                                    (account["id"], identity)).fetchall()
+            finally:
+                conn.close()
+            for row in rows:
+                path = Path(row["path"])
+                if not path.exists():
+                    continue
+                stat = path.stat()
+                file_identity = f"{stat.st_dev}:{stat.st_ino}"
+                offset = int(row["byte_offset"])
+                if (row["file_identity"] not in (None, file_identity) or offset > stat.st_size):
+                    offset = 0
+                with path.open("rb") as handle:
+                    handle.seek(offset)
+                    while True:
+                        line = handle.readline()
+                        if not line or not line.endswith(b"\n"):
+                            break
+                        offset = handle.tell()
+                        observation = {"windows": {}, "observed_at": 0, "allowed": False}
+                        try:
+                            event = json.loads(line)
+                            if event.get("source") == row["source"] and event.get("identity") == identity:
+                                ts = float(event["ts"])
+                                if 0 < ts <= time.time() + 5:
+                                    observation = quota_observation(event.get("headers") or {}, int(event["status"]), ts)
+                                    if event.get("account_error") == "account_on_hold":
+                                        observation["account_error"] = "account_on_hold"
+                        except (ValueError, TypeError, KeyError, AttributeError):
+                            pass
+                        self._observe(account, identity, observation, (row["source"], file_identity, offset))
+                        if observation.get("account_error"):
+                            self.record_auth_failure(account, observation["account_error"])
+            self._publish(account)
+
+    def record_worker_limit(self, account: dict, window: str) -> None:
+        """
+        合成的明确额度错误作为拒绝补证；无可信 reset 时保持等待。
+
+        :param account: 当前账号
+        :param window: 已识别通用窗口或 unknown
+        :return: None
+        """
+        with self._lock:
+            now = time.time()
+            if window == "unknown" and self.snapshot(account)["exhausted"]:
+                return
+            key = window if window in ("five_hour", "seven_day") else "unknown"
+            self._observe(account, _quota_identity(account), {
+                "windows": {key: {"observed_at": now, "rejected": True, "exhausted": True}},
+                "observed_at": now, "allowed": False,
+            })
+            self._publish(account)
+
+    def record_control_state(self, account: dict, source: str, payload: dict) -> None:
+        """
+        合并只读控制文件的补证，观察文件故障时仍保留等待事实。
+
+        :param account: 当前账号
+        :param source: 预期执行来源
+        :param payload: sidecar 原子写入的控制对象
+        :return: None
+        """
+        if not isinstance(payload, dict) or payload.get("source") != source or payload.get("status") != "quota_wait":
+            return
+        with self._lock:
+            try:
+                state = payload.get("quota_state") or {}
+                if state.get("account_error") in ("account_on_hold", "invalid_grant"):
+                    self.record_auth_failure(account, state["account_error"])
+                    return
+                observed = float(state.get("observed_at") or 0)
+                if isinstance(state.get("windows"), dict) and 0 < observed <= time.time() + 5:
+                    self._observe(account, _quota_identity(account), {**state, "allowed": False})
+            except (ValueError, TypeError, AttributeError):
+                pass
+            snapshot = self.snapshot(account)
+            if not snapshot["exhausted"] and not snapshot.get("account_error"):
+                self.record_worker_limit(account, "unknown")
+            self._publish(account)
+
+    def record_auth_failure(self, account: dict, code: str) -> None:
+        """
+        固化不可自动恢复的账号错误并收口其它等待任务。
+
+        :param account: 当前账号
+        :param code: account_on_hold 或 invalid_grant
+        :return: None
+        """
+        if code not in ("account_on_hold", "invalid_grant"):
+            return
+        with self._lock:
+            identity = _quota_identity(account)
+            with _db_lock:
+                conn = get_db()
+                try:
+                    with conn:
+                        row = conn.execute("SELECT state_json,identity FROM account_quota_states WHERE account_id=?", (account["id"],)).fetchone()
+                        state = json.loads(row["state_json"]) if row and row["identity"] == identity else {}
+                        state["account_error"] = code
+                        conn.execute("INSERT INTO account_quota_states(account_id,identity,state_json,updated_at) VALUES(?,?,?,?) "
+                                     "ON CONFLICT(account_id) DO UPDATE SET identity=excluded.identity,state_json=excluded.state_json,recovery_source=NULL,updated_at=excluded.updated_at",
+                                     (account["id"], identity, json.dumps(state), time.time()))
+                        conn.execute("UPDATE task_batches SET status='paused',next_launch_at=NULL WHERE account_id=? AND status IN ('active','quota_wait')", (account["id"],))
+                        conn.execute("UPDATE task_batch_items SET status='auth_failed' WHERE run_id IN (SELECT id FROM runs WHERE account_id=? AND status='quota_wait')", (account["id"],))
+                        conn.execute("UPDATE runs SET status='auth_failed',error=?,ended_at=? WHERE account_id=? AND status='quota_wait'", (code, time.time(), account["id"]))
+                        conn.execute("UPDATE accounts SET warmup_enabled=0,warmup_next_run_at=NULL,warmup_last_status='paused',warmup_last_error=? "
+                                     "WHERE id=? AND warmup_enabled=1", (code, account["id"]))
+                finally:
+                    conn.close()
+            self._publish(account)
+
+    def record_manual_usage(self, account: dict, usage: dict) -> None:
+        """
+        合并用户显式查询的可信窗口；自动路径不会调用此入口。
+
+        :param account: 查询对应账号
+        :param usage: 已标准化的手动额度结果
+        :return: None
+        """
+        if not usage.get("ok"):
+            return
+        headers = {}
+        for key, name in (("five_hour", "5h"), ("seven_day", "7d"), ("seven_day_fable", "7d_oi")):
+            window = usage.get(key)
+            if isinstance(window, dict) and window.get("utilization") is not None:
+                headers[f"anthropic-ratelimit-unified-{name}-utilization"] = str(float(window["utilization"]) / 100)
+                headers[f"anthropic-ratelimit-unified-{name}-reset"] = window.get("resets_at")
+        with self._lock:
+            observation = quota_observation(headers, 200, time.time())
+            observation["origin"] = "manual"
+            self._observe(account, _quota_identity(account), observation)
+            # 显式人工核实只影响未来新操作，已经收口的认证失败 run 不会自动重跑。
+            if all(key in observation["windows"] and not observation["windows"][key]["exhausted"] for key in ("five_hour", "seven_day")):
+                with _db_lock:
+                    conn = get_db()
+                    try:
+                        with conn:
+                            row = conn.execute("SELECT state_json FROM account_quota_states WHERE account_id=?", (account["id"],)).fetchone()
+                            state = json.loads(row["state_json"])
+                            state.pop("account_error", None)
+                            conn.execute("UPDATE account_quota_states SET state_json=? WHERE account_id=?", (json.dumps(state), account["id"]))
+                    finally:
+                        conn.close()
+            self._publish(account)
+
+    def start(self) -> None:
+        """启动被动观察后台，不执行任何主动额度请求。
+
+        :return: None
+        """
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        """停止被动观察后台。
+
+        :return: None
+        """
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=5)
+
+    def recover(self) -> None:
+        """消费重启前观察并清理旧执行，恢复等待事实。
+
+        :return: None
+        """
+        conn = get_db()
+        try:
+            accounts = [dict(row) for row in conn.execute("SELECT * FROM accounts WHERE deleted_at IS NULL")]
+            runs = [dict(row) for row in conn.execute("SELECT * FROM runs WHERE deleted_at IS NULL "
+                                                      "AND status IN ('quota_wait','queued','running','stopping')")]
+            observed_runs = {row["source"].split(":")[1] for row in conn.execute("SELECT source FROM quota_observation_cursors WHERE source LIKE 'run:%'")}
+        finally:
+            conn.close()
+        by_id = {account["id"]: account for account in accounts}
+        for account in accounts:
+            self.consume(account)
+            state = self.snapshot(account)
+            if state.get("account_error"):
+                self.record_auth_failure(account, state["account_error"])
+        for run in runs:
+            account = by_id.get(run["account_id"])
+            control_status = self._recover_control(account, run) if account else None
+            state = self.snapshot(account) if account else {}
+            if (run["status"] != "quota_wait" and not state.get("exhausted")
+                    and not run["quota_attempt"] and run["id"] not in observed_runs and not control_status):
+                continue
+            # 严格清理必须成功才启用自动恢复，覆盖容器已创建但 ID 尚未落库的崩溃点。
+            self.runner.cleanup_quota_run(run["id"])
+            if account and self._cancel_changed_identity(run, account):
+                continue
+            if account:
+                self.consume(account)
+                control_status = self._recover_control(account, run) or control_status
+                state = self.snapshot(account)
+            if control_status == "failed":
+                # 原子控制文件损坏是执行失败，不能把未知门禁当成可恢复任务。
+                with _db_lock:
+                    conn = get_db()
+                    try:
+                        with conn:
+                            conn.execute("UPDATE runs SET status=CASE WHEN stop_requested_at IS NOT NULL OR status='stopping' "
+                                         "THEN 'stopped' ELSE 'failed' END,error='服务重启前额度门禁执行异常',ended_at=? "
+                                         "WHERE id=? AND quota_attempt=? AND status IN ('queued','running','stopping','quota_wait')",
+                                         (time.time(), run["id"], run["quota_attempt"]))
+                    finally:
+                        conn.close()
+                if scheduler:
+                    scheduler._update_batch_item_for_run(run["id"], scheduler._get_run_state(run["id"])["status"])
+                continue
+            if scheduler and run["status"] in ("queued", "running", "stopping"):
+                if run["status"] == "stopping":
+                    scheduler._update_attempt(run["id"], int(run["quota_attempt"]), status="stopped", ended_at=time.time())
+                    scheduler._update_batch_item_for_run(run["id"], "stopped")
+                elif account and (state.get("exhausted") or state.get("account_error") or run["quota_attempt"]):
+                    scheduler._mark_quota_wait(run["id"], account, int(run["quota_attempt"]))
+                else:
+                    scheduler._update_attempt(run["id"], int(run["quota_attempt"]), status="failed", error="服务重启前执行已中断", ended_at=time.time())
+                    scheduler._update_batch_item_for_run(run["id"], "failed")
+                if warmup_scheduler:
+                    warmup_scheduler.handle_run_terminal(run["id"], account.get("cc2api_account_id") if account else None)
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    conn.execute("UPDATE account_quota_states SET recovery_source=NULL")
+            finally:
+                conn.close()
+
+    def _recover_control(self, account: dict, run: dict) -> Optional[str]:
+        """恢复日志故障时留下的独立补证；身份和代次仍以原执行为准。"""
+        if run.get("quota_identity") and run["quota_identity"] != _quota_identity(account):
+            return None
+        source = _quota_source(run["id"], int(run["quota_attempt"]))
+        path = _quota_control(run["id"], source) / "pause.json"
+        if not path.exists():
+            return None
+        try:
+            payload = json.loads(path.read_text())
+            if not isinstance(payload, dict) or payload.get("source") != source:
+                return "failed"
+            if payload.get("status") == "quota_wait":
+                self.record_control_state(account, source, payload)
+                return "quota_wait"
+        except (OSError, ValueError):
+            pass
+        return "failed"
+
+    def tick(self) -> None:
+        """消费真实响应并恢复已有等待工作，不发送探测。
+
+        :return: None
+        """
+        conn = get_db()
+        try:
+            accounts = [dict(row) for row in conn.execute("SELECT * FROM accounts WHERE deleted_at IS NULL")]
+        finally:
+            conn.close()
+        for account in accounts:
+            if self._stop.is_set():
+                break
+            try:
+                self.consume(account)
+                if continue_manager:
+                    continue_manager.quota_tick(account)
+                if not account["enabled"]:
+                    continue
+                self._resume_account(account)
+            except Exception:
+                # 文件或单账号容器异常不影响其它账号；下一轮仍保留门禁事实。
+                continue
+
+    def _loop(self) -> None:
+        while not self._stop.is_set():
+            self.tick()
+            self._stop.wait(2)
+
+    def _resume_account(self, account: dict) -> None:
+        state = self.snapshot(account)
+        if state["blocked"] or not scheduler:
+            return
+        conn = get_db()
+        try:
+            rows = [dict(row) for row in conn.execute(
+                "SELECT r.*,t.prompt,t.timeout_sec FROM runs r JOIN tasks t ON r.task_id=t.id "
+                "WHERE r.account_id=? AND r.status='quota_wait' AND r.deleted_at IS NULL AND t.deleted_at IS NULL "
+                "AND r.stop_requested_at IS NULL ORDER BY r.created_at,r.id", (account["id"],))]
+        finally:
+            conn.close()
+        for run in rows:
+            if self._cancel_changed_identity(run, account):
+                continue
+            if scheduler.is_executing(run["id"], int(run["quota_attempt"])):
+                continue
+            if run["run_kind"] == "capture" and run["quota_resume_at"] is not None and run["quota_resume_at"] > time.time():
+                continue
+            if run["run_kind"] == "capture":
+                if not self.capture_resume_ready(run["id"]):
+                    continue
+            if run["run_kind"] == "warmup" and not account.get("warmup_enabled"):
+                continue
+            attempt = int(run["quota_attempt"]) + 1
+            source = _quota_source(run["id"], attempt)
+            with _oauth_owner_lock(str(account["name"])):
+                conn = get_db()
+                try:
+                    current = _get_available_account(conn, int(account["id"]))
+                    parent = conn.execute("SELECT status,deleted_at FROM task_batches WHERE id=?", (run["batch_id"],)).fetchone() if run["batch_id"] else None
+                finally:
+                    conn.close()
+                if not current or (parent and (parent["deleted_at"] or parent["status"] not in ("active", "quota_wait"))):
+                    continue
+                account = dict(current)
+                self.runner.cleanup_quota_run(run["id"])
+                if not self.admit(account, source):
+                    continue
+                with _db_lock:
+                    conn = get_db()
+                    try:
+                        with conn:
+                            cur = conn.execute("UPDATE runs SET status='queued',quota_attempt=?,quota_resume_at=NULL,error=NULL,"
+                                               "worker_container=NULL,sidecar_container=NULL,ended_at=NULL WHERE id=? AND status='quota_wait' "
+                                               "AND quota_attempt=? AND stop_requested_at IS NULL AND deleted_at IS NULL",
+                                               (attempt, run["id"], run["quota_attempt"]))
+                            if cur.rowcount:
+                                conn.execute("UPDATE task_batch_items SET status='queued',updated_at=julianday('now') WHERE run_id=? AND status='quota_wait'", (run["id"],))
+                    finally:
+                        conn.close()
+                if not cur.rowcount:
+                    self.release(account, source)
+                    continue
+            task = {"id": run["task_id"], "prompt": run["prompt"], "timeout_sec": run["timeout_sec"],
+                    "claude_code_version": run["claude_code_version"], "claude_effort_level": run["claude_effort_level"],
+                    "quota_attempt": attempt, "model_override": run["execution_model"],
+                    "capture_full_http": run["run_kind"] == "capture", "capture_mode": run["capture_mode"],
+                    "capture_permission_mode": run["capture_permission_mode"]}
+            scheduler.submit(run["id"], account, task)
+        state = self.snapshot(account)
+        if state["blocked"] or state["recovery_source"]:
+            return
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    batches = conn.execute("SELECT id FROM task_batches b WHERE account_id=? AND status='quota_wait' AND deleted_at IS NULL "
+                                           "AND NOT EXISTS(SELECT 1 FROM runs r WHERE r.batch_id=b.id AND r.status IN ('quota_wait','queued','running','stopping'))", (account["id"],)).fetchall()
+                    if state["retry_ready"]:
+                        batches = batches[:1]
+                    for batch in batches:
+                        conn.execute("UPDATE task_batches SET status='active',next_launch_at=NULL WHERE id=? AND status='quota_wait'", (batch["id"],))
+                    conn.execute("UPDATE accounts SET warmup_next_run_at=?,warmup_last_status='scheduled',warmup_last_error=NULL "
+                                 "WHERE id=? AND warmup_enabled=1 AND warmup_last_status='quota_wait' "
+                                 "AND NOT EXISTS(SELECT 1 FROM runs WHERE account_id=? AND run_kind='warmup' AND status IN ('quota_wait','queued','running','stopping'))",
+                                 (time.time(), account["id"], account["id"]))
+            finally:
+                conn.close()
+        for batch in batches:
+            scheduler.submit_batch(batch["id"])
+
+    def capture_resume_ready(self, run_id: str) -> bool:
+        """
+        抓包 run 与抓包续聊共同遵守自动恢复的串行和启动间隔。
+
+        :param run_id: 待恢复的原 run ID
+        :return: 无其它抓包执行且距最近启动至少 120 秒时返回 True
+        """
+        conn = get_db()
+        try:
+            active = conn.execute("SELECT 1 FROM runs WHERE run_kind='capture' AND id!=? "
+                                  "AND status IN ('queued','running','stopping') LIMIT 1", (run_id,)).fetchone()
+            recent = conn.execute("SELECT MAX(started_at) FROM runs WHERE run_kind='capture'").fetchone()[0] or 0
+        finally:
+            conn.close()
+        if continue_manager:
+            with continue_manager._lock:
+                if any(session.run.get("run_kind") == "capture" and session.status == "running"
+                       for session in continue_manager.sessions.values()):
+                    return False
+                recent = max(recent, continue_manager._capture_started_at)
+        return not active and recent + 120 <= time.time()
+
+    def _cancel_changed_identity(self, run: dict, account: dict) -> bool:
+        previous = run.get("quota_identity")
+        if not previous or previous == _quota_identity(account):
+            return False
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    cur = conn.execute("UPDATE runs SET status='auth_failed',error='账号身份已变化，请人工重新运行',ended_at=? "
+                                       "WHERE id=? AND quota_attempt=? AND status IN ('queued','running','quota_wait') AND stop_requested_at IS NULL",
+                                       (time.time(), run["id"], run["quota_attempt"]))
+                    if cur.rowcount:
+                        conn.execute("UPDATE task_batch_items SET status='auth_failed' WHERE run_id=? AND status!='paused'", (run["id"],))
+                        conn.execute("UPDATE task_batches SET status='paused',next_launch_at=NULL WHERE id=? AND status IN ('active','quota_wait')", (run["batch_id"],))
+            finally:
+                conn.close()
+        return True
+
+
 # ============== Docker 运行器 ==============
+def _public_quota(account: dict) -> dict:
+    """读取页面可用的被动额度，参数为账号，返回不含身份或凭据哈希的摘要。"""
+    snapshot = quota_guard.snapshot(account) if quota_guard else {}
+    return {key: snapshot.get(key) for key in ("source", "known", "windows", "observed_at", "blocked", "exhausted", "resume_at", "retry_ready", "message", "account_error")}
+
+
+def _quota_source(run_id: str, attempt: int) -> str:
+    """生成 run 的独立执行来源，参数为 run ID/代次，返回来源字符串。"""
+    return f"run:{run_id}:{attempt}"
+
+
+def _quota_control(run_id: str, source: str) -> Path:
+    """生成不会被旧执行覆盖的控制目录，返回本地路径。"""
+    # 独立于可写 workspace，避免生成项目清理目录或 worker chown 破坏只读控制契约。
+    return BENCH_DATA / "quota-controls" / run_id / hashlib.sha256(source.encode()).hexdigest()[:20]
+
+
 class Runner:
     """封装 sidecar + worker 的生命周期"""
 
     def __init__(self) -> None:
         self.client = docker.from_env()
+
+    def _quota_mounts(self, account: dict, run_id: str, source: str, flows: Path) -> tuple[dict, dict, dict]:
+        if not quota_guard:
+            return {}, {}, {}
+        control = _quota_control(run_id, source)
+        env = quota_guard.prepare(account, source, flows, control)
+        host_control = HOST_BENCH_DATA / control.relative_to(BENCH_DATA)
+        return env, {
+            str(HOST_BENCH_DATA / "quota" / str(account["id"])): {"bind": "/quota-account", "mode": "ro"},
+            str(host_control): {"bind": "/quota-control", "mode": "rw"},
+            str(HOST_BENCH_DATA / "workspaces" / run_id / ".claude-home"): {"bind": "/quota-credentials", "mode": "ro"},
+        }, {str(host_control): {"bind": "/quota-control", "mode": "ro"}}
+
+    def cleanup_quota_run(self, run_id: str) -> None:
+        """
+        严格清理原 run 容器，失败时阻止恢复，避免旧执行继续请求。
+
+        :param run_id: 原 run ID
+        :return: None
+        """
+        for name in (f"bench-worker-{run_id}", f"bench-sidecar-{run_id}"):
+            try:
+                container = self.client.containers.get(name)
+            except NotFound:
+                continue
+            container.remove(force=True)
 
     def start_run(self, run_id: str, account: dict, task: dict) -> tuple[str, str]:
         """
@@ -2677,6 +3382,13 @@ class Runner:
             "LANG": fp["lang"],
             "LC_ALL": fp["lang"],
         }
+        source = _quota_source(run_id, int(task.get("quota_attempt") or 0))
+        quota_env, quota_sidecar_volumes, quota_worker_volumes = self._quota_mounts(
+            account, run_id, source, FLOWS_DIR / acc_name / str(task["id"]) / run_id)
+        sidecar_env.update(quota_env)
+        worker_env.update({key: value for key, value in quota_env.items() if key in ("QUOTA_SOURCE", "QUOTA_SIGNAL_FILE")})
+        if task.get("resume_session_id"):
+            worker_env["RESUME_SESSION_ID"] = task["resume_session_id"]
         if managed_oauth:
             worker_env["CC2API_MANAGED_OAUTH"] = "1"
             for marker_name in (
@@ -2691,7 +3403,7 @@ class Runner:
         if isinstance(model_override, str) and model_override:
             # 只给当前 worker 进程传一次性模型覆盖，避免污染账号 profile settings。
             worker_env["CLAUDE_MODEL_OVERRIDE"] = model_override
-        elif not capture_full_http:
+        elif not capture_full_http and "model_override" not in task:
             # 普通 / 批量 run 复用抓包的 --model 一次性覆盖链路；
             # 抓包 run 留空时必须沿用自身默认模型，不能被页面或环境全局配置带偏。
             worker_env["CLAUDE_MODEL_OVERRIDE"] = effective_runtime_model()
@@ -2713,6 +3425,7 @@ class Runner:
                 volumes={
                     str(host_flows): {"bind": "/flows", "mode": "rw"},
                     str(host_ca): {"bind": "/ca", "mode": "rw"},
+                    **quota_sidecar_volumes,
                 },
                 environment=sidecar_env,
             )
@@ -2742,6 +3455,7 @@ class Runner:
                     str(host_workspace): {"bind": "/workspace", "mode": "rw"},
                     str(host_claude_home): {"bind": f"{WORKER_HOME}/.claude", "mode": "rw"},
                     str(host_ca): {"bind": "/etc/mitm", "mode": "ro"},
+                    **quota_worker_volumes,
                 },
                 environment=worker_env,
             )
@@ -2954,6 +3668,14 @@ fs.renameSync(tmp, dst);
             "DNS_READY_HOST": DNS_READY_HOST,
             "SAVE_FULL_FLOWS": SAVE_FULL_FLOWS,
         })
+        flows = (continue_capture_dirs[0] if continue_capture_dirs else
+                 FLOWS_DIR / acc_name / str(run["task_id"]) / run["id"] / f"continue-{sid}")
+        flows.mkdir(parents=True, exist_ok=True)
+        sidecar_volumes[str(HOST_BENCH_DATA / flows.relative_to(BENCH_DATA))] = {"bind": "/flows", "mode": "rw"}
+        source = f"continue:{sid}:{int(run.get('continue_generation') or 0)}"
+        quota_env, quota_sidecar_volumes, quota_worker_volumes = self._quota_mounts(account, run["id"], source, flows)
+        sidecar_env.update(quota_env)
+        sidecar_volumes.update(quota_sidecar_volumes)
         if continue_capture_dirs:
             _flows_dir, host_flows = continue_capture_dirs
             # capture run 的继续会话仍是诊断链路，必须追加保存到原 run flows 目录。
@@ -3007,6 +3729,7 @@ fs.renameSync(tmp, dst);
                     str(host_workspace): {"bind": "/workspace", "mode": "rw"},
                     str(host_claude_home): {"bind": f"{WORKER_HOME}/.claude", "mode": "rw"},
                     str(host_ca): {"bind": "/etc/mitm", "mode": "ro"},
+                    **quota_worker_volumes,
                     **(
                         {str(host_profile): {"bind": "/mnt/profile", "mode": "rw"}}
                         if managed_oauth
@@ -3595,15 +4318,16 @@ class ContinueSession:
     """
 
     __slots__ = ("sid", "run_id", "account_id", "sidecar_id", "worker_id",
-                 "session_id", "permission_mode", "created_at")
+                 "session_id", "permission_mode", "created_at", "status", "generation",
+                 "connected", "run", "identity", "guard_lock", "quota", "resume_not_before")
 
     def __init__(
         self,
         sid: str,
         run_id: str,
         account_id: int,
-        sidecar_id: str,
-        worker_id: str,
+        sidecar_id: Optional[str],
+        worker_id: Optional[str],
         session_id: str,
         permission_mode: str,
     ) -> None:
@@ -3615,6 +4339,14 @@ class ContinueSession:
         self.session_id = session_id
         self.permission_mode = permission_mode
         self.created_at = time.time()
+        self.status = "running" if worker_id else "quota_wait"
+        self.generation = 0
+        self.connected = False
+        self.run: dict = {}
+        self.identity = ""
+        self.guard_lock = threading.RLock()
+        self.quota: dict = {}
+        self.resume_not_before = 0.0
 
 
 class LoginManager:
@@ -3900,6 +4632,7 @@ class ContinueManager:
         self.sessions: dict[str, ContinueSession] = {}
         self._run_locks: dict[str, str] = {}
         self._lock = threading.Lock()
+        self._capture_started_at = 0.0
 
     def cleanup_stale(self) -> None:
         """启动时清掉上次残留的 bench-continue-* 容器"""
@@ -3935,6 +4668,8 @@ class ContinueManager:
         :param account: accounts 表行
         :return: ContinueSession
         """
+        if login_manager and login_manager.has_active_name(str(account["name"])):
+            raise ValueError("账号正在重新授权，请完成后再继续对话")
         session_id = _find_latest_claude_session_id(run["id"])
         if not session_id:
             raise ValueError(
@@ -3950,12 +4685,14 @@ class ContinueManager:
             permission_mode = _resolve_capture_permission_mode(
                 run.get("capture_permission_mode")
             )
-            sidecar_id, worker_id = self.runner.start_continue(
-                sid,
-                run,
-                account,
-                session_id,
-            )
+            if quota_guard and quota_guard.snapshot(account).get("account_error"):
+                raise ValueError("账号存在永久认证异常，需先人工核实")
+            source = f"continue:{sid}:0"
+            sidecar_id, worker_id = None, None
+            if not quota_guard or quota_guard.admit(account, source):
+                if account.get("cc2api_account_id") is not None:
+                    _sync_bound_account_credentials_locked(account, 2400)
+                sidecar_id, worker_id = self.runner.start_continue(sid, run, account, session_id)
             session = ContinueSession(
                 sid,
                 run["id"],
@@ -3965,10 +4702,20 @@ class ContinueManager:
                 session_id,
                 permission_mode,
             )
+            session.run = dict(run)
+            session.identity = _quota_identity(account) if quota_guard else ""
+            session.quota = quota_guard.snapshot(account) if quota_guard else {}
             with self._lock:
                 self.sessions[sid] = session
+                if run.get("run_kind") == "capture":
+                    if worker_id:
+                        self._capture_started_at = time.time()
+                    else:
+                        session.resume_not_before = time.time() + 900
             return session
         except Exception:
+            if quota_guard:
+                quota_guard.release(account, f"continue:{sid}:0")
             with self._lock:
                 self._run_locks.pop(run["id"], None)
             raise
@@ -3983,8 +4730,20 @@ class ContinueManager:
             s = self.sessions.pop(sid, None)
         if not s:
             return
-        self.runner.persist_worker_profile(s.worker_id)
-        self.runner.cleanup(s.sidecar_id, s.worker_id)
+        with s.guard_lock:
+            s.status = "closed"
+            s.connected = False
+            self.runner.persist_worker_profile(s.worker_id)
+            self.runner.cleanup(s.sidecar_id, s.worker_id)
+            if quota_guard:
+                conn = get_db()
+                try:
+                    account_row = conn.execute("SELECT * FROM accounts WHERE id=?", (s.account_id,)).fetchone()
+                finally:
+                    conn.close()
+                if account_row:
+                    quota_guard.consume(dict(account_row))
+                    quota_guard.release(dict(account_row), f"continue:{s.sid}:{s.generation}")
         conn = get_db()
         try:
             row = conn.execute(
@@ -4009,6 +4768,140 @@ class ContinueManager:
         with self._lock:
             if self._run_locks.get(s.run_id) == sid:
                 del self._run_locks[s.run_id]
+
+    def _suspend_quota(self, session: ContinueSession, account: dict) -> None:
+        source = f"continue:{session.sid}:{session.generation}"
+        session.status = "quota_wait"
+        session.quota = quota_guard.snapshot(account)
+        if session.run.get("run_kind") == "capture":
+            session.resume_not_before = time.time() + 900
+        self.runner.persist_worker_profile(session.worker_id)
+        # 若删除失败，保留原 ID；下轮重试，绝不启动第二份执行。
+        for container_id in (session.worker_id, session.sidecar_id):
+            if container_id:
+                try:
+                    self.runner.client.containers.get(container_id).remove(force=True)
+                except NotFound:
+                    pass
+        session.sidecar_id = None
+        session.worker_id = None
+        quota_guard.release(account, source)
+        session.generation += 1
+
+    def _apply_control(self, session: ContinueSession, account: dict) -> bool:
+        source = f"continue:{session.sid}:{session.generation}"
+        path = _quota_control(session.run_id, source) / "pause.json"
+        if not path.exists():
+            return False
+        try:
+            payload = json.loads(path.read_text())
+        except (OSError, ValueError):
+            payload = {}
+        if isinstance(payload, dict) and payload.get("source") == source and payload.get("status") == "quota_wait":
+            quota_guard.record_control_state(account, source, payload)
+            if quota_guard.snapshot(account).get("account_error"):
+                session.quota = quota_guard.snapshot(account)
+                self.cleanup(session.sid)
+            else:
+                self._suspend_quota(session, account)
+        else:
+            session.quota = {"message": "额度门禁执行异常，继续会话已停止"}
+            self.cleanup(session.sid)
+        return True
+
+    def quota_tick(self, account: dict) -> None:
+        """
+        收口已耗尽的交互执行，到期恢复仍在线的原会话。
+
+        :param account: 当前账号行
+        :return: None
+        """
+        with self._lock:
+            sessions = [session for session in self.sessions.values() if session.account_id == account["id"]]
+        for session in sessions:
+            with session.guard_lock:
+                if self.get(session.sid) is not session or session.status == "closed":
+                    continue
+                if not account.get("enabled") or _quota_identity(account) != session.identity:
+                    self.cleanup(session.sid)
+                    continue
+                source = f"continue:{session.sid}:{session.generation}"
+                if quota_guard.snapshot(account).get("account_error"):
+                    session.quota = quota_guard.snapshot(account)
+                    self.cleanup(session.sid)
+                    continue
+                if session.status == "running" and self._apply_control(session, account):
+                    continue
+                if session.status != "quota_wait":
+                    continue
+                session.quota = quota_guard.snapshot(account)
+                if session.worker_id or session.sidecar_id:
+                    self._suspend_quota(session, account)
+                    continue
+                if not session.connected or time.time() < session.resume_not_before:
+                    continue
+                if session.run.get("run_kind") == "capture" and not quota_guard.capture_resume_ready(session.run_id):
+                    continue
+                with _oauth_owner_lock(str(account["name"])):
+                    conn = get_db()
+                    try:
+                        current = _get_available_account(conn, session.account_id)
+                        original = conn.execute("SELECT deleted_at FROM runs WHERE id=?", (session.run_id,)).fetchone()
+                    finally:
+                        conn.close()
+                    if not current or not original or original["deleted_at"] is not None:
+                        self.cleanup(session.sid)
+                        continue
+                    account = dict(current)
+                    if not quota_guard.admit(account, source):
+                        continue
+                    try:
+                        if account.get("cc2api_account_id") is not None:
+                            _sync_bound_account_credentials_locked(account, 2400)
+                        run = {**session.run, "continue_generation": session.generation}
+                        session.sidecar_id, session.worker_id = self.runner.start_continue(
+                            session.sid, run, account, session.session_id)
+                        session.status = "running"
+                        if session.run.get("run_kind") == "capture":
+                            with self._lock:
+                                self._capture_started_at = time.time()
+                    except Exception:
+                        # 非额度失败遵循失败收口，不在后台反复重建或重试认证。
+                        quota_guard.release(account, source)
+                        self.cleanup(session.sid)
+
+    def send_input(self, session: ContinueSession, generation: int, raw, data: bytes) -> bool:
+        """
+        只向仍有效且允许输入的 PTY 发送，不缓存等待期输入。
+
+        :param session: 当前继续会话
+        :param generation: 浏览器桥对应执行代次
+        :param raw: PTY socket
+        :param data: 文本或二进制输入
+        :return: 实际发送时返回 True
+        """
+        with session.guard_lock:
+            if self.get(session.sid) is not session or session.status != "running" or generation != session.generation:
+                return False
+            if quota_guard:
+                conn = get_db()
+                try:
+                    row = _get_available_account(conn, session.account_id)
+                finally:
+                    conn.close()
+                if not row:
+                    self.cleanup(session.sid)
+                    return False
+                account = dict(row)
+                quota_guard.consume(account)
+                if self._apply_control(session, account):
+                    return False
+                state = quota_guard.snapshot(account)
+                if state["blocked"] or (state["retry_ready"] and state["recovery_source"] != f"continue:{session.sid}:{generation}"):
+                    self._suspend_quota(session, account)
+                    return False
+            raw.send(data)
+            return True
 
 
 def _oauth_refresh_error_summary(error: object) -> str:
@@ -4222,7 +5115,12 @@ def _find_latest_claude_session_id(run_id: str) -> Optional[str]:
     base = WORKSPACES_DIR / run_id / ".claude-home" / "projects"
     if not base.exists():
         return None
-    files = [p for p in base.rglob("*.jsonl") if p.is_file()]
+    files = [p for p in base.glob("*/*.jsonl") if p.is_file()]
+    try:
+        baseline = json.loads((WORKSPACES_DIR / run_id / ".bench-session-baseline.json").read_text())
+        files = [p for p in files if p.parent.name == "-workspace" and p.stat().st_size > int(baseline.get(p.name, 0))]
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
     if not files:
         return None
     latest = max(files, key=lambda p: p.stat().st_mtime)
@@ -4399,6 +5297,19 @@ class Scheduler:
         self._batch_threads: dict[int, threading.Thread] = {}
         self._batch_restart: set[int] = set()
         self._batch_lock = threading.Lock()
+        self._executing: set[tuple[str, int]] = set()
+        self._execution_lock = threading.Lock()
+
+    def is_executing(self, run_id: str, attempt: int) -> bool:
+        """
+        查询代次是否仍在收口。
+
+        :param run_id: 原 run ID
+        :param attempt: 执行代次
+        :return: 仍在执行或收口时返回 True
+        """
+        with self._execution_lock:
+            return (run_id, attempt) in self._executing
 
     def _sem(self, account_id: int) -> threading.Semaphore:
         with self._sems_lock:
@@ -4462,6 +5373,11 @@ class Scheduler:
                 current = self._get_batch_status(batch_id)
                 if current != "active":
                     break
+                if quota_guard:
+                    quota_guard.consume(account)
+                    if quota_guard.snapshot(account)["blocked"]:
+                        self._wait_batch_quota(batch_id, account)
+                        break
                 # 先投满并发窗口；之后每次等一个 run 收口再按随机间隔投放下一项。
                 if len(active_runs) >= int(batch.get("concurrency") or 2):
                     self._wait_any_run_finished(active_runs)
@@ -4658,7 +5574,7 @@ class Scheduler:
                 with conn:
                     row = conn.execute(
                         "SELECT COUNT(*) AS n FROM task_batch_items "
-                        "WHERE batch_id=? AND status IN ('pending','paused','queued','running')",
+                        "WHERE batch_id=? AND status IN ('pending','paused','queued','running','quota_wait')",
                         (batch_id,),
                     ).fetchone()
                     status = "done" if row and row["n"] == 0 else "active"
@@ -4679,7 +5595,11 @@ class Scheduler:
         """
         while run_ids:
             statuses = self._get_run_statuses(run_ids)
-            done = [rid for rid in run_ids if statuses.get(rid) in _TERMINAL_RUN_STATUSES]
+            if any(status == "quota_wait" for status in statuses.values()):
+                # 其它已在途执行由各自线程收口；批次等待不能占住一个永久等终态的调度线程。
+                run_ids.clear()
+                return
+            done = [rid for rid in run_ids if statuses.get(rid) in _TERMINAL_RUN_STATUSES or statuses.get(rid) == "quota_wait"]
             if done:
                 for rid in done:
                     run_ids.remove(rid)
@@ -4711,17 +5631,26 @@ class Scheduler:
             conn.close()
 
     def _execute(self, run_id: str, account: dict, task: dict) -> None:
+        attempt = int(task.get("quota_attempt") or 0)
+        with self._execution_lock:
+            if (run_id, attempt) in self._executing:
+                return
+            self._executing.add((run_id, attempt))
         sem = self._sem(account["id"])
         sem.acquire()
         sid: Optional[str] = None
         wid: Optional[str] = None
         managed_refresh_stop = threading.Event()
         managed_refresh_thread: Optional[threading.Thread] = None
+        attempt = int(task.get("quota_attempt") or 0)
+        source = _quota_source(run_id, attempt)
         try:
             flows_path = FLOWS_DIR / account["name"] / str(task["id"]) / run_id
             capture_full_http = bool(task.get("capture_full_http"))
             initial_state = self._get_run_state(run_id)
             if not initial_state or initial_state.get("deleted_at") is not None:
+                return
+            if int(initial_state.get("quota_attempt") or 0) != attempt:
                 return
             if initial_state["status"] in ("stopping", "stopped"):
                 self._update_batch_item_for_run(run_id, "stopped")
@@ -4731,8 +5660,8 @@ class Scheduler:
                 try:
                     current_account_row = _get_available_account(conn, int(account["id"]))
                     if not current_account_row:
-                        self._update(
-                            run_id,
+                        self._update_attempt(
+                            run_id, attempt,
                             status="failed",
                             error="账号不存在或已停用",
                             ended_at=time.time(),
@@ -4742,14 +5671,56 @@ class Scheduler:
                     account = dict(current_account_row)
                 finally:
                     conn.close()
+                current = self._get_run_state(run_id)
+                if (not current or current["status"] != "queued" or current.get("stop_requested_at")
+                        or int(current.get("quota_attempt") or 0) != attempt):
+                    return
+                if quota_guard and quota_guard._cancel_changed_identity(current, account):
+                    return
+                if quota_guard and not current.get("quota_identity"):
+                    self._update_attempt(run_id, attempt, quota_identity=_quota_identity(account))
+                if login_manager and login_manager.has_active_name(str(account["name"])):
+                    if self._update_attempt(run_id, attempt, status="failed", error="账号正在重新授权，请完成后再次运行", ended_at=time.time()):
+                        self._update_batch_item_for_run(run_id, "failed")
+                    return
+                conn = get_db()
+                try:
+                    parent_task = conn.execute("SELECT deleted_at FROM tasks WHERE id=?", (task["id"],)).fetchone()
+                    parent_batch = conn.execute("SELECT status,deleted_at FROM task_batches WHERE id=?", (current["batch_id"],)).fetchone() if current["batch_id"] else None
+                finally:
+                    conn.close()
+                if (not parent_task or parent_task["deleted_at"] is not None
+                        or (parent_batch and (parent_batch["deleted_at"] is not None or parent_batch["status"] not in ("active", "quota_wait")))
+                        or (current["run_kind"] == "warmup" and not account.get("warmup_enabled"))):
+                    if self._update_attempt(run_id, attempt, status="stopped", ended_at=time.time()):
+                        self._update_batch_item_for_run(run_id, "stopped")
+                    return
+                # 首次进入启动流程即固化模型；自动恢复读取原 run 的快照。
+                model = current.get("execution_model")
+                if model is None:
+                    model = (task.get("model_override") or "") if capture_full_http else effective_runtime_model()
+                    self._update_attempt(run_id, attempt, execution_model=model)
+                task["model_override"] = model
+                if quota_guard and not quota_guard.admit(account, source):
+                    state = quota_guard.snapshot(account)
+                    if state.get("account_error"):
+                        self._update_attempt(run_id, attempt, status="auth_failed", error=state["message"], ended_at=time.time())
+                        self._update_batch_item_for_run(run_id, "auth_failed")
+                    else:
+                        self._mark_quota_wait(run_id, account, attempt)
+                    return
+                if attempt > 0:
+                    task["resume_session_id"] = _find_latest_claude_session_id(run_id)
                 if account.get("cc2api_account_id") is not None:
                     timeout_sec = max(60, int(task.get("timeout_sec") or 1800))
                     try:
                         _sync_bound_account_credentials_locked(account, timeout_sec + 600)
                     except Exception as exc:
                         error = _redact_cc2api_error(exc)
-                        self._update(
-                            run_id,
+                        if quota_guard and "invalid_grant" in error:
+                            quota_guard.record_auth_failure(account, "invalid_grant")
+                        self._update_attempt(
+                            run_id, attempt,
                             status="failed",
                             error=error,
                             ended_at=time.time(),
@@ -4758,28 +5729,30 @@ class Scheduler:
                         if warmup_scheduler:
                             warmup_scheduler.handle_run_sync_failure(run_id, account, exc)
                         return
-                self._update(
+                if not self._update_attempt(
                     run_id,
+                    attempt,
                     status="running",
                     started_at=time.time(),
                     workspace_dir=str(WORKSPACES_DIR / run_id),
                     flows_dir=str(flows_path),
                     capture_summary_path=str(flows_path / "capture_index.json") if capture_full_http else None,
-                )
+                ):
+                    return
                 if warmup_scheduler:
                     warmup_scheduler.handle_run_started(run_id)
                 try:
                     sid, wid = self.runner.start_run(run_id, account, task)
                 except Exception as exc:
-                    self._update(
-                        run_id,
+                    self._update_attempt(
+                        run_id, attempt,
                         status="failed",
                         error=str(exc),
                         ended_at=time.time(),
                     )
                     self._update_batch_item_for_run(run_id, "failed")
                     return
-                self._update(run_id, sidecar_container=sid, worker_container=wid)
+                self._update_attempt(run_id, attempt, sidecar_container=sid, worker_container=wid)
             try:
                 if account.get("cc2api_account_id") is not None:
                     managed_refresh_thread = threading.Thread(
@@ -4792,10 +5765,12 @@ class Scheduler:
                 if run_state and run_state["status"] in ("stopping", "stopped"):
                     self.runner.persist_worker_profile(wid)
                     self.runner.cleanup(sid, wid)
-                    self._update(run_id, status="stopped", ended_at=time.time())
+                    self._update_attempt(run_id, attempt, status="stopped", ended_at=time.time())
                     self._update_batch_item_for_run(run_id, "stopped")
                     return
                 exit_code = self.runner.wait_worker(wid)
+                if quota_guard:
+                    quota_guard.consume(account)
                 run_state = self._get_run_state(run_id)
                 if run_state and run_state["status"] in ("stopping", "stopped"):
                     status = "stopped"
@@ -4810,9 +5785,20 @@ class Scheduler:
                 worker_status = self.runner.read_worker_status(run_id)
                 error = worker_status.get("error") if isinstance(worker_status.get("error"), str) else None
                 status_hint = worker_status.get("status")
-                if status_hint == "auth_failed" and status not in ("stopped", "success"):
+                if status != "stopped" and (exit_code == 43 or status_hint == "quota_wait"):
+                    if quota_guard:
+                        quota_guard.record_control_state(account, source, worker_status)
+                    if quota_guard and error and error.startswith("被动识别额度耗尽:"):
+                        quota_guard.record_worker_limit(account, error.split(":", 1)[1])
+                    self._mark_quota_wait(run_id, account, attempt)
+                    return
+                if status_hint == "auth_failed" and status != "stopped":
                     status = "auth_failed"
                     error = error or "OAuth 认证失败"
+                    if quota_guard and ("account_on_hold" in error or "invalid_grant" in error):
+                        quota_guard.record_auth_failure(account, "account_on_hold" if "account_on_hold" in error else "invalid_grant")
+                elif status_hint in ("failed", "timeout") and status != "stopped":
+                    status = status_hint
                 update_fields = {
                     "status": status,
                     "exit_code": exit_code,
@@ -4820,12 +5806,12 @@ class Scheduler:
                 }
                 if error and status not in ("success", "stopped"):
                     update_fields["error"] = error
-                self._update(run_id, **update_fields)
-                self._update_batch_item_for_run(run_id, status)
+                if self._update_attempt(run_id, attempt, **update_fields):
+                    self._update_batch_item_for_run(run_id, status)
             except Exception as e:
                 run_state = self._get_run_state(run_id)
                 status = "stopped" if run_state and run_state["status"] in ("stopping", "stopped") else "failed"
-                self._update(run_id, status=status, error=str(e), ended_at=time.time())
+                self._update_attempt(run_id, attempt, status=status, error=str(e), ended_at=time.time())
                 self._update_batch_item_for_run(run_id, status)
             finally:
                 managed_refresh_stop.set()
@@ -4833,13 +5819,77 @@ class Scheduler:
                     managed_refresh_thread.join(timeout=2)
                 self.runner.persist_worker_profile(wid)
                 self.runner.cleanup(sid, wid)
+                if (self._get_run_state(run_id) or {}).get("status") == "quota_wait":
+                    archive = WORKSPACES_DIR / run_id / ".quota" / f"attempt-{attempt}"
+                    archive.mkdir(parents=True, exist_ok=True)
+                    for filename in (".bench-status.json", ".bench-transcript.log"):
+                        path = WORKSPACES_DIR / run_id / filename
+                        if path.exists():
+                            shutil.copy2(path, archive / filename)
         finally:
-            if warmup_scheduler:
-                warmup_scheduler.handle_run_terminal(
-                    run_id,
-                    account.get("cc2api_account_id"),
-                )
-            sem.release()
+            try:
+                if quota_guard:
+                    quota_guard.release(account, source)
+                if warmup_scheduler:
+                    warmup_scheduler.handle_run_terminal(run_id, account.get("cc2api_account_id"))
+            finally:
+                sem.release()
+                with self._execution_lock:
+                    self._executing.discard((run_id, attempt))
+
+    def _wait_batch_quota(self, batch_id: int, account: dict) -> None:
+        state = quota_guard.snapshot(account)
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    conn.execute("UPDATE task_batches SET status='quota_wait',next_launch_at=? "
+                                 "WHERE id=? AND status='active'", (state["resume_at"], batch_id))
+            finally:
+                conn.close()
+
+    def _update_attempt(self, run_id: str, attempt: int, **fields) -> bool:
+        if not fields:
+            return False
+        cols = ", ".join(f"{key}=?" for key in fields)
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    cur = conn.execute(f"UPDATE runs SET {cols} WHERE id=? AND quota_attempt=? "
+                                       "AND status IN ('queued','running','stopping') AND deleted_at IS NULL "
+                                       "AND (stop_requested_at IS NULL OR ?='stopped')",
+                                       [*fields.values(), run_id, attempt, fields.get("status")])
+                    return cur.rowcount == 1
+            finally:
+                conn.close()
+
+    def _mark_quota_wait(self, run_id: str, account: dict, attempt: int) -> None:
+        state = quota_guard.snapshot(account) if quota_guard else {}
+        if state.get("account_error"):
+            if self._update_attempt(run_id, attempt, status="auth_failed", error=state["message"], ended_at=time.time()):
+                self._update_batch_item_for_run(run_id, "auth_failed")
+            return
+        resume_at = state.get("resume_at")
+        current = self._get_run_state(run_id) or {}
+        if current.get("run_kind") == "capture" and resume_at is not None:
+            resume_at = max(resume_at, time.time() + 900)
+        if not self._update_attempt(run_id, attempt, status="quota_wait", ended_at=None,
+                                    quota_identity=current.get("quota_identity") or _quota_identity(account),
+                                    quota_resume_at=resume_at, error=state.get("message") or "额度耗尽，等待可信恢复时间"):
+            return
+        self._update_batch_item_for_run(run_id, "quota_wait")
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    conn.execute("UPDATE task_batches SET status='quota_wait',next_launch_at=?,updated_at=julianday('now') "
+                                 "WHERE id=(SELECT batch_id FROM runs WHERE id=?) AND status='active'", (resume_at, run_id))
+                    conn.execute("UPDATE accounts SET warmup_last_status='quota_wait',warmup_next_run_at=?,warmup_last_error=? "
+                                 "WHERE id=? AND warmup_enabled=1 AND warmup_last_run_id=?",
+                                 (resume_at, state.get("message"), account["id"], run_id))
+            finally:
+                conn.close()
 
     def _update(self, run_id: str, **fields) -> None:
         if not fields:
@@ -4858,7 +5908,7 @@ class Scheduler:
         conn = get_db()
         try:
             row = conn.execute(
-                "SELECT status, deleted_at FROM runs WHERE id=?",
+                "SELECT * FROM runs WHERE id=?",
                 (run_id,),
             ).fetchone()
             return dict(row) if row else None
@@ -4931,6 +5981,26 @@ class WarmupScheduler:
         :param require_due: 是否要求 `warmup_next_run_at` 已到期
         :return: 是否启动及新 run id
         """
+        if quota_guard:
+            conn = get_db()
+            try:
+                row = _get_available_account(conn, account_id)
+                candidate = dict(row) if row else None
+            finally:
+                conn.close()
+            if candidate and candidate.get("warmup_enabled") and candidate.get("cc2api_account_id") is not None:
+                quota_guard.consume(candidate)
+                state = quota_guard.snapshot(candidate)
+                if state["blocked"] or state.get("recovery_source"):
+                    with _db_lock:
+                        conn = get_db()
+                        try:
+                            with conn:
+                                conn.execute("UPDATE accounts SET warmup_last_status='quota_wait',warmup_next_run_at=?,warmup_last_error=? "
+                                             "WHERE id=? AND warmup_enabled=1", (state["resume_at"], state["message"], account_id))
+                        finally:
+                            conn.close()
+                    return {"started": False, "run_id": None}
         account = self._claim_account(account_id, require_due)
         if not account:
             return {"started": False, "run_id": None}
@@ -5181,7 +6251,7 @@ class WarmupScheduler:
                         return None
                     active = conn.execute(
                         "SELECT id, status FROM runs WHERE account_id=? AND run_kind='warmup' "
-                        "AND status IN ('queued','running','stopping') "
+                        "AND status IN ('queued','running','stopping','quota_wait') "
                         "ORDER BY created_at DESC LIMIT 1",
                         (account_id,),
                     ).fetchone()
@@ -5259,7 +6329,7 @@ class WarmupScheduler:
                         return None
                     active = conn.execute(
                         "SELECT id FROM runs WHERE account_id=? AND run_kind='warmup' "
-                        "AND status IN ('queued','running','stopping') LIMIT 1",
+                        "AND status IN ('queued','running','stopping','quota_wait') LIMIT 1",
                         (account["id"],),
                     ).fetchone()
                     if active:
@@ -5385,11 +6455,12 @@ login_manager: Optional[LoginManager] = None
 continue_manager: Optional[ContinueManager] = None
 oauth_refresh_scheduler: Optional[OAuthRefreshScheduler] = None
 warmup_scheduler: Optional[WarmupScheduler] = None
+quota_guard: Optional[QuotaGuard] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler
+    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard
     init_db()
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     FLOWS_DIR.mkdir(parents=True, exist_ok=True)
@@ -5401,15 +6472,19 @@ async def lifespan(app: FastAPI):
     continue_manager = ContinueManager(runner)
     oauth_refresh_scheduler = OAuthRefreshScheduler(runner)
     warmup_scheduler = WarmupScheduler(scheduler)
+    quota_guard = QuotaGuard(runner)
+    quota_guard.recover()
     # 清掉上次进程残留的 login 容器，避免重启后僵尸容器堆积
     login_manager.cleanup_stale()
     continue_manager.cleanup_stale()
     oauth_refresh_scheduler.cleanup_stale()
     oauth_refresh_scheduler.start()
     warmup_scheduler.start()
+    quota_guard.start()
     try:
         yield
     finally:
+        quota_guard.stop()
         warmup_scheduler.stop()
         oauth_refresh_scheduler.stop()
 
@@ -5719,7 +6794,7 @@ def _oauth_owner_transition_blocker(account: dict) -> Optional[str]:
     try:
         active_run = conn.execute(
             "SELECT id, status FROM runs WHERE account_id=? "
-            "AND status IN ('queued','running','stopping') ORDER BY created_at LIMIT 1",
+            "AND status IN ('queued','running','stopping','quota_wait') ORDER BY created_at LIMIT 1",
             (account["id"],),
         ).fetchone()
     finally:
@@ -5862,6 +6937,7 @@ def list_accounts():
             )
             account["timezone_mode"] = "manual" if timezone else "auto"
             account.update(_read_account_oauth_status(account["name"]))
+            account["passive_quota"] = _public_quota(account)
             accounts.append(account)
         return accounts
     finally:
@@ -6071,7 +7147,7 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
                             raise HTTPException(404, "账号不存在或已停用")
                         active = conn.execute(
                             "SELECT id, status FROM runs WHERE account_id=? AND run_kind='warmup' "
-                            "AND status IN ('queued','running','stopping') LIMIT 1",
+                            "AND status IN ('queued','running','stopping','quota_wait') LIMIT 1",
                             (aid,),
                         ).fetchone()
                         conn.execute(
@@ -6089,6 +7165,9 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
                                 aid,
                             ),
                         )
+                        if not enabled and active and active["status"] == "quota_wait":
+                            conn.execute("UPDATE runs SET status='stopped',stop_requested_at=?,ended_at=? WHERE id=? AND status='quota_wait'",
+                                         (time.time(), time.time(), active["id"]))
                 except sqlite3.IntegrityError:
                     raise HTTPException(409, "该 cc2api 账号已绑定其他 bench 账号")
                 finally:
@@ -6145,7 +7224,7 @@ def resume_account_warmup(aid: int):
                 account = dict(row)
                 active = conn.execute(
                     "SELECT id, status FROM runs WHERE account_id=? AND run_kind='warmup' "
-                    "AND status IN ('queued','running','stopping') LIMIT 1",
+                    "AND status IN ('queued','running','stopping','quota_wait') LIMIT 1",
                     (aid,),
                 ).fetchone()
                 next_run_at = None if active else warmup_scheduler._next_run_at(account) if warmup_scheduler else None
@@ -6307,13 +7386,19 @@ def query_account_quota(aid: int):
                 _sync_bound_account_credentials_locked(current, OAUTH_REFRESH_BUFFER_SEC)
                 raw = cc2api_client.refresh_usage(int(current_binding))
                 _sync_bound_account_credentials_locked(current, OAUTH_REFRESH_BUFFER_SEC)
-                return _format_quota_result(raw)
+                result = _format_quota_result(raw)
+                if quota_guard:
+                    quota_guard.record_manual_usage(current, result)
+                return result
             except ConnectionError as exc:
                 raise HTTPException(502, _redact_cc2api_error(exc))
             except ValueError as exc:
                 raise HTTPException(400, _redact_cc2api_error(exc))
         try:
-            return runner.query_quota(current)
+            result = runner.query_quota(current)
+            if quota_guard:
+                quota_guard.record_manual_usage(current, result)
+            return result
         except ValueError as exc:
             raise HTTPException(400, str(exc))
         except Exception as exc:
@@ -6343,14 +7428,15 @@ def login_start(body: LoginStartIn):
         conn = get_db()
         try:
             bound = conn.execute(
-                "SELECT id FROM accounts WHERE name=? AND deleted_at IS NULL "
-                "AND cc2api_account_id IS NOT NULL",
+                "SELECT * FROM accounts WHERE name=? AND deleted_at IS NULL",
                 (body.name,),
             ).fetchone()
         finally:
             conn.close()
-        if bound:
+        if bound and bound["cc2api_account_id"] is not None:
             raise HTTPException(409, "账号已绑定 cc2api，请先解绑后再重新授权")
+        if bound:
+            _require_oauth_owner_transition_idle(dict(bound))
         try:
             proxy_scheme = _normalize_upstream_proxy_scheme(body.upstream_proxy_scheme)
             timezone = _normalize_account_timezone(body.timezone)
@@ -6535,7 +7621,7 @@ def login_commit(sid: str, body: LoginStartIn):
         inflight = conn.execute(
             "SELECT COUNT(*) AS n FROM runs r "
             "JOIN accounts a ON r.account_id = a.id "
-            "WHERE a.name = ? AND r.status IN ('queued','running')",
+            "WHERE a.name = ? AND r.status IN ('queued','running','stopping','quota_wait')",
             (name,),
         ).fetchone()
     finally:
@@ -6546,6 +7632,14 @@ def login_commit(sid: str, body: LoginStartIn):
             f"account '{name}' has {inflight['n']} in-flight run(s); "
             f"wait for them to finish or cancel before re-login",
         )
+    if continue_manager:
+        conn = get_db()
+        try:
+            account = conn.execute("SELECT id FROM accounts WHERE name=?", (name,)).fetchone()
+        finally:
+            conn.close()
+        if account and continue_manager.has_active_account(account["id"]):
+            raise HTTPException(409, "账号仍有继续对话会话，请先关闭再重新授权")
 
     try:
         status = login_manager.auth_status(sid)
@@ -6630,6 +7724,9 @@ def login_commit(sid: str, body: LoginStartIn):
                         "SELECT id FROM accounts WHERE name=?", (name,)
                     ).fetchone()
                     account_id = r["id"]
+                # 已完成显式重授权且没有活跃工作；旧身份的拒绝和游标不能污染新会话。
+                conn.execute("DELETE FROM account_quota_states WHERE account_id=?", (account_id,))
+                conn.execute("DELETE FROM quota_observation_cursors WHERE account_id=?", (account_id,))
         finally:
             conn.close()
 
@@ -6987,7 +8084,11 @@ def list_task_batches():
             "(SELECT COUNT(*) FROM task_batch_items i WHERE i.batch_id=b.id AND i.status IN ('success','failed','timeout','auth_failed')) AS done_count "
             "FROM task_batches b WHERE b.deleted_at IS NULL ORDER BY b.id DESC"
         ).fetchall()
-        return [dict(r) for r in rows]
+        items = [dict(r) for r in rows]
+        for item in items:
+            account = conn.execute("SELECT * FROM accounts WHERE id=?", (item["account_id"],)).fetchone()
+            item["passive_quota"] = _public_quota(dict(account)) if account else {}
+        return items
     finally:
         conn.close()
 
@@ -7038,7 +8139,7 @@ def pause_task_batch(batch_id: int):
                 )
                 conn.execute(
                     "UPDATE task_batch_items SET status='paused', updated_at=julianday('now') "
-                    "WHERE batch_id=? AND status IN ('queued','running') AND run_id IS NOT NULL",
+                    "WHERE batch_id=? AND status IN ('queued','running','quota_wait') AND run_id IS NOT NULL",
                     (batch_id,),
                 )
         finally:
@@ -7047,7 +8148,7 @@ def pause_task_batch(batch_id: int):
     try:
         runs = conn.execute(
             "SELECT * FROM runs WHERE batch_id=? AND deleted_at IS NULL "
-            "AND status IN ('queued','running')",
+            "AND status IN ('queued','running','quota_wait')",
             (batch_id,),
         ).fetchall()
         run_rows = [dict(r) for r in runs]
@@ -7062,7 +8163,7 @@ def pause_task_batch(batch_id: int):
                 with conn:
                     conn.execute(
                         "UPDATE runs SET status='stopping', stop_requested_at=? WHERE id=? "
-                        "AND status IN ('queued','running')",
+                        "AND status IN ('queued','running','quota_wait')",
                         (now, run["id"]),
                     )
             finally:
@@ -7312,7 +8413,11 @@ def list_runs(limit: int = 200):
             "ORDER BY (started_at IS NULL), started_at DESC, created_at DESC LIMIT ?",
             (limit,),
         ).fetchall()
-        return [dict(r) for r in rows]
+        items = [dict(r) for r in rows]
+        for item in items:
+            account = conn.execute("SELECT * FROM accounts WHERE id=?", (item["account_id"],)).fetchone()
+            item["passive_quota"] = _public_quota(dict(account)) if account else {}
+        return items
     finally:
         conn.close()
 
@@ -7327,7 +8432,10 @@ def get_run(rid: str):
         ).fetchone()
         if not row:
             raise HTTPException(404)
-        return dict(row)
+        result = dict(row)
+        account = conn.execute("SELECT * FROM accounts WHERE id=?", (result["account_id"],)).fetchone()
+        result["passive_quota"] = _public_quota(dict(account)) if account else {}
+        return result
     finally:
         conn.close()
 
@@ -7520,7 +8628,7 @@ def stop_run(rid: str):
                 warmup_binding_id = account_row["cc2api_account_id"]
     finally:
         conn.close()
-    if run["status"] not in ("queued", "running"):
+    if run["status"] not in ("queued", "running", "quota_wait"):
         raise HTTPException(400, f"运行 {rid} 当前不是 queued/running 状态")
     runner.persist_worker_profile(run.get("worker_container"))
     with _db_lock:
@@ -7569,7 +8677,7 @@ def delete_run(rid: str):
                 ).fetchone()
                 if not row:
                     raise HTTPException(404, "运行记录不存在")
-                if row["status"] in ("queued", "running", "stopping"):
+                if row["status"] in ("queued", "running", "stopping", "quota_wait"):
                     raise HTTPException(409, f"运行 {rid} 仍处于 {row['status']} 状态，请先停止并收口")
                 cur = conn.execute(
                     "UPDATE runs SET deleted_at=? WHERE id=? AND deleted_at IS NULL",
@@ -7626,13 +8734,6 @@ def continue_run_start(rid: str):
             account = dict(current_account_row)
         finally:
             conn.close()
-        if account.get("cc2api_account_id") is not None:
-            try:
-                _sync_bound_account_credentials_locked(account, 2400)
-            except ConnectionError as exc:
-                raise HTTPException(502, _redact_cc2api_error(exc))
-            except ValueError as exc:
-                raise HTTPException(400, _redact_cc2api_error(exc))
         try:
             session = continue_manager.start(run, account)
         except ValueError as e:
@@ -7644,6 +8745,8 @@ def continue_run_start(rid: str):
         "run_id": session.run_id,
         "claude_session_id": session.session_id,
         "ws_path": f"/api/run-continue/ws/{session.sid}",
+        "status": session.status,
+        "quota": _public_quota(account),
     }
 
 
@@ -7668,170 +8771,184 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
         return
 
     api = continue_manager.runner.client.api
-    try:
-        exec_id = api.exec_create(
-            session.worker_id,
-            [
-                "sh",
-                "-lc",
-                "if [ -f /workspace/.claude.json ] && [ ! -f \"$HOME/.claude.json\" ]; then "
-                "cp /workspace/.claude.json \"$HOME/.claude.json\"; fi; "
-                "claude --permission-mode \"$CLAUDE_PERMISSION_MODE\" "
-                "--resume \"$CONTINUE_SESSION_ID\"",
-            ],
-            stdin=True,
-            tty=True,
-            user=WORKER_USER,
-            environment=_claude_exec_env(True, {
-                "TERM": "xterm-256color",
-                "COLUMNS": "120",
-                "LINES": "36",
-                "CONTINUE_SESSION_ID": session.session_id,
-                "CLAUDE_PERMISSION_MODE": session.permission_mode,
-            }),
-            workdir="/workspace",
-        )["Id"]
-        sock = api.exec_start(
-            exec_id, detach=False, tty=True,
-            stream=False, socket=True, demux=False,
-        )
-    except Exception as e:
-        await websocket.send_text(json.dumps(
-            {"type": "error", "msg": f"exec failed: {e}"}))
-        await websocket.close(code=4500)
-        continue_manager.cleanup(sid)
-        return
-
-    raw = getattr(sock, "_sock", None) or sock
-    try:
-        raw.setblocking(False)
-    except Exception:
-        pass
-
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     closed = asyncio.Event()
+    bridge = {"raw": None, "exec_id": None, "generation": -1}
+    session.connected = True
     auth_tail = ""
     auth_refresh_task: Optional[asyncio.Task] = None
 
-    async def recover_managed_oauth_once() -> None:
-        """首次检测到 continue 401 时交给 cc2api 刷新并提示 Claude 重试。"""
+    def close_bridge() -> None:
+        """断开旧 PTY，返回 None；不保留用户输入。"""
+        raw = bridge["raw"]
+        bridge.update(raw=None, exec_id=None, generation=-1)
+        if raw is not None:
+            try:
+                raw.close()
+            except Exception:
+                pass
+
+    def open_bridge() -> None:
+        """锁内为当前代次恢复 Claude exec；返回 None。"""
+        with session.guard_lock:
+            if session.status != "running" or continue_manager.get(sid) is not session:
+                return
+            exec_id = api.exec_create(
+                session.worker_id,
+                ["sh", "-lc", "if [ -f /workspace/.claude.json ] && [ ! -f \"$HOME/.claude.json\" ]; then "
+                 "cp /workspace/.claude.json \"$HOME/.claude.json\"; fi; "
+                 "if [ -n \"${CLAUDE_MODEL_OVERRIDE:-}\" ]; then "
+                 "claude --permission-mode \"$CLAUDE_PERMISSION_MODE\" --resume \"$CONTINUE_SESSION_ID\" --model \"$CLAUDE_MODEL_OVERRIDE\"; "
+                 "else claude --permission-mode \"$CLAUDE_PERMISSION_MODE\" --resume \"$CONTINUE_SESSION_ID\"; fi"],
+                stdin=True, tty=True, user=WORKER_USER,
+                environment=_claude_exec_env(True, {
+                    "TERM": "xterm-256color", "COLUMNS": "120", "LINES": "36",
+                    "CONTINUE_SESSION_ID": session.session_id, "CLAUDE_PERMISSION_MODE": session.permission_mode,
+                    **({"CLAUDE_MODEL_OVERRIDE": session.run.get("execution_model") or session.run.get("capture_model_override")}
+                       if session.run.get("execution_model") or session.run.get("capture_model_override") else {}),
+                }), workdir="/workspace",
+            )["Id"]
+            sock = api.exec_start(exec_id, detach=False, tty=True, stream=False, socket=True, demux=False)
+            raw = getattr(sock, "_sock", None) or sock
+            raw.setblocking(False)
+            bridge.update(raw=raw, exec_id=exec_id, generation=session.generation)
+
+    async def recover_managed_oauth_once(generation: int) -> None:
+        """仅向原代次交互执行回写 cc2api 凭据，等待和关闭时禁止重试。"""
         conn = get_db()
         try:
-            account_row = _get_available_account(conn, session.account_id)
-            account = dict(account_row) if account_row else None
+            row = _get_available_account(conn, session.account_id)
+            account = dict(row) if row else None
         finally:
             conn.close()
         if not account or account.get("cc2api_account_id") is None:
             return
         try:
-            await asyncio.to_thread(
-                _sync_bound_account_credentials,
-                account,
-                600,
-                True,
-            )
-            await asyncio.to_thread(
-                continue_manager.runner.sync_managed_credentials_to_worker,
-                session.worker_id,
-            )
-            raw.send(b"\x03")
-            await asyncio.sleep(1)
-            raw.send(
-                "检测到认证失败，cc2api 已刷新凭据。请重试刚才失败的请求；若仍失败请停止。\r".encode(
-                    "utf-8"
-                )
-            )
+            if session.status != "running" or session.generation != generation:
+                return
+            if quota_guard and quota_guard.snapshot(account)["blocked"]:
+                return
+            await asyncio.to_thread(_sync_bound_account_credentials, account, 600, True)
+            def sync_worker() -> None:
+                """锁内同步原代次凭据，返回 None。"""
+                with session.guard_lock:
+                    if session.status == "running" and session.generation == generation:
+                        continue_manager.runner.sync_managed_credentials_to_worker(session.worker_id)
+            if session.status != "running" or session.generation != generation:
+                return
+            await asyncio.to_thread(sync_worker)
+            if bridge["raw"] is not None:
+                await asyncio.to_thread(continue_manager.send_input, session, generation, bridge["raw"], b"\x03")
+                await asyncio.sleep(1)
+                await asyncio.to_thread(continue_manager.send_input, session, generation, bridge["raw"],
+                    "检测到认证失败，cc2api 已刷新凭据。请重试刚才失败的请求；若仍失败请停止。\r".encode())
         except Exception as exc:
             if websocket.client_state == WebSocketState.CONNECTED:
-                await websocket.send_bytes(
-                    f"\r\n[bench] cc2api 凭据刷新失败：{_redact_cc2api_error(exc)}\r\n".encode(
-                        "utf-8"
-                    )
-                )
+                await websocket.send_text(json.dumps({"type": "error", "msg": _redact_cc2api_error(exc)}))
 
-    async def pump_container_to_ws():
-        """worker PTY → ws"""
+    async def pump_container_to_ws() -> None:
+        """跟随会话代次替换 PTY，等待时保持 WS。返回 None。"""
         nonlocal auth_tail, auth_refresh_task
+        last_state = None
         try:
             while not closed.is_set():
+                if continue_manager.get(sid) is not session or session.status == "closed":
+                    if session.quota.get("message"):
+                        await websocket.send_text(json.dumps({"type": "error", "msg": session.quota["message"]}))
+                    break
+                if session.status == "running" and bridge["generation"] != session.generation:
+                    close_bridge()
+                    auth_tail = ""
+                    if auth_refresh_task and not auth_refresh_task.done():
+                        auth_refresh_task.cancel()
+                    auth_refresh_task = None
+                    await asyncio.to_thread(open_bridge)
+                event = {"type": "quota_state", "status": session.status,
+                         "message": session.quota.get("message", ""),
+                         "resume_at": session.quota.get("resume_at"), "generation": session.generation}
+                signature = json.dumps(event)
+                if signature != last_state:
+                    await websocket.send_text(signature)
+                    last_state = signature
+                if session.status == "quota_wait":
+                    close_bridge()
+                    await asyncio.sleep(0.2)
+                    continue
+                raw = bridge["raw"]
+                if raw is None:
+                    await asyncio.sleep(0.2)
+                    continue
                 try:
-                    data = await asyncio.wait_for(
-                        loop.sock_recv(raw, 4096), timeout=1.0
-                    )
+                    data = await asyncio.wait_for(loop.sock_recv(raw, 4096), timeout=1)
                 except asyncio.TimeoutError:
                     continue
+                except (OSError, ValueError):
+                    if session.status == "quota_wait":
+                        continue
+                    raise
                 if not data:
-                    break
-                if websocket.client_state != WebSocketState.CONNECTED:
+                    # 额度暂停清理容器可能先于下一次轮询；只在同代次仍运行时结束 WS。
+                    if session.status == "quota_wait" or bridge["generation"] != session.generation:
+                        continue
                     break
                 await websocket.send_bytes(data)
                 auth_tail = (auth_tail + data.decode("utf-8", errors="ignore"))[-6000:]
-                if auth_refresh_task is None and any(
-                    marker in auth_tail
-                    for marker in (
-                        "Please run /login",
-                        "API Error: 401",
-                        "Invalid authentication credentials",
-                        "OAuth token has expired",
-                    )
-                ):
-                    auth_refresh_task = asyncio.create_task(recover_managed_oauth_once())
-        except Exception:
-            pass
+                if (auth_refresh_task is None and "account_on_hold" not in auth_tail and "on hold" not in auth_tail.lower()
+                        and any(marker in auth_tail for marker in ("Please run /login", "API Error: 401", "Invalid authentication credentials", "OAuth token has expired"))):
+                    auth_refresh_task = asyncio.create_task(recover_managed_oauth_once(session.generation))
+        except Exception as exc:
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.send_text(json.dumps({"type": "error", "msg": f"继续会话执行失败：{type(exc).__name__}"}))
         finally:
             closed.set()
 
-    async def pump_ws_to_container():
-        """ws → worker PTY"""
+    async def pump_ws_to_container() -> None:
+        """后端同时拦截文本和二进制输入，等待期没有重放队列。返回 None。"""
         try:
             while not closed.is_set():
                 msg = await websocket.receive()
                 if msg["type"] == "websocket.disconnect":
                     break
-                if msg.get("bytes"):
-                    raw.send(msg["bytes"])
-                    continue
-                txt = msg.get("text")
-                if not txt:
-                    continue
-                try:
-                    ev = json.loads(txt)
-                except json.JSONDecodeError:
-                    raw.send(txt.encode())
-                    continue
-                if ev.get("type") == "resize":
+                data = msg.get("bytes")
+                text = msg.get("text")
+                if text:
                     try:
-                        api.exec_resize(
-                            exec_id,
-                            height=int(ev.get("rows") or 36),
-                            width=int(ev.get("cols") or 120),
-                        )
-                    except Exception:
-                        pass
-                elif ev.get("type") == "input":
-                    raw.send((ev.get("data") or "").encode())
+                        event = json.loads(text)
+                    except ValueError:
+                        event = {"type": "input", "data": text}
+                    if not isinstance(event, dict):
+                        continue
+                    if event.get("type") == "resize":
+                        if bridge["exec_id"] and session.status == "running":
+                            try:
+                                api.exec_resize(bridge["exec_id"], height=int(event.get("rows") or 36), width=int(event.get("cols") or 120))
+                            except Exception:
+                                pass
+                        continue
+                    if event.get("type") == "input":
+                        data = str(event.get("data") or "").encode()
+                if data and bridge["raw"] is not None:
+                    await asyncio.to_thread(continue_manager.send_input, session, bridge["generation"], bridge["raw"], data)
         except WebSocketDisconnect:
-            pass
-        except Exception:
             pass
         finally:
             closed.set()
 
+    output = asyncio.create_task(pump_container_to_ws())
+    incoming = asyncio.create_task(pump_ws_to_container())
     try:
-        await asyncio.gather(pump_container_to_ws(), pump_ws_to_container())
+        await asyncio.wait((output, incoming), return_when=asyncio.FIRST_COMPLETED)
     finally:
-        if auth_refresh_task and not auth_refresh_task.done():
-            auth_refresh_task.cancel()
-        try:
-            raw.close()
-        except Exception:
-            pass
-        continue_manager.cleanup(sid)
+        session.connected = False
+        closed.set()
+        for task in (output, incoming, auth_refresh_task):
+            if task and not task.done():
+                task.cancel()
+        await asyncio.gather(output, incoming, return_exceptions=True)
+        close_bridge()
+        await asyncio.to_thread(continue_manager.cleanup, sid)
         if websocket.client_state == WebSocketState.CONNECTED:
-            try:
-                await websocket.close()
-            except Exception:
-                pass
+            await websocket.close()
 
 
 @app.delete("/api/run-continue/{sid}")
@@ -7867,15 +8984,8 @@ async def stream_runs():
     async def gen():
         last_payload = ""
         while True:
-            conn = get_db()
-            try:
-                rows = conn.execute(
-                    "SELECT * FROM runs WHERE deleted_at IS NULL "
-                    "ORDER BY (started_at IS NULL), started_at DESC, created_at DESC LIMIT 100"
-                ).fetchall()
-            finally:
-                conn.close()
-            payload = json.dumps([dict(r) for r in rows], default=str, ensure_ascii=False)
+            rows = await asyncio.to_thread(list_runs, 100)
+            payload = json.dumps(rows, default=str, ensure_ascii=False)
             if payload != last_payload:
                 last_payload = payload
                 yield {"event": "runs", "data": payload}

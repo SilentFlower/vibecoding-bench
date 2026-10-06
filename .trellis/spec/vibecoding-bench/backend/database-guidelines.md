@@ -493,6 +493,99 @@ def continue_run_ws(...):
 
 ---
 
+## Scenario: 被动额度等待与原任务恢复
+
+### 1. Scope / Trigger
+
+- 修改额度采集、5h/7d 门禁、quota_wait、自动恢复、worker 完成判定、继续对话或相应容器挂载时适用。
+- 单次、批次、再次运行、养号、抓包和继续对话共用账号事实；自动路径只消费正式请求的响应，不调用 usage、cc2api refresh_usage、查询 worker 或模型探测。
+
+### 2. Signatures
+
+```text
+account_quota_states(account_id INTEGER PRIMARY KEY, identity TEXT,
+  state_json TEXT, recovery_source TEXT, updated_at REAL)
+quota_observation_cursors(source TEXT PRIMARY KEY, account_id INTEGER,
+  identity TEXT, path TEXT, file_identity TEXT, byte_offset INTEGER DEFAULT 0)
+runs.execution_model TEXT NULL
+runs.quota_attempt INTEGER NOT NULL DEFAULT 0
+runs.quota_resume_at REAL NULL
+runs.quota_identity TEXT NULL
+```
+
+新表用 `CREATE TABLE IF NOT EXISTS`，四个 run 列由 `init_db()` 的 `_ensure_column()` 幂等补齐，不删除历史数据。
+
+纯协议真实源为 `orchestrator/quota_protocol.py`，`scripts/sync-quota-protocol.py` 同步到 sidecar 独立构建上下文；两个 Dockerfile 必须复制该模块。
+
+```python
+quota_observation(headers: dict, status: int, now: float) -> dict
+merge_quota_observation(existing: dict, incoming: dict) -> dict
+quota_decision(state: dict, now: float) -> dict
+QuotaGuard.admit(account: dict, source: str) -> bool
+QuotaGuard.consume(account: dict) -> None
+QuotaGuard.record_control_state(account: dict, source: str, payload: dict) -> None
+QuotaGuard.recover() -> None
+QuotaGuard.capture_resume_ready(run_id: str) -> bool
+```
+
+### 3. Contracts
+
+- 身份由 bench ID、绑定 ID、profile 的账号/组织 UUID 构成，不使用轮换 AT/RT。run 固化 quota_identity，身份变化不得自动在新身份执行旧工作。来源为 `run:<rid>:<attempt>` 或 `continue:<sid>:<generation>`。
+- sidecar 仅观察当前 OAuth AT 所属的 `api.anthropic.com/v1/messages`。内部白名单 JSONL 保存 source、identity、ts、status、额度头及有限 account_error，不保存 AT/RT 或任意错误正文。dummy key、其它域名及 OAuth 路径不能污染账号额度。
+- 每窗口保存 observed_at、utilization（百分比）、reset_at（UTC 秒）、rejected、exhausted。响应头比例乘 100；秒、毫秒、带时区 RFC3339 均可解析。缺失/非法窗口保留既有事实，按窗口自身时间合并，乱序或同时间允许不能清掉拒绝；跨周期高位残留按真实允许响应归零。
+- 429 的 rejected 优先，allowed 排除该窗口的高位猜测；普通 RPM 429 不形成通用耗尽。仅 seven_day_fable / 7d_oi 耗尽不阻断通用窗口。通用窗口达到 100% 或明确拒绝后阻止后续正式请求；已接受的成功流可以完成。
+- 多窗口耗尽取全部 reset 及可信 retry-after 的最晚值。无可信 reset 时保持等待，不猜 now+5h/7d。明确 limit 但窗口未知时保存 unknown 补证；已有真实耗尽窗口不再追加未知阻断。
+- 到期仅为 retry_ready，不写成恢复或 0%。共同门禁先认领一个已有正式执行；其真实允许响应合并后，未再耗尽才放行其它工作。执行失败释放本代认领，不能批量冲上游。
+- quota_wait 是非终态，不计批次完成。自动恢复沿用 run/task/prompt、workspace/session、CLI/effort/权限/模型快照；首次额度判定前固化 execution_model，空串也属于有效快照，不能重新读取全局覆盖。恢复使用原主会话并按本次新增 JSONL 判断完成，排除子代理和复制的旧历史。
+- worker 优先处理独立暂停信号，保存状态后以 43 退出。rate_limit、account_on_hold、invalid_grant 及其它 synthetic API 错误不能判 success；明确封号/invalid_grant 固化永久门禁、暂停批次并关闭养号，不按额度到期恢复。
+- 停止、暂停、关闭养号/续聊、账号停用及删除优先。代次/status/父任务/stop_requested_at 必须在恢复与收口时复查；绑定和重授权的活跃检查包含 quota_wait。等待不占 semaphore 或长期 owner/profile lock。
+- 共享状态为 `BENCH_DATA/quota/<aid>/state.json`，原子替换并挂只读目录。控制为 `BENCH_DATA/quota-controls/<rid>/<source_hash>/pause.json`，位于可写 workspace 外，sidecar RW、worker RO；宿主挂载使用 HOST_BENCH_DATA。sidecar 使用 QUOTA_SOURCE、QUOTA_IDENTITY、QUOTA_STATE_FILE、QUOTA_SIGNAL_FILE、QUOTA_OBSERVATIONS_FILE、QUOTA_CREDENTIALS_FILE；worker 仅消费来源和信号文件。
+- 日志优先写入，再发布控制；控制携带归一化 quota_state，日志故障仍保留真实 reset 和封号分类。服务启动在清理原容器前后消费观察与控制补证，严格清理失败不得恢复。控制损坏或门禁不可读按执行失败收口。
+- continue HTTP 可返回不占 worker 的等待 session；WS 的 quota_state 事件包含 status、message、resume_at、generation，running 只在 PTY 打开后通知。服务端拒绝等待期文本/二进制输入且不重放；关闭/断连取消重建。抓包 run 与抓包续聊自动恢复共同遵守串行、120 秒间隔和异常后至少 15 分钟暂停。
+- accounts/run/batch API 的 passive_quota 只返回 source、known、windows、observed_at、blocked、exhausted、resume_at、retry_ready、message、account_error，不暴露内部身份或哈希；页面渲染、刷新、SSE 不触发主动查询，显式手动查询仍可更新来源为 manual 的记录。
+- 配套交付 orchestrator、worker、sidecar 和 WebUI。回滚旧版前先停止等待工作并备份 SQLite；旧版不识别 quota_wait，不能将等待记录批量改为 active，不删除 profile/workspace/flows。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 无首次观察 | 正常任务可以启动，页面显示未知 |
+| 排队后才耗尽 | semaphore 后最终门禁拒绝，不创建 worker |
+| 两窗口耗尽且仅一个到期 | 保持等待 |
+| 明确拒绝但 reset 缺失 | 保留该窗口旧未来 reset，否则无限等待有效证据 |
+| 已接受流携带 100% | 本流可完成，下一条模型请求本地阻断 |
+| 控制已写但 JSONL 故障，随后重启 | 原 reset/封号分类由控制恢复，清旧容器后再调度 |
+| 恢复后再次拒绝 | 同一 run 重新等待，不换题或循环探测 |
+| 封号/invalid_grant | auth_failed，无额度自动恢复 |
+| 等待期 WS 文本或二进制输入 | 丢弃，恢复后只接收新输入 |
+| 用户停止、关闭或身份变化 | 不复活原工作 |
+
+### 5. Scenarios and Examples
+
+- 正常：原题耗尽，两个窗口都到期后认领原 run，`--resume` 原 session；真实成功响应更新额度后才推进批次后续题。
+- 边界：拒绝头缺少 reset 且没有旧可信时间，页面显示暂无可信恢复时间，后台不补查；其它账号仍正常运行。
+- 错误用法：把到期缓存直接写成 0%，或者仅禁用前端输入而继续把 WS 二进制帧送给 PTY。
+- 正确处理：到期只认领正常恢复机会；所有输入经过 ContinueManager.send_input 的服务端门禁。
+
+```python
+# 原 run 的空模型快照同样必须保留。
+task["model_override"] = run["execution_model"]
+# 只有旧内部调用未携带该键时才可读取当前全局模型。
+if "model_override" not in task:
+    task["model_override"] = effective_runtime_model()
+```
+
+### 6. Tests Required
+
+- 六类入口、排队期间变化、两个窗口不同 reset、普通 RPM 429、缺失/非法/跨周期/乱序与同时间拒绝优先。
+- 直接执行 worker 内嵌 Python，用真实形状的脱敏 synthetic rate_limit/hold/timeout/认证消息证明不会 success；正常完成与恢复基线仍正确。
+- 同 run/session/config、空模型快照、单账号单次恢复认领、再次拒绝、暂停/停止/停用/身份切换、其它账号隔离。
+- JSONL 半行/轮换/游标重启，观察日志故障和控制先到，清理失败、queued 认领后崩溃；旧 worker 与恢复不能重叠。
+- continue 实际 WS 文本与二进制门禁、自动恢复、无输入重放、关闭不复活；抓包 run/续聊共同限频。
+- 自动路径 mock usage 和 refresh_usage 为调用即失败；API/观察文件不含凭据明文，协议副本字节一致，旧数据库重复升级后原数据与新列默认值保留。
+
+---
+
 ## Common Mistakes
 
 | 反模式 | 为什么不要 | 怎么改 |

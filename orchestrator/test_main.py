@@ -1047,7 +1047,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
 
     def test_old_database_upgrade_adds_run_identity_snapshot_columns(self) -> None:
         """
-        旧 runs 表重复升级后应幂等补齐版本、预算和抓包权限快照列。
+        旧 runs 表重复升级后应幂等补齐执行快照及额度列，保留历史数据。
 
         :return: None
         """
@@ -1086,11 +1086,17 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             preserved_setting = conn.execute(
                 "SELECT value FROM app_settings WHERE key='claude_effort_level'"
             ).fetchone()
+            preserved_quota = conn.execute(
+                "SELECT quota_attempt,quota_resume_at,quota_identity,execution_model "
+                "FROM runs WHERE id='preserved-run'"
+            ).fetchone()
         finally:
             conn.close()
         self.assertIn("claude_code_version", columns)
         self.assertIn("claude_effort_level", columns)
         self.assertIn("capture_permission_mode", columns)
+        self.assertTrue({"quota_attempt", "quota_resume_at", "quota_identity", "execution_model"} <= columns)
+        self.assertEqual((0, None, None, None), preserved_quota)
         self.assertEqual(
             ("preserved-run", 7, 9, "success", None, "bypassPermissions"),
             preserved_run,
@@ -2650,6 +2656,10 @@ global.fetch = async (_url, options) => {
                 conn.execute(
                     "INSERT INTO runs(id, task_id, account_id, status) "
                     "VALUES('owner-run',1,1,'queued')"
+                )
+                conn.execute(
+                    "INSERT INTO tasks(id,topic_no,title,prompt,account_id) "
+                    "VALUES(1,1,'所有权锁测试','原任务',1)"
                 )
         finally:
             conn.close()
