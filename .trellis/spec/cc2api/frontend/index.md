@@ -8,7 +8,7 @@
 
 | Guide | Description | Status |
 |-------|-------------|--------|
-| [Frontend Guidelines](./frontend-guidelines.md) | Vue Router、API client、settings UI、类型同步和构建规则 | Filled |
+| [Frontend Guidelines](./frontend-guidelines.md) | Vue Router、API client、settings UI、账号基础版本/画像配置展示、类型同步和构建规则 | Filled |
 
 ---
 

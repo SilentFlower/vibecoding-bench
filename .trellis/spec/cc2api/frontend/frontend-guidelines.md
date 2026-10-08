@@ -111,6 +111,47 @@ const isValidLimit = computed(() => {
 - 邮箱、账号 UUID、organization UUID 可以展示，但不要和 token 一起导出到日志。
 - usage、RPM、并发和队列状态应标明窗口来源，避免把 5h/7d/RPM 混在一起。
 
+### Scenario: 账号基础版本与画像选择配置展示
+
+#### 1. Scope / Trigger
+
+- Trigger：修改账号卡片版本展示或账号列表画像配置时适用。
+- 账号持久环境与请求画像有不同含义；同账号可以承载不同客户端版本，页面必须分别标明基础版本和画像选择方式。
+
+#### 2. Signatures
+
+- `GET /admin/accounts?page=<页码>&page_size=<数量>`，保留既有分页响应。
+- `GatewayService::profile_selection_config(&self) -> ClaudeCodeProfileSelectionConfig`（async），返回当前生效的原子配置快照。
+
+#### 3. Contracts
+
+- 列表顶层增加 `claude_code_profile_selection_mode: "client_version" | "account"`、`claude_code_version_profile: string`；读取网关实际缓存，不另读数据库猜测生效配置。
+- 卡片中 `canonical_env.version` 标为「账号基础版本」，画像方式独立展示；客户端模式显示「默认回退」。基础版本不能当作该账号所有请求的版本。
+- 账号配置展示和请求版本适配不依赖自动遥测开关。
+- 沿用账号列表每 5 秒轮询。前端新增字段使用可选类型兼容旧后端；缺少配置时显示「未提供画像配置」，不硬编码模式或默认版本。
+
+#### 4. Validation & Error Matrix
+
+| 条件 | 展示/接口行为 |
+| --- | --- |
+| 基础版本 280，客户端模式，自动遥测关闭 | 展示基础版本、按客户端 UA 适配和实际默认回退版本 |
+| 账号模式 | 展示「使用账号画像」，不展示客户端模式的默认回退 |
+| mode/default 保存成功并 reload | 下一轮账号列表展示实际生效的新配置 |
+| 设置校验失败 | 列表继续展示原有缓存配置 |
+| 旧响应没有新增字段 | 展示配置缺失提示，不能硬编码 280 或客户端模式 |
+
+#### 5. Scenarios and Examples
+
+- 正常：卡片显示「账号基础版本：v2.1.280」「按客户端 UA 适配」「默认回退：v2.1.280」。
+- 边界：自动遥测关闭仍正常显示画像配置；旧接口没有画像字段时显示配置缺失提示。
+- 错误：把账号保存的 v280 当成当前所有请求版本，或用默认 280 填补旧接口缺失的配置字段。
+- 正确：基础版本读取持久 env，画像方式和默认回退读取网关当前生效的配置。
+
+#### 6. Tests Required
+
+- 管理 API：非空账号列表保留基础版本，自动遥测关闭时仍返回画像配置；mode/default 热刷新和失败校验后列表配置符合实际缓存。
+- 前端：同步 `api.ts` 可选类型和卡片配置缺失分支，通过 `npm run build`；后端通过 `cargo fmt --check` 与完整 `cargo test`。
+
 ## UI 风格
 
 - 这是运维管理后台，优先信息密度和可扫描性。
