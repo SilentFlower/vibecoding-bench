@@ -107,8 +107,8 @@ HeaderCaseMap::from_names<I, S>(names: I) -> Result<Self, InvalidHeaderName>
 - 字符索引必须按 JavaScript UTF-16 code unit 语义。
 - `messages[0].content` 是数组时，Claude Code 主请求可能先放环境上下文 text block，再放真实用户 prompt text block；后缀文本源应取首条 user message 的最后一个 text block，而不是第一个 text block。
 - Haiku/title 这类只有一个 text block 的请求仍取唯一 text block。
-- `2.1.280` 带 `thread.previous_message_id` 的续轮请求复用入站 billing block 中已有的会话级
-  三位小写十六进制后缀；同一 run 的所有续轮保持一致。即使当前 user message 在
+- `2.1.280` / `2.1.293` 带 `thread.previous_message_id` 的续轮请求复用入站 billing block 中已有的会话级
+  三位小写十六进制后缀；同一会话链的续轮保持一致，同一 run 可以存在交错的独立会话链。即使当前 user message 在
   `tool_result` 后重新出现 text block，也不能按该文本生成确定性后缀。初始线程请求只有
   `thread.type`，仍按最后一个 user text 确定性计算。
 
@@ -178,7 +178,7 @@ CCH 契约：
 
 - seed 不是默认可变项；升级时先用旧 seed 复算，不命中再尝试找 seed。
 - `2.1.156`、`2.1.169`、`2.1.172`、`2.1.173`、`2.1.185`、`2.1.187`、
-  `2.1.195`、`2.1.197`、`2.1.220`、`2.1.257`、`2.1.260`、`2.1.280` 使用 seed
+  `2.1.195`、`2.1.197`、`2.1.220`、`2.1.257`、`2.1.260`、`2.1.280`、`2.1.293` 使用 seed
   `0x4D659218E32A3268`；不能因版本号变化直接更换 seed。
 - `2.1.169`：在最终 body 字节上把真实 `cch=<5hex>` 替回 `cch=00000` 后计算，保留完整 body。
 - `2.1.172`：在最终 body 字节上替回 `cch=00000` 后，再做 top-level 规范化：
@@ -194,11 +194,11 @@ CCH 契约：
   `claude-fable-5-1` 保留 `fallbacks="default"`，Opus、Sonnet 和 Haiku 删除不存在的
   top-level `fallbacks`。没有 `2.1.260 claude-fable-5` 抓包时，不得外推其 fallback
   或 CCH 裁剪规则。
-- `2.1.280`：保留相同 seed，删除 top-level `max_tokens`，保留最终请求中的 top-level
+- `2.1.280` / `2.1.293`：保留相同 seed，删除 top-level `max_tokens`，保留最终请求中的 top-level
   `fallbacks`；对序列化 JSON 中每个 key 字节精确等于 `"model"` 且 value 为字符串的字段
   清空值，包括 advisor 工具和 fallback 对象里的嵌套模型。不得改写字符串正文中的
   `\"model\"`、转义 key（例如 `"\u006dodel"`）或非字符串 model 值。
-- `2.1.260` 及更早画像的 CCH 输入裁剪必须只作用 top-level JSON 字段；2.1.280 的全层级
+- `2.1.260` 及更早画像的 CCH 输入裁剪必须只作用 top-level JSON 字段；2.1.280/293 的全层级
   model 清空是独立版本契约，不能反向套用到旧画像。
 - 不要先 `serde_json` 反序列化再重新序列化后计算 CCH；字段顺序、转义和空格变化会改变结果。
 
@@ -1211,7 +1211,7 @@ web/src/components/Settings.vue
 
 ```text
 claude_code_version_profile=<profile key>
-allowed_claude_code_versions=<profile.access_policy.allowed_claude_code_versions>
+allowed_claude_code_versions=<客户端模式独立准入范围；账号模式为目标画像范围>
 allowed_user_agents=<管理员自定义值，版本切换不得覆盖>
 ```
 
@@ -1232,20 +1232,22 @@ allowed_user_agents=<管理员自定义值，版本切换不得覆盖>
 - `claude_code_version_profile` 保存时必须校验为内置 profile key；未知 key 返回 `BadRequest`，不能落库。
 - 切换 profile 必须在同一事务中完成：
   - 写入 `settings.claude_code_version_profile`。
-  - 强制覆盖 `settings.allowed_claude_code_versions` 为目标画像范围。
+  - 客户端模式保存显式提交的 `allowed_claude_code_versions`；profile-only payload 保留存量范围。账号模式覆盖为目标画像范围。
   - 批量覆盖所有账号 `canonical_env.version/version_base/build_time/node_version`。
+- 本次提交的其它 settings 也必须在同一事务中提交；任一写入失败，settings 与账号软件字段整体回滚。
 - 切换 profile 不得覆盖 `allowed_user_agents`，该 setting 仍由管理员独立维护。
 - 新账号创建必须读取当前 `claude_code_version_profile`，再把目标 `identity` 写入 `canonical_env`。
 - 客户端模式下，请求入口冻结原始 UA 对应的内置画像或配置的默认画像，使用请求级账号副本完成重写和 telemetry；账号模式沿用账号 `canonical_env.version`。映射失败只能回退内置画像，不能拼出未验证特征，具体规则见下方「按客户端 UA 选择请求画像」。
-- 只提交 `claude_code_version_profile` 的 settings payload 时，也必须 reload access policy 和画像选择配置，因为后端会同步改写 `allowed_claude_code_versions`，且未匹配 UA 的默认画像需要立即生效。
-- 前端 Settings 保存成功后必须重新加载 settings，用后端强制覆盖后的版本范围作为只读回显。
+- 只提交 `claude_code_version_profile` 的 settings payload 时，也必须调用 `reload_access_profile_config` 原子刷新准入与画像选择；未匹配 UA 的默认画像需要立即生效，账号模式还会同步改写允许范围。
+- 前端 Settings 保存成功后必须重新加载 settings，回显实际落库值；客户端模式的版本范围可编辑，账号模式只读。
 
 ### 4. Validation & Error Matrix
 
 | 条件 | 期望 |
 |------|------|
 | settings 提交未知 `claude_code_version_profile` | 返回 `BadRequest`，不更新 settings 和账号 env |
-| 只提交 `claude_code_version_profile` | 同步覆盖 `allowed_claude_code_versions` 并 reload access policy 和画像选择配置 |
+| 客户端模式只提交 `claude_code_version_profile` | 保留存量允许范围，原子 reload 准入与画像选择 |
+| 账号模式提交 `claude_code_version_profile` | 同步目标画像允许范围，原子 reload 准入与画像选择 |
 | 切换 profile 时存在自定义 `allowed_user_agents` | 原值保持不变 |
 | 切换 profile 后已有账号仍保留旧 `canonical_env.version` | 视为失败，检查事务内账号批量更新 |
 | 账号 env.version 不是内置版本 | 热路径回退默认 profile，避免组合未验证请求/telemetry 特征 |
@@ -1270,7 +1272,8 @@ allowed_user_agents=<管理员自定义值，版本切换不得覆盖>
 - settings：
   - 未知 `claude_code_version_profile` 返回错误。
   - 切换 profile 后 settings 与所有账号 env 在同一事务结果中一致。
-  - `allowed_claude_code_versions` 被强制覆盖，`allowed_user_agents` 保留。
+  - 客户端模式的显式范围与 profile-only 存量范围保留；账号模式使用目标画像范围。两种模式均保留未提交的 `allowed_user_agents`。
+  - settings 任一写入失败时，配置与账号软件字段整体回滚；SQLite/PostgreSQL 都需覆盖。
   - profile-only payload 触发 access policy reload 的可观察行为。
 - account：
   - 新账号使用当前 profile 的 `identity`。
@@ -1293,11 +1296,9 @@ settings.insert("claude_code_version_profile".into(), user_input_version);
 ```rust
 let profile = profile_for_key(&user_input_version)?;
 settings.insert("claude_code_version_profile".into(), profile.key.to_string());
-settings.insert(
-    "allowed_claude_code_versions".into(),
-    profile.access_policy.allowed_claude_code_versions.to_string(),
-);
 ```
+
+随后由 `upsert_many_with_profile(&settings, Some(profile))` 在同一事务内按生效模式处理允许范围与账号软件字段。
 
 #### Wrong: 切版本时顺手覆盖 UA 白名单
 
@@ -1307,12 +1308,12 @@ settings.insert("allowed_user_agents".into(), profile_default_user_agents);
 
 这样会覆盖管理员的独立安全策略。
 
-#### Correct: 只覆盖 Claude Code 版本范围
+#### Correct: 不顺带写入 UA 白名单
 
 ```rust
 settings.insert(
-    "allowed_claude_code_versions".into(),
-    profile.access_policy.allowed_claude_code_versions.to_string(),
+    "claude_code_version_profile".into(),
+    profile.key.to_string(),
 );
 ```
 
@@ -1323,7 +1324,7 @@ settings.insert(
 ### 1. Scope / Trigger
 
 - Trigger：修改请求版本选择、默认回退、配置热刷新，或同账号多版本遥测与缓存时适用。
-- 默认同时适配 `2.1.260` 和 `2.1.280`；版本匹配仅依赖原始 Claude UA。请求体版本字段不参与选择，新增版本必须先补齐抓包证据和内置画像。
+- 客户端模式精确适配 `2.1.260`、`2.1.280`、`2.1.293`；出厂默认画像为 293。版本匹配仅依赖原始 Claude UA。请求体版本字段不参与选择，新增版本必须先补齐抓包证据和内置画像。
 - 画像表示软件协议特征，账号设备身份、凭证和总容量仍由同一持久账号承载，防止两版交错请求互相覆盖或扩大容量。
 
 ### 2. Signatures
@@ -1334,6 +1335,7 @@ PUT /admin/settings <- JSON 字符串映射
 ClaudeCodeProfileSelectionMode::parse(value: &str) -> Result<Self, AppError>
 ClaudeCodeProfileSelectionConfig::resolve(self, user_agent: &str) -> Option<&'static ClaudeCodeProfile>
 account_for_request_profile(account: &Account, profile: Option<&'static ClaudeCodeProfile>) -> Account
+GatewayService::reload_access_profile_config(&self) -> Result<(), AppError>  // async
 GatewayService::reload_profile_selection_config(&self) -> Result<(), AppError>  // async
 TelemetryService::get_session_expires_at(&self, account_id: i64) -> Option<DateTime<Utc>>  // async
 ```
@@ -1343,21 +1345,22 @@ TelemetryService::get_session_expires_at(&self, account_id: i64) -> Option<DateT
 ```json
 {
   "claude_code_profile_selection_mode": "client_version",
-  "claude_code_version_profile": "2.1.280"
+  "claude_code_version_profile": "2.1.293"
 }
 ```
 
 ### 3. Contracts
 
 - `claude_code_profile_selection_mode` 仅接受精确值 `client_version` 或 `account`，默认前者；不 trim、不接受空白变体。GET 补齐默认值，PUT 在任何写入前校验。无需新增环境变量。
-- 客户端模式只识别以 `claude-code/` 或 `claude-cli/` 开头的原始 UA，前缀不区分大小写；取斜杠后第一个空白分隔 token，只有精确 `2.1.260`、`2.1.280` 自动匹配。
-- 缺少 UA、非法 UA、Bun/axios 等辅助 UA，以及未匹配版本，均使用 `claude_code_version_profile` 指定的内置默认画像，出厂为 `2.1.280`。不得按邻近版本、请求体 `appVersion` 或其它字段推断。
+- 客户端模式只识别以 `claude-code/` 或 `claude-cli/` 开头的原始 UA，前缀不区分大小写；取斜杠后第一个空白分隔 token，只有精确 `2.1.260`、`2.1.280`、`2.1.293` 自动匹配。
+- 缺少 UA、非法 UA、Bun/axios 等辅助 UA，以及未匹配版本，均使用 `claude_code_version_profile` 指定的内置默认画像，出厂为 `2.1.293`。不得按邻近版本、请求体 `appVersion` 或其它字段推断。
 - 准入策略先检查原始 UA，再于读取 body 和账号重试前冻结画像。默认回退不绕过 `allowed_user_agents`、`allowed_claude_code_versions`；准入拒绝的请求仍被拒绝。
 - `account` 模式的 `resolve` 返回 `None`，沿用最终选中账号的持久 env 和旧选择规则；换号后使用新账号原有画像。客户端模式冻结的 `Some(profile)` 在 401、签名重试、换号和配置热刷新期间保持一致。
 - 每次选定账号后调用 `account_for_request_profile` 生成副本，只覆盖 `version/version_base/build_time/node_version` 软件字段。旧账号 env 无法反序列化时，先使用既有 `device_profile` 归一化已知字段并保留未知字段，再覆盖软件版本；副本不得写回存储。
 - 原账号用于调度、sticky、RPM/并发 admission、凭证和上游 Session 池；副本用于 headers/body、模型/beta、billing/CCH、count_tokens、bootstrap、内部 Hello、原生及自动遥测。公开 `GET/HEAD /api/hello` 继续保持无状态，不选择账号。
-- 启动和 mode/default 设置保存后从同一次 `get_all` 读取配置，并以一把 `RwLock` 原子更新。非法存量 mode 回退 `client_version`，非法存量默认 key 回退 `2.1.280`；已冻结的客户端画像不受后续 reload 影响。
-- 数据库仅补齐缺失的 mode key：SQLite 使用 `INSERT OR IGNORE`，PostgreSQL 使用 `ON CONFLICT (key) DO NOTHING`，保留显式值。只切 mode 不写账号 env；保存默认 profile 仍执行上方全局画像事务及准入范围同步。
+- 启动和 mode/default/允许范围/禁止版本/允许 UA 保存后，通过 `reload_access_profile_config` 从同一次 `get_all` 读取准入与选择配置，并在 `AccessProfileConfig` 的一把 `RwLock` 中原子替换。写锁覆盖读取和替换，防止并发 reload 的旧读取覆盖新快照；policy 解析失败保留旧快照。请求在同一读锁内先准入、再冻结画像。
+- 非法存量 mode 回退 `client_version`，非法存量默认 key 回退 `2.1.293`；已冻结的客户端画像不受后续 reload 影响。旧 reload 方法委托给组合刷新。
+- 数据库仅补齐缺失的 mode key：SQLite 使用 `INSERT OR IGNORE`，PostgreSQL 使用 `ON CONFLICT (key) DO NOTHING`，保留显式值。只切 mode 不写账号 env；保存默认 profile 执行上方全局事务，允许范围按模式处理。出厂组合升级边界见 [Settings & Database](../backend/settings-database.md#迁移规则)。
 - 自动遥测以 `(account_id, profile_key)` 分容器，创建时固定账号副本；续期仅更新 token 和 10 分钟 TTL，不重读账号替换软件画像。请求结果和流结束回调携带同一副本，payload 与 UA 从同一容器生成。
 - run/GrowthBook 运行 ID 的种子包含 profile key，同秒两版也不相同；device ID 和账号 UUID 继续共享。管理端过期时间取该账号各画像容器的最大值，发送计数仍按账号累计；容器过期只清理自身 key。
 
@@ -1379,8 +1382,9 @@ sticky、RPM、并发与上游 Session 池容量不得因 profile 增加独立�
 |------|------|
 | `claude-code/2.1.260 (external, cli)` 或大小写变体 | 使用 260；body 声明 280 也不覆盖 |
 | `claude-cli/2.1.280` | 使用 280 |
-| 缺少 UA，body 声明 260 | 使用配置默认画像，出厂 280 |
-| Bun/axios、`2.1.293`、`2.1.2600`、`2.1.260-beta` | 使用配置默认画像，不自动适配新版本 |
+| `claude-cli/2.1.293` | 使用 293 |
+| 缺少 UA，body 声明 260 | 使用配置默认画像，出厂 293 |
+| Bun/axios、`2.1.294`、`2.1.2600`、`2.1.260-beta` | 使用配置默认画像，不自动适配新版本 |
 | 默认画像改为内置 260，UA 未匹配 | 新请求使用 260；原有已冻结请求继续原画像 |
 | PUT mode 为 `invalid`、` account ` 或非字符串 | 参数错误；校验失败不得更新 settings 或账号 env |
 | PUT profile 为未知内置 key | `BadRequest`，不落库 |
@@ -1389,14 +1393,20 @@ sticky、RPM、并发与上游 Session 池容量不得因 profile 增加独立�
 
 ### 5. Scenarios and Examples
 
-**正常场景**：同一账号接收交错或并发的 260/280 请求，每次上游 headers、body、CCH 和遥测都使用对应画像；持久设备身份和账号容量共享。
+**正常场景**：同一账号接收交错或并发的 260/280/293 请求，每次上游 headers、body 和 CCH 都使用对应画像；持久设备身份和账号容量共享。既有遥测容器隔离契约继续适用，本轮不扩展遥测。
 
 **边界场景**：无 Claude 版本 UA 的 GrowthBook/event logging 请求使用配置默认画像；body 中版本字段仍按所选画像重写，不能充当选择依据。
 
 Gateway 在读取 body 和开始账号循环前固定选择，在最终账号选出后生成副本：
 
 ```rust
-let request_profile = self.profile_selection_config.read().await.resolve(&ua);
+let request_profile = {
+    let snapshot = self.access_profile_config.read().await;
+    if let Err(rejection) = snapshot.policy.check_user_agent(&ua) {
+        return Ok(access_policy_error_response(&rejection));
+    }
+    snapshot.selection.resolve(&ua)
+};
 // 每次选定最终账号后，协议改写使用副本；调度和存储继续使用原账号。
 let request_account = account_for_request_profile(&account, request_profile);
 ```
@@ -1407,9 +1417,153 @@ let request_account = account_for_request_profile(&account, request_profile);
 
 ### 6. Tests Required
 
-- Resolver：前缀大小写、两版精确 token、缺失/非法/未匹配 UA、非默认回退、body 不参与选择、账号模式与非法 mode。
+- Resolver：前缀大小写、260/280/293 精确 token、缺失/非法/未匹配 UA、非默认回退、body 不参与选择、账号模式与非法 mode。
 - Settings/迁移：缺失 key 补齐、显式 `account` 保留、非法参数写入前失败、GET 字符串默认、mode/default 热刷新；两种数据库插入语法保持兼容。
-- Gateway mock：同账号交错与并发的两版 headers/body/billing/CCH 一致，持久身份未变；401 期间 reload、签名重试、换号保持客户端画像；覆盖 count_tokens、bootstrap 和辅助遥测准入。
+- Gateway mock：同账号交错与并发的各版本 headers/body/billing/CCH 一致，持久身份未变；401 期间 reload、签名重试、换号保持客户端画像；覆盖 count_tokens、bootstrap 和辅助遥测准入。
 - Telemetry/identity：同秒运行 ID 隔离、设备身份共享、交错续期不覆盖画像、延迟结果正确归属、UA/payload 一致、单容器 TTL 清理与账号过期时间/计数聚合。
 - 缓存：同账号同真实 Session 的两版 stateful 状态隔离，反序延迟提交不串版；同上游 Session 两版 Hello 各探一次；非流式探针在相同 headers/body 时仍分 key。
 - 保留旧版本 fixture、CCH 和未知字段/SSE 行为回归；执行 `cargo fmt --check`、`cargo test`、`cargo test cch`，设置页变更还需 `npm run build`。
+
+---
+
+## Scenario: Claude Code 2.1.293 画像与 280/293 准入预设
+
+### 1. Scope / Trigger
+
+- 修改 293 软件身份、精确模型、标题、beta、线程/CCH、后台端点、默认配置或管理页时适用；旧画像必须保持独立，不能因切换默认画像而改变 280 wire。
+- 证据来自正式抓包任务的 25 轮、四模型六权限模式，112 条 billing 的 CCH/后缀全部独立复查命中。矩阵固定 xhigh；其它 effort 以及同时带 safeguard 与 fallback 的组合不计入真实采集覆盖。合成测试不能替代抓包。
+- 原始正文只留受限远端；仓库 fixture 使用合成文本和身份，保留协议形状、顺序及独立期望值。遥测扩展与自动部署不属于本次升级。
+
+### 2. Signatures
+
+```text
+GET /admin/settings -> JSON 字符串映射
+PUT /admin/settings <- JSON 字符串映射
+SettingsStore::upsert_many_with_profile(
+    &self,
+    items: &HashMap<String, String>,
+    profile: Option<&'static ClaudeCodeProfile>,
+) -> Result<(), AppError>  // async
+GatewayService::reload_access_profile_config(&self) -> Result<(), AppError>  // async
+is_structured_haiku_title_request_for_profile(
+    body: &serde_json::Value,
+    request_profile: &RequestProfile,
+) -> bool
+upgrade_default_profile_setting(pool: &AnyPool, driver: &str) -> Result<(), sqlx::Error>  // async
+use280293AccessPreset(): void
+```
+
+请求相关结构分别由 `ClaudeCodeProfile.request/billing/endpoints` 声明；293 使用 `HaikuTitleProfile::ClaudeCode21293`、`MessageBodyOrderProfile::ClaudeCode21293`、`EndpointHeaderProfile::ClaudeCode21293` 与 `CchProfile::ClaudeCodeAllModelValues`，不新增自由输入版本或环境变量。
+
+### 3. Contracts
+
+**身份与模型**
+
+| 字段 | 293 值 |
+| --- | --- |
+| version / version_base / 默认 profile key | `2.1.293` |
+| build_time | `2026-10-07T06:36:42Z` |
+| Stainless SDK / Node / timeout | `0.128.0` / `v26.3.0` / `600` |
+| Hello UA | `Bun/1.4.3` |
+| 出厂允许范围 / 禁止版本 | `2.1.89-2.1.293` / 空字符串 |
+
+257/260/280 的 SDK 固定为 `0.112.1`，不能引用已经切换为 293 的全局默认 SDK。260/280 的 registry、精确 UA 映射、页面选项与旧模型处理继续保留。
+
+| 精确主模型 ID | 默认 max_tokens / 293 API 上限 | thinking | 默认 effort | bootstrap cwk |
+| --- | --- | --- | --- | --- |
+| `claude-opus-5-5` | 128000 | adaptive，display=updates | xhigh | saffron |
+| `claude-sonnet-5-5` | 128000 | adaptive，display=updates | xhigh | cardamom |
+| `claude-haiku-5-5` | 128000 | adaptive，display=updates | xhigh | lovage |
+| `claude-fable-5-1` | 64000 | adaptive，display=updates | xhigh | sorrel |
+
+只对这些精确 ID 使用新表；其它模型和旧画像沿用已有行为，旧画像 API 的 64000 上限保持原契约。已有显式 effort 选择规则保留，不能宣称所有档位都已抓包。Fable 的 CLI `[1m]` 后缀不证明 wire 存在 context-1m 或 fallback，本矩阵没有观察到这两项；不自动补入。bootstrap 的 `client_data.cedar_basin=2027-08-31`，未涉及的上游字段保留。
+
+**Beta 与标题**
+
+Opus/Sonnet/Fable 普通主请求的基线按如下顺序维护，不包含自动启用的 context-1m：
+
+```text
+claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,mid-conversation-system-2026-04-07,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,inline-tools-2026-09-15,advisor-tool-2026-03-01,advanced-tool-use-2025-11-20,mid-conversation-system-clear-at-2026-08-21,effort-2025-11-24,thinking-binding-controls-2026-08-01,thinking-display-updates-2026-08-18,extended-cache-ttl-2025-04-11,cache-diagnosis-2026-04-07,message-threads-2026-08-12
+```
+
+- Haiku 5.5 普通主请求从 oauth 开始，`claude-code-20250219` 位于 mid-conversation-system 后、per-turn-control 前，其余顺序与基线一致。原生客户端的 claude-code 与 extended-cache-ttl 两个 token 按入站是否携带决定，不依据权限模式、diagnostics 或 thread 猜测；293 API 缺少该客户端选择信息时使用完整基线。
+- 四模型 Auto/Plan 已观察 safeguards：dangerous-tool-use 插在 effort 后，afk-mode 插在 thinking-display-updates 后、extended-cache-ttl 前。使用精确 safeguard 表，不能合并任意未知 beta；已验证的客户端可选 token 按原位置保留。
+- Opus 原生 context-1m 需要客户端已携带 token 且账号允许 1M；位置在 oauth 后。不得从账户权限单独推断启用。
+- 已观察 Opus 普通 `fallbacks="default"`：server-side-fallback、fallback-credit 依次位于 effort 后、thinking-binding-controls 前；保留 fallback 参与 CCH。不得据此自动生成其它模型的默认 fallback 或声称 safeguard+fallback 组合已采集。
+- 293 标题必须为精确 `claude-haiku-5-5`、stream=true、tools 为空或缺省、max_tokens=128000、thinking 字段缺省，且 `output_config.format` 的 schema 仅要求 title。不得用旧 32000 token 标题判定把它归到主请求。
+- 标题的精确 beta 顺序如下；旧 Haiku 4.5 自动单 token 探测仍使用原有窄表，不属于新主模型升级。
+
+```text
+oauth-2025-04-20,interleaved-thinking-2025-05-14,redact-thinking-2026-02-12,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,mid-conversation-system-2026-04-07,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,inline-tools-2026-09-15,advisor-tool-2026-03-01,mid-conversation-system-clear-at-2026-08-21,effort-2025-11-24,structured-outputs-2025-12-15,cache-diagnosis-2026-04-07
+```
+
+**字节与会话**
+
+293 顶层已知字段顺序为 `model,messages,system,tools,metadata,max_tokens,thinking,context_management,fallbacks,safeguards,output_config,thread,diagnostics,stream`；缺省字段不因排序而插入，未知字段保持相对顺序，SSE 与 safeguard_results 保持字节透传。
+
+CCH 使用 `0x4D659218E32A3268`：在最终序列化字节上将首个 CCH 替为占位值、删除顶层 max_tokens、清空全层级精确字符串 model 值，保留 fallback，再取 xxhash64 低 20 bits。禁止 JSON 往返重排。初始后缀仍以 salt `59cf53e54c78`、首条 user 的最后一个 text block、UTF-16 code units `[4,7,20]` 与版本计算 SHA256 前三位；缺失索引按既有 `0` 规则，孤立代理项按既有替换字符语义处理。续轮使用当前入站 billing 后缀；审计通过 previous_message_id 对应前一 SSE message_start.id 逐链检查，同 run/model 不构成唯一会话键，也不新增全局后缀缓存。
+
+**后台端点**
+
+以下为本轮已观察的精确分支；其它路径不得按 293 版本号套用旧版后台端点分类。
+
+| 端点 | 方法 | UA | beta | Content-Type | anthropic-version |
+| --- | --- | --- | --- | --- | --- |
+| `/api/hello` | HEAD | Bun/1.4.3 | 无 | 无 | 无 |
+| `/api/eval/*` | POST | claude-code/2.1.293 | oauth-2025-04-20 | application/json | 无 |
+| `/api/claude_code_grove` | GET | claude-cli/2.1.293 (external, cli) | oauth-2025-04-20 | 无 | 无 |
+| `/api/claude_code_penguin_mode` | GET | claude-code/2.1.293 | oauth-2025-04-20 | 无 | 无 |
+| `/api/claude_cli/bootstrap` | GET | claude-code/2.1.293 | oauth-2025-04-20 | application/json | 无 |
+| `/v1/mcp_servers` | GET | claude-code/2.1.293 | mcp-servers-2025-12-04 | application/json | 2023-06-01 |
+
+Hello/eval 的 Accept 为 `*/*`、Accept-Encoding 为 `gzip, deflate, br, zstd`；其余四项为 `application/json, text/plain, */*` 与 `gzip, compress, deflate, br`。MCP capability 沿用280常量，协议版本为 `2025-11-25`。280 的 eval Bun 与 penguin/MCP Axios 身份保持原样。
+
+**配置与管理页面**
+
+预设 `use280293AccessPreset` 只填入以下四个表单字段，保存后才生效；不得顺带改 UA、遥测开关或删除260选项：
+
+```json
+{
+  "claude_code_profile_selection_mode": "client_version",
+  "claude_code_version_profile": "2.1.293",
+  "allowed_claude_code_versions": "2.1.89-2.1.293",
+  "blocked_claude_code_versions": "2.1.89-2.1.279,2.1.281-2.1.292"
+}
+```
+
+禁止规则优先于允许范围，准入通过后才选择画像。默认回退无法放行被禁版本。客户端模式允许范围独立保存；账号模式使用目标画像范围并只读回显。主动保存画像仍在同一事务中更新全部账号四项软件字段；启动迁移仅处理客户端模式的精确旧出厂组合，账号模式和自定义策略保留，详见 [Settings & Database](../backend/settings-database.md)。账号页基础版本来自持久环境，模式/默认回退来自实际配置，显示「准入通过后」，不得当成最近请求画像。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 期望 |
+| --- | --- |
+| 目标预设保存后 UA 为 280 / 293 | 分别放行并选择对应画像 |
+| 目标预设下 UA 为 260、279、281、292、294 | 准入拒绝；260底层画像仍存在 |
+| 缺失或未匹配 UA | 先遵守原有准入，通过后回退配置默认293 |
+| 客户端模式 profile-only 从293切280 | 保存默认280，存量允许/禁止/其它UA不变 |
+| 账号模式的旧出厂260/280组合启动 | 不自动迁移为293 |
+| 客户端模式画像或范围之一已自定义 | 保留显式组合，不新增260专用迁移 |
+| PUT非法mode/profile/准入语法 | 写入前失败，账号与配置不变 |
+| 事务内任意setting写入失败 | 已写settings与账号软件字段整体回滚 |
+| Haiku标题出现thinking字段或主请求结构 | 不命中新标题分类；不得丢失thinking |
+| 同一run两条Haiku Plan会话交错 | 按各自previous_message_id与入站billing继承后缀 |
+
+### 5. Scenarios and Examples
+
+**正常**：点击「仅允许 280、293（默认 293）」只改变表单，保存并刷新后四项值一致、其它UA不变；同一账号并发280/293请求使用各自SDK/beta/CCH，持久设备身份与总容量共享。
+
+**边界**：客户端模式管理员只修改默认画像为280，准入范围仍可包含293；原始293 UA仍选293，准入通过的无版本请求才使用280。账号模式则继续使用最终选中账号画像。
+
+**错误**：为达到两版本准入删除260注册，或在启动时无条件填入禁止区间。**修正**：保留画像能力，由管理员显式保存目标允许/禁止配置，保护原有自定义策略与账号模式。
+
+**错误**：按run/model缓存一个后缀，或把Haiku可选beta是否存在归因于权限模式。**修正**：线程按响应身份逐链核对，网关复用每条入站billing后缀；可选beta依据原始客户端头并保持表内位置。
+
+### 6. Tests Required
+
+- `version_profile.rs`：精确260/280/293 UA、未知版本/缺失UA默认293、显式回退与账号模式、注册表与身份完整性、旧SDK固定。
+- `rewriter.rs`：`native_293_headers_match_every_observed_variant`、`cch_293_fixture_matches_independent_bytes_and_interleaved_suffixes`、`auxiliary_293_header_sets_match_captured_endpoints_and_keep_280_identity`、`safeguard_293_context_beta_requires_incoming_token_and_account_permission`、`api_293_model_limits_title_and_order_follow_capture`。
+- `tests/fixtures/claude-code-2.1.293-profile.json`：11组独立字节/UTF-16/交错后缀、22种原生beta形状、6个后台端点；只含合成正文和身份。
+- `tests/version_profile_settings_test.rs`：SQLite和显式本地PostgreSQL的事务回滚、四软件字段与未知字段保留、profile-only准入保留、目标预设、客户端出厂迁移、自定义与账号模式260/280保护、迁移幂等。
+- `gateway.rs`：三版本交错/并发、401/签名重试保持冻结画像、同快照先准入后选择、目标规则放行280/293并拒绝边界版本、count_tokens/bootstrap、共享身份/容量与现有版本缓存隔离。
+- 管理页本地实际验证：预设不自动保存、保存/刷新回显、其它UA保留、260选项保留、账号模式范围只读、账号页基础版本及默认回退来自真实配置。
+- 执行 `cargo fmt --check`、`cargo test`、`cargo test cch`、`npm run build`；PostgreSQL场景以临时本地库显式运行 `postgres_profile_settings_and_rollback`，默认忽略不等于已验证。

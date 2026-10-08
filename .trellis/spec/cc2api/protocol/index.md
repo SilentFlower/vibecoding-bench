@@ -8,7 +8,7 @@
 
 | Guide | Description | Status |
 |-------|-------------|--------|
-| [Claude Code Profile Upgrade](./claude-code-profile-upgrade.md) | Claude Code 版本画像、UA 请求选择与默认回退、CCH、`cc_version`、beta、bootstrap、telemetry/缓存隔离、账号迁移与抓包验收 | Filled |
+| [Claude Code Profile Upgrade](./claude-code-profile-upgrade.md) | Claude Code 版本画像（含 293）、UA 选择与默认回退、280/293 准入预设、原子配置、CCH、beta、标题、bootstrap、telemetry/缓存隔离、迁移与抓包验收 | Filled |
 
 ---
 
