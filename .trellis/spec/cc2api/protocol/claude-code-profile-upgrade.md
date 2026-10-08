@@ -445,12 +445,12 @@ Bootstrap 契约：
 - 该端点是无状态连通性端点，不读取 gateway token，不选择账号，不占用 RPM/并发，不生成 telemetry，也不代理到上游。
 - Claude Code `2.1.220` 的 hello 预检固定访问 `https://api.anthropic.com/api/hello`，不使用 `ANTHROPIC_BASE_URL`；模型请求才使用配置的 base URL。
 - 因此当前不得为 new-api 添加同名本地响应、渠道选择或故障转移。只有后续版本抓包证明 hello 开始使用 `ANTHROPIC_BASE_URL` 时，才重新评估透传策略。
-- session hello 代理探测的 UA 必须来自账号所选版本画像：2.1.280 使用 `Bun/1.4.3`，
+- session hello 代理探测的 UA 必须来自请求账号副本的有效版本画像：2.1.280 使用 `Bun/1.4.3`，
   2.1.260 与 2.1.257 使用 `Bun/1.4.1`，2.1.220 回滚画像继续使用 `Bun/1.4.0`。
 
 Telemetry 契约：
 
-- `env.version`、`env.version_base`、`env.build_time` 必须跟默认版本画像一致。
+- `env.version`、`env.version_base`、`env.build_time` 必须跟本次请求或自动遥测容器的有效版本画像一致；客户端模式下无法从原始 UA 匹配版本时使用配置的默认画像。
 - `model`、`preNormalizedModel`、`betas` 应来自最终请求 profile。
 - `2.1.260` 与 `2.1.280` 继续使用既有 `ClaudeCode2185` telemetry shape；只迁移 env、build time 和
   UA，不因版本号新建 shape。
@@ -1221,7 +1221,8 @@ allowed_user_agents=<管理员自定义值，版本切换不得覆盖>
 {
   "version": "<profile.identity.version>",
   "version_base": "<profile.identity.version_base>",
-  "build_time": "<profile.identity.build_time>"
+  "build_time": "<profile.identity.build_time>",
+  "node_version": "<profile.identity.stainless_runtime_version>"
 }
 ```
 
@@ -1232,11 +1233,11 @@ allowed_user_agents=<管理员自定义值，版本切换不得覆盖>
 - 切换 profile 必须在同一事务中完成：
   - 写入 `settings.claude_code_version_profile`。
   - 强制覆盖 `settings.allowed_claude_code_versions` 为目标画像范围。
-  - 批量覆盖所有账号 `canonical_env.version/version_base/build_time`。
+  - 批量覆盖所有账号 `canonical_env.version/version_base/build_time/node_version`。
 - 切换 profile 不得覆盖 `allowed_user_agents`，该 setting 仍由管理员独立维护。
 - 新账号创建必须读取当前 `claude_code_version_profile`，再把目标 `identity` 写入 `canonical_env`。
-- 请求重写和 telemetry 必须从账号 `canonical_env.version` 映射到内置 profile；映射失败只能回退默认内置 profile，不能拼出未验证特征。
-- 只提交 `claude_code_version_profile` 的 settings payload 时，也必须 reload access policy，因为后端会同步改写 `allowed_claude_code_versions`。
+- 客户端模式下，请求入口冻结原始 UA 对应的内置画像或配置的默认画像，使用请求级账号副本完成重写和 telemetry；账号模式沿用账号 `canonical_env.version`。映射失败只能回退内置画像，不能拼出未验证特征，具体规则见下方「按客户端 UA 选择请求画像」。
+- 只提交 `claude_code_version_profile` 的 settings payload 时，也必须 reload access policy 和画像选择配置，因为后端会同步改写 `allowed_claude_code_versions`，且未匹配 UA 的默认画像需要立即生效。
 - 前端 Settings 保存成功后必须重新加载 settings，用后端强制覆盖后的版本范围作为只读回显。
 
 ### 4. Validation & Error Matrix
@@ -1244,7 +1245,7 @@ allowed_user_agents=<管理员自定义值，版本切换不得覆盖>
 | 条件 | 期望 |
 |------|------|
 | settings 提交未知 `claude_code_version_profile` | 返回 `BadRequest`，不更新 settings 和账号 env |
-| 只提交 `claude_code_version_profile` | 同步覆盖 `allowed_claude_code_versions` 并 reload access policy |
+| 只提交 `claude_code_version_profile` | 同步覆盖 `allowed_claude_code_versions` 并 reload access policy 和画像选择配置 |
 | 切换 profile 时存在自定义 `allowed_user_agents` | 原值保持不变 |
 | 切换 profile 后已有账号仍保留旧 `canonical_env.version` | 视为失败，检查事务内账号批量更新 |
 | 账号 env.version 不是内置版本 | 热路径回退默认 profile，避免组合未验证请求/telemetry 特征 |
@@ -1274,7 +1275,7 @@ allowed_user_agents=<管理员自定义值，版本切换不得覆盖>
 - account：
   - 新账号使用当前 profile 的 `identity`。
 - protocol：
-  - rewriter 按账号 env.version 选择 UA、beta、billing/CCH 子画像。
+  - rewriter 按请求级账号副本的 env.version 选择 UA、beta、billing/CCH 子画像；账号模式沿用持久账号。
   - telemetry 按 profile shape 切换 event logging 和 GrowthBook payload。
 
 ### 7. Wrong vs Correct
@@ -1314,3 +1315,101 @@ settings.insert(
     profile.access_policy.allowed_claude_code_versions.to_string(),
 );
 ```
+
+---
+
+## Scenario: 按客户端 UA 选择请求画像
+
+### 1. Scope / Trigger
+
+- Trigger：修改请求版本选择、默认回退、配置热刷新，或同账号多版本遥测与缓存时适用。
+- 默认同时适配 `2.1.260` 和 `2.1.280`；版本匹配仅依赖原始 Claude UA。请求体版本字段不参与选择，新增版本必须先补齐抓包证据和内置画像。
+- 画像表示软件协议特征，账号设备身份、凭证和总容量仍由同一持久账号承载，防止两版交错请求互相覆盖或扩大容量。
+
+### 2. Signatures
+
+```text
+GET /admin/settings -> JSON 字符串映射
+PUT /admin/settings <- JSON 字符串映射
+ClaudeCodeProfileSelectionMode::parse(value: &str) -> Result<Self, AppError>
+ClaudeCodeProfileSelectionConfig::resolve(self, user_agent: &str) -> Option<&'static ClaudeCodeProfile>
+account_for_request_profile(account: &Account, profile: Option<&'static ClaudeCodeProfile>) -> Account
+GatewayService::reload_profile_selection_config(&self) -> Result<(), AppError>  // async
+TelemetryService::get_session_expires_at(&self, account_id: i64) -> Option<DateTime<Utc>>  // async
+```
+
+配置字段的类型均为字符串：
+
+```json
+{
+  "claude_code_profile_selection_mode": "client_version",
+  "claude_code_version_profile": "2.1.280"
+}
+```
+
+### 3. Contracts
+
+- `claude_code_profile_selection_mode` 仅接受精确值 `client_version` 或 `account`，默认前者；不 trim、不接受空白变体。GET 补齐默认值，PUT 在任何写入前校验。无需新增环境变量。
+- 客户端模式只识别以 `claude-code/` 或 `claude-cli/` 开头的原始 UA，前缀不区分大小写；取斜杠后第一个空白分隔 token，只有精确 `2.1.260`、`2.1.280` 自动匹配。
+- 缺少 UA、非法 UA、Bun/axios 等辅助 UA，以及未匹配版本，均使用 `claude_code_version_profile` 指定的内置默认画像，出厂为 `2.1.280`。不得按邻近版本、请求体 `appVersion` 或其它字段推断。
+- 准入策略先检查原始 UA，再于读取 body 和账号重试前冻结画像。默认回退不绕过 `allowed_user_agents`、`allowed_claude_code_versions`；准入拒绝的请求仍被拒绝。
+- `account` 模式的 `resolve` 返回 `None`，沿用最终选中账号的持久 env 和旧选择规则；换号后使用新账号原有画像。客户端模式冻结的 `Some(profile)` 在 401、签名重试、换号和配置热刷新期间保持一致。
+- 每次选定账号后调用 `account_for_request_profile` 生成副本，只覆盖 `version/version_base/build_time/node_version` 软件字段。旧账号 env 无法反序列化时，先使用既有 `device_profile` 归一化已知字段并保留未知字段，再覆盖软件版本；副本不得写回存储。
+- 原账号用于调度、sticky、RPM/并发 admission、凭证和上游 Session 池；副本用于 headers/body、模型/beta、billing/CCH、count_tokens、bootstrap、内部 Hello、原生及自动遥测。公开 `GET/HEAD /api/hello` 继续保持无状态，不选择账号。
+- 启动和 mode/default 设置保存后从同一次 `get_all` 读取配置，并以一把 `RwLock` 原子更新。非法存量 mode 回退 `client_version`，非法存量默认 key 回退 `2.1.280`；已冻结的客户端画像不受后续 reload 影响。
+- 数据库仅补齐缺失的 mode key：SQLite 使用 `INSERT OR IGNORE`，PostgreSQL 使用 `ON CONFLICT (key) DO NOTHING`，保留显式值。只切 mode 不写账号 env；保存默认 profile 仍执行上方全局画像事务及准入范围同步。
+- 自动遥测以 `(account_id, profile_key)` 分容器，创建时固定账号副本；续期仅更新 token 和 10 分钟 TTL，不重读账号替换软件画像。请求结果和流结束回调携带同一副本，payload 与 UA 从同一容器生成。
+- run/GrowthBook 运行 ID 的种子包含 profile key，同秒两版也不相同；device ID 和账号 UUID 继续共享。管理端过期时间取该账号各画像容器的最大值，发送计数仍按账号累计；容器过期只清理自身 key。
+
+版本相关缓存必须使用以下维度；延迟提交沿用请求阶段已经捕获的 key：
+
+| 状态 | key 契约 |
+|------|----------|
+| Stateful blocks | `<account_id>:<profile_key>:<real_session_id>`，保留真实下游 Session，不改成上游池 Session |
+| Hello 状态和 singleflight | `session_hello_probe:v2:<account_id>:<profile_key>:<sha256(upstream_session_id)>:<sha256(proxy_url)>` |
+| 非流式探针 | 既有 JSON key 增加 `profile` 字段，即使两版 headers/body 相同也隔离 |
+
+sticky、RPM、并发与上游 Session 池容量不得因 profile 增加独立配额。
+
+### 4. Validation & Error Matrix
+
+以下选择行为以请求通过原始 UA 准入检查为前提：
+
+| 条件 | 期望 |
+|------|------|
+| `claude-code/2.1.260 (external, cli)` 或大小写变体 | 使用 260；body 声明 280 也不覆盖 |
+| `claude-cli/2.1.280` | 使用 280 |
+| 缺少 UA，body 声明 260 | 使用配置默认画像，出厂 280 |
+| Bun/axios、`2.1.293`、`2.1.2600`、`2.1.260-beta` | 使用配置默认画像，不自动适配新版本 |
+| 默认画像改为内置 260，UA 未匹配 | 新请求使用 260；原有已冻结请求继续原画像 |
+| PUT mode 为 `invalid`、` account ` 或非字符串 | 参数错误；校验失败不得更新 settings 或账号 env |
+| PUT profile 为未知内置 key | `BadRequest`，不落库 |
+| 账号模式，持久账号为 280，UA 为 260 | 继续账号 280；切回客户端模式后新请求使用 260 |
+| 原始 UA 被访问策略拒绝 | 按既有准入错误返回，不因默认回退放行 |
+
+### 5. Scenarios and Examples
+
+**正常场景**：同一账号接收交错或并发的 260/280 请求，每次上游 headers、body、CCH 和遥测都使用对应画像；持久设备身份和账号容量共享。
+
+**边界场景**：无 Claude 版本 UA 的 GrowthBook/event logging 请求使用配置默认画像；body 中版本字段仍按所选画像重写，不能充当选择依据。
+
+Gateway 在读取 body 和开始账号循环前固定选择，在最终账号选出后生成副本：
+
+```rust
+let request_profile = self.profile_selection_config.read().await.resolve(&ua);
+// 每次选定最终账号后，协议改写使用副本；调度和存储继续使用原账号。
+let request_account = account_for_request_profile(&account, request_profile);
+```
+
+**错误用法**：用请求体 `attributes.appVersion` 选择画像，或将请求副本写回账号表；前者破坏 UA 唯一来源，后者导致交错请求污染持久身份。
+
+**正确处理**：入口仅从原始 UA 冻结选择；所有异步发送、重试与缓存提交使用该选择对应的副本和 key，始终保留原账号供容量与存储操作使用。
+
+### 6. Tests Required
+
+- Resolver：前缀大小写、两版精确 token、缺失/非法/未匹配 UA、非默认回退、body 不参与选择、账号模式与非法 mode。
+- Settings/迁移：缺失 key 补齐、显式 `account` 保留、非法参数写入前失败、GET 字符串默认、mode/default 热刷新；两种数据库插入语法保持兼容。
+- Gateway mock：同账号交错与并发的两版 headers/body/billing/CCH 一致，持久身份未变；401 期间 reload、签名重试、换号保持客户端画像；覆盖 count_tokens、bootstrap 和辅助遥测准入。
+- Telemetry/identity：同秒运行 ID 隔离、设备身份共享、交错续期不覆盖画像、延迟结果正确归属、UA/payload 一致、单容器 TTL 清理与账号过期时间/计数聚合。
+- 缓存：同账号同真实 Session 的两版 stateful 状态隔离，反序延迟提交不串版；同上游 Session 两版 Hello 各探一次；非流式探针在相同 headers/body 时仍分 key。
+- 保留旧版本 fixture、CCH 和未知字段/SSE 行为回归；执行 `cargo fmt --check`、`cargo test`、`cargo test cch`，设置页变更还需 `npm run build`。

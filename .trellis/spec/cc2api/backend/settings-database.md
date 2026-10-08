@@ -14,6 +14,7 @@
 
 - `ALTER TABLE ... ADD COLUMN` 目前采用幂等失败吞掉的方式支持旧库升级；新增列要确认重复执行安全。
 - settings 默认值通过 `settings` 表插入 key/value；新增 setting 必须有默认值、老值迁移策略和非法值兜底。
+- `claude_code_profile_selection_mode` 缺失时幂等插入 `client_version`，SQLite 使用 `INSERT OR IGNORE`、PostgreSQL 使用 `ON CONFLICT (key) DO NOTHING`；不得覆盖显式模式值。仅补齐选择模式不批量修改账号 env。
 - 版本画像相关迁移必须更新已有账号的 `canonical_env.version/version_base/build_time/node_version`，不能只改新账号默认值。
 - 多个 setting 共同表达一个默认画像时，旧默认组合必须成对迁移。例如 `claude_code_version_profile` 和 `allowed_claude_code_versions` 只有同时仍是旧默认值时才自动升级；管理员自定义过其中一个 key 时按显式配置保留。
 - 删除或废弃 setting key 时，加入 `OBSOLETE_SETTINGS_KEYS`，并确认 UI 不再提交旧 key。
@@ -30,6 +31,8 @@
 6. README 或部署文档中需要用户配置的说明。
 
 Setting value 应以字符串存储，进入 service 前解析成 enum/bool/number。非法值必须返回 `AppError::BadRequest` 或回退到明确默认值，不要让热路径 panic。
+
+`claude_code_profile_selection_mode` 仅接受精确字符串 `client_version` / `account`，PUT 在任何写入前校验，GET 补齐默认 `client_version`。保存 mode 或 `claude_code_version_profile` 后必须原子 reload 画像选择配置；非法存量 mode/default 分别回退 `client_version` / `2.1.280`。仅切 mode 不写账号 env，保存默认 profile 仍保留既有全局事务和准入范围同步。完整请求回退与隔离契约见 [按客户端 UA 选择请求画像](../protocol/claude-code-profile-upgrade.md#scenario-按客户端-ua-选择请求画像)。
 
 ## Account 字段同步
 

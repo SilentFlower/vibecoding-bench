@@ -667,7 +667,7 @@ match account_svc.resolve_upstream_token(account.id).await {
 ### 1. Scope / Trigger
 
 - Trigger：修改 Claude Code `/v1/messages` 首次连通性检查、账号代理网络路径、上游 Session 池解析、Session 去重、CacheStore/Redis singleflight、严格模式或对应 Settings 时适用。
-- 目标：新的有效上游 Session 第一次准备承载上游请求时，通过最终选中账号的 `proxy_url` 匿名探测 Anthropic Hello；同一活跃上游 Session、账号和代理路径只探测一次。
+- 目标：新的有效上游 Session 第一次准备承载上游请求时，通过最终选中账号的 `proxy_url` 匿名探测 Anthropic Hello；同一活跃上游 Session、账号、有效画像和代理路径只探测一次。
 - 公开 `GET/HEAD /api/hello` 仍是无状态本地健康端点，不进入账号选择或代理探测；完整 wire 画像见 `../protocol/claude-code-profile-upgrade.md`。
 
 ### 2. Signatures
@@ -675,7 +675,7 @@ match account_svc.resolve_upstream_token(account.id).await {
 - 服务入口：`SessionHelloProbeService::ensure_ready(account, real_session_id, upstream_session_id, config).await -> SessionHelloProbeDecision`。
 - 决策：`Proceed`、`BlockFailure`、`BlockTimeout`、`BlockUnavailable`。
 - CacheStore：`get_session_hello_probe_state(key, success_ttl)`、`set_session_hello_probe_state(key, state, ttl)`，并复用 owner 语义的 `acquire_lock/release_lock`。
-- 状态 key：`session_hello_probe:v1:<account_id>:<sha256(upstream_session_id)>:<sha256(proxy_url)>`。
+- 状态 key：`session_hello_probe:v2:<account_id>:<profile_key>:<sha256(upstream_session_id)>:<sha256(proxy_url)>`，singleflight 使用相同画像维度。
 - 全局 settings：
   - `session_hello_probe_enabled=false`
   - `session_hello_probe_strict=false`
@@ -688,7 +688,7 @@ match account_svc.resolve_upstream_token(account.id).await {
 - 仅当 path 精确为 `/v1/messages`、客户端为 Claude Code、原始 body 能提取非空真实 Session，且请求已经选定账号并完成本轮 slot/RPM admission 时调用探测。
 - Gateway 必须先解析账号级上游 Session 池，再调用探测；探测使用最终改写后的有效上游 Session 去重。池关闭或解析失败时回退到真实下游 Session，不得因池故障阻断原有业务转发。
 - assistant prefill、warmup、classifier、event logging、count tokens、普通 API 客户端和其它本地响应不得创建探测状态。
-- 探测请求固定为匿名 `HEAD https://api.anthropic.com/api/hello`，header 为 `User-Agent: Bun/1.4.0`、`Accept: */*`、`Accept-Encoding: gzip, deflate, br, zstd`、`Connection: keep-alive`；不得添加 query、body、Authorization、Cookie、billing header 或用户数据。
+- 探测请求固定为匿名 `HEAD https://api.anthropic.com/api/hello`，`User-Agent` 来自请求账号副本的有效画像：280 为 `Bun/1.4.3`、260/257 为 `Bun/1.4.1`、220 为 `Bun/1.4.0`；其余 header 为 `Accept: */*`、`Accept-Encoding: gzip, deflate, br, zstd`、`Connection: keep-alive`。不得添加 query、body、Authorization、Cookie、billing header 或用户数据。
 - 非空 `Account.proxy_url` 必须由 `tlsfp::get_request_client` 内部通过 `reqwest::Proxy::all` 校验并应用；客户端创建失败时返回错误，无效代理不得静默直连。空代理允许直连。
 - 只有 HTTP 200 为成功。成功状态命中时原子续期，形成滑动空闲 TTL；`failure` / `timeout` 使用固定冷却，不因读取续期。
 - 状态不存在时，leader 获取 `:lock` 后执行网络请求并写状态；follower 轮询同一状态并复用结果。RedisStore 必须保证跨进程去重，MemoryStore 只保证单进程。
@@ -884,6 +884,8 @@ web/src/components/Settings.vue 控件和文案
 ```
 
 不要只在 `settings_store.rs` 加常量。漏掉 reload 会导致 UI 写入后服务仍用旧值；漏掉 migration 会导致老实例没有默认值。
+
+画像选择配置通过 `reload_profile_selection_config` 将 mode/default 一次性读入同一把 `RwLock`。请求通过原始 UA 准入后、读取 body 前冻结选择；客户端模式的重试和异步回调复用该画像，不能随 reload 串版。完整配置、账号副本及遥测/缓存契约见 [按客户端 UA 选择请求画像](../protocol/claude-code-profile-upgrade.md#scenario-按客户端-ua-选择请求画像)。
 
 ## 后台任务边界
 
