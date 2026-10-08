@@ -1,0 +1,116 @@
+{
+  "id": "cc2api-client-version-profiles",
+  "name": "cc2api-client-version-profiles",
+  "title": "cc2api 按客户端版本同时适配 260 与 280",
+  "description": "按入站客户端版本同时适配 2.1.260 与 2.1.280，默认 280，隔离版本相关遥测和缓存。",
+  "status": "completed",
+  "dev_type": "fullstack",
+  "scope": "cc2api",
+  "package": "cc2api",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-08",
+  "completedAt": "2026-10-08",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-08T03:13:19Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "cc2api/src/service/version_profile.rs",
+    "cc2api/src/service/gateway.rs",
+    "cc2api/src/service/rewriter.rs",
+    "cc2api/src/service/telemetry.rs",
+    "cc2api/src/service/session_hello_probe.rs",
+    "cc2api/src/store/settings_store.rs",
+    "cc2api/src/store/db.rs",
+    "cc2api/src/handler/router.rs",
+    "cc2api/src/main.rs",
+    "cc2api/web/src/components/Settings.vue",
+    "cc2api/src/model/identity.rs",
+    "cc2api/src/service/access_policy.rs",
+    "cc2api/README.md",
+    ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md",
+    ".trellis/spec/cc2api/protocol/index.md",
+    ".trellis/spec/cc2api/backend/service-architecture.md",
+    ".trellis/spec/cc2api/backend/settings-database.md"
+  ],
+  "notes": "实现、full Check-All、Update-Spec written 与双仓业务提交/推送完成；609 项 Rust 回归、24 项 CCH、前端构建和格式/diff 检查通过。用户确认精确 Git 计划后，同步任务完成态、Close 与独立任务记录；保留既有抓包文档改动，未发布或部署。",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-08T02:08:27Z",
+      "contextKey": "codex_01a11936-f2c4-7833-8615-2b91925e78b5",
+      "implementationStarted": true,
+      "baseline": {
+        "head": "ac0d59b24a391a6656bb147610889bb0e50b57d9",
+        "status": [
+          {
+            "status": " M",
+            "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+          },
+          {
+            "status": " M",
+            "path": "cc2api"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "ac0d59b24a391a6656bb147610889bb0e50b57d9",
+            "status": [
+              {
+                "status": " M",
+                "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+              },
+              {
+                "status": " M",
+                "path": "cc2api"
+              }
+            ],
+            "worktreeDiffSha256": "2cb51cb92b9b8a14117438691441bcad5afb13d25095db1fa1e98aeb6aaf807f",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "1c26c4adac288a374025cfc38843f059238efd73dbd8d2b7ecb45c6300ed42d4"
+          },
+          {
+            "root": "cc2api",
+            "head": "9819163dc2102401bf3ae8251fc2f29dc560f794",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "0c9537b27e6b5a7203f78cac9ce6e15198a0286bacc1eaaa7c8cc325e9312fd0"
+          }
+        ],
+        "fingerprint": "71c6cc2d6645f10901be4493f66417ea4acad53767f134a743b18ed647acb485"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "完成原始 UA 的 260/280 请求画像选择与默认 280 回退",
+      "完成协议、重试、遥测和版本相关缓存隔离",
+      "完整 Rust/CCH 回归、前端构建与 full Check-All 通过",
+      "规范同步与结构、链接、边界验证通过",
+      "cc2api 与 vibecoding-bench 业务提交及推送完成"
+    ],
+    "partialStep": null,
+    "nextStep": "无需后续动作；293 待抓包后另行接入",
+    "notes": "任务记录随已确认的交付计划同步。保留既有抓包文档改动；未部署或发布。PostgreSQL 迁移与真实上游尚未实测。",
+    "updatedAt": "2026-10-08T03:13:19Z"
+  }
+}

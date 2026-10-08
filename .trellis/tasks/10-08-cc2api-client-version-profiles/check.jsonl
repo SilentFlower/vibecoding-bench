@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "请求 admission、真实 session 与上游 session 池契约"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "设置默认、热刷新、SQLite/Postgres 和显式配置保留"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "完整 Rust 回归与敏感信息边界"}
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "两版画像、CCH、billing、遥测与原生字段契约"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "Settings 控件与字符串 payload 契约"}
+{"file": ".trellis/tasks/10-08-cc2api-client-version-profiles/design.md", "reason": "请求级画像、遥测复合 key 与缓存隔离设计"}
