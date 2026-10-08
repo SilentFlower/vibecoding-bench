@@ -1,0 +1,90 @@
+{
+  "id": "cc2api-2-1-293-capture-upgrade",
+  "name": "cc2api-2-1-293-capture-upgrade",
+  "title": "采集 Claude Code 2.1.293 协议并升级 cc2api 版本画像",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "cc2api",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-08",
+  "completedAt": "2026-10-08",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-08T08:24:58Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-08T04:24:39Z",
+      "contextKey": "codex_01a11936-f2c4-7833-8615-2b91925e78b5",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "4866cad454d2bab4b4aabd0d5fbac0144ae27096",
+        "status": [
+          {
+            "status": " M",
+            "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "4866cad454d2bab4b4aabd0d5fbac0144ae27096",
+            "status": [
+              {
+                "status": " M",
+                "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+              }
+            ],
+            "worktreeDiffSha256": "42573c91f46371f0c132e36c5d19bfeff386320cd256533797e9f650e9ab1791",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "ed01e1e3a277cc9d98d30c12f55983b5ed758aee85291ad2ebade1d613d79b62"
+          },
+          {
+            "root": "cc2api",
+            "head": "782535815f2d732560948e4077fbf46dcadd7f73",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "a0081b2c2482da71d00eddec4e37a786fea2cdf59f7e5db80bb237d40eedb51a"
+          }
+        ],
+        "fingerprint": "466cbdf25a0462266f869ce9f841bbe341b40e8e33b987533322d783bd937c4d"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "完成 25 轮正式抓包及 112 条 billing 独立复算",
+      "实现默认 293、280/293 准入预设并保留旧画像",
+      "完成 Rust、CCH、SQLite/PostgreSQL、前端和全面检查",
+      "同步协议与配置规范",
+      "完成确认范围的 cc2api 与 vibecoding-bench 提交推送"
+    ],
+    "partialStep": null,
+    "nextStep": "代码交付完成；如需上线，另行按部署流程执行。",
+    "notes": "本轮未自动部署；真实采集固定 xhigh，未采集的 effort 与 safeguard+fallback 组合不计入实测覆盖。",
+    "updatedAt": "2026-10-08T08:24:58Z"
+  }
+}
