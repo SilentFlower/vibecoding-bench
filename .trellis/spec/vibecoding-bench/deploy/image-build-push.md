@@ -413,6 +413,63 @@ profile settings 中不保存 `statusLine`;额度查询走 OAuth usage API 或�
 
 ---
 
+## Scenario: Claude 首次 Auto 默认模式推荐
+
+### 1. Scope / Trigger
+
+修改 worker 首屏引导、顶层配置预置或权限模式启动参数时适用。Claude Code 2.1.293 的首次 Auto 推荐菜单默认选中接受；题目注入的回车可能被菜单消费，同时将运行模式和长期默认模式改为 Auto。
+
+### 2. Signatures
+
+- orchestrator：`_DEFAULT_CLAUDE_TOP_CONFIG`、`_persist_default_claude_top_config(profile_dir: Path) -> None`。
+- worker：`patch_top_config_gates()`、`handle_claude_startup_gates()`、`inject_tmux_prompt(buffer, text)`。
+- 启动命令：`claude --permission-mode "$CLAUDE_PERMISSION_MODE"`；未设置环境变量时使用 `bypassPermissions`。
+- 顶层文件：账号 `data/profiles/<account>/.claude.json`，运行副本 `$HOME/.claude.json`。
+
+### 3. Contracts
+
+- orchestrator 与 worker 都在已有顶层配置中写入 `"hasSeenAutoDefaultNudge": true`；该字段不属于 `.claude/settings.json`，也不表示启用 Auto 模式。
+- 合并必须保留 `oauthAccount`、其他项目和 `/workspace` 已有状态。顶层文件缺失时不凭空创建账号身份，继续由终端引导检测兜底。
+- 识别当前可见 pane 的 `Make auto mode your default permission mode?` 时只发送一次 `Escape`。该菜单的取消回调保留当前模式；禁止用提交题目的回车接受推荐。
+- 检测到引导后，菜单消失且连续三个轮询未命中引导，才允许提交题目。75 次轮询内推荐菜单仍未清除时返回失败；调用方跳过题目注入并以非零退出。
+- 任务指定的权限模式继续由创建时快照传入。跳过推荐不能把显式 `auto` / `plan` 改成 bypass；成功注入的 `TASK_PROMPT` 保持原样。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+|------|------|
+| 已有顶层配置缺少推荐标记或标记为 false | 补为 true，身份和已有项目字段保留 |
+| 预置未生效，推荐菜单仍出现 | 发送一次 Escape，保留当前模式，等待菜单清除 |
+| 菜单取消后消失 | 原样提交题目，不丢失首条 user message |
+| 菜单收到取消后仍停留到轮询上限 | 启动失败，不粘贴或提交题目 |
+| 本次任务显式指定 auto / plan | 保留指定模式，取消的只是首次默认模式推荐 |
+
+### 5. Scenarios and Examples
+
+- 正常：旧账号 profile 缺少标记，启动前补齐后直接进入 bypass 输入界面。
+- 边界：配置预置未生效但出现推荐菜单，Escape 取消后提交原始题目；显式 Auto 任务仍处于 Auto。
+- 错误用法：仅等待几秒后直接粘贴题目并发送 Enter，菜单可能接受 Auto 且吞掉题目。
+- 正确处理：先预置顶层标记，再由首屏检测取消推荐，确认引导清除后调用 `inject_tmux_prompt`。
+
+```json
+{
+  "hasCompletedOnboarding": true,
+  "bypassPermissionsModeAccepted": true,
+  "hasSeenAutoDefaultNudge": true
+}
+```
+
+以上是顶层配置的引导字段片段，不能用于覆盖包含账号身份的完整文件。
+
+### 6. Tests Required
+
+- `bash -n images/worker/entrypoint.sh`。
+- `orchestrator/test_main.py`：顶层配置合并后推荐标记为 true，账号身份、其他项目及当前项目字段保留。
+- `orchestrator/test_worker_startup.py`：执行真实 shell 函数，验证 bypass / auto / plan 模式保留、题目原样提交、菜单未清除时禁止提交，以及 worker 合并配置不覆盖身份。
+- 真实首轮验证检查 session 存在 user message，且 settings 与 TUI 的权限模式符合任务快照；只看到进程的 `--permission-mode` 参数不能证明没有被首次菜单改写。
+
+---
+
 ## Scenario: cc2api managed OAuth worker
 
 ### 1. Scope / Trigger

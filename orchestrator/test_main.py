@@ -1219,6 +1219,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         )
         self.assertTrue(persisted["hasCompletedOnboarding"])
         self.assertTrue(persisted["bypassPermissionsModeAccepted"])
+        self.assertTrue(persisted["hasSeenAutoDefaultNudge"])
 
     def test_entrypoint_has_workspace_trust_gate_fallback(self) -> None:
         """

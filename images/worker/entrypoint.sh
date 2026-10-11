@@ -147,6 +147,7 @@ patch_top_config_gates() {
     . + {
       "hasCompletedOnboarding": true,
       "bypassPermissionsModeAccepted": true,
+      "hasSeenAutoDefaultNudge": true,
       "projects": ($projects + {
         "/workspace": ($workspace + {"hasTrustDialogAccepted": true})
       })
@@ -161,6 +162,7 @@ handle_claude_startup_gates() {
   local theme_sent=0
   local trust_sent=0
   local bypass_sent=0
+  local auto_default_sent=0
   local clear_ticks=0
   local pane
   for i in $(seq 1 75); do
@@ -198,12 +200,23 @@ handle_claude_startup_gates() {
       sleep 1
       continue
     fi
+    if printf '%s' "$pane" | grep -q "Make auto mode your default permission mode?"; then
+      if [ "$auto_default_sent" -eq 0 ]; then
+        # 该菜单默认接受 Auto；取消回调明确保留当前模式，避免吞掉题目的回车。
+        log "检测到 Auto 默认权限推荐；取消推荐并保留本次权限模式"
+        tmux send-keys -t "$SESSION" Escape
+        auto_default_sent=1
+      fi
+      clear_ticks=0
+      sleep 1
+      continue
+    fi
     if printf '%s' "$pane" | grep -Eiq "Browser didn't open|Paste code here|Use the url below to sign in|claude\.ai/oauth|org:create_api_key|setup-token|Choose how you want to log in"; then
       log "WARN: Claude opened an auth/onboarding gate; refusing to inject task prompt"
       echo "auth/onboarding gate" > /tmp/claude-startup-gate
       return 1
     fi
-    if [ "$theme_sent" -eq 1 ] || [ "$trust_sent" -eq 1 ] || [ "$bypass_sent" -eq 1 ]; then
+    if [ "$theme_sent" -eq 1 ] || [ "$trust_sent" -eq 1 ] || [ "$bypass_sent" -eq 1 ] || [ "$auto_default_sent" -eq 1 ]; then
       clear_ticks=$((clear_ticks + 1))
       if [ "$clear_ticks" -ge 3 ]; then
         log "Claude startup gates cleared"
@@ -218,7 +231,7 @@ handle_claude_startup_gates() {
     fi
     return 0
   done
-  if [ "$theme_sent" -eq 1 ] || [ "$trust_sent" -eq 1 ] || [ "$bypass_sent" -eq 1 ]; then
+  if [ "$theme_sent" -eq 1 ] || [ "$trust_sent" -eq 1 ] || [ "$bypass_sent" -eq 1 ] || [ "$auto_default_sent" -eq 1 ]; then
     log "WARN: Claude startup gate did not clear; skip prompt injection"
     return 1
   fi

@@ -255,6 +255,8 @@ _DEFAULT_CLAUDE_SETTINGS: dict[str, object] = {
 _DEFAULT_CLAUDE_TOP_CONFIG: dict[str, object] = {
     "hasCompletedOnboarding": True,
     "bypassPermissionsModeAccepted": True,
+    # 新版 Auto 推荐菜单会消费题目提交的回车，自动任务必须跳过该首次引导。
+    "hasSeenAutoDefaultNudge": True,
     "projects": {
         "/workspace": {
             "hasTrustDialogAccepted": True,
