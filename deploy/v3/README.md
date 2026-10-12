@@ -16,7 +16,28 @@ python3 deploy/v3/manage.py backup --env /absolute/path/v3.env --backup-dir /abs
 
 建议端口 18080 只是默认值，实际启动前必须空闲。默认绑定 127.0.0.1；远程访问按现有安全反代配置接入这个新端口。内部账号和调度器服务只在独立 Docker 网络通信。
 
-每个构建批次使用唯一 `v3-<release>` 标签。清单记录父仓和子仓提交、冻结源码内容哈希、工作区是否有未提交修改、平台、默认 CLI、布局与传输版本及两个本地镜像的内容 digest；启动逐项核对标签、角色、批次和 digest。不得用旧 latest、混用批次或覆盖清单。本地构建不会推送镜像；正式发布后还应保存仓库 manifest digest。`scripts/v3-stack` 提供同一组命令的短入口。
+每个构建批次使用唯一 `v3-<release>` 标签。清单记录父仓和子仓提交、冻结源码内容哈希、工作区是否有未提交修改、平台、默认 CLI、布局与传输版本及两个镜像的本地 ID（`digest`）与原始配置哈希（`config_digest`）；启动逐项核对标签、角色、批次和镜像身份。不得用旧 latest、混用批次或覆盖清单。本地构建不会推送镜像。`scripts/v3-stack` 提供同一组命令的短入口。
+
+## GHCR 发布与远程交付
+
+v3 分支的 Action 联合构建后发布两个专用包：`ghcr.io/silentflower/vibebench-v3-control` 和 `ghcr.io/silentflower/vibebench-v3-account`，统一标签 `v3-ci-<run_id>-<run_attempt>`。仅 v3 ref 的当前 Action 可以调用 publish；使用 `GITHUB_TOKEN`，不写旧版包或 latest。父提交必须对应当前 Action，未提交来源拒绝发布，同一 attempt 的发布标记禁止重试；失败重跑必须使用新 attempt。
+
+只有两个镜像都推送成功并取得仓库 digest 后才保存发布清单。`digest` 是构建机 Docker 的本地 ID，可能指向 OCI 索引；`config_digest` 根据归档原始配置字节计算，`registry_digest` 则是推送的仓库 manifest/索引 digest。不同 Docker 存储实现的本地 ID 可以不同，启动仍必须匹配清单固定的配置或 OCI 根及相同平台。Action 的 `v3-release-<run_id>-<run_attempt>` artifact 保存发布清单、同批压缩镜像包及其 SHA256/大小，保留 14 天，不包含部署配置或账号资料。
+
+```bash
+# 从对应 Action 下载同批 artifact，先保存发布清单。
+scripts/v3-stack pull --manifest /absolute/path/v3.json
+# 首次包默认私有、无法匿名拉取时，使用同一 artifact 的镜像包。
+scripts/v3-stack load --manifest /absolute/path/v3.json --bundle /absolute/path/v3-images.tar.gz
+```
+
+pull 按 `registry_digest` 固定下载，核对配置 ID后建立清单中的标签；load 先核对包名称、大小和 SHA256。随后两者都执行角色、批次、提交与平台核对。首次发布不自动修改包可见性；离线交付不需要服务器保存 GHCR PAT。env 中的两个镜像引用必须和发布清单完全一致。
+
+## RAM 与 swap 预算
+
+`V3_ACCOUNT_MEMORY` 是每账号 RAM 上限，`V3_ACCOUNT_SWAP` 是额外 swap 上限，默认 `0` 保持禁用。Docker 的内存加 swap 总上限由两者相加生成，账号首次保存预算；历史环境缺 swap 字段时保持关闭。以后修改全局配置不会自动改已有账号预算或身份。
+
+美国服务器起步配置：`V3_ACCOUNT_MEMORY=1536m`、`V3_ACCOUNT_SWAP=2048m`、`V3_MAX_ACTIVE_ACCOUNTS=1`，RAM 1.5 GiB，额外 swap 2 GiB，总额度 3.5 GiB。部署预检分别要求可用 RAM 至少为账号预算加 1 GiB、空闲 swap 足够覆盖活跃账号额度且 Docker 支持 swap 限额；显式更高的 `V3_MIN_FREE_MEMORY_BYTES` 仍生效。默认 4 GiB、单账号配置继续要求至少 5 GiB 可用 RAM，swap 不能代替物理余量。起步上限不代表真实 CLI 的峰值已经验证。
 
 首次使用空目录；不复制旧账号有效 RT。每账号 HOME、CA、工作目录、CLI 版本缓存和 Recorder 证据归属保存在 `bench/environments/<环境 ID>`。停止固定容器保留目录和容器，重启服务先对账遗留执行。停止入口按产品及部署标签收口，不 prune Docker、不删除数据或旧网络。
 

@@ -356,6 +356,8 @@ def verify() -> None:
         assert container.exec_run(["cat", "/etc/machine-id"]).output == machine
         assert (runtime._root(row) / "home" / ".claude" / ".credentials.json").read_bytes() == original
         assert not container.attrs["HostConfig"]["PortBindings"]
+        assert container.attrs["HostConfig"]["Memory"] == 1536 * 1024**2
+        assert container.attrs["HostConfig"]["MemorySwap"] == 3584 * 1024**2
         # 续聊仍使用同一账号 HOME、原项目目录和独立 source。
         source = "continue:abcdef111111:0"
         token, _ = runtime.begin_continue(account, {"id": "synthetic-run", "claude_code_version": "9.9.9", "capture_full_http": True},

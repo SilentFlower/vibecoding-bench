@@ -36,7 +36,8 @@ def main() -> None:
             runner = client.containers.run(manifest["images"]["control"]["reference"], ["/source/deploy/v3/verify_local.py", "--proxy-ip", proxy], entrypoint="python", detach=True,
                 network=network.name, labels={**labels, "vibebench.role": "verification"},
                 environment={"PYTHONPATH": "/source/orchestrator", "V3_DEPLOYMENT_ID": deployment, "V3_RELEASE": manifest["release"],
-                    "V3_ACCOUNT_IMAGE": manifest["images"]["account"]["reference"], "V3_NETWORK": network.name, "VERIFY_HOST_ROOT": str(root), "V3_WORKER_SCRIPT": "/source/images/worker/entrypoint.sh"},
+                    "V3_ACCOUNT_IMAGE": manifest["images"]["account"]["reference"], "V3_NETWORK": network.name, "VERIFY_HOST_ROOT": str(root), "V3_WORKER_SCRIPT": "/source/images/worker/entrypoint.sh",
+                    "V3_ACCOUNT_MEMORY": "1536m", "V3_ACCOUNT_SWAP": "2048m"},
                 volumes={str(repository): {"bind": "/source", "mode": "ro"}, str(fixtures): {"bind": "/fixtures", "mode": "ro"},
                     str(root): {"bind": "/verify", "mode": "rw"}, "/var/run/docker.sock": {"bind": "/var/run/docker.sock", "mode": "rw"}})
             result = runner.wait(timeout=240)

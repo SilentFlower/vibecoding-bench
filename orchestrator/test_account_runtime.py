@@ -36,7 +36,8 @@ class AccountRuntimeTests(unittest.TestCase):
         self.gateway = Mock()
         self.fingerprint = Mock(return_value={"hostname": "fixed", "machine_id": "a" * 32, "mac": "02:00:00:00:00:01", "tz": "UTC", "lang": "en_US.UTF-8"})
         environment = patch.dict(os.environ, {"V3_DEPLOYMENT_ID": "test", "V3_ACCOUNT_IMAGE": "v3-test",
-            "V3_NETWORK": "vibebench-v3-test", "V3_MAX_ACTIVE_ACCOUNTS": "1"})
+            "V3_NETWORK": "vibebench-v3-test", "V3_MAX_ACTIVE_ACCOUNTS": "1",
+            "V3_ACCOUNT_MEMORY": "4g", "V3_ACCOUNT_SWAP": "0"})
         environment.start()
         self.addCleanup(environment.stop)
         self.runtime = AccountRuntime(self.client, self.root, self.root, database, self.fingerprint, self.gateway)
@@ -50,6 +51,58 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual(initial["fingerprint_json"], renamed["fingerprint_json"])
         self.assertEqual(renamed["name"], "renamed")
         self.fingerprint.assert_called_once_with("synthetic")
+
+    def test_ram_and_swap_limits_remain_frozen_when_global_budget_changes(self) -> None:
+        """新账号使用选定总额度，后续全局预算不能改变既有身份或限额。
+
+        :return: None
+        """
+        with patch.dict(os.environ, {"V3_ACCOUNT_MEMORY": "1536m", "V3_ACCOUNT_SWAP": "2048m"}):
+            row = self.runtime._row("synthetic", 1)
+        self.runtime.release_id = "test"
+        self.client.images.get.return_value.attrs = {"Config": {"Labels": {
+            "vibebench.product": "v3", "vibebench.role": "account", "vibebench.release": "test"}}}
+        container = Mock(id="new-container", status="running")
+        container.exec_run.return_value = SimpleNamespace(exit_code=0)
+        self.client.containers.run.return_value = container
+        with patch.object(self.runtime, "_make_room"), patch.object(self.runtime, "_sender_active", return_value=0), patch.object(self.runtime, "_ensure_version"):
+            current, _ = self.runtime.ensure({"id": 1, "name": "synthetic"}, "2.1.280")
+        limits = self.client.containers.run.call_args.kwargs
+        self.assertEqual(limits["mem_limit"], 1536 * 1024**2)
+        self.assertEqual(limits["memswap_limit"], 3584 * 1024**2)
+        self.assertEqual(current["fingerprint_json"], row["fingerprint_json"])
+
+    def test_old_fingerprint_missing_swap_preserves_no_swap(self) -> None:
+        """已有记录缺 swap 时不能随新全局配置开放额外额度。
+
+        :return: None
+        """
+        row = self.runtime._row("synthetic", 1)
+        fingerprint = json.loads(row["fingerprint_json"])
+        del fingerprint["swap"]
+        self.runtime._update(row, fingerprint_json=json.dumps(fingerprint))
+        self.runtime.release_id = "test"
+        self.client.images.get.return_value.attrs = {"Config": {"Labels": {
+            "vibebench.product": "v3", "vibebench.role": "account", "vibebench.release": "test"}}}
+        container = Mock(id="legacy-container", status="running")
+        container.exec_run.return_value = SimpleNamespace(exit_code=0)
+        self.client.containers.run.return_value = container
+        with patch.dict(os.environ, {"V3_ACCOUNT_SWAP": "2048m"}), patch.object(self.runtime, "_make_room"), patch.object(self.runtime, "_sender_active", return_value=0), patch.object(self.runtime, "_ensure_version"):
+            self.runtime.ensure({"id": 1, "name": "synthetic"}, "2.1.280")
+        limits = self.client.containers.run.call_args.kwargs
+        self.assertEqual(limits["mem_limit"], 4 * 1024**3)
+        self.assertEqual(limits["memswap_limit"], limits["mem_limit"])
+
+    def test_unlimited_swap_is_rejected_before_account_registration(self) -> None:
+        """非法预算不能留下新账号环境记录。
+
+        :return: None
+        """
+        with patch.dict(os.environ, {"V3_ACCOUNT_SWAP": "-1"}):
+            with self.assertRaisesRegex(ValueError, "无限额"):
+                self.runtime._row("synthetic", 1)
+        with self.database() as connection:
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM account_environments").fetchone()[0], 0)
 
     def test_quota_resume_preserves_evidence_and_aggregates_run_once(self) -> None:
         """两代 run 统计累加一次，抓包保留各代文件，续聊不污染 run 统计。

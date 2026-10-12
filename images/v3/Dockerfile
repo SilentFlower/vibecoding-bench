@@ -47,7 +47,9 @@ ARG V3_RELEASE
 ARG V3_PARENT_REV
 ARG V3_GATEWAY_REV
 LABEL vibebench.product="v3" vibebench.role="control" vibebench.release=$V3_RELEASE \
-    vibebench.parent-revision=$V3_PARENT_REV vibebench.gateway-revision=$V3_GATEWAY_REV
+    vibebench.parent-revision=$V3_PARENT_REV vibebench.gateway-revision=$V3_GATEWAY_REV \
+    org.opencontainers.image.source="https://github.com/SilentFlower/vibecoding-bench" \
+    org.opencontainers.image.revision=$V3_PARENT_REV
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/v3-control"]
 
 FROM python:3.12-slim-bookworm AS account
@@ -80,5 +82,7 @@ ARG V3_RELEASE
 ARG V3_PARENT_REV
 ARG V3_GATEWAY_REV
 LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELEASE \
-    vibebench.parent-revision=$V3_PARENT_REV vibebench.gateway-revision=$V3_GATEWAY_REV
+    vibebench.parent-revision=$V3_PARENT_REV vibebench.gateway-revision=$V3_GATEWAY_REV \
+    org.opencontainers.image.source="https://github.com/SilentFlower/vibecoding-bench" \
+    org.opencontainers.image.revision=$V3_PARENT_REV
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/v3-account-init"]

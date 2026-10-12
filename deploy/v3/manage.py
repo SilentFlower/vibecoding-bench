@@ -2,8 +2,10 @@
 """v3 两镜像的联合构建、冲突检查及受限启停入口。"""
 import argparse
 import hashlib
+import gzip
 import shutil
 import tempfile
+import tarfile
 import json
 import os
 import re
@@ -21,6 +23,9 @@ from urllib.parse import quote
 
 REPO = Path(__file__).resolve().parents[2]
 COMPOSE = Path(__file__).with_name("compose.yml")
+# 独立部署脚本复用镜像内的纯预算模块，避免预检和容器解释不同单位。
+sys.path.insert(0, str(REPO / "orchestrator"))
+from resource_budget import account_limits
 
 
 def command(*arguments: str, capture: bool = False, environment=None) -> str:
@@ -76,7 +81,7 @@ def inspect_images(values: dict) -> dict:
         info = json.loads(command("docker", "image", "inspect", name, capture=True))[0]
         entry = manifest["images"][role]
         labels = info["Config"]["Labels"] or {}
-        if entry["reference"] != name or entry["digest"] != info["Id"]:
+        if entry["reference"] != name or not _image_matches(info, entry):
             raise ValueError("镜像 digest 与清单不匹配")
         if entry.get("platform") and entry["platform"] != info.get("Os", "") + "/" + info.get("Architecture", ""):
             raise ValueError("镜像平台与清单不匹配")
@@ -135,21 +140,41 @@ def preflight(values: dict) -> Path:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
         probe.bind((address, port))
     inspect_images(values)
-    memory = next(int(line.split()[1]) * 1024 for line in Path("/proc/meminfo").read_text().splitlines() if line.startswith("MemAvailable:"))
-    active_limit = int(values.get("V3_MAX_ACTIVE_ACCOUNTS", "1"))
-    memory_match = re.fullmatch(r"([1-9][0-9]*)([mg])", values.get("V3_ACCOUNT_MEMORY", "4g"))
-    if active_limit < 1 or not memory_match or float(values.get("V3_ACCOUNT_CPUS", "2")) <= 0:
-        raise ValueError("账号 CPU、内存或活跃环境预算无效")
-    account_memory = int(memory_match[1]) * 1024 ** (3 if memory_match[2] == "g" else 2)
-    minimum = max(int(values.get("V3_MIN_FREE_MEMORY_BYTES", str(5 * 1024**3))), active_limit * account_memory + 1024**3)
-    if memory < minimum:
-        raise ValueError("宿主可用内存不足，拒绝启动")
     marker = root / ".v3-deployment.json"
     if marker.exists():
         if json.loads(marker.read_text()).get("deployment") != deployment:
             raise ValueError("数据目录属于其它部署")
     elif root.exists() and any(root.iterdir()):
         raise ValueError("非空数据目录缺少 v3 归属标记，拒绝接管")
+    memory = {line.split(":", 1)[0]: int(line.split()[1]) * 1024
+        for line in Path("/proc/meminfo").read_text().splitlines()
+        if line.startswith(("MemAvailable:", "SwapFree:"))}
+    active_limit = int(values.get("V3_MAX_ACTIVE_ACCOUNTS", "1"))
+    account_memory, total_memory = account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"))
+    database = root / "bench/db.sqlite"
+    if database.is_file():
+        if not database.resolve().is_relative_to(root):
+            raise ValueError("数据库路径不属于本部署")
+        with sqlite3.connect("file:" + quote(str(database), safe="/") + "?mode=ro", uri=True) as connection:
+            if connection.execute("SELECT 1 FROM sqlite_master WHERE name='account_environments'").fetchone():
+                # 已有账号保留首次限额；下调全局配置不能让预检低估下一次唤醒的额度。
+                for saved, in connection.execute("SELECT fingerprint_json FROM account_environments"):
+                    fingerprint = json.loads(saved)
+                    ram, combined = account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))
+                    if ram > account_memory or combined - ram > total_memory - account_memory:
+                        raise ValueError("已有账号固化预算超过当前配置，请提高部署预算后再启动")
+    if active_limit < 1 or float(values.get("V3_ACCOUNT_CPUS", "2")) <= 0:
+        raise ValueError("账号 CPU、内存或活跃环境预算无效")
+    # 余量独立于 swap；默认 4g 仍要求 5g，显式的小预算不再被固定 5g 挡住。
+    minimum = max(int(values.get("V3_MIN_FREE_MEMORY_BYTES", "0")), active_limit * account_memory + 1024**3)
+    if memory.get("MemAvailable", 0) < minimum:
+        raise ValueError("宿主可用内存不足，拒绝启动")
+    swap = total_memory - account_memory
+    if swap:
+        if memory.get("SwapFree", 0) < active_limit * swap:
+            raise ValueError("宿主空闲 swap 不足，拒绝启动")
+        if json.loads(command("docker", "info", "--format", "{{json .SwapLimit}}", capture=True)) is not True:
+            raise ValueError("Docker 不支持 swap 限额，拒绝启动")
     return root
 
 
@@ -192,13 +217,239 @@ def build(release: str, manifest_path: Path) -> None:
                 "--build-arg", f"V3_RELEASE={release}", "--build-arg", f"V3_PARENT_REV={parent}",
                 "--build-arg", f"V3_GATEWAY_REV={gateway}", "-t", reference, str(snapshot))
             info = json.loads(command("docker", "image", "inspect", reference, capture=True))[0]
-            images[role] = {"reference": reference, "digest": info["Id"], "platform": info["Os"] + "/" + info["Architecture"]}
+            images[role] = {"reference": reference, "digest": info["Id"],
+                "config_digest": _image_config_digest(reference),
+                "platform": info["Os"] + "/" + info["Architecture"]}
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     with manifest_path.open("x") as output:
         json.dump({"schema": 3, "bridge_protocol": 1, "layout_version": 1, "default_cli_version": "2.1.280",
             "release": release, "parent_revision": parent, "gateway_revision": gateway,
             "dirty_worktree": dirty, "source_content_sha256": source_hash, "images": images}, output, indent=2)
         output.write("\n")
+
+
+def _manifest_values(manifest_path: Path) -> dict:
+    manifest = json.loads(manifest_path.read_text())
+    return {"V3_RELEASE_MANIFEST": str(manifest_path),
+        **{f"V3_{role.upper()}_IMAGE": manifest["images"][role]["reference"] for role in ("control", "account")}}
+
+
+def _write_new_json(path: Path, value: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w") as output:
+            json.dump(value, output, indent=2)
+            output.write("\n")
+            output.flush()
+            os.fsync(output.fileno())
+        # link 以独占方式发布完整文件；不能用 replace 覆盖另一个已完成批次。
+        os.link(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _image_config_digest(reference: str) -> str:
+    # containerd 的 Id 可以是 OCI 索引；归档中的原始 config 字节才有跨 daemon 的稳定哈希。
+    process = subprocess.Popen(["docker", "save", reference], cwd=REPO, stdout=subprocess.PIPE)
+    configs, manifests = {}, []
+    try:
+        with tarfile.open(fileobj=process.stdout, mode="r|") as archive:
+            for item in archive:
+                if not item.isfile() or item.size > 4 * 1024**2:
+                    continue
+                if item.name == "manifest.json":
+                    manifests = json.load(archive.extractfile(item))
+                elif item.name.endswith(".json") or item.name.startswith("blobs/sha256/"):
+                    payload = archive.extractfile(item).read()
+                    try:
+                        value = json.loads(payload)
+                    except (ValueError, UnicodeDecodeError):
+                        continue
+                    if isinstance(value, dict) and isinstance(value.get("rootfs"), dict) and "architecture" in value:
+                        configs[item.name] = "sha256:" + hashlib.sha256(payload).hexdigest()
+        if process.wait() != 0:
+            raise ValueError("镜像配置归档导出失败")
+        entries = [item for item in manifests if reference in (item.get("RepoTags") or [])]
+        if len(entries) != 1 or entries[0].get("Config") not in configs:
+            raise ValueError("无法从镜像归档核对唯一的原始配置")
+        return configs[entries[0]["Config"]]
+    except tarfile.TarError as error:
+        raise ValueError("镜像配置归档格式不匹配") from error
+    finally:
+        process.stdout.close()
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+
+
+def _image_matches(info: dict, entry: dict) -> bool:
+    if info["Id"] == entry["digest"]:
+        return True
+    config = entry.get("config_digest")
+    if not config or not re.fullmatch(r"sha256:[0-9a-f]{64}", config):
+        return False
+    # classic store 用 config ID，containerd 可用 OCI 索引 ID；两者均由发布清单固定。
+    registry = entry.get("registry_digest")
+    return info["Id"] == config or bool(registry and (
+        info["Id"] == registry or (info.get("Descriptor") or {}).get("digest") == registry))
+
+
+def _check_local_reference(reference: str, expected: dict) -> None:
+    result = subprocess.run(["docker", "image", "inspect", reference], cwd=REPO,
+        capture_output=True, text=True, check=False)
+    if result.returncode == 0:
+        if not _image_matches(json.loads(result.stdout)[0], expected):
+            raise ValueError("本地批次标签指向其它镜像，拒绝覆盖")
+    elif "No such image" not in result.stderr:
+        raise ValueError("无法核对本地镜像，拒绝继续")
+
+
+def publish(manifest_path: Path, output_path: Path, bundle_path: Path,
+            namespace: str = "ghcr.io/silentflower") -> dict:
+    """将当前 v3 Action 的同批镜像发布到 GHCR，最后才生成完整交付清单。
+
+    :param manifest_path: 已完成构建的本地清单
+    :param output_path: 全新发布清单路径
+    :param bundle_path: 全新同批镜像包路径
+    :param namespace: 当前 Action 仓库 owner 的 GHCR namespace
+    :return: 已发布的联合清单；失败保留发布标记，必须使用新 attempt 重跑
+    """
+    manifest = json.loads(manifest_path.read_text())
+    expected_release = "ci-" + os.environ.get("GITHUB_RUN_ID", "") + "-" + os.environ.get("GITHUB_RUN_ATTEMPT", "")
+    owner = os.environ.get("GITHUB_REPOSITORY_OWNER", "").lower()
+    if (os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("GITHUB_REF") != "refs/heads/v3"
+            or not re.fullmatch(r"ci-[1-9][0-9]*-[1-9][0-9]*", expected_release)
+            or manifest.get("release") != expected_release
+            or manifest.get("parent_revision") != os.environ.get("GITHUB_SHA")
+            or os.environ.get("GITHUB_REPOSITORY", "").lower() != owner + "/vibecoding-bench"
+            or namespace != "ghcr.io/" + owner or not re.fullmatch(r"ghcr.io/[a-z0-9][a-z0-9-]*", namespace)):
+        raise ValueError("发布必须使用当前 v3 Action 的仓库、提交与唯一 run/attempt 批次")
+    if manifest.get("dirty_worktree") is not False:
+        raise ValueError("不能发布含未提交修改或来源未知的批次")
+    paths = [manifest_path.resolve(), output_path.resolve(), bundle_path.resolve()]
+    if len(set(paths)) != 3 or output_path.exists() or bundle_path.exists():
+        raise ValueError("发布清单和镜像包必须使用全新独立路径")
+    started = output_path.with_name(output_path.name + ".started")
+    if started.exists():
+        raise ValueError("本批次已经开始发布，请使用新的 Action attempt 重跑")
+    inspect_images(_manifest_values(manifest_path))
+    references = {role: f"{namespace}/vibebench-v3-{role}:v3-{manifest['release']}" for role in ("control", "account")}
+    for role, reference in references.items():
+        _check_local_reference(reference, manifest["images"][role])
+    # GitHub 重跑增加 attempt；本次标记防止进程重试复用同批标签覆盖部分发布。
+    _write_new_json(started,
+        {"release": manifest["release"], "parent_revision": manifest["parent_revision"]})
+    published = {**manifest, "images": {}}
+    for role, reference in references.items():
+        entry = manifest["images"][role]
+        command("docker", "tag", entry["reference"], reference)
+        command("docker", "push", reference)
+        info = json.loads(command("docker", "image", "inspect", reference, capture=True))[0]
+        repository = reference.rsplit(":", 1)[0]
+        digests = {value[len(repository) + 1:] for value in info.get("RepoDigests", [])
+            if value.startswith(repository + "@")}
+        if info["Id"] != entry["digest"] or len(digests) != 1 or not re.fullmatch(r"sha256:[0-9a-f]{64}", next(iter(digests), "")):
+            raise ValueError("推送后镜像配置 ID 或仓库 digest 无法核对")
+        config_digest = entry.get("config_digest") or _image_config_digest(entry["reference"])
+        published["images"][role] = {**entry, "reference": reference,
+            "config_digest": config_digest, "registry_digest": next(iter(digests))}
+    bundle_path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=bundle_path.name + ".", dir=bundle_path.parent)
+    process = None
+    try:
+        with os.fdopen(descriptor, "wb") as output:
+            process = subprocess.Popen(["docker", "save", *references.values()], cwd=REPO, stdout=subprocess.PIPE)
+            try:
+                with gzip.GzipFile(fileobj=output, mode="wb", mtime=0) as archive:
+                    shutil.copyfileobj(process.stdout, archive, length=1024 * 1024)
+                if process.wait() != 0:
+                    raise ValueError("同批镜像包生成失败")
+                output.flush()
+                os.fsync(output.fileno())
+            finally:
+                process.stdout.close()
+                if process.poll() is None:
+                    process.terminate()
+                    process.wait()
+        os.link(temporary, bundle_path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+    published["bundle"] = {"name": bundle_path.name, "sha256": _file_sha256(bundle_path), "size": bundle_path.stat().st_size}
+    _write_new_json(output_path, published)
+    return published
+
+
+def _published_manifest(manifest_path: Path) -> dict:
+    manifest = json.loads(manifest_path.read_text())
+    if manifest.get("schema") != 3 or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", manifest.get("release", "")):
+        raise ValueError("发布清单格式或批次不匹配")
+    for role in ("control", "account"):
+        entry = manifest["images"][role]
+        reference = entry["reference"]
+        if not re.fullmatch(r"ghcr.io/[a-z0-9][a-z0-9-]*/vibebench-v3-" + role + ":v3-" + re.escape(manifest["release"]), reference):
+            raise ValueError("发布镜像引用不属于指定 v3 角色和批次")
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", entry.get("registry_digest", "")):
+            raise ValueError("发布清单缺少有效仓库 digest")
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", entry.get("digest", "")):
+            raise ValueError("发布清单缺少有效本地镜像 ID")
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", entry.get("config_digest", "")):
+            raise ValueError("发布清单缺少有效原始配置 digest")
+    return manifest
+
+
+def pull(manifest_path: Path) -> None:
+    """按仓库 digest 下载两镜像，核对后建立受控批次标签。
+
+    :param manifest_path: 完整的发布清单
+    :return: None；认证、下载或身份核对失败时停止
+    """
+    manifest = _published_manifest(manifest_path)
+    for role in ("control", "account"):
+        entry = manifest["images"][role]
+        reference = entry["reference"]
+        _check_local_reference(reference, entry)
+    for role in ("control", "account"):
+        entry = manifest["images"][role]
+        pinned = entry["reference"].rsplit(":", 1)[0] + "@" + entry["registry_digest"]
+        command("docker", "pull", pinned)
+        info = json.loads(command("docker", "image", "inspect", pinned, capture=True))[0]
+        if not _image_matches(info, entry):
+            raise ValueError("下载镜像配置 ID 与发布清单不匹配")
+        command("docker", "tag", pinned, entry["reference"])
+    inspect_images(_manifest_values(manifest_path))
+
+
+def load_bundle(manifest_path: Path, bundle_path: Path) -> None:
+    """验证同批包的 SHA256 后加载，不需要服务器保存仓库凭据。
+
+    :param manifest_path: 完整发布清单
+    :param bundle_path: 与清单匹配的压缩镜像包
+    :return: None；包或镜像身份不符时停止
+    """
+    manifest = _published_manifest(manifest_path)
+    bundle = manifest.get("bundle") or {}
+    if (bundle.get("name") != bundle_path.name or bundle.get("size") != bundle_path.stat().st_size
+            or not re.fullmatch(r"[0-9a-f]{64}", bundle.get("sha256", ""))
+            or _file_sha256(bundle_path) != bundle["sha256"]):
+        raise ValueError("同批镜像包名称、大小或 SHA256 不匹配")
+    for role in ("control", "account"):
+        entry = manifest["images"][role]
+        _check_local_reference(entry["reference"], entry)
+    command("docker", "load", "--input", str(bundle_path))
+    inspect_images(_manifest_values(manifest_path))
 
 
 def _owned_root(values: dict, stopped: bool = False) -> Path:
@@ -235,10 +486,10 @@ def status(values: dict) -> dict:
         if labels.get("vibebench.product") != "v3" or labels.get("vibebench.deployment") != values["V3_DEPLOYMENT_ID"]:
             continue
         role = labels.get("vibebench.role", "unknown")
-        expected = manifest["images"]["account" if role == "account" else "control"]["digest"]
+        expected = manifest["images"]["account" if role == "account" else "control"]
         containers.append({"id": item["Id"], "name": item["Name"].lstrip("/"), "role": role,
             "environment_id": labels.get("vibebench.environment"), "status": item["State"]["Status"],
-            "image_digest": item["Image"], "matches_release": item["Image"] == expected})
+            "image_digest": item["Image"], "matches_release": _image_matches({"Id": item["Image"]}, expected)})
     environments = []
     database = root / "bench/db.sqlite"
     if database.is_file():
@@ -429,16 +680,33 @@ def main() -> None:
     :return: None
     """
     parser = argparse.ArgumentParser(description="v3 联合镜像管理")
-    parser.add_argument("action", choices=("build", "check", "up", "status", "stop", "backup", "import-offline"))
+    parser.add_argument("action", choices=("build", "publish", "pull", "load", "check", "up", "status", "stop", "backup", "import-offline"))
     parser.add_argument("--env", type=Path)
     parser.add_argument("--release")
     parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--bundle", type=Path)
+    parser.add_argument("--namespace", default="ghcr.io/silentflower")
     parser.add_argument("--backup-dir", type=Path)
     parser.add_argument("--source", type=Path)
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     if args.action == "build":
         build(args.release or uuid.uuid4().hex, args.manifest or REPO / "releases" / "v3.json")
+        return
+    if args.action in ("publish", "pull", "load"):
+        if not args.manifest:
+            parser.error("镜像交付操作需要 --manifest")
+        if args.action == "publish":
+            if not args.output or not args.bundle:
+                parser.error("publish 需要 --output 和 --bundle")
+            publish(args.manifest, args.output, args.bundle, args.namespace)
+        elif args.action == "pull":
+            pull(args.manifest)
+        else:
+            if not args.bundle:
+                parser.error("load 需要 --bundle")
+            load_bundle(args.manifest, args.bundle)
         return
     if not args.env:
         parser.error("此操作需要 --env")

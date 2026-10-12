@@ -21,6 +21,7 @@ from typing import Callable
 from urllib.parse import quote, unquote, urlsplit
 
 from docker.errors import NotFound
+from resource_budget import account_limits
 
 
 def atomic_json(path: Path, value: dict, mode: int = 0o600) -> None:
@@ -179,6 +180,8 @@ class AccountRuntime:
             environment_id = uuid.uuid4().hex
             fingerprint = self.fingerprint(name)
             fingerprint["mem"] = os.environ.get("V3_ACCOUNT_MEMORY", "4g")
+            fingerprint["swap"] = os.environ.get("V3_ACCOUNT_SWAP", "0")
+            account_limits(fingerprint["mem"], fingerprint["swap"])
             with connection:
                 connection.execute("INSERT INTO account_environments(environment_id,name,account_id,fingerprint_json) VALUES(?,?,?,?)",
                                    (environment_id, name, account_id, json.dumps(fingerprint)))
@@ -300,10 +303,12 @@ class AccountRuntime:
                     quota = self.data / "quota"
                     quota.mkdir(parents=True, exist_ok=True, mode=0o700)
                     mounts[str(self.host_data / "quota")] = {"bind": "/quota-accounts", "mode": "ro"}
+                    # swap 跟随首次预算固化；旧环境缺字段时保持禁用，不能随全局配置放大。
+                    memory, memory_swap = account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))
                     container = self.client.containers.run(self.image, name=name, detach=True,
                         auto_remove=False, labels={**self._labels(row), "vibebench.release": self.release_id}, network=self.network,
                         hostname=fingerprint["hostname"], mac_address=fingerprint["mac"],
-                        mem_limit=fingerprint["mem"], memswap_limit=fingerprint["mem"],
+                        mem_limit=memory, memswap_limit=memory_swap,
                         nano_cpus=int(float(os.environ.get("V3_ACCOUNT_CPUS", "2")) * 1_000_000_000),
                         cap_add=["NET_ADMIN"], devices=["/dev/net/tun:/dev/net/tun"],
                         security_opt=["no-new-privileges:true"], volumes=mounts, environment=environment,

@@ -133,6 +133,84 @@ class PreflightTests(unittest.TestCase):
             self.assertEqual(target.stat().st_mode & 0o777, 0o700)
 
 
+class ResourceBudgetTests(unittest.TestCase):
+    """资源预检分别核对 RAM 与 swap，不能用宿主 swap 掩盖 RAM 不足。"""
+    setUp = PreflightTests.setUp
+
+    def _preflight(self, ram: int, swap: int, supported: bool = True):
+        content = f"MemAvailable: {ram // 1024} kB\nSwapFree: {swap // 1024} kB\n"
+        with patch.object(manage.Path, "read_text", return_value=content), patch.object(manage, "inspect_images", return_value={}), patch.object(manage, "command", side_effect=["", "", json.dumps(supported)]):
+            return manage.preflight(self.values)
+
+    def test_us_budget_accepts_available_ram_and_swap_separately(self) -> None:
+        """明确的低预算通过预检，不再被固定 5 GiB 挡住。
+
+        :return: None
+        """
+        self.values.update(V3_ACCOUNT_MEMORY="1536m", V3_ACCOUNT_SWAP="2048m")
+        self.assertEqual(self._preflight(2804184 * 1024, 6639656 * 1024), self.root)
+
+    def test_default_budget_still_requires_five_gib_ram(self) -> None:
+        """默认 4g 账号仍预留管理服务余量，不能借 swap 越过物理预算。
+
+        :return: None
+        """
+        with self.assertRaisesRegex(ValueError, "内存不足"):
+            self._preflight(3 * 1024**3, 8 * 1024**3)
+
+    def test_swap_shortage_and_missing_limit_support_refuse_start(self) -> None:
+        """空闲 swap 不足或 Docker 不支持时都不能假称可用。
+
+        :return: None
+        """
+        self.values.update(V3_ACCOUNT_MEMORY="1536m", V3_ACCOUNT_SWAP="2048m")
+        with self.assertRaisesRegex(ValueError, "swap 不足"):
+            self._preflight(3 * 1024**3, 1024**3)
+        with self.assertRaisesRegex(ValueError, "不支持 swap"):
+            self._preflight(3 * 1024**3, 3 * 1024**3, False)
+
+    def test_explicit_ram_floor_and_active_accounts_are_respected(self) -> None:
+        """显式更高门槛和多个账号都会增加真实资源要求。
+
+        :return: None
+        """
+        self.values.update(V3_ACCOUNT_MEMORY="1536m", V3_ACCOUNT_SWAP="2048m", V3_MIN_FREE_MEMORY_BYTES=str(5 * 1024**3))
+        with self.assertRaisesRegex(ValueError, "内存不足"):
+            self._preflight(3 * 1024**3, 8 * 1024**3)
+        self.values.update(V3_MIN_FREE_MEMORY_BYTES="1", V3_MAX_ACTIVE_ACCOUNTS="2")
+        with self.assertRaisesRegex(ValueError, "swap 不足"):
+            self._preflight(6 * 1024**3, 3 * 1024**3)
+
+    def test_invalid_or_unlimited_budget_is_rejected(self) -> None:
+        """不接受负数、无限或格式含糊的预算。
+
+        :return: None
+        """
+        for ram, swap in (("0", "0"), ("1.5g", "0"), ("1536m", "-1"), ("1536m", "0g")):
+            with self.subTest(ram=ram, swap=swap):
+                with self.assertRaises(ValueError):
+                    manage.account_limits(ram, swap)
+
+    def test_frozen_existing_budget_cannot_be_hidden_by_lower_global_config(self) -> None:
+        """既有大预算账号仍可能被唤醒，下调配置必须拒绝且不改其记录。
+
+        :return: None
+        """
+        self.root.mkdir()
+        (self.root / ".v3-deployment.json").write_text('{"deployment":"test"}')
+        database = self.root / "bench/db.sqlite"
+        database.parent.mkdir()
+        with sqlite3.connect(database) as connection:
+            connection.execute("CREATE TABLE account_environments(fingerprint_json TEXT)")
+            connection.execute("INSERT INTO account_environments VALUES(?)", (json.dumps({"mem": "4g"}),))
+        self.values.update(V3_ACCOUNT_MEMORY="1536m", V3_ACCOUNT_SWAP="2048m")
+        with patch.object(manage, "inspect_images", return_value={}), patch.object(manage, "command", side_effect=["", ""]):
+            with self.assertRaisesRegex(ValueError, "固化预算"):
+                manage.preflight(self.values)
+        with sqlite3.connect(database) as connection:
+            self.assertEqual(json.loads(connection.execute("SELECT fingerprint_json FROM account_environments").fetchone()[0]), {"mem": "4g"})
+
+
 class OfflineAndStatusTests(unittest.TestCase):
     """验证离线资料不接管账号，以及状态入口不暴露服务秘密。"""
     setUp = PreflightTests.setUp
@@ -227,9 +305,10 @@ class OfflineAndStatusTests(unittest.TestCase):
         for role in ("gateway", "orchestrator", "account-1", "account-2", "legacy"):
             own = role != "legacy"
             account = role.startswith("account")
-            containers.append({"Id": role, "Name": "/" + role, "Image": "sha256:account" if account else "sha256:control", "State": {"Status": "running"},
+            containers.append({"Id": role, "Name": "/" + role, "Image": "sha256:" + "2" * 64 if account else "sha256:control", "State": {"Status": "running"},
                 "Config": {"Env": ["TOKEN=synthetic-secret"], "Labels": {"vibebench.product": "v3", "vibebench.deployment": "test" if own else "old", "vibebench.role": "account" if account else role}}})
-        manifest = {"release": "batch", "images": {"control": {"digest": "sha256:control"}, "account": {"digest": "sha256:account"}}}
+        manifest = {"release": "batch", "images": {"control": {"digest": "sha256:control"},
+            "account": {"digest": "sha256:" + "1" * 64, "config_digest": "sha256:" + "2" * 64}}}
         snapshot = {"active": 1, "waiting": 2, "lease": {"owner": "run:test", "generation": "lease", "phase": "claimed", "expires_at": 123, "secret": "synthetic-secret"}}
         opener = Mock()
         opener.open.side_effect = lambda *args, **kwargs: io.BytesIO(json.dumps(snapshot).encode())
@@ -238,7 +317,8 @@ class OfflineAndStatusTests(unittest.TestCase):
             result = manage.status(self.values)
         self.assertEqual(len(result["containers"]), 4)
         self.assertEqual(len(result["environments"]), 2)
-        self.assertTrue(all(row["image_digest"] == "sha256:account" for row in result["environments"]))
+        self.assertTrue(all(row["image_digest"] == "sha256:" + "2" * 64 for row in result["environments"]))
+        self.assertTrue(all(row["matches_release"] for row in result["containers"]))
         self.assertEqual(result["environments"][0]["occupancy"]["active"], 1)
         self.assertEqual(result["environments"][0]["occupancy"]["lease"]["generation"], "lease")
         self.assertNotIn("synthetic-secret", output.getvalue())

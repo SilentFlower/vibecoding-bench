@@ -1,4 +1,4 @@
-name: v3 联合构建验证
+name: v3 联合构建与发布
 on:
   workflow_dispatch:
   push:
@@ -7,6 +7,10 @@ permissions:
   contents: read
 jobs:
   build:
+    if: github.ref == 'refs/heads/v3'
+    permissions:
+      contents: read
+      packages: write
     runs-on: ubuntu-latest
     steps:
       - name: 检出父仓与子仓
@@ -14,9 +18,22 @@ jobs:
         with:
           submodules: recursive
       - name: 构建两个镜像并生成版本清单
-        run: python3 deploy/v3/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3.json
-      - name: 保存版本清单
+        run: python3 deploy/v3/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
+      - name: 登录 GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: 发布同批镜像并保存交付包
+        run: python3 deploy/v3/manage.py publish --manifest releases/v3-local.json --output releases/v3.json --bundle releases/v3-images.tar.gz
+      - name: 保存联合清单与同批镜像包
         uses: actions/upload-artifact@v4
         with:
           name: v3-release-${{ github.run_id }}-${{ github.run_attempt }}
-          path: releases/v3.json
+          retention-days: 14
+          compression-level: 0
+          if-no-files-found: error
+          path: |
+            releases/v3.json
+            releases/v3-images.tar.gz
