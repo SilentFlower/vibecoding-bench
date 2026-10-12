@@ -532,6 +532,38 @@ class Recorder:
         except Exception:
             pass
 
+    def request(self, flow: http.HTTPFlow) -> None:
+        """仅在 v3 保存实际 CLI 消息身份，不把 userID 或 machine-id 当成设备 ID。
+
+        :param flow: 完整请求 body 已可读取的 CLI 流
+        :return: None；缺少明确身份时保持未确认
+        """
+        if os.environ.get("V3_ACCOUNT") != "1" or not any(
+                host.rstrip(".") in ("api.anthropic.com", "api.anthropic.com:443")
+                for host in _flow_host_values(flow)):
+            return
+        if flow.request.path.split("?", 1)[0] != "/v1/messages":
+            return
+        try:
+            body = json.loads(flow.request.raw_content or b"{}")
+            user_id = body.get("metadata", {}).get("user_id")
+            identity = json.loads(user_id) if isinstance(user_id, str) else None
+            if not isinstance(identity, dict) or not re.fullmatch(r"[a-f0-9]{64}", identity.get("device_id", "")):
+                return
+            observed = {"device_id": identity["device_id"], "account_uuid": identity.get("account_uuid"),
+                "source": "cli:/v1/messages:metadata.user_id.device_id", "observed_at": time.time()}
+            path = Path("/run/v3/identity.json")
+            if path.exists():
+                previous = json.loads(path.read_text())
+                if previous.get("conflict") or previous.get("device_id") != observed["device_id"] or previous.get("account_uuid") != observed["account_uuid"]:
+                    observed["conflict"] = True
+            temporary = path.with_suffix(".tmp")
+            temporary.write_text(json.dumps(observed))
+            temporary.chmod(0o600)
+            temporary.replace(path)
+        except (ValueError, TypeError, AttributeError, OSError):
+            return
+
     def response(self, flow: http.HTTPFlow) -> None:
         """
         保存原有响应统计，并以有限错误码补充明确账号停用事实。

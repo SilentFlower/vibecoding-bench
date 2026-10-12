@@ -1538,7 +1538,7 @@ write_api_timeout_status() {
 #   - 跨账号 → 不同 machine-id(避免被关联识别为同台机器开多份)
 # ACC_NAME 由 orchestrator 注入(task/login 模式都注入);未注入(如 legacy CLI
 # init-account.sh)时跳过,保持向下兼容,不影响功能。
-if [ -n "${ACC_NAME:-}" ]; then
+if [ -n "${ACC_NAME:-}" ] && [ "${V3_PERSISTENT_HOME:-0}" != "1" ]; then
   printf %s "$ACC_NAME" | sha256sum | cut -c1-32 > /etc/machine-id
   log "Wrote /etc/machine-id from ACC_NAME hash"
 fi
@@ -1547,8 +1547,10 @@ fi
 CA_PEM=/etc/mitm/mitmproxy-ca-cert.pem
 if [ -f "$CA_PEM" ]; then
   log "Installing MITM CA into system + runtime trust stores"
-  cp "$CA_PEM" /usr/local/share/ca-certificates/mitm.crt
-  update-ca-certificates >/dev/null
+  if [ "${V3_PERSISTENT_HOME:-0}" != "1" ]; then
+    cp "$CA_PEM" /usr/local/share/ca-certificates/mitm.crt
+    update-ca-certificates >/dev/null
+  fi
   export NODE_EXTRA_CA_CERTS="$CA_PEM"
   export SSL_CERT_FILE="$CA_PEM"
   export REQUESTS_CA_BUNDLE="$CA_PEM"
@@ -1567,7 +1569,9 @@ fi
 # (走 tun → hev → SOCKS5 TCP),解决商用 SOCKS5 不支持 UDP relay 的问题。
 # login 模式允许用户不填 SOCKS5 直连 bridge 网络；这种情况下没有 sidecar /
 # unbound，不能把 DNS 改到 127.0.0.1。task 模式恒定共享 sidecar netns。
-if [ "$WORKER_MODE" != "login" ] || [ "${USE_SIDECAR_DNS:-0}" = "1" ]; then
+if [ "${V3_PERSISTENT_HOME:-0}" = "1" ]; then
+  : # 固定环境的 DNS 由常驻网络进程初始化，作业不重写。
+elif [ "$WORKER_MODE" != "login" ] || [ "${USE_SIDECAR_DNS:-0}" = "1" ]; then
   echo "nameserver 127.0.0.1" > /etc/resolv.conf
   log "Overrode /etc/resolv.conf to use sidecar unbound (127.0.0.1)"
 else
@@ -1616,7 +1620,9 @@ trap 'terminate_task_mode 130' INT
 # 就是当时 OAuth 完成时的顶层文件;复制时要单独 mv 到 /home/node/.claude.json,
 # 不能让它躺在 $HOME/.claude/ 子目录里(那里 claude 不会读顶层配置)。
 mkdir -p "$CLAUDE_DIR"
-if [ -d /mnt/profile ]; then
+if [ "${V3_PERSISTENT_HOME:-0}" = "1" ]; then
+  : # 运行 HOME 已由管理端发布 AT；保留会话、顶层配置与缓存。
+elif [ -d /mnt/profile ]; then
   log "Copying account profile from /mnt/profile -> $CLAUDE_DIR"
   if [ -n "${RESUME_SESSION_ID:-}" ]; then
     # 原 run 的 projects/session 已落盘；恢复只同步账号配置，不能覆盖会话历史。

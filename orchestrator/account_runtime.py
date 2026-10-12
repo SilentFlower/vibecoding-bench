@@ -1,0 +1,1276 @@
+"""v3 单账号固定容器、执行句柄和服务间传输登记。"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import secrets
+import shlex
+import shutil
+import threading
+import time
+import tempfile
+import urllib.error
+import urllib.request
+import uuid
+from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Callable
+from urllib.parse import quote, unquote, urlsplit
+
+from docker.errors import NotFound
+
+
+def atomic_json(path: Path, value: dict, mode: int = 0o600) -> None:
+    """原子保存受限 JSON。
+
+    :param path: 目标路径
+    :param value: JSON object
+    :param mode: 文件权限
+    :return: None
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w") as output:
+            os.chmod(temporary, mode)
+            json.dump(value, output, ensure_ascii=False)
+            output.flush()
+            os.fsync(output.fileno())
+        temporary.replace(path)
+        directory = os.open(path.parent, os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+class RuntimeBusy(ValueError):
+    """低优先级作业遇到正式工作时顺延，不能记为认证或任务失败。"""
+
+
+class AccountRuntime:
+    """每账号仅一个固定容器；执行结束不销毁 HOME 或网络。
+
+    :param client: Docker SDK 客户端
+    :param data: 调度器本地数据根
+    :param host_data: Docker daemon 视角的数据根
+    :param database: 返回 SQLite connection 的函数
+    :param fingerprint: 首次创建时读取现有环境参数的函数
+    :param gateway: 受信任 cc2api 客户端
+    """
+
+    def __init__(self, client, data: Path, host_data: Path, database: Callable,
+                 fingerprint: Callable, gateway, quota_identity: Callable | None = None) -> None:
+        self.client, self.data, self.host_data = client, data, host_data
+        self.database, self.fingerprint, self.gateway = database, fingerprint, gateway
+        self.quota_identity = quota_identity
+        self.deployment = os.environ["V3_DEPLOYMENT_ID"]
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,35}", self.deployment):
+            raise ValueError("V3_DEPLOYMENT_ID 格式不合法")
+        self.image = os.environ["V3_ACCOUNT_IMAGE"]
+        self.network = os.environ["V3_NETWORK"]
+        self.release_id = os.environ.get("V3_RELEASE", "")
+        self.limit = int(os.environ.get("V3_MAX_ACTIVE_ACCOUNTS", "1"))
+        if self.limit < 1:
+            raise ValueError("v3 活跃环境预算必须大于零")
+        self.lock = threading.RLock()
+        self.environment_locks: dict[str, threading.RLock] = {}
+        self.capacity_lock = threading.RLock()
+        self.heartbeat_pool = ThreadPoolExecutor(max_workers=self.limit + 1, thread_name_prefix="v3-lease")
+        self.jobs: dict[str, dict] = {}
+        self.stopping = threading.Event()
+        self.heartbeat = threading.Thread(target=self._heartbeat, daemon=True)
+        connection = database()
+        try:
+            with connection:
+                connection.execute("""CREATE TABLE IF NOT EXISTS account_environments (
+                    environment_id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,
+                    account_id INTEGER UNIQUE, fingerprint_json TEXT NOT NULL,
+                    generation INTEGER NOT NULL DEFAULT 0, container_id TEXT,
+                    state TEXT NOT NULL DEFAULT 'stopped')""")
+                columns = {row["name"] for row in connection.execute("PRAGMA table_info(runs)")}
+                if columns:
+                    for column, kind in (("environment_id", "TEXT"), ("environment_generation", "INTEGER"),
+                            ("execution_source", "TEXT"), ("runtime_release", "TEXT")):
+                        if column not in columns:
+                            connection.execute(f"ALTER TABLE runs ADD COLUMN {column} {kind}")
+        finally:
+            connection.close()
+
+    def environment_lock(self, environment_id: str):
+        """取得账号级生命周期锁，全局登记锁只用于读取锁映射。
+
+        :param environment_id: 不可变环境 ID
+        :return: 可重入的账号锁
+        """
+        with self.lock:
+            return self.environment_locks.setdefault(environment_id, threading.RLock())
+
+    def _account_lock(self, account: dict):
+        with self.lock:
+            row = self._row(account["name"], account.get("id"))
+        return self.environment_lock(row["environment_id"])
+
+    @staticmethod
+    def execution_token(container_id: str, source: str) -> str:
+        """生成绑定执行来源的句柄，固定容器 ID 不能单独用于清理。
+
+        :param container_id: 固定容器 ID
+        :param source: 不可复用的执行来源
+        :return: 绑定来源摘要的执行 token
+        """
+        return container_id + ":" + hashlib.sha256(source.encode()).hexdigest()[:20]
+
+    def _sync_proxy(self, account: dict, configuration: dict) -> None:
+        """仅从 cc2api 同步绑定账号代理；保留身份和运行目录。"""
+        proxy = configuration["proxy_url"] or ""
+        try:
+            parsed = urlsplit(proxy)
+            if proxy and (parsed.scheme not in ("http", "socks5", "socks5h") or not parsed.hostname
+                    or parsed.path not in ("", "/") or parsed.query or parsed.fragment):
+                raise ValueError
+            fields = {"upstream_proxy_scheme": parsed.scheme or "socks5",
+                "upstream_socks5_host": parsed.hostname or "", "upstream_socks5_port": parsed.port or (80 if parsed.scheme == "http" else 1080),
+                "upstream_socks5_user": unquote(parsed.username) if parsed.username else "",
+                "upstream_socks5_pass": unquote(parsed.password) if parsed.password else ""}
+        except ValueError:
+            raise ValueError("cc2api 代理配置不支持当前账号网络环境") from None
+        if all(account.get(key) == value for key, value in fields.items()):
+            return
+        connection = self.database()
+        try:
+            with connection:
+                cursor = connection.execute("UPDATE accounts SET " + ",".join(f"{key}=?" for key in fields)
+                    + " WHERE id=? AND cc2api_account_id=?", (*fields.values(), account["id"], account["cc2api_account_id"]))
+                if cursor.rowcount != 1:
+                    raise ValueError("账号绑定已改变，拒绝发布代理配置")
+            account.update(fields)
+        finally:
+            connection.close()
+
+    def _row(self, name: str, account_id=None) -> dict:
+        connection = self.database()
+        try:
+            row = connection.execute("SELECT * FROM account_environments WHERE account_id=? OR name=?",
+                                     (account_id, name)).fetchone()
+            if row:
+                if account_id is not None and row["account_id"] not in (None, account_id):
+                    raise ValueError("环境已绑定其它账号")
+                if account_id is not None and row["account_id"] is None:
+                    with connection:
+                        connection.execute("UPDATE account_environments SET account_id=? WHERE environment_id=?",
+                                           (account_id, row["environment_id"]))
+                result = dict(row)
+                if account_id is not None:
+                    result["account_id"] = account_id
+                    if result["name"] != name:
+                        with connection:
+                            connection.execute("UPDATE account_environments SET name=? WHERE environment_id=?", (name, row["environment_id"]))
+                        result["name"] = name
+                return result
+            if not re.fullmatch(r"[a-zA-Z0-9_-]+", name):
+                raise ValueError("账号名称不合法")
+            environment_id = uuid.uuid4().hex
+            fingerprint = self.fingerprint(name)
+            fingerprint["mem"] = os.environ.get("V3_ACCOUNT_MEMORY", "4g")
+            with connection:
+                connection.execute("INSERT INTO account_environments(environment_id,name,account_id,fingerprint_json) VALUES(?,?,?,?)",
+                                   (environment_id, name, account_id, json.dumps(fingerprint)))
+            return {"environment_id": environment_id, "name": name, "account_id": account_id,
+                    "fingerprint_json": json.dumps(fingerprint), "generation": 0,
+                    "container_id": None, "state": "stopped"}
+        finally:
+            connection.close()
+
+    def _update(self, row: dict, **fields) -> None:
+        connection = self.database()
+        try:
+            with connection:
+                connection.execute("UPDATE account_environments SET " + ",".join(f"{key}=?" for key in fields)
+                                   + " WHERE environment_id=?", (*fields.values(), row["environment_id"]))
+            row.update(fields)
+        finally:
+            connection.close()
+
+    def _root(self, row: dict) -> Path:
+        return self.data / "environments" / row["environment_id"]
+
+    def _labels(self, row: dict) -> dict:
+        return {"vibebench.product": "v3", "vibebench.deployment": self.deployment,
+                "vibebench.environment": row["environment_id"], "vibebench.role": "account"}
+
+    def _container(self, row: dict):
+        container = self.client.containers.get(row["container_id"])
+        if any(container.labels.get(key) != value for key, value in self._labels(row).items()):
+            raise ValueError("容器部署归属不匹配，拒绝操作")
+        return container
+
+    def ensure(self, account: dict, version: str | None = None) -> tuple[dict, object]:
+        """创建或唤醒固定环境，沿用首次固化参数。
+
+        :param account: bench 账号或登录草稿
+        :param version: 可选目标 CLI 版本；发送器准备无需 CLI
+        :return: 环境记录与 Docker container
+        """
+        with self._account_lock(account):
+            image = self.client.images.get(self.image)
+            image_labels = image.attrs["Config"].get("Labels") or {}
+            if not self.release_id or image_labels.get("vibebench.product") != "v3" or image_labels.get("vibebench.role") != "account" or image_labels.get("vibebench.release") != self.release_id:
+                raise ValueError("账号镜像角色或构建批次不匹配")
+            if account.get("cc2api_account_id") is not None:
+                configuration = self.gateway._request("GET", f"/admin/runtime/accounts/{account['cc2api_account_id']}/config")
+                if configuration["auth_type"] != "oauth" or configuration["status"] != "active":
+                    raise ValueError("绑定账号认证类型或状态不可用")
+                self._sync_proxy(account, configuration)
+            row = self._row(account["name"], account.get("id"))
+            if int(row["generation"]) == 0 and account.get("timezone"):
+                fingerprint = json.loads(row["fingerprint_json"])
+                fingerprint["tz"] = account["timezone"]
+                self._update(row, fingerprint_json=json.dumps(fingerprint))
+            root = self._root(row)
+            root.mkdir(parents=True, exist_ok=True, mode=0o700)
+            for name in ("home", "workspaces", "flows", "controls", "ca", "cli", "runtime"):
+                (root / name).mkdir(exist_ok=True, mode=0o700)
+            for name in ("home", "workspaces"):
+                os.chown(root / name, 1000, 1000)
+            if row["state"] == "reconcile":
+                raise ValueError("账号环境需要先对账，拒绝自动放行")
+            with self.capacity_lock:
+                try:
+                    container = self._container(row) if row["container_id"] else None
+                except NotFound:
+                    container = None
+                if container:
+                    if container.labels.get("vibebench.release") != self.release_id:
+                        raise ValueError("账号容器属于旧 v3 批次，请空闲重建后使用")
+                    container.reload()
+                    configuration_path = root / "runtime" / "sender.json"
+                    configuration = json.loads(configuration_path.read_text())
+                    if configuration.get("proxy_source", configuration["proxy_url"]) != self._proxy(account):
+                        if container.status == "running" or row["environment_id"] in self.jobs:
+                            raise ValueError("代理已改变，请先空闲维护账号环境")
+                        # 配置事务已经停止旧发送器；只替换停止实例，HOME 和身份保持原值。
+                        container.remove()
+                        self._update(row, container_id=None, state="stopped")
+                        container = None
+                if container:
+                    if container.status != "running":
+                        self._make_room(row)
+                        configuration_path = root / "runtime" / "sender.json"
+                        configuration = json.loads(configuration_path.read_text())
+                        generation = int(row["generation"]) + 1
+                        configuration["binding"].update(generation=generation, secret=secrets.token_hex(32))
+                        atomic_json(configuration_path, configuration)
+                        (root / "runtime" / "ready").unlink(missing_ok=True)
+                        container.start()
+                        self._update(row, state="starting", generation=generation)
+                else:
+                    self._make_room(row)
+                    fingerprint = json.loads(row["fingerprint_json"])
+                    generation = int(row["generation"]) + 1
+                    # DNS 单标签上限为 63 字符；完整部署归属保存在 labels 中。
+                    deployment_key = hashlib.sha256(self.deployment.encode()).hexdigest()[:12]
+                    name = f"v3-{deployment_key}-account-{row['environment_id']}"
+                    binding = {"account_id": int(account.get("cc2api_account_id") or 0),
+                        "environment_id": row["environment_id"], "generation": generation,
+                        "endpoint": f"http://{name}:8091", "secret": secrets.token_hex(32), "release_id": self.release_id}
+                    proxy = self._proxy(account)
+                    atomic_json(root / "runtime" / "sender.json", {"binding": binding,
+                        "proxy_url": proxy, "allowed_origin": "https://api.anthropic.com",
+                        "evidence_file": "/flows/api/observations.jsonl", "quota_identity": ""})
+                    environment = {"V3_MACHINE_ID": fingerprint["machine_id"], "HOME": "/home/node",
+                        "TZ": fingerprint["tz"], "LANG": fingerprint["lang"],
+                        "LC_ALL": fingerprint["lang"], "V3_SENDER_CONFIG": "/run/v3/sender.json",
+                        "DNS_READY_HOST": os.environ.get("DNS_READY_HOST", "example.com"),
+                        "UPSTREAM_PROXY_SCHEME": account.get("upstream_proxy_scheme") or "socks5",
+                        "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
+                        "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
+                        "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
+                        "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or ""}
+                    host_root = self.host_data / root.relative_to(self.data)
+                    mounts = {str(host_root / source): {"bind": target, "mode": "rw"} for source, target in (
+                        ("home", "/home/node"), ("workspaces", "/workspaces"), ("flows", "/flows"),
+                        ("controls", "/controls"), ("ca", "/ca"), ("cli", "/cli"), ("runtime", "/run/v3"))}
+                    quota = self.data / "quota"
+                    quota.mkdir(parents=True, exist_ok=True, mode=0o700)
+                    mounts[str(self.host_data / "quota")] = {"bind": "/quota-accounts", "mode": "ro"}
+                    container = self.client.containers.run(self.image, name=name, detach=True,
+                        auto_remove=False, labels={**self._labels(row), "vibebench.release": self.release_id}, network=self.network,
+                        hostname=fingerprint["hostname"], mac_address=fingerprint["mac"],
+                        mem_limit=fingerprint["mem"], memswap_limit=fingerprint["mem"],
+                        nano_cpus=int(float(os.environ.get("V3_ACCOUNT_CPUS", "2")) * 1_000_000_000),
+                        cap_add=["NET_ADMIN"], devices=["/dev/net/tun:/dev/net/tun"],
+                        security_opt=["no-new-privileges:true"], volumes=mounts, environment=environment,
+                        log_config={"type": "json-file", "config": {"max-size": "10m", "max-file": "3"}})
+                    self._update(row, container_id=container.id, generation=generation, state="starting")
+            deadline = time.monotonic() + 120
+            while time.monotonic() < deadline:
+                result = container.exec_run(["test", "-f", "/run/v3/ready"])
+                if result.exit_code == 0:
+                    try:
+                        self._sender_active(row)
+                    except (OSError, urllib.error.URLError):
+                        time.sleep(0.25)
+                        continue
+                    if row["state"] != "cli_reconcile":
+                        self._update(row, state="ready")
+                    break
+                container.reload()
+                if container.status != "running":
+                    raise ValueError("账号环境启动失败")
+                time.sleep(0.25)
+            else:
+                raise ValueError("账号环境未在截止时间内就绪")
+        # 版本缓存准备不持有环境生命周期锁，API 不等待 CLI 安装。
+        if version is not None:
+            self._ensure_version(container, version)
+        return row, container
+
+    def _ensure_version(self, container, version: str) -> None:
+        if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9._-]+)?", version):
+            raise ValueError("CLI 版本格式不合法")
+        result = container.exec_run(["timeout", "--kill-after=5", "180", "/usr/local/bin/v3-cli-version", version])
+        if result.exit_code != 0:
+            raise ValueError("固定环境 CLI 版本准备失败")
+
+    @staticmethod
+    def _proxy(account: dict) -> str:
+        host = account.get("upstream_socks5_host") or ""
+        if not host:
+            return ""
+        scheme = account.get("upstream_proxy_scheme") or "socks5"
+        if scheme not in ("http", "socks5", "socks5h"):
+            raise ValueError("不支持该上游代理协议")
+        user, password = account.get("upstream_socks5_user"), account.get("upstream_socks5_pass")
+        credentials = f"{quote(user, safe='')}:{quote(password or '', safe='')}@" if user else ""
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
+        return f"{scheme}://{credentials}{host}:{int(account.get('upstream_socks5_port') or 1080)}"
+
+    def sync_credentials(self, row: dict, account: dict) -> None:
+        """发布 AT-only 运行凭据，完整 RT 副本留在管理目录。
+
+        :param row: 固定环境
+        :param account: bench 账号
+        :return: None
+        """
+        profile = self.data / "profiles" / account["name"]
+        path = profile / ".credentials.json"
+        if not path.exists():
+            return
+        credentials = json.loads(path.read_text())
+        home = self._root(row) / "home"
+        destination = home / ".claude" / ".credentials.json"
+        if account.get("cc2api_account_id") is None and destination.exists():
+            # 未绑定时固定 HOME 是唯一运行所有者，不能用旧 profile 覆盖轮换后的 RT。
+            credentials = json.loads(destination.read_text())
+        if account.get("cc2api_account_id") is not None:
+            credentials.get("claudeAiOauth", {}).pop("refreshToken", None)
+        atomic_json(destination, credentials)
+        os.chown(destination.parent, 1000, 1000)
+        os.chown(destination, 1000, 1000)
+        access = self._root(row) / "runtime" / "access" / ".credentials.json"
+        atomic_json(access, credentials)
+        if not (home / ".claude.json").exists() and (profile / ".claude.json").exists():
+            shutil.copy2(profile / ".claude.json", home / ".claude.json")
+            os.chown(home / ".claude.json", 1000, 1000)
+
+    def transport(self, account: dict, version: str) -> dict:
+        """返回只用于服务间调用的当前传输绑定。
+
+        :param account: 绑定的 bench 账号
+        :param version: 兼容旧调用方的 CLI 版本，不参与 API 环境准备
+        :return: 当前账号传输绑定，含受限服务秘密
+        """
+        row, _ = self.ensure(account)
+        config_path = self._root(row) / "runtime" / "sender.json"
+        config = json.loads(config_path.read_text())
+        binding = config["binding"]
+        if config.get("proxy_source", config["proxy_url"]) != self._proxy(account):
+            raise ValueError("代理配置已改变，请空闲重建环境后再使用")
+        identity = self.quota_identity(account) if self.quota_identity else ""
+        if binding["account_id"] != account["cc2api_account_id"] or config.get("quota_identity") != identity:
+            binding["account_id"] = int(account["cc2api_account_id"])
+            config["quota_identity"] = identity
+            atomic_json(config_path, config)
+        return binding
+
+    def _sender_active(self, row: dict) -> int:
+        binding = json.loads((self._root(row) / "runtime" / "sender.json").read_text())["binding"]
+        request = urllib.request.Request(binding["endpoint"] + "/internal/status",
+            headers={"Authorization": "Bearer " + binding["secret"]})
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(request, timeout=5) as response:
+            value = json.load(response)
+        if value["environment_id"] != row["environment_id"] or value["generation"] != row["generation"]:
+            raise ValueError("发送器代次不一致")
+        if value.get("evidence_ok") is False:
+            raise ValueError("API 证据写入异常，账号环境需要维护")
+        return int(value["active"])
+
+    def _running_sender_active(self, row: dict) -> int:
+        if not row.get("container_id"):
+            return 0
+        try:
+            container = self._container(row)
+        except NotFound:
+            return 0
+        container.reload()
+        return self._sender_active(row) if container.status == "running" else 0
+
+    @contextmanager
+    def owner_transition(self, account: dict, target_id: int | None):
+        """在绑定切换整个事务期间关闭两端门禁并撤销旧发送实例。
+
+        :param account: 切换前的 bench 账号
+        :param target_id: 新 cc2api 绑定，None 表示解绑或删除
+        :return: 持有环境锁与远端门禁的上下文
+        """
+        with self._account_lock(account):
+            row = self._row(account["name"], account["id"])
+            if row["environment_id"] in self.jobs:
+                raise ValueError("账号环境正在执行工作，不能切换绑定")
+            leases = []
+            try:
+                for account_id in sorted({int(value) for value in (account.get("cc2api_account_id"), target_id) if value is not None}):
+                    path = f"/admin/runtime/accounts/{account_id}/lease"
+                    snapshot = self.gateway._request("GET", path)
+                    if snapshot["active"] or snapshot.get("waiting") or snapshot["lease"]:
+                        raise ValueError("绑定账号有活动或等待请求，不能切换绑定")
+                    snapshot = self.gateway._request("POST", path, {"operation": "prepare", "owner": f"binding:{uuid.uuid4().hex}"})
+                    leases.append((path, snapshot["lease"]))
+                    if snapshot["active"] or self._running_sender_active(row):
+                        raise ValueError("账号发送连接尚未收口，不能切换绑定")
+                if self._running_sender_active(row):
+                    raise ValueError("账号发送连接尚未收口，不能切换绑定")
+                if row.get("container_id"):
+                    try:
+                        self._container(row).stop(timeout=5)
+                    except NotFound:
+                        pass
+                # 已解析的旧 API 请求只能遇到停止的实例；下一唤醒轮换秘密和代次。
+                self._update(row, state="stopped")
+                yield
+                connection = self.database()
+                try:
+                    current = connection.execute("SELECT * FROM accounts WHERE id=?", (account["id"],)).fetchone()
+                finally:
+                    connection.close()
+                if current:
+                    self.sync_credentials(row, dict(current))
+            finally:
+                for path, lease in reversed(leases):
+                    try:
+                        self.gateway._request("POST", path, {"operation": "release", "owner": lease["owner"], "generation": lease["generation"]})
+                    except Exception:
+                        self._update(row, state="reconcile")
+                        raise
+
+    def claim(self, row: dict, account: dict, source: str, idle_only: bool = False,
+              exclusive: bool = False) -> dict:
+        """串行认领 CLI；只有环境维护需要排空独立 API。
+
+        :param row: 环境记录
+        :param account: 当前账号
+        :param source: 不可复用的执行来源
+        :param idle_only: 低优先级工作遇到正式 CLI 或维护时立即顺延
+        :param exclusive: 是否修改共享环境并需要排空 API
+        :return: 本代执行句柄
+        """
+        with self.environment_lock(row["environment_id"]):
+            if not exclusive and (self._root(row) / "runtime" / "cli-unhealthy").exists():
+                self._update(row, state="cli_reconcile")
+            if row["state"] in ("reconcile", "cli_reconcile"):
+                raise ValueError("账号 CLI 需要先对账，拒绝开始下一作业")
+            with self.lock:
+                if row["environment_id"] in self.jobs:
+                    if idle_only:
+                        raise RuntimeBusy("账号环境正在执行其它工作，低优先级工作顺延")
+                    raise ValueError("账号环境正在执行其它工作")
+                job = {"row": row, "account": dict(account), "source": source, "lease": None, "exec": None,
+                    "claimed": False, "exclusive": exclusive, "last_used": time.monotonic()}
+                job["lease_lock"] = threading.RLock()
+                job["token"] = self.execution_token(row.get("container_id") or row["environment_id"], source)
+                self.jobs[row["environment_id"]] = job
+            account_id = account.get("cc2api_account_id")
+            try:
+                if account_id is not None:
+                    path = f"/admin/runtime/accounts/{account_id}/lease"
+                    if idle_only:
+                        snapshot = self.gateway._request("GET", path)
+                        if snapshot["lease"] or (exclusive and (snapshot["active"] or snapshot.get("waiting"))):
+                            raise RuntimeBusy("账号有正式请求，低优先级工作顺延")
+                    result = self.gateway._request("POST", path,
+                        {"operation": "prepare" if exclusive else "prepare-cli", "owner": source})
+                    job["lease"] = result["lease"]
+                    if exclusive and idle_only and (result["active"] or self._running_sender_active(row)):
+                        raise RuntimeBusy("账号已有请求，低优先级工作顺延")
+                    deadline = time.monotonic() + 120
+                    while exclusive and (result["active"] or self._running_sender_active(row)):
+                        if time.monotonic() > deadline:
+                            raise ValueError("账号既有请求未完成，执行未启动")
+                        self._lease(job, "heartbeat")
+                        time.sleep(0.5)
+                        result = self.gateway._request("GET", path)
+                    self._lease(job, "claim")
+                elif exclusive and self._running_sender_active(row):
+                    raise ValueError("未绑定环境仍有发送连接，需先对账")
+                if job.get("heartbeat_failed"):
+                    raise ValueError("执行门禁心跳失败，执行未启动")
+                job["claimed"] = True
+                self._save_execution(job)
+                return job
+            except Exception:
+                # 排空未完成时尚未启动 CLI，可撤销本次排空门禁，保留已接受的 API 流。
+                try:
+                    self._lease(job, "release")
+                except Exception:
+                    self._save_execution(job)
+                    self._isolate_job(job)
+                    raise
+                finally:
+                    with self.lock:
+                        self.jobs.pop(row["environment_id"], None)
+                raise
+
+    def _lease(self, job: dict, operation: str) -> dict:
+        with job.setdefault("lease_lock", threading.RLock()):
+            lease = job.get("lease")
+            if not lease:
+                return {}
+            result = self.gateway._request("POST", f"/admin/runtime/accounts/{job['account']['cc2api_account_id']}/lease",
+                {"operation": operation, "owner": lease["owner"], "generation": lease["generation"]})
+            job["lease"] = None if operation == "release" else result["lease"]
+            return result
+
+    def _save_execution(self, job: dict) -> None:
+        execution = {"source": job["source"], "lease": job["lease"],
+            "account_id": job["account"].get("cc2api_account_id"), "phase": "claimed",
+            "exclusive": job.get("exclusive", True), "container_id": job["row"].get("container_id"),
+            "generation": job["row"]["generation"]}
+        for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before"):
+            if key in job:
+                execution[key] = job[key]
+        atomic_json(self._root(job["row"]) / "runtime" / "execution.json", execution)
+
+    def _isolate_job(self, job: dict) -> None:
+        # 普通 CLI 收口失败只禁止下一 CLI，独立发送器继续处理已接受的 API。
+        if job.get("exclusive", True):
+            try:
+                if job.get("claimed", True):
+                    self._container(job["row"]).stop(timeout=5)
+            finally:
+                self._update(job["row"], state="reconcile")
+        else:
+            self._update(job["row"], state="cli_reconcile")
+
+    def release(self, job: dict) -> None:
+        """确认本作业收口后释放租约；共享 CLI 不等待独立 API。
+
+        :param job: 领取的执行句柄
+        :return: None
+        """
+        row = job["row"]
+        with self.environment_lock(row["environment_id"]):
+            with self.lock:
+                if self.jobs.get(row["environment_id"]) is not job:
+                    return
+            try:
+                if job.get("exec") and self.client.api.exec_inspect(job["exec"]).get("Running"):
+                    raise ValueError("执行尚未停止")
+                if job.get("exclusive", True) and self._running_sender_active(row):
+                    raise ValueError("账号发送连接尚未收口")
+                if job["account"].get("cc2api_account_id") is None:
+                    credentials = self._root(row) / "home" / ".claude" / ".credentials.json"
+                    if credentials.exists():
+                        atomic_json(self.data / "profiles" / row["name"] / ".credentials.json", json.loads(credentials.read_text()))
+                self._lease(job, "release")
+                (self._root(row) / "runtime" / "execution.json").unlink(missing_ok=True)
+                if row["state"] == "cli_reconcile":
+                    self._update(row, state="ready")
+            except Exception:
+                self._isolate_job(job)
+                raise
+            finally:
+                with self.lock:
+                    self.jobs.pop(row["environment_id"], None)
+
+    def _heartbeat(self) -> None:
+        while not self.stopping.wait(5):
+            with self.lock:
+                jobs = list(self.jobs.values())
+            # 每个账号独立续期，单个慢服务请求不能耗尽其它账号的 30 秒租约。
+            for job in jobs:
+                future = job.get("heartbeat_future")
+                if not future or future.done():
+                    job["heartbeat_future"] = self.heartbeat_pool.submit(self._renew_job, job)
+
+    def _renew_job(self, job: dict) -> None:
+        failed = False
+        with job.setdefault("lease_lock", threading.RLock()):
+            with self.lock:
+                if self.stopping.is_set() or self.jobs.get(job["row"]["environment_id"]) is not job:
+                    return
+            try:
+                self._lease(job, "heartbeat")
+            except Exception:
+                job["heartbeat_failed"] = True
+                failed = True
+        if failed:
+            # 不能带租约锁等待环境锁，cleanup 的锁顺序相反；旧 token 也不能清理新代。
+            with self.environment_lock(job["row"]["environment_id"]):
+                with self.lock:
+                    if self.jobs.get(job["row"]["environment_id"]) is not job:
+                        return
+                if job["claimed"]:
+                    try:
+                        self.cleanup(job["token"])
+                    except Exception:
+                        pass
+
+    @contextmanager
+    def _cli_setup(self, account: dict, source: str, version: str,
+                   idle_only: bool = False, exclusive: bool = False):
+        row, container = self.ensure(account)
+        job = self.claim(row, account, source, idle_only, exclusive)
+        try:
+            self._ensure_version(container, version)
+            with self.environment_lock(row["environment_id"]):
+                with self.lock:
+                    if self.jobs.get(row["environment_id"]) is not job or job.get("heartbeat_failed"):
+                        raise ValueError("CLI 准备期间租约失效，执行未启动")
+                yield row, container, job
+        except Exception:
+            self.cleanup(job["token"])
+            raise
+
+    def start_run(self, account: dict, task: dict, run_id: str, worker_env: dict, quota_env: dict) -> tuple[str, str]:
+        """在固定容器内创建独立工作目录并启动一次 driver exec。
+
+        :param account: 当前账号
+        :param task: 已冻结的 run 配置
+        :param run_id: 原 run ID
+        :param worker_env: 既有 driver 环境变量
+        :param quota_env: 当前额度上下文
+        :return: 相同的执行 token，供旧 DTO 的两个字段兼容使用
+        """
+        source = worker_env.get("QUOTA_SOURCE") or f"run:{run_id}:{task.get('quota_attempt', 0)}"
+        with self._cli_setup(account, source, worker_env["CLAUDE_CODE_VERSION"], bool(task.get("warmup"))) as (row, container, job):
+            try:
+                self.sync_credentials(row, account)
+                root = self._root(row)
+                settings = root / "home" / ".claude" / "settings.json"
+                job["hooks_before"] = json.loads(settings.read_text()).get("hooks") if settings.exists() else None
+                workspace = root / "workspaces" / run_id
+                workspace.mkdir(parents=True, exist_ok=True)
+                os.chown(workspace, 1000, 1000)
+                legacy = self.data / "workspaces" / run_id
+                legacy.parent.mkdir(parents=True, exist_ok=True)
+                if not legacy.exists():
+                    legacy.symlink_to(os.path.relpath(workspace, legacy.parent), target_is_directory=True)
+                elif legacy.resolve() != workspace.resolve():
+                    # 只允许迁入独立 v3 的历史工作目录；不可让旧文件留在第二个运行位置。
+                    if any(legacy.iterdir()):
+                        shutil.copytree(legacy, workspace, dirs_exist_ok=True)
+                    shutil.rmtree(legacy)
+                    legacy.symlink_to(os.path.relpath(workspace, legacy.parent), target_is_directory=True)
+                self._session_view(row, run_id)
+                handle = hashlib.sha256(source.encode()).hexdigest()[:20]
+                controls = root / "controls" / handle
+                controls.mkdir(parents=True, exist_ok=True, mode=0o700)
+                (root / "controls").chmod(0o750)
+                os.chown(root / "controls", 0, 1000)
+                controls.chmod(0o750)
+                os.chown(controls, 0, 1000)
+                temporary = workspace / ".v3-tmp" / handle
+                temporary.mkdir(parents=True, exist_ok=True)
+                os.chown(temporary, 1000, 1000)
+                cwd = f"/workspaces/{run_id}"
+                source_script = Path(os.environ.get("V3_WORKER_SCRIPT", "/opt/v3/worker.sh")).read_text()
+                # 复用完整 driver，所有硬编码项目/临时状态一次性改到该执行代次。
+                script = source_script.replace("-workspace", f"-workspaces-{run_id}")
+                script = script.replace("/workspace", cwd).replace("/tmp/", f"{cwd}/.v3-tmp/{handle}/")
+                script = script.replace("/mnt/profile", "/run/v3/access")
+                # tmux 的登录 shell 会改写 PATH，显式传入本代已选定的 CLI 缓存。
+                script = script.replace("runuser -u '$CLAUDE_USER' -- env", "setpriv --reuid=1000 --regid=1000 --init-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env PATH='$PATH'")
+                script_path = root / "runtime" / f"job-{handle}.sh"
+                script_path.write_text(script)
+                script_path.chmod(0o700)
+                original_flows = self.data / "flows" / account["name"] / str(task["id"]) / run_id
+                flow_directory = self.execution_flows(account, source, original_flows)
+                flow_path = "/flows/" + str(flow_directory.relative_to(root / "flows"))
+                context = dict(quota_env)
+                context.update(STATS_FILE=f"{flow_path}/stats.jsonl",
+                    CAPTURE_FILE=f"{flow_path}/http_capture.jsonl", CAPTURE_INDEX_FILE=f"{flow_path}/capture_index.json",
+                    CAPTURE_FULL_HTTP="1" if task.get("capture_full_http") else "0",
+                    SAVE_FULL_FLOWS="1" if task.get("capture_full_http") else "0")
+                original_controls = self.data / "quota-controls" / run_id / handle
+                self._link_directory(original_controls, controls)
+                for key in ("QUOTA_STATE_FILE", "QUOTA_SIGNAL_FILE", "QUOTA_OBSERVATIONS_FILE"):
+                    if key in context:
+                        local = Path(context[key])
+                        # 旧 sidecar 路径不能沿用；只发布本账号网络进程可读写的位置。
+                        if key == "QUOTA_SIGNAL_FILE":
+                            context[key] = f"/controls/{handle}/pause.json"
+                        elif key == "QUOTA_OBSERVATIONS_FILE":
+                            context[key] = f"{flow_path}/passive-quota.jsonl"
+                        elif local.name == "state.json":
+                            context[key] = f"/quota-accounts/{account['id']}/state.json"
+                context["QUOTA_CREDENTIALS_FILE"] = "/home/node/.claude/.credentials.json"
+                atomic_json(root / "runtime" / "context.json", context)
+                self._configure_recorder(container, context)
+                (root / "runtime" / f"tmux-{handle}").mkdir(exist_ok=True, mode=0o700)
+                environment = dict(worker_env)
+                environment.update(V3_PERSISTENT_HOME="1", USE_SIDECAR_DNS="1", HOME="/home/node",
+                    PATH=f"/cli/{worker_env['CLAUDE_CODE_VERSION']}/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                    QUOTA_SIGNAL_FILE=context.get("QUOTA_SIGNAL_FILE", ""), TMUX_TMPDIR=f"/run/v3/tmux-{handle}")
+                ex = self.client.api.exec_create(container.id,
+                    # setsid 默认可能先返回，必须让 exec 生命周期跟随真实 driver。
+                    ["setsid", "--wait", "bash", "-c", f"echo $$ > /run/v3/job-{handle}.pid; exec bash /run/v3/job-{handle}.sh"],
+                    environment=environment, workdir=cwd)
+                job.update(exec=ex["Id"], run_id=run_id, context=context, handle=handle,
+                    tmux=f"claude-{run_id}", tmux_socket=f"/run/v3/tmux-{handle}/tmux-0/default")
+                self._save_execution(job)
+                connection = self.database()
+                try:
+                    with connection:
+                        connection.execute("UPDATE runs SET environment_id=?,environment_generation=?,execution_source=?,runtime_release=? WHERE id=?",
+                            (row["environment_id"], row["generation"], source, self.release_id, run_id))
+                finally:
+                    connection.close()
+                self.client.api.exec_start(ex["Id"], detach=True)
+                return job["token"], job["token"]
+            except Exception:
+                self.cleanup(job["token"])
+                raise
+
+    def _configure_recorder(self, container, context: dict) -> None:
+        result = container.exec_run(["/usr/local/bin/v3-network-context"])
+        if result.exit_code != 0:
+            raise ValueError("网络上下文切换失败，执行未启动")
+        acknowledgement = container.exec_run(["cat", "/run/v3/context-ack.json"])
+        if acknowledgement.exit_code != 0 or json.loads(acknowledgement.output)["QUOTA_SOURCE"] != context.get("QUOTA_SOURCE", ""):
+            raise ValueError("网络上下文确认不匹配")
+
+    def wait_worker(self, container_id: str) -> int:
+        """等待本次 exec，而非等待固定容器退出。
+
+        :param container_id: 固定账号容器 ID
+        :return: 本次 driver 的退出码
+        """
+        job = self.job_for_container(container_id)
+        while True:
+            state = self.client.api.exec_inspect(job["exec"])
+            if not state.get("Running"):
+                return int(state.get("ExitCode") if state.get("ExitCode") is not None else -1)
+            time.sleep(0.5)
+
+    def register_exec(self, token: str, exec_id: str) -> None:
+        """将交互执行句柄写入当前代次，支持重启后仅清理 CLI。
+
+        :param token: 绑定执行来源的 token
+        :param exec_id: Docker exec 标识
+        :return: None
+        """
+        job = self.job_for_container(token)
+        with self.environment_lock(job["row"]["environment_id"]):
+            with self.lock:
+                if self.jobs.get(job["row"]["environment_id"]) is not job:
+                    raise ValueError("执行代次已改变")
+            job["exec"] = exec_id
+            self._save_execution(job)
+
+    def cleanup(self, container_id: str) -> None:
+        """停止本代 driver/子进程并撤销诊断，保留固定容器。
+
+        :param container_id: 带执行来源的完整 token；原始容器 ID 不触发清理
+        :return: None
+        """
+        with self.lock:
+            job = next((job for job in self.jobs.values() if job["token"] == container_id), None)
+        if not job:
+            return
+        with self.environment_lock(job["row"]["environment_id"]):
+            with self.lock:
+                if self.jobs.get(job["row"]["environment_id"]) is not job:
+                    return
+            container = self._container(job["row"])
+            try:
+                if job.get("tmux"):
+                    container.exec_run(["tmux", "-S", job["tmux_socket"], "kill-server"])
+                    processes = container.exec_run(["pgrep", "-f", job["tmux_socket"]])
+                    if processes.exit_code == 0:
+                        raise ValueError("登录进程尚未收口")
+                if job.get("exec"):
+                    inspected = self.client.api.exec_inspect(job["exec"])
+                    if inspected.get("Running"):
+                        pid_path = self._root(job["row"]) / "runtime" / f"job-{job['handle']}.pid"
+                        pid = int(pid_path.read_text().strip())
+                        if pid > 1:
+                            container.exec_run(["kill", "-TERM", "--", f"-{pid}"])
+                        else:
+                            raise ValueError("执行进程组不合法，拒绝清理其它进程")
+                        deadline = time.monotonic() + 10
+                        while self.client.api.exec_inspect(job["exec"]).get("Running") and time.monotonic() < deadline:
+                            time.sleep(0.1)
+                        if self.client.api.exec_inspect(job["exec"]).get("Running"):
+                            container.exec_run(["kill", "-KILL", "--", f"-{pid}"])
+                            deadline = time.monotonic() + 3
+                            while self.client.api.exec_inspect(job["exec"]).get("Running") and time.monotonic() < deadline:
+                                time.sleep(0.1)
+                            if self.client.api.exec_inspect(job["exec"]).get("Running"):
+                                raise ValueError("执行未完成收口，禁止下一 CLI 作业")
+                # 一个账号只有一个 CLI 执行，收口该 UID 的全部子进程，防止项目服务器遗留。
+                container.exec_run(["pkill", "-TERM", "-u", "1000"])
+                deadline = time.monotonic() + 3
+                while container.exec_run(["pgrep", "-u", "1000"]).exit_code == 0 and time.monotonic() < deadline:
+                    time.sleep(0.1)
+                container.exec_run(["pkill", "-KILL", "-u", "1000"])
+                if container.exec_run(["pgrep", "-u", "1000"]).exit_code == 0:
+                    raise ValueError("账号子进程尚未完成收口，禁止下一 CLI 作业")
+                atomic_json(self._root(job["row"]) / "runtime" / "context.json", {})
+                self._configure_recorder(container, {})
+                if "hooks_before" in job:
+                    settings = self._root(job["row"]) / "home" / ".claude" / "settings.json"
+                    value = json.loads(settings.read_text()) if settings.exists() else {}
+                    if job["hooks_before"] is None:
+                        value.pop("hooks", None)
+                    else:
+                        value["hooks"] = job["hooks_before"]
+                    atomic_json(settings, value)
+                    os.chown(settings, 1000, 1000)
+                self.release(job)
+            except Exception:
+                try:
+                    self._isolate_job(job)
+                finally:
+                    with self.lock:
+                        self.jobs.pop(job["row"]["environment_id"], None)
+                raise
+
+    def execution_flows(self, account: dict, source: str, flows: Path) -> Path:
+        """取得固定证据组内的分代目录，额度恢复不改写兼容入口。
+
+        :param account: 当前账号
+        :param source: 当前 run/续聊执行来源
+        :param flows: 账号下原 run/续聊的兼容目录
+        :return: Recorder 与额度游标共同使用的本代本地目录
+        """
+        relative = flows.relative_to(self.data / "flows" / account["name"])
+        if ".." in relative.parts or not relative.parts:
+            raise ValueError("证据目录不属于当前账号")
+        row = self._row(account["name"], account["id"])
+        with self.environment_lock(row["environment_id"]):
+            group = self._root(row) / "flows" / ("group-" + hashlib.sha256(str(relative).encode()).hexdigest()[:20])
+            group.mkdir(parents=True, exist_ok=True, mode=0o700)
+            self._link_directory(flows, group)
+            # 保留每代原生 flow，不能用复制或共享文件让新 Recorder 覆盖旧证据。
+            execution = group / "executions" / hashlib.sha256(source.encode()).hexdigest()[:20]
+            execution.mkdir(parents=True, exist_ok=True, mode=0o700)
+            return execution
+
+    @staticmethod
+    def _link_directory(path: Path, destination: Path) -> None:
+        """将 v3 兼容入口固定到唯一数据目录，禁止改写指向其它目录的链接。"""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.is_symlink():
+            if path.resolve() != destination.resolve():
+                raise ValueError("数据目录绑定冲突")
+            return
+        if path.exists():
+            shutil.copytree(path, destination, dirs_exist_ok=True)
+            shutil.rmtree(path)
+        path.symlink_to(os.path.relpath(destination, path.parent), target_is_directory=True)
+
+    def _session_view(self, row: dict, run_id: str) -> None:
+        home = self._root(row) / "home"
+        project = home / ".claude" / "projects" / f"-workspaces-{run_id}"
+        project.mkdir(parents=True, exist_ok=True)
+        os.chown(project, 1000, 1000)
+        for parent in (project.parent, project.parent.parent):
+            os.chown(parent, 1000, 1000)
+        projects = self._root(row) / "workspaces" / run_id / ".claude-home" / "projects"
+        projects.mkdir(parents=True, exist_ok=True)
+        view = projects / "-workspace"
+        if not view.exists():
+            view.symlink_to(project, target_is_directory=True)
+
+    def _make_room(self, requested: dict) -> None:
+        running = self.client.containers.list(filters={"label": ["vibebench.product=v3",
+            f"vibebench.deployment={self.deployment}", "vibebench.role=account"]})
+        if len(running) < self.limit:
+            return
+        connection = self.database()
+        try:
+            rows = [dict(row) for row in connection.execute("SELECT * FROM account_environments")]
+            for row in rows:
+                if row["environment_id"] == requested["environment_id"]:
+                    continue
+                guard = self.environment_lock(row["environment_id"])
+                # 不等待另一个正在准备的账号锁，避免两个环境相互等待资源预算。
+                if not guard.acquire(blocking=False):
+                    continue
+                try:
+                    with self.lock:
+                        busy = row["environment_id"] in self.jobs
+                    if busy or row["container_id"] not in {container.id for container in running}:
+                        continue
+                    account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
+                    account = dict(account) if account else {"name": row["name"]}
+                    try:
+                        job = self.claim(row, account, f"idle:{uuid.uuid4().hex}", idle_only=True, exclusive=True)
+                    except (ValueError, RuntimeError):
+                        continue
+                    self._container(row).stop(timeout=5)
+                    self._update(row, state="stopped")
+                    (self._root(row) / "runtime" / "execution.json").unlink(missing_ok=True)
+                    self._lease(job, "release")
+                    with self.lock:
+                        self.jobs.pop(row["environment_id"], None)
+                    return
+                finally:
+                    guard.release()
+        finally:
+            connection.close()
+        raise ValueError("已达到 v3 活跃环境预算且没有可停止的空闲账号")
+
+    def begin_login(self, sid: str, account: dict, version: str, force: bool) -> tuple[dict, object, Path, str]:
+        """在固定环境创建 tmux 登录；重授权使用同环境内的暂存 HOME。
+
+        :param sid: 登录会话 ID
+        :param account: 账号草稿或已存在账号
+        :param version: 精确 CLI 版本
+        :param force: 是否保护旧凭据
+        :return: 环境、容器、登录 profile、本次 HOME
+        """
+        with self._cli_setup(account, f"login:{sid}", version, exclusive=True) as (row, container, job):
+            home = self._root(row) / "home"
+            cli_home = "/home/node"
+            if force:
+                staged = home / ".v3-login" / sid
+                staged.mkdir(parents=True, exist_ok=True)
+                for source in (home / ".claude.json", home / ".claude" / "settings.json"):
+                    if source.exists():
+                        target = staged / (".claude.json" if source.name == ".claude.json" else ".claude/settings.json")
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(source, target)
+                home = staged
+                cli_home = f"/home/node/.v3-login/{sid}"
+            profile = home / ".claude"
+            profile.mkdir(exist_ok=True)
+            for current, dirs, files in os.walk(home if force else profile):
+                os.chown(current, 1000, 1000)
+                for name in files:
+                    os.chown(Path(current) / name, 1000, 1000)
+            if force:
+                os.chown(home.parent, 1000, 1000)
+            socket_path = f"/tmp/v3-login-{sid}.sock"
+            command = ["setpriv", "--reuid=1000", "--regid=1000", "--init-groups", "--bounding-set=-all",
+                "--inh-caps=-all", "--ambient-caps=-all", "--no-new-privs", "env", f"HOME={cli_home}",
+                f"PATH=/cli/{version}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin",
+                "NODE_EXTRA_CA_CERTS=/etc/mitm/mitmproxy-ca-cert.pem", "claude", "auth", "login"]
+            try:
+                job.update(tmux=sid, tmux_socket=socket_path, home=cli_home, version=version)
+                self._save_execution(job)
+                result = container.exec_run(["tmux", "-S", socket_path, "new-session", "-d", "-s", sid,
+                    "-x", "120", "-y", "36", shlex.join(command) + "; sleep 86400"])
+                if result.exit_code:
+                    raise ValueError("tmux 登录启动失败")
+                return row, container, profile, cli_home
+            except Exception:
+                self.release(job)
+                raise
+
+    @staticmethod
+    def cli_command(command: list[str]) -> list[str]:
+        """生成去掉所有能力的非 root CLI 命令。
+
+        :param command: 实际 argv
+        :return: 不经过字符串拼接的 setpriv argv
+        """
+        return ["setpriv", "--reuid=1000", "--regid=1000", "--init-groups", "--bounding-set=-all",
+            "--inh-caps=-all", "--ambient-caps=-all", "--no-new-privs", "--", *command]
+
+    def exec_cli(self, container_id: str, command: list[str], home: str, version: str):
+        """执行短期 CLI 子命令，保留版本和证书配置。
+
+        :param container_id: 本部署固定容器
+        :param command: CLI argv
+        :param home: 当前执行 HOME
+        :param version: 精确版本
+        :return: Docker ExecResult
+        """
+        job = self.job_for_container(container_id)
+        return self._container(job["row"]).exec_run(self.cli_command(command),
+            environment={"HOME": home, "PATH": f"/cli/{version}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin",
+                "NODE_EXTRA_CA_CERTS": "/etc/mitm/mitmproxy-ca-cert.pem"}, workdir=home)
+
+    def job_for_container(self, container_id: str) -> dict:
+        """按容器或执行 token 找当前执行；异步回调必须传入带来源的 token。
+
+        :param container_id: 固定容器 ID
+        :return: 当前执行句柄
+        """
+        with self.lock:
+            job = next((job for job in self.jobs.values() if job["token"] == container_id
+                or (":" not in container_id and job["row"]["container_id"] == container_id)), None)
+        if not job:
+            raise ValueError("账号执行已过期")
+        return job
+
+    def commit_login(self, session, account_id: int) -> None:
+        """提交暂存登录配置，并把环境绑定到不可变账号 ID。
+
+        :param session: 已通过登录校验的 LoginSession
+        :param account_id: bench 账号 ID
+        :return: None
+        """
+        job = self.job_for_container(self.execution_token(session.worker_id, f"login:{session.sid}"))
+        row = self._row(session.name, account_id)
+        destination = self._root(row) / "home"
+        for relative in (".claude.json", ".claude/.credentials.json", ".claude/settings.json"):
+            source = session.profile_dir.parent / relative
+            target = destination / relative
+            if source.exists() and source.resolve() != target.resolve():
+                atomic_json(target, json.loads(source.read_text()))
+                os.chown(target, 1000, 1000)
+        job["row"] = row
+
+    def begin_continue(self, account: dict, run: dict, sid: str, context: dict, flows: Path) -> tuple[str, str]:
+        """在原工作目录领取续聊，不复制整个账号 HOME。
+
+        :param account: 当前账号
+        :param run: 原 run 快照
+        :param sid: 续聊会话
+        :param context: 被动额度上下文
+        :param flows: 当前续聊证据目录
+        :return: 当前执行 token 的兼容二元组
+        """
+        version = run.get("claude_code_version") or os.environ.get("CLAUDE_CODE_VERSION", "2.1.280")
+        with self._cli_setup(account, context["QUOTA_SOURCE"], version) as (row, container, job):
+            try:
+                self.sync_credentials(row, account)
+                self._session_view(row, run["id"])
+                handle = hashlib.sha256(context["QUOTA_SOURCE"].encode()).hexdigest()[:20]
+                root = self._root(row)
+                flow_directory = self.execution_flows(account, context["QUOTA_SOURCE"], flows)
+                flow_path = "/flows/" + str(flow_directory.relative_to(root / "flows"))
+                control = root / "controls" / handle
+                control.mkdir(parents=True, exist_ok=True, mode=0o750)
+                self._link_directory(self.data / "quota-controls" / run["id"] / handle, control)
+                context = dict(context, STATS_FILE=f"{flow_path}/stats.jsonl",
+                    QUOTA_SIGNAL_FILE=f"/controls/{handle}/pause.json",
+                    QUOTA_STATE_FILE=f"/quota-accounts/{account['id']}/state.json",
+                    QUOTA_OBSERVATIONS_FILE=f"{flow_path}/passive-quota.jsonl",
+                    QUOTA_CREDENTIALS_FILE="/home/node/.claude/.credentials.json")
+                if run.get("capture_full_http"):
+                    context.update(CAPTURE_FULL_HTTP="1", SAVE_FULL_FLOWS="1",
+                        CAPTURE_FILE=f"{flow_path}/http_capture.jsonl", CAPTURE_INDEX_FILE=f"{flow_path}/capture_index.json")
+                atomic_json(root / "runtime" / "context.json", context)
+                self._configure_recorder(container, context)
+                job.update(run_id=run["id"], handle=handle, version=version)
+                self._save_execution(job)
+                return job["token"], job["token"]
+            except Exception:
+                self.cleanup(job["token"])
+                raise
+
+    def maintenance(self, environment_id: str, operation: str) -> None:
+        """空闲维护本部署环境，保留 HOME 和已确认身份。
+
+        :param environment_id: 不可变环境 ID
+        :param operation: stop、rebuild 或 reconcile
+        :return: None；活动作业和 API 请求拒绝维护
+        """
+        if operation not in ("stop", "rebuild", "reconcile"):
+            raise ValueError("维护操作不合法")
+        with self.environment_lock(environment_id):
+            connection = self.database()
+            try:
+                record = connection.execute("SELECT * FROM account_environments WHERE environment_id=?", (environment_id,)).fetchone()
+                if not record or environment_id in self.jobs:
+                    raise ValueError("环境不存在或正在执行工作")
+                row = dict(record)
+                account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
+            finally:
+                connection.close()
+            account = dict(account) if account else {"name": row["name"]}
+            if operation == "reconcile" and row["state"] == "cli_reconcile":
+                self.reconcile(environment_id)
+                if self._row(row["name"], row["account_id"])["state"] == "cli_reconcile":
+                    raise ValueError("CLI 对账未完成，独立 API 环境保持运行")
+                return
+            job = None
+            if operation != "reconcile":
+                job = self.claim(row, account, f"maintenance:{uuid.uuid4().hex}", idle_only=True, exclusive=True)
+            else:
+                account_id = account.get("cc2api_account_id")
+                if account_id is not None:
+                    snapshot = self.gateway._request("GET", f"/admin/runtime/accounts/{account_id}/lease")
+                    if snapshot["active"]:
+                        raise ValueError("API 仍有活动请求，拒绝对账")
+            try:
+                container = self._container(row) if row.get("container_id") else None
+            except NotFound:
+                container = None
+            if container:
+                container.stop(timeout=5)
+                if operation == "rebuild":
+                    container.remove()
+            if job:
+                self._lease(job, "release")
+                with self.lock:
+                    self.jobs.pop(environment_id, None)
+            elif account.get("cc2api_account_id") is not None and snapshot["lease"]:
+                lease = snapshot["lease"]
+                self.gateway._request("POST", f"/admin/runtime/accounts/{account['cc2api_account_id']}/lease",
+                    {"operation": "release", "owner": lease["owner"], "generation": lease["generation"]})
+            (self._root(row) / "runtime" / "execution.json").unlink(missing_ok=True)
+            self._update(row, state="stopped", **({"container_id": None} if operation == "rebuild" else {}))
+
+    def identity_import(self, account: dict, version: str) -> dict:
+        """导出实际 CLI 请求确认的设备字段及可测量的基础环境。
+
+        :param account: 新导入的 bench 账号
+        :param version: 当前 CLI 基础版本
+        :return: 无凭据的身份载荷；缺少证据时阻止导入
+        """
+        row, container = self.ensure(account, version)
+        identity_file = self._root(row) / "runtime" / "identity.json"
+        if not identity_file.exists():
+            raise ValueError("设备身份尚未确认：请先在该固定环境完成一次 CLI 任务，再同步账号")
+        identity = json.loads(identity_file.read_text())
+        if identity.get("conflict") or not re.fullmatch(r"[a-f0-9]{64}", identity.get("device_id", "")):
+            raise ValueError("客户端设备身份存在冲突，已阻止同步")
+        top = self._root(row) / "home" / ".claude.json"
+        oauth_account = json.loads(top.read_text()).get("oauthAccount", {}) if top.exists() else {}
+        if not identity.get("account_uuid") or identity["account_uuid"] != oauth_account.get("accountUuid"):
+            raise ValueError("观测设备身份与当前登录账号归属不一致，已阻止同步")
+        probe = '''const os=require('os');const fs=require('fs');const distro=Object.fromEntries(fs.readFileSync('/etc/os-release','utf8').split('\\n').filter(x=>x.includes('=')).map(x=>{const i=x.indexOf('=');return[x.slice(0,i),x.slice(i+1).replace(/^"|"$/g,'')]}));console.log(JSON.stringify({platform_raw:process.platform,arch:process.arch,node_version:process.version,linux_distro_id:distro.ID||'',linux_distro_version:distro.VERSION_ID||'',linux_kernel:os.release()}));'''
+        result = container.exec_run(self.cli_command(["node", "-e", probe]))
+        if result.exit_code:
+            raise ValueError("实际基础环境读取失败")
+        environment = json.loads(result.output)
+        environment.update(platform="Linux", terminal="tmux", package_managers="npm", runtimes="node",
+            version=version, version_base=version, build_time="", deployment_environment="", vcs="git")
+        return {"device_id": identity["device_id"], "environment_id": row["environment_id"],
+            "source": identity["source"], "canonical_env": environment,
+            "canonical_prompt": {"platform": "linux", "shell": "bash", "os_version": environment["linux_kernel"],
+                "working_dir": "/home/node"}}
+
+    def reconcile(self, environment_id: str | None = None) -> None:
+        """启动时按持久模式收口遗留执行，共享 CLI 保留独立 API。
+
+        :param environment_id: 可选的单环境对账范围
+        :return: None；未知门禁保持隔离
+        """
+        connection = self.database()
+        try:
+            rows = [dict(row) for row in connection.execute("SELECT * FROM account_environments")]
+        finally:
+            connection.close()
+        for row in rows:
+            if environment_id is not None and row["environment_id"] != environment_id:
+                continue
+            record = self._root(row) / "runtime" / "execution.json"
+            shared = row["state"] == "cli_reconcile"
+            try:
+                container = self._container(row) if row["container_id"] else None
+            except NotFound:
+                container = None
+            try:
+                if record.exists():
+                    execution = json.loads(record.read_text())
+                    shared = execution.get("exclusive") is False
+                    if shared:
+                        if execution.get("container_id") != row["container_id"] or execution.get("generation") != row["generation"]:
+                            raise ValueError("遗留 CLI 记录与当前容器代次不一致")
+                        lease = execution.get("lease")
+                        if lease:
+                            path = f"/admin/runtime/accounts/{execution['account_id']}/lease"
+                            current = self.gateway._request("GET", path)["lease"]
+                            if current and (current["owner"] != lease["owner"] or current["generation"] != lease["generation"] or current.get("exclusive", True)):
+                                raise ValueError("遗留 CLI 记录与当前租约不一致")
+                            lease = current
+                        job = {"row": row, "account": {"cc2api_account_id": execution.get("account_id")},
+                            "source": execution["source"], "lease": lease, "exclusive": False, "claimed": True,
+                            "token": self.execution_token(row["container_id"] or row["environment_id"], execution["source"])}
+                        for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before"):
+                            if key in execution:
+                                job[key] = execution[key]
+                        with self.environment_lock(row["environment_id"]):
+                            with self.lock:
+                                if row["environment_id"] in self.jobs:
+                                    continue
+                                self.jobs[row["environment_id"]] = job
+                            if container:
+                                container.reload()
+                            if container and container.status == "running":
+                                self.cleanup(job["token"])
+                                self._update(row, state="ready")
+                            else:
+                                job["exec"] = None
+                                self.release(job)
+                                self._update(row, state="stopped")
+                        continue
+                    if container:
+                        container.stop(timeout=5)
+                    if execution.get("lease"):
+                        lease = execution["lease"]
+                        path = f"/admin/runtime/accounts/{execution['account_id']}/lease"
+                        current = self.gateway._request("GET", path)
+                        if current["lease"]:
+                            self.gateway._request("POST", path, {"operation": "release", "owner": lease["owner"], "generation": lease["generation"]})
+                    record.unlink()
+                    self._update(row, state="stopped")
+                else:
+                    # 管理服务重启不应截断账号内已接受的 API/SSE；只有遗留 CLI 执行才收口容器。
+                    connection = self.database()
+                    try:
+                        account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
+                    finally:
+                        connection.close()
+                    if account and account["cc2api_account_id"] is not None:
+                        current = self.gateway._request("GET", f"/admin/runtime/accounts/{account['cc2api_account_id']}/lease")
+                        if current["lease"]:
+                            shared = current["lease"].get("exclusive") is False
+                            raise ValueError("存在没有本地执行记录的门禁，需人工对账")
+                    if container:
+                        container.reload()
+                        if shared and container.status == "running" and (self._root(row) / "runtime" / "cli-unhealthy").exists():
+                            atomic_json(self._root(row) / "runtime" / "context.json", {})
+                            self._configure_recorder(container, {})
+                    self._update(row, state="ready" if container and container.status == "running" else "stopped")
+            except Exception:
+                self._update(row, state="cli_reconcile" if shared else "reconcile")
+
+    def start(self) -> None:
+        """启动执行租约心跳。
+
+        :return: None
+        """
+        self.heartbeat.start()
+
+    def stop(self) -> None:
+        """停止调度时收口 CLI，保留独立 API 与持久环境。
+
+        :return: None
+        """
+        self.stopping.set()
+        if self.heartbeat.is_alive():
+            self.heartbeat.join(timeout=6)
+        self.heartbeat_pool.shutdown(wait=False, cancel_futures=True)
+        with self.lock:
+            jobs = list(self.jobs.values())
+        for job in jobs:
+            try:
+                self.cleanup(job["token"])
+            except Exception:
+                # cleanup 已保存隔离状态；不能因单账号失联阻止其它 CLI 收口。
+                pass

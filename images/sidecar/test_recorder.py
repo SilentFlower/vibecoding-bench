@@ -102,6 +102,28 @@ class RecorderQuotaTests(unittest.TestCase):
         self.assertFalse(self.observations.exists())
         self.assertFalse(self.signal.exists())
 
+    def test_identity_observation_accepts_ip_host_with_verified_domain_and_rejects_other_domain(self) -> None:
+        """透明代理 IP 不能丢失身份采集；相似域名不得作为有效来源。@return None。"""
+        identity_path = self.base / "identity.json"
+        actual_path = Path
+
+        def path(value):
+            """把容器专用身份路径映射到测试私有目录。"""
+            return identity_path if value == "/run/v3/identity.json" else actual_path(value)
+
+        body = json.dumps({"metadata": {"user_id": json.dumps({"device_id": "a" * 64, "account_uuid": "synthetic-account"})}}).encode()
+        with patch.dict(os.environ, {"V3_ACCOUNT": "1"}), patch.object(recorder, "Path", side_effect=path):
+            wrong = self._flow(host="evil-anthropic.com")
+            wrong.request.raw_content = body
+            self.addon.request(wrong)
+            self.assertFalse(identity_path.exists())
+            flow = self._flow(host="198.18.0.10")
+            flow.request.headers["host"] = "api.anthropic.com:443"
+            flow.server_conn.sni = "api.anthropic.com"
+            flow.request.raw_content = body
+            self.addon.request(flow)
+        self.assertEqual(json.loads(identity_path.read_text())["device_id"], "a" * 64)
+
     def test_only_recovery_owner_can_pass_expired_shared_window(self) -> None:
         """窗口到期不同时放行其它执行。"""
         payload = {"windows": {"five_hour": {"exhausted": True, "reset_at": time.time() - 1}},
@@ -157,6 +179,27 @@ class RecorderQuotaTests(unittest.TestCase):
         self.addon.requestheaders(next_flow)
         self.assertEqual(429, next_flow.response.status_code)
         self.assertIn("account_on_hold", self.signal.read_text())
+
+    def test_v3_identity_accepts_only_explicit_device_and_keeps_conflict(self) -> None:
+        """userID/machineID 不推测映射；设备或账号归属变化后保持冲突。"""
+        identity_file = self.base / "identity.json"
+        flow = self._flow()
+        with patch.dict(os.environ, {"V3_ACCOUNT": "1"}), patch.object(recorder, "Path", return_value=identity_file):
+            flow.request.raw_content = json.dumps({"metadata": {"user_id": json.dumps({"machineID": "a" * 64})}}).encode()
+            self.addon.request(flow)
+            self.assertFalse(identity_file.exists())
+            identity = {"device_id": "a" * 64, "account_uuid": "synthetic-one"}
+            flow.request.raw_content = json.dumps({"metadata": {"user_id": json.dumps(identity)}}).encode()
+            self.addon.request(flow)
+            self.assertEqual(json.loads(identity_file.read_text())["device_id"], "a" * 64)
+            identity["account_uuid"] = "synthetic-two"
+            flow.request.raw_content = json.dumps({"metadata": {"user_id": json.dumps(identity)}}).encode()
+            self.addon.request(flow)
+            self.assertTrue(json.loads(identity_file.read_text())["conflict"])
+            identity["account_uuid"] = "synthetic-one"
+            flow.request.raw_content = json.dumps({"metadata": {"user_id": json.dumps(identity)}}).encode()
+            self.addon.request(flow)
+            self.assertTrue(json.loads(identity_file.read_text())["conflict"])
 
     def test_unreadable_shared_state_does_not_forward_owned_model_request(self) -> None:
         """门禁文件失效停止当前执行，不标成可用额度或继续转发。"""

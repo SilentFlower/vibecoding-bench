@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# 统一 v3 构建、检查和启停入口；所有保护由 manage.py 执行。
+set -euo pipefail
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 "$script_dir/../deploy/v3/manage.py" "$@"

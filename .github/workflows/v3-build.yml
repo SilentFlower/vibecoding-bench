@@ -1,0 +1,22 @@
+name: v3 联合构建验证
+on:
+  workflow_dispatch:
+  push:
+    branches: [v3]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出父仓与子仓
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: 构建两个镜像并生成版本清单
+        run: python3 deploy/v3/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3.json
+      - name: 保存版本清单
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: releases/v3.json

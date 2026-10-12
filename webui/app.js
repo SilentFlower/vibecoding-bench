@@ -3,14 +3,16 @@
  * 纯原生 JS + Hash 路由 + Fetch + SSE
  */
 
+const RUNTIME_BASE = location.pathname.startsWith('/runtime') ? '/runtime' : '';
 const API = (path, opts = {}) =>
-  fetch('/api' + path, {
+  fetch(RUNTIME_BASE + '/api' + path, {
     headers: { 'Content-Type': 'application/json' },
     credentials: 'same-origin',
     ...opts,
   }).then(async (r) => {
     // 401:session 过期或未登录 → 全局弹登录框,中止当前调用
     if (r.status === 401 && !path.startsWith('/auth/')) {
+      if (RUNTIME_BASE) throw new Error('统一后台会话已过期，请重新进入环境与任务页面');
       showAuthModal();
       throw new Error('auth required');
     }
@@ -42,6 +44,7 @@ const state = {
 
 // ===================== 路由 =====================
 const ROUTES = {
+  environments: renderEnvironments,
   accounts: renderAccounts,
   topics: renderTopics,
   tasks: renderTasks,
@@ -71,6 +74,23 @@ function navigate() {
 }
 
 window.addEventListener('hashchange', navigate);
+
+/** 加载固定环境状态及空闲维护入口。@return 页面渲染完成。 */
+async function renderEnvironments() {
+  const rows = await API('/environments');
+  const view = $('#view');
+  view.innerHTML = '<h2>固定账号环境</h2><p>停止和重建会保留 HOME、身份和证据。活动任务与 API 请求期间不能维护。</p>' +
+    rows.map(row => `<article class="card"><h3>${escapeHTML(row.name)}</h3><p>${escapeHTML(row.state)} · ${row.busy ? '执行中' : '无 CLI 作业'} · ${escapeHTML(row.fingerprint.hostname)} · ${escapeHTML(row.fingerprint.mem)}</p><p>环境 ${escapeHTML(row.environment_id)} · 容器代次 ${row.generation}</p><p>${escapeHTML(row.identity_status)} · CLI ${escapeHTML((row.cli_versions || []).join(", "))}</p>${['stop', 'rebuild', 'reconcile'].map(operation => `<button data-environment="${escapeHTML(row.environment_id)}" data-operation="${operation}" ${row.busy ? 'disabled' : ''}>${({stop:'停止',rebuild:'重建容器',reconcile:'故障对账'})[operation]}</button>`).join('')}</article>`).join('');
+  $$('[data-operation]', view).forEach(button => button.addEventListener('click', async () => {
+    if (!confirm('确认在账号空闲时执行此维护操作？持久数据会保留。')) return;
+    try {
+      await API(`/environments/${button.dataset.environment}/maintenance`, { method: 'POST', body: JSON.stringify({ operation: button.dataset.operation }) });
+      await renderEnvironments();
+    } catch (error) {
+      alert(error.message);
+    }
+  }));
+}
 
 // ===================== Accounts =====================
 function formatDuration(sec) {
@@ -605,7 +625,11 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running') {
   fit.fit();
 
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const ws = new WebSocket(`${proto}//${location.host}${wsPath}`);
+  if (RUNTIME_BASE) {
+    const result = await API('/terminal-ticket', { method: 'POST', body: JSON.stringify({ path: wsPath.split('?')[0] }) });
+    wsPath += (wsPath.includes('?') ? '&' : '?') + 'ticket=' + encodeURIComponent(result.ticket);
+  }
+  const ws = new WebSocket(`${proto}//${location.host}${RUNTIME_BASE}${wsPath}`);
   ws.binaryType = 'arraybuffer';
   let inputAllowed = hostSelector !== '#continue-xterm' && initialStatus === 'running';
 
@@ -1143,7 +1167,7 @@ async function renderRuns() {
   bindCaptureForm();
   paintRuns(state.runs);
   if (state.runsEventSource) state.runsEventSource.close();
-  state.runsEventSource = new EventSource('/api/runs-stream');
+  state.runsEventSource = new EventSource(RUNTIME_BASE + '/api/runs-stream');
   state.runsEventSource.addEventListener('runs', (e) => {
     try {
       state.runs = JSON.parse(e.data);
@@ -1431,7 +1455,7 @@ function renderStatValue(stats, key) {
 
 async function fetchRunTranscript(rid) {
   try {
-    const r = await fetch(`/api/runs/${rid}/transcript`, { credentials: 'same-origin' });
+    const r = await fetch(RUNTIME_BASE + `/api/runs/${rid}/transcript`, { credentials: 'same-origin' });
     if (r.status === 404) return { text: '', state: '等待 transcript' };
     if (!r.ok) return { text: '', state: `transcript 加载失败：${r.status} ${r.statusText}` };
     return { text: await r.text(), state: '' };
@@ -1704,7 +1728,7 @@ function hideAuthUser() {
  */
 async function bootstrapAuth() {
   try {
-    const r = await fetch('/api/auth/me', { credentials: 'same-origin' });
+    const r = await fetch(RUNTIME_BASE + '/api/auth/me', { credentials: 'same-origin' });
     if (r.status === 401) { showAuthModal(); return false; }
     if (!r.ok) return true;   // 其他错(如后端没起)不阻塞 UI
     const data = await r.json();
@@ -1726,7 +1750,7 @@ function wireAuth() {
       errEl?.classList.add('hidden');
       btn.disabled = true;
       try {
-        const r = await fetch('/api/auth/login', {
+        const r = await fetch(RUNTIME_BASE + '/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
@@ -1757,11 +1781,12 @@ function wireAuth() {
 
   const logoutBtn = $('#auth-logout');
   if (logoutBtn) {
+    if (RUNTIME_BASE) { logoutBtn.style.display = 'none'; return; }
     logoutBtn.onclick = async (e) => {
       e.stopPropagation();
       if (!confirm('退出登录?')) return;
       try {
-        await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+        await fetch(RUNTIME_BASE + '/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
       } catch {}
       hideAuthUser();
       location.reload();

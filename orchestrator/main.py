@@ -19,6 +19,7 @@ import random
 import re
 import secrets
 import shutil
+import shlex
 import sqlite3
 import threading
 import time
@@ -27,7 +28,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from collections import deque
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Literal, Optional, Sequence
 
@@ -42,6 +43,7 @@ from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
 
 from quota_protocol import merge_quota_observation, quota_decision, quota_observation
+from account_runtime import AccountRuntime, RuntimeBusy
 
 
 # ============== 配置 ==============
@@ -60,7 +62,8 @@ HOST_BENCH_DATA = Path(os.environ.get("HOST_BENCH_DATA", str(BENCH_DATA)))
 
 WORKER_IMAGE = os.environ.get("WORKER_IMAGE", "vibebench-worker:latest")
 SIDECAR_IMAGE = os.environ.get("SIDECAR_IMAGE", "vibebench-sidecar:latest")
-PER_ACCOUNT_CONCURRENCY = int(os.environ.get("PER_ACCOUNT_CONCURRENCY", "2"))
+V3_ENABLED = bool(os.environ.get("V3_DEPLOYMENT_ID"))
+PER_ACCOUNT_CONCURRENCY = 1 if V3_ENABLED else int(os.environ.get("PER_ACCOUNT_CONCURRENCY", "2"))
 SIDECAR_READY_TIMEOUT = float(os.environ.get("SIDECAR_READY_TIMEOUT", "120"))
 DNS_READY_HOST = os.environ.get("DNS_READY_HOST", "example.com")
 _SIDECAR_DNS_READY_SH = (
@@ -222,7 +225,7 @@ WEBUI_PASS = os.environ.get("WEBUI_PASS", "")
 _AUTH_ENABLED = bool(WEBUI_USER and WEBUI_PASS)
 _SESSION_SECRET = os.environ.get("WEBUI_SESSION_SECRET") or secrets.token_hex(32)
 _SESSION_TTL = 7 * 24 * 3600  # 7 天
-_SESSION_COOKIE = "vb_session"
+_SESSION_COOKIE = "vb_v3_session" if V3_ENABLED else "vb_session"
 _DEFAULT_CLAUDE_SETTINGS: dict[str, object] = {
     "env": {
         "CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
@@ -696,6 +699,7 @@ class Cc2ApiClient:
                 "Accept": "application/json",
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.admin_password}",
+                **({"x-v3-service-token": os.environ.get("V3_INTERNAL_TOKEN", "")} if path == "/admin/accounts" and body and body.get("cli_identity") else {}),
             },
         )
         try:
@@ -1097,12 +1101,16 @@ def _sync_bound_account_credentials_locked(
     cc2api_account_id = account.get("cc2api_account_id")
     if cc2api_account_id is None:
         raise ValueError("bench 账号尚未绑定 cc2api")
-    return _resolve_and_sync_cc2api_credentials(
+    snapshot = _resolve_and_sync_cc2api_credentials(
         str(account["name"]),
         int(cc2api_account_id),
         min_validity_seconds,
         force_refresh,
     )
+    if account_runtime:
+        row = account_runtime._row(account["name"], account["id"])
+        account_runtime.sync_credentials(row, account)
+    return snapshot
 
 
 def _sync_bound_account_credentials(
@@ -2850,6 +2858,18 @@ class QuotaGuard:
         """
         with self._lock:
             identity = _quota_identity(account)
+            if account_runtime and account.get("cc2api_account_id") is not None:
+                connection = get_db()
+                try:
+                    environment = connection.execute("SELECT * FROM account_environments WHERE account_id=?", (account["id"],)).fetchone()
+                    if environment:
+                        source = f"api:{environment['environment_id']}:{identity}"
+                        path = account_runtime.data / "environments" / environment["environment_id"] / "flows" / "api" / "observations.jsonl"
+                        with connection:
+                            connection.execute("INSERT OR IGNORE INTO quota_observation_cursors(source,account_id,identity,path,byte_offset) VALUES(?,?,?,?,0)",
+                                (source, account["id"], identity, str(path)))
+                finally:
+                    connection.close()
             conn = get_db()
             try:
                 rows = conn.execute("SELECT * FROM quota_observation_cursors WHERE account_id=? AND identity=?",
@@ -2879,6 +2899,8 @@ class QuotaGuard:
                                 ts = float(event["ts"])
                                 if 0 < ts <= time.time() + 5:
                                     observation = quota_observation(event.get("headers") or {}, int(event["status"]), ts)
+                                    if event.get("origin") == "api":
+                                        observation["origin"] = "api"
                                     if event.get("account_error") == "account_on_hold":
                                         observation["account_error"] = "account_on_hold"
                         except (ValueError, TypeError, KeyError, AttributeError):
@@ -3130,6 +3152,8 @@ class QuotaGuard:
 
     def _loop(self) -> None:
         while not self._stop.is_set():
+            if login_manager:
+                login_manager.sweep_expired()
             self.tick()
             self._stop.wait(2)
 
@@ -3283,6 +3307,8 @@ class Runner:
     def _quota_mounts(self, account: dict, run_id: str, source: str, flows: Path) -> tuple[dict, dict, dict]:
         if not quota_guard:
             return {}, {}, {}
+        if account_runtime:
+            flows = account_runtime.execution_flows(account, source, flows)
         control = _quota_control(run_id, source)
         env = quota_guard.prepare(account, source, flows, control)
         host_control = HOST_BENCH_DATA / control.relative_to(BENCH_DATA)
@@ -3299,6 +3325,12 @@ class Runner:
         :param run_id: 原 run ID
         :return: None
         """
+        if account_runtime:
+            with account_runtime.lock:
+                jobs = [job for job in account_runtime.jobs.values() if job.get("run_id") == run_id]
+            for job in jobs:
+                account_runtime.cleanup(job["token"])
+            return
         for name in (f"bench-worker-{run_id}", f"bench-sidecar-{run_id}"):
             try:
                 container = self.client.containers.get(name)
@@ -3410,6 +3442,8 @@ class Runner:
             # 抓包 run 留空时必须沿用自身默认模型，不能被页面或环境全局配置带偏。
             worker_env["CLAUDE_MODEL_OVERRIDE"] = effective_runtime_model()
 
+        if account_runtime:
+            return account_runtime.start_run(account, task, run_id, worker_env, sidecar_env)
         sidecar_id: Optional[str] = None
         worker_id: Optional[str] = None
         try:
@@ -3480,7 +3514,7 @@ class Runner:
         :param profile_effort_level: 回写账号 profile 时保留的思考预算兜底值
         :return: None
         """
-        if not worker_id:
+        if account_runtime or not worker_id:
             return
         try:
             api = self.client.api
@@ -3523,6 +3557,8 @@ class Runner:
             pass
 
     def wait_worker(self, worker_id: str) -> int:
+        if account_runtime:
+            return account_runtime.wait_worker(worker_id)
         worker = self.client.containers.get(worker_id)
         result = worker.wait()
         return int(result.get("StatusCode", -1))
@@ -3544,6 +3580,10 @@ class Runner:
         return data if isinstance(data, dict) else {}
 
     def cleanup(self, sidecar_id: Optional[str], worker_id: Optional[str]) -> None:
+        if account_runtime:
+            if worker_id or sidecar_id:
+                account_runtime.cleanup(worker_id or sidecar_id)
+            return
         for cid in (worker_id, sidecar_id):
             if not cid:
                 continue
@@ -3563,6 +3603,7 @@ class Runner:
         run_id: str,
         account: dict,
         stop_event: threading.Event,
+        worker_id: Optional[str] = None,
     ) -> None:
         """
         监听 managed worker 的单次 401 刷新请求并交给 cc2api 处理。
@@ -3570,6 +3611,7 @@ class Runner:
         :param run_id: 当前 runs.id
         :param account: 已绑定 cc2api 的 bench accounts 行
         :param stop_event: worker 收口后用于停止 watcher 的事件
+        :param worker_id: v3 当前执行 token，阻止旧刷新回调覆盖新执行
         :return: None
         """
         workspace = WORKSPACES_DIR / run_id
@@ -3580,8 +3622,30 @@ class Runner:
                 continue
             try:
                 _sync_bound_account_credentials(account, 600, force_refresh=True)
+                if stop_event.is_set():
+                    return
+                if account_runtime:
+                    job = account_runtime.job_for_container(worker_id or "expired")
+                    with account_runtime.environment_lock(job["row"]["environment_id"]):
+                        account_runtime.job_for_container(worker_id or "expired")
+                        _write_json_atomically(result_path, {"ok": True})
+                    return
                 _write_json_atomically(result_path, {"ok": True})
             except Exception as exc:
+                if stop_event.is_set():
+                    return
+                if account_runtime:
+                    try:
+                        job = account_runtime.job_for_container(worker_id or "expired")
+                    except ValueError:
+                        return
+                    with account_runtime.environment_lock(job["row"]["environment_id"]):
+                        try:
+                            account_runtime.job_for_container(worker_id or "expired")
+                        except ValueError:
+                            return
+                        _write_json_atomically(result_path, {"ok": False, "error": _redact_cc2api_error(exc)})
+                    return
                 _write_json_atomically(
                     result_path,
                     {"ok": False, "error": _redact_cc2api_error(exc)},
@@ -3595,6 +3659,10 @@ class Runner:
         :param worker_id: continue worker 容器 ID
         :return: None
         """
+        if account_runtime:
+            job = account_runtime.job_for_container(worker_id)
+            account_runtime.sync_credentials(job["row"], job["account"])
+            return
         script = """
 const fs = require('fs');
 const src = '/mnt/profile/.credentials.json';
@@ -3634,6 +3702,12 @@ fs.renameSync(tmp, dst);
         :param session_id: Claude session id
         :return: (sidecar_id, worker_id)
         """
+        if account_runtime:
+            flows = FLOWS_DIR / account["name"] / str(run["task_id"]) / run["id"] / f"continue-{sid}"
+            current = continue_manager.get(sid) if continue_manager else None
+            source = f"continue:{sid}:{current.generation if current else 0}"
+            quota_env, _, _ = self._quota_mounts(account, run["id"], source, flows)
+            return account_runtime.begin_continue(account, run, sid, quota_env, flows)
         sidecar_name = f"bench-continue-sidecar-{sid}"
         worker_name = f"bench-continue-worker-{sid}"
         acc_name = account["name"]
@@ -3769,6 +3843,16 @@ fs.renameSync(tmp, dst);
         """
         if not account.get("upstream_socks5_host"):
             raise ValueError("account has no upstream proxy configured")
+        if account_runtime:
+            row, container = account_runtime.ensure(account, effective_claude_code_version())
+            job = account_runtime.claim(row, account, f"quota:{uuid.uuid4().hex}")
+            try:
+                if account.get("cc2api_account_id") is not None:
+                    _sync_bound_account_credentials(account, 600)
+                account_runtime.sync_credentials(row, account)
+                return _format_quota_result(self._exec_quota_probe(container.id))
+            finally:
+                account_runtime.cleanup(job["token"])
         sid = uuid.uuid4().hex[:12]
         sidecar_name = f"bench-quota-sidecar-{sid}"
         worker_name = f"bench-quota-worker-{sid}"
@@ -3976,11 +4060,11 @@ JS
 '''
         api = self.client.api
         ex = api.exec_create(
-            worker_id,
-            ["sh", "-lc", script],
+            account_runtime.job_for_container(worker_id)["row"]["container_id"] if account_runtime else worker_id,
+            account_runtime.cli_command(["sh", "-c", script]) if account_runtime else ["sh", "-lc", script],
             stdout=True,
             stderr=True,
-            user=WORKER_USER,
+            user="root" if account_runtime else WORKER_USER,
             environment=_claude_exec_env(True),
             workdir=WORKER_HOME,
         )
@@ -4290,7 +4374,7 @@ class LoginSession:
     """单个 OAuth 引导会话：一对 sidecar+worker + 元数据"""
 
     __slots__ = ("sid", "name", "sidecar_id", "worker_id", "created_at",
-                 "proxy", "profile_dir", "force_reauth", "committed")
+                 "proxy", "profile_dir", "force_reauth", "committed", "home", "version")
 
     def __init__(self, sid: str, name: str, sidecar_id: Optional[str],
                  worker_id: str, proxy: dict, profile_dir: Path,
@@ -4304,6 +4388,8 @@ class LoginSession:
         self.profile_dir = profile_dir
         self.force_reauth = force_reauth
         self.committed = False
+        self.home = WORKER_HOME
+        self.version = effective_claude_code_version()
 
 
 class ContinueSession:
@@ -4359,8 +4445,27 @@ class LoginManager:
         self._name_locks: dict[str, str] = {}
         self._lock = threading.Lock()
 
+    def sweep_expired(self) -> None:
+        """收口到期的 v3 tmux 登录，包括没有浏览器连接的会话。
+
+        :return: None
+        """
+        if not account_runtime:
+            return
+        with self._lock:
+            expired = [sid for sid, session in self.sessions.items()
+                if time.time() - session.created_at >= int(os.environ.get("V3_LOGIN_TTL_SECONDS", "1800"))]
+        for sid in expired:
+            try:
+                self.cleanup(sid)
+            except Exception:
+                # AccountRuntime 已将不能证明收口的环境隔离；继续清理其它会话。
+                pass
+
     def cleanup_stale(self) -> None:
         """启动时调用：清掉上次 orchestrator 进程残留的 bench-login-* 容器"""
+        if account_runtime:
+            return
         try:
             for c in self.client.containers.list(
                 all=True, filters={"name": "bench-login-"}
@@ -4413,6 +4518,23 @@ class LoginManager:
             self._name_locks[name] = sid
 
         try:
+            if account_runtime:
+                connection = get_db()
+                try:
+                    existing = connection.execute("SELECT * FROM accounts WHERE name=?", (name,)).fetchone()
+                finally:
+                    connection.close()
+                account = dict(existing) if existing else {"name": name}
+                account.update(upstream_proxy_scheme=proxy.get("scheme"),
+                    upstream_socks5_host=proxy.get("host"), upstream_socks5_port=proxy.get("port"),
+                    upstream_socks5_user=proxy.get("user"), upstream_socks5_pass=proxy.get("pass"), timezone=tz)
+                version = effective_claude_code_version()
+                _, container, profile, home = account_runtime.begin_login(sid, account, version, force_reauth)
+                session = LoginSession(sid, name, container.id, container.id, proxy, profile, force_reauth)
+                session.home, session.version = home, version
+                with self._lock:
+                    self.sessions[sid] = session
+                return session
             actual_host_profile = HOST_BENCH_DATA / "profiles" / name
             actual_local_profile = BENCH_DATA / "profiles" / name
             claude_code_version = effective_claude_code_version()
@@ -4527,6 +4649,13 @@ class LoginManager:
         s = self.get(sid)
         if not s:
             raise KeyError(sid)
+        if account_runtime:
+            result = account_runtime.exec_cli(account_runtime.execution_token(s.worker_id, f"login:{s.sid}"),
+                ["claude", "auth", "status"], s.home, s.version)
+            try:
+                return json.loads(result.output)
+            except (ValueError, TypeError):
+                return {"loggedIn": False}
         api = self.client.api
         ex = api.exec_create(
             s.worker_id, ["claude", "auth", "status"],
@@ -4560,8 +4689,8 @@ class LoginManager:
             stdout=True,
             stderr=True,
             user=WORKER_USER,
-            environment={"HOME": WORKER_HOME},
-            workdir=WORKER_HOME,
+            environment={"HOME": s.home},
+            workdir=s.home,
         )
         raw = api.exec_start(ex["Id"])
         inspected = api.exec_inspect(ex["Id"])
@@ -4607,6 +4736,16 @@ class LoginManager:
             s = self.sessions.pop(sid, None)
         if not s:
             return
+        if account_runtime:
+            try:
+                account_runtime.cleanup(account_runtime.execution_token(s.worker_id, f"login:{sid}"))
+                if s.force_reauth:
+                    shutil.rmtree(s.profile_dir.parent, ignore_errors=True)
+            finally:
+                with self._lock:
+                    if self._name_locks.get(s.name) == sid:
+                        del self._name_locks[s.name]
+            return
         for cid in (s.worker_id, s.sidecar_id):
             if not cid:
                 continue
@@ -4638,6 +4777,8 @@ class ContinueManager:
 
     def cleanup_stale(self) -> None:
         """启动时清掉上次残留的 bench-continue-* 容器"""
+        if account_runtime:
+            return
         try:
             for c in self.runner.client.containers.list(
                 all=True, filters={"name": "bench-continue-"}
@@ -4779,12 +4920,15 @@ class ContinueManager:
             session.resume_not_before = time.time() + 900
         self.runner.persist_worker_profile(session.worker_id)
         # 若删除失败，保留原 ID；下轮重试，绝不启动第二份执行。
-        for container_id in (session.worker_id, session.sidecar_id):
-            if container_id:
-                try:
-                    self.runner.client.containers.get(container_id).remove(force=True)
-                except NotFound:
-                    pass
+        if account_runtime:
+            self.runner.cleanup(session.sidecar_id, session.worker_id)
+        else:
+            for container_id in (session.worker_id, session.sidecar_id):
+                if container_id:
+                    try:
+                        self.runner.client.containers.get(container_id).remove(force=True)
+                    except NotFound:
+                        pass
         session.sidecar_id = None
         session.worker_id = None
         quota_guard.release(account, source)
@@ -4999,6 +5143,8 @@ class OAuthRefreshScheduler:
 
         :return: None
         """
+        if account_runtime:
+            return
         try:
             for c in self.runner.client.containers.list(
                 all=True, filters={"name": "bench-oauth-refresh-"}
@@ -5146,6 +5292,8 @@ def _aggregate_claude_session_usage(run_id: str) -> dict[str, int | bool]:
         }
     tokens_in = tokens_out = requests = 0
     seen_requests: set[str] = set()
+    if account_runtime:
+        base = base / "-workspace"
     for path in sorted((p for p in base.rglob("*.jsonl") if p.is_file()), key=lambda p: p.stat().st_mtime):
         for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
             try:
@@ -5281,7 +5429,10 @@ def _capture_files(base: Path) -> list[dict[str, object]]:
     if not base.exists():
         return []
     files: list[dict[str, object]] = []
-    for path in sorted(p for p in base.rglob("*") if p.is_file()):
+    paths = {p for p in base.rglob("*") if p.is_file()}
+    for directory in base.glob("continue-*"):
+        paths.update(p for p in directory.rglob("*") if p.is_file())
+    for path in sorted(paths):
         rel = path.relative_to(base)
         files.append({
             "path": str(rel),
@@ -5703,6 +5854,7 @@ class Scheduler:
                     model = (task.get("model_override") or "") if capture_full_http else effective_runtime_model()
                     self._update_attempt(run_id, attempt, execution_model=model)
                 task["model_override"] = model
+                task["warmup"] = current.get("run_kind") == "warmup"
                 if quota_guard and not quota_guard.admit(account, source):
                     state = quota_guard.snapshot(account)
                     if state.get("account_error"):
@@ -5746,10 +5898,11 @@ class Scheduler:
                 try:
                     sid, wid = self.runner.start_run(run_id, account, task)
                 except Exception as exc:
+                    deferred = bool(task.get("warmup") and isinstance(exc, RuntimeBusy))
                     self._update_attempt(
                         run_id, attempt,
-                        status="failed",
-                        error=str(exc),
+                        status="stopped" if deferred else "failed",
+                        error="养号顺延：" + str(exc) if deferred else str(exc),
                         ended_at=time.time(),
                     )
                     self._update_batch_item_for_run(run_id, "failed")
@@ -5759,7 +5912,7 @@ class Scheduler:
                 if account.get("cc2api_account_id") is not None:
                     managed_refresh_thread = threading.Thread(
                         target=self.runner.watch_managed_oauth_refresh,
-                        args=(run_id, account, managed_refresh_stop),
+                        args=(run_id, account, managed_refresh_stop, wid),
                         daemon=True,
                     )
                     managed_refresh_thread.start()
@@ -5983,6 +6136,32 @@ class WarmupScheduler:
         :param require_due: 是否要求 `warmup_next_run_at` 已到期
         :return: 是否启动及新 run id
         """
+        if account_runtime:
+            connection = get_db()
+            try:
+                row = _get_available_account(connection, account_id)
+                candidate = dict(row) if row else None
+                formal = connection.execute("SELECT 1 FROM runs WHERE account_id=? AND run_kind!='warmup' "
+                    "AND status IN ('queued','running','stopping','quota_wait') LIMIT 1", (account_id,)).fetchone()
+            finally:
+                connection.close()
+            with account_runtime.lock:
+                busy = bool(formal) or any(job["row"]["account_id"] == account_id for job in account_runtime.jobs.values())
+            if candidate and candidate.get("cc2api_account_id") is not None and not busy:
+                try:
+                    snapshot = cc2api_client._request("GET", f"/admin/runtime/accounts/{candidate['cc2api_account_id']}/lease")
+                    busy = bool(snapshot["lease"])
+                except Exception:
+                    busy = True
+            if busy:
+                connection = get_db()
+                try:
+                    with connection:
+                        connection.execute("UPDATE accounts SET warmup_next_run_at=?,warmup_last_status='scheduled' "
+                            "WHERE id=? AND warmup_enabled=1", (time.time() + 60, account_id))
+                finally:
+                    connection.close()
+                return {"started": False, "run_id": None}
         if quota_guard:
             conn = get_db()
             try:
@@ -6165,6 +6344,11 @@ class WarmupScheduler:
                         and account.get("warmup_next_run_at") is not None
                     ):
                         # 排队后同步失败已经按临时故障安排短重试，不能再被普通 failed 终态覆盖。
+                        return
+
+                    if (run.get("error") or "").startswith("养号顺延："):
+                        conn.execute("UPDATE accounts SET warmup_last_status='scheduled',warmup_next_run_at=?,warmup_last_error=NULL WHERE id=? AND warmup_enabled=1",
+                            (time.time() + 60, account["id"]))
                         return
 
                     auth_failures = int(account.get("warmup_auth_failures") or 0)
@@ -6458,17 +6642,22 @@ continue_manager: Optional[ContinueManager] = None
 oauth_refresh_scheduler: Optional[OAuthRefreshScheduler] = None
 warmup_scheduler: Optional[WarmupScheduler] = None
 quota_guard: Optional[QuotaGuard] = None
+account_runtime: Optional[AccountRuntime] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard
+    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard, account_runtime
     init_db()
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     FLOWS_DIR.mkdir(parents=True, exist_ok=True)
     WORKSPACES_DIR.mkdir(parents=True, exist_ok=True)
     CA_DIR.mkdir(parents=True, exist_ok=True)
     runner = Runner()
+    if V3_ENABLED:
+        account_runtime = AccountRuntime(runner.client, BENCH_DATA, HOST_BENCH_DATA, get_db, derive_fingerprint, cc2api_client, _quota_identity)
+        account_runtime.reconcile()
+        account_runtime.start()
     scheduler = Scheduler(runner)
     login_manager = LoginManager(runner.client)
     continue_manager = ContinueManager(runner)
@@ -6489,6 +6678,8 @@ async def lifespan(app: FastAPI):
         quota_guard.stop()
         warmup_scheduler.stop()
         oauth_refresh_scheduler.stop()
+        if account_runtime:
+            account_runtime.stop()
 
 
 app = FastAPI(title="vibecoding-bench", lifespan=lifespan)
@@ -6501,18 +6692,43 @@ app.add_middleware(
 
 
 # ===== Cookie-Session 鉴权工具 + 中间件 =====
+def _session_signature(payload: str) -> str:
+    """v3 会话同时绑定当前管理密码，密码轮换后旧会话立即失效。"""
+    key = _SESSION_SECRET + ("\0" + WEBUI_PASS if V3_ENABLED else "")
+    return hmac.new(key.encode(), payload.encode(), hashlib.sha256).hexdigest()
+
+
+def _v3_session_store():
+    """打开独立会话登记，仅保存 token 摘要和过期时间。"""
+    connection = get_db()
+    with connection:
+        connection.execute("CREATE TABLE IF NOT EXISTS v3_management_sessions (token_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)")
+    return connection
+
+
 def _make_session_token(user: str) -> str:
     """
-    生成签名 session token: base64url("user|exp_ts|hmac_sha256(user|exp_ts)")
-    用 HMAC-SHA256 + _SESSION_SECRET 防伪造;不存 server 状态,scale 友好。
+    签发管理会话；v3 增加随机代次和服务端撤销记录。
+
+    :param user: 当前管理用户名
+    :return: 不含密码的签名 token
     """
     exp = int(time.time()) + _SESSION_TTL
     payload = f"{user}|{exp}"
-    sig = hmac.new(
-        _SESSION_SECRET.encode(), payload.encode(), hashlib.sha256
-    ).hexdigest()
+    if V3_ENABLED:
+        payload += "|" + secrets.token_hex(16)
+    sig = _session_signature(payload)
     raw = f"{payload}|{sig}".encode()
-    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+    token = base64.urlsafe_b64encode(raw).decode().rstrip("=")
+    if V3_ENABLED:
+        connection = _v3_session_store()
+        try:
+            with connection:
+                connection.execute("DELETE FROM v3_management_sessions WHERE expires_at<?", (int(time.time()),))
+                connection.execute("INSERT INTO v3_management_sessions VALUES(?,?)", (hashlib.sha256(token.encode()).hexdigest(), exp))
+        finally:
+            connection.close()
+    return token
 
 
 def _verify_session_token(token: str) -> Optional[str]:
@@ -6523,19 +6739,27 @@ def _verify_session_token(token: str) -> Optional[str]:
         # 补回 base64 padding
         padded = token + "=" * (-len(token) % 4)
         raw = base64.urlsafe_b64decode(padded).decode("utf-8")
-        user, exp_str, sig = raw.split("|")
+        parts = raw.split("|")
+        if len(parts) != (4 if V3_ENABLED else 3):
+            return None
+        user, exp_str, sig = parts[0], parts[1], parts[-1]
         if int(exp_str) < int(time.time()):
             return None
-        expected = hmac.new(
-            _SESSION_SECRET.encode(),
-            f"{user}|{exp_str}".encode(),
-            hashlib.sha256,
-        ).hexdigest()
+        expected = _session_signature("|".join(parts[:-1]))
         if not secrets.compare_digest(sig, expected):
             return None
-        # 进一步校验 user 与当前配置一致(env 改了密码后旧 token 立失效)
+        # 用户名必须仍有效；v3 签名还绑定当前密码，轮换密码即撤销旧签名。
         if not secrets.compare_digest(user, WEBUI_USER):
             return None
+        if V3_ENABLED:
+            connection = get_db()
+            try:
+                record = connection.execute("SELECT expires_at FROM v3_management_sessions WHERE token_hash=?",
+                    (hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
+                if not record or record["expires_at"] != int(exp_str):
+                    return None
+            finally:
+                connection.close()
         return user
     except Exception:
         return None
@@ -6550,6 +6774,14 @@ async def session_auth_middleware(request, call_next):
     - 非 API 路径(静态 HTML/CSS/JS)放行 —— 否则首次访问连登录页都看不到
     - WebSocket(starlette scope=websocket)不经此中间件,由路由 sid 间接保护
     """
+    if V3_ENABLED:
+        expected = os.environ.get("V3_INTERNAL_TOKEN", "")
+        actual = request.headers.get("authorization", "").removeprefix("Bearer ")
+        if len(expected) < 32 or not secrets.compare_digest(actual, expected):
+            return JSONResponse(status_code=401, content={"detail": "内部服务鉴权失败"})
+        if request.url.path == "/api/auth/login":
+            return JSONResponse(status_code=403, content={"detail": "请从统一后台登录"})
+        return await call_next(request)
     if not _AUTH_ENABLED:
         return await call_next(request)
     path = request.url.path
@@ -6620,9 +6852,22 @@ def auth_login(body: AuthIn, response: Response):
 
 
 @app.post("/api/auth/logout")
-def auth_logout(response: Response):
-    """清 session cookie,幂等。"""
-    response.delete_cookie(_SESSION_COOKIE)
+def auth_logout(request: Request, response: Response):
+    """撤销 v3 会话并清除 Cookie；旧版继续只清除 Cookie。
+
+    :param request: 含待撤销会话的请求
+    :param response: 写入清除 Cookie 的响应
+    :return: 幂等退出结果
+    """
+    if V3_ENABLED:
+        connection = _v3_session_store()
+        try:
+            with connection:
+                connection.execute("DELETE FROM v3_management_sessions WHERE token_hash=?",
+                    (hashlib.sha256(request.cookies.get(_SESSION_COOKIE, "").encode()).hexdigest(),))
+        finally:
+            connection.close()
+    response.delete_cookie(_SESSION_COOKIE, path="/runtime" if V3_ENABLED else "/")
     return {"ok": True}
 
 
@@ -6822,6 +7067,25 @@ def _require_oauth_owner_transition_idle(account: dict) -> None:
         raise HTTPException(409, f"账号凭据所有权暂不能切换：{blocker}，请先停止并收口")
 
 
+@contextmanager
+def _runtime_owner_transition(account: dict, target_id: Optional[int], needed: bool = True):
+    """在所有权事务期间协调固定环境和两端 API 门禁。
+
+    :param account: 修改前账号
+    :param target_id: 修改后绑定，None 表示解绑或删除
+    :param needed: 是否实际修改所有权
+    :return: 持有相应门禁的上下文
+    """
+    if not account_runtime or not needed:
+        yield
+        return
+    try:
+        with account_runtime.owner_transition(account, target_id):
+            yield
+    except (ValueError, ConnectionError) as exc:
+        raise HTTPException(409, _redact_cc2api_error(exc))
+
+
 def _require_cc2api_binding_available(
     bench_account_id: int,
     cc2api_account_id: int,
@@ -7018,6 +7282,7 @@ def sync_account_to_cc2api(aid: int):
                     created = matched is None
                     if matched is None:
                         matched = cc2api_client.create_account({
+                            **({"cli_identity": account_runtime.identity_import(account, effective_claude_code_version())} if account_runtime else {}),
                             "name": account["name"],
                             "email": profile["email"],
                             "auth_type": "oauth",
@@ -7033,6 +7298,10 @@ def sync_account_to_cc2api(aid: int):
                 if not _cc2api_account_is_active_oauth(matched):
                     raise ValueError("匹配到的 cc2api 账号不是 active OAuth 账号")
                 _validate_cc2api_identity(profile, matched)
+                if account_runtime and existing_binding is None and not created:
+                    observed = account_runtime.identity_import(account, effective_claude_code_version())
+                    if matched.get("device_id") != observed["device_id"]:
+                        raise ValueError("已有 cc2api 设备身份与 CLI 观测不一致，保留已有身份并阻止绑定")
                 cc2api_account_id = int(matched.get("id") or 0)
                 if cc2api_account_id <= 0:
                     raise ValueError("cc2api 账号 ID 无效")
@@ -7047,27 +7316,32 @@ def sync_account_to_cc2api(aid: int):
             except ValueError as exc:
                 raise HTTPException(409, _redact_cc2api_error(exc))
 
-            with _db_lock:
-                conn = get_db()
-                try:
-                    with conn:
-                        current = _get_available_account(conn, aid)
-                        if not current:
-                            raise HTTPException(404, "账号不存在或已停用")
-                        current_binding = current["cc2api_account_id"]
-                        if current_binding is not None and int(current_binding) != cc2api_account_id:
-                            raise HTTPException(409, "bench 账号已绑定其他 cc2api 账号")
-                        if current_binding is None:
-                            conn.execute(
-                                "UPDATE accounts SET cc2api_account_id=?, warmup_enabled=0, "
-                                "warmup_next_run_at=NULL, warmup_last_status='off', warmup_last_error=NULL "
-                                "WHERE id=?",
-                                (cc2api_account_id, aid),
-                            )
-                except sqlite3.IntegrityError:
-                    raise HTTPException(409, "该 cc2api 账号已绑定其他 bench 账号")
-                finally:
-                    conn.close()
+            with _runtime_owner_transition(account, cc2api_account_id, existing_binding is None):
+                with _db_lock:
+                    conn = get_db()
+                    try:
+                        with conn:
+                            current = _get_available_account(conn, aid)
+                            if not current:
+                                raise HTTPException(404, "账号不存在或已停用")
+                            current_binding = current["cc2api_account_id"]
+                            if current_binding is not None and int(current_binding) != cc2api_account_id:
+                                raise HTTPException(409, "bench 账号已绑定其他 cc2api 账号")
+                            if current_binding is None:
+                                conn.execute(
+                                    "UPDATE accounts SET cc2api_account_id=?, warmup_enabled=0, "
+                                    "warmup_next_run_at=NULL, warmup_last_status='off', warmup_last_error=NULL "
+                                    "WHERE id=?",
+                                    (cc2api_account_id, aid),
+                                )
+                    except sqlite3.IntegrityError:
+                        raise HTTPException(409, "该 cc2api 账号已绑定其他 bench 账号")
+                    finally:
+                        conn.close()
+    if account_runtime:
+        current_account = dict(account, cc2api_account_id=cc2api_account_id)
+        row = account_runtime._row(account["name"], aid)
+        account_runtime.sync_credentials(row, current_account)
     return {
         "ok": True,
         "created": created,
@@ -7128,6 +7402,10 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
                     if not selected or not _cc2api_account_is_active_oauth(selected):
                         raise ValueError("选择的 cc2api 账号不可用")
                     _validate_cc2api_identity(profile, selected)
+                    if account_runtime and binding_changes:
+                        observed = account_runtime.identity_import(account, effective_claude_code_version())
+                        if selected.get("device_id") != observed["device_id"]:
+                            raise ValueError("已有 cc2api 设备身份与 CLI 观测不一致，保留已有身份并阻止绑定")
                     _require_cc2api_binding_available(aid, int(body.cc2api_account_id))
                     _resolve_and_sync_cc2api_credentials(
                         account["name"],
@@ -7140,40 +7418,41 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
                     raise HTTPException(409, _redact_cc2api_error(exc))
 
             next_run_at = time.time() + random.uniform(low * 3600, high * 3600) if enabled else None
-            with _db_lock:
-                conn = get_db()
-                try:
-                    with conn:
-                        current = _get_available_account(conn, aid)
-                        if not current:
-                            raise HTTPException(404, "账号不存在或已停用")
-                        active = conn.execute(
-                            "SELECT id, status FROM runs WHERE account_id=? AND run_kind='warmup' "
-                            "AND status IN ('queued','running','stopping','quota_wait') LIMIT 1",
-                            (aid,),
-                        ).fetchone()
-                        conn.execute(
-                            "UPDATE accounts SET cc2api_account_id=?, warmup_enabled=?, "
-                            "warmup_interval_min_hours=?, warmup_interval_max_hours=?, "
-                            "warmup_next_run_at=?, warmup_last_status=?, warmup_last_error=NULL, "
-                            "warmup_auth_failures=0 WHERE id=?",
-                            (
-                                int(body.cc2api_account_id),
-                                int(enabled),
-                                low,
-                                high,
-                                None if active else next_run_at,
-                                active["status"] if active and enabled else ("scheduled" if enabled else "off"),
-                                aid,
-                            ),
-                        )
-                        if not enabled and active and active["status"] == "quota_wait":
-                            conn.execute("UPDATE runs SET status='stopped',stop_requested_at=?,ended_at=? WHERE id=? AND status='quota_wait'",
-                                         (time.time(), time.time(), active["id"]))
-                except sqlite3.IntegrityError:
-                    raise HTTPException(409, "该 cc2api 账号已绑定其他 bench 账号")
-                finally:
-                    conn.close()
+            with _runtime_owner_transition(account, body.cc2api_account_id, binding_changes):
+                with _db_lock:
+                    conn = get_db()
+                    try:
+                        with conn:
+                            current = _get_available_account(conn, aid)
+                            if not current:
+                                raise HTTPException(404, "账号不存在或已停用")
+                            active = conn.execute(
+                                "SELECT id, status FROM runs WHERE account_id=? AND run_kind='warmup' "
+                                "AND status IN ('queued','running','stopping','quota_wait') LIMIT 1",
+                                (aid,),
+                            ).fetchone()
+                            conn.execute(
+                                "UPDATE accounts SET cc2api_account_id=?, warmup_enabled=?, "
+                                "warmup_interval_min_hours=?, warmup_interval_max_hours=?, "
+                                "warmup_next_run_at=?, warmup_last_status=?, warmup_last_error=NULL, "
+                                "warmup_auth_failures=0 WHERE id=?",
+                                (
+                                    int(body.cc2api_account_id),
+                                    int(enabled),
+                                    low,
+                                    high,
+                                    None if active else next_run_at,
+                                    active["status"] if active and enabled else ("scheduled" if enabled else "off"),
+                                    aid,
+                                ),
+                            )
+                            if not enabled and active and active["status"] == "quota_wait":
+                                conn.execute("UPDATE runs SET status='stopped',stop_requested_at=?,ended_at=? WHERE id=? AND status='quota_wait'",
+                                             (time.time(), time.time(), active["id"]))
+                    except sqlite3.IntegrityError:
+                        raise HTTPException(409, "该 cc2api 账号已绑定其他 bench 账号")
+                    finally:
+                        conn.close()
     return {"ok": True, "enabled": enabled, "next_run_at": None if active else next_run_at}
 
 
@@ -7273,20 +7552,21 @@ def delete_account_cc2api_binding(aid: int):
             conn.close()
         if account.get("cc2api_account_id") is not None:
             _require_oauth_owner_transition_idle(account)
-        with _db_lock:
-            conn = get_db()
-            try:
-                with conn:
-                    cur = conn.execute(
-                        "UPDATE accounts SET cc2api_account_id=NULL, warmup_enabled=0, "
-                        "warmup_next_run_at=NULL, warmup_last_status='off', warmup_last_error=NULL, "
-                        "warmup_auth_failures=0 WHERE id=? AND deleted_at IS NULL",
-                        (aid,),
-                    )
-                    if cur.rowcount == 0:
-                        raise HTTPException(404, "账号不存在")
-            finally:
-                conn.close()
+        with _runtime_owner_transition(account, None):
+            with _db_lock:
+                conn = get_db()
+                try:
+                    with conn:
+                        cur = conn.execute(
+                            "UPDATE accounts SET cc2api_account_id=NULL, warmup_enabled=0, "
+                            "warmup_next_run_at=NULL, warmup_last_status='off', warmup_last_error=NULL, "
+                            "warmup_auth_failures=0 WHERE id=? AND deleted_at IS NULL",
+                            (aid,),
+                        )
+                        if cur.rowcount == 0:
+                            raise HTTPException(404, "账号不存在")
+                finally:
+                    conn.close()
     return {"ok": True}
 
 
@@ -7323,35 +7603,36 @@ def delete_account(aid: int):
             conn.close()
         if account.get("cc2api_account_id") is not None:
             _require_oauth_owner_transition_idle(account)
-        with _db_lock:
-            conn = get_db()
-            try:
-                with conn:
-                    current = conn.execute(
-                        "SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL",
-                        (aid,),
-                    ).fetchone()
-                    if not current:
-                        raise HTTPException(404, "账号不存在")
-                    counts = _account_reference_counts(conn, aid)
-                    if sum(counts.values()) > 0:
-                        # 任务、批次和 run 都按 account_id 保存历史引用；软删除能保留
-                        # 历史语义，同时让后台刷新器和新运行入口都不再选中该账号。
-                        conn.execute(
-                            "UPDATE accounts SET enabled=0, deleted_at=?, cc2api_account_id=NULL, "
-                            "warmup_enabled=0, warmup_next_run_at=NULL, warmup_last_status='off' "
-                            "WHERE id=?",
-                            (time.time(), aid),
-                        )
-                        return {
-                            "ok": True,
-                            "deleted": True,
-                            "soft_deleted": True,
-                            "references": counts,
-                        }
-                    conn.execute("DELETE FROM accounts WHERE id=?", (aid,))
-            finally:
-                conn.close()
+        with _runtime_owner_transition(account, None):
+            with _db_lock:
+                conn = get_db()
+                try:
+                    with conn:
+                        current = conn.execute(
+                            "SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL",
+                            (aid,),
+                        ).fetchone()
+                        if not current:
+                            raise HTTPException(404, "账号不存在")
+                        counts = _account_reference_counts(conn, aid)
+                        if sum(counts.values()) > 0:
+                            # 任务、批次和 run 都按 account_id 保存历史引用；软删除能保留
+                            # 历史语义，同时让后台刷新器和新运行入口都不再选中该账号。
+                            conn.execute(
+                                "UPDATE accounts SET enabled=0, deleted_at=?, cc2api_account_id=NULL, "
+                                "warmup_enabled=0, warmup_next_run_at=NULL, warmup_last_status='off' "
+                                "WHERE id=?",
+                                (time.time(), aid),
+                            )
+                            return {
+                                "ok": True,
+                                "deleted": True,
+                                "soft_deleted": True,
+                                "references": counts,
+                            }
+                        conn.execute("DELETE FROM accounts WHERE id=?", (aid,))
+                finally:
+                    conn.close()
     return {"ok": True, "deleted": True, "soft_deleted": False}
 
 
@@ -7383,6 +7664,14 @@ def query_account_quota(aid: int):
         finally:
             conn.close()
         current_binding = current.get("cc2api_account_id")
+        if account_runtime:
+            try:
+                result = runner.query_quota(current)
+                if quota_guard:
+                    quota_guard.record_manual_usage(current, result)
+                return result
+            except (ValueError, ConnectionError) as exc:
+                raise HTTPException(409, _redact_cc2api_error(exc))
         if current_binding is not None:
             try:
                 _sync_bound_account_credentials_locked(current, OAUTH_REFRESH_BUFFER_SEC)
@@ -7469,6 +7758,9 @@ def login_start(body: LoginStartIn):
 @app.websocket("/api/accounts/login/ws/{sid}")
 async def login_ws(websocket: WebSocket, sid: str):
     """PTY 桥：把 worker 里 `claude auth login` 的 PTY 双向接到浏览器 xterm"""
+    if V3_ENABLED and not _v3_websocket_authorized(websocket):
+        await websocket.close(code=4401)
+        return
     await websocket.accept()
     if not login_manager:
         await websocket.close(code=4500)
@@ -7484,16 +7776,17 @@ async def login_ws(websocket: WebSocket, sid: str):
     try:
         exec_id = api.exec_create(
             session.worker_id,
-            ["claude", "auth", "login"],
+            (["tmux", "-S", f"/tmp/v3-login-{sid}.sock", "attach-session", "-t", sid]
+             if account_runtime else ["claude", "auth", "login"]),
             stdin=True,
             tty=True,
-            user=WORKER_USER,
+            user="root" if account_runtime else WORKER_USER,
             environment=_claude_exec_env(session.sidecar_id is not None, {
                 "TERM": "xterm-256color",
                 "COLUMNS": "120",
                 "LINES": "36",
             }),
-            workdir=WORKER_HOME,
+            workdir=session.home,
         )["Id"]
         sock = api.exec_start(
             exec_id, detach=False, tty=True,
@@ -7668,8 +7961,9 @@ def login_commit(sid: str, body: LoginStartIn):
     # (orchestrator 容器内路径),不能用 HOST_BENCH_DATA(那是给 docker daemon
     # 报告挂载点的宿主路径,在 orchestrator 容器里访问不到)。
     profile_dir = BENCH_DATA / "profiles" / name
-    shutil.rmtree(profile_dir / "telemetry", ignore_errors=True)
-    shutil.rmtree(profile_dir / "backups", ignore_errors=True)
+    if not account_runtime:
+        shutil.rmtree(profile_dir / "telemetry", ignore_errors=True)
+        shutil.rmtree(profile_dir / "backups", ignore_errors=True)
 
     with _db_lock:
         conn = get_db()
@@ -7732,6 +8026,8 @@ def login_commit(sid: str, body: LoginStartIn):
         finally:
             conn.close()
 
+    if account_runtime:
+        account_runtime.commit_login(session, account_id)
     login_manager.cleanup(sid)
     return {
         "id": account_id,
@@ -8493,6 +8789,12 @@ def get_stats(rid: str):
     base = FLOWS_DIR
     # flows 目录按 account/task/run 分层，扫描所有匹配
     matches = list(base.rglob(f"{rid}/stats.jsonl"))
+    # 兼容入口是固定链接；按 run 目录列出分代文件，排除续聊/API，避免扫描账号 HOME。
+    for directory in base.glob(f"*/*/{rid}"):
+        if (directory / "stats.jsonl").is_file():
+            matches.append(directory / "stats.jsonl")
+        matches.extend(sorted((directory / "executions").glob("*/stats.jsonl")))
+    matches = list({path.resolve(): path for path in matches}.values())
     if not matches:
         session_stats = _aggregate_claude_session_usage(rid)
         return {
@@ -8589,6 +8891,22 @@ def get_capture(rid: str):
     flows_dir = capture_dirs[0] if capture_dirs else FLOWS_DIR / "_missing" / rid
     index_path = Path(run["capture_summary_path"]) if run.get("capture_summary_path") else flows_dir / "capture_index.json"
     index = _read_capture_index(index_path)
+    # 分代索引只读聚合，原始 HTTP/flow 保持原目录，原平铺索引仍可读取。
+    indexes = [index] if index.get("available") else []
+    for path in sorted(flows_dir.glob("executions/*/capture_index.json")):
+        item = _read_capture_index(path)
+        if item.get("available"):
+            indexes.append(item)
+    for directory in sorted(flows_dir.glob("continue-*")):
+        for path in sorted(directory.glob("executions/*/capture_index.json")):
+            item = _read_capture_index(path)
+            if item.get("available"):
+                indexes.append(item)
+    if indexes:
+        index = dict(indexes[-1], entries=[entry for item in indexes for entry in item.get("entries", [])])
+        index["total_flows"] = len(index["entries"])
+        index["cc_versions"] = sorted({version for item in indexes for version in item.get("cc_versions", [])})
+        index["updated_at"] = max(float(item.get("updated_at") or 0) for item in indexes)
     return {
         "run_id": rid,
         "mode": run.get("capture_mode") or "full_http",
@@ -8761,6 +9079,9 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
     :param sid: continue 会话 ID
     :return: None
     """
+    if V3_ENABLED and not _v3_websocket_authorized(websocket):
+        await websocket.close(code=4401)
+        return
     await websocket.accept()
     if not continue_manager:
         await websocket.close(code=4500)
@@ -8795,21 +9116,31 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
         with session.guard_lock:
             if session.status != "running" or continue_manager.get(sid) is not session:
                 return
-            exec_id = api.exec_create(
-                session.worker_id,
-                ["sh", "-lc", "if [ -f /workspace/.claude.json ] && [ ! -f \"$HOME/.claude.json\" ]; then "
+            cwd = f"/workspaces/{session.run_id}" if account_runtime else "/workspace"
+            command = ["sh", "-lc", "if [ -f /workspace/.claude.json ] && [ ! -f \"$HOME/.claude.json\" ]; then "
                  "cp /workspace/.claude.json \"$HOME/.claude.json\"; fi; "
                  "if [ -n \"${CLAUDE_MODEL_OVERRIDE:-}\" ]; then "
                  "claude --permission-mode \"$CLAUDE_PERMISSION_MODE\" --resume \"$CONTINUE_SESSION_ID\" --model \"$CLAUDE_MODEL_OVERRIDE\"; "
-                 "else claude --permission-mode \"$CLAUDE_PERMISSION_MODE\" --resume \"$CONTINUE_SESSION_ID\"; fi"],
-                stdin=True, tty=True, user=WORKER_USER,
+                 "else claude --permission-mode \"$CLAUDE_PERMISSION_MODE\" --resume \"$CONTINUE_SESSION_ID\"; fi"]
+            actual_worker = session.worker_id
+            if account_runtime:
+                job = account_runtime.job_for_container(session.worker_id)
+                actual_worker = job["row"]["container_id"]
+                command = ["setsid", "--wait", "sh", "-c", f"echo $$ > /run/v3/job-{job['handle']}.pid; exec " + shlex.join(account_runtime.cli_command(["sh", "-c", command[2]]))]
+            exec_id = api.exec_create(
+                actual_worker,
+                command,
+                stdin=True, tty=True, user="root" if account_runtime else WORKER_USER,
                 environment=_claude_exec_env(True, {
                     "TERM": "xterm-256color", "COLUMNS": "120", "LINES": "36",
+                    **({"PATH": f"/cli/{job['version']}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin"} if account_runtime else {}),
                     "CONTINUE_SESSION_ID": session.session_id, "CLAUDE_PERMISSION_MODE": session.permission_mode,
                     **({"CLAUDE_MODEL_OVERRIDE": session.run.get("execution_model") or session.run.get("capture_model_override")}
                        if session.run.get("execution_model") or session.run.get("capture_model_override") else {}),
-                }), workdir="/workspace",
+                }), workdir=cwd,
             )["Id"]
+            if account_runtime:
+                account_runtime.register_exec(session.worker_id, exec_id)
             sock = api.exec_start(exec_id, detach=False, tty=True, stream=False, socket=True, demux=False)
             raw = getattr(sock, "_sock", None) or sock
             raw.setblocking(False)
@@ -8993,6 +9324,156 @@ async def stream_runs():
                 yield {"event": "runs", "data": payload}
             await asyncio.sleep(1)
     return EventSourceResponse(gen())
+
+
+def _v3_websocket_authorized(websocket: WebSocket) -> bool:
+    """同时验证服务来源、浏览器会话及短期路径票据。"""
+    secret = os.environ.get("V3_INTERNAL_TOKEN", "")
+    actual = websocket.headers.get("authorization", "").removeprefix("Bearer ")
+    if len(secret) < 32 or not secrets.compare_digest(secret, actual):
+        return False
+    cookie = websocket.cookies.get(_SESSION_COOKIE, "")
+    if not _verify_session_token(cookie):
+        return False
+    try:
+        ticket = websocket.query_params.get("ticket", "")
+        raw = base64.urlsafe_b64decode(ticket + "=" * (-len(ticket) % 4)).decode()
+        path, expires, digest, signature = raw.split("|")
+        expected = hmac.new(_SESSION_SECRET.encode(), f"{path}|{expires}|{digest}".encode(), hashlib.sha256).hexdigest()
+        return (int(expires) >= time.time() and int(expires) <= time.time() + 120
+            and path == websocket.url.path
+            and digest == hashlib.sha256(cookie.encode()).hexdigest()
+            and secrets.compare_digest(signature, expected))
+    except (ValueError, UnicodeError):
+        return False
+
+
+@app.post("/internal/v3/session")
+def v3_session_grant():
+    """受控管理桥交换独立 HttpOnly 会话，不返回管理密码。"""
+    if not V3_ENABLED:
+        raise HTTPException(404)
+    response = JSONResponse({"ok": True})
+    response.set_cookie(_SESSION_COOKIE, _make_session_token(WEBUI_USER), httponly=True,
+        samesite="strict", path="/runtime", max_age=_SESSION_TTL)
+    return response
+
+
+@app.get("/internal/v3/session/verify")
+def v3_session_verify(request: Request):
+    """验证浏览器会话；仅内部桥可调用。"""
+    if not V3_ENABLED or not _verify_session_token(request.cookies.get(_SESSION_COOKIE, "")):
+        raise HTTPException(401)
+    return {"ok": True}
+
+
+@app.post("/api/terminal-ticket")
+def v3_terminal_ticket(request: Request, body: dict):
+    """签发一分钟且绑定会话及具体 WS 路径的票据。"""
+    cookie = request.cookies.get(_SESSION_COOKIE, "")
+    if not V3_ENABLED or not _verify_session_token(cookie):
+        raise HTTPException(401)
+    path = body.get("path", "")
+    if not re.fullmatch(r"/api/(?:accounts/login/ws|run-continue/ws)/[a-f0-9]{12}", path):
+        raise HTTPException(400, "终端路径不合法")
+    payload = f"{path}|{int(time.time()) + 60}|{hashlib.sha256(cookie.encode()).hexdigest()}"
+    signature = hmac.new(_SESSION_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    return {"ticket": base64.urlsafe_b64encode(f"{payload}|{signature}".encode()).decode().rstrip("=")}
+
+
+@app.post("/internal/v3/quiesce/{account_id}")
+def v3_quiesce(account_id: int, body: dict):
+    """凭配置事务的门禁证明收口固定实例，避免配置修改后仍发送旧请求。
+
+    :param account_id: cc2api 账号 ID
+    :param body: 当前 owner 与 generation
+    :return: 已确认空闲并停止的结果
+    """
+    if not account_runtime:
+        raise HTTPException(404)
+    connection = get_db()
+    try:
+        account = connection.execute("SELECT * FROM accounts WHERE cc2api_account_id=? AND deleted_at IS NULL", (account_id,)).fetchone()
+    finally:
+        connection.close()
+    if not account:
+        return {"ok": True}
+    account = dict(account)
+    with account_runtime._account_lock(account):
+        snapshot = cc2api_client._request("GET", f"/admin/runtime/accounts/{account_id}/lease")
+        lease = snapshot.get("lease")
+        if not lease or not lease.get("exclusive", True) or lease["owner"] != body.get("owner") or lease["generation"] != body.get("generation") or snapshot["active"]:
+            raise HTTPException(409, "配置门禁证明无效")
+        row = account_runtime._row(account["name"], account["id"])
+        with account_runtime.lock:
+            busy = row["environment_id"] in account_runtime.jobs
+        if busy or account_runtime._running_sender_active(row):
+            raise HTTPException(409, "账号环境仍有工作或发送连接")
+        if row["container_id"]:
+            try:
+                account_runtime._container(row).stop(timeout=5)
+            except NotFound:
+                pass
+        account_runtime._update(row, state="stopped")
+    return {"ok": True}
+
+
+@app.get("/internal/v3/transport/{account_id}")
+def v3_transport(account_id: int):
+    """解析唯一绑定账号并返回受限发送实例，浏览器无法直接调用。"""
+    if not account_runtime:
+        raise HTTPException(404)
+    connection = get_db()
+    try:
+        rows = connection.execute("SELECT * FROM accounts WHERE cc2api_account_id=? AND deleted_at IS NULL",
+            (account_id,)).fetchall()
+    finally:
+        connection.close()
+    if len(rows) != 1:
+        raise HTTPException(409, "账号没有唯一的 v3 环境绑定")
+    try:
+        return account_runtime.transport(dict(rows[0]), effective_claude_code_version())
+    except (ValueError, RuntimeError):
+        raise HTTPException(503, "账号环境未就绪或需要维护")
+
+
+@app.get("/api/environments")
+def v3_environments():
+    """列出环境状态及固化基础参数，排除服务秘密和凭据。"""
+    if not account_runtime:
+        return []
+    connection = get_db()
+    try:
+        rows = [dict(row) for row in connection.execute("SELECT * FROM account_environments ORDER BY name")]
+    finally:
+        connection.close()
+    for row in rows:
+        row["fingerprint"] = json.loads(row.pop("fingerprint_json"))
+        with account_runtime.lock:
+            row["busy"] = row["environment_id"] in account_runtime.jobs
+        identity_path = account_runtime._root(row) / "runtime" / "identity.json"
+        identity = json.loads(identity_path.read_text()) if identity_path.exists() else {}
+        row["identity_status"] = "冲突，已阻止同步" if identity.get("conflict") else ("已观测 CLI 设备身份" if identity.get("device_id") else "待 CLI 任务观测，暂不能同步到 cc2api")
+        row["runtime_release"] = account_runtime.release_id
+        row["cli_versions"] = sorted(path.name for path in (account_runtime._root(row) / "cli").glob("*/.ready") for path in [path.parent])
+    return rows
+
+
+@app.post("/api/environments/{environment_id}/maintenance")
+def v3_environment_maintenance(environment_id: str, body: dict):
+    """仅在账号空闲时维护本部署固定环境。
+
+    :param environment_id: 不可变环境 ID
+    :param body: 维护操作
+    :return: 成功结果；占用或归属异常返回冲突
+    """
+    if not account_runtime:
+        raise HTTPException(404)
+    try:
+        account_runtime.maintenance(environment_id, body.get("operation", ""))
+    except (ValueError, RuntimeError):
+        raise HTTPException(409, "环境有活动请求、归属冲突或需进一步对账")
+    return {"ok": True}
 
 
 # ---------- 静态 WebUI ----------

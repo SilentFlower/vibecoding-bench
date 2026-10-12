@@ -56,6 +56,9 @@ if ! [[ "$UPSTREAM_SOCKS5_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   UPSTREAM_HOST_IP="$resolved"
   log "Resolved upstream proxy host: $UPSTREAM_SOCKS5_HOST -> $UPSTREAM_HOST_IP"
 fi
+if [ "${V3_ACCOUNT:-0}" = "1" ]; then
+  printf '%s' "$UPSTREAM_HOST_IP" > /run/v3/proxy-ip
+fi
 
 cat > /etc/proxychains4.conf <<EOF
 strict_chain
@@ -88,6 +91,9 @@ if [ "${CAPTURE_FULL_HTTP:-0}" = "1" ]; then
   # 完整抓包 run 要尽量覆盖 OAuth / 平台侧 Claude Code 请求，不能沿用普通 run 的忽略规则。
   MITM_IGNORE_ARGS=()
 fi
+if [ "${V3_ACCOUNT:-0}" = "1" ]; then
+  /usr/local/bin/v3-network-context
+else
 log "Starting mitmdump (socks5 inbound :8080, upstream via proxychains ${PROXYCHAINS_TYPE} -> ${UPSTREAM_SOCKS5_HOST}:${UPSTREAM_SOCKS5_PORT})"
 proxychains4 -q mitmdump \
   --mode socks5 \
@@ -97,10 +103,11 @@ proxychains4 -q mitmdump \
   -s /sidecar/recorder.py \
   >/var/log/mitmdump.log 2>&1 &
 MITM_PID=$!
+fi
 
 # 等 8080 端口就绪 + CA 生成
 for i in $(seq 1 40); do
-  if ss -ltn 2>/dev/null | grep -q ':8080 '; then break; fi
+  if ss -ltn 2>/dev/null | grep ':8080 ' >/dev/null; then break; fi
   sleep 0.25
 done
 for i in $(seq 1 20); do
@@ -162,13 +169,13 @@ HEV_PID=$!
 ok=0
 for i in $(seq 1 15); do
   sleep 0.5
-  ip link show tun0 2>/dev/null | grep -q "state UP" || continue
+  ip link show tun0 2>/dev/null | grep "state UP" >/dev/null || continue
   ip route del default 2>/dev/null || true
   ip route add default dev tun0 2>/dev/null || continue
   stable=1
   for j in 1 2 3; do
     sleep 0.5
-    ip route | grep -q "^default dev tun0" || { stable=0; break; }
+    ip route | grep "^default dev tun0" >/dev/null || { stable=0; break; }
   done
   if [ $stable -eq 1 ]; then
     log "Default route stable via tun0 (after attempt $i)"
@@ -217,7 +224,7 @@ unbound -d -c /etc/unbound/sidecar.conf >/var/log/unbound.log 2>&1 &
 UNBOUND_PID=$!
 
 for i in $(seq 1 20); do
-  if ss -ltn 2>/dev/null | grep -q '127.0.0.1:53 '; then break; fi
+  if ss -ltn 2>/dev/null | grep '127.0.0.1:53 ' >/dev/null; then break; fi
   sleep 0.25
 done
 
@@ -231,7 +238,7 @@ DNS_READY_HOST="${DNS_READY_HOST:-example.com}"
 for i in $(seq 1 45); do
   # getent 会同时受 glibc/NSS、IPv6 排序和缓存状态影响;ready 阶段只需要证明
   # unbound 能经当前出口拿到通用 A 记录,所以直接查询本地 resolver 更稳。
-  if dig @127.0.0.1 "$DNS_READY_HOST" A +time=3 +tries=1 +short 2>/dev/null | grep -q .; then
+  if dig @127.0.0.1 "$DNS_READY_HOST" A +time=3 +tries=1 +short 2>/dev/null | grep . >/dev/null; then
     touch /tmp/sidecar-ready
     log "Sidecar DNS ready via generic resolver ($DNS_READY_HOST, after ${i}s)"
     break
@@ -244,5 +251,11 @@ if [ ! -f /tmp/sidecar-ready ]; then
   exit 1
 fi
 
-log "Sidecar up: mitmproxy=$MITM_PID hev=$HEV_PID unbound=$UNBOUND_PID stats=/flows/stats.jsonl"
-wait
+log "Sidecar up: mitmproxy=${MITM_PID:-managed} hev=$HEV_PID unbound=$UNBOUND_PID stats=/flows/stats.jsonl"
+if [ "${V3_ACCOUNT:-0}" = "1" ]; then
+  # 任一网络服务退出都必须让 PID1 收口发送器，不能仅等另一个进程。
+  wait -n "$HEV_PID" "$UNBOUND_PID"
+  exit 1
+else
+  wait
+fi

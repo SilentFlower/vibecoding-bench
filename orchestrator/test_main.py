@@ -2737,6 +2737,28 @@ global.fetch = async (_url, options) => {
             conn.close()
         self.assertEqual(7, row["cc2api_account_id"])
 
+    def test_v3_warmup_starts_during_api_activity_but_yields_to_formal_cli(self) -> None:
+        """API 活动与排队不阻止养号，正式 CLI 执行仍优先。@return None。"""
+        main.init_db()
+        profile = main.PROFILES_DIR / "main"
+        profile.mkdir(parents=True)
+        (profile / ".credentials.json").write_text(json.dumps({"claudeAiOauth": {"accessToken": "synthetic"}}))
+        with main.get_db() as connection:
+            connection.execute("INSERT INTO accounts(name,profile_path,cc2api_account_id,warmup_enabled,warmup_next_run_at) VALUES('main','profiles/main',7,1,?)", (time.time() - 1,))
+            connection.execute("INSERT INTO topics(no,title,description,category) VALUES(1,'合成题','本地调度验证','测试')")
+        runtime = Mock(lock=threading.RLock(), jobs={})
+        client = Mock()
+        client._request.return_value = {"active": 2, "waiting": 3, "lease": None}
+        client.resolve_credentials.return_value = {"account_id": 7, "access_token": "synthetic",
+            "refresh_token": "synthetic-rt", "expires_at": int(time.time() * 1000) + 3600000}
+        submitter = Mock()
+        with patch.object(main, "account_runtime", runtime), patch.object(main, "cc2api_client", client), patch.object(main, "quota_guard", None):
+            scheduler = main.WarmupScheduler(submitter)
+            self.assertTrue(scheduler.trigger_account(1)["started"])
+            runtime.jobs["synthetic"] = {"row": {"account_id": 1}}
+            self.assertFalse(scheduler.trigger_account(1)["started"])
+        submitter.submit.assert_called_once()
+
     def test_warmup_creates_real_run_with_topic_only_prompt(self) -> None:
         """养号应创建真实 warmup run，且 prompt 不拼接账号信息。"""
         main.init_db()

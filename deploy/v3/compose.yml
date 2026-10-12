@@ -1,0 +1,74 @@
+name: vibebench-v3-${V3_DEPLOYMENT_ID:?需要部署标识}
+services:
+  gateway:
+    image: ${V3_CONTROL_IMAGE:?需要管理镜像}
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5674/',timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    environment:
+      V3_ROLE: gateway
+      V3_RELEASE: ${V3_RELEASE:?需要联合构建批次}
+      V3_DEPLOYMENT_ID: ${V3_DEPLOYMENT_ID}
+      SERVER_PORT: 5674
+      DATABASE_DRIVER: sqlite
+      DATABASE_DSN: /data/gateway.sqlite
+      ADMIN_PASSWORD: ${V3_ADMIN_PASSWORD:?需要管理密码}
+      V3_RUNTIME_URL: http://orchestrator:8000
+      V3_INTERNAL_TOKEN: ${V3_INTERNAL_TOKEN:?需要内部秘密}
+      V3_LEASE_DIR: /data/leases
+    ports:
+      - "${V3_BIND_ADDRESS:-127.0.0.1}:${V3_HOST_PORT:-18080}:5674"
+    volumes:
+      - ${V3_DATA_ROOT:?需要独立数据目录}/gateway:/data
+    networks: [v3]
+    labels:
+      vibebench.product: v3
+      vibebench.deployment: ${V3_DEPLOYMENT_ID}
+      vibebench.role: gateway
+    logging:
+      options: {max-size: 10m, max-file: "3"}
+  orchestrator:
+    image: ${V3_CONTROL_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      gateway:
+        condition: service_healthy
+    environment:
+      V3_ROLE: orchestrator
+      V3_RELEASE: ${V3_RELEASE}
+      V3_DEPLOYMENT_ID: ${V3_DEPLOYMENT_ID}
+      V3_NETWORK: vibebench-v3-${V3_DEPLOYMENT_ID}
+      V3_ACCOUNT_IMAGE: ${V3_ACCOUNT_IMAGE:?需要账号镜像}
+      V3_INTERNAL_TOKEN: ${V3_INTERNAL_TOKEN}
+      V3_MAX_ACTIVE_ACCOUNTS: ${V3_MAX_ACTIVE_ACCOUNTS:-1}
+      V3_ACCOUNT_CPUS: ${V3_ACCOUNT_CPUS:-2}
+      V3_ACCOUNT_MEMORY: ${V3_ACCOUNT_MEMORY:-4g}
+      BENCH_DATA: /data
+      HOST_BENCH_DATA: ${V3_DATA_ROOT}/bench
+      CC2API_BASE_URL: http://gateway:5674
+      CC2API_ADMIN_PASSWORD: ${V3_ADMIN_PASSWORD}
+      WEBUI_USER: v3
+      WEBUI_PASS: ${V3_ADMIN_PASSWORD}
+      WEBUI_SESSION_SECRET: ${V3_SESSION_SECRET:?需要会话秘密}
+      WEBUI_DIR: /webui
+      TOPICS_FILE: /repo/topics.md
+      CLAUDE_CODE_VERSION: ${V3_CLI_VERSION:-2.1.280}
+    volumes:
+      - ${V3_DATA_ROOT}/bench:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [v3]
+    labels:
+      vibebench.product: v3
+      vibebench.deployment: ${V3_DEPLOYMENT_ID}
+      vibebench.role: orchestrator
+    logging:
+      options: {max-size: 10m, max-file: "3"}
+networks:
+  v3:
+    name: vibebench-v3-${V3_DEPLOYMENT_ID}
+    labels:
+      vibebench.product: v3
+      vibebench.deployment: ${V3_DEPLOYMENT_ID}

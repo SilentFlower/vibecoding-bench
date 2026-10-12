@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "source_id": "synthetic-legacy",
+  "accounts": [{"legacy_id": "old-account", "name": "offline-synthetic", "enabled": false}],
+  "tasks": [{"legacy_id": "old-task", "account_legacy_id": "old-account", "topic_no": 1, "title": "离线历史验证"}],
+  "runs": [{"id": "offline-run", "task_legacy_id": "old-task", "account_legacy_id": "old-account", "status": "done"}]
+}
