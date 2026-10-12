@@ -211,5 +211,165 @@ class RecorderQuotaTests(unittest.TestCase):
         self.assertEqual("failed", json.loads(self.signal.read_text())["status"])
 
 
+class RecorderWarmupTests(unittest.TestCase):
+    """验证真实 addon 的单次请求和收尾门禁，不继承重复的旧测试。"""
+
+    _write_state = RecorderQuotaTests._write_state
+    _headers = RecorderQuotaTests._headers
+
+    def setUp(self) -> None:
+        """复用独立状态夹具并启用当前执行的养号作用域。@return None。"""
+        RecorderQuotaTests.setUp(self)
+        patcher = patch.dict(os.environ, {"QUOTA_WARMUP": "1"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.sequence = 0
+        self.limits = {"five_hour": 30, "seven_day": None}
+        self._policy()
+        self.addon = recorder.Recorder()
+
+    def _flow(self, **options):
+        """构造正在代理中的独立流；参数为请求/响应选项，返回替身。"""
+        self.sequence += 1
+        flow = RecorderQuotaTests._flow(self, **options)
+        flow.id = f"warmup-{self.sequence}"
+        flow.live = True
+        return flow
+
+    def _policy(self, windows=None, admission=None) -> None:
+        """保存模拟管理端策略；参数为窗口/许可，返回 None。"""
+        decision = recorder.warmup_quota_decision({"windows": windows or {}}, self.limits, time.time())
+        if admission is None:
+            admission = {"identity": "identity", "source": "run:original:0",
+                         **{key: decision[key] for key in ("policy_key", "window_key")}}
+        self._write_state({"windows": windows or {}, "warmup_quota": {**decision, "admission": admission}})
+
+    def test_unknown_allows_one_request_then_waits_for_actual_proxy_end(self) -> None:
+        """未知仅一次，response 钩子时仍 live 的成功请求不会被提前杀掉。@return None。"""
+        first = self._flow()
+        self.addon.requestheaders(first)
+        self.assertEqual(200, first.response.status_code)
+        self.assertTrue(self.signal.with_name("warmup-sample.json").exists())
+        second = self._flow()
+        self.addon.requestheaders(second)
+        self.assertEqual(429, second.response.status_code)
+        self.assertFalse(self.signal.exists())
+        self.assertTrue(self.signal.with_name("warmup-draining.json").exists())
+        self.addon.responseheaders(first)
+        self.addon.response(first)
+        self.assertFalse(self.signal.exists())
+        first.live = False
+        self.addon._check_warmup_pause()
+        self.assertTrue(json.loads(self.signal.read_text())["warmup_wait"])
+        self.assertFalse(self.signal.with_name("warmup-draining.json").exists())
+
+    def test_valid_first_response_permits_normal_followup(self) -> None:
+        """第一次正式请求拿到低于阈值的真实额度后继续，不另做探测。@return None。"""
+        first = self._flow()
+        self.addon.requestheaders(first)
+        first.response.headers = self._headers(False)
+        first.response.headers["anthropic-ratelimit-unified-5h-utilization"] = "0.2"
+        self.addon.responseheaders(first)
+        self.addon.response(first)
+        first.live = False
+        self.addon._check_warmup_pause()
+        self.assertFalse(self.signal.exists())
+        second = self._flow()
+        self.addon.requestheaders(second)
+        self.assertEqual(200, second.response.status_code)
+        self.assertEqual(1, len(self.observations.read_text().splitlines()))
+
+    def test_threshold_defers_until_all_parallel_streams_finish(self) -> None:
+        """多个已接受流都结束才暂停，新的请求立即在本地阻断。@return None。"""
+        self._policy({"five_hour": {"utilization": 20, "reset_at": time.time() + 600}})
+        first, second = self._flow(), self._flow()
+        self.addon.requestheaders(first)
+        self.addon.requestheaders(second)
+        first.response.headers = self._headers(False)
+        first.response.headers["anthropic-ratelimit-unified-5h-utilization"] = "0.3"
+        self.addon.responseheaders(first)
+        denied = self._flow()
+        self.addon.requestheaders(denied)
+        self.assertEqual(429, denied.response.status_code)
+        self.assertFalse(self.signal.exists())
+        self.addon.response(first)
+        first.live = False
+        self.addon._check_warmup_pause()
+        self.assertFalse(self.signal.exists())
+        self.addon.response(second)
+        second.live = False
+        self.addon._check_warmup_pause()
+        self.assertTrue(self.signal.exists())
+        self.assertEqual([], json.loads(self.signal.read_text())["exhausted"])
+
+    def test_marker_survives_recorder_restart_and_corruption_fails_closed(self) -> None:
+        """重启不得再次发送未知请求，损坏标记按执行故障处理。@return None。"""
+        first = self._flow()
+        self.addon.requestheaders(first)
+        restarted = recorder.Recorder()
+        denied = self._flow()
+        restarted.requestheaders(denied)
+        self.assertEqual(429, denied.response.status_code)
+        self.signal.with_name("warmup-sample.json").write_text("损坏")
+        broken = self._flow()
+        restarted.requestheaders(broken)
+        self.assertEqual(503, broken.response.status_code)
+        self.assertEqual("failed", json.loads(self.signal.read_text())["status"])
+
+    def test_unrelated_request_does_not_consume_one_opportunity(self) -> None:
+        """其它域名和项目假 key 不消费当前账号的单次正式机会。@return None。"""
+        for options in ({"host": "example.invalid"}, {"token": "project-dummy"}, {"path": "/api/oauth/usage"}):
+            self.addon.requestheaders(self._flow(**options))
+        self.assertFalse(self.signal.with_name("warmup-sample.json").exists())
+        self.assertFalse(self.addon.warmup_flows)
+
+    def test_normal_execution_does_not_inherit_warmup_policy(self) -> None:
+        """同一账号正常任务忽略养号阈值与已用标记。@return None。"""
+        self._policy({"five_hour": {"utilization": 40, "reset_at": time.time() + 600}})
+        with patch.dict(os.environ, {"QUOTA_WARMUP": "0"}):
+            normal = recorder.Recorder()
+        flow = self._flow()
+        normal.requestheaders(flow)
+        self.assertEqual(200, flow.response.status_code)
+        self.assertFalse(self.signal.exists())
+
+    def test_shared_api_update_pauses_without_another_cli_request(self) -> None:
+        """共享 API 更新达到阈值时，也能等待当前 CLI 响应后暂停。@return None。"""
+        self._policy({"five_hour": {"utilization": 20, "reset_at": time.time() + 600}})
+        current = self._flow()
+        self.addon.requestheaders(current)
+        self._policy({"five_hour": {"utilization": 40, "reset_at": time.time() + 600}})
+        self.addon._check_warmup_pause()
+        self.assertFalse(self.signal.exists())
+        with patch.object(recorder, "_should_record", return_value=False):
+            self.addon.response(current)
+        current.live = False
+        self.addon._check_warmup_pause()
+        self.assertTrue(self.signal.exists())
+
+    def test_control_io_failure_cannot_forward_and_stays_closed(self) -> None:
+        """控制落盘故障仍生成本地拒绝，不能因异常跳过请求门禁。@return None。"""
+        self._policy({"five_hour": {"utilization": 40, "reset_at": time.time() + 600}})
+        flow = self._flow()
+        with patch.object(Path, "write_text", side_effect=OSError("合成写入故障")):
+            self.addon.requestheaders(flow)
+        self.assertEqual(503, flow.response.status_code)
+        self.assertTrue(self.addon.quota_control_failed)
+        self._policy({"five_hour": {"utilization": 10, "reset_at": time.time() + 600}})
+        retry = self._flow()
+        self.addon.requestheaders(retry)
+        self.assertEqual(503, retry.response.status_code)
+
+    def test_malformed_window_is_an_execution_error(self) -> None:
+        """身份匹配但窗口结构损坏时拒绝，不能当作未知机会直接发送。@return None。"""
+        self._policy()
+        state = json.loads(self.state.read_text())
+        state["windows"] = []
+        self.state.write_text(json.dumps(state))
+        flow = self._flow()
+        self.addon.requestheaders(flow)
+        self.assertEqual(503, flow.response.status_code)
+
+
 if __name__ == "__main__":
     unittest.main()

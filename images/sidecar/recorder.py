@@ -3,6 +3,7 @@ mitmproxy addon：抽取 Anthropic API 流量的 token / 状态码，按行落�
 分析抓包模式下额外保存完整 HTTP 请求/响应体和轻量索引。
 """
 from __future__ import annotations
+import asyncio
 import base64
 import hashlib
 import json
@@ -13,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from mitmproxy import http
-from quota_protocol import merge_quota_observation, quota_decision, quota_observation
+from quota_protocol import merge_quota_observation, quota_decision, quota_observation, warmup_quota_decision, warmup_sample_used
 
 STATS_FILE = os.environ.get("STATS_FILE", "/flows/stats.jsonl")
 CAPTURE_FILE = os.environ.get("CAPTURE_FILE", "/flows/http_capture.jsonl")
@@ -409,10 +410,115 @@ class Recorder:
         self.quota_local: dict = {}
         self.quota_cached: dict = {}
         self.quota_state_valid = False
+        self.quota_warmup = os.environ.get("QUOTA_WARMUP", "0") == "1"
+        self.warmup_flows: dict[str, http.HTTPFlow] = {}
+        self.warmup_finished: set[str] = set()
+        self._pending_quota: tuple[dict, str, bool] | None = None
+        self._warmup_task: asyncio.Task | None = None
+        self.quota_control_failed = False
+
+    def running(self) -> None:
+        """启动养号状态观察；普通作业不增加后台任务。@return None。"""
+        if self.quota_warmup and self._warmup_task is None:
+            self._warmup_task = asyncio.create_task(self._watch_warmup())
+
+    def done(self) -> None:
+        """撤销本执行观察任务，避免上下文切换后沿用旧作业。@return None。"""
+        if self._warmup_task is not None:
+            self._warmup_task.cancel()
+
+    async def _watch_warmup(self) -> None:
+        """有界读取真实共享状态，API 更新也能让养号在收尾后暂停。"""
+        while True:
+            await asyncio.sleep(0.2)
+            try:
+                self._check_warmup_pause()
+            except (OSError, ValueError, TypeError, KeyError, AttributeError):
+                self._pause_quota({"message": "养号额度策略或许可不可读取，已停止执行",
+                                   "resume_at": None, "exhausted": []}, "failed")
+
+    def _prune_warmup_flows(self) -> None:
+        """响应钩子后仍等待代理发送结束，不能提前杀掉缓冲响应。"""
+        for flow_id in list(self.warmup_finished):
+            flow = self.warmup_flows.get(flow_id)
+            if flow is None or not getattr(flow, "live", False):
+                self.warmup_finished.discard(flow_id)
+                self.warmup_flows.pop(flow_id, None)
+
+    def _warmup_decision(self, state: dict) -> dict:
+        """计算当前执行是否还有正式请求许可，不修改共用真实窗口。"""
+        policy = state.get("warmup_quota")
+        if not isinstance(policy, dict) or not isinstance(policy.get("limits"), dict):
+            raise ValueError("养号策略上下文缺失")
+        decision = warmup_quota_decision(state, policy["limits"], time.time())
+        if not decision["sample_required"]:
+            return decision
+        admission = policy.get("admission")
+        granted = (isinstance(admission, dict) and admission.get("identity") == self.quota_identity
+                   and admission.get("source") == self.quota_source
+                   and warmup_sample_used(decision, admission))
+        marker = Path(self.quota_signal_file).with_name("warmup-sample.json")
+        used = False
+        if granted and marker.exists():
+            saved = json.loads(marker.read_text())
+            if saved != {key: admission[key] for key in ("identity", "policy_key", "window_key", "source")}:
+                raise ValueError("养号单次请求标记不匹配")
+            used = True
+        if not granted or used:
+            decision.update(blocked=True, resume_at=None,
+                            message="养号单次额度更新机会已使用，等待新的真实额度或调整阈值")
+        return decision
+
+    def _check_warmup_pause(self) -> None:
+        """仅在当前养号所有已接受流结束后发布等待信号。"""
+        self._prune_warmup_flows()
+        state = self._quota_state()
+        if not self.quota_state_valid:
+            raise ValueError("共享额度身份或文件无效")
+        merged = merge_quota_observation(state, self.quota_local) if self.quota_local else state
+        decision = self._warmup_decision(merged)
+        if not decision["enabled"]:
+            self._pending_quota = None
+            Path(self.quota_signal_file).with_name("warmup-draining.json").unlink(missing_ok=True)
+            return
+        common = quota_decision(merged, time.time())
+        if merged.get("account_error"):
+            self.quota_local["account_error"] = merged["account_error"]
+            self._pause_quota({"message": f"{merged['account_error']}：账号异常，需人工处理",
+                               "resume_at": None, "exhausted": []})
+            return
+        if common["blocked"] or (common["retry_ready"] and state.get("recovery_source") != self.quota_source):
+            self._pause_quota(common)
+        elif decision["blocked"]:
+            self._pause_quota({**decision, "exhausted": []}, warmup_wait=True)
+        else:
+            self._pending_quota = None
+            Path(self.quota_signal_file).with_name("warmup-draining.json").unlink(missing_ok=True)
+
+    def _finish_warmup_flow(self, flow: http.HTTPFlow) -> None:
+        """标记代理响应/错误已结束，等待实际发送结束后再放行暂停。"""
+        if self.quota_warmup and flow.id in self.warmup_flows:
+            self.warmup_finished.add(flow.id)
+            try:
+                self._check_warmup_pause()
+            except (OSError, ValueError, TypeError, KeyError, AttributeError):
+                # 控制异常仍保留正常统计/认证分类，不能中断后续 response 收尾。
+                self._pause_quota({"message": "养号额度策略不可读取，已停止执行",
+                                   "resume_at": None, "exhausted": []}, "failed")
+
+    def error(self, flow: http.HTTPFlow) -> None:
+        """异常流同样释放收尾等待，不为失败补发请求。
+
+        :param flow: 当前 HTTP 错误流
+        :return: None
+        """
+        self._finish_warmup_flow(flow)
 
     def _quota_state(self) -> dict:
         try:
             state = json.loads(Path(self.quota_state_file).read_text())
+            if not isinstance(state.get("windows", {}), dict):
+                raise ValueError("额度窗口结构无效")
             self.quota_state_valid = state.get("identity") == self.quota_identity
             if self.quota_state_valid:
                 self.quota_cached = state
@@ -441,43 +547,106 @@ class Recorder:
             pass
         return hashlib.sha256(auth[7:].strip().encode()).hexdigest() in hashes
 
-    def _pause_quota(self, decision: dict, status: str = "quota_wait") -> None:
+    def _write_quota_control(self, path: Path, payload: dict) -> bool:
+        """控制写入失败仍拒绝请求，不能因异常跳过本地响应而直达上游。"""
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = path.with_suffix(".tmp")
+            temporary.write_text(json.dumps(payload, ensure_ascii=False))
+            temporary.replace(path)
+            return True
+        except (OSError, ValueError):
+            self.quota_control_failed = True
+            return False
+
+    def _pause_quota(self, decision: dict, status: str = "quota_wait", warmup_wait: bool = False) -> None:
         if not self.quota_signal_file:
             return
+        self._prune_warmup_flows()
+        if (self.quota_warmup and status == "quota_wait" and not self.quota_local.get("account_error")
+                and (warmup_wait or self.quota_cached.get("warmup_quota", {}).get("enabled"))
+                and self.warmup_flows):
+            pending = (decision, status, warmup_wait)
+            if self._pending_quota != pending:
+                path = Path(self.quota_signal_file).with_name("warmup-draining.json")
+                if self._write_quota_control(path, {"source": self.quota_source, "status": "draining"}):
+                    self._pending_quota = pending
+            return
         path = Path(self.quota_signal_file)
-        path.parent.mkdir(parents=True, exist_ok=True)
         payload = {"source": self.quota_source, "status": status,
                    "error": decision["message"], "resume_at": decision["resume_at"],
                    "exhausted": decision["exhausted"], "quota_state": self.quota_local}
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(payload, ensure_ascii=False))
-        tmp.replace(path)
+        if warmup_wait:
+            payload["warmup_wait"] = True
+        written = self._write_quota_control(path, payload)
+        if self.quota_warmup and written:
+            path.with_name("warmup-draining.json").unlink(missing_ok=True)
+            self._pending_quota = None
 
-    def _quota_gate(self, flow: http.HTTPFlow) -> None:
+    def _quota_gate(self, flow: http.HTTPFlow) -> bool:
         state = self._quota_state()
-        if not self._owns_model_request(flow, state):
-            return
-        if not self.quota_state_valid:
-            # 状态挂载失效时不把账号伪装成未知可用；此处是执行故障而非额度耗尽。
-            self._pause_quota({"message": "额度门禁不可读取，已停止当前执行", "resume_at": None, "exhausted": []}, "failed")
+        candidate = (self.quota_source and flow.request.path.split("?", 1)[0] == "/v1/messages"
+                     and any(host.split(":", 1)[0] == "api.anthropic.com" for host in _flow_host_values(flow))
+                     and _header_value(_headers_dict(flow.request.headers), "authorization").lower().startswith("bearer "))
+        if candidate and (not self.quota_state_valid or self.quota_control_failed):
             flow.response = http.Response.make(503, b'{"type":"error","error":{"type":"api_error","message":"quota guard unavailable"}}',
                                                {"content-type": "application/json", "x-vibebench-quota-blocked": "1"})
-            return
-        merged = merge_quota_observation(state, self.quota_local) if self.quota_local else state
-        if self.quota_local.get("account_error"):
-            merged["account_error"] = self.quota_local["account_error"]
-        decision = quota_decision(merged, time.time())
+            self._pause_quota({"message": "额度门禁不可读取，已停止当前执行", "resume_at": None, "exhausted": []}, "failed")
+            return False
+        if not self._owns_model_request(flow, state):
+            return True
+        try:
+            merged = merge_quota_observation(state, self.quota_local) if self.quota_local else state
+            if self.quota_local.get("account_error"):
+                merged["account_error"] = self.quota_local["account_error"]
+            decision = quota_decision(merged, time.time())
+        except (ValueError, TypeError, AttributeError):
+            flow.response = http.Response.make(503, b'{"type":"error","error":{"type":"api_error","message":"invalid quota state"}}',
+                                               {"content-type": "application/json", "x-vibebench-quota-blocked": "1"})
+            self._pause_quota({"message": "额度状态结构无效，已停止执行", "resume_at": None, "exhausted": []}, "failed")
+            return False
         if merged.get("account_error"):
             decision.update(blocked=True, retry_ready=False, resume_at=None, exhausted=[],
                             message=f"{merged['account_error']}：账号异常，需人工处理")
         if not decision["blocked"] and (not decision["retry_ready"]
                 or state.get("recovery_source") == self.quota_source):
-            return
-        self._pause_quota(decision)
+            if self.quota_warmup:
+                try:
+                    warmup = self._warmup_decision(merged)
+                    if warmup["blocked"]:
+                        flow.response = http.Response.make(429, json.dumps({
+                            "type": "error", "error": {"type": "rate_limit_error", "message": warmup["message"]},
+                        }).encode(), {"content-type": "application/json", "x-vibebench-quota-blocked": "1"})
+                        self._pause_quota({**warmup, "exhausted": []}, warmup_wait=True)
+                        if self.quota_control_failed:
+                            flow.response = http.Response.make(503, b'{"type":"error","error":{"type":"api_error","message":"quota control unavailable"}}',
+                                                               {"content-type": "application/json", "x-vibebench-quota-blocked": "1"})
+                        return False
+                    if warmup["sample_required"]:
+                        admission = state["warmup_quota"]["admission"]
+                        marker = Path(self.quota_signal_file).with_name("warmup-sample.json")
+                        descriptor = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                        with os.fdopen(descriptor, "w") as output:
+                            json.dump({key: admission[key] for key in ("identity", "policy_key", "window_key", "source")}, output)
+                            output.flush()
+                            os.fsync(output.fileno())
+                        directory = os.open(marker.parent, os.O_RDONLY | os.O_DIRECTORY)
+                        try:
+                            os.fsync(directory)
+                        finally:
+                            os.close(directory)
+                except (OSError, ValueError, TypeError, KeyError, AttributeError):
+                    flow.response = http.Response.make(503, b'{"type":"error","error":{"type":"api_error","message":"warmup quota guard unavailable"}}',
+                                                       {"content-type": "application/json", "x-vibebench-quota-blocked": "1"})
+                    self._pause_quota({"message": "养号额度许可不可读取，已停止执行", "resume_at": None, "exhausted": []}, "failed")
+                    return False
+            return True
         flow.response = http.Response.make(429, json.dumps({
             "type": "error", "error": {"type": "rate_limit_error",
             "message": decision["message"] or "等待账号原任务更新额度"},
         }).encode(), {"content-type": "application/json", "x-vibebench-quota-blocked": "1"})
+        self._pause_quota(decision)
+        return False
 
     def responseheaders(self, flow: http.HTTPFlow) -> None:
         """
@@ -514,7 +683,9 @@ class Recorder:
         :param flow: mitmproxy 流
         :return: None
         """
-        self._quota_gate(flow)
+        admitted = self._quota_gate(flow)
+        if self.quota_warmup and admitted and self._owns_model_request(flow, self.quota_cached):
+            self.warmup_flows[flow.id] = flow
         if not _should_record(flow):
             return
         try:
@@ -571,6 +742,7 @@ class Recorder:
         :param flow: mitmproxy 流
         :return: None
         """
+        self._finish_warmup_flow(flow)
         if not _should_record(flow):
             return
         try:

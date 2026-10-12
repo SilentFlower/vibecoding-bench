@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from hashlib import sha256
+from json import dumps, loads
 from math import isfinite
 from typing import Any
 
@@ -178,3 +180,68 @@ def quota_decision(state: dict, now: float) -> dict:
                     else f"{names} 窗口已到期，等待正常任务响应更新" if retry_ready
                     else f"{names} 额度耗尽，等待窗口重置" if exhausted else ""),
     }
+
+
+def warmup_quota_decision(state: dict, limits: dict, now: float) -> dict:
+    """计算养号专用阈值，不改写共用额度事实。
+
+    :param state: 当前身份已合并的真实窗口
+    :param limits: five_hour/seven_day 的整数阈值，None 表示关闭
+    :param now: 当前 UTC 秒数
+    :return: 阈值命中、未知窗口、恢复时间及稳定策略/周期键
+    """
+    limits = {key: limits.get(key) for key in ("five_hour", "seven_day")}
+    if any(value is not None and (type(value) is not int or not 1 <= value <= 100)
+           for value in limits.values()):
+        raise ValueError("养号额度阈值必须为 1-100 的整数或关闭")
+    hit, unknown, deadlines, periods = [], [], [], {}
+    missing_reset = False
+    windows = state.get("windows", {})
+    if not isinstance(windows, dict):
+        raise ValueError("额度窗口结构无效")
+    for key, limit in limits.items():
+        if limit is None:
+            continue
+        window = windows.get(key, {})
+        if not isinstance(window, dict):
+            raise ValueError("额度窗口结构无效")
+        reset = quota_timestamp(window.get("reset_at"))
+        periods[key] = [reset, bool(reset is not None and reset <= now)]
+        try:
+            raw = window.get("utilization")
+            used = float(raw) if not isinstance(raw, bool) else float("nan")
+            if not isfinite(used) or used < 0:
+                used = None
+        except (TypeError, ValueError):
+            used = None
+        if used is not None and used >= limit and (reset is None or reset > now):
+            hit.append(key)
+            missing_reset = missing_reset or reset is None
+            if reset is not None:
+                deadlines.append(reset)
+        elif used is None or reset is None or reset <= now:
+            unknown.append(key)
+    names = " / ".join("5h" if key == "five_hour" else "7d" for key in hit)
+    return {"enabled": any(value is not None for value in limits.values()), "limits": limits,
+            "hit": hit, "unknown": unknown, "blocked": bool(hit),
+            "sample_required": bool(unknown) and not hit,
+            "resume_at": max(deadlines) if deadlines and not missing_reset else None,
+            "message": (f"{names} 已用达到养号阈值，等待可信窗口更新" if hit
+                        else "养号额度未知或窗口已到期，等待一次正式请求更新" if unknown else ""),
+            "policy_key": sha256(dumps(limits, sort_keys=True).encode()).hexdigest(),
+            "window_key": dumps(periods, sort_keys=True)}
+
+
+def warmup_sample_used(decision: dict, admission: dict | None) -> bool:
+    """判断仍未知的窗口是否已经使用本策略的单次更新机会。
+
+    :param decision: 最新养号判定
+    :param admission: 当前身份的持久许可，不存在时为 None
+    :return: 任一仍需更新的窗口已经使用机会时返回 True
+    """
+    if not admission or admission.get("policy_key") != decision["policy_key"]:
+        return False
+    previous = loads(admission["window_key"])
+    current = loads(decision["window_key"])
+    # 部分窗口刚得到数据不能为仍未知的另一个窗口重新发放机会。
+    return any(key in previous and previous[key] == current[key] for key in decision["unknown"])

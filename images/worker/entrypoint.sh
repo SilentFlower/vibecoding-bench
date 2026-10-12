@@ -1127,6 +1127,21 @@ except (OSError, ValueError, AttributeError):
 PY
 }
 
+check_warmup_draining() {
+  # 参数来自本代只读控制上下文；返回 0 表示仍有已接受请求，不能按局部错误提前退出。
+  [ "${QUOTA_WARMUP:-0}" = "1" ] && [ -n "${QUOTA_SIGNAL_FILE:-}" ] || return 1
+  python3 - "$QUOTA_SIGNAL_FILE" "${QUOTA_SOURCE:-}" <<'PY'
+import json
+import sys
+from pathlib import Path
+try:
+    payload = json.loads(Path(sys.argv[1]).with_name("warmup-draining.json").read_text())
+    sys.exit(0 if payload.get("source") == sys.argv[2] and payload.get("status") == "draining" else 1)
+except (OSError, ValueError, AttributeError):
+    sys.exit(1)
+PY
+}
+
 detect_claude_auth_error() {
   # 认证错误可能出现在最终 assistant 文本、tool_result 或 TUI transcript 中。
   # 只匹配明确 OAuth/401 标记，避免把普通失败误判为账号失效。
@@ -1771,6 +1786,11 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
   fi
   early_status=0
   classify_claude_completion 0 >/tmp/claude-completion-state 2>/dev/null || early_status=$?
+  # 后续请求可先收到本地拒绝，但成功流仍在收尾；永久认证异常保持最高优先级。
+  if check_warmup_draining && ! { [ "$early_status" -eq 2 ] && { [ "$(cat /tmp/claude-completion-state)" = "fatal_account_on_hold" ] || [ "$(cat /tmp/claude-completion-state)" = "fatal_invalid_grant" ]; }; }; then
+    sleep 0.2
+    continue
+  fi
   if handle_completion_failure "$early_status"; then
     break
   fi

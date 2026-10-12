@@ -45,7 +45,9 @@ pull 按 `registry_digest` 固定下载，核对配置 ID后建立清单中的�
 
 v3 回退先停止当前批次并保留最新停机备份。只在布局/桥协议兼容时，把 env 中两个镜像及清单一起切回已保存的兼容批次，再 check/up；通过“环境与任务”的重建操作替换已停止的旧批次容器，保留环境 ID 和持久 HOME。未完成重建的环境会拒绝发送，不静默混用镜像。数据库或布局不兼容时不能直接回退镜像，需先在独立离线目录核对快照与最新凭据所有者，再安排恢复；没有自动恢复数据库或切回旧版的入口。
 
-登录在真实 CLI/tmux 内完成。CLI 与 Rust API 客户端共用账号容器及代理，但仍是不同客户端；固定容器不保证完整指纹相同或避免封禁。身份没有明确来源时不应猜测。遥测专项与 5h/7d 可配置提前停止阈值继续留在后续任务。
+登录在真实 CLI/tmux 内完成。CLI 与 Rust API 客户端共用账号容器及代理，但仍是不同客户端；固定容器不保证完整指纹相同或避免封禁。身份没有明确来源时不应猜测。遥测专项继续留在后续任务。
+
+养号支持账号级 5h/7d 已用百分比阈值，两个窗口独立配置 1～100 的整数或关闭，默认关闭。达到任一阈值后拒绝后续养号请求，当前已接受请求收尾后暂停，保留原 run/HOME/工作目录/主会话。未知或到期只允许一次正式请求更新额度，仍未知则等待；许可与请求标记持久化，重启/重复点击不重复放行，不新增自动 usage 查询。普通 CLI 与 API 保持原有门禁。此功能需要同批 control/account 镜像，回滚前先关闭阈值并收口等待工作，保留持久数据。
 
 API 与同账号普通 CLI、养号、抓包独立调度，可以同时运行；CLI 之间串行，养号让位于正式 CLI 工作。API 准备发送器不安装 CLI。普通 CLI 的取消、心跳失联、调度器重启只清理本次进程和 CLI 观察上下文，保留账号容器与 API 长流；清理无法确认时标为 `cli_reconcile`，只禁止下一 CLI。旧无模式记录默认排他。重授权、代理修改、绑定切换、停止及重建仍关闭 API 入场并检查或排空已有请求。两条链路共享账号额度及容器资源，容器或公共网络故障仍可能影响两者。
 
@@ -59,6 +61,10 @@ python3 deploy/v3/run_local_verification.py --manifest /absolute/path/release.js
 python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json
 # 已安装 Chrome/Chromium 时，验证真实页面的统一退出和旧 Cookie 重放拒绝。
 python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser
+# 验证实际 Recorder 的本地 HTTPS/SSE、未知一次机会及重启不重复。
+python3 deploy/v3/verify_warmup_quota.py --manifest /absolute/path/release.json
+# 在统一后台验证合成账号阈值配置、保存重读、明暗主题和 390px。
+python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --warmup-quota
 ```
 
 演练创建随机部署标识的内部 Docker 网络，使用空 SQLite、合成凭据、CLI 测试替身及仅在本地处理的 SOCKS/DNS/HTTP。Docker 检查分别验证发送器直调和真实网关入口到账号的 ClientHello，断言合法短 DNS 绑定可用、共享 CLI 租约不阻止网关发送、错误账号绑定拒绝且无重复发送；另保持账号发送器 API 长流并启动 CLI 养号/抓包、发送第二次 API，验证 CLI 取消及调度器重启对账后长流继续且容器不变。Rust 的 `cargo test --lib local_https` 另用临时 CA 和回环 TLS 服务验证完整响应、原始字节/头顺序、非信任证书及错误主机名拒绝、长流取消。额外信任根仅编译进测试，正式镜像不提供跳过证书校验或追加测试 CA 的开关。TLS 测试需要 Python3 和 OpenSSL。结束只删除本次创建的测试资料与资源。

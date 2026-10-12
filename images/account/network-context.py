@@ -42,7 +42,7 @@ def main() -> None:
         environment["HOME"] = "/root"
         permitted = {"STATS_FILE", "CAPTURE_FILE", "CAPTURE_INDEX_FILE", "CAPTURE_FULL_HTTP",
             "CAPTURE_MAX_BODY_BYTES", "CAPTURE_SCOPE", "CAPTURE_MODE", "CAPTURE_TARGETS", "QUOTA_SOURCE", "QUOTA_IDENTITY", "QUOTA_STATE_FILE",
-            "QUOTA_SIGNAL_FILE", "QUOTA_OBSERVATIONS_FILE", "QUOTA_CREDENTIALS_FILE"}
+            "QUOTA_SIGNAL_FILE", "QUOTA_OBSERVATIONS_FILE", "QUOTA_CREDENTIALS_FILE", "QUOTA_WARMUP"}
         environment.update({key: str(value) for key, value in context.items() if key in permitted})
         environment.setdefault("STATS_FILE", "/run/v3/idle-stats.jsonl")
         command = ["proxychains4", "-q", "mitmdump", "--mode", "socks5",

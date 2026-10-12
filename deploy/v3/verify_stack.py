@@ -55,7 +55,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--browser", action="store_true")
+    parser.add_argument("--warmup-quota", action="store_true")
     args = parser.parse_args()
+    if args.warmup_quota and not args.browser:
+        parser.error("养号页面验证需要同时指定 --browser")
     manifest = json.loads(args.manifest.read_text())
     client = docker.from_env()
     deployment = "stack-verify-" + uuid.uuid4().hex[:10]
@@ -128,7 +131,20 @@ def main() -> None:
             asyncio.run(verify_websocket(base, cookie, ticket))
             if args.browser:
                 from verify_browser import verify_visible_logout
-                asyncio.run(verify_visible_logout(base, values["V3_ADMIN_PASSWORD"]))
+                exercise = None
+                if args.warmup_quota:
+                    from verify_warmup_browser import verify_warmup_ui
+                    exercise = verify_warmup_ui
+                    with sqlite3.connect(data / "bench" / "db.sqlite") as database:
+                        database.execute("INSERT INTO accounts(name,profile_path,timezone,cc2api_account_id,warmup_enabled) "
+                                         "VALUES('warmup-ui-fixture','profiles/warmup-ui-fixture','Asia/Tokyo',7,0)")
+                try:
+                    asyncio.run(verify_visible_logout(base, values["V3_ADMIN_PASSWORD"], exercise=exercise))
+                finally:
+                    if args.warmup_quota:
+                        with sqlite3.connect(data / "bench" / "db.sqlite") as database:
+                            database.execute("DELETE FROM warmup_quota_admissions WHERE account_id=(SELECT id FROM accounts WHERE name='warmup-ui-fixture')")
+                            database.execute("DELETE FROM accounts WHERE name='warmup-ui-fixture'")
             assert browser.post(base + "/runtime/logout", headers=authorization, timeout=5).status_code == 200
             assert browser.get(base + "/runtime/api/environments", timeout=5).status_code == 401
             assert requests.get(base + "/runtime/api/environments", headers={"Cookie": cookie}, timeout=5).status_code == 401

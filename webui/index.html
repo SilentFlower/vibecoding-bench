@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261012-layout" />
+  <link rel="stylesheet" href="style.css?v=20261013-warmup-quota" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -383,6 +383,29 @@
           <input name="enabled" type="checkbox" />
           <span>启用定时养号</span>
         </label>
+        <div class="row warmup-interval-row">
+          <div class="warmup-quota-panel">
+            <label class="toggle-line">
+              <input name="quota_5h_enabled" type="checkbox" />
+              <span>启用 5h 阈值</span>
+            </label>
+            <label><span class="lbl">$ 5h 已用百分比</span>
+              <input name="warmup_quota_5h_limit_percent" type="number" min="1" max="100" step="1" placeholder="1～100" disabled />
+            </label>
+            <p class="hint" id="warmup-quota-5h-hint"></p>
+          </div>
+          <div class="warmup-quota-panel">
+            <label class="toggle-line">
+              <input name="quota_7d_enabled" type="checkbox" />
+              <span>启用 7d 阈值</span>
+            </label>
+            <label><span class="lbl">$ 7d 已用百分比</span>
+              <input name="warmup_quota_7d_limit_percent" type="number" min="1" max="100" step="1" placeholder="1～100" disabled />
+            </label>
+            <p class="hint" id="warmup-quota-7d-hint"></p>
+          </div>
+        </div>
+        <p class="hint">任一阈值命中后，当前请求收尾，再暂停养号并保留会话。额度未知或窗口到期后，只允许一次正常养号请求更新额度；仍未知则等待。</p>
         <div class="row-end">
           <button type="button" class="btn" data-close="#warmup-modal">cancel</button>
           <button type="submit" class="btn btn-primary">save</button>
@@ -620,6 +643,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20260802-prompt-mode"></script>
+  <script src="app.js?v=20261013-warmup-quota"></script>
 </body>
 </html>

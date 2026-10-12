@@ -38,11 +38,11 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StrictInt
 from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
 
-from quota_protocol import merge_quota_observation, quota_decision, quota_observation
+from quota_protocol import merge_quota_observation, quota_decision, quota_observation, warmup_quota_decision, warmup_sample_used
 from account_runtime import AccountRuntime, RuntimeBusy
 
 
@@ -1256,6 +1256,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   warmup_enabled INTEGER DEFAULT 0,
   warmup_interval_min_hours INTEGER DEFAULT 3,
   warmup_interval_max_hours INTEGER DEFAULT 5,
+  warmup_quota_5h_limit_percent INTEGER,
+  warmup_quota_7d_limit_percent INTEGER,
   warmup_next_run_at REAL,
   warmup_last_attempt_at REAL,
   warmup_last_run_id TEXT,
@@ -1385,6 +1387,14 @@ CREATE TABLE IF NOT EXISTS quota_observation_cursors (
   file_identity TEXT,
   byte_offset INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS warmup_quota_admissions (
+  account_id INTEGER PRIMARY KEY,
+  identity TEXT NOT NULL,
+  policy_key TEXT NOT NULL,
+  window_key TEXT NOT NULL,
+  source TEXT NOT NULL,
+  created_at REAL NOT NULL
+);
 """
 
 _db_lock = threading.Lock()
@@ -1407,6 +1417,8 @@ def init_db() -> None:
             _ensure_column(conn, "accounts", "deleted_at", "REAL")
             _ensure_column(conn, "accounts", "cc2api_account_id", "INTEGER")
             _ensure_column(conn, "accounts", "warmup_enabled", "INTEGER DEFAULT 0")
+            _ensure_column(conn, "accounts", "warmup_quota_5h_limit_percent", "INTEGER")
+            _ensure_column(conn, "accounts", "warmup_quota_7d_limit_percent", "INTEGER")
             _ensure_column(
                 conn, "accounts", "warmup_interval_min_hours", "INTEGER DEFAULT 3"
             )
@@ -2706,39 +2718,97 @@ class QuotaGuard:
         return {**state, **decision, "source": state.get("source") or "passive", "identity": identity,
                 "recovery_source": recovery_source, "known": bool(state.get("windows"))}
 
+    def warmup_snapshot(self, account: dict, source: Optional[str] = None, *, quota_state: Optional[dict] = None) -> dict:
+        """读取最新账号阈值和单次机会，普通业务不消费此门禁。
+
+        :param account: 当前账号及身份
+        :param source: 实际启动来源；页面/触发检查不指定来源
+        :param quota_state: 发布时复用的共用额度快照；省略时读取当前事实
+        :return: 养号判定及内部持久许可，公开接口需移除内部键
+        """
+        state = self.snapshot(account) if quota_state is None else quota_state
+        conn = get_db()
+        try:
+            row = conn.execute("SELECT warmup_quota_5h_limit_percent,warmup_quota_7d_limit_percent "
+                               "FROM accounts WHERE id=?", (account["id"],)).fetchone()
+            record = conn.execute("SELECT * FROM warmup_quota_admissions WHERE account_id=? AND identity=?",
+                                  (account["id"], state["identity"])).fetchone()
+        finally:
+            conn.close()
+        decision = warmup_quota_decision(state, {
+            "five_hour": row["warmup_quota_5h_limit_percent"] if row else None,
+            "seven_day": row["warmup_quota_7d_limit_percent"] if row else None,
+        }, time.time())
+        admission = dict(record) if record else None
+        used = decision["sample_required"] and warmup_sample_used(decision, admission)
+        decision.update(admission=admission, sample_used=bool(used))
+        if used and (source is None or admission["source"] != source):
+            decision.update(blocked=True, resume_at=None,
+                            message="养号单次额度更新机会已使用，等待新的真实额度或调整阈值")
+        return decision
+
+    def _admit_warmup(self, account: dict, source: str) -> bool:
+        """在实际启动前认领一次额度更新，失败和重启不会重发机会。"""
+        decision = self.warmup_snapshot(account, source)
+        if decision["blocked"]:
+            return False
+        if not decision["sample_required"] or decision["sample_used"]:
+            return True
+        identity = _quota_identity(account)
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    conn.execute("INSERT INTO warmup_quota_admissions(account_id,identity,policy_key,window_key,source,created_at) "
+                                 "VALUES(?,?,?,?,?,?) ON CONFLICT(account_id) DO UPDATE SET identity=excluded.identity,"
+                                 "policy_key=excluded.policy_key,window_key=excluded.window_key,source=excluded.source,created_at=excluded.created_at",
+                                 (account["id"], identity, decision["policy_key"], decision["window_key"], source, time.time()))
+            finally:
+                conn.close()
+        return True
+
     def _publish(self, account: dict) -> dict:
         """发布最新门禁和本地 AT 哈希；此文件不进入 API 响应。"""
-        snapshot = self.snapshot(account)
-        path = BENCH_DATA / "quota" / str(account["id"]) / "state.json"
-        hashes = set()
-        try:
-            previous = json.loads(path.read_text())
-            if previous.get("identity") == snapshot["identity"]:
-                hashes.update(previous.get("token_hashes", []))
-        except (OSError, ValueError):
-            pass
-        try:
-            credentials = json.loads((PROFILES_DIR / account["name"] / ".credentials.json").read_text())
-            token = (credentials.get("claudeAiOauth") or {}).get("accessToken")
-            if isinstance(token, str) and token:
-                hashes.add(hashlib.sha256(token.encode()).hexdigest())
-        except (OSError, ValueError, AttributeError):
-            pass
-        _write_quota_json(path, {**snapshot, "token_hashes": sorted(hashes)})
-        return snapshot
+        # 配置入口也会发布；读取到替换文件必须串行，防止旧快照覆盖新响应。
+        with self._lock:
+            snapshot = self.snapshot(account)
+            path = BENCH_DATA / "quota" / str(account["id"]) / "state.json"
+            hashes = set()
+            try:
+                previous = json.loads(path.read_text())
+                if previous.get("identity") == snapshot["identity"]:
+                    hashes.update(previous.get("token_hashes", []))
+            except (OSError, ValueError):
+                pass
+            try:
+                credentials = json.loads((PROFILES_DIR / account["name"] / ".credentials.json").read_text())
+                token = (credentials.get("claudeAiOauth") or {}).get("accessToken")
+                if isinstance(token, str) and token:
+                    hashes.add(hashlib.sha256(token.encode()).hexdigest())
+            except (OSError, ValueError, AttributeError):
+                pass
+            _write_quota_json(path, {**snapshot, "token_hashes": sorted(hashes),
+                                    "warmup_quota": self.warmup_snapshot(account, quota_state=snapshot)})
+            return snapshot
 
-    def admit(self, account: dict, source: str) -> bool:
+    def admit(self, account: dict, source: str, warmup: bool = False) -> bool:
         """
         认领启动机会；到期只放行一个已有正常执行，等待其真实响应。
 
         :param account: 锁内重读的账号行
         :param source: 执行来源及代次
+        :param warmup: 是否为自动养号执行，其他入口不检查养号阈值
         :return: 是否可以创建正式 worker
         """
         with self._lock:
             self.consume(account)
             snapshot = self.snapshot(account)
             if snapshot["blocked"]:
+                self._publish(account)
+                return False
+            if snapshot["retry_ready"] and snapshot.get("recovery_source") not in (None, source):
+                return False
+            if warmup and not self._admit_warmup(account, source):
                 self._publish(account)
                 return False
             if snapshot["retry_ready"]:
@@ -2778,7 +2848,7 @@ class QuotaGuard:
                     conn.close()
             self._publish(account)
 
-    def prepare(self, account: dict, source: str, flows: Path, control: Path) -> dict:
+    def prepare(self, account: dict, source: str, flows: Path, control: Path, warmup: bool = False) -> dict:
         """
         登记观察来源并创建只读门禁挂载；不创建任何探测流量。
 
@@ -2786,6 +2856,7 @@ class QuotaGuard:
         :param source: run/continue 及其代次
         :param flows: 本次观察所在目录
         :param control: 本次执行独立控制目录
+        :param warmup: 当前执行是否允许使用养号阈值
         :return: sidecar 的内部环境变量
         """
         with self._lock:
@@ -2804,6 +2875,7 @@ class QuotaGuard:
                 finally:
                     conn.close()
             return {"QUOTA_SOURCE": source, "QUOTA_IDENTITY": snapshot["identity"],
+                    "QUOTA_WARMUP": "1" if warmup else "0",
                     "QUOTA_STATE_FILE": "/quota-account/state.json",
                     "QUOTA_SIGNAL_FILE": "/quota-control/pause.json",
                     "QUOTA_OBSERVATIONS_FILE": "/flows/passive-quota.jsonl",
@@ -2940,6 +3012,25 @@ class QuotaGuard:
         """
         if not isinstance(payload, dict) or payload.get("source") != source or payload.get("status") != "quota_wait":
             return
+        warmup_wait = False
+        if payload.get("warmup_wait") is True and source.startswith("run:"):
+            conn = get_db()
+            try:
+                run = conn.execute("SELECT run_kind,account_id,quota_attempt FROM runs WHERE id=?",
+                                   (source.split(":")[1],)).fetchone()
+            finally:
+                conn.close()
+            try:
+                # workspace 的状态文件可写；只有 Recorder 私有控制补证才可跳过整体耗尽分类。
+                control = json.loads((_quota_control(source.split(":")[1], source) / "pause.json").read_text())
+                warmup_wait = bool(run and run["run_kind"] == "warmup" and run["account_id"] == account["id"]
+                                   and source == _quota_source(source.split(":")[1], run["quota_attempt"])
+                                   and control.get("source") == source and control.get("warmup_wait") is True
+                                   and control.get("status") == "quota_wait")
+                if warmup_wait:
+                    payload = control
+            except (OSError, ValueError, AttributeError):
+                pass
         with self._lock:
             try:
                 state = payload.get("quota_state") or {}
@@ -2952,7 +3043,8 @@ class QuotaGuard:
             except (ValueError, TypeError, AttributeError):
                 pass
             snapshot = self.snapshot(account)
-            if not snapshot["exhausted"] and not snapshot.get("account_error"):
+            if (not snapshot["exhausted"] and not snapshot.get("account_error")
+                    and not warmup_wait):
                 self.record_worker_limit(account, "unknown")
             self._publish(account)
 
@@ -3062,8 +3154,9 @@ class QuotaGuard:
             account = by_id.get(run["account_id"])
             control_status = self._recover_control(account, run) if account else None
             state = self.snapshot(account) if account else {}
+            warmup_guarded = bool(account and run["run_kind"] == "warmup" and self.warmup_snapshot(account)["enabled"])
             if (run["status"] != "quota_wait" and not state.get("exhausted")
-                    and not run["quota_attempt"] and run["id"] not in observed_runs and not control_status):
+                    and not run["quota_attempt"] and run["id"] not in observed_runs and not control_status and not warmup_guarded):
                 continue
             # 严格清理必须成功才启用自动恢复，覆盖容器已创建但 ID 尚未落库的崩溃点。
             self.runner.cleanup_quota_run(run["id"])
@@ -3092,7 +3185,7 @@ class QuotaGuard:
                 if run["status"] == "stopping":
                     scheduler._update_attempt(run["id"], int(run["quota_attempt"]), status="stopped", ended_at=time.time())
                     scheduler._update_batch_item_for_run(run["id"], "stopped")
-                elif account and (state.get("exhausted") or state.get("account_error") or run["quota_attempt"]):
+                elif account and (state.get("exhausted") or state.get("account_error") or run["quota_attempt"] or warmup_guarded):
                     scheduler._mark_quota_wait(run["id"], account, int(run["quota_attempt"]))
                 else:
                     scheduler._update_attempt(run["id"], int(run["quota_attempt"]), status="failed", error="服务重启前执行已中断", ended_at=time.time())
@@ -3193,8 +3286,11 @@ class QuotaGuard:
                 if not current or (parent and (parent["deleted_at"] or parent["status"] not in ("active", "quota_wait"))):
                     continue
                 account = dict(current)
+                if run["run_kind"] == "warmup" and (
+                        not account.get("warmup_enabled") or self.warmup_snapshot(account, source)["blocked"]):
+                    continue
                 self.runner.cleanup_quota_run(run["id"])
-                if not self.admit(account, source):
+                if not self.admit(account, source, warmup=run["run_kind"] == "warmup"):
                     continue
                 with _db_lock:
                     conn = get_db()
@@ -3220,6 +3316,7 @@ class QuotaGuard:
         state = self.snapshot(account)
         if state["blocked"] or state["recovery_source"]:
             return
+        warmup_state = self.warmup_snapshot(account)
         with _db_lock:
             conn = get_db()
             try:
@@ -3232,8 +3329,9 @@ class QuotaGuard:
                         conn.execute("UPDATE task_batches SET status='active',next_launch_at=NULL WHERE id=? AND status='quota_wait'", (batch["id"],))
                     conn.execute("UPDATE accounts SET warmup_next_run_at=?,warmup_last_status='scheduled',warmup_last_error=NULL "
                                  "WHERE id=? AND warmup_enabled=1 AND warmup_last_status='quota_wait' "
+                                 "AND ?=0 "
                                  "AND NOT EXISTS(SELECT 1 FROM runs WHERE account_id=? AND run_kind='warmup' AND status IN ('quota_wait','queued','running','stopping'))",
-                                 (time.time(), account["id"], account["id"]))
+                                 (time.time(), account["id"], int(warmup_state["blocked"]), account["id"]))
             finally:
                 conn.close()
         for batch in batches:
@@ -3304,13 +3402,13 @@ class Runner:
     def __init__(self) -> None:
         self.client = docker.from_env()
 
-    def _quota_mounts(self, account: dict, run_id: str, source: str, flows: Path) -> tuple[dict, dict, dict]:
+    def _quota_mounts(self, account: dict, run_id: str, source: str, flows: Path, warmup: bool = False) -> tuple[dict, dict, dict]:
         if not quota_guard:
             return {}, {}, {}
         if account_runtime:
             flows = account_runtime.execution_flows(account, source, flows)
         control = _quota_control(run_id, source)
-        env = quota_guard.prepare(account, source, flows, control)
+        env = quota_guard.prepare(account, source, flows, control, warmup=warmup)
         host_control = HOST_BENCH_DATA / control.relative_to(BENCH_DATA)
         return env, {
             str(HOST_BENCH_DATA / "quota" / str(account["id"])): {"bind": "/quota-account", "mode": "ro"},
@@ -3418,9 +3516,9 @@ class Runner:
         }
         source = _quota_source(run_id, int(task.get("quota_attempt") or 0))
         quota_env, quota_sidecar_volumes, quota_worker_volumes = self._quota_mounts(
-            account, run_id, source, FLOWS_DIR / acc_name / str(task["id"]) / run_id)
+            account, run_id, source, FLOWS_DIR / acc_name / str(task["id"]) / run_id, warmup=bool(task.get("warmup")))
         sidecar_env.update(quota_env)
-        worker_env.update({key: value for key, value in quota_env.items() if key in ("QUOTA_SOURCE", "QUOTA_SIGNAL_FILE")})
+        worker_env.update({key: value for key, value in quota_env.items() if key in ("QUOTA_SOURCE", "QUOTA_SIGNAL_FILE", "QUOTA_WARMUP")})
         if task.get("resume_session_id"):
             worker_env["RESUME_SESSION_ID"] = task["resume_session_id"]
         if managed_oauth:
@@ -5855,7 +5953,7 @@ class Scheduler:
                     self._update_attempt(run_id, attempt, execution_model=model)
                 task["model_override"] = model
                 task["warmup"] = current.get("run_kind") == "warmup"
-                if quota_guard and not quota_guard.admit(account, source):
+                if quota_guard and not quota_guard.admit(account, source, warmup=current["run_kind"] == "warmup"):
                     state = quota_guard.snapshot(account)
                     if state.get("account_error"):
                         self._update_attempt(run_id, attempt, status="auth_failed", error=state["message"], ended_at=time.time())
@@ -6027,6 +6125,12 @@ class Scheduler:
             return
         resume_at = state.get("resume_at")
         current = self._get_run_state(run_id) or {}
+        if current.get("run_kind") == "warmup" and quota_guard and not state.get("blocked"):
+            warmup_state = quota_guard.warmup_snapshot(account)
+            if warmup_state["enabled"]:
+                state = {**state, "message": warmup_state["message"] or "等待原养号会话恢复",
+                         "resume_at": warmup_state["resume_at"]}
+                resume_at = state["resume_at"]
         if current.get("run_kind") == "capture" and resume_at is not None:
             resume_at = max(resume_at, time.time() + 900)
         if not self._update_attempt(run_id, attempt, status="quota_wait", ended_at=None,
@@ -6167,11 +6271,19 @@ class WarmupScheduler:
             try:
                 row = _get_available_account(conn, account_id)
                 candidate = dict(row) if row else None
+                active = conn.execute("SELECT 1 FROM runs WHERE account_id=? AND run_kind='warmup' "
+                                      "AND status IN ('queued','running','stopping','quota_wait') LIMIT 1", (account_id,)).fetchone()
             finally:
                 conn.close()
+            if active:
+                return {"started": False, "run_id": None}
             if candidate and candidate.get("warmup_enabled") and candidate.get("cc2api_account_id") is not None:
                 quota_guard.consume(candidate)
                 state = quota_guard.snapshot(candidate)
+                warmup_state = quota_guard.warmup_snapshot(candidate)
+                if not state["blocked"] and warmup_state["blocked"]:
+                    state = {**state, "blocked": True, "resume_at": warmup_state["resume_at"],
+                             "message": warmup_state["message"]}
                 if state["blocked"] or state.get("recovery_source"):
                     with _db_lock:
                         conn = get_db()
@@ -7022,12 +7134,22 @@ class AccountIn(BaseModel):
 
 
 class WarmupConfigIn(BaseModel):
-    """账号 cc2api 绑定与养号随机间隔配置。"""
+    """账号 cc2api 绑定、养号间隔与独立额度阈值。
+
+    :param cc2api_account_id: 绑定的网关账号
+    :param enabled: 是否启用养号
+    :param interval_min_hours: 最小随机间隔小时数
+    :param interval_max_hours: 最大随机间隔小时数
+    :param warmup_quota_5h_limit_percent: 5h 已用整数阈值；null 关闭，省略保留
+    :param warmup_quota_7d_limit_percent: 7d 已用整数阈值；null 关闭，省略保留
+    """
 
     cc2api_account_id: int
     enabled: bool = False
     interval_min_hours: int = 3
     interval_max_hours: int = 5
+    warmup_quota_5h_limit_percent: Optional[StrictInt] = None
+    warmup_quota_7d_limit_percent: Optional[StrictInt] = None
 
 
 def _oauth_owner_transition_blocker(account: dict) -> Optional[str]:
@@ -7204,6 +7326,9 @@ def list_accounts():
             account["timezone_mode"] = "manual" if timezone else "auto"
             account.update(_read_account_oauth_status(account["name"]))
             account["passive_quota"] = _public_quota(account)
+            warmup_state = quota_guard.warmup_snapshot(account) if quota_guard else {}
+            account["warmup_quota"] = {key: warmup_state.get(key) for key in (
+                "enabled", "limits", "hit", "unknown", "blocked", "sample_used", "resume_at", "message")}
             accounts.append(account)
         return accounts
     finally:
@@ -7364,6 +7489,11 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
         raise HTTPException(400, "养号间隔必须为 1-720 小时")
     if high < low:
         raise HTTPException(400, "最大养号间隔不能小于最小间隔")
+    threshold_fields = ("warmup_quota_5h_limit_percent", "warmup_quota_7d_limit_percent")
+    for field in threshold_fields:
+        value = getattr(body, field)
+        if value is not None and not 1 <= value <= 100:
+            raise HTTPException(400, "养号额度阈值必须为 1-100 的已用百分比整数")
     conn = get_db()
     try:
         row = _get_available_account(conn, aid)
@@ -7446,6 +7576,10 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
                                     aid,
                                 ),
                             )
+                            # 旧客户端省略新字段时保留策略，null 才明确关闭某个窗口。
+                            for field in threshold_fields:
+                                if field in body.model_fields_set:
+                                    conn.execute(f"UPDATE accounts SET {field}=? WHERE id=?", (getattr(body, field), aid))
                             if not enabled and active and active["status"] == "quota_wait":
                                 conn.execute("UPDATE runs SET status='stopped',stop_requested_at=?,ended_at=? WHERE id=? AND status='quota_wait'",
                                              (time.time(), time.time(), active["id"]))
@@ -7453,6 +7587,13 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
                         raise HTTPException(409, "该 cc2api 账号已绑定其他 bench 账号")
                     finally:
                         conn.close()
+            if quota_guard:
+                connection = get_db()
+                try:
+                    current = connection.execute("SELECT * FROM accounts WHERE id=?", (aid,)).fetchone()
+                finally:
+                    connection.close()
+                quota_guard._publish(dict(current))
     return {"ok": True, "enabled": enabled, "next_run_at": None if active else next_run_at}
 
 
@@ -7630,6 +7771,7 @@ def delete_account(aid: int):
                                 "soft_deleted": True,
                                 "references": counts,
                             }
+                        conn.execute("DELETE FROM warmup_quota_admissions WHERE account_id=?", (aid,))
                         conn.execute("DELETE FROM accounts WHERE id=?", (aid,))
                 finally:
                     conn.close()

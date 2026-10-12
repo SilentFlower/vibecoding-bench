@@ -140,6 +140,11 @@ function formatWarmupTime(value) {
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
 }
 
+/**
+ * 展示绑定、养号调度与独立额度阈值。
+ * @param {Object} account 账号与服务端养号摘要
+ * @return {string} 已转义的状态 HTML
+ */
 function renderWarmupStatus(account) {
   if (account.cc2api_account_id == null) {
     return '<span class="pill pill-queued">未绑定</span>';
@@ -164,10 +169,19 @@ function renderWarmupStatus(account) {
   const error = account.warmup_last_error
     ? `<div class="warmup-error" title="${escapeHTML(account.warmup_last_error)}">${escapeHTML(account.warmup_last_error)}</div>`
     : '';
+  const thresholds = [['5h', account.warmup_quota_5h_limit_percent], ['7d', account.warmup_quota_7d_limit_percent]]
+    .filter(([, value]) => value != null)
+    .map(([name, value]) => `${name} 已用 ≥ ${value}%`).join(' · ');
+  const quota = account.warmup_quota;
+  const quotaStatus = quota?.enabled && quota.message
+    ? `<div class="warmup-error">${escapeHTML(quota.message)}${quota.resume_at ? `<div>恢复机会 ${escapeHTML(formatWarmupTime(quota.resume_at))}</div>` : ''}</div>`
+    : '';
   return `
     <div><code>cc#${escapeHTML(account.cc2api_account_id)}</code> <span class="pill ${statusClass}">${escapeHTML(status === 'quota_wait' ? '额度等待' : status)}</span></div>
     <div>${escapeHTML(account.warmup_interval_min_hours || 3)}-${escapeHTML(account.warmup_interval_max_hours || 5)}h</div>
     <div class="muted">next ${escapeHTML(formatWarmupTime(account.warmup_next_run_at))}</div>
+    ${thresholds ? `<div class="muted">阈值：${escapeHTML(thresholds)}</div>` : ''}
+    ${quotaStatus}
     ${error}
   `;
 }
@@ -314,6 +328,11 @@ async function renderAccounts() {
   $('#warmup-form').onsubmit = saveWarmupConfig;
 }
 
+/**
+ * 载入账号养号配置及两个独立阈值。
+ * @param {Object} account 当前账号
+ * @return {Promise<void>} 表单就绪后完成
+ */
 async function openWarmupModal(account) {
   try {
     state.cc2apiAccounts = await API('/cc2api/accounts');
@@ -325,6 +344,16 @@ async function openWarmupModal(account) {
   form.interval_min_hours.value = account.warmup_interval_min_hours || 3;
   form.interval_max_hours.value = account.warmup_interval_max_hours || 5;
   form.enabled.checked = Number(account.warmup_enabled || 0) === 1;
+  for (const window of ['5h', '7d']) {
+    const input = form.elements[`warmup_quota_${window}_limit_percent`];
+    const enabled = form.elements[`quota_${window}_enabled`];
+    const value = account[`warmup_quota_${window}_limit_percent`];
+    enabled.checked = value != null;
+    input.value = value ?? '';
+    enabled.onchange = () => updateWarmupQuotaInputs(form);
+    input.oninput = () => updateWarmupQuotaInputs(form);
+  }
+  updateWarmupQuotaInputs(form);
   const options = state.cc2apiAccounts.map(item => `
     <option value="${escapeHTML(item.id)}">#${escapeHTML(item.id)} ${escapeHTML(item.name || 'oauth')} · ${escapeHTML(item.email_masked || '-')}</option>
   `).join('');
@@ -347,6 +376,30 @@ async function openWarmupModal(account) {
   openModal('#warmup-modal');
 }
 
+/**
+ * 更新阈值表单的可编辑状态及已用/剩余说明。
+ * @param {HTMLFormElement} form 养号配置表单
+ * @return {void} 不返回值
+ */
+function updateWarmupQuotaInputs(form) {
+  for (const window of ['5h', '7d']) {
+    const input = form.elements[`warmup_quota_${window}_limit_percent`];
+    const enabled = form.elements[`quota_${window}_enabled`].checked;
+    input.disabled = !enabled;
+    input.required = enabled;
+    const value = Number(input.value);
+    $(`#warmup-quota-${window}-hint`).textContent = !enabled ? '已关闭，沿用额度用满保护'
+      : input.value && Number.isInteger(value) && value >= 1 && value <= 100
+        ? `已用达到 ${value}%（剩余 ${100 - value}%）时暂停养号`
+        : '请输入 1～100 的已用百分比整数';
+  }
+}
+
+/**
+ * 原子保存绑定、养号间隔及阈值，关闭窗口显式提交 null。
+ * @param {SubmitEvent} e 配置提交事件
+ * @return {Promise<void>} 保存并刷新账号状态后完成
+ */
 async function saveWarmupConfig(e) {
   e.preventDefault();
   const form = e.currentTarget;
@@ -357,6 +410,8 @@ async function saveWarmupConfig(e) {
     enabled: form.enabled.checked,
     interval_min_hours: Number(form.interval_min_hours.value),
     interval_max_hours: Number(form.interval_max_hours.value),
+    warmup_quota_5h_limit_percent: form.quota_5h_enabled.checked ? Number(form.warmup_quota_5h_limit_percent.value) : null,
+    warmup_quota_7d_limit_percent: form.quota_7d_enabled.checked ? Number(form.warmup_quota_7d_limit_percent.value) : null,
   };
   button.disabled = true;
   try {
@@ -405,7 +460,10 @@ function renderPassiveQuota(quota) {
     const name = key === 'five_hour' ? '5h' : '7d';
     if (!window) return `${name} 未知`;
     const expired = window.reset_at && window.reset_at <= Date.now() / 1000;
-    return `${name} ${window.utilization == null ? '用量未知' : `${Number(window.utilization).toFixed(1)}%`}${expired ? '（窗口已到期）' : ''}`;
+    const used = Number(window.utilization);
+    const amount = window.utilization == null || !Number.isFinite(used) ? '用量未知'
+      : `已用 ${used.toFixed(1)}% / 剩余 ${Math.max(0, 100 - used).toFixed(1)}%`;
+    return `${name} ${expired ? '上次' : ''}${amount}${expired ? '（窗口已到期）' : ''}`;
   }).join(' · ');
   const reason = quota.message ? `<div>${escapeHTML(quota.message)}</div>` : '';
   const resume = quota.exhausted?.length ? `<div>${quota.resume_at ? `恢复机会 ${escapeHTML(formatWarmupTime(quota.resume_at))}` : '暂无可信恢复时间'}</div>` : '';

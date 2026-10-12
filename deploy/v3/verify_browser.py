@@ -12,11 +12,12 @@ import requests
 from websockets.asyncio.client import connect
 
 
-async def verify_visible_logout(base: str, password: str) -> None:
+async def verify_visible_logout(base: str, password: str, exercise=None) -> None:
     """从登录页操作到退出按钮，验证 Cookie 撤销和旧 Cookie 重放失败。
 
     :param base: 本地合成部署地址
     :param password: 仅用于本次合成部署的管理密码，不写入进程参数或输出
+    :param exercise: 可选的已登录页面场景，复用本次 CDP 会话而不重复启动浏览器
     :return: None；失败抛出异常，最终收口本次 Chrome 进程组
     """
     chrome = shutil.which("google-chrome") or shutil.which("chromium")
@@ -90,6 +91,8 @@ async def verify_visible_logout(base: str, password: str) -> None:
                 await evaluate("Array.from(document.querySelectorAll('a')).find(a=>a.textContent.trim()==='环境与任务').click()")
                 await wait_for("Boolean(document.querySelector('iframe'))")
                 assert await evaluate("fetch('/runtime/api/environments').then(response=>response.status)") == 200
+                if exercise is not None:
+                    await exercise(rpc, evaluate, wait_for, session_id)
                 cookies = await rpc("Network.getCookies", {"urls": [base + "/runtime/"]}, session_id)
                 old = next(cookie for cookie in cookies["cookies"] if cookie["name"] == "vb_v3_session")
                 await evaluate("Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()==='退出').click()")
