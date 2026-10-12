@@ -157,6 +157,8 @@ input, textarea, select { font-variant-numeric: tabular-nums; }
 }
 .tabs a {
   display: inline-flex;
+  flex-shrink: 0;
+  white-space: nowrap;
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
@@ -355,6 +357,8 @@ code {
 .table-frame {
   position: relative;
   overflow-x: auto;
+  /* 上下装饰线超出 1px，不应让按内容展开的表格出现纵向滚动条。 */
+  overflow-y: hidden;
   background:
     linear-gradient(180deg, rgba(255,182,73,0.02), transparent 40%),
     var(--surface);
@@ -1136,10 +1140,18 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 *::-webkit-scrollbar-thumb:hover { background: var(--amber-deep); }
 
 /* ===== responsive ===== */
+/* 中等宽度把导航放到独立一行，避免品牌和状态栏挤压中英文标签。 */
+@media (max-width: 1440px) {
+  .topbar { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; }
+  .tabs { grid-column: 1 / -1; grid-row: 2; flex-wrap: wrap; justify-content: flex-start; }
+  .statline { grid-column: 2; grid-row: 1; }
+}
+
 @media (max-width: 920px) {
   .topbar { grid-template-columns: 1fr; gap: 8px; padding: 8px 14px; }
-  .tabs { justify-content: flex-start; border: none; padding: 0; }
-  .statline { justify-self: start; }
+  .brand-sub { display: none; }
+  .tabs { grid-column: auto; grid-row: auto; border: none; padding: 0; }
+  .statline { grid-column: auto; grid-row: auto; justify-self: start; }
   main { padding: 18px 14px 80px; }
   .view-title { font-size: 22px; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }

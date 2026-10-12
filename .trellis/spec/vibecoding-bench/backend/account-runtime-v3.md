@@ -95,6 +95,10 @@ artifact `v3-release-<run_id>-<run_attempt>` 保存发布清单与同批 gzip �
 
 统一 Vue 后台通过受鉴权的 `/runtime/` 桥访问 bench，保留 HTTP/SSE/WS。浏览器桥限定路径/方法，拒绝内部和编码绕过；v3 Cookie 名和 scope 独立，退出撤销服务端会话及旧票据。终端资源打包到镜像，不依赖运行时 CDN。
 
+**管理页面布局**：`route.name === 'environments'` 时 Dashboard 使用 `100dvh` 纵向 flex，隐藏统计卡片，main 全宽且 `flex: 1; min-height: 0`；Environments 的 iframe 填满剩余空间，无额外边距、圆角或固定高度扣减。外层不承担内容滚动，bench 保留原主题和自身滚动；离开该路由后恢复网关普通页的内容宽度、统计卡片和滚动。
+
+bench 导航项不拆分中英文标签；宽度不超过 1440px 时导航独立一行，不超过 920px 时顶部区域单列、隐藏品牌副说明并允许整项换行。表格保持水平滚动和内容自适应高度，超出 1px 的装饰线不能触发纵向滚动条。静态 CSS 更新时同步 index.html 的样式版本参数，避免缓存保留旧布局。
+
 停机/备份/离线导入只作用于本部署，保留持久数据。离线导入默认 dry-run，来源幂等，拒绝凭据，账号停用、旧活动 run 停止，不恢复旧调度；真实接管不能让旧、新系统同时刷新同一账号。
 
 ### 4. Validation & Error Matrix
@@ -115,6 +119,7 @@ artifact `v3-release-<run_id>-<run_attempt>` 保存发布清单与同批 gzip �
 | 非当前 v3 Action、dirty 来源、同 attempt 或已有输出 | 拒绝发布，不覆盖批次 |
 | 任一推送、仓库 digest 或镜像包失败 | 无完整发布清单，已推镜像保留 |
 | 包名称/大小/SHA256、镜像角色/ID/平台不符 | 拒绝交付；本地同批标签不覆盖 |
+| 桌面或窄屏打开环境与任务 | iframe 全宽，底边贴合视口；标签保持横排，外层不产生额外滚动 |
 
 ### 5. Scenarios and Examples
 
@@ -127,6 +132,7 @@ artifact `v3-release-<run_id>-<run_attempt>` 保存发布清单与同批 gzip �
 - 基础/历史：旧环境没有 swap 字段，继续禁用；Docker 存储实现更换后本地 ID可以不同，但固定 config_digest/registry_digest 与平台仍能核对。
 - 错误用法：将 memswap_limit 设成 RAM值却声称容器可用宿主 swap，或用 SwapFree 抵扣 RAM 预算。正确做法：总限额为RAM＋额外swap，预检分别比较两种余量。
 - 错误用法：把本地 Docker Id 当作仓库 digest，或只成功推一件就生成可部署清单。正确做法：三种哈希明确区分，两个角色都成功后才保存完整交付结果。
+- 错误用法：把 bench 放进网关的 max-width 容器，叠加统计卡片和 iframe 的 `100vh - 100px` 高度。正确做法：环境路由独占导航下方工作区，flex 根据实际导航高度分配 iframe 空间。
 
 ### 6. Tests Required
 
@@ -137,3 +143,4 @@ artifact `v3-release-<run_id>-<run_attempt>` 保存发布清单与同批 gzip �
 - actionlint 核对 ref、权限与 artifact；实际本地 registry 的 push/pull、归档 config 哈希以及双镜像 save/load 核对。CI/GHCR发布结果与指定服务器实时预检/健康/旧服务不变在发布后验收，不能以本地替身称其已完成。
 - 联合重建后串行跑 `run_local_verification.py --manifest ...`、`verify_stack.py --manifest ... --browser`：实际运行中的合成 CLI、同 run 第二代、API 长流与新增 API、CLI 取消/重启/Recorder故障保留 API、tmux 重连、两账号传输隔离、旧哨兵及数据库不变。
 - 校验冻结源码哈希和最终输入一致，标明平台、失败日志、测试替身及未执行项。真实 CLI OAuth/实际主会话/额度恢复、公网全链路与同宿主压力由隔离部署负责人后续验证；arm64 发布前在对应环境验证。不能用本地 mock 宣称这些真实验收已完成。
+- 只改管理页面布局时运行 `cd cc2api/web && npm run build`，浏览器覆盖 1541/1280/920/390px 与明暗主题：iframe 宽度等于视口、顶边等于导航底边、底边等于视口高度，外层无溢出，标签不竖排；表格内容高度完整、窄屏水平滚动可用，弹窗及退出可用，切回网关账号页恢复统计卡片和普通布局。
