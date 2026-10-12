@@ -1,0 +1,355 @@
+{
+  "id": "account-docker-cli-integration",
+  "name": "account-docker-cli-integration",
+  "title": "v3 大版本：固定账号 Docker 与统一登录、管理和部署",
+  "description": "每账号一个固定 Docker 与持久 HOME，真实 Claude Code CLI 在 tmux 中登录；任务、养号、抓包和续聊复用环境，融合 cc2api 管理与执行协调。管理端保留选号、协议、重试和响应处理，账号容器复用现有 HTTP/TLS 实际发送 HTTPS；管理/账号两镜像联合构建及 Compose 启停，独立网络、数据、端口和 labels 与旧版并行。额度阈值仅后续 roadmap，遥测修复暂缓。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "v3-account-runtime",
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-12",
+  "completedAt": "2026-10-12",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-12T09:14:19Z",
+    "blockers": []
+  },
+  "branch": "v3",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-12T03:26:59Z",
+      "contextKey": "codex_01a12dc2-f512-7013-83da-0633efa59f92",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "49e8fb097a527bca9b16af1842b5c524ea5f2da9",
+        "status": [
+          {
+            "status": " M",
+            "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/account-hold-comparison.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/recovery-contracts.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/telemetry-evidence.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/worker-contracts.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/task.json"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "49e8fb097a527bca9b16af1842b5c524ea5f2da9",
+            "status": [
+              {
+                "status": " M",
+                "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/account-hold-comparison.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/recovery-contracts.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/telemetry-evidence.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/worker-contracts.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/task.json"
+              }
+            ],
+            "worktreeDiffSha256": "42573c91f46371f0c132e36c5d19bfeff386320cd256533797e9f650e9ab1791",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md",
+                "sha256": "8ba4e9f26af89b42e2ce20fe88bee62e3e03bbf35a9718e02c96b7c4c27b5745"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl",
+                "sha256": "91534c2dd15014470e9266e207fea31ca117537fb0f5c74e7880d9954b2c8399"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md",
+                "sha256": "0af15a1ee3eef2ad7d75bbfeee48ce78a7a5c47a977ab65e650f68ea3e85a50d"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl",
+                "sha256": "3f8050ff392e2bb0ed37ce8865bfe3b7c4e341c8fe89c01bd643386fc186c2e1"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md",
+                "sha256": "bd30f98dafc1b6726301d7d44183be17d2f1782d63cba44ec47bffd2c875c43f"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md",
+                "sha256": "34b4876aefc2ba9cb2c345839e614f18611050f2f429e4cbf69d52dc9fb79715"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md",
+                "sha256": "1e907d1a7f469f49b46a4a9644156c8af2379164e5064b88ef069acc74b5fbc0"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md",
+                "sha256": "3b96b5901fa58216e783fafaf84f7c5e370c70aba8c2de82b5ed42bf5b6513df"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md",
+                "sha256": "95db129ed16d1a85e3ef21361ec506332a4cec902f20ec91cafa76c49a681819"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json",
+                "sha256": "53a52a996c4db18c5b422746b488099f45c1dedc4d18b245d500e92a02edcdef"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/brief.md",
+                "sha256": "b96632b24c8289b8912f782b091022a148037914057f48a591925e82dd982143"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/check.jsonl",
+                "sha256": "6a334cbc38658f19938380b89767461ca59ab44677025b5654085f075cebbcd5"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/design.md",
+                "sha256": "a50397b8ef738d04bd160907a594f00969ce2aecdbbd59a0087d567d4b395580"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.jsonl",
+                "sha256": "d289c33e827e2e5a17529626199f34a5a5bbb411451a5491e4150776cecf7428"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.md",
+                "sha256": "905c420bd2ff3d396634bd5cc2972b0504a0e0d9c28e12b1ceb53bddabef8691"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/prd.md",
+                "sha256": "17ef0f84dc4dbd14d6393b2bef47064184a7f6e2516129cce05e8a3fcc476347"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/account-hold-comparison.md",
+                "sha256": "76ba3752b38a4dc32ce8a4d2a9a6dc8f10f4bcbf5bfb6e642bb058bd16ce762c"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/recovery-contracts.md",
+                "sha256": "5b305441324f8f6c72568be289a1a7a07751f2eef77113916ac5063f6dbb002a"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/telemetry-evidence.md",
+                "sha256": "8cf11213eee1518660d1903b475964fca7710fb210865ec3fa7ab79decadf841"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/worker-contracts.md",
+                "sha256": "f89688bd7de8ff0a9eadfb4d97294660f0681ef6b97697627fe5b5eae419c649"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/task.json",
+                "sha256": "cf64ee2d3af29224a9c79d6abbf27541482ca0e090ec218b51f660b0a7fa54f5"
+              }
+            ],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "82e8663871168fda1e8a25e04ca4aaba5dbaa8d5f9586224bf456cddb7bb9dac"
+          },
+          {
+            "root": "cc2api",
+            "head": "34ed25fd5a352e823c1ec0269bdfb39b530bae92",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "ff9bd0c6ed378484744ed52896ede5d864462ed3a787729a3a8df04bab9903a5"
+          }
+        ],
+        "fingerprint": "c39d14365f1ace40cf4b9a4a43ff66035b9820b7945e0a433a2256a6809f9eff"
+      }
+    },
+    "v3": {
+      "major": 3,
+      "imageCount": 2,
+      "accountContainersPerAccount": 1,
+      "controlContainerCount": 2,
+      "accountHttpsSender": true,
+      "preserveGatewayProtocolSemantics": true,
+      "suggestedHostPort": 18080,
+      "hostPortVerifiedFree": false,
+      "cliTmuxLogin": true,
+      "productionCutoverAuthorized": false,
+      "quotaThresholdRoadmapOnly": true
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "完成 v3 固定账号 Docker、真实 CLI tmux 登录入口、账号容器 HTTPS 发送及统一管理部署实现",
+      "完成同账号 API 与普通 CLI、养号和抓包独立调度，以及维护排他与执行收口",
+      "修复同 run 与续聊恢复的证据目录和额度游标，完成有效本地回归与 full Check-All",
+      "固化跨项目运行环境规范，完成两个仓库 v3 业务提交与远端同步"
+    ],
+    "partialStep": null,
+    "nextStep": "在独立部署中使用测试账号验收官方 CLI OAuth、实际会话与额度恢复、完整公网链路和同宿主压力；arm64 发布前另行构建验证",
+    "notes": "本任务完成态表示本地实现与验证交付。当前镜像和完整容器演练覆盖 linux/amd64，CLI 业务场景使用明确的合成替身；尚未执行真实账号验收或生产切换。额度阈值保留在后续 roadmap，遥测修复仍暂缓。",
+    "updatedAt": "2026-10-12T09:14:19Z"
+  }
+}

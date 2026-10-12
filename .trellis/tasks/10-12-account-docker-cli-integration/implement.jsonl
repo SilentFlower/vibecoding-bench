@@ -1,0 +1,9 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/index.md", "reason": "绑定所有权、被动额度、原会话恢复及幂等迁移；专项完整契约见 research/spec-contracts.md，修改前重读原规范对应段落"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/auth-design.md", "reason": "管理鉴权、WS 与独立会话命名空间"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/index.md", "reason": "worker managed 凭据及联合镜像验证；专项完整契约见 research/spec-contracts.md，修改前重读原规范对应段落"}
+{"file": ".trellis/spec/cc2api/backend/index.md", "reason": "账号队列、RPM 入场、SSE permit 与上游边界；专项完整契约见 research/spec-contracts.md，修改前重读原规范对应段落"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "统一 Vue 后台、API 类型和画像展示"}
+{"file": ".trellis/spec/cc2api/deploy/deploy-guidelines.md", "reason": "子模块与镜像构建交付"}
+{"file": ".trellis/tasks/10-12-account-docker-cli-integration/research/current-contracts.md", "reason": "当前代码依据、v3 范围及未验证机制"}
+{"file": ".trellis/tasks/10-12-account-docker-cli-integration/research/spec-contracts.md", "reason": "逐字关键规范摘录，避免 source/identity、RT 与入场语义被大文件截断"}
+{"file": ".trellis/tasks/10-12-account-docker-cli-integration/research/packaging-options.md", "reason": "用户最终确定管理/账号两镜像、每账号一个容器和实际 HTTPS 发送边界；CLI 非 root、传输保真与故障不重放契约"}

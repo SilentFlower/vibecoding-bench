@@ -1,0 +1,9 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/index.md", "reason": "额度、执行归属、凭据所有权和取消恢复回归；专项完整契约见 research/spec-contracts.md，修改前重读原规范对应段落"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md", "reason": "抓包限频、证据与用户现有修改保护"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "Rust 检查和敏感信息边界"}
+{"file": ".trellis/spec/cc2api/backend/index.md", "reason": "占用协调不破坏网关数据面；专项完整契约见 research/spec-contracts.md，修改前重读原规范对应段落"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "前端构建和统一管理展示"}
+{"file": ".trellis/spec/cc2api/deploy/deploy-guidelines.md", "reason": "镜像和部署验证"}
+{"file": ".trellis/tasks/10-12-account-docker-cli-integration/research/current-contracts.md", "reason": "两镜像、账号容器 HTTPS 发送及旧版隔离基线"}
+{"file": ".trellis/tasks/10-12-account-docker-cli-integration/research/spec-contracts.md", "reason": "逐字关键规范摘录，避免 source/identity、RT 与入场语义被大文件截断"}
+{"file": ".trellis/tasks/10-12-account-docker-cli-integration/research/packaging-options.md", "reason": "用户最终确定管理/账号两镜像、每账号一个容器和实际 HTTPS 发送边界；CLI 非 root、传输保真与故障不重放契约"}
