@@ -212,6 +212,29 @@ class PublicationTests(unittest.TestCase):
         self.assertTrue(manage._image_matches({"Id": entry["registry_digest"]}, entry))
         self.assertFalse(manage._image_matches({"Id": "sha256:" + "9" * 64}, entry))
 
+    def test_containerd_archive_manifest_uses_original_config_digest(self) -> None:
+        """containerd 重建 archive manifest 后仍以原始 config 严格确认内容。
+
+        :return: None
+        """
+        published = self._publish()
+        entry = published["images"]["control"]
+        transformed = {"Id": "sha256:" + "9" * 64, "Descriptor": {
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "digest": "sha256:" + "9" * 64,
+        }}
+        with patch.object(manage, "_image_config_digest", return_value=entry["config_digest"]) as digest:
+            self.assertTrue(manage._local_image_matches(entry["reference"], transformed, entry))
+        digest.assert_called_once_with(entry["reference"])
+        with patch.object(manage, "_image_config_digest", return_value="sha256:" + "8" * 64):
+            self.assertFalse(manage._local_image_matches(entry["reference"], transformed, entry))
+        self.assertFalse(manage._local_image_matches(entry["reference"], {
+            "Id": transformed["Id"],
+            "Descriptor": {"mediaType": "application/vnd.oci.image.index.v1+json"},
+        }, entry))
+        self.assertTrue(manage._container_image_matches(transformed["Id"], transformed["Id"], entry))
+        self.assertFalse(manage._container_image_matches("sha256:" + "7" * 64, transformed["Id"], entry))
+
 
 if __name__ == "__main__":
     unittest.main()

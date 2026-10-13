@@ -81,7 +81,7 @@ def inspect_images(values: dict) -> dict:
         info = json.loads(command("docker", "image", "inspect", name, capture=True))[0]
         entry = manifest["images"][role]
         labels = info["Config"]["Labels"] or {}
-        if entry["reference"] != name or not _image_matches(info, entry):
+        if entry["reference"] != name or not _local_image_matches(name, info, entry):
             raise ValueError("镜像 digest 与清单不匹配")
         if entry.get("platform") and entry["platform"] != info.get("Os", "") + "/" + info.get("Architecture", ""):
             raise ValueError("镜像平台与清单不匹配")
@@ -307,11 +307,45 @@ def _image_matches(info: dict, entry: dict) -> bool:
         info["Id"] == registry or (info.get("Descriptor") or {}).get("digest") == registry))
 
 
+def _local_image_matches(reference: str, info: dict, entry: dict) -> bool:
+    """核对本地镜像；containerd 导入 archive 时允许以原始 config 证明同一内容。
+
+    :param reference: 当前本地镜像引用
+    :param info: `docker image inspect` 的单条结果
+    :param entry: 发布清单中的角色镜像记录
+    :return: 本地镜像可由清单 digest 或 archive 原始 config 唯一确认时为 True
+    """
+    if _image_matches(info, entry):
+        return True
+    descriptor = info.get("Descriptor") or {}
+    config = entry.get("config_digest")
+    # 只有 containerd 从 docker archive 重建 OCI manifest 的已知形态才做昂贵回查；
+    # config digest 同时锚定 rootfs diff_ids 和运行配置，不能只凭标签放行。
+    if (descriptor.get("mediaType") != "application/vnd.oci.image.manifest.v1+json"
+            or not config or not re.fullmatch(r"sha256:[0-9a-f]{64}", config)):
+        return False
+    try:
+        return _image_config_digest(reference) == config
+    except (ValueError, OSError, subprocess.CalledProcessError):
+        return False
+
+
+def _container_image_matches(image_id: str, local_id: str, entry: dict) -> bool:
+    """核对容器镜像是否属于当前已验证的本地标签或发布清单。
+
+    :param image_id: 容器 inspect 返回的镜像 ID
+    :param local_id: 当前批次标签经严格校验后的本地镜像 ID
+    :param entry: 发布清单中的角色镜像记录
+    :return: 容器使用当前本地内容或清单固定 digest 时为 True
+    """
+    return image_id == local_id or _image_matches({"Id": image_id}, entry)
+
+
 def _check_local_reference(reference: str, expected: dict) -> None:
     result = subprocess.run(["docker", "image", "inspect", reference], cwd=REPO,
         capture_output=True, text=True, check=False)
     if result.returncode == 0:
-        if not _image_matches(json.loads(result.stdout)[0], expected):
+        if not _local_image_matches(reference, json.loads(result.stdout)[0], expected):
             raise ValueError("本地批次标签指向其它镜像，拒绝覆盖")
     elif "No such image" not in result.stderr:
         raise ValueError("无法核对本地镜像，拒绝继续")
@@ -426,7 +460,7 @@ def pull(manifest_path: Path) -> None:
         pinned = entry["reference"].rsplit(":", 1)[0] + "@" + entry["registry_digest"]
         command("docker", "pull", pinned)
         info = json.loads(command("docker", "image", "inspect", pinned, capture=True))[0]
-        if not _image_matches(info, entry):
+        if not _local_image_matches(pinned, info, entry):
             raise ValueError("下载镜像配置 ID 与发布清单不匹配")
         command("docker", "tag", pinned, entry["reference"])
     inspect_images(_manifest_values(manifest_path))
@@ -477,6 +511,11 @@ def status(values: dict) -> dict:
     """
     manifest = inspect_images(values)
     root = _owned_root(values)
+    local_ids = {}
+    for role in ("control", "account"):
+        reference = values.get(f"V3_{role.upper()}_IMAGE") or manifest["images"][role].get("reference")
+        local_ids[role] = (json.loads(command("docker", "image", "inspect", reference, capture=True))[0]["Id"]
+            if reference else manifest["images"][role]["digest"])
     ids = command("docker", "ps", "-aq", "--filter", "label=vibebench.product=v3",
         "--filter", f"label=vibebench.deployment={values['V3_DEPLOYMENT_ID']}", capture=True).split()
     inspected = json.loads(command("docker", "inspect", *ids, capture=True)) if ids else []
@@ -486,10 +525,12 @@ def status(values: dict) -> dict:
         if labels.get("vibebench.product") != "v3" or labels.get("vibebench.deployment") != values["V3_DEPLOYMENT_ID"]:
             continue
         role = labels.get("vibebench.role", "unknown")
-        expected = manifest["images"]["account" if role == "account" else "control"]
+        expected_role = "account" if role == "account" else "control"
+        expected = manifest["images"][expected_role]
         containers.append({"id": item["Id"], "name": item["Name"].lstrip("/"), "role": role,
             "environment_id": labels.get("vibebench.environment"), "status": item["State"]["Status"],
-            "image_digest": item["Image"], "matches_release": _image_matches({"Id": item["Image"]}, expected)})
+            "image_digest": item["Image"],
+            "matches_release": _container_image_matches(item["Image"], local_ids[expected_role], expected)})
     environments = []
     database = root / "bench/db.sqlite"
     if database.is_file():
