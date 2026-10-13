@@ -328,14 +328,17 @@
     }
   },
   "progress": {
-    "updatedAt": "2026-10-13T21:17:59+08:00",
+    "updatedAt": "2026-10-13T21:56:45+08:00",
     "completedSteps": [
       "实现 v3 TLS 透传、profile v2、reprofile 与未绑定阈值保存",
       "Full Check-All 与本地 Docker、浏览器全链路验证通过",
-      "业务代码和代码规范已推送到 origin/v3"
+      "业务代码和代码规范已推送到 origin/v3",
+      "Actions/GHCR 发布及 us.flower-cli.com 生产部署完成，旧服务保持运行",
+      "10-13 已校正为 profile v2 并验证 profile_reauth 跨管理服务重启保持",
+      "containerd 离线 bundle 验真兼容已在真实服务器验证并推送"
     ],
-    "partialStep": "GitHub Actions/GHCR 构建与生产迁移尚未完成",
-    "nextStep": "等待 v3 GitHub Actions 完成，取得同批发布清单后部署到 us.flower-cli.com；保留旧服务，并完成 10-13 reprofile 与真实重授权验收",
-    "notes": "生产发布前继续保留上线后验证项，任务维持 in_progress。"
+    "partialStep": "10-13 真实 Claude Code OAuth 重授权和重授权后任务验收尚未完成",
+    "nextStep": "用户在 v3 页面完成 10-13 重新授权；随后验证 ready、画像不变、普通任务 passthrough 与额度阈值，并关闭任务",
+    "notes": "生产批次 ci-38404058185-1；停机备份和部署记录已保存在服务器，本任务维持 in_progress。"
   }
 }
