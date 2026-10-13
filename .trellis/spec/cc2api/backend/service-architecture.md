@@ -587,6 +587,7 @@ oauth::refresh_oauth_token_at(
 
 AccountService::resolve_upstream_token(id: i64) -> Result<String, AppError>
 AccountStore::disable_for_auth_failure(id: i64, reason: &str) -> Result<(), AppError>
+AccountService::disable_for_auth_failure_if_current(expected: &Account, reason: &str) -> Result<(), AppError>
 ```
 
 - Gateway 适用入口为 `/v1/messages` 与 `/v1/messages/count_tokens`。
@@ -599,7 +600,7 @@ AccountStore::disable_for_auth_failure(id: i64, reason: &str) -> Result<(), AppE
 - OAuth 账号缺少 refresh token 时必须在有效 AT 快路径之前返回 `PermanentCredential`；有效 AT 不能掩盖已无法续期的账号状态。
 - 永久凭据错误必须保留到 Gateway，不得包装回普通 `ServiceUnavailable`，也不得使用仍有效旧 AT fallback。临时错误可继续复用尚未过期的 AT，并且不得切换到其他账号放大 token endpoint 故障。
 - 只有 Gateway 请求调度路径负责停用账号；管理端 resolve、usage、telemetry 和后台任务可观察该错误，但不得仅因一次解析调用自行修改账号状态。
-- Gateway 收到 `PermanentCredential` 后必须先调用 `disable_for_auth_failure`。该存储入口用一条 SQL 原子写入 `status=disabled`、相同的 `auth_error` / `disable_reason`，并清空 `rate_limited_at` / `rate_limit_reset_at`；写入失败必须向上返回，不能继续假装账号已被隔离。
+- Gateway 收到 OAuth `PermanentCredential` 后调用 `disable_for_auth_failure_if_current`，按原 AT/RT 且仍为 active OAuth 的条件写入。实际命中时原子写入 `status=disabled`、相同的 `auth_error` / `disable_reason` 并清空两项限流时间；已换凭据或人工停用时忽略旧回包，SQL 失败仍向上返回。无条件 `disable_for_auth_failure` 保留给既有 SetupToken 路径。
 - 停用成功后把账号加入本轮 `exclude_ids`；`/v1/messages` 还必须显式释放当前 slot，再继续账号选择。sticky 选择必须服从同一排除集合，同一请求内每个永久失效账号最多探测一次。
 - 永久凭据排除必须使用独立状态判断，并在候选耗尽时优先于历史 429 返回通用 503；不得改变普通 401 恢复失败与历史 429 的既有优先级。
 
@@ -650,7 +651,7 @@ match account_svc.resolve_upstream_token(account.id).await {
     Ok(token) => token,
     Err(AppError::PermanentCredential(reason)) => {
         account_svc
-            .disable_for_auth_failure(account.id, &reason)
+            .disable_for_auth_failure_if_current(&account, &reason)
             .await?;
         exclude_ids.push(account.id);
         drop(slot_guard);
@@ -660,7 +661,7 @@ match account_svc.resolve_upstream_token(account.id).await {
 }
 ```
 
-永久错误只在确认停用成功后切号；临时错误沿用原失败或有效 AT fallback 语义。
+实际永久错误停用后切号；旧凭据快照已过期时只排除本请求中的旧候选，不能停用新登录凭据。临时错误沿用原失败或有效 AT fallback 语义。
 
 ## Scenario: 有效上游 Session 首次 Hello 代理探测
 
@@ -869,6 +870,76 @@ let client = get_request_client(&account.proxy_url)
 ```
 
 共享 client factory 只缓存成功构建的客户端，非空代理失败立即向上传播；Gateway 对 classifier 单独选择正文改写和 summary-only 日志策略。
+
+## Scenario: v3 重授权凭据导入与迟到回包保护
+
+### 1. Scope / Trigger
+
+- 修改 CLI 重授权导入、OAuth 回执/锁、登录维护租约，或刷新/401 的认证状态写入时适用。bench 的暂存与恢复流程见 [固定账号环境](../../vibecoding-bench/backend/account-runtime-v3.md#scenario-v3-关联重授权提交与恢复)。
+
+### 2. Signatures
+
+```text
+POST /admin/accounts/:id/oauth-credentials/import
+GET  /admin/accounts/:id/oauth-credentials/import/:operation_id
+OAuthCredentialImport {
+  operation_id: String, owner: String, generation: String, email: String,
+  account_uuid: Option<String>, organization_uuid: Option<String>,
+  access_token: String, refresh_token: String, expires_at: i64
+}
+oauth_credential_imports(
+  operation_id TEXT PRIMARY KEY,
+  account_id BIGINT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  request_hash TEXT NOT NULL, created_at TEXT NOT NULL)
+AccountService::import_oauth_credentials(id: i64, input: &OAuthCredentialImport)
+  -> Result<OAuthCredentialSnapshot, AppError>
+AccountService::oauth_import_status(id: i64, operation_id: &str)
+  -> Result<Option<OAuthCredentialSnapshot>, AppError>
+AccountService::disable_oauth_for_failed_token(id: i64, failed_access_token: &str, reason: &str)
+  -> Result<bool, AppError>
+RuntimeGate::begin_oauth_import(owner: &str, generation: &str)
+  -> Result<OAuthImportPermit, AppError>
+```
+
+### 3. Contracts
+
+- 两路导入/对账要求管理 Bearer 和 `x-v3-service-token`；`V3_RUNTIME_URL` 非空，`V3_INTERNAL_TOKEN` 至少 32 字节且恒时比较。浏览器不持内部秘密，不公开凭据快照。
+- DTO 拒绝未知字段。操作 ID 为 32 位十六进制；bench 生成小写 UUID hex。邮箱非空且最多 320 字节；AT/RT 非空、各不超过 16384 字节且只含非空白可见 ASCII。新提交有效期为 UTC 毫秒，至少剩余 60 秒。
+- 原账号须为 OAuth；邮箱、已有非空 UUID/组织按 trim/ASCII 忽略大小写匹配。原 UUID/组织已存在时，新值不可缺失。接口不修改设备、画像、代理或身份字段。
+- 复用 `oauth:refresh:account:{id}` 的 Memory/Redis 锁：TTL 30 秒、500ms 间隔最多 20 次等待。锁内重读回执/账号，首次导入要求未过期、claimed、exclusive 的同代 `login:` 租约，active/importing 均为 0。
+- 凭据、回执与认证恢复同事务写入；按原 AT/RT、状态、停用原因、邮箱及 UUID/组织做条件更新。冲突回滚回执。SQLite/PostgreSQL 共同幂等建表，回执只存请求 SHA256 与元数据，不额外保存令牌。
+- 同操作、同账号、同载荷返回当前权威快照，不重写首次 RT；载荷/账号冲突拒绝。提交响应包含 `imported:true`、账号/操作 ID、AT/RT/毫秒有效期。对账无回执返回 `imported:false` 与账号/操作 ID；导入仍在途时返回不可确认错误，不能伪报未提交。
+- 导入清旧 auth_error。仅 disabled 且 auth_error 等于 disable_reason、原因属于已有 OAuth 401、缺 RT 或已分类的非 429 客户端 `invalid_grant` 时恢复 active。支持已有 `permanent credential failure: ` 前缀；人工/其他停用、限流及未知配置保持，不调用会清限流的通用 enable。
+- import permit 固定在途占用，release 在 importing 非 0 时拒绝。`fence` 仅同代排他 `login:` 租约使用，将 phase 写为 reconcile、expires_at=0，撤销后续导入；已在途事务仍须对账收口。
+- 所有 OAuth 刷新成功/失败/缺 RT 写入按调用时 AT/RT 条件更新；失配丢弃旧结果并重读。gateway/count_tokens/prime 的 401 按实际失败 AT 重读，再以当前 AT/RT 和 active OAuth 条件停用，不能用刷新前的账号副本停用刷新后的结果。prime 的失败 AT 仅内存传递，不进日志/回执；转发与重试协议保持。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+|---|---|
+| 缺管理或内部服务证明、非 v3 | 401 |
+| DTO/令牌/操作 ID/身份/有效期不合法 | 拒绝；service 的 BadRequest 为 400，JSON 结构错误由 Axum 拒绝 |
+| 登录租约不存在 | 400，不导入 |
+| 非 claimed 同代登录租约、未排空、锁等待超时、条件写入失配 | 503，不释放维护门禁 |
+| 同 ID 不同载荷、对账账号冲突 | 400，原凭据/回执保持 |
+| 回执已提交且租约已失效 | 只读返回当前快照，不再次导入 |
+| 导入未知或仍在途 | 503，不能返回 imported:false |
+| 迟到刷新/401，或已人工停用 | 条件写入不命中，保持新凭据/状态 |
+
+### 5. Scenarios and Examples
+
+- 正常：原登录租约导入一次，再查询同操作回执；只更新原账号，设备与限流不变。
+- 基础：人工停用账号仍可修复凭据，但保持 disabled；认证恢复与养号开关、额度门禁分开。
+- 错误用法：响应丢失后生成新操作或再次覆盖第一次 RT。正确处理：保留原操作/载荷，查询回执后使用当前权威快照。
+- 错误用法：锁 TTL 足以防旧回包，或按旧账号 ID 无条件停用。正确处理：OAuth 锁加 AT/RT 条件写入；401 使用实际失败令牌。
+- 错误用法：取消时先 release 再查询。正确处理：先 fence，等待在途提交确定，清理暂存后才 release。
+
+### 6. Tests Required
+
+- `login_import_*`：只恢复认证停用、保留限流/身份；UUID/组织缺失冲突；条件更新回滚回执；同操作返回进一步轮换后的 RT。
+- gateway/prime 的迟到 OAuth 401 回归：新凭据保持 active；人工停用不被旧请求覆盖；普通刷新后再次 401 仍按既有规则停用。
+- `login_import_fences_late_calls_and_prevents_early_release`：在途 pin、fence 后拒新导入、释放前 API 关闭、确认后放行。
+- `cargo fmt --check && cargo test --locked`；SQLite 实测及 PostgreSQL SQL 兼容检查。隔离临时 DSN 未配置时明确记录已有 PostgreSQL 测试 skipped/ignored。
 
 ## 设置热刷新模式
 

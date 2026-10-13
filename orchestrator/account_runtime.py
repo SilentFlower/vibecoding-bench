@@ -214,11 +214,12 @@ class AccountRuntime:
             raise ValueError("容器部署归属不匹配，拒绝操作")
         return container
 
-    def ensure(self, account: dict, version: str | None = None) -> tuple[dict, object]:
+    def ensure(self, account: dict, version: str | None = None, allow_inactive_login: bool = False) -> tuple[dict, object]:
         """创建或唤醒固定环境，沿用首次固化参数。
 
         :param account: bench 账号或登录草稿
         :param version: 可选目标 CLI 版本；发送器准备无需 CLI
+        :param allow_inactive_login: 仅显式重授权允许读取非 active OAuth 配置
         :return: 环境记录与 Docker container
         """
         with self._account_lock(account):
@@ -228,7 +229,7 @@ class AccountRuntime:
                 raise ValueError("账号镜像角色或构建批次不匹配")
             if account.get("cc2api_account_id") is not None:
                 configuration = self.gateway._request("GET", f"/admin/runtime/accounts/{account['cc2api_account_id']}/config")
-                if configuration["auth_type"] != "oauth" or configuration["status"] != "active":
+                if configuration["auth_type"] != "oauth" or (configuration["status"] != "active" and not allow_inactive_login):
                     raise ValueError("绑定账号认证类型或状态不可用")
                 self._sync_proxy(account, configuration)
             row = self._row(account["name"], account.get("id"))
@@ -494,6 +495,9 @@ class AccountRuntime:
             if row["state"] in ("reconcile", "cli_reconcile"):
                 raise ValueError("账号 CLI 需要先对账，拒绝开始下一作业")
             with self.lock:
+                pending = self._root(row) / "runtime" / "login-commit.json"
+                if pending.exists() and source != f"login:{json.loads(pending.read_text())['sid']}":
+                    raise ValueError("重授权提交尚未收口，请先对账")
                 if row["environment_id"] in self.jobs:
                     if idle_only:
                         raise RuntimeBusy("账号环境正在执行其它工作，低优先级工作顺延")
@@ -641,8 +645,8 @@ class AccountRuntime:
 
     @contextmanager
     def _cli_setup(self, account: dict, source: str, version: str,
-                   idle_only: bool = False, exclusive: bool = False):
-        row, container = self.ensure(account)
+                   idle_only: bool = False, exclusive: bool = False, allow_inactive_login: bool = False):
+        row, container = self.ensure(account, allow_inactive_login=allow_inactive_login)
         job = self.claim(row, account, source, idle_only, exclusive)
         try:
             self._ensure_version(container, version)
@@ -805,6 +809,9 @@ class AccountRuntime:
             with self.lock:
                 if self.jobs.get(job["row"]["environment_id"]) is not job:
                     return
+            commit_path = self._root(job["row"]) / "runtime" / "login-commit.json"
+            if commit_path.exists() and json.loads(commit_path.read_text()).get("phase") != "mirrored":
+                raise ValueError("重授权提交结果尚未确认，必须先对账")
             container = self._container(job["row"])
             try:
                 if job.get("tmux"):
@@ -850,6 +857,9 @@ class AccountRuntime:
                         value["hooks"] = job["hooks_before"]
                     atomic_json(settings, value)
                     os.chown(settings, 1000, 1000)
+                if job.get("tmux") and job.get("home", "/home/node") != "/home/node":
+                    # RT 必须在释放排他门禁前销毁，避免普通 CLI 形成第二条刷新链。
+                    shutil.rmtree(self._root(job["row"]) / "home" / ".v3-login" / job["tmux"], ignore_errors=False)
                 self.release(job)
             except Exception:
                 try:
@@ -954,7 +964,8 @@ class AccountRuntime:
         :param force: 是否保护旧凭据
         :return: 环境、容器、登录 profile、本次 HOME
         """
-        with self._cli_setup(account, f"login:{sid}", version, exclusive=True) as (row, container, job):
+        with self._cli_setup(account, f"login:{sid}", version, exclusive=True,
+            allow_inactive_login=force and account.get("cc2api_account_id") is not None) as (row, container, job):
             home = self._root(row) / "home"
             cli_home = "/home/node"
             if force:
@@ -965,6 +976,12 @@ class AccountRuntime:
                         target = staged / (".claude.json" if source.name == ".claude.json" else ".claude/settings.json")
                         target.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(source, target)
+                top = staged / ".claude.json"
+                if top.exists():
+                    configuration = json.loads(top.read_text())
+                    # 只保留设备与本地设置；新身份必须由本次 CLI 登录重新写出。
+                    configuration.pop("oauthAccount", None)
+                    atomic_json(top, configuration)
                 home = staged
                 cli_home = f"/home/node/.v3-login/{sid}"
             profile = home / ".claude"
@@ -1047,6 +1064,72 @@ class AccountRuntime:
                 os.chown(target, 1000, 1000)
         job["row"] = row
 
+    def login_commit_context(self, session) -> dict:
+        """取得本次登录的固定环境和受控提交记录位置。
+
+        :param session: 当前登录会话
+        :return: 环境、租约与 root 私有记录路径
+        """
+        job = self.job_for_container(self.execution_token(session.worker_id, f"login:{session.sid}"))
+        return {"environment_id": job["row"]["environment_id"], "generation": job["row"]["generation"],
+            "lease": dict(job["lease"] or {}), "path": self._root(job["row"]) / "runtime" / "login-commit.json"}
+
+    def capture_login_pane(self, session) -> str:
+        """读取原 tmux 的有界输出，浏览器断线不会丢失授权链接。
+
+        :param session: 当前登录会话
+        :return: 仅供链接提取的屏幕文本，不记录终端全文
+        """
+        job = self.job_for_container(self.execution_token(session.worker_id, f"login:{session.sid}"))
+        result = self._container(job["row"]).exec_run(["tmux", "-S", job["tmux_socket"],
+            "capture-pane", "-p", "-J", "-S", "-200"])
+        if result.exit_code:
+            raise ValueError("登录终端已结束")
+        return result.output[-65536:].decode("utf-8", errors="replace")
+
+    def finish_bound_login(self, record: dict, snapshot: dict) -> None:
+        """镜像已确认的权威凭据，主 HOME 永远不发布 RT。
+
+        :param record: root 私有的已验证提交记录
+        :param snapshot: cc2api 同一账号当前凭据
+        :return: None；任何不完整写入保留记录供重试
+        """
+        connection = self.database()
+        try:
+            existing = connection.execute("SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL", (record["account_id"],)).fetchone()
+        finally:
+            connection.close()
+        if not existing or existing["name"] != record["name"] or existing["cc2api_account_id"] != record["cc2api_account_id"]:
+            raise ValueError("重授权的原关联账号已改变")
+        account = dict(existing)
+        row = self._row(account["name"], account["id"])
+        if row["environment_id"] != record["environment_id"] or snapshot.get("account_id") != account["cc2api_account_id"]:
+            raise ValueError("重授权环境或凭据归属不匹配")
+        profile = self.data / "profiles" / account["name"]
+        credentials_path = profile / ".credentials.json"
+        credentials = json.loads(credentials_path.read_text())
+        oauth = credentials.get("claudeAiOauth")
+        if not isinstance(oauth, dict) or any(not isinstance(snapshot.get(key), str) or not snapshot[key]
+            for key in ("access_token", "refresh_token")) or type(snapshot.get("expires_at")) is not int:
+            raise ValueError("权威凭据不完整，重授权尚未完成")
+        oauth.update(accessToken=snapshot["access_token"], refreshToken=snapshot["refresh_token"], expiresAt=snapshot["expires_at"])
+        atomic_json(credentials_path, credentials)
+        os.chown(credentials_path, 1000, 1000)
+        home = self._root(row) / "home"
+        identity = record["identity"]
+        for top in (profile / ".claude.json", home / ".claude.json"):
+            value = json.loads(top.read_text()) if top.exists() else {}
+            oauth_account = value.setdefault("oauthAccount", {})
+            # 只更新经验证的登录身份，保留 userID 等原设备字段与本地配置。
+            for source, target in (("email", "emailAddress"), ("account_uuid", "accountUuid"), ("organization_uuid", "organizationUuid")):
+                if identity.get(source):
+                    oauth_account[target] = identity[source]
+            atomic_json(top, value)
+            os.chown(top, 1000, 1000)
+        self.sync_credentials(row, account)
+        record["phase"] = "mirrored"
+        atomic_json(self._root(row) / "runtime" / "login-commit.json", record)
+
     def begin_continue(self, account: dict, run: dict, sid: str, context: dict, flows: Path) -> tuple[str, str]:
         """在原工作目录领取续聊，不复制整个账号 HOME。
 
@@ -1099,13 +1182,20 @@ class AccountRuntime:
             connection = self.database()
             try:
                 record = connection.execute("SELECT * FROM account_environments WHERE environment_id=?", (environment_id,)).fetchone()
-                if not record or environment_id in self.jobs:
-                    raise ValueError("环境不存在或正在执行工作")
+                if not record:
+                    raise ValueError("环境不存在")
                 row = dict(record)
                 account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
             finally:
                 connection.close()
             account = dict(account) if account else {"name": row["name"]}
+            if operation == "reconcile" and (self._root(row) / "runtime" / "login-commit.json").exists():
+                self.reconcile(environment_id)
+                if (self._root(row) / "runtime" / "login-commit.json").exists():
+                    raise ValueError("重授权提交结果仍需对账，暂存和门禁已保留")
+                return
+            if environment_id in self.jobs:
+                raise ValueError("环境正在执行工作")
             if operation == "reconcile" and row["state"] == "cli_reconcile":
                 self.reconcile(environment_id)
                 if self._row(row["name"], row["account_id"])["state"] == "cli_reconcile":
@@ -1190,6 +1280,10 @@ class AccountRuntime:
             except NotFound:
                 container = None
             try:
+                commit_path = self._root(row) / "runtime" / "login-commit.json"
+                if commit_path.exists():
+                    self._reconcile_login_import(row, container, commit_path)
+                    continue
                 if record.exists():
                     execution = json.loads(record.read_text())
                     shared = execution.get("exclusive") is False
@@ -1254,6 +1348,51 @@ class AccountRuntime:
                     self._update(row, state="ready" if container and container.status == "running" else "stopped")
             except Exception:
                 self._update(row, state="cli_reconcile" if shared else "reconcile")
+
+    def _reconcile_login_import(self, row: dict, container, path: Path) -> None:
+        """撤销迟到提交权限后对账；结果未知时保持门禁和暂存。
+
+        :param row: 固定环境
+        :param container: 该环境原容器
+        :param path: root 私有提交记录
+        :return: None；不能确认时抛出异常并由调用方保留 reconcile
+        """
+        with self.environment_lock(row["environment_id"]):
+            record = json.loads(path.read_text())
+            if record.get("environment_id") != row["environment_id"] or not re.fullmatch(r"[a-f0-9]{12}", record.get("sid", "")):
+                raise ValueError("重授权提交记录归属不合法")
+            with self.lock:
+                job = self.jobs.pop(row["environment_id"], None)
+            if job:
+                # 等待已经在途的心跳退出；移除作业后不会再启动新的续租。
+                with job["lease_lock"]:
+                    pass
+            lease_path = f"/admin/runtime/accounts/{record['cc2api_account_id']}/lease"
+            current = self.gateway._request("GET", lease_path)
+            lease = current.get("lease")
+            if lease:
+                if lease["owner"] != record["lease"]["owner"] or lease["generation"] != record["lease"]["generation"]:
+                    raise ValueError("重授权门禁已由其他代次接管")
+            else:
+                lease = self.gateway._request("POST", lease_path, {"operation": "prepare", "owner": f"login:{record['sid']}"})["lease"]
+                record["lease"] = lease
+                atomic_json(path, record)
+            self.gateway._request("POST", lease_path, {"operation": "fence", "owner": lease["owner"], "generation": lease["generation"]})
+            current = self.gateway._request("GET", lease_path)
+            if current.get("active") or self._running_sender_active(row):
+                raise ValueError("重授权对账等待现有 API 收口")
+            if container:
+                container.stop(timeout=5)
+            snapshot = self.gateway.import_status(record["cc2api_account_id"], record["operation_id"])
+            if snapshot is not None:
+                self.finish_bound_login(record, snapshot)
+            staged = self._root(row) / "home" / ".v3-login" / record["sid"]
+            if staged.exists():
+                shutil.rmtree(staged)
+            self.gateway._request("POST", lease_path, {"operation": "release", "owner": lease["owner"], "generation": lease["generation"]})
+            (self._root(row) / "runtime" / "execution.json").unlink(missing_ok=True)
+            path.unlink()
+            self._update(row, state="stopped")
 
     def start(self) -> None:
         """启动执行租约心跳。

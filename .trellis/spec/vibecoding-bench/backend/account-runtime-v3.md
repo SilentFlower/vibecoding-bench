@@ -32,7 +32,7 @@ AccountRuntime.start_run(account, task, run_id, worker_env, quota_env) -> tuple[
 AccountRuntime.cleanup(container_id: str) -> None
 ```
 
-管理租约输入为 `operation: string`、`owner: string`、`generation: string | null`；操作为 `prepare-cli`、`prepare`、`claim`、`heartbeat`、`release`。查询返回 `lease`、`active`、`waiting`；租约包含 `owner`、`generation`、`expires_at`（UTC 秒）、`phase`、`exclusive`，TTL 为 30 秒。旧记录缺少 `exclusive` 时默认 `true`。
+管理租约输入为 `operation: string`、`owner: string`、`generation: string | null`；操作为 `prepare-cli`、`prepare`、`claim`、`heartbeat`、`fence`、`release`。查询返回 `lease`、`active`、`waiting`、`importing`；租约包含 `owner`、`generation`、`expires_at`（UTC 秒）、`phase`、`exclusive`，TTL 为 30 秒。旧记录缺少 `exclusive` 时默认 `true`。fence 与在途导入保护见下方重授权场景。
 
 发送绑定 `TransportBinding`：`account_id: i64`、`environment_id: string`、`generation: u64`、`endpoint: string`、`secret: string`、`release_id: string`。`PreparedRequest` 增加 `request_id`（UUID）、`deadline_unix_ms`、`method`、`target_url`、有序 `headers` 及 `preserve_header_casing`；最终 body 独立传原始字节。秘密只在服务间传递。
 
@@ -144,3 +144,64 @@ bench 导航项不拆分中英文标签；宽度不超过 1440px 时导航独立
 - 联合重建后串行跑 `run_local_verification.py --manifest ...`、`verify_stack.py --manifest ... --browser`：实际运行中的合成 CLI、同 run 第二代、API 长流与新增 API、CLI 取消/重启/Recorder故障保留 API、tmux 重连、两账号传输隔离、旧哨兵及数据库不变。
 - 校验冻结源码哈希和最终输入一致，标明平台、失败日志、测试替身及未执行项。真实 CLI OAuth/实际主会话/额度恢复、公网全链路与同宿主压力由隔离部署负责人后续验证；arm64 发布前在对应环境验证。不能用本地 mock 宣称这些真实验收已完成。
 - 只改管理页面布局时运行 `cd cc2api/web && npm run build`，浏览器覆盖 1541/1280/920/390px 与明暗主题：iframe 宽度等于视口、顶边等于导航底边、底边等于视口高度，外层无溢出，标签不竖排；表格内容高度完整、窄屏水平滚动可用，弹窗及退出可用，切回网关账号页恢复统计卡片和普通布局。
+
+## Scenario: v3 关联重授权提交与恢复
+
+### 1. Scope / Trigger
+
+- 修改绑定账号的 CLI 登录、凭据镜像、取消、启动对账及环境页维护时适用。cc2api 导入 DTO/回执/条件写入以 [服务契约](../../cc2api/backend/service-architecture.md#scenario-v3-重授权凭据导入与迟到回包保护) 为准；页面连接以 [终端生命周期](../frontend/hook-guidelines.md#scenario-v3-登录终端重连与授权链接) 为准。
+
+### 2. Signatures
+
+```text
+POST   /api/accounts/login/start
+GET    /api/accounts/login/{sid}/status
+POST   /api/accounts/login/{sid}/commit
+DELETE /api/accounts/login/{sid}
+WS     /api/accounts/login/ws/{sid}
+POST   /api/environments/{environment_id}/maintenance
+AccountRuntime.ensure(account, version=None, allow_inactive_login=False)
+AccountRuntime.login_commit_context(session) -> dict
+AccountRuntime.finish_bound_login(record: dict, snapshot: dict) -> None
+LoginManager.commit_bound(session: LoginSession) -> dict
+LoginManager.cleanup_reconciled(environment_id: str) -> None
+```
+
+### 3. Contracts
+
+- 仅 v3 且明确 `force_reauth:true` 的原绑定 OAuth 账号进入重授权。该路径才允许读取非 active 配置；普通执行仍拒绝。代理沿用 cc2api，时区沿用原账号；固定容器、环境 ID、userID 与固化设备字段保留。活动 run（含 quota_wait）、续聊或其它登录拒绝开始；现有 API 等待排空，不强行截断。
+- start 返回 `session_id/ws_path/name/has_sidecar/reconnectable/cc2api_account_id`。LoginSession 记录原 bench ID、绑定 ID、邮箱/UUID/组织、环境/代次、租约、phase 与提交操作。phase 为 authorizing/submitting/committed/cancelled；成功结果无 AT/RT。
+- force 在原 HOME 下的 `.v3-login/<sid>` 暂存登录；复制设备配置/设置，去掉旧 oauthAccount，不复制旧 credentials。新身份必须来自 CLI 登录产物和 auth status，不从旧配置补齐 UUID/组织。
+- 提交先在 owner 锁内重读原绑定/活动状态，再按 owner → profile 顺序镜像。环境页维护使用 owner → profile → environment 顺序；`cleanup_reconciled` 自行取得非重入 owner 锁，必须在维护外层锁释放后调用。HTTP 在 `_db_lock` 外。
+- HTTP 导入之前原子写 root 私有 `runtime/login-commit.json`（0600），保存 sid、name、两端账号 ID、操作 ID、环境/代次、租约、phase、auth_method 与已验证身份；不保存令牌、授权码或终端全文。内存 payload 保存同操作载荷供重试。
+- 导入成功先镜像权威 AT/RT/expiry 到管理 profile，保留未知配置；主 HOME 与 runtime 只发布 AT，顶层配置只更新已核对的身份字段，保留 userID。不改 bench enabled、养号开关/阈值、限流或已有额度状态。
+- 本地写入/清理未完成时保留暂存和记录，不报成功。重试先查回执，用当前快照；只有明确未提交才以原操作重试。收口 tmux/进程/Recorder并销毁暂存 RT 后再 release。成功结果缓存 1800 秒，仅含账号/同步状态，允许同名同 sid 的重复 commit。
+- pending 记录优先于普通执行恢复。对账先停止新心跳、核对原租约，必要时取得新维护门禁，再 fence；等待 API/发送器收口、停止原容器、查询回执。已提交则镜像当前快照；明确未提交保留原 profile。删暂存、release、删执行/提交记录后才完成。未知结果或租约被其它代次接管时保留 reconcile 和门禁。
+- 普通 TTL 清理只处理 authorizing；不确定提交不可自动删除。取消已提交只关闭终端，不回滚远端凭据。服务重启恢复结果，不承诺恢复同一交互终端。
+- status 为 `Cache-Control:no-store`，返回 phase、credentials_ready、expires_at（UTC 秒）、reconnectable 与 authorization_url；已完成返回最小 committed 状态。URL 从同 tmux 的有界屏幕提取，不持久化终端全文。
+
+### 4. Validation & Error Matrix
+
+| 条件 | bench 行为 |
+|---|---|
+| 旧部署绑定重授权、绑定但未 force_reauth | 409，保持原保护 |
+| 账号有活动工作、原绑定/环境改变、身份不符或缺失 | 409，不写其它账号或原 profile |
+| 未登录或导入尚不能确认 | 提交未完成；连接/导入未知为 503，保留维护资料 |
+| profile/HOME/cleanup 写入失败 | 500 或受控冲突，明确重试/对账，不假报成功 |
+| 无 SID、authorizing 到期 | status 404/410；WS 拒绝失效输入 |
+| 环境维护占用/归属冲突、对账连接未知 | 409/503；不强行放行 |
+
+### 5. Scenarios and Examples
+
+- 正常：原绑定账号用 `{"name":"账号名","force_reauth":true}` 登录，提交后仍为原 cc2api ID，管理 profile 有新 AT/RT，HOME 只有 AT。
+- 基础：认证自动停用可恢复，人工停用保持；未绑定登录、普通 CLI/API 并行行为沿用原分支。
+- 错误用法：读复制来的旧 oauthAccount 判断新登录身份，或调用普通 commit_login 把 RT 发到绑定 HOME。正确处理：暂存去旧身份，验证本次登录，走 finish_bound_login。
+- 错误用法：HTTP 超时就清暂存/放门禁，或环境页对账绕开 owner 锁。正确处理：保留记录和原操作，fence 后对账，镜像与提交共用锁顺序。
+
+### 6. Tests Required
+
+- `test_login_reauth.py` 使用临时真实 SQLite/文件覆盖同 ID、设备/策略保留、AT-only、身份冲突/缺失、改绑、响应丢失、部分落盘、重启/未知结果、对账占用清理和维护等待 owner 锁；显式声明远端/Docker 替身。
+- `verify_stack.py --manifest <联合清单> --browser --reauth`：随机独立部署、合成 CLI/本地代理，真实页面/HTTP/WS/tmux/双 DB 验证；控制 `.synthetic-login.json` 仅在验证目录，fixtures 不进正式镜像。
+- `verify_browser.py` 的 insecure_http 模式用 `v3-verify.test` 只解析到回环，Chrome 仍阻止其它公网请求；检查真实非安全上下文的复制降级。原 localhost 属于安全上下文，不能以 HTTP 协议名冒充此验证。
+- 两侧凭据、回执、设备、策略、租约与暂存前后比对；结束只按随机部署精确标签清理，核对旧哨兵 StartedAt/hash 不变。恢复测试数据后再验证无遗留。
+- 单测/模拟通过不证明真实 OAuth 成功或账号限制解除；上线后由部署负责人安排可用测试账号，经真实 CLI 重授权和正式 API 验收。回滚前收口所有 pending 登录，不删除新回执表。

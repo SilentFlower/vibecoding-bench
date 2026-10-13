@@ -59,12 +59,15 @@ async function attachAccLoginTerminal(wsPath) {
   state.accLogin.onResize = onResize;
 }
 
-function endAccLogin({ alsoCloseModal = false, skipServerCancel = false } = {}) {
+async function endAccLogin({ alsoCloseModal = false, skipServerCancel = false } = {}) {
   const al = state.accLogin || {};
-  if (al.ws && al.ws.readyState <= 1) { try { al.ws.close(); } catch {} }
-  if (al.term) { try { al.term.dispose(); } catch {} }
-  if (al.onResize) window.removeEventListener('resize', al.onResize);
-  if (al.sid && !skipServerCancel) API(`/accounts/login/${al.sid}`, { method: 'DELETE' }).catch(() => {});
+  // 此处仅展示收口顺序；启动/提交并发保护见下方 v3 场景和实际实现。
+  if (al.sid && !skipServerCancel) {
+    try { await API(`/accounts/login/${al.sid}`, { method: 'DELETE' }); }
+    catch (error) { return; } // 结果未知时保留窗口、暂存和 state 供重试。
+  }
+  clearTimeout(al.pollTimer);
+  al.connection?.dispose();
   state.accLogin = null;
   // ...UI 重置
 }
@@ -73,8 +76,8 @@ function endAccLogin({ alsoCloseModal = false, skipServerCancel = false } = {}) 
 **约定**:
 - 句柄存到 `state.<feature>.<handle>`(`state.accLogin.ws` / `state.accLogin.term`)
 - teardown 函数必须**幂等**:多次调用 / 资源已释放,都不能崩
-- 所有清理操作包 `try {} catch {}`,清理失败不要妨碍后续清理
-- teardown 必须**清空 state**(`state.accLogin = null`),防止悬挂引用
+- 本地句柄按幂等方式清理；服务端取消/凭据同步结果未知时不能吞错并丢掉维护资料。
+- 服务端确认收口后 teardown **清空 state**(`state.accLogin = null`)；取消失败保留 state 和窗口，让用户重试。
 
 ---
 
@@ -98,6 +101,7 @@ async function renderX() {
 `API()` 已统一处理:
 - `Content-Type: application/json`
 - 非 2xx → 抛 `Error(detail || statusText)`
+- API 错误保留 `error.status`，便于生命周期区分鉴权/过期与可重试故障。
 - 2xx → 返回 `json()` 结果
 
 **不引入** SWR / React Query / 任何缓存层。**列表数据每次 render 重拉**,P1 数据量小够用。`state.topics` 是唯一带"已加载就复用"判断的(`if (state.topics.length === 0) { state.topics = await API('/topics'); }`),因为 seed 全量题(当前 600 道)通常只在题库维护后变化。
@@ -138,3 +142,55 @@ async function renderX() {
 | `setup` 函数依赖 DOM 元素存在但不防御 `if (!el) return` | 在不挂该 UI 的页面调用时 `el.onclick` 抛 TypeError | 所有 setup 头部都加防御 |
 | 清理路径不 `try/catch` | 一个资源已经被关 / 抛异常 → 后续资源没机会清 | 每个清理动作单独 `try {} catch {}` |
 | 数据加载不显示 loading 状态 | 用户以为卡死 | render 入口可立即 `body.innerHTML = '<tr><td>加载中…</td></tr>'`,await 完再覆写 |
+
+## Scenario: v3 登录终端重连与授权链接
+
+### 1. Scope / Trigger
+
+- 修改 `attachTerminal/attachAccLoginTerminal/startAccLogin/commitAccLogin/endAccLogin`、登录 modal、WS 票据或授权链接展示时适用。服务端提交和 status 契约见 [关联重授权](../backend/account-runtime-v3.md#scenario-v3-关联重授权提交与恢复)。
+
+### 2. Signatures
+
+```text
+attachTerminal(hostSelector, wsPath, initialStatus='running', options={})
+  -> Promise<{term,fit,ws getter,onResize,stop,reconnect,dispose}>
+options: autoReconnect, isActive, onSocket, onState
+GET /api/accounts/login/{sid}/status
+POST /api/terminal-ticket {path: 原 WS 路径}
+authorization_url(pane: str) -> str | None
+```
+
+### 3. Contracts
+
+- v3 登录启用 autoReconnect，续聊默认不启用。重连只 attach 原 sid/tmux，每次取得新短票据；当前 socket 通过 getter/onSocket 更新，旧回调用 generation 与当前 state 校验。
+- 重试延迟 1/2/4/8 秒、最多 8 次，连续稳定 30 秒才清重试数；心跳每 10 秒发送 ping，超过 30 秒无回包在下个 tick 关闭半开连接。手动重连不重启 CLI。Terminal/FitAddon 加载最多等 10 秒，窗口失效即停止。
+- 只在当前窗口、当前 socket OPEN、输入获准时透传；离线输入丢弃并提示，不缓存/重放授权码。删除额外粘贴本地回显。服务端任一 pump 结束就取消另一 pump、关闭 attach；断线仅 detach。
+- status 在窗口内每 2 秒串行查询，与 WS 首次输出独立；停止状态停止重连。取消期间暂缓轮询，取消失败继续查询；提交/关闭互斥。start HTTP 尚未取得 SID 时关闭窗口，标记 closeRequested，取得 SID 后确认取消再隐藏，避免后台遗留不可见登录。
+- URL 来源为真实 CLI tmux pane：最多 65536 字节，剥 ANSI、拼连续 URL 字符的有限硬换行，候选不超过 8192 字符。仅接受 HTTPS 的 claude.ai/platform.claude.com `/oauth/authorize`，无 fragment，PKCE 必需参数单一非空、code/S256、43 字符 base64url challenge/state；redirect 主机为 platform.claude.com 或 console.anthropic.com 的 HTTPS。不生成或补猜参数；CLI 升级须核对实际形状。
+- URL 以 textarea.value/textContent 展示；打开用 `_blank`、`noopener,noreferrer`。复制依次尝试安全 Clipboard、选中完整文本的 execCommand，再明确手动复制；未复制不报成功。URL 不进入持久缓存或日志。
+- 会话过期、鉴权失效或进入提交阶段后停止重连/心跳与终端输入，status 停止条件也终止轮询；终端和窗口留供显示诊断。关闭、成功提交或确认取消后释放 socket、xterm、输入订阅及 resize listener，并清 state；取消失败保窗。窄屏终端区域要能滚动，提交/取消按钮必须实际可点击；同步静态资源版本与明暗主题。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 页面行为 |
+|---|---|
+| 普通断线/短期网络故障 | 有界重试或手动重连原会话，取新票据 |
+| status 401/403/404/409/410 | 停止连接/轮询，清链接，显示结束/失效状态 |
+| WS 4004/4401/4404 | 停止重连和输入，显示结束/鉴权失效；链接是否有效继续由 status 判断 |
+| submitting/committed | 禁止继续向终端输入，提示重试/对账或完成 |
+| 非官方/非 HTTPS/截断/重复参数/超长 URL | 不展示无效候选，保留终端手动流程 |
+| HTTP 或复制权限不支持 | 选择完整 URL，明确手动复制 |
+| 服务端取消失败/结果未知 | 保留窗口和 state，不假报关闭成功 |
+
+### 5. Scenarios and Examples
+
+- 正常：终端已输出 URL 后断线，HTTP 仍读原 pane；自动或手动重连取新 ticket，原 sid 不变。
+- 基础：HTTP 非安全上下文没有 Clipboard，选中可复制；390px 明暗主题能滚动并点击提交。
+- 错误用法：保存 ticket URL 反复重连，或离线缓存输入后补发。正确处理：新建连接代次、重新出票、丢弃离线输入。
+- 错误用法：调用 DELETE 后立即清 state、吞掉失败。正确处理：await 服务端确认，保留失败窗口；启动中关闭也等 SID 收口。
+
+### 6. Tests Required
+
+- URL 单测覆盖 ANSI、硬换行、截断 state、重复参数、恶意主机/fragment、非 HTTPS；取真实支持 CLI 的脱敏形状核对，不只用自造样本。
+- 真实 Chrome 验证断线与手动重连的新票据/同 sid、离线输入未到 tmux、启动中关闭、HTTP 复制选择、打开参数、1280/390 明暗和真实点击；打开外页在测试中拦截，不能访问真实 OAuth。
+- 取消/过期/退出与非法票据、半开 pump 收口；旧未绑定登录/续聊默认行为回归。`node --check webui/app.js`，组件/错误路径变动后复用对应隔离验证。

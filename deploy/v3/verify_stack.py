@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+from contextlib import ExitStack
 from pathlib import Path
 
 import docker
@@ -56,9 +57,12 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--browser", action="store_true")
     parser.add_argument("--warmup-quota", action="store_true")
+    parser.add_argument("--reauth", action="store_true")
     args = parser.parse_args()
     if args.warmup_quota and not args.browser:
         parser.error("养号页面验证需要同时指定 --browser")
+    if args.reauth and (not args.browser or args.warmup_quota):
+        parser.error("重授权验证需要 --browser，并单独执行以隔离合成账号")
     manifest = json.loads(args.manifest.read_text())
     client = docker.from_env()
     deployment = "stack-verify-" + uuid.uuid4().hex[:10]
@@ -88,6 +92,8 @@ def main() -> None:
             "V3_ADMIN_PASSWORD": uuid.uuid4().hex + uuid.uuid4().hex,
             "V3_INTERNAL_TOKEN": uuid.uuid4().hex + uuid.uuid4().hex,
             "V3_SESSION_SECRET": uuid.uuid4().hex + uuid.uuid4().hex}
+        if args.reauth:
+            values.update(V3_CLI_VERSION="9.9.9", V3_ACCOUNT_MEMORY="1536m", V3_ACCOUNT_SWAP="0")
         configuration = root / "v3.env"
         configuration.write_text("".join(f"{key}={value}\n" for key, value in values.items()))
         configuration.chmod(0o600)
@@ -139,7 +145,11 @@ def main() -> None:
                         database.execute("INSERT INTO accounts(name,profile_path,timezone,cc2api_account_id,warmup_enabled) "
                                          "VALUES('warmup-ui-fixture','profiles/warmup-ui-fixture','Asia/Tokyo',7,0)")
                 try:
-                    asyncio.run(verify_visible_logout(base, values["V3_ADMIN_PASSWORD"], exercise=exercise))
+                    with ExitStack() as fixtures:
+                        if args.reauth:
+                            from verify_reauth_stack import reauth_fixture
+                            exercise = fixtures.enter_context(reauth_fixture(client, deployment, data, manifest, browser, base, authorization))
+                        asyncio.run(verify_visible_logout(base, values["V3_ADMIN_PASSWORD"], exercise=exercise, insecure_http=args.reauth))
                 finally:
                     if args.warmup_quota:
                         with sqlite3.connect(data / "bench" / "db.sqlite") as database:

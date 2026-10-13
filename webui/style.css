@@ -1175,7 +1175,11 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 /* ===== 内嵌 OAuth 登录 (acc-modal step 2) ===== */
 .acc-step { /* step 容器 */ }
 .acc-step.hidden { display: none; }
-.acc-step-terminal { padding: 18px 22px 20px; }
+.acc-step-terminal {
+  padding: 18px 22px 20px;
+  max-height: calc(100vh - 180px);
+  overflow: auto;
+}
 
 .login-meta {
   display: flex;
@@ -1205,6 +1209,34 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   line-height: 1.5;
 }
 .login-hint strong { color: var(--amber); font-weight: 700; }
+
+.login-connection,
+.login-link-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.login-connection { justify-content: space-between; }
+.login-link { margin-bottom: 12px; min-width: 0; }
+.login-link textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-height: 72px;
+  margin: 6px 0;
+  padding: 8px;
+  resize: vertical;
+  font: 11px/1.5 var(--mono);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-bright);
+  overflow-wrap: anywhere;
+}
 .login-hint code {
   font-size: 11px;
   padding: 0 4px;

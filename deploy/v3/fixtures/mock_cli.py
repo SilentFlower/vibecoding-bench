@@ -5,18 +5,34 @@ import os
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlencode
 
 home = Path(os.environ["HOME"])
 if "--version" in sys.argv:
     print("9.9.9 (Synthetic lifecycle fixture)")
 elif sys.argv[1:] == ["auth", "status"]:
-    print(json.dumps({"loggedIn": (home / ".claude" / ".credentials.json").exists()}))
+    print(json.dumps({"loggedIn": (home / ".claude" / ".credentials.json").exists(), "authMethod": "oauth"}))
 elif sys.argv[1:] == ["auth", "login"]:
-    print("Synthetic login pane", flush=True)
+    control_home = home.parents[1] if home.parent.name == ".v3-login" else home
+    control_file = control_home / ".synthetic-login.json"
+    control = json.loads(control_file.read_text()) if control_file.exists() else {}
+    print("合成 CLI 登录会话", flush=True)
+    if control.get("wait_for_code"):
+        link = "https://claude.ai/oauth/authorize?" + urlencode({"client_id": "synthetic-client", "response_type": "code",
+            "redirect_uri": "https://platform.claude.com/oauth/code/callback", "scope": "user:profile user:inference",
+            "code_challenge": "c" * 43, "code_challenge_method": "S256", "state": "s" * 43})
+        print(link, flush=True)
+        print("请输入合成授权码：", flush=True)
+        while sys.stdin.readline().strip() != "synthetic-code":
+            print("合成授权码不匹配", flush=True)
     (home / ".claude").mkdir(exist_ok=True)
-    (home / ".claude" / ".credentials.json").write_text(json.dumps({"claudeAiOauth": {"accessToken": "synthetic", "refreshToken": "synthetic-rt",
+    (home / ".claude" / ".credentials.json").write_text(json.dumps({"claudeAiOauth": {"accessToken": control.get("access_token", "synthetic"), "refreshToken": control.get("refresh_token", "synthetic-rt"),
         "expiresAt": int(time.time() * 1000) + 3600000}}))
-    (home / ".claude.json").write_text(json.dumps({"oauthAccount": {"accountUuid": "synthetic-uuid"}}))
+    top = json.loads((home / ".claude.json").read_text()) if (home / ".claude.json").exists() else {}
+    top["oauthAccount"] = {"accountUuid": control.get("account_uuid", "synthetic-uuid"),
+        "organizationUuid": control.get("organization_uuid", "synthetic-org"), "emailAddress": control.get("email", "synthetic@example.invalid")}
+    (home / ".claude.json").write_text(json.dumps(top))
+    print("合成登录完成", flush=True)
     while True:
         time.sleep(1)
 else:

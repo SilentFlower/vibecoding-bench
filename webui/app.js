@@ -12,14 +12,17 @@ const API = (path, opts = {}) =>
   }).then(async (r) => {
     // 401:session 过期或未登录 → 全局弹登录框,中止当前调用
     if (r.status === 401 && !path.startsWith('/auth/')) {
-      if (RUNTIME_BASE) throw new Error('统一后台会话已过期，请重新进入环境与任务页面');
-      showAuthModal();
-      throw new Error('auth required');
+      if (!RUNTIME_BASE) showAuthModal();
+      const error = new Error(RUNTIME_BASE ? '统一后台会话已过期，请重新进入环境与任务页面' : 'auth required');
+      error.status = 401;
+      throw error;
     }
     if (!r.ok) {
       let msg = `${r.status} ${r.statusText}`;
       try { const j = await r.json(); msg = j.detail || msg; } catch {}
-      throw new Error(msg);
+      const error = new Error(msg);
+      error.status = r.status;
+      throw error;
     }
     return r.json();
   });
@@ -208,7 +211,7 @@ async function renderAccounts() {
         <button class="btn btn-sm" data-warmup-config="${a.id}">养号</button>
         ${a.cc2api_account_id != null && Number(a.warmup_enabled || 0) === 1 ? `<button class="btn btn-sm btn-primary" data-warmup-now="${a.id}">立即运行</button>` : ''}
         ${a.cc2api_account_id != null && Number(a.warmup_enabled || 0) !== 1 ? `<button class="btn btn-sm" data-warmup-resume="${a.id}">恢复</button>` : ''}
-        ${a.cc2api_account_id == null ? `<button class="btn btn-sm" data-relogin="${a.id}">重授权</button>` : ''}
+        ${a.cc2api_account_id == null || RUNTIME_BASE ? `<button class="btn btn-sm" data-relogin="${a.id}">重授权</button>` : ''}
         ${a.cc2api_account_id != null ? `<button class="btn btn-sm btn-danger" data-cc2-unbind="${a.id}">解绑</button>` : ''}
         <button class="btn btn-sm btn-danger" data-del="${a.id}">删除</button>
       </div></td>
@@ -324,6 +327,11 @@ async function renderAccounts() {
   }
   $('#acc-login-cancel').onclick = () => endAccLogin({ alsoCloseModal: true });
   $('#acc-login-commit').onclick = () => commitAccLogin();
+  $('#acc-login-reconnect').onclick = () => state.accLogin?.connection?.reconnect();
+  $('#acc-login-copy').onclick = copyAccLoginURL;
+  $('#acc-login-open').onclick = () => {
+    if (state.accLogin?.authorizationURL) window.open(state.accLogin.authorizationURL, '_blank', 'noopener,noreferrer');
+  };
   $('#acc-modal-close').onclick = () => endAccLogin({ alsoCloseModal: true });
   $('#warmup-form').onsubmit = saveWarmupConfig;
 }
@@ -585,6 +593,11 @@ function openAccLoginModal(account = null) {
     form.elements.upstream_socks5_pass.value = account.upstream_socks5_pass || '';
   }
   form.elements.name.readOnly = Boolean(account);
+  const bound = Boolean(account?.cc2api_account_id != null);
+  for (const name of ['upstream_proxy_scheme', 'upstream_socks5_host', 'upstream_socks5_port', 'upstream_socks5_user', 'upstream_socks5_pass', 'timezone']) {
+    form.elements[name].disabled = bound;
+  }
+  $('#acc-proxy-url').disabled = bound;
   $('#acc-force-reauth').value = account ? 'true' : 'false';
   $('.modal-titlebar-name', $('#acc-modal')).firstChild.textContent = account ? 'acc / relogin ' : 'acc / new ';
   $('#acc-modal-stage').textContent = 'step 1 · configure';
@@ -600,6 +613,9 @@ function showAccStep(which) {
 async function startAccLogin(body) {
   const loginState = state.accLogin || {};
   state.accLogin = loginState;
+  loginState.starting = true;
+  const startButton = $('#acc-form button[type="submit"]');
+  startButton.disabled = true;
   let resp;
   try {
     resp = await API('/accounts/login/start', {
@@ -607,7 +623,20 @@ async function startAccLogin(body) {
       body: JSON.stringify(body),
     });
   } catch (e) {
+    loginState.starting = false;
+    startButton.disabled = false;
+    if (state.accLogin === loginState && loginState.closeRequested) {
+      await endAccLogin({ alsoCloseModal: true, skipServerCancel: true });
+      return;
+    }
     return alert('启动登录会话失败: ' + e.message);
+  }
+  loginState.starting = false;
+  startButton.disabled = false;
+  if (state.accLogin !== loginState) {
+    // 启动 HTTP 期间关窗后，仍等返回 SID 才取消，避免遗留看不见的登录会话。
+    API(`/accounts/login/${resp.session_id}`, { method: 'DELETE' }).catch(() => {});
+    return;
   }
   // 保存 proxy/name 给 commit 用
   state.accLogin.body = body;
@@ -615,6 +644,13 @@ async function startAccLogin(body) {
   state.accLogin.accountId = loginState.accountId || null;
   state.accLogin.sid = resp.session_id;
   state.accLogin.name = resp.name;
+  state.accLogin.reconnectable = Boolean(resp.reconnectable);
+  state.accLogin.authorizationURL = null;
+  $('#acc-auth-url').value = '';
+  $('#acc-login-copy').disabled = true;
+  $('#acc-login-open').disabled = true;
+  $('#acc-login-reconnect').disabled = true;
+  $('#acc-login-link-status').textContent = '等待 CLI 输出授权链接';
 
   $('#acc-login-sid').textContent = resp.session_id;
   $('#acc-login-sidecar').textContent = resp.has_sidecar ? 'yes' : 'no (direct)';
@@ -622,44 +658,111 @@ async function startAccLogin(body) {
   $('#acc-modal-stage').textContent = 'step 2 · terminal';
 
   showAccStep('terminal');
-  await attachAccLoginTerminal(resp.ws_path);
+  if (loginState.closeRequested) {
+    // 启动期间请求关闭时保留窗口，取得 SID 后等待取消确认；失败仍可重试取消。
+    await endAccLogin({ alsoCloseModal: true });
+    return;
+  }
+  try { await attachAccLoginTerminal(resp.ws_path); }
+  catch (error) {
+    if (state.accLogin === loginState) $('#acc-login-connection-status').textContent = '终端初始化失败：' + error.message + '；可取消后重新登录';
+  }
 }
 
 async function attachAccLoginTerminal(wsPath) {
-  const termState = await attachTerminal('#acc-login-xterm', wsPath);
+  const login = state.accLogin;
+  const termState = await attachTerminal('#acc-login-xterm', wsPath, 'running', {
+    autoReconnect: login.reconnectable,
+    isActive: () => state.accLogin === login && !login.closing,
+    onSocket: socket => { if (state.accLogin === login) login.ws = socket; },
+    onState: message => { if (state.accLogin === login) $('#acc-login-connection-status').textContent = message; },
+  });
+  if (state.accLogin !== login) { termState.dispose(); return; }
 
-  state.accLogin.term = termState.term;
-  state.accLogin.fit = termState.fit;
-  state.accLogin.ws = termState.ws;
-
-  // 粘贴本地回显:claude TUI 的 "Paste code here >" 默认不回显粘贴内容,
-  // 用户看不到自己粘了啥。在 xterm 内部 textarea 上挂 paste 监听,把文本以
-  // 暗色写到屏幕(本地回显);onData 仍把数据照常透传给后端 PTY,服务端不变。
-  const host = $('#acc-login-xterm');
-  const ta = host.querySelector('textarea.xterm-helper-textarea');
-  if (ta) {
-    ta.addEventListener('paste', (e) => {
-      const text = (e.clipboardData || window.clipboardData)?.getData('text') || '';
-      if (text) {
-        // \x1b[2m = dim, \x1b[0m = reset; 粘贴文本可能含换行,统一成 CRLF
-        termState.term.write(`\x1b[2m${text.replace(/\r?\n/g, '\r\n')}\x1b[0m`);
+  login.term = termState.term;
+  login.fit = termState.fit;
+  login.ws = termState.ws;
+  login.connection = termState;
+  login.onResize = termState.onResize;
+  $('#acc-login-reconnect').disabled = !login.reconnectable;
+  if (login.reconnectable) {
+    /** 只在当前登录窗内串行查状态，不依赖 WS 首次输出来找链接。 */
+    const poll = async () => {
+      if (state.accLogin !== login) return;
+      if (login.closing) { login.pollTimer = setTimeout(poll, 2000); return; }
+      try {
+        const status = await API(`/accounts/login/${login.sid}/status`, { cache: 'no-store' });
+        if (state.accLogin !== login || login.closing) return;
+        login.authorizationURL = status.authorization_url || null;
+        $('#acc-auth-url').value = login.authorizationURL || '';
+        $('#acc-login-copy').disabled = !login.authorizationURL;
+        $('#acc-login-open').disabled = !login.authorizationURL;
+        $('#acc-login-link-status').textContent = status.credentials_ready ? 'CLI 已生成凭据，可以提交保存' : '等待 CLI 输出授权链接';
+        if (!status.reconnectable) {
+          login.pollStopped = true;
+          termState.stop(status.phase === 'committed' ? '登录已完成' : '凭据同步待确认，可重试提交或在环境页对账');
+          $('#acc-login-reconnect').disabled = true;
+          return;
+        }
+      } catch (error) {
+        if (state.accLogin !== login || login.closing) return;
+        if ([401, 403, 404, 409, 410].includes(error.status)) {
+          login.pollStopped = true;
+          termState.stop(error.message);
+          $('#acc-login-reconnect').disabled = true;
+          login.authorizationURL = null;
+          $('#acc-auth-url').value = '';
+          $('#acc-login-copy').disabled = true;
+          $('#acc-login-open').disabled = true;
+          return;
+        }
+        $('#acc-login-link-status').textContent = '暂时无法读取登录状态，稍后重试';
+      } finally {
+        // 取消请求失败后仍要继续读状态，不能因请求中的临时 closing 丢掉轮询。
+        if (state.accLogin === login && !login.pollStopped) login.pollTimer = setTimeout(poll, 2000);
       }
-    });
+    };
+    poll();
   }
-
-  state.accLogin.onResize = termState.onResize;
 }
 
-async function attachTerminal(hostSelector, wsPath, initialStatus = 'running') {
-  if (typeof Terminal === 'undefined') {
-    await new Promise(r => {
-      const t = setInterval(() => {
-        if (typeof Terminal !== 'undefined' && typeof FitAddon !== 'undefined') {
-          clearInterval(t); r();
-        }
-      }, 50);
-    });
+/**
+ * 复制完整授权链接，兼容 HTTP 页面的剪贴板限制。
+ * @return {Promise<void>} 显示实际复制结果或选中文本供手动复制。
+ */
+async function copyAccLoginURL() {
+  const login = state.accLogin;
+  if (!login?.authorizationURL) return;
+  let copied = false;
+  if (window.isSecureContext && navigator.clipboard?.writeText) {
+    try { await navigator.clipboard.writeText(login.authorizationURL); copied = true; } catch {}
   }
+  if (state.accLogin !== login) return;
+  if (!copied) {
+    const input = $('#acc-auth-url');
+    input.focus();
+    input.select();
+    try { copied = document.execCommand('copy'); } catch {}
+  }
+  $('#acc-login-link-status').textContent = copied ? '授权链接已复制' : '链接已选中，请按 Ctrl+C 或长按复制';
+}
+
+/**
+ * 挂载终端；登录可重连原 tmux，续聊保持原行为。
+ * @param {string} hostSelector 终端宿主。
+ * @param {string} wsPath 原会话路径，不保存旧票据。
+ * @param {string} initialStatus 初始输入状态。
+ * @param {object} options 登录连接选项和状态回调。
+ * @return {Promise<object>} 当前连接与幂等收口句柄。
+ */
+async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', options = {}) {
+  const vendorDeadline = Date.now() + 10000;
+  while (typeof Terminal === 'undefined' || typeof FitAddon === 'undefined') {
+    if (options.isActive && !options.isActive()) throw new Error('登录窗口已关闭');
+    if (Date.now() >= vendorDeadline) throw new Error('终端组件加载超时');
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  if (options.isActive && !options.isActive()) throw new Error('登录窗口已关闭');
 
   const host = $(hostSelector);
   host.innerHTML = '';
@@ -683,59 +786,146 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running') {
   fit.fit();
 
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  if (RUNTIME_BASE) {
-    const result = await API('/terminal-ticket', { method: 'POST', body: JSON.stringify({ path: wsPath.split('?')[0] }) });
-    wsPath += (wsPath.includes('?') ? '&' : '?') + 'ticket=' + encodeURIComponent(result.ticket);
-  }
-  const ws = new WebSocket(`${proto}//${location.host}${RUNTIME_BASE}${wsPath}`);
-  ws.binaryType = 'arraybuffer';
-  let inputAllowed = hostSelector !== '#continue-xterm' && initialStatus === 'running';
-
-  ws.onopen = () => {
-    ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-    term.focus();
-  };
-  ws.onmessage = (e) => {
-    if (e.data instanceof ArrayBuffer) {
-      term.write(new Uint8Array(e.data));
-    } else if (typeof e.data === 'string') {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'error') term.write(`\r\n\x1b[31m[orchestrator] ${msg.msg}\x1b[0m\r\n`);
-        if (msg.type === 'quota_state') {
-          inputAllowed = msg.status === 'running';
-          const status = $('#continue-quota-status');
-          if (status) status.textContent = inputAllowed ? '可继续输入' : `${msg.message || '额度等待'}${msg.resume_at ? `；恢复机会 ${formatWarmupTime(msg.resume_at)}` : '；暂无可信恢复时间'}`;
-        }
-      } catch { term.write(e.data); }
-    }
-  };
-  ws.onclose = () => {
+  let ws = null;
+  let inputAllowed = false;
+  let disposed = false;
+  let stopped = false;
+  let generation = 0;
+  let retries = 0;
+  let retryTimer = null;
+  let heartbeatTimer = null;
+  const active = () => !disposed && (!options.isActive || options.isActive());
+  const notify = message => { if (active()) options.onState?.(message); };
+  const stop = message => {
+    stopped = true;
     inputAllowed = false;
-    term.write('\r\n\x1b[90m[ws closed]\x1b[0m\r\n');
+    clearTimeout(retryTimer);
+    clearInterval(heartbeatTimer);
+    notify(message);
+    if (ws?.readyState <= WebSocket.OPEN) ws.close();
   };
-  ws.onerror = () => {
-    term.write(`\r\n\x1b[31m[ws error]\x1b[0m\r\n`);
-  };
-  term.onData((data) => {
-    if (inputAllowed && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'input', data }));
+  const schedule = () => {
+    if (!active() || stopped) return;
+    if (!options.autoReconnect || retries >= 8) {
+      notify('连接已断开，请手动重新连接');
+      return;
     }
+    const delay = Math.min(1000 * 2 ** retries, 8000);
+    retries += 1;
+    notify(`连接已断开，${delay / 1000} 秒后重连（${retries}/8）`);
+    retryTimer = setTimeout(connect, delay);
+  };
+  /** 每次重连都重新取短票据，不重复启动 CLI 或重放离线输入。 */
+  const connect = async () => {
+    if (!active() || stopped) return;
+    const current = ++generation;
+    inputAllowed = false;
+    notify('正在连接登录终端…');
+    let path = wsPath.split('?')[0];
+    try {
+      if (RUNTIME_BASE) {
+        const result = await API('/terminal-ticket', { method: 'POST', body: JSON.stringify({ path }) });
+        path += '?ticket=' + encodeURIComponent(result.ticket);
+      }
+      if (!active() || stopped || current !== generation) return;
+      const socket = new WebSocket(`${proto}//${location.host}${RUNTIME_BASE}${path}`);
+      ws = socket;
+      options.onSocket?.(socket);
+      socket.binaryType = 'arraybuffer';
+      let lastMessage = Date.now();
+      let openedAt = 0;
+      socket.onopen = () => {
+        if (!active() || stopped || current !== generation) { socket.close(); return; }
+        openedAt = Date.now();
+        lastMessage = openedAt;
+        inputAllowed = hostSelector !== '#continue-xterm' && initialStatus === 'running';
+        socket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+        notify('终端已连接');
+        term.focus();
+        if (options.autoReconnect) {
+          clearInterval(heartbeatTimer);
+          heartbeatTimer = setInterval(() => {
+            if (!active() || current !== generation) return;
+            if (Date.now() - openedAt >= 30000) retries = 0;
+            if (Date.now() - lastMessage > 30000) { socket.close(); return; }
+            if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'ping' }));
+          }, 10000);
+        }
+      };
+      socket.onmessage = e => {
+        if (!active() || current !== generation) return;
+        lastMessage = Date.now();
+        if (e.data instanceof ArrayBuffer) {
+          term.write(new Uint8Array(e.data));
+        } else if (typeof e.data === 'string') {
+          try {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'error') term.write(`\r\n\x1b[31m${msg.msg}\x1b[0m\r\n`);
+            if (msg.type === 'quota_state') {
+              inputAllowed = msg.status === 'running';
+              const status = $('#continue-quota-status');
+              if (status) status.textContent = inputAllowed ? '可继续输入' : `${msg.message || '额度等待'}${msg.resume_at ? `；恢复机会 ${formatWarmupTime(msg.resume_at)}` : '；暂无可信恢复时间'}`;
+            }
+          } catch { term.write(e.data); }
+        }
+      };
+      socket.onclose = event => {
+        if (current !== generation || disposed || stopped) return;
+        inputAllowed = false;
+        clearInterval(heartbeatTimer);
+        if (openedAt && Date.now() - openedAt >= 30000) retries = 0;
+        if ([4004, 4401, 4404].includes(event.code)) { stop('登录会话已结束或鉴权失效，请重新授权'); return; }
+        term.write('\r\n\x1b[90m[连接已断开]\x1b[0m\r\n');
+        schedule();
+      };
+      socket.onerror = () => { if (current === generation) notify('终端连接异常，等待重新连接'); };
+    } catch (error) {
+      if (!active() || current !== generation) return;
+      if ([401, 403, 404, 410].includes(error.status)) stop(error.message);
+      else schedule();
+    }
+  };
+  const input = term.onData(data => {
+    if (active() && inputAllowed && ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', data }));
+    else if (active()) notify('终端未连接，输入未发送；连接恢复后请重新输入');
   });
 
   const onResize = () => {
     try { fit.fit(); } catch {}
-    if (ws.readyState === WebSocket.OPEN) {
+    if (active() && ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
     }
   };
   window.addEventListener('resize', onResize);
-  return { term, fit, ws, onResize };
+  await connect();
+  return { term, fit, get ws() { return ws; }, onResize, stop,
+    reconnect: () => {
+      if (!active() || stopped) return;
+      retries = 0;
+      clearTimeout(retryTimer);
+      clearInterval(heartbeatTimer);
+      generation += 1;
+      if (ws?.readyState <= WebSocket.OPEN) ws.close();
+      connect();
+    },
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      generation += 1;
+      clearTimeout(retryTimer);
+      clearInterval(heartbeatTimer);
+      if (ws?.readyState <= WebSocket.OPEN) ws.close();
+      input.dispose();
+      window.removeEventListener('resize', onResize);
+      term.dispose();
+    },
+  };
 }
 
 async function commitAccLogin() {
   const al = state.accLogin;
-  if (!al || !al.sid) return;
+  if (!al || !al.sid || al.closing || al.committing) return;
+  al.committing = true;
   const btn = $('#acc-login-commit');
   btn.disabled = true;
   try {
@@ -743,30 +933,52 @@ async function commitAccLogin() {
       method: 'POST',
       body: JSON.stringify(al.body || { name: al.name }),
     });
-    const action = al.mode === 'relogin' ? 'reauthorized' : 'saved';
-    if (al.term) al.term.write(`\r\n\x1b[32m[ok] account ${action} (#${r.id}) · auth=${r.auth_method}\x1b[0m\r\n`);
+    if (state.accLogin !== al) return;
+    const action = r.credentials_synced ? '已重授权并同步关联账号' : (al.mode === 'relogin' ? '已重新授权' : '账号已保存');
+    if (al.term) al.term.write(`\r\n\x1b[32m[完成] ${action} (#${r.id})\x1b[0m\r\n`);
     // commit 成功后服务端已清容器；前端关 WS + 弹窗 + 刷列表
-    endAccLogin({ alsoCloseModal: true, skipServerCancel: true });
+    al.committing = false;
+    await endAccLogin({ alsoCloseModal: true, skipServerCancel: true });
     renderAccounts();
   } catch (e) {
-    btn.disabled = false;
-    alert('提交失败: ' + e.message + '\n\n如果还没登录成功，请先在终端完成 OAuth。');
+    if (state.accLogin === al) {
+      btn.disabled = false;
+      alert('提交失败: ' + e.message + '\n\n如果还没登录成功，请先在终端完成 OAuth。');
+    }
+  } finally {
+    al.committing = false;
   }
 }
 
-function endAccLogin({ alsoCloseModal = false, skipServerCancel = false } = {}) {
+async function endAccLogin({ alsoCloseModal = false, skipServerCancel = false } = {}) {
   const al = state.accLogin || {};
+  if (al.closing) return;
+  if (al.starting) {
+    al.closeRequested = true;
+    $('#acc-modal-stage').textContent = '正在等待会话启动，随后取消';
+    return;
+  }
+  if (al.committing) { $('#acc-login-connection-status').textContent = '正在确认提交结果，请稍候再关闭'; return; }
+  al.closing = true;
+  // 先等待服务端确认取消；结果未知时保留弹窗，不能静默丢掉暂存凭据。
+  if (al.sid && !skipServerCancel) {
+    try { await API(`/accounts/login/${al.sid}`, { method: 'DELETE' }); }
+    catch (error) {
+      al.closing = false;
+      $('#acc-login-connection-status').textContent = '取消未完成：' + error.message;
+      return;
+    }
+  }
+  clearTimeout(al.pollTimer);
+  if (al.connection) al.connection.dispose();
   // 1. 关闭 WS
   if (al.ws && al.ws.readyState <= 1) {
     try { al.ws.close(); } catch {}
   }
   // 2. 释放 xterm
-  if (al.term) { try { al.term.dispose(); } catch {} }
+  if (al.term && !al.connection) { try { al.term.dispose(); } catch {} }
   if (al.onResize) window.removeEventListener('resize', al.onResize);
   // 3. 通知后端清容器（commit 路径已清，不重复）
-  if (al.sid && !skipServerCancel) {
-    API(`/accounts/login/${al.sid}`, { method: 'DELETE' }).catch(() => {});
-  }
   state.accLogin = null;
   if (alsoCloseModal) closeModal('#acc-modal');
   // 重置 step

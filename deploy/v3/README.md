@@ -65,6 +65,8 @@ python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --brows
 python3 deploy/v3/verify_warmup_quota.py --manifest /absolute/path/release.json
 # 在统一后台验证合成账号阈值配置、保存重读、明暗主题和 390px。
 python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --warmup-quota
+# 关联重授权的页面/WS/tmux/凭据落盘演练，使用专用合成账号和本地代理
+python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --reauth
 ```
 
 演练创建随机部署标识的内部 Docker 网络，使用空 SQLite、合成凭据、CLI 测试替身及仅在本地处理的 SOCKS/DNS/HTTP。Docker 检查分别验证发送器直调和真实网关入口到账号的 ClientHello，断言合法短 DNS 绑定可用、共享 CLI 租约不阻止网关发送、错误账号绑定拒绝且无重复发送；另保持账号发送器 API 长流并启动 CLI 养号/抓包、发送第二次 API，验证 CLI 取消及调度器重启对账后长流继续且容器不变。Rust 的 `cargo test --lib local_https` 另用临时 CA 和回环 TLS 服务验证完整响应、原始字节/头顺序、非信任证书及错误主机名拒绝、长流取消。额外信任根仅编译进测试，正式镜像不提供跳过证书校验或追加测试 CA 的开关。TLS 测试需要 Python3 和 OpenSSL。结束只删除本次创建的测试资料与资源。

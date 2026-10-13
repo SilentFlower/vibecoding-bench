@@ -43,7 +43,8 @@ from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
 
 from quota_protocol import merge_quota_observation, quota_decision, quota_observation, warmup_quota_decision, warmup_sample_used
-from account_runtime import AccountRuntime, RuntimeBusy
+from account_runtime import AccountRuntime, RuntimeBusy, atomic_json
+from login_terminal import authorization_url
 
 
 # ============== 配置 ==============
@@ -699,7 +700,9 @@ class Cc2ApiClient:
                 "Accept": "application/json",
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.admin_password}",
-                **({"x-v3-service-token": os.environ.get("V3_INTERNAL_TOKEN", "")} if path == "/admin/accounts" and body and body.get("cli_identity") else {}),
+                **({"x-v3-service-token": os.environ.get("V3_INTERNAL_TOKEN", "")} if
+                    (path == "/admin/accounts" and body and body.get("cli_identity"))
+                    or re.fullmatch(r"/admin/accounts/[0-9]+/oauth-credentials/import(?:/[a-f0-9]{32})?", path) else {}),
             },
         )
         try:
@@ -808,6 +811,45 @@ class Cc2ApiClient:
         """
         return self._request("POST", f"/admin/accounts/{account_id}/usage")
 
+    def import_credentials(self, account_id: int, payload: dict) -> dict:
+        """向原绑定账号导入真实 CLI 新凭据。
+
+        :param account_id: 原关联 ID
+        :param payload: 凭据、身份、操作 ID 与租约证明
+        :return: 同一操作的最终权威快照
+        """
+        data = self._request("POST", f"/admin/accounts/{account_id}/oauth-credentials/import", payload)
+        return self._import_snapshot(account_id, payload["operation_id"], data)
+
+    def import_status(self, account_id: int, operation_id: str) -> Optional[dict]:
+        """查询回执；网络错误不能被当成未提交。
+
+        :param account_id: 原关联 ID
+        :param operation_id: 唯一提交 ID
+        :return: 已提交的当前快照，明确未提交时为 None
+        """
+        if not re.fullmatch(r"[a-f0-9]{32}", operation_id):
+            raise ValueError("凭据提交操作 ID 不合法")
+        data = self._request("GET", f"/admin/accounts/{account_id}/oauth-credentials/import/{operation_id}")
+        if data.get("imported") is False and data.get("account_id") == account_id and data.get("operation_id") == operation_id:
+            return None
+        return self._import_snapshot(account_id, operation_id, data)
+
+    @staticmethod
+    def _import_snapshot(account_id: int, operation_id: str, data: dict) -> dict:
+        """严格核对导入回执，拒绝错误账号和不完整凭据。
+
+        :param account_id: 期望账号
+        :param operation_id: 期望操作
+        :param data: 受信任服务返回值
+        :return: 最小凭据快照
+        """
+        if data.get("imported") is not True or data.get("account_id") != account_id or data.get("operation_id") != operation_id:
+            raise ValueError("凭据导入回执不匹配")
+        if any(not isinstance(data.get(key), str) or not data[key] for key in ("access_token", "refresh_token")) or type(data.get("expires_at")) is not int:
+            raise ValueError("凭据导入回执不完整")
+        return {key: data[key] for key in ("account_id", "access_token", "refresh_token", "expires_at")}
+
 
 cc2api_client = Cc2ApiClient(
     CC2API_BASE_URL,
@@ -816,16 +858,19 @@ cc2api_client = Cc2ApiClient(
 )
 
 
-def _read_bench_profile_identity(account_name: str) -> dict:
+def _read_bench_profile_identity(account_name: str, profile_dir: Optional[Path] = None,
+    top_config_path: Optional[Path] = None) -> dict:
     """
     读取同步 cc2api 所需的 bench OAuth profile 字段。
 
     :param account_name: bench accounts.name
+    :param profile_dir: 可选暂存凭据目录
+    :param top_config_path: 可选暂存顶层配置
     :return: 经过结构校验的身份与凭据字段
     """
-    profile_dir = PROFILES_DIR / account_name
+    profile_dir = profile_dir or PROFILES_DIR / account_name
     credentials_path = profile_dir / ".credentials.json"
-    top_config_path = profile_dir / ".claude.json"
+    top_config_path = top_config_path or profile_dir / ".claude.json"
     try:
         credentials = json.loads(credentials_path.read_text(encoding="utf-8"))
         top_config = json.loads(top_config_path.read_text(encoding="utf-8"))
@@ -4472,7 +4517,8 @@ class LoginSession:
     """单个 OAuth 引导会话：一对 sidecar+worker + 元数据"""
 
     __slots__ = ("sid", "name", "sidecar_id", "worker_id", "created_at",
-                 "proxy", "profile_dir", "force_reauth", "committed", "home", "version")
+                 "proxy", "profile_dir", "force_reauth", "committed", "home", "version",
+                 "account_id", "binding_id", "identity", "commit_context", "phase", "import_payload", "authorization_url", "auth_method")
 
     def __init__(self, sid: str, name: str, sidecar_id: Optional[str],
                  worker_id: str, proxy: dict, profile_dir: Path,
@@ -4488,6 +4534,14 @@ class LoginSession:
         self.committed = False
         self.home = WORKER_HOME
         self.version = effective_claude_code_version()
+        self.account_id = None
+        self.binding_id = None
+        self.identity = {}
+        self.commit_context = {}
+        self.phase = "authorizing"
+        self.import_payload = None
+        self.authorization_url = None
+        self.auth_method = None
 
 
 class ContinueSession:
@@ -4542,6 +4596,7 @@ class LoginManager:
         # 同一个账号名同时只允许一个 login session（防并发覆盖 profile）
         self._name_locks: dict[str, str] = {}
         self._lock = threading.Lock()
+        self.completed: dict[str, dict] = {}
 
     def sweep_expired(self) -> None:
         """收口到期的 v3 tmux 登录，包括没有浏览器连接的会话。
@@ -4552,10 +4607,14 @@ class LoginManager:
             return
         with self._lock:
             expired = [sid for sid, session in self.sessions.items()
-                if time.time() - session.created_at >= int(os.environ.get("V3_LOGIN_TTL_SECONDS", "1800"))]
+                if session.phase == "authorizing" and time.time() - session.created_at >= int(os.environ.get("V3_LOGIN_TTL_SECONDS", "1800"))]
+            self.completed = {sid: value for sid, value in self.completed.items() if value["expires_at"] > time.time()}
         for sid in expired:
             try:
-                self.cleanup(sid)
+                session = self.get(sid)
+                if session:
+                    with _oauth_owner_lock(session.name):
+                        self.cleanup(sid)
             except Exception:
                 # AccountRuntime 已将不能证明收口的环境隔离；继续清理其它会话。
                 pass
@@ -4623,6 +4682,8 @@ class LoginManager:
                 finally:
                     connection.close()
                 account = dict(existing) if existing else {"name": name}
+                binding_id = account.get("cc2api_account_id")
+                configuration = cc2api_client._request("GET", f"/admin/runtime/accounts/{binding_id}/config") if binding_id is not None else None
                 account.update(upstream_proxy_scheme=proxy.get("scheme"),
                     upstream_socks5_host=proxy.get("host"), upstream_socks5_port=proxy.get("port"),
                     upstream_socks5_user=proxy.get("user"), upstream_socks5_pass=proxy.get("pass"), timezone=tz)
@@ -4630,6 +4691,10 @@ class LoginManager:
                 _, container, profile, home = account_runtime.begin_login(sid, account, version, force_reauth)
                 session = LoginSession(sid, name, container.id, container.id, proxy, profile, force_reauth)
                 session.home, session.version = home, version
+                if binding_id is not None:
+                    session.account_id, session.binding_id = int(account["id"]), int(binding_id)
+                    session.identity = {key: configuration.get(key) for key in ("email", "account_uuid", "organization_uuid")}
+                    session.commit_context = account_runtime.login_commit_context(session)
                 with self._lock:
                     self.sessions[sid] = session
                 return session
@@ -4831,19 +4896,29 @@ class LoginManager:
 
     def cleanup(self, sid: str) -> None:
         with self._lock:
-            s = self.sessions.pop(sid, None)
+            s = self.sessions.get(sid)
         if not s:
             return
         if account_runtime:
-            try:
-                account_runtime.cleanup(account_runtime.execution_token(s.worker_id, f"login:{sid}"))
-                if s.force_reauth:
-                    shutil.rmtree(s.profile_dir.parent, ignore_errors=True)
-            finally:
-                with self._lock:
-                    if self._name_locks.get(s.name) == sid:
-                        del self._name_locks[s.name]
+            account_runtime.cleanup(account_runtime.execution_token(s.worker_id, f"login:{sid}"))
+            if s.binding_id is not None:
+                pending_lease = cc2api_client._request("GET", f"/admin/runtime/accounts/{s.binding_id}/lease").get("lease")
+                if pending_lease:
+                    account_runtime.reconcile(s.commit_context["environment_id"])
+                    if cc2api_client._request("GET", f"/admin/runtime/accounts/{s.binding_id}/lease").get("lease"):
+                        raise ValueError("登录维护门禁仍需对账")
+                s.commit_context["path"].unlink(missing_ok=True)
+            if s.force_reauth:
+                shutil.rmtree(s.profile_dir.parent, ignore_errors=True)
+            with self._lock:
+                s.phase = "cancelled"
+                s.import_payload, s.authorization_url = None, None
+                self.sessions.pop(sid, None)
+                if self._name_locks.get(s.name) == sid:
+                    del self._name_locks[s.name]
             return
+        with self._lock:
+            self.sessions.pop(sid, None)
         for cid in (s.worker_id, s.sidecar_id):
             if not cid:
                 continue
@@ -4861,6 +4936,95 @@ class LoginManager:
         with self._lock:
             if self._name_locks.get(s.name) == sid:
                 del self._name_locks[s.name]
+
+    def commit_bound(self, session: LoginSession) -> dict:
+        """提交已绑定账号重授权；调用方须先取得账号所有权锁。
+
+        :param session: 原固定环境的登录会话
+        :return: 不含凭据的提交结果；结果未知时保留暂存与门禁
+        """
+        connection = get_db()
+        try:
+            row = connection.execute("SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL", (session.account_id,)).fetchone()
+        finally:
+            connection.close()
+        if not row or row["name"] != session.name or row["cc2api_account_id"] != session.binding_id:
+            raise ValueError("原关联账号已改变，不能提交重授权")
+        blocker = _oauth_owner_transition_blocker(dict(row), session.sid)
+        if blocker:
+            raise ValueError(f"账号仍有活动工作：{blocker}")
+        path = session.commit_context["path"]
+        snapshot = None
+        if path.exists():
+            record = json.loads(path.read_text())
+            snapshot = cc2api_client.import_status(session.binding_id, record["operation_id"])
+        else:
+            status = self.auth_status(session.sid)
+            if not status.get("loggedIn"):
+                raise ValueError("尚未登录，请先在终端完成授权")
+            session.auth_method = status.get("authMethod")
+            identity = _read_bench_profile_identity(session.name, session.profile_dir, session.profile_dir.parent / ".claude.json")
+            if session.identity.get("account_uuid") and not identity.get("account_uuid"):
+                raise ValueError("新登录缺少账号 UUID，不能使用旧身份替代")
+            _validate_cc2api_identity(identity, session.identity)
+            if _normalize_identity_value(identity["email"]) != _normalize_identity_value(session.identity.get("email")):
+                raise ValueError("新登录邮箱与原关联账号不匹配")
+            organization = _normalize_identity_value(session.identity.get("organization_uuid"))
+            if organization and organization != _normalize_identity_value(identity.get("organization_uuid")):
+                raise ValueError("新登录组织与原关联账号不匹配")
+            context = account_runtime.login_commit_context(session)
+            if context["environment_id"] != session.commit_context["environment_id"] or context["generation"] != session.commit_context["generation"]:
+                raise ValueError("原登录环境代次已改变")
+            operation_id = uuid.uuid4().hex
+            record = {"sid": session.sid, "name": session.name, "account_id": session.account_id,
+                "cc2api_account_id": session.binding_id, "operation_id": operation_id,
+                "environment_id": context["environment_id"], "generation": context["generation"],
+                "lease": context["lease"], "phase": "submitting", "auth_method": status.get("authMethod"),
+                "identity": {key: identity[key] for key in ("email", "account_uuid", "organization_uuid")}}
+            session.import_payload = {key: identity[key] for key in ("email", "account_uuid", "organization_uuid", "access_token", "refresh_token", "expires_at")}
+            session.import_payload.update(operation_id=operation_id, owner=context["lease"]["owner"], generation=context["lease"]["generation"])
+            # 提交意图先落盘；HTTP 超时不能被误当成“尚未更新远端”。
+            atomic_json(path, record)
+            session.phase = "submitting"
+        if snapshot is None:
+            if session.import_payload is None:
+                raise ValueError("提交结果需先对账，请在环境页执行对账")
+            snapshot = cc2api_client.import_credentials(session.binding_id, session.import_payload)
+        with _profile_lock(session.name):
+            account_runtime.finish_bound_login(record, snapshot)
+        result = {"id": session.account_id, "name": session.name, "auth_method": record.get("auth_method"),
+            "cc2api_account_id": session.binding_id, "credentials_synced": True}
+        try:
+            account_runtime.login_commit_context(session)
+        except ValueError:
+            account_runtime.reconcile(record["environment_id"])
+            if path.exists():
+                raise ValueError("凭据已同步，但登录维护仍需对账") from None
+        self.cleanup(session.sid)
+        session.phase, session.import_payload = "committed", None
+        with self._lock:
+            self.completed[session.sid] = {"result": result, "expires_at": time.time() + 1800}
+        return result
+
+    def cleanup_reconciled(self, environment_id: str) -> None:
+        """对账完成后解除遗留登录占用，让原页面可重试并允许重新登录。
+
+        :param environment_id: 已完成对账的固定环境
+        :return: None；未确认时保留会话
+        """
+        with self._lock:
+            sessions = [session for session in self.sessions.values() if session.commit_context.get("environment_id") == environment_id]
+        for session in sessions:
+            with _oauth_owner_lock(session.name):
+                if environment_id in account_runtime.jobs or session.commit_context["path"].exists():
+                    continue
+                snapshot = cc2api_client.import_status(session.binding_id, session.import_payload["operation_id"]) if session.import_payload else None
+                self.cleanup(session.sid)
+                if snapshot is not None:
+                    with self._lock:
+                        self.completed[session.sid] = {"expires_at": time.time() + 1800, "result": {
+                            "id": session.account_id, "name": session.name, "auth_method": session.auth_method,
+                            "cc2api_account_id": session.binding_id, "credentials_synced": True}}
 
 
 class ContinueManager:
@@ -7152,11 +7316,12 @@ class WarmupConfigIn(BaseModel):
     warmup_quota_7d_limit_percent: Optional[StrictInt] = None
 
 
-def _oauth_owner_transition_blocker(account: dict) -> Optional[str]:
+def _oauth_owner_transition_blocker(account: dict, login_sid: Optional[str] = None) -> Optional[str]:
     """
     查找会让 AT/RT 所有权切换不安全的活跃工作。
 
     :param account: accounts 表行
+    :param login_sid: 提交时允许的当前登录会话；其他登录仍阻塞
     :return: 阻塞原因；账号空闲时返回 None
     """
     conn = get_db()
@@ -7173,7 +7338,9 @@ def _oauth_owner_transition_blocker(account: dict) -> Optional[str]:
     if continue_manager and continue_manager.has_active_account(int(account["id"])):
         return "账号存在活跃的继续对话会话"
     if login_manager and login_manager.has_active_name(str(account["name"])):
-        return "账号存在活跃的登录或重授权会话"
+        own_login = login_manager.get(login_sid) if login_sid else None
+        if not own_login or own_login.name != account["name"]:
+            return "账号存在活跃的登录或重授权会话"
     return None
 
 
@@ -7867,7 +8034,11 @@ def login_start(body: LoginStartIn):
         finally:
             conn.close()
         if bound and bound["cc2api_account_id"] is not None:
-            raise HTTPException(409, "账号已绑定 cc2api，请先解绑后再重新授权")
+            if not account_runtime or not body.force_reauth:
+                raise HTTPException(409, "已绑定账号须使用 v3 的显式重授权入口")
+            # 关联重授权不接受顺便改代理/时区，继续沿用权威关联配置。
+            body = LoginStartIn(name=body.name, force_reauth=True, timezone=bound["timezone"],
+                **{key: bound[key] for key in ("upstream_proxy_scheme", "upstream_socks5_host", "upstream_socks5_port", "upstream_socks5_user", "upstream_socks5_pass")})
         if bound:
             _require_oauth_owner_transition_idle(dict(bound))
         try:
@@ -7894,7 +8065,42 @@ def login_start(body: LoginStartIn):
         "ws_path": f"/api/accounts/login/ws/{session.sid}",
         "has_sidecar": session.sidecar_id is not None,
         "name": session.name,
+        "reconnectable": bool(account_runtime),
+        "cc2api_account_id": session.binding_id,
     }
+
+
+@app.get("/api/accounts/login/{sid}/status")
+def login_status(sid: str, response: Response) -> dict:
+    """提供不含凭据的登录状态与实际授权链接。
+
+    :param sid: 当前登录会话
+    :param response: 设置禁止缓存的响应
+    :return: 登录阶段、可重连性与已验证链接
+    """
+    response.headers["Cache-Control"] = "no-store"
+    session = login_manager.get(sid) if login_manager else None
+    if not session:
+        completed = login_manager.completed.get(sid) if login_manager else None
+        if completed and completed["expires_at"] > time.time():
+            return {"phase": "committed", "reconnectable": False, "authorization_url": None}
+        raise HTTPException(404, "登录会话已结束或过期，请重新授权")
+    expires_at = session.created_at + int(os.environ.get("V3_LOGIN_TTL_SECONDS", "1800"))
+    if session.phase == "authorizing" and time.time() >= expires_at:
+        raise HTTPException(410, "登录会话已过期，请重新授权")
+    ready = (session.profile_dir / ".credentials.json").exists()
+    if account_runtime and session.phase == "authorizing" and not ready:
+        try:
+            session.authorization_url = authorization_url(account_runtime.capture_login_pane(session)) or session.authorization_url
+        except ValueError:
+            raise HTTPException(409, "登录终端已结束，请检查环境状态") from None
+        except Exception:
+            raise HTTPException(503, "暂时无法读取登录终端，请稍后重试") from None
+    else:
+        session.authorization_url = None
+    return {"phase": session.phase, "credentials_ready": ready, "expires_at": expires_at,
+        "reconnectable": bool(account_runtime) and session.phase == "authorizing",
+        "authorization_url": session.authorization_url}
 
 
 @app.websocket("/api/accounts/login/ws/{sid}")
@@ -7913,12 +8119,15 @@ async def login_ws(websocket: WebSocket, sid: str):
             {"type": "error", "msg": "session not found"}))
         await websocket.close(code=4004)
         return
+    if session.phase != "authorizing" or time.time() >= session.created_at + int(os.environ.get("V3_LOGIN_TTL_SECONDS", "1800")):
+        await websocket.close(code=4404)
+        return
 
     api = login_manager.client.api
     try:
-        exec_id = api.exec_create(
+        execution = await asyncio.to_thread(api.exec_create,
             session.worker_id,
-            (["tmux", "-S", f"/tmp/v3-login-{sid}.sock", "attach-session", "-t", sid]
+            (["tmux", "-S", f"/tmp/v3-login-{sid}.sock", "attach-session", "-d", "-t", sid]
              if account_runtime else ["claude", "auth", "login"]),
             stdin=True,
             tty=True,
@@ -7929,14 +8138,15 @@ async def login_ws(websocket: WebSocket, sid: str):
                 "LINES": "36",
             }),
             workdir=session.home,
-        )["Id"]
-        sock = api.exec_start(
+        )
+        exec_id = execution["Id"]
+        sock = await asyncio.to_thread(api.exec_start,
             exec_id, detach=False, tty=True,
             stream=False, socket=True, demux=False,
         )
-    except Exception as e:
+    except Exception:
         await websocket.send_text(json.dumps(
-            {"type": "error", "msg": f"exec failed: {e}"}))
+            {"type": "error", "msg": "暂时无法连接登录终端，请重连或检查环境状态"}))
         await websocket.close(code=4500)
         return
 
@@ -7952,7 +8162,7 @@ async def login_ws(websocket: WebSocket, sid: str):
     async def pump_container_to_ws():
         """worker PTY → ws (binary)"""
         try:
-            while not closed.is_set():
+            while not closed.is_set() and session.phase == "authorizing":
                 try:
                     data = await asyncio.wait_for(
                         loop.sock_recv(raw, 4096), timeout=1.0
@@ -7976,8 +8186,10 @@ async def login_ws(websocket: WebSocket, sid: str):
                 msg = await websocket.receive()
                 if msg["type"] == "websocket.disconnect":
                     break
+                if session.phase != "authorizing":
+                    break
                 if msg.get("bytes"):
-                    raw.send(msg["bytes"])
+                    await loop.sock_sendall(raw, msg["bytes"])
                     continue
                 txt = msg.get("text")
                 if not txt:
@@ -7986,11 +8198,15 @@ async def login_ws(websocket: WebSocket, sid: str):
                 try:
                     ev = json.loads(txt)
                 except json.JSONDecodeError:
-                    raw.send(txt.encode())
+                    await loop.sock_sendall(raw, txt.encode())
                     continue
-                if ev.get("type") == "resize":
+                if not isinstance(ev, dict) or session.phase != "authorizing":
+                    continue
+                if ev.get("type") == "ping":
+                    await websocket.send_text(json.dumps({"type": "pong"}))
+                elif ev.get("type") == "resize":
                     try:
-                        api.exec_resize(
+                        await asyncio.to_thread(api.exec_resize,
                             exec_id,
                             height=int(ev.get("rows") or 36),
                             width=int(ev.get("cols") or 120),
@@ -7998,7 +8214,7 @@ async def login_ws(websocket: WebSocket, sid: str):
                     except Exception:
                         pass
                 elif ev.get("type") == "input":
-                    raw.send((ev.get("data") or "").encode())
+                    await loop.sock_sendall(raw, (ev.get("data") or "").encode())
         except WebSocketDisconnect:
             pass
         except Exception:
@@ -8006,11 +8222,14 @@ async def login_ws(websocket: WebSocket, sid: str):
         finally:
             closed.set()
 
+    pumps = [asyncio.create_task(pump_container_to_ws()), asyncio.create_task(pump_ws_to_container())]
     try:
-        await asyncio.gather(
-            pump_container_to_ws(), pump_ws_to_container()
-        )
+        # 任一方向结束即关闭 attach；gather 两条永久等待会遗留半开连接。
+        await asyncio.wait(pumps, return_when=asyncio.FIRST_COMPLETED)
     finally:
+        for pump in pumps:
+            pump.cancel()
+        await asyncio.gather(*pumps, return_exceptions=True)
         try:
             raw.close()
         except Exception:
@@ -8029,9 +8248,22 @@ def login_commit(sid: str, body: LoginStartIn):
         raise HTTPException(500)
     session = login_manager.get(sid)
     if not session:
+        completed = login_manager.completed.get(sid)
+        if completed and completed["expires_at"] > time.time() and completed["result"]["name"] == body.name:
+            return completed["result"]
         raise HTTPException(404, "session not found")
     if session.name != body.name:
         raise HTTPException(400, "name mismatch with session")
+    if account_runtime and session.binding_id is not None:
+        with _oauth_owner_lock(session.name):
+            try:
+                return login_manager.commit_bound(session)
+            except ValueError as exc:
+                raise HTTPException(409, str(exc)) from None
+            except ConnectionError:
+                raise HTTPException(503, "凭据同步结果尚未确认，请重试提交；暂存和维护门禁已保留") from None
+            except Exception:
+                raise HTTPException(500, "重授权未完成，请重试提交或在环境页对账") from None
     conn = get_db()
     try:
         bound = conn.execute(
@@ -8182,7 +8414,14 @@ def login_commit(sid: str, body: LoginStartIn):
 def login_cancel(sid: str):
     """放弃登录：停容器 + 清状态。可重复调用幂等。"""
     if login_manager:
-        login_manager.cleanup(sid)
+        session = login_manager.get(sid)
+        if session:
+            with _oauth_owner_lock(session.name):
+                if session.binding_id is not None and session.commit_context["path"].exists():
+                    account_runtime.reconcile(session.commit_context["environment_id"])
+                    if session.commit_context["path"].exists():
+                        raise HTTPException(409, "提交结果仍需对账，暂存凭据和维护门禁已保留")
+                login_manager.cleanup(sid)
     return {"ok": True}
 
 
@@ -9603,7 +9842,7 @@ def v3_environments():
 
 @app.post("/api/environments/{environment_id}/maintenance")
 def v3_environment_maintenance(environment_id: str, body: dict):
-    """仅在账号空闲时维护本部署固定环境。
+    """空闲维护或对账待确认的重授权，不中断正式运行。
 
     :param environment_id: 不可变环境 ID
     :param body: 维护操作
@@ -9611,10 +9850,26 @@ def v3_environment_maintenance(environment_id: str, body: dict):
     """
     if not account_runtime:
         raise HTTPException(404)
+    connection = get_db()
     try:
-        account_runtime.maintenance(environment_id, body.get("operation", ""))
+        environment = connection.execute("SELECT COALESCE(a.name,e.name) AS name FROM account_environments e "
+            "LEFT JOIN accounts a ON a.id=e.account_id WHERE e.environment_id=?", (environment_id,)).fetchone()
+    finally:
+        connection.close()
+    if not environment:
+        raise HTTPException(404, "环境不存在")
+    try:
+        # 对账会镜像已提交凭据，必须与提交/绑定共用 owner → profile → environment 锁顺序。
+        with _oauth_owner_lock(environment["name"]):
+            with _profile_lock(environment["name"]):
+                account_runtime.maintenance(environment_id, body.get("operation", ""))
+        # 该方法自行领取 owner 锁；不可在上面的非重入锁内调用。
+        if body.get("operation") == "reconcile" and login_manager:
+            login_manager.cleanup_reconciled(environment_id)
     except (ValueError, RuntimeError):
         raise HTTPException(409, "环境有活动请求、归属冲突或需进一步对账")
+    except ConnectionError:
+        raise HTTPException(503, "对账结果尚未确认，请稍后重试") from None
     return {"ok": True}
 
 

@@ -7,29 +7,33 @@ import signal
 import socket
 import tempfile
 import urllib.request
+from urllib.parse import urlsplit
 
 import requests
 from websockets.asyncio.client import connect
 
 
-async def verify_visible_logout(base: str, password: str, exercise=None) -> None:
+async def verify_visible_logout(base: str, password: str, exercise=None, insecure_http: bool = False) -> None:
     """从登录页操作到退出按钮，验证 Cookie 撤销和旧 Cookie 重放失败。
 
     :param base: 本地合成部署地址
     :param password: 仅用于本次合成部署的管理密码，不写入进程参数或输出
     :param exercise: 可选的已登录页面场景，复用本次 CDP 会话而不重复启动浏览器
+    :param insecure_http: 使用仅解析到回环的测试域名，验证真正的 HTTP 非安全上下文
     :return: None；失败抛出异常，最终收口本次 Chrome 进程组
     """
     chrome = shutil.which("google-chrome") or shutil.which("chromium")
     if not chrome:
         raise RuntimeError("浏览器验证需要本地 Chrome 或 Chromium")
+    browser_base = f"http://v3-verify.test:{urlsplit(base).port}" if insecure_http else base
     with tempfile.TemporaryDirectory(prefix="v3-browser-") as profile:
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             port = listener.getsockname()[1]
         process = await asyncio.create_subprocess_exec(chrome, "--headless=new", "--no-sandbox", "--disable-dev-shm-usage",
             "--disable-background-networking", "--no-first-run", "--proxy-server=http://127.0.0.1:9",
-            "--proxy-bypass-list=127.0.0.1;localhost", f"--user-data-dir={profile}", f"--remote-debugging-port={port}",
+            "--proxy-bypass-list=127.0.0.1;localhost;v3-verify.test", "--host-resolver-rules=MAP v3-verify.test 127.0.0.1",
+            f"--user-data-dir={profile}", f"--remote-debugging-port={port}",
             "about:blank", start_new_session=True, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
         try:
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -79,7 +83,7 @@ async def verify_visible_logout(base: str, password: str, exercise=None) -> None
                         while not await evaluate(expression):
                             await asyncio.sleep(0.1)
 
-                await rpc("Page.navigate", {"url": base + "/login"}, session_id)
+                await rpc("Page.navigate", {"url": browser_base + "/login"}, session_id)
                 await wait_for("Boolean(document.querySelector('input[type=password]'))")
                 await evaluate("(() => {const input=document.querySelector('input[type=password]');"
                     "Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input," + json.dumps(password) + ");"
@@ -93,7 +97,7 @@ async def verify_visible_logout(base: str, password: str, exercise=None) -> None
                 assert await evaluate("fetch('/runtime/api/environments').then(response=>response.status)") == 200
                 if exercise is not None:
                     await exercise(rpc, evaluate, wait_for, session_id)
-                cookies = await rpc("Network.getCookies", {"urls": [base + "/runtime/"]}, session_id)
+                cookies = await rpc("Network.getCookies", {"urls": [browser_base + "/runtime/"]}, session_id)
                 old = next(cookie for cookie in cookies["cookies"] if cookie["name"] == "vb_v3_session")
                 await evaluate("Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()==='退出').click()")
                 await wait_for("location.pathname==='/login'")
