@@ -1,0 +1,4 @@
+{"file":".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md","reason":"检查原环境与代次、未绑定草稿恢复及正式历史保护"}
+{"file":".trellis/spec/vibecoding-bench/frontend/hook-guidelines.md","reason":"检查发送反馈、迟到回包、窗口清理与旧版输入回归"}
+{"file":".trellis/spec/vibecoding-bench/backend/quality-guidelines.md","reason":"有意义的 API/SQLite/隔离 Docker 行为验证与秘密保护"}
+{"file":".trellis/tasks/10-13-v3-login-code-feedback/research/evidence.md","reason":"区分真实 CLI 校验与合成成功链，不能将未知原因写成已修复"}
