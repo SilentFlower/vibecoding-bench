@@ -1,0 +1,6 @@
+{"file":".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md","reason":"凭据归属、固定身份、排他维护及普通 CLI/API 独立性"}
+{"file":".trellis/spec/vibecoding-bench/backend/index.md","reason":"按需读取 database-guidelines.md 的绑定、停用和额度/养号回归契约，避免整份长规范注入截断"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"Rust 验证与敏感数据边界"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"双数据库迁移和原子提交检查"}
+{"file":".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md","reason":"真实浏览器、主题、窄屏、XSS 与资源收口"}
+{"file":".trellis/tasks/10-13-v3-bound-reauth-login/research/current-contracts.md","reason":"核对修复覆盖当前缺口且不破坏既有契约"}

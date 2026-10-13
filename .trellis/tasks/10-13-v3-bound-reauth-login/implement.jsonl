@@ -1,0 +1,7 @@
+{"file":".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md","reason":"固定环境、AT-only HOME、唯一刷新权和排他登录租约"}
+{"file":".trellis/spec/vibecoding-bench/backend/index.md","reason":"按需读取 database-guidelines.md 的绑定身份、owner/profile 锁顺序和养号/额度契约，避免整份长规范注入截断"}
+{"file":".trellis/spec/cc2api/backend/index.md","reason":"按需读取 service-architecture.md 的 handler/service/store 分层契约，避免整份长规范注入截断"}
+{"file":".trellis/spec/cc2api/backend/settings-database.md","reason":"导入回执的 SQLite/PostgreSQL 幂等存储"}
+{"file":".trellis/spec/vibecoding-bench/frontend/hook-guidelines.md","reason":"终端挂载、重连和收口生命周期"}
+{"file":".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md","reason":"零构建、主题、窄屏和安全展示"}
+{"file":".trellis/tasks/10-13-v3-bound-reauth-login/research/current-contracts.md","reason":"真实类/DTO/锁与接口行为取证"}
