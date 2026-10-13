@@ -116,6 +116,9 @@ class AccountRuntime:
     def _account_lock(self, account: dict):
         with self.lock:
             row = self._row(account["name"], account.get("id"))
+            draft_path = self.data / "login-drafts" / (row["environment_id"] + ".json")
+            if draft_path.exists() and json.loads(draft_path.read_text()).get("phase") == "deleting":
+                raise ValueError("登录草稿正在清理，禁止唤醒或重建")
         return self.environment_lock(row["environment_id"])
 
     @staticmethod
@@ -214,12 +217,14 @@ class AccountRuntime:
             raise ValueError("容器部署归属不匹配，拒绝操作")
         return container
 
-    def ensure(self, account: dict, version: str | None = None, allow_inactive_login: bool = False) -> tuple[dict, object]:
+    def ensure(self, account: dict, version: str | None = None, allow_inactive_login: bool = False,
+               allow_login_recovery: bool = False) -> tuple[dict, object]:
         """创建或唤醒固定环境，沿用首次固化参数。
 
         :param account: bench 账号或登录草稿
         :param version: 可选目标 CLI 版本；发送器准备无需 CLI
         :param allow_inactive_login: 仅显式重授权允许读取非 active OAuth 配置
+        :param allow_login_recovery: 仅恢复原登录提交可进入本地保存门禁
         :return: 环境记录与 Docker container
         """
         with self._account_lock(account):
@@ -233,6 +238,9 @@ class AccountRuntime:
                     raise ValueError("绑定账号认证类型或状态不可用")
                 self._sync_proxy(account, configuration)
             row = self._row(account["name"], account.get("id"))
+            draft_path = self.data / "login-drafts" / (row["environment_id"] + ".json")
+            if draft_path.exists() and json.loads(draft_path.read_text()).get("phase") == "submitting" and not allow_login_recovery:
+                raise ValueError("原登录保存尚未完成，请先继续登录提交")
             if int(row["generation"]) == 0 and account.get("timezone"):
                 fingerprint = json.loads(row["fingerprint_json"])
                 fingerprint["tz"] = account["timezone"]
@@ -646,7 +654,8 @@ class AccountRuntime:
     @contextmanager
     def _cli_setup(self, account: dict, source: str, version: str,
                    idle_only: bool = False, exclusive: bool = False, allow_inactive_login: bool = False):
-        row, container = self.ensure(account, allow_inactive_login=allow_inactive_login)
+        row, container = self.ensure(account, allow_inactive_login=allow_inactive_login,
+            allow_login_recovery=source.startswith("login:"))
         job = self.claim(row, account, source, idle_only, exclusive)
         try:
             self._ensure_version(container, version)
@@ -857,7 +866,7 @@ class AccountRuntime:
                         value["hooks"] = job["hooks_before"]
                     atomic_json(settings, value)
                     os.chown(settings, 1000, 1000)
-                if job.get("tmux") and job.get("home", "/home/node") != "/home/node":
+                if job.get("tmux") and job.get("home", "/home/node") != "/home/node" and job["account"].get("cc2api_account_id") is not None:
                     # RT 必须在释放排他门禁前销毁，避免普通 CLI 形成第二条刷新链。
                     shutil.rmtree(self._root(job["row"]) / "home" / ".v3-login" / job["tmux"], ignore_errors=False)
                 self.release(job)
@@ -1086,6 +1095,31 @@ class AccountRuntime:
         if result.exit_code:
             raise ValueError("登录终端已结束")
         return result.output[-65536:].decode("utf-8", errors="replace")
+
+    def login_terminal_alive(self, session) -> bool:
+        """区分仍等待授权的 CLI 与用于保留屏幕的 sleep。
+
+        :param session: 当前登录会话
+        :return: CLI/tmux 尚未结束时为 True
+        """
+        job = self.job_for_container(self.execution_token(session.worker_id, f"login:{session.sid}"))
+        result = self._container(job["row"]).exec_run(["tmux", "-S", job["tmux_socket"],
+            "display-message", "-p", "-t", session.sid, "#{pane_current_command}"])
+        return result.exit_code == 0 and result.output.strip() != b"sleep"
+
+    def recover_login(self, sid: str, account: dict, version: str, home: str) -> tuple[dict, object]:
+        """认领重启后保留的产物，只检查认证，不伪造旧 tmux。
+
+        :param sid: 新的维护会话 ID
+        :param account: 原草稿配置
+        :param version: 原 CLI 版本
+        :param home: 已校验的原容器 HOME
+        :return: 原环境与容器
+        """
+        with self._cli_setup(account, f"login:{sid}", version, exclusive=True) as (row, container, job):
+            job.update(home=home, version=version)
+            self._save_execution(job)
+            return row, container
 
     def finish_bound_login(self, record: dict, snapshot: dict) -> None:
         """镜像已确认的权威凭据，主 HOME 永远不发布 RT。

@@ -113,9 +113,16 @@ class V3AuthTests(unittest.TestCase):
 
     def test_web_login_passes_runtime_account_proxy_fields(self) -> None:
         """执行真实登录入口和 LoginManager，验证 DTO 到 Runtime 的边界。@return None。"""
-        runtime = Mock()
+        with self.database() as connection:
+            connection.execute("DROP TABLE accounts")
+            connection.executescript(main._SCHEMA)
+        with patch.dict(os.environ, {"V3_DEPLOYMENT_ID": "auth-unit", "V3_ACCOUNT_IMAGE": "fake",
+            "V3_NETWORK": "fake", "V3_RELEASE": "fake"}):
+            runtime = AccountRuntime(Mock(), self.root, self.root, self.database, main.derive_fingerprint, Mock())
+        self.addCleanup(runtime.heartbeat_pool.shutdown)
+        row = runtime._row("synthetic")
         container = Mock(id="synthetic-container")
-        runtime.begin_login.return_value = ({}, container, self.root / ".claude", "/home/node")
+        runtime.begin_login = Mock(return_value=(row, container, self.root / ".claude", "/home/node"))
         manager = main.LoginManager(Mock())
         with patch.multiple(main, account_runtime=runtime, login_manager=manager), patch.object(main, "effective_claude_code_version", return_value="2.1.280"):
             result = main.login_start(main.LoginStartIn(name="synthetic", timezone="Asia/Tokyo", upstream_proxy_scheme="http",

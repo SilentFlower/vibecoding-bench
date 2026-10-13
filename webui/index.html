@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261013-reauth-login" />
+  <link rel="stylesheet" href="style.css?v=20261013-login-drafts" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -533,6 +533,7 @@
         <div class="login-connection">
           <span id="acc-login-connection-status" role="status" aria-live="polite">正在连接登录终端…</span>
           <button type="button" class="btn btn-sm" id="acc-login-reconnect" disabled>重新连接</button>
+          <button type="button" class="btn btn-sm hidden" id="acc-login-restart">重新登录</button>
         </div>
         <div class="login-link">
           <label for="acc-auth-url" class="lbl">授权链接</label>
@@ -656,6 +657,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20261013-reauth-login"></script>
+  <script src="app.js?v=20261013-login-drafts"></script>
 </body>
 </html>

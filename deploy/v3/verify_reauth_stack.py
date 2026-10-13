@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from manage import REPO
+from verify_login_drafts import verify_login_drafts
 
 
 @contextmanager
@@ -146,7 +147,13 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
                     await evaluate(f"{doc}.querySelector('.acc-step-terminal').scrollTop=0")
             # 输入通过当前真实 WS 到原 tmux；没有调用替身的文件写入接口。
             await evaluate(f"{state}.ws.send(JSON.stringify({{type:'input',data:'synthetic-code\\r'}}))")
-            await wait_for(f"{doc}.querySelector('#acc-login-link-status').textContent.includes('可以提交保存')")
+            try:
+                await wait_for(f"{doc}.querySelector('#acc-login-link-status').textContent.includes('可以提交保存')")
+            except TimeoutError:
+                status = browser.get(base + f"/runtime/api/accounts/login/{sid}/status", timeout=5)
+                print("关联状态诊断：", status.status_code, {key: value for key, value in status.json().items() if key != "authorization_url"}, flush=True)
+                print("页面状态诊断：", await evaluate(f"{doc}.querySelector('#acc-login-link-status').textContent"), flush=True)
+                raise
             await evaluate(f"{doc}.querySelector('#acc-login-commit').scrollIntoView({{block:'center'}})")
             point = await evaluate(f"(() => {{const f=document.querySelector('iframe').getBoundingClientRect(),b={doc}.querySelector('#acc-login-commit').getBoundingClientRect();return {{x:f.left+b.left+b.width/2,y:f.top+b.top+b.height/2}};}})()")
             await rpc("Input.dispatchMouseEvent", {"type": "mousePressed", **point, "button": "left", "clickCount": 1}, session_id)
@@ -206,6 +213,8 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
                 assert database.execute("SELECT access_token,refresh_token FROM accounts WHERE id=?", (gateway_id,)).fetchone() == ("new-access", "new-refresh")
                 assert database.execute("SELECT count(*) FROM oauth_credential_imports WHERE account_id=?", (gateway_id,)).fetchone()[0] == 1
             print("通过：真实 Docker/HTTP 错登拒绝、取消后会话和暂存收口，原关联凭据保持")
+
+            await verify_login_drafts(client, deployment, data, browser, base, address, rpc, evaluate, wait_for, session_id)
 
         yield exercise
     finally:

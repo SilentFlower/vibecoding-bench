@@ -35,6 +35,16 @@ def synthetic_url() -> str:
 class AuthorizationURLTests(unittest.TestCase):
     """验证完整链接、终端换行与非授权链接拒绝。"""
 
+    def test_cli_293_endpoint_and_exact_host_path_pairs(self) -> None:
+        """CLI 2.1.293 的入口可解析，主机与路径不可交叉放宽。@return None。"""
+        url = synthetic_url().replace("claude.ai/oauth/authorize", "claude.com/cai/oauth/authorize")
+        wrapped = "\n".join(url[index:index + 81] for index in range(0, len(url), 81))
+        self.assertEqual(authorization_url(wrapped + "\nPaste code here >"), url)
+        self.assertEqual(authorization_url(url), url)
+        for invalid in (url.replace("/cai/oauth/", "/oauth/"),
+            url.replace("claude.com/", "claude.ai/"), url + "&state=duplicate"):
+            self.assertIsNone(authorization_url(invalid))
+
     def test_complete_ansi_and_hard_wrapped_link(self) -> None:
         """ANSI 和屏幕换行不能截断 query；不输出样本全文。@return None。"""
         url = synthetic_url()
@@ -49,6 +59,11 @@ class AuthorizationURLTests(unittest.TestCase):
             url.replace("claude.ai/", "claude.ai.attacker.invalid/"), url + "&state=duplicate",
             url.replace("/oauth/authorize", "/oauth/code/callback"), url + "#fragment"):
             self.assertIsNone(authorization_url(invalid))
+
+    def test_wrapped_duplicate_parameter_is_not_hidden_by_early_return(self) -> None:
+        """参数换行后仍须完整校验，不能在首段看似完整时提前接受。@return None。"""
+        self.assertIsNone(authorization_url(synthetic_url() + "\n&state=duplicate\nPaste code here >"))
+        self.assertIsNone(authorization_url(synthetic_url() + "\n&optional=synthetic" * 14 + "\n&state=duplicate\nPaste code here >"))
 
 
 class BoundReauthTests(unittest.TestCase):

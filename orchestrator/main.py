@@ -45,6 +45,7 @@ from starlette.websockets import WebSocketState
 from quota_protocol import merge_quota_observation, quota_decision, quota_observation, warmup_quota_decision, warmup_sample_used
 from account_runtime import AccountRuntime, RuntimeBusy, atomic_json
 from login_terminal import authorization_url
+from login_drafts import LoginDraftStore
 
 
 # ============== 配置 ==============
@@ -1640,10 +1641,26 @@ def _get_available_account(conn: sqlite3.Connection, account_id: int) -> Optiona
     :param account_id: accounts.id
     :return: 可用账号行；不存在、停用或软删除时返回 None
     """
-    return conn.execute(
+    row = conn.execute(
         "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL",
         (account_id,),
     ).fetchone()
+    return row if row and not _login_save_pending(conn, row["name"]) else None
+
+
+def _login_save_pending(conn: sqlite3.Connection, name: str) -> bool:
+    if not account_runtime:
+        return False
+    environment = conn.execute("SELECT * FROM account_environments WHERE name=?", (name,)).fetchone()
+    if not environment:
+        return False
+    try:
+        return LoginDraftStore(account_runtime, get_db, _db_lock).record(dict(environment))["phase"] == "submitting"
+    except FileNotFoundError:
+        # 提交尾部已删除标记，账号的 HOME 与数据库已完整保存。
+        return False
+    except (ValueError, KeyError):
+        return True
 
 
 def _restore_deleted_account(
@@ -4518,7 +4535,7 @@ class LoginSession:
 
     __slots__ = ("sid", "name", "sidecar_id", "worker_id", "created_at",
                  "proxy", "profile_dir", "force_reauth", "committed", "home", "version",
-                 "account_id", "binding_id", "identity", "commit_context", "phase", "import_payload", "authorization_url", "auth_method")
+                 "account_id", "binding_id", "identity", "commit_context", "phase", "import_payload", "authorization_url", "auth_method", "environment_id", "draft_generation")
 
     def __init__(self, sid: str, name: str, sidecar_id: Optional[str],
                  worker_id: str, proxy: dict, profile_dir: Path,
@@ -4542,6 +4559,8 @@ class LoginSession:
         self.import_payload = None
         self.authorization_url = None
         self.auth_method = None
+        self.environment_id = None
+        self.draft_generation = None
 
 
 class ContinueSession:
@@ -4607,7 +4626,7 @@ class LoginManager:
             return
         with self._lock:
             expired = [sid for sid, session in self.sessions.items()
-                if session.phase == "authorizing" and time.time() - session.created_at >= int(os.environ.get("V3_LOGIN_TTL_SECONDS", "1800"))]
+                if session.phase in ("authorizing", "ended", "ready_to_submit") and time.time() - session.created_at >= int(os.environ.get("V3_LOGIN_TTL_SECONDS", "1800"))]
             self.completed = {sid: value for sid, value in self.completed.items() if value["expires_at"] > time.time()}
         for sid in expired:
             try:
@@ -4650,6 +4669,7 @@ class LoginManager:
         proxy: dict,
         force_reauth: bool = False,
         timezone: Optional[str] = None,
+        version: Optional[str] = None,
     ) -> LoginSession:
         """
         启动账号 OAuth 登录容器。
@@ -4658,6 +4678,7 @@ class LoginManager:
         :param proxy: 上游代理配置
         :param force_reauth: 是否使用一次性 profile 副本强制重授权
         :param timezone: 登录 worker 显式时区；None 表示按账号名自动派生
+        :param version: 恢复草稿时沿用首次选择的 CLI 版本
         :return: 登录会话对象
         """
         if not _ACC_NAME_RE.match(name):
@@ -4674,23 +4695,41 @@ class LoginManager:
             sid = uuid.uuid4().hex[:12]
             self._name_locks[name] = sid
 
+        draft_row, draft_registered = None, False
         try:
             if account_runtime:
                 connection = get_db()
                 try:
                     existing = connection.execute("SELECT * FROM accounts WHERE name=?", (name,)).fetchone()
+                    environment = connection.execute("SELECT * FROM account_environments WHERE name=?", (name,)).fetchone()
                 finally:
                     connection.close()
+                if environment:
+                    pending = _login_drafts().record(dict(environment))
+                    if pending["phase"] in ("deleting", "submitting"):
+                        raise ValueError("原登录仍在清理或保存，请先完成原草稿操作")
                 account = dict(existing) if existing else {"name": name}
                 binding_id = account.get("cc2api_account_id")
                 configuration = cc2api_client._request("GET", f"/admin/runtime/accounts/{binding_id}/config") if binding_id is not None else None
                 account.update(upstream_proxy_scheme=proxy.get("scheme"),
                     upstream_socks5_host=proxy.get("host"), upstream_socks5_port=proxy.get("port"),
                     upstream_socks5_user=proxy.get("user"), upstream_socks5_pass=proxy.get("pass"), timezone=tz)
-                version = effective_claude_code_version()
-                _, container, profile, home = account_runtime.begin_login(sid, account, version, force_reauth)
+                version = version or effective_claude_code_version()
+                if not existing:
+                    drafts = _login_drafts()
+                    draft_row = account_runtime._row(name)
+                    record = drafts.guard(draft_row)
+                    if record["phase"] == "deleting":
+                        raise ValueError("草稿正在清理，请先完成删除")
+                    drafts.save(draft_row, sid=sid, generation=uuid.uuid4().hex, phase="preparing",
+                        version=version, created_at=time.time(), home=f"/home/node/.v3-login/{sid}" if force_reauth else "/home/node")
+                    draft_registered = True
+                row, container, profile, home = account_runtime.begin_login(sid, account, version, force_reauth)
                 session = LoginSession(sid, name, container.id, container.id, proxy, profile, force_reauth)
                 session.home, session.version = home, version
+                if draft_row:
+                    record = drafts.save(row, phase="authorizing")
+                    session.environment_id, session.draft_generation = row["environment_id"], record["generation"]
                 if binding_id is not None:
                     session.account_id, session.binding_id = int(account["id"]), int(binding_id)
                     session.identity = {key: configuration.get(key) for key in ("email", "account_uuid", "organization_uuid")}
@@ -4799,8 +4838,14 @@ class LoginManager:
                 self.sessions[sid] = session
             return session
         except Exception:
-            with self._lock:
-                self._name_locks.pop(name, None)
+            try:
+                if draft_registered:
+                    if 'container' in locals():
+                        account_runtime.cleanup(account_runtime.execution_token(container.id, f"login:{sid}"))
+                    drafts.save(draft_row, phase="interrupted")
+            finally:
+                with self._lock:
+                    self._name_locks.pop(name, None)
             if force_reauth:
                 shutil.rmtree(BENCH_DATA / "login-sessions" / sid, ignore_errors=True)
             raise
@@ -4909,7 +4954,14 @@ class LoginManager:
                         raise ValueError("登录维护门禁仍需对账")
                 s.commit_context["path"].unlink(missing_ok=True)
             if s.force_reauth:
-                shutil.rmtree(s.profile_dir.parent, ignore_errors=True)
+                # 未提交草稿取消保留已写入产物；完整删除走独立归属校验路径。
+                if not s.environment_id:
+                    shutil.rmtree(s.profile_dir.parent, ignore_errors=True)
+            if s.environment_id:
+                drafts = _login_drafts()
+                row = drafts.row(s.environment_id)
+                if row and row["account_id"] is None and drafts.record(row)["phase"] != "deleting":
+                    drafts.save(row, phase="cancelled")
             with self._lock:
                 s.phase = "cancelled"
                 s.import_payload, s.authorization_url = None, None
@@ -7480,6 +7532,8 @@ def list_accounts():
         ).fetchall()
         accounts = []
         for row in rows:
+            if _login_save_pending(conn, row["name"]):
+                continue
             account = dict(row)
             account["upstream_proxy_scheme"] = _normalize_upstream_proxy_scheme(
                 account.get("upstream_proxy_scheme")
@@ -8019,6 +8073,249 @@ class LoginStartIn(BaseModel):
     force_reauth: bool = False
 
 
+class LoginDraftActionIn(BaseModel):
+    """草稿操作必须携带页面看到的代次，防止旧页面操作新登录。
+
+    :param generation: 页面最后读取的草稿代次
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    generation: str
+
+
+def _login_drafts() -> LoginDraftStore:
+    if not account_runtime or not login_manager:
+        raise HTTPException(409, "登录草稿管理仅在 v3 固定环境中可用")
+    return LoginDraftStore(account_runtime, get_db, _db_lock)
+
+
+def _draft_session(row: dict) -> Optional[LoginSession]:
+    with login_manager._lock:
+        return next((session for session in login_manager.sessions.values() if session.name == row["name"]), None)
+
+
+def _login_response(session: LoginSession) -> dict:
+    return {"session_id": session.sid, "ws_path": f"/api/accounts/login/ws/{session.sid}",
+        "has_sidecar": session.sidecar_id is not None, "name": session.name,
+        "reconnectable": bool(account_runtime) and session.phase == "authorizing",
+        "cc2api_account_id": session.binding_id, "environment_id": session.environment_id,
+        "draft_generation": session.draft_generation}
+
+
+def _unverified_login_draft(row: dict) -> dict:
+    return {"draft_id": row["environment_id"], "environment_id": row["environment_id"],
+        "name": row["name"], "generation": "unverified", "state": "reconcile",
+        "session_id": None, "reconnectable": False, "credentials_ready": False,
+        "credentials_present": False, "container_status": "unknown",
+        "message": "草稿记录损坏或归属不一致，请检查环境；自动操作已禁用",
+        "can_resume": False, "can_restart": False, "can_delete": False}
+
+
+@app.get("/api/accounts/login-drafts")
+def list_login_drafts() -> list[dict]:
+    """仅为账号页展示未提交环境，不提供正式账号 ID 或凭据。
+
+    :return: 草稿状态和受控操作许可
+    """
+    if not account_runtime:
+        return []
+    drafts = _login_drafts()
+    result = []
+    for row in drafts.rows():
+        owner_lock = _oauth_owner_lock(row["name"])
+        acquired = owner_lock.acquire(blocking=False)
+        try:
+            try:
+                current = drafts.row(row["environment_id"])
+                if not current:
+                    continue
+                initial_record = drafts.record(current)
+            except (ValueError, KeyError, TypeError, OSError):
+                # 单条私有记录损坏不能遮住其它账号；未知归属只展示，不开放清理。
+                result.append(_unverified_login_draft(row))
+                continue
+            pending = initial_record["phase"] == "submitting"
+            if current["account_id"] is not None and not pending:
+                continue
+            message, allowed = "", True
+            try:
+                record = drafts.guard(current, allow_submitting=pending)
+            except ValueError as error:
+                record = initial_record
+                message, allowed = str(error), False
+            session = _draft_session(current)
+            if session and allowed and record["phase"] != "deleting" and acquired:
+                try:
+                    _login_status_snapshot(session)
+                except HTTPException as error:
+                    if error.status_code == 410:
+                        message = "原登录已过期，请重新登录"
+                        session.phase = "ended"
+                    else:
+                        message, allowed = "暂时无法确认登录状态，请稍后重试", False
+            phase = record["phase"]
+            if pending:
+                phase, message = "submitting", "账号保存尚未完成，请继续登录并重试提交"
+            elif not allowed:
+                phase = "reconcile"
+            elif phase != "deleting":
+                phase = session.phase if session else ("preparing" if login_manager.has_active_name(current["name"]) else
+                    (phase if phase in ("cancelled", "ended") else "interrupted"))
+            profile, _ = drafts.profile(current, record)
+            container_status = "missing"
+            if current["container_id"]:
+                try:
+                    container = account_runtime._container(current)
+                    container.reload()
+                    container_status = container.status
+                except NotFound:
+                    pass
+                except Exception:
+                    message, allowed, phase = "无法确认专属容器归属，请检查环境", False, "reconcile"
+                    container_status = "unknown"
+            if not acquired:
+                # 初始化/提交可持续较久；列表只读快照，不等待操作锁或改写会话状态。
+                message, allowed = "登录操作进行中，请稍候刷新", False
+            result.append({"draft_id": current["environment_id"], "environment_id": current["environment_id"],
+                "name": current["name"], "generation": record["generation"], "state": phase,
+                "session_id": session.sid if session else None,
+                "reconnectable": bool(session and session.phase == "authorizing"),
+                "credentials_ready": bool(session and session.phase == "ready_to_submit"),
+                "credentials_present": (profile / ".credentials.json").is_file(),
+                "container_status": container_status, "message": message,
+                "can_resume": allowed and phase not in ("preparing", "deleting") and bool(session or (profile / ".credentials.json").is_file()),
+                "can_restart": allowed and phase not in ("preparing", "deleting", "submitting"),
+                "can_delete": allowed and phase not in ("preparing", "submitting")})
+        finally:
+            if acquired:
+                owner_lock.release()
+    return result
+
+
+def _require_login_draft(environment_id: str, generation: str) -> tuple[LoginDraftStore, dict, dict]:
+    drafts = _login_drafts()
+    row = drafts.row(environment_id)
+    if not row:
+        raise HTTPException(404, "登录草稿已不存在")
+    record = drafts.guard(row, generation)
+    if record["phase"] == "deleting":
+        raise ValueError("草稿正在清理，请先完成删除")
+    return drafts, row, record
+
+
+@app.post("/api/accounts/login-drafts/{environment_id}/resume")
+def resume_login_draft(environment_id: str, body: LoginDraftActionIn) -> dict:
+    """继续活跃原会话，或验证重启后保留的凭据后提供提交入口。
+
+    :param environment_id: 固定草稿环境
+    :param body: 页面草稿代次
+    :return: 可恢复的会话信息；不返回代理密码
+    """
+    drafts = _login_drafts()
+    row = drafts.row(environment_id)
+    if not row:
+        raise HTTPException(404, "登录草稿已不存在")
+    with _oauth_owner_lock(row["name"]), _profile_lock(row["name"]):
+        try:
+            row = drafts.row(environment_id)
+            if not row:
+                raise HTTPException(404, "登录草稿已不存在")
+            record = drafts.guard(row, body.generation, allow_submitting=True)
+            if record["phase"] == "deleting":
+                raise ValueError("草稿正在清理，请先完成删除")
+            pending = record["phase"] == "submitting"
+            session = _draft_session(row)
+            if session:
+                if record.get("sid") != session.sid:
+                    # 兼容升级前只有内存会话的环境，继续时补齐当前登录的持久归属。
+                    record = drafts.save(row, sid=session.sid, generation=uuid.uuid4().hex, phase=session.phase,
+                        version=session.version, home=session.home, created_at=session.created_at)
+                session.environment_id, session.draft_generation = environment_id, record["generation"]
+                _login_status_snapshot(session)
+                return _login_response(session)
+            profile, home = drafts.profile(row, record)
+            if not (profile / ".credentials.json").is_file():
+                raise ValueError("原登录已中断且没有凭据，请选择重新登录")
+            account = drafts.account(row)
+            version = record.get("version") or effective_claude_code_version()
+            if not _CLAUDE_CODE_VERSION_RE.fullmatch(version):
+                raise ValueError("草稿 CLI 版本无效")
+            sid = uuid.uuid4().hex[:12]
+            _, container = account_runtime.recover_login(sid, account, version, home)
+            session = LoginSession(sid, row["name"], container.id, container.id, {}, profile, home != "/home/node")
+            session.home, session.version = home, version
+            session.environment_id, session.draft_generation = environment_id, uuid.uuid4().hex
+            session.phase = "submitting" if pending else "ready_to_submit"
+            with login_manager._lock:
+                login_manager.sessions[sid] = session
+                login_manager._name_locks[session.name] = sid
+            drafts.save(row, sid=sid, generation=session.draft_generation, phase=session.phase,
+                version=version, home=home, created_at=session.created_at)
+            if not login_manager.auth_status(sid).get("loggedIn"):
+                if not pending:
+                    login_manager.cleanup(sid)
+                raise ValueError("保留产物未通过 CLI 认证检查，请重新登录")
+            return _login_response(session)
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from None
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(503, "暂时无法继续登录，草稿和产物已保留，请重试或检查环境") from None
+
+
+@app.post("/api/accounts/login-drafts/{environment_id}/restart")
+def restart_login_draft(environment_id: str, body: LoginDraftActionIn) -> dict:
+    """在原固定环境重新授权，明确创建新 SID 和草稿代次。
+
+    :param environment_id: 原草稿环境
+    :param body: 页面草稿代次
+    :return: 新登录终端信息
+    """
+    drafts = _login_drafts()
+    row = drafts.row(environment_id)
+    if not row:
+        raise HTTPException(404, "登录草稿已不存在")
+    with _oauth_owner_lock(row["name"]), _profile_lock(row["name"]):
+        try:
+            drafts, row, record = _require_login_draft(environment_id, body.generation)
+            account = drafts.account(row)
+            session = _draft_session(row)
+            if session:
+                login_manager.cleanup(session.sid)
+            proxy = {"scheme": account["upstream_proxy_scheme"], "host": account["upstream_socks5_host"],
+                "port": account["upstream_socks5_port"], "user": account["upstream_socks5_user"], "pass": account["upstream_socks5_pass"]}
+            session = login_manager.start(row["name"], proxy, True, account["timezone"], record.get("version"))
+            return _login_response(session)
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from None
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(503, "重新登录尚未完成，草稿仍保留，请重试或检查环境") from None
+
+
+@app.delete("/api/accounts/login-drafts/{environment_id}")
+def delete_login_draft(environment_id: str, generation: str) -> dict:
+    """完整删除未提交草稿，失败保留可重试状态。
+
+    :param environment_id: 专属固定环境 ID
+    :param generation: 页面看到的草稿代次
+    :return: 仅完整清理或已经不存在时返回 ok
+    """
+    drafts = _login_drafts()
+    try:
+        row = drafts.row(environment_id)
+        if row:
+            with _oauth_owner_lock(row["name"]), _profile_lock(row["name"]):
+                drafts.delete(row, generation, login_manager)
+        return {"ok": True}
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from None
+    except Exception:
+        raise HTTPException(503, "清理未完成，草稿已保留，请刷新列表后重试删除") from None
+
+
 @app.post("/api/accounts/login/start")
 def login_start(body: LoginStartIn):
     """启动一个 OAuth 引导会话；前端拿到 session_id 后开 WS 拿 PTY"""
@@ -8060,14 +8357,7 @@ def login_start(body: LoginStartIn):
             raise HTTPException(400, str(e))
         except Exception as e:
             raise HTTPException(500, f"启动登录会话失败：{e}")
-    return {
-        "session_id": session.sid,
-        "ws_path": f"/api/accounts/login/ws/{session.sid}",
-        "has_sidecar": session.sidecar_id is not None,
-        "name": session.name,
-        "reconnectable": bool(account_runtime),
-        "cc2api_account_id": session.binding_id,
-    }
+    return _login_response(session)
 
 
 @app.get("/api/accounts/login/{sid}/status")
@@ -8085,22 +8375,50 @@ def login_status(sid: str, response: Response) -> dict:
         if completed and completed["expires_at"] > time.time():
             return {"phase": "committed", "reconnectable": False, "authorization_url": None}
         raise HTTPException(404, "登录会话已结束或过期，请重新授权")
+    with _oauth_owner_lock(session.name):
+        if login_manager.get(sid) is not session:
+            raise HTTPException(404, "登录会话已结束，请刷新账号列表")
+        return _login_status_snapshot(session)
+
+
+def _login_status_snapshot(session: LoginSession) -> dict:
     expires_at = session.created_at + int(os.environ.get("V3_LOGIN_TTL_SECONDS", "1800"))
-    if session.phase == "authorizing" and time.time() >= expires_at:
-        raise HTTPException(410, "登录会话已过期，请重新授权")
-    ready = (session.profile_dir / ".credentials.json").exists()
-    if account_runtime and session.phase == "authorizing" and not ready:
+    if session.phase in ("authorizing", "ended", "ready_to_submit") and time.time() >= expires_at:
+        raise HTTPException(410, "登录会话已过期，请从账号列表继续或重新授权")
+    ready = not account_runtime and (session.profile_dir / ".credentials.json").is_file()
+    if account_runtime and session.phase in ("authorizing", "ended", "ready_to_submit"):
         try:
-            session.authorization_url = authorization_url(account_runtime.capture_login_pane(session)) or session.authorization_url
+            if (session.profile_dir / ".credentials.json").is_file():
+                ready = bool(login_manager.auth_status(session.sid).get("loggedIn"))
+            if ready:
+                session.phase = "ready_to_submit"
+            elif session.phase == "ready_to_submit":
+                session.phase = "ended"
+            elif session.phase == "authorizing":
+                session.authorization_url = authorization_url(account_runtime.capture_login_pane(session)) or session.authorization_url
+                if not account_runtime.login_terminal_alive(session):
+                    session.phase = "ended"
         except ValueError:
-            raise HTTPException(409, "登录终端已结束，请检查环境状态") from None
+            session.phase = "ended"
         except Exception:
             raise HTTPException(503, "暂时无法读取登录终端，请稍后重试") from None
-    else:
+    if session.phase != "authorizing":
         session.authorization_url = None
+    if session.environment_id:
+        drafts = _login_drafts()
+        row = drafts.row(session.environment_id)
+        if row:
+            record = drafts.guard(row, session.draft_generation, allow_submitting=session.phase == "submitting")
+            if record["phase"] == "deleting":
+                raise HTTPException(409, "草稿正在清理")
+            drafts.save(row, phase=session.phase)
+    message = {"authorizing": "终端正在等待授权", "ended": "登录终端已结束，请重新登录",
+        "ready_to_submit": "CLI 认证检查通过，可以提交保存", "submitting": "凭据同步待确认，可重试提交或在环境页对账",
+        "committed": "登录已完成"}.get(session.phase, "登录会话已结束")
     return {"phase": session.phase, "credentials_ready": ready, "expires_at": expires_at,
         "reconnectable": bool(account_runtime) and session.phase == "authorizing",
-        "authorization_url": session.authorization_url}
+        "authorization_url": session.authorization_url, "message": message,
+        "restartable": session.phase == "ended"}
 
 
 @app.websocket("/api/accounts/login/ws/{sid}")
@@ -8243,7 +8561,18 @@ async def login_ws(websocket: WebSocket, sid: str):
 
 @app.post("/api/accounts/login/{sid}/commit")
 def login_commit(sid: str, body: LoginStartIn):
-    """登录完成后调用：校验 `claude auth status`，落 accounts 表，清容器"""
+    """与草稿删除、取消和重登互斥地校验并保存登录。
+
+    :param sid: 本次登录会话
+    :param body: 账号名及原登录配置
+    :return: 已保存账号的结果，不含凭据
+    """
+    session = login_manager.get(sid) if login_manager else None
+    with _oauth_owner_lock(session.name if session else body.name):
+        return _login_commit_locked(sid, body)
+
+
+def _login_commit_locked(sid: str, body: LoginStartIn):
     if not login_manager:
         raise HTTPException(500)
     session = login_manager.get(sid)
@@ -8255,15 +8584,27 @@ def login_commit(sid: str, body: LoginStartIn):
     if session.name != body.name:
         raise HTTPException(400, "name mismatch with session")
     if account_runtime and session.binding_id is not None:
-        with _oauth_owner_lock(session.name):
-            try:
-                return login_manager.commit_bound(session)
-            except ValueError as exc:
-                raise HTTPException(409, str(exc)) from None
-            except ConnectionError:
-                raise HTTPException(503, "凭据同步结果尚未确认，请重试提交；暂存和维护门禁已保留") from None
-            except Exception:
-                raise HTTPException(500, "重授权未完成，请重试提交或在环境页对账") from None
+        try:
+            return login_manager.commit_bound(session)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from None
+        except ConnectionError:
+            raise HTTPException(503, "凭据同步结果尚未确认，请重试提交；暂存和维护门禁已保留") from None
+        except Exception:
+            raise HTTPException(500, "重授权未完成，请重试提交或在环境页对账") from None
+    if session.environment_id:
+        try:
+            drafts = _login_drafts()
+            row = drafts.row(session.environment_id)
+            if not row:
+                raise ValueError("原登录草稿已不存在")
+            record = drafts.record(row)
+            if record.get("sid") != sid or record["generation"] != session.draft_generation:
+                raise ValueError("登录草稿已换代")
+            drafts.guard(row, session.draft_generation, allow_submitting=record["phase"] == "submitting")
+            body = LoginStartIn(**drafts.account(row))
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from None
     conn = get_db()
     try:
         bound = conn.execute(
@@ -8320,6 +8661,11 @@ def login_commit(sid: str, body: LoginStartIn):
         # 不清容器：让用户继续 retry。返回错误细节给前端展示。
         raise HTTPException(400, f"not logged in yet: {status}")
 
+    if session.environment_id:
+        # 本地保存也可能在 DB/HOME 之间中断；先记意图，取消/删除不得丢掉维护材料。
+        drafts.save(row, phase="submitting")
+        session.phase = "submitting"
+
     try:
         login_manager.persist_profile_files(sid)
         login_manager.persist_top_config(sid)
@@ -8365,7 +8711,7 @@ def login_commit(sid: str, body: LoginStartIn):
                         body.upstream_socks5_user,
                         body.upstream_socks5_pass,
                         timezone,
-                        1,
+                        0 if session.environment_id else 1,
                     )
                     values = ((restored_account_id,) + base_values) if restored_account_id is not None else base_values
                     cur = conn.execute(
@@ -8378,7 +8724,7 @@ def login_commit(sid: str, body: LoginStartIn):
                     conn.execute(
                         "UPDATE accounts SET profile_path=?, upstream_proxy_scheme=?, upstream_socks5_host=?, "
                         "upstream_socks5_port=?, upstream_socks5_user=?, "
-                        "upstream_socks5_pass=?, timezone=?, enabled=1, deleted_at=NULL WHERE name=?",
+                        "upstream_socks5_pass=?, timezone=?, enabled=?, deleted_at=NULL WHERE name=?",
                         (
                             f"profiles/{name}",
                             proxy_scheme,
@@ -8387,6 +8733,7 @@ def login_commit(sid: str, body: LoginStartIn):
                             body.upstream_socks5_user,
                             body.upstream_socks5_pass,
                             timezone,
+                            0 if session.environment_id else 1,
                             name,
                         ),
                     )
@@ -8401,13 +8748,38 @@ def login_commit(sid: str, body: LoginStartIn):
             conn.close()
 
     if account_runtime:
+        if session.environment_id:
+            drafts.save(row, saved_account_id=account_id)
         account_runtime.commit_login(session, account_id)
+        if session.environment_id:
+            cleanup_home = record.get("cleanup_home") or (session.home if session.force_reauth else None)
+            # HOME 已原子镜像成功；先更新恢复入口，清理暂存失败也能从主 HOME 重试。
+            drafts.save(row, home="/home/node", cleanup_home=cleanup_home)
     login_manager.cleanup(sid)
-    return {
+    result = {
         "id": account_id,
         "name": name,
         "auth_method": status.get("authMethod"),
     }
+    if session.environment_id:
+        if cleanup_home:
+            if not re.fullmatch(r"/home/node/\.v3-login/[a-f0-9]{12}", cleanup_home):
+                raise ValueError("暂存 HOME 归属无效，账号已保存但清理需检查")
+            staged_profile, _ = drafts.profile(row, {"home": cleanup_home})
+            drafts._safe_tree(staged_profile.parent, account_runtime._root(row) / "home" / ".v3-login")
+            if staged_profile.parent.exists():
+                shutil.rmtree(staged_profile.parent)
+        with _db_lock:
+            connection = get_db()
+            try:
+                with connection:
+                    connection.execute("UPDATE accounts SET enabled=1 WHERE id=? AND name=? AND cc2api_account_id IS NULL AND deleted_at IS NULL", (account_id, name))
+            finally:
+                connection.close()
+        _login_drafts()._path(session.environment_id).unlink(missing_ok=True)
+    with login_manager._lock:
+        login_manager.completed[sid] = {"result": result, "expires_at": time.time() + 1800}
+    return result
 
 
 @app.delete("/api/accounts/login/{sid}")
@@ -8421,6 +8793,11 @@ def login_cancel(sid: str):
                     account_runtime.reconcile(session.commit_context["environment_id"])
                     if session.commit_context["path"].exists():
                         raise HTTPException(409, "提交结果仍需对账，暂存凭据和维护门禁已保留")
+                if session.environment_id:
+                    drafts = _login_drafts()
+                    row = drafts.row(session.environment_id)
+                    if row and drafts.record(row)["phase"] == "submitting":
+                        raise HTTPException(409, "账号保存尚未完成，请先重试提交，不能取消并丢弃产物")
                 login_manager.cleanup(sid)
     return {"ok": True}
 

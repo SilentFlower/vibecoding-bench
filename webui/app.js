@@ -189,9 +189,13 @@ function renderWarmupStatus(account) {
   `;
 }
 
+/**
+ * 分别载入正式账号与登录草稿，只有正式账号进入共享任务选择状态。
+ * @return {Promise<void>} 账号列表与操作入口就绪
+ */
 async function renderAccounts() {
   try {
-    state.accounts = await API('/accounts');
+    [state.accounts, state.loginDrafts] = await Promise.all([API('/accounts'), API('/accounts/login-drafts', { cache: 'no-store' })]);
   } catch (e) { return alert('加载账号失败: ' + e.message); }
 
   const body = $('#accounts-body');
@@ -216,9 +220,40 @@ async function renderAccounts() {
         <button class="btn btn-sm btn-danger" data-del="${a.id}">删除</button>
       </div></td>
     </tr>
-  `).join('') || '<tr><td colspan="9" class="muted empty-cell">暂无账号</td></tr>';
+  `).join('') + (state.loginDrafts || []).map(draft => {
+    const phase = { preparing: '准备登录', authorizing: '登录中 · 未提交', ready_to_submit: '认证通过 · 待提交', ended: '终端已结束',
+      interrupted: '登录已中断', cancelled: '已取消 · 环境保留', submitting: '保存未完成 · 请继续提交', reconcile: '需检查 / 对账', deleting: '清理未完成 · 可重试' }[draft.state] || '未完成登录';
+    const id = escapeHTML(draft.environment_id);
+    return `<tr class="account-draft-row">
+      <td><span class="muted">草稿</span></td><td><strong>${escapeHTML(draft.name)}</strong></td>
+      <td colspan="4"><strong>${escapeHTML(phase)}</strong><div class="muted">${escapeHTML(draft.message || (draft.credentials_present && !draft.credentials_ready ? '保留授权产物；继续后检查认证状态' : '尚未保存账号'))}</div></td>
+      <td>不参与任务与养号</td><td>—</td><td><div class="op-actions account-actions">
+        <button type="button" class="btn btn-sm" data-draft-resume="${id}" ${draft.can_resume ? '' : 'disabled'}>继续登录</button>
+        <button type="button" class="btn btn-sm" data-draft-restart="${id}" ${draft.can_restart ? '' : 'disabled'}>重新登录</button>
+        ${draft.session_id ? `<button type="button" class="btn btn-sm" data-draft-cancel="${id}" ${draft.can_restart ? '' : 'disabled'}>取消登录</button>` : ''}
+        <button type="button" class="btn btn-sm btn-danger" data-draft-delete="${id}" ${draft.can_delete ? '' : 'disabled'}>删除草稿</button>
+      </div></td></tr>`;
+  }).join('') || '<tr><td colspan="9" class="muted empty-cell">暂无账号</td></tr>';
 
   body.onclick = async (e) => {
+    const draftId = e.target.dataset.draftResume || e.target.dataset.draftRestart || e.target.dataset.draftCancel || e.target.dataset.draftDelete;
+    if (draftId) {
+      const draft = state.loginDrafts.find(item => item.environment_id === draftId);
+      if (!draft) return;
+      if (e.target.dataset.draftDelete && !confirm(`删除未提交草稿「${draft.name}」？将取消登录，并删除专属容器、HOME、缓存及未提交授权产物。`)) return;
+      e.target.disabled = true;
+      try {
+        if (e.target.dataset.draftDelete) {
+          await API(`/accounts/login-drafts/${draftId}?generation=${encodeURIComponent(draft.generation)}`, { method: 'DELETE' });
+        } else if (e.target.dataset.draftCancel) {
+          await API(`/accounts/login/${draft.session_id}`, { method: 'DELETE' });
+        } else {
+          await openLoginDraft(draft, e.target.dataset.draftRestart ? 'restart' : 'resume');
+        }
+      } catch (error) { alert('草稿操作未完成：' + error.message); }
+      finally { await renderAccounts(); }
+      return;
+    }
     const id = e.target.dataset.del;
     const quotaId = e.target.dataset.quota;
     const reloginId = e.target.dataset.relogin;
@@ -328,6 +363,7 @@ async function renderAccounts() {
   $('#acc-login-cancel').onclick = () => endAccLogin({ alsoCloseModal: true });
   $('#acc-login-commit').onclick = () => commitAccLogin();
   $('#acc-login-reconnect').onclick = () => state.accLogin?.connection?.reconnect();
+  $('#acc-login-restart').onclick = restartAccLogin;
   $('#acc-login-copy').onclick = copyAccLoginURL;
   $('#acc-login-open').onclick = () => {
     if (state.accLogin?.authorizationURL) window.open(state.accLogin.authorizationURL, '_blank', 'noopener,noreferrer');
@@ -610,6 +646,11 @@ function showAccStep(which) {
   $('.acc-step-terminal').classList.toggle('hidden', which !== 'terminal');
 }
 
+/**
+ * 以用户配置开始登录，启动中关闭必须等待服务端返回后收口。
+ * @param {Object} body 登录配置
+ * @return {Promise<void>} 终端就绪或失败处理结束
+ */
 async function startAccLogin(body) {
   const loginState = state.accLogin || {};
   state.accLogin = loginState;
@@ -638,6 +679,42 @@ async function startAccLogin(body) {
     API(`/accounts/login/${resp.session_id}`, { method: 'DELETE' }).catch(() => {});
     return;
   }
+  await showAccLoginSession(resp, body, loginState);
+  await renderAccounts();
+}
+
+/**
+ * 打开账号列表中的原草稿，继续与重登使用同一终端生命周期。
+ * @param {Object} draft 页面草稿及代次
+ * @param {string} action resume 或 restart
+ * @return {Promise<void>} 会话窗口就绪后完成
+ */
+async function openLoginDraft(draft, action) {
+  openAccLoginModal();
+  const login = state.accLogin;
+  login.starting = true;
+  try {
+    const resp = await API(`/accounts/login-drafts/${draft.environment_id}/${action}`, {
+      method: 'POST', body: JSON.stringify({ generation: draft.generation }),
+    });
+    login.starting = false;
+    await showAccLoginSession(resp, { name: draft.name }, login);
+  } catch (error) {
+    login.starting = false;
+    await endAccLogin({ alsoCloseModal: true, skipServerCancel: true });
+    throw error;
+  }
+}
+
+/**
+ * 展示新建或恢复的登录，统一收口启动期间的关闭请求。
+ * @param {Object} resp 服务端会话信息
+ * @param {Object} body 原提交配置
+ * @param {Object} loginState 本窗口的状态对象
+ * @return {Promise<void>} 完成终端初始化或确认取消
+ */
+async function showAccLoginSession(resp, body, loginState) {
+  if (state.accLogin !== loginState) return;
   // 保存 proxy/name 给 commit 用
   state.accLogin.body = body;
   state.accLogin.mode = loginState.mode || 'new';
@@ -645,11 +722,14 @@ async function startAccLogin(body) {
   state.accLogin.sid = resp.session_id;
   state.accLogin.name = resp.name;
   state.accLogin.reconnectable = Boolean(resp.reconnectable);
+  state.accLogin.environmentId = resp.environment_id || null;
+  state.accLogin.draftGeneration = resp.draft_generation || null;
   state.accLogin.authorizationURL = null;
   $('#acc-auth-url').value = '';
   $('#acc-login-copy').disabled = true;
   $('#acc-login-open').disabled = true;
   $('#acc-login-reconnect').disabled = true;
+  $('#acc-login-restart').classList.add('hidden');
   $('#acc-login-link-status').textContent = '等待 CLI 输出授权链接';
 
   $('#acc-login-sid').textContent = resp.session_id;
@@ -669,10 +749,29 @@ async function startAccLogin(body) {
   }
 }
 
+/**
+ * 已结束的登录明确重启授权，不尝试重连死亡的终端。
+ * @return {Promise<void>} 原环境新会话打开后完成
+ */
+async function restartAccLogin() {
+  const login = state.accLogin;
+  if (!login || login.closing || login.committing || login.starting) return;
+  const draft = { environment_id: login.environmentId, generation: login.draftGeneration, name: login.name };
+  const account = state.accounts.find(item => item.id === login.accountId);
+  await endAccLogin({ alsoCloseModal: true });
+  if (state.accLogin) return;
+  try {
+    if (draft.environment_id) await openLoginDraft(draft, 'restart');
+    else openAccLoginModal(account || null);
+  } catch (error) { alert('重新登录失败：' + error.message); }
+  await renderAccounts();
+}
+
 async function attachAccLoginTerminal(wsPath) {
   const login = state.accLogin;
   const termState = await attachTerminal('#acc-login-xterm', wsPath, 'running', {
     autoReconnect: login.reconnectable,
+    startStopped: !login.reconnectable && Boolean(login.environmentId || RUNTIME_BASE),
     isActive: () => state.accLogin === login && !login.closing,
     onSocket: socket => { if (state.accLogin === login) login.ws = socket; },
     onState: message => { if (state.accLogin === login) $('#acc-login-connection-status').textContent = message; },
@@ -685,7 +784,7 @@ async function attachAccLoginTerminal(wsPath) {
   login.connection = termState;
   login.onResize = termState.onResize;
   $('#acc-login-reconnect').disabled = !login.reconnectable;
-  if (login.reconnectable) {
+  if (login.reconnectable || login.environmentId || RUNTIME_BASE) {
     /** 只在当前登录窗内串行查状态，不依赖 WS 首次输出来找链接。 */
     const poll = async () => {
       if (state.accLogin !== login) return;
@@ -697,10 +796,11 @@ async function attachAccLoginTerminal(wsPath) {
         $('#acc-auth-url').value = login.authorizationURL || '';
         $('#acc-login-copy').disabled = !login.authorizationURL;
         $('#acc-login-open').disabled = !login.authorizationURL;
-        $('#acc-login-link-status').textContent = status.credentials_ready ? 'CLI 已生成凭据，可以提交保存' : '等待 CLI 输出授权链接';
+        $('#acc-login-link-status').textContent = status.credentials_ready ? 'CLI 认证检查通过，可以提交保存' : (status.reconnectable ? '等待 CLI 输出授权链接' : status.message || '登录已结束');
+        $('#acc-login-restart').classList.toggle('hidden', !status.restartable);
         if (!status.reconnectable) {
           login.pollStopped = true;
-          termState.stop(status.phase === 'committed' ? '登录已完成' : '凭据同步待确认，可重试提交或在环境页对账');
+          termState.stop(status.message || (status.phase === 'committed' ? '登录已完成' : '凭据同步待确认，可重试提交或在环境页对账'));
           $('#acc-login-reconnect').disabled = true;
           return;
         }
@@ -710,6 +810,7 @@ async function attachAccLoginTerminal(wsPath) {
           login.pollStopped = true;
           termState.stop(error.message);
           $('#acc-login-reconnect').disabled = true;
+          $('#acc-login-restart').classList.toggle('hidden', ![404, 409, 410].includes(error.status));
           login.authorizationURL = null;
           $('#acc-auth-url').value = '';
           $('#acc-login-copy').disabled = true;
@@ -878,7 +979,7 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
         term.write('\r\n\x1b[90m[连接已断开]\x1b[0m\r\n');
         schedule();
       };
-      socket.onerror = () => { if (current === generation) notify('终端连接异常，等待重新连接'); };
+      socket.onerror = () => { if (current === generation && !stopped) notify('终端连接异常，等待重新连接'); };
     } catch (error) {
       if (!active() || current !== generation) return;
       if ([401, 403, 404, 410].includes(error.status)) stop(error.message);
@@ -887,7 +988,8 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
   };
   const input = term.onData(data => {
     if (active() && inputAllowed && ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', data }));
-    else if (active()) notify('终端未连接，输入未发送；连接恢复后请重新输入');
+    // 终态原因已经确定；离线输入不能覆盖它或承诺恢复一个死亡的终端。
+    else if (active() && !stopped) notify('终端未连接，输入未发送；连接恢复后请重新输入');
   });
 
   const onResize = () => {
@@ -897,7 +999,8 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
     }
   };
   window.addEventListener('resize', onResize);
-  await connect();
+  if (options.startStopped) stopped = true;
+  else await connect();
   return { term, fit, get ws() { return ws; }, onResize, stop,
     reconnect: () => {
       if (!active() || stopped) return;
@@ -985,6 +1088,7 @@ async function endAccLogin({ alsoCloseModal = false, skipServerCancel = false } 
   showAccStep('config');
   $('#acc-modal-stage').textContent = 'step 1 · configure';
   $('#acc-login-commit').disabled = false;
+  if (!skipServerCancel && currentTab() === 'accounts') await renderAccounts();
 }
 
 // ===================== Topics =====================

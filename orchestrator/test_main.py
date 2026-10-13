@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from pydantic import ValidationError
+from account_runtime import AccountRuntime
 
 import main
 
@@ -2740,6 +2741,10 @@ global.fetch = async (_url, options) => {
     def test_v3_warmup_starts_during_api_activity_but_yields_to_formal_cli(self) -> None:
         """API 活动与排队不阻止养号，正式 CLI 执行仍优先。@return None。"""
         main.init_db()
+        # 使用真实模型补齐固定环境表，调度/发送器仍是本用例的隔离替身。
+        with patch.dict(os.environ, {"V3_DEPLOYMENT_ID": "warmup-unit", "V3_ACCOUNT_IMAGE": "fake", "V3_NETWORK": "fake"}):
+            schema_runtime = AccountRuntime(Mock(), main.BENCH_DATA, main.BENCH_DATA, main.get_db, main.derive_fingerprint, Mock())
+        schema_runtime.heartbeat_pool.shutdown()
         profile = main.PROFILES_DIR / "main"
         profile.mkdir(parents=True)
         (profile / ".credentials.json").write_text(json.dumps({"claudeAiOauth": {"accessToken": "synthetic"}}))

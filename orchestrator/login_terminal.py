@@ -13,33 +13,43 @@ def authorization_url(pane: str) -> str | None:
     required = {"client_id", "response_type", "redirect_uri", "scope", "code_challenge", "code_challenge_method", "state"}
     for match in finditer(r"https://[^\s<>\"'\x00-\x1f]+", text):
         candidate = match.group().rstrip("),.;")
-        # CLI 的硬换行可能切开 query；只拼接连续 URL 字符行，不合成参数。
+        # 先拼完整连续行再校验，避免在换行的重复参数之前提前接受候选。
         remaining = text[match.end():].splitlines()
-        for continuation in [None, *remaining[:12]]:
-            if continuation is not None:
-                part = continuation.strip()
-                if not part:
-                    continue
-                if not fullmatch(r"[A-Za-z0-9_~.%&=+/?#:-]+", part):
-                    break
-                candidate += part
-            if len(candidate) > 8192:
+        if remaining and not remaining[0].strip():
+            remaining = remaining[1:]
+        else:
+            remaining = []
+        for part in remaining[:13]:
+            part = part.strip()
+            if not part or part.startswith("https://") or not fullmatch(r"[A-Za-z0-9_~.%&=+/?#:-]+", part):
                 break
-            try:
-                parsed = urlsplit(candidate)
-                query = parse_qs(parsed.query, keep_blank_values=True)
-                if parsed.scheme != "https" or parsed.netloc not in ("claude.ai", "platform.claude.com") or parsed.path != "/oauth/authorize" or parsed.fragment:
-                    break
-                if not required.issubset(query) or any(len(query[key]) != 1 or not query[key][0] for key in required):
-                    continue
-                if query["response_type"] != ["code"] or query["code_challenge_method"] != ["S256"]:
-                    break
-                if not fullmatch(r"[A-Za-z0-9_-]{43}", query["code_challenge"][0]) or not fullmatch(r"[A-Za-z0-9_-]{43}", query["state"][0]):
-                    continue
-                redirect = urlsplit(query["redirect_uri"][0])
-                if redirect.scheme != "https" or redirect.netloc not in ("platform.claude.com", "console.anthropic.com"):
-                    break
-                return candidate
-            except ValueError:
-                break
+            candidate += part
+        else:
+            # 达到拼接上限时不能把仍在续行的有效前缀当完整链接。
+            tail = remaining[13].strip() if len(remaining) > 13 else ""
+            if tail and not tail.startswith("https://") and fullmatch(r"[A-Za-z0-9_~.%&=+/?#:-]+", tail):
+                continue
+        if len(candidate) > 8192:
+            continue
+        try:
+            parsed = urlsplit(candidate)
+            query = parse_qs(parsed.query, keep_blank_values=True)
+            if parsed.scheme != "https" or (parsed.netloc, parsed.path) not in (
+                ("claude.com", "/cai/oauth/authorize"),
+                ("claude.ai", "/oauth/authorize"),
+                ("platform.claude.com", "/oauth/authorize"),
+            ) or parsed.fragment:
+                continue
+            if not required.issubset(query) or any(len(query[key]) != 1 or not query[key][0] for key in required):
+                continue
+            if query["response_type"] != ["code"] or query["code_challenge_method"] != ["S256"]:
+                continue
+            if not fullmatch(r"[A-Za-z0-9_-]{43}", query["code_challenge"][0]) or not fullmatch(r"[A-Za-z0-9_-]{43}", query["state"][0]):
+                continue
+            redirect = urlsplit(query["redirect_uri"][0])
+            if redirect.scheme != "https" or redirect.netloc not in ("platform.claude.com", "console.anthropic.com"):
+                continue
+            return candidate
+        except ValueError:
+            continue
     return None

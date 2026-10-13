@@ -160,7 +160,7 @@ POST   /api/accounts/login/{sid}/commit
 DELETE /api/accounts/login/{sid}
 WS     /api/accounts/login/ws/{sid}
 POST   /api/environments/{environment_id}/maintenance
-AccountRuntime.ensure(account, version=None, allow_inactive_login=False)
+AccountRuntime.ensure(account, version=None, allow_inactive_login=False, allow_login_recovery=False)
 AccountRuntime.login_commit_context(session) -> dict
 AccountRuntime.finish_bound_login(record: dict, snapshot: dict) -> None
 LoginManager.commit_bound(session: LoginSession) -> dict
@@ -177,7 +177,7 @@ LoginManager.cleanup_reconciled(environment_id: str) -> None
 - 导入成功先镜像权威 AT/RT/expiry 到管理 profile，保留未知配置；主 HOME 与 runtime 只发布 AT，顶层配置只更新已核对的身份字段，保留 userID。不改 bench enabled、养号开关/阈值、限流或已有额度状态。
 - 本地写入/清理未完成时保留暂存和记录，不报成功。重试先查回执，用当前快照；只有明确未提交才以原操作重试。收口 tmux/进程/Recorder并销毁暂存 RT 后再 release。成功结果缓存 1800 秒，仅含账号/同步状态，允许同名同 sid 的重复 commit。
 - pending 记录优先于普通执行恢复。对账先停止新心跳、核对原租约，必要时取得新维护门禁，再 fence；等待 API/发送器收口、停止原容器、查询回执。已提交则镜像当前快照；明确未提交保留原 profile。删暂存、release、删执行/提交记录后才完成。未知结果或租约被其它代次接管时保留 reconcile 和门禁。
-- 普通 TTL 清理只处理 authorizing；不确定提交不可自动删除。取消已提交只关闭终端，不回滚远端凭据。服务重启恢复结果，不承诺恢复同一交互终端。
+- 普通 TTL 清理处理 authorizing/ended/ready_to_submit；不确定提交不可自动删除。取消已提交只关闭终端，不回滚远端凭据。服务重启恢复结果，不承诺恢复同一交互终端；未提交草稿沿用下方独立契约。
 - status 为 `Cache-Control:no-store`，返回 phase、credentials_ready、expires_at（UTC 秒）、reconnectable 与 authorization_url；已完成返回最小 committed 状态。URL 从同 tmux 的有界屏幕提取，不持久化终端全文。
 
 ### 4. Validation & Error Matrix
@@ -205,3 +205,64 @@ LoginManager.cleanup_reconciled(environment_id: str) -> None
 - `verify_browser.py` 的 insecure_http 模式用 `v3-verify.test` 只解析到回环，Chrome 仍阻止其它公网请求；检查真实非安全上下文的复制降级。原 localhost 属于安全上下文，不能以 HTTP 协议名冒充此验证。
 - 两侧凭据、回执、设备、策略、租约与暂存前后比对；结束只按随机部署精确标签清理，核对旧哨兵 StartedAt/hash 不变。恢复测试数据后再验证无遗留。
 - 单测/模拟通过不证明真实 OAuth 成功或账号限制解除；上线后由部署负责人安排可用测试账号，经真实 CLI 重授权和正式 API 验收。回滚前收口所有 pending 登录，不删除新回执表。
+
+## Scenario: v3 未提交登录草稿与完整清理
+
+### 1. Scope / Trigger
+
+- 修改新账号登录开始、草稿列表/恢复/重登/删除、首次提交或宕机恢复时适用。已有正式账号的重授权及历史软删除保持原契约；终端交互见 [登录终端生命周期](../frontend/hook-guidelines.md#scenario-v3-登录终端重连与授权链接)。
+
+### 2. Signatures
+
+```text
+GET    /api/accounts/login-drafts
+POST   /api/accounts/login-drafts/{environment_id}/resume
+POST   /api/accounts/login-drafts/{environment_id}/restart
+DELETE /api/accounts/login-drafts/{environment_id}?generation=<页面代次>
+LoginDraftActionIn: {generation: string}；extra=forbid
+AccountRuntime.recover_login(sid: str, account: dict, version: str, home: str)
+  -> tuple[dict, object]
+AccountRuntime.login_terminal_alive(session) -> bool
+bench/login-drafts/<32位小写hex环境ID>.json
+```
+
+### 3. Contracts
+
+- 草稿使用 `account_environments.account_id=NULL`，首次 start 在初始化前写 preparing，成功后写 authorizing；不提前创建正式账号。正式账号列表及任务/养号/额度入口不能把草稿当作可用账号；只有账号页读取独立草稿列表。
+- 列表 DTO 包含 `draft_id/environment_id/name/generation/state/session_id/reconnectable/credentials_ready/credentials_present/container_status/message/can_resume/can_restart/can_delete`。ID 是环境 ID，不能作为正式 account_id；`credentials_present` 只表示文件存在，不能推断认证成功。不返回令牌、代理密码、发送器秘密或 OAuth 参数。
+- 元数据使用 `atomic_json`、0600、原子替换与 fsync，保存在环境目录外。字段为环境/name、sid、字符串 generation、phase、version、home、created_at；保存中还可有 saved_account_id/cleanup_home，删除中有 deleting_at。不保存授权 URL/code/AT/RT 或终端全文。草稿 generation 是逻辑操作代次，与环境整数 generation 不同；旧无标记环境使用 `legacy-<环境generation>`，活动旧会话继续时补齐归属。
+- 有效 phase 为 preparing/authorizing/ready_to_submit/committed/cancelled/ended/interrupted/reconcile/deleting/submitting。`home` 只接受 `/home/node` 或 `/home/node/.v3-login/<12位小写hex SID>`；元数据必须是对象，环境/name 一致、generation 是非空字符串、phase 有效。单条损坏或归属冲突显示 reconcile、generation=unverified、所有操作禁用，不能使其他草稿和正式账号不可见；JSON 或名称结构损坏的孤立标记也保留可见诊断。
+- 列表不阻塞等待 owner 锁；初始化或提交锁仍占用时返回只读快照和操作进行中提示，禁用操作，不在该次查询改写会话状态。
+- resume 有活动会话时继续原 SID/tmux，不启动第二个 CLI。重启后没有原会话但有产物时，在原环境/HOME/代理/版本认领新的维护 SID，实际 `claude auth status` 通过后才允许提交，不创建虚假的旧 tmux。restart 必须显式请求：先收口旧登录，再生成新 SID/草稿代次，仍保留原环境、容器、HOME 身份、代理及 CLI 缓存。
+- 管理容器 `unless-stopped`，账号容器 `restart=no`、按需唤醒；启动 reconcile 收口遗留执行，HOME/草稿保留，状态显示中断或待检查产物。不承诺恢复宕机前已死亡的交互进程，不同时自启所有账号。
+- 本地首次提交先写 submitting，持有 owner → profile 锁；中间 accounts 行保持 enabled=0。只要 submitting 标记仍存在，正式列表和 `_get_available_account` 均隔离该账号；仅原登录恢复路径允许 `allow_login_recovery=True` 穿过本地保存门禁。HOME 镜像成功后先把恢复入口改为主 HOME，再清暂存，失败仍能继续提交。全部保存和清理完成才启用账号、移除标记并缓存幂等结果。submitting 拒绝取消、删除及新登录，不能丢掉未确认产物。
+- 完整删除采用 owner → profile → environment 锁序，锁内重读环境和代次。任一正式/软删除账号、同 profile 引用、run/flow 历史、未知提交/对账、其他作业或活动发送连接均拒绝。容器必须通过完整产品/部署/角色/环境 labels；目录须为专属 realpath，根或父目录链接、跨树内部链接均拒绝，npm 指向本专属树的链接允许。
+- 先保存 deleting，收口原登录和执行，再停止并移除唯一归属容器，清环境 HOME/CLI 缓存/暂存和专属 profile；外部清理完成后才条件删除 account_environments，最后删除标记。Docker/文件/最终标记失败不能假成功；保留可见 deleting/reconcile 供重试，禁止期间唤醒/重建。重复删除已不存在草稿返回 ok；草稿已经正式提交时拒绝删除。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 非 v3 查询草稿 | 空列表；草稿操作 409 |
+| resume/restart 缺少 generation 或带额外字段 | 422 |
+| 已换代、正式/历史/归属冲突、清理或提交门禁 | 409，不操作新代或正式资源 |
+| resume/restart 锁内重读已不存在 | 404，不能转成 503 并误称仍保留 |
+| 重启后无产物或 CLI 认证未通过 | 409，不把文件存在当成功 |
+| 单条元数据坏 JSON/结构/HOME/归属 | 该条 reconcile 只读可见，其他条目继续返回 |
+| Docker/IO 未完成或恢复连接未知 | 503，保留可重试资料，不报删除/恢复成功 |
+| 提交期间 DB/HOME/清理中断 | 不启用可用账号，保留 submitting，继续原提交 |
+| 重复删除资源已不存在 | ok；正式提交后新草稿删除仍为 409 |
+
+### 5. Scenarios and Examples
+
+- 正常：start 创建专属环境，刷新账号页后用 `resume {"generation":"页面返回值"}` 继续原 SID；CLI 结束时显式 restart 创建新 SID，环境/CID/userID 保留。
+- 基础：管理器突然退出后发现 interrupted 草稿；没有产物则重新登录，有产物则先验证认证再提交，账号容器仍按需唤醒。
+- 错误用法：只有 credentials 文件就标记已登录，或提交 IO 失败后通过删除放行。正确处理：真实 CLI 认证检查；submitting 保留资料和门禁，继续提交/对账。
+- 错误用法：用旧页面代次删除新登录，或凭账号名称前缀批量删容器。正确处理：锁内重读代次、精确标签和目录归属，仅清专属未提交资源。
+
+### 6. Tests Required
+
+- `test_login_drafts.py` 用临时 SQLite/文件和 Docker 替身覆盖列表/旧环境、非调度、同 SID 继续、原身份重登、重启产物认证、本地保存中断、取消/提交/删除互斥、旧代次/锁内 404、正式/软删除/历史保护、labels/链接拒绝和部分清理重试。
+- 必须断言坏 JSON、错环境及 home=null 只隔离单条，另一正式账号仍可读取，坏孤立标记可见且不能删资源；旧非 v3 status 继续按原凭据存在契约返回 credentials_ready，v3 仍须真实认证检查。
+- `verify_stack.py --manifest <最终联合清单> --browser --reauth` 串入 `verify_login_drafts.py`：真实 Docker/Chrome/HTTP/WS/tmux、刷新原 SID、CLI 结束与迟到事件、管理器 SIGKILL 后对账/恢复、原环境提交、鼠标确认完整删除；验证全部专属目录/CID/DB 消失且正式账号保留。
+- 合成 CLI/OAuth 和故障替身必须明确标注，不访问真实 OAuth；按随机部署精确标签清理测试数据与容器，核对旧哨兵不变和最终冻结源码哈希。真实 OAuth/正式 API 另作上线后验证。

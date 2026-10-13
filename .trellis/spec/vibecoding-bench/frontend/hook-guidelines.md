@@ -147,14 +147,16 @@ async function renderX() {
 
 ### 1. Scope / Trigger
 
-- 修改 `attachTerminal/attachAccLoginTerminal/startAccLogin/commitAccLogin/endAccLogin`、登录 modal、WS 票据或授权链接展示时适用。服务端提交和 status 契约见 [关联重授权](../backend/account-runtime-v3.md#scenario-v3-关联重授权提交与恢复)。
+- 修改 `attachTerminal/attachAccLoginTerminal/startAccLogin/commitAccLogin/endAccLogin`、草稿列表、登录 modal、WS 票据或授权链接展示时适用。服务端提交见 [关联重授权](../backend/account-runtime-v3.md#scenario-v3-关联重授权提交与恢复)，草稿接口/私有记录/完整清理见 [未提交草稿](../backend/account-runtime-v3.md#scenario-v3-未提交登录草稿与完整清理)。
 
 ### 2. Signatures
 
 ```text
 attachTerminal(hostSelector, wsPath, initialStatus='running', options={})
   -> Promise<{term,fit,ws getter,onResize,stop,reconnect,dispose}>
-options: autoReconnect, isActive, onSocket, onState
+options: autoReconnect, startStopped, isActive, onSocket, onState
+openLoginDraft(draft, action) -> Promise<void>；action=resume/restart
+restartAccLogin() -> Promise<void>
 GET /api/accounts/login/{sid}/status
 POST /api/terminal-ticket {path: 原 WS 路径}
 authorization_url(pane: str) -> str | None
@@ -164,33 +166,41 @@ authorization_url(pane: str) -> str | None
 
 - v3 登录启用 autoReconnect，续聊默认不启用。重连只 attach 原 sid/tmux，每次取得新短票据；当前 socket 通过 getter/onSocket 更新，旧回调用 generation 与当前 state 校验。
 - 重试延迟 1/2/4/8 秒、最多 8 次，连续稳定 30 秒才清重试数；心跳每 10 秒发送 ping，超过 30 秒无回包在下个 tick 关闭半开连接。手动重连不重启 CLI。Terminal/FitAddon 加载最多等 10 秒，窗口失效即停止。
-- 只在当前窗口、当前 socket OPEN、输入获准时透传；离线输入丢弃并提示，不缓存/重放授权码。删除额外粘贴本地回显。服务端任一 pump 结束就取消另一 pump、关闭 attach；断线仅 detach。
+- 只在当前窗口、当前 socket OPEN、输入获准时透传；离线输入丢弃并提示，不缓存/重放授权码。终态确定后，onData 和迟到的 WS.onerror 均不得覆盖结束原因。删除额外粘贴本地回显。服务端任一 pump 结束就取消另一 pump、关闭 attach；断线仅 detach。
 - status 在窗口内每 2 秒串行查询，与 WS 首次输出独立；停止状态停止重连。取消期间暂缓轮询，取消失败继续查询；提交/关闭互斥。start HTTP 尚未取得 SID 时关闭窗口，标记 closeRequested，取得 SID 后确认取消再隐藏，避免后台遗留不可见登录。
-- URL 来源为真实 CLI tmux pane：最多 65536 字节，剥 ANSI、拼连续 URL 字符的有限硬换行，候选不超过 8192 字符。仅接受 HTTPS 的 claude.ai/platform.claude.com `/oauth/authorize`，无 fragment，PKCE 必需参数单一非空、code/S256、43 字符 base64url challenge/state；redirect 主机为 platform.claude.com 或 console.anthropic.com 的 HTTPS。不生成或补猜参数；CLI 升级须核对实际形状。
+- URL 来源为真实 CLI tmux pane：输入最多 65536 字符，剥 ANSI、最多拼 13 条连续 URL 字符硬换行，候选不超过 8192 字符；先拼完整 query 再校验，到续行上限仍有后续则拒绝有效前缀。仅接受 HTTPS 精确组合 `claude.com /cai/oauth/authorize`、`claude.ai /oauth/authorize`、`platform.claude.com /oauth/authorize`，无 fragment，PKCE 必需参数单一非空、code/S256、43 字符 base64url challenge/state；redirect 主机为 platform.claude.com 或 console.anthropic.com 的 HTTPS。不生成或补猜参数；CLI 升级须核对实际形状，不能把白名单主机/路径交叉组合。
 - URL 以 textarea.value/textContent 展示；打开用 `_blank`、`noopener,noreferrer`。复制依次尝试安全 Clipboard、选中完整文本的 execCommand，再明确手动复制；未复制不报成功。URL 不进入持久缓存或日志。
 - 会话过期、鉴权失效或进入提交阶段后停止重连/心跳与终端输入，status 停止条件也终止轮询；终端和窗口留供显示诊断。关闭、成功提交或确认取消后释放 socket、xterm、输入订阅及 resize listener，并清 state；取消失败保窗。窄屏终端区域要能滚动，提交/取消按钮必须实际可点击；同步静态资源版本与明暗主题。
+- v3 status 200 可返回 ended、message 和 restartable，不能继续显示普通断线提示；重新连接仅用于活跃原 SID，重新登录才生成新 SID。ready_to_submit 已经通过服务端认证检查，可停止终端后提交；恢复窗口用 startStopped 避免连接不存在的 tmux。
+- 账号页将草稿作为独立行展示，`state.accounts` 和正式任务下拉不混入草稿。所有动作传页面 generation，操作许可来自 DTO；删除确认说明未提交授权产物也将清除，失败刷新可见状态。启动与恢复期间关窗仍等待 SID，再确认取消；清理未知不丢 state。
 
 ### 4. Validation & Error Matrix
 
 | 条件 | 页面行为 |
 |---|---|
 | 普通断线/短期网络故障 | 有界重试或手动重连原会话，取新票据 |
+| status 200 + ended | 停止连接/输入/轮询，保留 message，显示重新登录；迟到错误不覆盖 |
+| ready_to_submit / 恢复产物窗口 | 终端停止，显示认证已通过，允许提交保存 |
 | status 401/403/404/409/410 | 停止连接/轮询，清链接，显示结束/失效状态 |
 | WS 4004/4401/4404 | 停止重连和输入，显示结束/鉴权失效；链接是否有效继续由 status 判断 |
 | submitting/committed | 禁止继续向终端输入，提示重试/对账或完成 |
 | 非官方/非 HTTPS/截断/重复参数/超长 URL | 不展示无效候选，保留终端手动流程 |
 | HTTP 或复制权限不支持 | 选择完整 URL，明确手动复制 |
 | 服务端取消失败/结果未知 | 保留窗口和 state，不假报关闭成功 |
+| 草稿 preparing/deleting/submitting/reconcile 或代次冲突 | 按许可禁用动作或显示错误并刷新，不操作正式账号资源 |
 
 ### 5. Scenarios and Examples
 
 - 正常：终端已输出 URL 后断线，HTTP 仍读原 pane；自动或手动重连取新 ticket，原 sid 不变。
 - 基础：HTTP 非安全上下文没有 Clipboard，选中可复制；390px 明暗主题能滚动并点击提交。
+- 基础：刷新账号页发现草稿，继续原 SID；管理器重启后按服务端返回的中断/认证状态选择重登或提交，不伪造原终端。
 - 错误用法：保存 ticket URL 反复重连，或离线缓存输入后补发。正确处理：新建连接代次、重新出票、丢弃离线输入。
 - 错误用法：调用 DELETE 后立即清 state、吞掉失败。正确处理：await 服务端确认，保留失败窗口；启动中关闭也等 SID 收口。
+- 错误用法：CLI 已退出后仍让输入或迟到 onerror 把原因改成等待重连。正确处理：stop 后所有连接/输入回调尊重终态，另提供明确重新登录。
 
 ### 6. Tests Required
 
-- URL 单测覆盖 ANSI、硬换行、截断 state、重复参数、恶意主机/fragment、非 HTTPS；取真实支持 CLI 的脱敏形状核对，不只用自造样本。
+- URL 单测覆盖三个精确入口、拒绝交叉路径、ANSI、软/硬换行、续行上限、截断 state、换行后的重复参数、恶意主机/fragment、非 HTTPS；取真实支持 CLI 的脱敏形状核对，不只用自造样本。
 - 真实 Chrome 验证断线与手动重连的新票据/同 sid、离线输入未到 tmux、启动中关闭、HTTP 复制选择、打开参数、1280/390 明暗和真实点击；打开外页在测试中拦截，不能访问真实 OAuth。
 - 取消/过期/退出与非法票据、半开 pump 收口；旧未绑定登录/续聊默认行为回归。`node --check webui/app.js`，组件/错误路径变动后复用对应隔离验证。
+- 草稿真实浏览器验证刷新继续、CLI 退出后离线输入及人工迟到 onerror 不覆盖结束原因、原环境重登、宕机后产物恢复、提交和删除按钮实际鼠标点击；坏元数据的只读状态与正式账号可用性由对应 SQLite/API 回归证明。
