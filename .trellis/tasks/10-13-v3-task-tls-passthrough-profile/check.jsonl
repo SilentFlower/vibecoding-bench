@@ -1,0 +1,5 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "后端实现与回归检查清单"}
+{"file": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md", "reason": "固定环境生命周期与失败关闭检查"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md", "reason": "TLS 透传、抓包隔离与证据检查"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md", "reason": "浏览器、主题和窄屏检查"}

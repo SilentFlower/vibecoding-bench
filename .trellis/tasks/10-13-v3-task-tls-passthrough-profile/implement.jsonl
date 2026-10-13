@@ -1,0 +1,5 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md", "reason": "固定账号容器、网络、重授权与环境维护契约"}
+{"file": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md", "reason": "普通任务与养号额度阈值、等待和恢复契约"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md", "reason": "正式代理链路、抓包证据与敏感数据边界"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md", "reason": "原生 WebUI 表单与跨主题回归规范"}
