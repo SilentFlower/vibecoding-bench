@@ -141,7 +141,12 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
     await evaluate(f"{win}.renderAccounts()")
     await wait_for(f"Boolean({doc}.querySelector('[data-draft-resume=\"{environment_id}\"]:not([disabled])'))")
     await click_button(f'[data-draft-resume="{environment_id}"]')
-    await wait_for(f"{doc}.querySelector('#acc-login-link-status').textContent.includes('可以提交保存')")
+    try:
+        await wait_for(f"{doc}.querySelector('#acc-login-link-status').textContent.includes('可以提交保存')")
+    except TimeoutError:
+        print("重启后提交诊断：", browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json(), flush=True)
+        print("重启后页面诊断：", await evaluate(f"[Boolean({state}),{doc}.querySelector('#acc-login-link-status').textContent,{doc}.querySelector('#acc-login-connection-status').textContent]"), flush=True)
+        raise
     await click_button('#acc-login-commit')
     await wait_for(f"{doc}.querySelector('#acc-modal').classList.contains('hidden')")
     with sqlite3.connect(bench_db) as connection:

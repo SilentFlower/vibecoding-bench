@@ -395,6 +395,48 @@ class BoundReauthTests(unittest.TestCase):
 class LoginWebSocketTests(unittest.TestCase):
     """验证首个转发结束会取消另一方向，断线不销毁登录会话。"""
 
+    def test_v3_login_ws_forwards_live_terminal_input(self) -> None:
+        """v3 登录终端必须把当前连接的键盘输入送到原 tmux。@return None。"""
+        async def exercise():
+            """运行实际异步路由，使用 socketpair 观察终端输入。"""
+            raw, peer = socket.socketpair()
+            raw.setblocking(False)
+            messages = [
+                {"type": "websocket.connect"},
+                {"type": "websocket.receive", "text": json.dumps(
+                    {"type": "input", "data": "interactive-choice\r"})},
+                {"type": "websocket.disconnect"},
+            ]
+            output = []
+
+            async def receive():
+                """按真实 ASGI 顺序提供连接、输入和断开消息。"""
+                if messages:
+                    return messages.pop(0)
+                await asyncio.Future()
+
+            async def send(message):
+                """收集实际 WS 握手和关闭消息。"""
+                output.append(message)
+
+            websocket = WebSocket({"type": "websocket", "path": "/api/accounts/login/ws/abcdef123456", "headers": []}, receive, send)
+            session = SimpleNamespace(worker_id="synthetic", home="/home/node", sidecar_id=None, phase="authorizing", created_at=time.time())
+            manager = Mock()
+            manager.get.return_value = session
+            manager.client.api.exec_create.return_value = {"Id": "synthetic-exec"}
+            manager.client.api.exec_start.return_value = raw
+            with patch.multiple(main, login_manager=manager, account_runtime=Mock(), V3_ENABLED=False):
+                await asyncio.wait_for(main.login_ws(websocket, "abcdef123456"), timeout=2)
+            peer.settimeout(1)
+            try:
+                self.assertEqual(b"interactive-choice\r", peer.recv(4096))
+            finally:
+                peer.close()
+            self.assertTrue(any(message.get("type") == "websocket.accept" for message in output))
+            manager.cleanup.assert_not_called()
+
+        asyncio.run(exercise())
+
     def test_pty_eof_closes_half_open_ws_without_cleaning_login(self) -> None:
         """真实 socket EOF 不能让 WS receive 永久挂起。@return None。"""
         async def exercise():

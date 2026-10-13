@@ -741,7 +741,7 @@ async function showAccLoginSession(resp, body, loginState) {
   $('#acc-code-toggle').setAttribute('aria-pressed', 'false');
   $('#acc-code-status').textContent = '尚未发送';
   $('#acc-login-input-hint').textContent = loginState.codeMode
-    ? '打开授权链接完成登录，将完整授权码填入下方输入框并发送。终端只显示 CLI 输出；等待认证检查通过后点击“提交保存”。'
+    ? '打开授权链接完成登录。授权码优先填入下方输入框并发送；CLI 出现其它确认或选择时，点击黑色终端直接操作。请勿在两处重复发送同一授权码。认证检查通过后点击“提交保存”。'
     : '打开授权链接完成登录，将完整授权码粘回终端后按 Enter，再点击“提交保存”。';
   $('#acc-auth-code').oninput = updateAccCodeControls;
   $('#acc-code-form').onsubmit = event => { event.preventDefault(); sendAccLoginCode(); };
@@ -799,12 +799,16 @@ async function attachAccLoginTerminal(wsPath) {
   const login = state.accLogin;
   let termState;
   try { termState = await attachTerminal('#acc-login-xterm', wsPath, 'running', {
-    readOnly: login.codeMode,
     autoReconnect: login.reconnectable,
     startStopped: !login.reconnectable && Boolean(login.environmentId || RUNTIME_BASE),
     isActive: () => state.accLogin === login && !login.closing,
     onSocket: socket => { if (state.accLogin === login) login.ws = socket; },
-    onState: message => { if (state.accLogin === login) $('#acc-login-connection-status').textContent = message; },
+    onState: message => {
+      if (state.accLogin !== login) return;
+      $('#acc-login-connection-status').textContent = message === '终端已连接' && login.codeMode
+        ? '终端已连接，可点击黑框进行 CLI 交互；授权码建议使用上方输入框'
+        : message;
+    },
   }); } catch (error) {
     if (!login.codeMode) throw error;
     // 授权码走独立 HTTP；输出组件失败不能阻断认证状态轮询和提交反馈。

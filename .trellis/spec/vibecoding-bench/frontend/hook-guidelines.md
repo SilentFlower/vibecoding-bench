@@ -168,7 +168,7 @@ authorization_url(pane: str) -> str | None
 
 - v3 登录启用 autoReconnect，续聊默认不启用。重连只 attach 原 sid/tmux，每次取得新短票据；当前 socket 通过 getter/onSocket 更新，旧回调用 generation 与当前 state 校验。
 - 重试延迟 1/2/4/8 秒、最多 8 次，连续稳定 30 秒才清重试数；心跳每 10 秒发送 ping，超过 30 秒无回包在下个 tick 关闭半开连接。手动重连不重启 CLI。Terminal/FitAddon 加载最多等 10 秒，窗口失效即停止。
-- v3 授权终端使用 readOnly/disableStdin，只显示输出，不通过 onData 发送授权码；旧版/续聊仅在当前窗口、socket OPEN、输入获准时透传。离线输入不缓存/重放；终态确定后，onData 和迟到 WS.onerror 不覆盖原因，不增加粘贴本地回显。服务端任一 pump 结束就取消另一 pump、关闭 attach；断线仅 detach。
+- v3 授权终端保留当前 WebSocket 到原 tmux 的键盘交互，供 CLI 的确认、选择及其它提示使用；授权码优先使用独立输入框，以获得长度和发送回执。页面必须明确两种入口并提示不要重复发送同一授权码。旧版/续聊沿用原输入分支。所有终端输入仅在当前窗口、socket OPEN、输入获准时透传，离线不缓存/重放；终态确定后，onData 和迟到 WS.onerror 不覆盖原因，不增加粘贴本地回显。服务端任一 pump 结束就取消另一 pump、关闭 attach；断线仅 detach。
 - v3 使用原生 password 输入框，支持显示/隐藏与当前字符长度，原生粘贴不拦截 contextmenu/paste。按钮/Enter 共用投递入口，同步设置 codeSending 再发 HTTP；发送与查询各 15 秒超时，原会话活跃时不依赖 WS。发送后清输入值，保留原请求标识供查询，delivered只说明投递，认证仍读 status；uncertain不自动重发且禁用再次发送。正文/回执详细约束见 [投递契约](../backend/account-runtime-v3.md#scenario-v3-授权码投递与发送回执)。
 - status 在窗口内每 2 秒串行查询，与 WS 首次输出独立；停止状态停止重连。取消期间暂缓轮询，取消失败继续查询；提交/关闭互斥。start HTTP 尚未取得 SID 时关闭窗口，标记 closeRequested，取得 SID 后确认取消再隐藏，避免后台遗留不可见登录。
 - URL 来源为真实 CLI tmux pane：输入最多 65536 字符，剥 ANSI、最多拼 13 条连续 URL 字符硬换行，候选不超过 8192 字符；先拼完整 query 再校验，到续行上限仍有后续则拒绝有效前缀。仅接受 HTTPS 精确组合 `claude.com /cai/oauth/authorize`、`claude.ai /oauth/authorize`、`platform.claude.com /oauth/authorize`，无 fragment，PKCE 必需参数单一非空、code/S256、43 字符 base64url challenge/state；redirect 主机为 platform.claude.com 或 console.anthropic.com 的 HTTPS。不生成或补猜参数；CLI 升级须核对实际形状，不能把白名单主机/路径交叉组合。

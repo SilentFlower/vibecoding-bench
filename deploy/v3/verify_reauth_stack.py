@@ -119,12 +119,24 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
             assert lease["lease"]["exclusive"] and lease["lease"]["owner"] == "login:" + sid
             # 真正断开当前 WebSocket，检查自动重连取得新票据而 SID/tmux 保持。
             old_ticket_url = await evaluate(f"{state}.ws.url")
+            await evaluate(f"{doc}.querySelector('#acc-login-xterm').scrollIntoView({{block:'center'}})")
+            await evaluate(f"{state}.term.focus()")
+            assert await evaluate(f"{doc}.activeElement.classList.contains('xterm-helper-textarea')"), "登录终端没有取得键盘焦点"
+            await rpc("Input.dispatchKeyEvent", {"type": "keyDown", "key": "x", "code": "KeyX", "text": "x", "windowsVirtualKeyCode": 88}, session_id)
+            await rpc("Input.dispatchKeyEvent", {"type": "keyUp", "key": "x", "code": "KeyX", "windowsVirtualKeyCode": 88}, session_id)
+            await rpc("Input.dispatchKeyEvent", {"type": "keyDown", "key": "Enter", "code": "Enter", "text": "\r", "windowsVirtualKeyCode": 13}, session_id)
+            await rpc("Input.dispatchKeyEvent", {"type": "keyUp", "key": "Enter", "code": "Enter", "windowsVirtualKeyCode": 13}, session_id)
+            for _ in range(50):
+                if (home / ".synthetic-code-count.json").exists() and json.loads((home / ".synthetic-code-count.json").read_text())["count"] == 1:
+                    break
+                await asyncio.sleep(0.1)
+            else:
+                raise AssertionError("终端键盘输入没有进入原 CLI")
             await evaluate(f"{state}.ws.close();{state}.term.paste('not-replay-code\\r')")
             await wait_for(f"{state}?.ws?.readyState === 1 && {state}.ws.url !== " + json.dumps(old_ticket_url))
             assert await evaluate(f"{state}.sid") == sid
             assert await evaluate(f"{doc}.querySelector('#acc-auth-url').value") == url
-            pane = container.exec_run(["tmux", "-S", f"/tmp/v3-login-{sid}.sock", "capture-pane", "-p", "-J"])
-            assert "合成授权码不匹配" not in pane.output.decode(), "离线输入被重放"
+            assert json.loads((home / ".synthetic-code-count.json").read_text())["count"] == 1, "离线输入被重放"
             await evaluate(f"{doc}.querySelector('#acc-login-reconnect').click()")
             await wait_for(f"{state}.ws.readyState === 1")
             # 禁用 secure clipboard 与 execCommand，验证真实 HTTP 降级能选择完整文本。
@@ -180,7 +192,7 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
             request_id = await evaluate(f"{state}.codeRequestId")
             duplicate = browser.post(base + f"/runtime/api/accounts/login/{sid}/code", json={"request_id": request_id, "code": "synthetic-wrong"}, timeout=10)
             assert duplicate.json()["status"] == "delivered"
-            assert json.loads((home / ".synthetic-code-count.json").read_text())["count"] == 1
+            assert json.loads((home / ".synthetic-code-count.json").read_text())["count"] == 2
             # 恢复浏览器原生剪贴板，真实 Ctrl+V 触发输入事件；右键原生菜单另列未自动驱动项。
             await evaluate(f"delete {win}.navigator.clipboard")
             await rpc("Browser.grantPermissions", {"origin": base, "permissions": ["clipboardReadWrite", "clipboardSanitizedWrite"]})
@@ -206,8 +218,8 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
             await rpc("Input.dispatchKeyEvent", {"type": "keyUp", "key": "Enter", "code": "Enter", "windowsVirtualKeyCode": 13}, session_id)
             await wait_for(f"{state}.codeStatus === 'delivered'")
             assert await evaluate(f"{doc}.querySelector('#acc-auth-code').value") == ''
-            assert json.loads((home / ".synthetic-code-count.json").read_text())["count"] == 2
-            print("通过：真实键盘/原生 Ctrl+V、隐藏输入、长度反馈、按钮/Enter、丢回包查询与同标识单次投递、WS 断线独立发送；右键系统菜单未自动驱动")
+            assert json.loads((home / ".synthetic-code-count.json").read_text())["count"] == 3
+            print("通过：终端真实键盘交互、授权码输入框原生 Ctrl+V、隐藏/长度、按钮/Enter、丢回包查询与同标识单次投递、WS 断线独立发送；右键系统菜单未自动驱动")
             try:
                 await wait_for(f"{doc}.querySelector('#acc-login-link-status').textContent.includes('可以提交保存')")
             except TimeoutError:

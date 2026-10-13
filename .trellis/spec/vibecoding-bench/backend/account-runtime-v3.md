@@ -231,7 +231,7 @@ status = sending | delivered | uncertain | rejected
 - owner 锁内重读原会话、TTL、phase 和草稿代次。缓存命中只返回原回执；未命中的新请求须为 authorizing、未过期且草稿未保存/清理。每 SID 最多保留 32 个不同标识，不淘汰旧标识后允许重放；回执只含标识、状态、说明，不保存 code，随会话结束清除。成功回执为 `Cache-Control:no-store`。
 - 投递先登记 sending，再在 owner → environment 锁序下核对完整执行 token、原 SID/tmux/socket、容器 ID、环境代次和原执行证明；Docker IO 不持有 SQLite 全局锁。授权码经 Docker exec stdin 进入 `tmux load-buffer -b <request_id> -`，stdin EOF 与 exec 成功确认后在原会话 paste-buffer，再发送 Enter。code 不进入 argv、脚本或持久文件。
 - 临时 tmux buffer 在 finally 中清理。投递前的 ValueError 拒绝为 rejected；可能已注入后的 IO、回包或清理异常均为 uncertain，不能误报“未发送”或自动重复 paste/Enter。delivered 只说明原 tmux 投递完成，认证成功仍须既有 CLI auth status/credentials_ready。
-- GET 只查询原回执，不触发投递；原会话/回执不可查不能推断“尚未发送”。管理器重启不恢复授权码或重发队列。v3 登录 WS 保留输出、resize、ping/pong及同 SID 重连，丢弃旧输入消息；旧版登录与续聊输入保持原分支。
+- GET 只查询原回执，不触发投递；原会话/回执不可查不能推断“尚未发送”。管理器重启不恢复授权码或重发队列。v3 登录 WS 保留双向终端交互、resize、ping/pong及同 SID 重连；当前连接的键盘输入只送入原 tmux，不缓存、不重放。授权码仍优先走独立 HTTP 输入框以获得可见回执，页面必须提示不要在两条路径重复发送。
 
 ### 4. Validation & Error Matrix
 

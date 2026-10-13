@@ -8681,8 +8681,10 @@ async def login_ws(websocket: WebSocket, sid: str):
                     except Exception:
                         pass
                 elif ev.get("type") == "input":
-                    if not account_runtime:
-                        await loop.sock_sendall(raw, (ev.get("data") or "").encode())
+                    data = ev.get("data")
+                    if isinstance(data, str) and data:
+                        # 独立授权码输入框负责可见回执；终端仍需透传其它 CLI 确认和选择。
+                        await loop.sock_sendall(raw, data.encode())
         except WebSocketDisconnect:
             pass
         except Exception:
