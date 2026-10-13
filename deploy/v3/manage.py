@@ -19,6 +19,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from stat import S_ISSOCK
 from urllib.parse import quote
 
 REPO = Path(__file__).resolve().parents[2]
@@ -701,7 +702,10 @@ def backup(values: dict, destination: Path) -> None:
     manifest = inspect_images(values)
     target.mkdir(mode=0o700, parents=True)
     try:
-        shutil.copytree(root, target / "data", symlinks=True)
+        # tmux 留下的 Unix socket 无法复制或恢复连接；持久文件和符号链接仍完整保留。
+        shutil.copytree(root, target / "data", symlinks=True,
+            ignore=lambda directory, names: [name for name in names
+                if S_ISSOCK((Path(directory) / name).lstat().st_mode)])
         for relative in ("gateway/gateway.sqlite", "bench/db.sqlite"):
             source = root / relative
             if not source.exists():

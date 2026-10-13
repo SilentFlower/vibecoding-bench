@@ -140,13 +140,21 @@ class PreflightTests(unittest.TestCase):
             source.commit()
             target = self.root.parent / "backup"
             manifest = {"layout_version": 1, "bridge_protocol": 1, "release": "synthetic"}
-            with patch.object(manage, "command", return_value=""), patch.object(manage, "inspect_images", return_value=manifest):
-                manage.backup(self.values, target)
-                with self.assertRaisesRegex(ValueError, "全新"):
+            socket_path = database.parent / "tmux.sock"
+            (database.parent / "metadata.json").write_text('{"preserved":true}')
+            (database.parent / "metadata-link").symlink_to("metadata.json")
+            with socket.socket(socket.AF_UNIX) as listener:
+                listener.bind(str(socket_path))
+                with patch.object(manage, "command", return_value=""), patch.object(manage, "inspect_images", return_value=manifest):
                     manage.backup(self.values, target)
+                    with self.assertRaisesRegex(ValueError, "全新"):
+                        manage.backup(self.values, target)
             with sqlite3.connect(target / "data/bench/db.sqlite") as snapshot:
                 self.assertEqual(snapshot.execute("SELECT value FROM observations").fetchone()[0], "synthetic")
             self.assertEqual(target.stat().st_mode & 0o777, 0o700)
+            self.assertFalse((target / "data/bench/tmux.sock").exists())
+            self.assertTrue((target / "data/bench/metadata-link").is_symlink())
+            self.assertEqual('{"preserved":true}', (target / "data/bench/metadata-link").read_text())
 
 
 class ResourceBudgetTests(unittest.TestCase):

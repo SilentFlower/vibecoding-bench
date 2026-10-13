@@ -155,6 +155,7 @@ class AccountRuntimeTests(unittest.TestCase):
         result = subprocess.run(["node", "-", str(settings)], input=fragment.group(1),
             capture_output=True, text=True, timeout=10)
         self.assertEqual(0, result.returncode, result.stderr)
+
         persisted = json.loads(settings.read_text())
         self.assertNotIn("Stop", persisted["hooks"])
         self.assertEqual("opus[1m]", persisted["model"])
@@ -169,6 +170,26 @@ class AccountRuntimeTests(unittest.TestCase):
             env={**os.environ, "CLAUDE_DIR": str(root / "home/.claude")},
             capture_output=True, text=True, timeout=10)
         self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_cli_setup_disables_autoupdater_and_preserves_other_settings(self) -> None:
+        """真实 CLI 准备关闭自动更新，其他模型、env 与 hooks 保持。@return None。"""
+        row = self.runtime._row("synthetic", 1)
+        settings = self.runtime._root(row) / "home/.claude/settings.json"
+        original = {"model": "sonnet", "env": {"CLAUDE_CODE_EFFORT_LEVEL": "xhigh", "DISABLE_AUTOUPDATER": "0"},
+            "hooks": {"UserPromptSubmit": []}}
+        atomic_json(settings, original)
+        container = Mock()
+        job = {"row": row, "token": "synthetic-token"}
+        self.runtime.jobs[row["environment_id"]] = job
+        with patch.object(self.runtime, "ensure", return_value=(row, container)), \
+                patch.object(self.runtime, "claim", return_value=job), \
+                patch.object(self.runtime, "_ensure_version"):
+            with self.runtime._cli_setup({"id": 1, "name": "synthetic"}, "run:test", "2.1.293"):
+                current = json.loads(settings.read_text())
+        self.assertEqual("1", current["env"]["DISABLE_AUTOUPDATER"])
+        self.assertEqual(original["env"]["CLAUDE_CODE_EFFORT_LEVEL"], current["env"]["CLAUDE_CODE_EFFORT_LEVEL"])
+        self.assertEqual(original["model"], current["model"])
+        self.assertEqual(original["hooks"], current["hooks"])
 
     def test_reprofile_rejects_existing_task_history(self) -> None:
         """已有任务历史时不能旋转画像。@return None。"""

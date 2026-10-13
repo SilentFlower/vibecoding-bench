@@ -722,6 +722,13 @@ class AccountRuntime:
                 with self.lock:
                     if self.jobs.get(row["environment_id"]) is not job or job.get("heartbeat_failed"):
                         raise ValueError("CLI 准备期间租约失效，执行未启动")
+                # CLI 版本由管理端固定，禁止账号 CLI 自行写入 root 管理的版本缓存。
+                settings = self._root(row) / "home/.claude/settings.json"
+                value = json.loads(settings.read_text()) if settings.is_file() else {}
+                environment = value.get("env") if isinstance(value.get("env"), dict) else {}
+                value["env"] = {**environment, "DISABLE_AUTOUPDATER": "1"}
+                atomic_json(settings, value)
+                os.chown(settings, 1000, 1000)
                 yield row, container, job
         except Exception:
             self.cleanup(job["token"])
