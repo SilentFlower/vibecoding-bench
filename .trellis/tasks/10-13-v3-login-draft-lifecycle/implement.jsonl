@@ -1,0 +1,4 @@
+{"file":".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md","reason":"固定环境、所有权锁、提交对账和重启恢复"}
+{"file":".trellis/spec/vibecoding-bench/backend/database-guidelines.md","reason":"正式账号与软删除/历史语义，数据库写入规范"}
+{"file":".trellis/spec/vibecoding-bench/frontend/hook-guidelines.md","reason":"终端、授权链接及取消/重连生命周期"}
+{"file":".trellis/tasks/10-13-v3-login-draft-lifecycle/research/current-evidence.md","reason":"真实问题证据、用户完整删除决定与当前重启策略"}

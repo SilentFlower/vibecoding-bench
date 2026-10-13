@@ -1,0 +1,4 @@
+{"file":".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md","reason":"验证固定身份、租约、提交恢复及资源归属"}
+{"file":".trellis/spec/vibecoding-bench/backend/database-guidelines.md","reason":"确认草稿不影响正式账号、历史、养号和额度"}
+{"file":".trellis/spec/vibecoding-bench/frontend/hook-guidelines.md","reason":"核对链接入口、终态提示和重新登录/取消生命周期"}
+{"file":".trellis/tasks/10-13-v3-login-draft-lifecycle/implement.md","reason":"定向与真实跨层场景、回归和清理边界"}
