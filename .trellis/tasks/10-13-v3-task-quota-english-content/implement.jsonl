@@ -1,0 +1,4 @@
+{"file":".trellis/spec/vibecoding-bench/backend/database-guidelines.md","reason":"账号额度事实、养号阈值、quota_wait、恢复与旧库兼容契约"}
+{"file":".trellis/spec/vibecoding-bench/backend/topic-prompt-contract.md","reason":"题库默认 prompt 的 natural/canonical 生成与历史持久化契约"}
+{"file":".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md","reason":"普通 CLI、养号、抓包、API 的独立调度与固定环境保护"}
+{"file":".trellis/tasks/10-13-v3-task-quota-english-content/research/evidence.md","reason":"当前阈值调用链、题库解析器、提示来源和生产同步边界"}

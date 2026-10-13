@@ -1,0 +1,4 @@
+{"file":".trellis/spec/vibecoding-bench/backend/database-guidelines.md","reason":"检查普通 run 入场、等待恢复、身份/批次/旧库和养号单次机会"}
+{"file":".trellis/spec/vibecoding-bench/backend/topic-prompt-contract.md","reason":"检查 600 题完整性、英文默认 prompt、持久化与同步一致性"}
+{"file":".trellis/spec/vibecoding-bench/backend/quality-guidelines.md","reason":"检查真实 SQLite、调度状态、Docker 与浏览器验证质量"}
+{"file":".trellis/tasks/10-13-v3-task-quota-english-content/research/evidence.md","reason":"检查实现没有越过旧服务、历史 prompt 和生产数据库边界"}
