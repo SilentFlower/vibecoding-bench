@@ -3,16 +3,34 @@ import ipaddress
 import json
 import socket
 import socketserver
+import ssl
 import struct
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from datetime import datetime, timezone
+from pathlib import Path
 
 
 class Handler(BaseHTTPRequestHandler):
     """记录发送来源并返回合成额度头，不访问公网。"""
 
     protocol_version = "HTTP/1.1"
+
+    def do_GET(self):
+        """通过真实本地 TLS 返回合成 usage，不记录凭据。@return None。"""
+        now = time.time()
+        body = json.dumps({
+            "five_hour": {"utilization": 12, "resets_at": datetime.fromtimestamp(now + 3600, timezone.utc).isoformat()},
+            "seven_day": {"utilization": 23, "resets_at": datetime.fromtimestamp(now + 86400, timezone.utc).isoformat()},
+        }).encode()
+        with Path("/fixtures-data/usage-calls.jsonl").open("a") as output:
+            output.write(json.dumps({"path": self.path, "tls": isinstance(self.connection, ssl.SSLSocket)}) + "\n")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_POST(self):
         """原样返回请求正文及来源地址，返回 None。"""
@@ -74,15 +92,18 @@ def serve_dns(connection):
 
 def record_tls(connection, peer):
     """记录隔离 TLS 探针的来源、长度和有限前缀。@param connection 代理连接；@param peer 来源 IP；@return None。"""
-    hello = connection.recv(16384)
+    native_usage = Path("/fixtures-data/usage-tls.enabled").exists()
+    hello = connection.recv(16384, socket.MSG_PEEK if native_usage else 0)
     with open("/fixtures-data/tls.jsonl", "a") as output:
         output.write(json.dumps({"peer": peer, "record_type": hello[0] if hello else None,
             "length": len(hello), "payload_prefix": hello[:32].hex()}) + "\n")
+    if native_usage:
+        forward_http(connection, port=8443)
 
 
-def forward_http(connection):
+def forward_http(connection, port=8081):
     """把隔离代理的 8081 隧道转到本地合成 HTTP。@param connection 代理连接；@return None。"""
-    with socket.create_connection(("127.0.0.1", 8081)) as upstream:
+    with socket.create_connection(("127.0.0.1", port)) as upstream:
         def forward(source, destination):
             """转发有限本地字节并在结束时关闭写侧。"""
             try:
@@ -165,6 +186,13 @@ class Server(socketserver.ThreadingTCPServer):
 
 
 if __name__ == "__main__":
+    certificate = Path("/fixtures-data/native-usage.crt")
+    if certificate.exists():
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(str(certificate), "/fixtures-data/native-usage.key")
+        tls_server = ThreadingHTTPServer(("0.0.0.0", 8443), Handler)
+        tls_server.socket = context.wrap_socket(tls_server.socket, server_side=True)
+        threading.Thread(target=tls_server.serve_forever, daemon=True).start()
     threading.Thread(target=ThreadingHTTPServer(("0.0.0.0", 8081), Handler).serve_forever, daemon=True).start()
     threading.Thread(target=Server(("0.0.0.0", 1081), HttpConnect).serve_forever, daemon=True).start()
     Server(("0.0.0.0", 1080), Socks).serve_forever()

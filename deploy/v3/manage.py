@@ -113,6 +113,7 @@ def preflight(values: dict) -> Path:
     containers = json.loads(command("docker", "inspect", *ids, capture=True)) if ids else []
     port = int(values.get("V3_HOST_PORT", "18080"))
     address = values.get("V3_BIND_ADDRESS", "127.0.0.1")
+    owned_port = False
     for container in containers:
         labels = container["Config"].get("Labels") or {}
         own = labels.get("vibebench.product") == "v3" and labels.get("vibebench.deployment") == deployment
@@ -124,9 +125,13 @@ def preflight(values: dict) -> Path:
         account_prefix = "v3-" + hashlib.sha256(deployment.encode()).hexdigest()[:12] + "-account-"
         if (name.startswith(f"vibebench-v3-{deployment}-") or name.startswith(account_prefix)) and not own:
             raise ValueError("容器名称被其它部署占用")
-        for bindings in (container.get("HostConfig", {}).get("PortBindings") or {}).values():
+        for container_port, bindings in (container.get("HostConfig", {}).get("PortBindings") or {}).items():
             for binding in bindings or []:
                 if int(binding.get("HostPort") or 0) == port and binding.get("HostIp", "") in ("", "0.0.0.0", "::", address):
+                    if (own and labels.get("vibebench.role") == "gateway" and container_port == "5674/tcp"
+                            and binding.get("HostIp", "") == address):
+                        owned_port = owned_port or bool(container.get("State", {}).get("Running"))
+                        continue
                     raise ValueError("宿主端口已被容器发布，拒绝启动")
     network_name = f"vibebench-v3-{deployment}"
     networks = [json.loads(line) for line in command("docker", "network", "ls", "--format", "{{json .}}", capture=True).splitlines()]
@@ -136,9 +141,10 @@ def preflight(values: dict) -> Path:
             labels = info.get("Labels") or {}
             if labels.get("vibebench.product") != "v3" or labels.get("vibebench.deployment") != deployment:
                 raise ValueError("网络名称被其它部署占用")
-    # up 仅在端口空闲时执行；已运行实例使用 status 检查，避免掩盖配置漂移。
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-        probe.bind((address, port))
+    # 自有网关允许重复 up；其它进程或 Docker NAT 占用仍在预检拒绝。
+    if not owned_port:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.bind((address, port))
     inspect_images(values)
     marker = root / ".v3-deployment.json"
     if marker.exists():
@@ -165,8 +171,11 @@ def preflight(values: dict) -> Path:
                         raise ValueError("已有账号固化预算超过当前配置，请提高部署预算后再启动")
     if active_limit < 1 or float(values.get("V3_ACCOUNT_CPUS", "2")) <= 0:
         raise ValueError("账号 CPU、内存或活跃环境预算无效")
-    # 余量独立于 swap；默认 4g 仍要求 5g，显式的小预算不再被固定 5g 挡住。
-    minimum = max(int(values.get("V3_MIN_FREE_MEMORY_BYTES", "0")), active_limit * account_memory + 1024**3)
+    # 账号预算与运维余量分开；小内存部署无需绕过完整归属和镜像预检。
+    headroom = int(values.get("V3_MEMORY_HEADROOM_BYTES", str(256 * 1024**2)))
+    if headroom < 0:
+        raise ValueError("内存余量不能为负数")
+    minimum = max(int(values.get("V3_MIN_FREE_MEMORY_BYTES", "0")), active_limit * account_memory + headroom)
     if memory.get("MemAvailable", 0) < minimum:
         raise ValueError("宿主可用内存不足，拒绝启动")
     swap = total_memory - account_memory

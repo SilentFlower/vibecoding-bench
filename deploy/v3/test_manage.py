@@ -63,6 +63,22 @@ class PreflightTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "端口"):
                 manage.preflight(self.values)
 
+    def test_running_owned_gateway_port_allows_repeated_up(self) -> None:
+        """重复启动可复用精确匹配的自有网关端口，不操作监听进程。@return None。"""
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            listener.listen()
+            self.values.update(V3_HOST_PORT=str(listener.getsockname()[1]), V3_ACCOUNT_MEMORY="1536m")
+            container = {"Name": "/vibebench-v3-test-gateway", "Config": {"Labels": {
+                "vibebench.product": "v3", "vibebench.deployment": "test", "vibebench.role": "gateway"}},
+                "Mounts": [], "State": {"Running": True},
+                "HostConfig": {"PortBindings": {"5674/tcp": [{"HostIp": "127.0.0.1", "HostPort": self.values["V3_HOST_PORT"]}]}}}
+            with patch.object(manage, "command", side_effect=["gateway", json.dumps([container]), ""]), \
+                    patch.object(manage, "inspect_images", return_value={}), \
+                    patch.object(manage.Path, "read_text", return_value="MemAvailable: 2097152 kB\nSwapFree: 0 kB\n"):
+                self.assertEqual(self.root, manage.preflight(self.values))
+            self.assertGreaterEqual(listener.fileno(), 0)
+
     def test_nonempty_unowned_data_directory_rejects(self) -> None:
         """不能把旧数据库目录标记成新的 v3 数据根。@return None。"""
         self.root.mkdir()
@@ -149,6 +165,17 @@ class ResourceBudgetTests(unittest.TestCase):
         """
         self.values.update(V3_ACCOUNT_MEMORY="1536m", V3_ACCOUNT_SWAP="2048m")
         self.assertEqual(self._preflight(2804184 * 1024, 6639656 * 1024), self.root)
+
+    def test_headroom_is_configurable_without_bypassing_other_checks(self) -> None:
+        """低内存部署使用明确余量，仍保留账号 RAM 与 swap 验证。@return None。"""
+        self.values.update(V3_ACCOUNT_MEMORY="1536m", V3_ACCOUNT_SWAP="2048m")
+        self.assertEqual(self.root, self._preflight(2 * 1024**3, 3 * 1024**3))
+        self.values["V3_MEMORY_HEADROOM_BYTES"] = str(1024**3)
+        with self.assertRaisesRegex(ValueError, "内存不足"):
+            self._preflight(2 * 1024**3, 3 * 1024**3)
+        self.values["V3_MEMORY_HEADROOM_BYTES"] = "-1"
+        with self.assertRaisesRegex(ValueError, "余量"):
+            self._preflight(3 * 1024**3, 3 * 1024**3)
 
     def test_default_budget_still_requires_five_gib_ram(self) -> None:
         """默认 4g 账号仍预留管理服务余量，不能借 swap 越过物理预算。

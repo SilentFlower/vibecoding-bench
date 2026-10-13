@@ -2745,7 +2745,7 @@ def _write_quota_json(path: Path, payload: dict) -> None:
 
 class QuotaGuard:
     """
-    消费真实响应并维护账号共用的额度门禁，不执行主动查询。
+    消费真实响应并维护额度门禁，v3 阈值按执行边界自动采样。
 
     :param runner: 既有容器运行器
     """
@@ -2761,6 +2761,103 @@ class QuotaGuard:
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
+        self._usage_refresh: dict[int, dict] = {}
+        self._started_at = time.time()
+
+    def refresh_usage(self, account: dict, force: bool = False) -> bool:
+        """为 v3 阈值自动查询真实额度，同账号复用缓存并间隔重试。
+
+        :param account: 当前账号行
+        :param force: 执行收尾后忽略近期成功缓存
+        :return: 额度已更新或无需查询时为 True，仍等待时为 False
+        """
+        if not account_runtime or not any(account.get(key) is not None for key in (
+                "warmup_quota_5h_limit_percent", "warmup_quota_7d_limit_percent")):
+            return True
+        # owner 锁与手动查询、改绑、登录共用；不得在数据库锁或额度锁内做网络 IO。
+        with _oauth_owner_lock(str(account["name"])):
+            conn = get_db()
+            try:
+                current = _get_available_account(conn, int(account["id"]))
+            finally:
+                conn.close()
+            if not current:
+                return False
+            account = dict(current)
+            state = self.snapshot(account)
+            now = time.time()
+            retry = state.get("usage_refresh") or {}
+            if state.get("account_error") or (retry.get("retry_at") or 0) > now:
+                return False
+            windows = state.get("windows") or {}
+            limits = {"five_hour": account.get("warmup_quota_5h_limit_percent"),
+                "seven_day": account.get("warmup_quota_7d_limit_percent")}
+            fresh = not warmup_quota_decision(state, limits, now)["unknown"] and all(
+                windows.get(window, {}).get("utilization") is not None
+                and (windows.get(window, {}).get("reset_at") or 0) > now
+                and now - (windows.get(window, {}).get("observed_at") or 0) < 300
+                and (windows.get(window, {}).get("observed_at") or 0) >= self._started_at
+                for window, field in (("five_hour", "warmup_quota_5h_limit_percent"),
+                                      ("seven_day", "warmup_quota_7d_limit_percent"))
+                if account.get(field) is not None
+            )
+            if fresh and not force and not retry.get("dirty") and not retry.get("error"):
+                return True
+            if login_manager and login_manager.has_active_name(str(account["name"])):
+                return False
+            with account_runtime.lock:
+                if any(job["row"].get("account_id") == account["id"] for job in account_runtime.jobs.values()):
+                    return False
+            result = {}
+            try:
+                result = self.runner.query_quota(account)
+                if not result.get("ok"):
+                    raise ValueError("额度接口未返回有效数据")
+                observation = self.record_manual_usage(account, result, source="automatic")
+                if any(key not in observation["windows"] for key, field in (
+                    ("five_hour", "warmup_quota_5h_limit_percent"),
+                    ("seven_day", "warmup_quota_7d_limit_percent"),
+                ) if account.get(field) is not None):
+                    raise ValueError("额度接口缺少启用窗口的有效数据")
+                return True
+            except Exception as exc:
+                # 接口/网络故障保留旧事实，不能把查询失败当成 0% 或反复请求。
+                raw = result.get("raw") or {}
+                status = raw.get("status") if isinstance(raw, dict) else None
+                retry_after = raw.get("retry_after_sec") if isinstance(raw, dict) else None
+                delay = max(60, min(retry_after, 86400)) if type(retry_after) is int else 60
+                message = "自动额度查询失败，稍后重试；可手动查询核实"
+                if status in (401, 403):
+                    message = "额度查询认证失败，请重新授权或手动核实"
+                elif isinstance(exc, ValueError):
+                    for marker, explanation in (
+                        ("对账", "账号环境需要故障对账，额度查询尚未执行"),
+                        ("提交", "原登录保存尚未完成，请完成保存"),
+                        ("代理", "账号代理配置不可用，请检查环境"),
+                        ("凭据", "本地 OAuth 凭据不可用，请重新授权或手动核实"),
+                    ):
+                        if marker in str(exc):
+                            message = explanation
+                            break
+                with self._lock:
+                    self._usage_refresh[int(account["id"])] = {
+                        "identity": state["identity"], "retry_at": time.time() + delay,
+                        "error": message, "dirty": True,
+                    }
+                self._publish(account)
+                return False
+
+    def invalidate_usage(self, account: dict) -> None:
+        """执行产生消费后使旧缓存失效，后续工作等待自动采样。
+
+        :param account: 完成执行的账号
+        :return: None
+        """
+        if account_runtime:
+            with self._lock:
+                self._usage_refresh[int(account["id"])] = {
+                    "identity": _quota_identity(account), "dirty": True,
+                }
 
     def snapshot(self, account: dict) -> dict:
         """
@@ -2782,7 +2879,10 @@ class QuotaGuard:
         if state.get("account_error"):
             decision.update(blocked=True, retry_ready=False, resume_at=None, exhausted=[],
                             message=f"{state['account_error']}：账号异常，需重新授权或人工核实")
+        refresh = self._usage_refresh.get(int(account["id"])) or {}
+        refresh = refresh if refresh.get("identity") == identity else {}
         return {**state, **decision, "source": state.get("source") or "passive", "identity": identity,
+                "usage_refresh": {key: refresh[key] for key in ("error", "retry_at", "dirty") if key in refresh},
                 "recovery_source": recovery_source, "known": bool(state.get("windows"))}
 
     def policy_snapshot(
@@ -2883,6 +2983,27 @@ class QuotaGuard:
         :return: 指定工作负载的阈值判定
         """
         decision = warmup_quota_decision(state, limits, time.time())
+        if account_runtime:
+            refresh = state.get("usage_refresh") or {}
+            stale = any(
+                ((state.get("windows") or {}).get(key, {}).get("observed_at") or 0) < self._started_at
+                or time.time() - ((state.get("windows") or {}).get(key, {}).get("observed_at") or 0) >= 300
+                for key, limit in limits.items() if limit is not None
+            )
+            needs_refresh = bool(decision["unknown"] or stale or refresh.get("dirty") or refresh.get("error"))
+            label = "普通任务" if workload == "normal" else "养号"
+            decision.update(admission=None, sample_used=False, sample_required=False,
+                blocked=bool(decision["hit"]) or (decision["enabled"] and needs_refresh),
+                refresh_retry_at=refresh.get("retry_at"))
+            if decision["hit"]:
+                names = " / ".join("5h" if key == "five_hour" else "7d" for key in decision["hit"])
+                decision["message"] = f"{names} 已用达到阈值，{label}等待额度更新"
+            elif decision["enabled"] and needs_refresh:
+                decision.update(resume_at=refresh.get("retry_at"),
+                    message=refresh.get("error") or "等待自动查询最新额度，无需手动操作")
+            else:
+                decision["message"] = ""
+            return decision
         if workload == "normal":
             decision.update(admission=None, sample_used=False)
             if not decision["enabled"]:
@@ -3291,16 +3412,17 @@ class QuotaGuard:
                     conn.close()
             self._publish(account)
 
-    def record_manual_usage(self, account: dict, usage: dict) -> None:
+    def record_manual_usage(self, account: dict, usage: dict, source: str = "manual") -> dict:
         """
-        合并用户显式查询的可信窗口；自动路径不会调用此入口。
+        合并手动或自动 usage 查询的可信窗口。
 
         :param account: 查询对应账号
         :param usage: 已标准化的手动额度结果
-        :return: None
+        :param source: manual 用户查询或 automatic 调度采样
+        :return: 本次有效窗口观察；失败结果返回空对象
         """
         if not usage.get("ok"):
-            return
+            return {}
         headers = {}
         for key, name in (("five_hour", "5h"), ("seven_day", "7d"), ("seven_day_fable", "7d_oi")):
             window = usage.get(key)
@@ -3309,10 +3431,10 @@ class QuotaGuard:
                 headers[f"anthropic-ratelimit-unified-{name}-reset"] = window.get("resets_at")
         with self._lock:
             observation = quota_observation(headers, 200, time.time())
-            observation["origin"] = "manual"
+            observation["origin"] = source
             self._observe(account, _quota_identity(account), observation)
             # 显式人工核实只影响未来新操作，已经收口的认证失败 run 不会自动重跑。
-            if all(key in observation["windows"] and not observation["windows"][key]["exhausted"] for key in ("five_hour", "seven_day")):
+            if source == "manual" and all(key in observation["windows"] and not observation["windows"][key]["exhausted"] for key in ("five_hour", "seven_day")):
                 with _db_lock:
                     conn = get_db()
                     try:
@@ -3323,7 +3445,9 @@ class QuotaGuard:
                             conn.execute("UPDATE account_quota_states SET state_json=? WHERE account_id=?", (json.dumps(state), account["id"]))
                     finally:
                         conn.close()
+            self._usage_refresh.pop(int(account["id"]), None)
             self._publish(account)
+            return observation
 
     def start(self) -> None:
         """启动被动观察后台，不执行任何主动额度请求。
@@ -3449,6 +3573,20 @@ class QuotaGuard:
             if self._stop.is_set():
                 break
             try:
+                if account_runtime:
+                    conn = get_db()
+                    try:
+                        pending = conn.execute(
+                            "SELECT 1 WHERE EXISTS(SELECT 1 FROM runs WHERE account_id=? AND deleted_at IS NULL "
+                            "AND status IN ('queued','quota_wait')) OR EXISTS(SELECT 1 FROM task_batches WHERE "
+                            "account_id=? AND deleted_at IS NULL AND status IN ('active','quota_wait')) "
+                            "OR EXISTS(SELECT 1 FROM accounts WHERE id=? AND warmup_enabled=1 AND warmup_last_status='quota_wait')",
+                            (account["id"], account["id"], account["id"]),
+                        ).fetchone()
+                    finally:
+                        conn.close()
+                    if pending:
+                        self.refresh_usage(account)
                 self.consume(account)
                 if continue_manager:
                     continue_manager.quota_tick(account)
@@ -3610,6 +3748,18 @@ def _public_quota(account: dict) -> dict:
     """读取页面可用的被动额度，参数为账号，返回不含身份或凭据哈希的摘要。"""
     snapshot = quota_guard.snapshot(account) if quota_guard else {}
     return {key: snapshot.get(key) for key in ("source", "known", "windows", "observed_at", "blocked", "exhausted", "resume_at", "retry_ready", "message", "account_error")}
+
+
+def _public_quota_policy(account: dict, workload: Literal["normal", "warmup"] = "normal") -> dict:
+    """返回页面需要的阈值和自动采样摘要，省略内部身份与许可。
+
+    :param account: 当前账号
+    :param workload: 普通任务或养号
+    :return: 脱敏策略摘要
+    """
+    policy = quota_guard.policy_snapshot(account, workload) if quota_guard else {}
+    return {key: policy.get(key) for key in (
+        "enabled", "limits", "hit", "unknown", "blocked", "resume_at", "message", "refresh_retry_at")}
 
 
 def _quota_source(run_id: str, attempt: int) -> str:
@@ -4167,7 +4317,7 @@ fs.renameSync(tmp, dst);
 
     def query_quota(self, account: dict) -> dict:
         """
-        用账号代理启动临时 worker，经 sidecar 网络查询 OAuth usage API。
+        经账号代理查询 OAuth usage，v3 复用固定容器和原生 TLS。
 
         :param account: accounts 表行
         :return: 额度查询结果
@@ -4175,22 +4325,19 @@ fs.renameSync(tmp, dst);
         if not account.get("upstream_socks5_host"):
             raise ValueError("account has no upstream proxy configured")
         if account_runtime:
-            row, container = account_runtime.ensure(account, effective_claude_code_version())
+            if account.get("cc2api_account_id") is None and _read_account_oauth_status(account["name"])["oauth_token_state"] in ("expiring", "expired"):
+                self.refresh_account_oauth_token(account)
+            row, container = account_runtime.ensure(account)
             job = account_runtime.claim(row, account, f"quota:{uuid.uuid4().hex}")
             try:
-                context = {
-                    "NETWORK_INSPECTION_MODE": "quota",
-                    "QUOTA_SOURCE": job["source"],
-                    "QUOTA_CREDENTIALS_FILE": "/home/node/.claude/.credentials.json",
-                }
-                atomic_json(account_runtime._root(row) / "runtime" / "context.json", context)
-                account_runtime._configure_network_context(container, context)
                 if account.get("cc2api_account_id") is not None:
-                    _sync_bound_account_credentials(account, 600)
+                    # 查询入口已持有不可重入的 owner 锁，不能再次进入外层同步包装。
+                    _sync_bound_account_credentials_locked(account, 600)
                 account_runtime.sync_credentials(row, account)
                 return _format_quota_result(self._exec_quota_probe(container.id))
             finally:
-                account_runtime.cleanup(job["token"])
+                # 只读查询没有 CLI 子进程或检查上下文，不重启原生 TLS 监听。
+                account_runtime.release(job)
         sid = uuid.uuid4().hex[:12]
         sidecar_name = f"bench-quota-sidecar-{sid}"
         worker_name = f"bench-quota-worker-{sid}"
@@ -4336,7 +4483,7 @@ async function requestUsage(url, options) {
   let lastError = '';
   for (let attempt = 1; attempt <= 5; attempt += 1) {
     try {
-      const response = await fetch(url, options);
+      const response = await fetch(url, {...options, signal: AbortSignal.timeout(15000)});
       const text = await response.text();
       if (!response.ok) {
         const retryAfter = Number.parseInt(response.headers.get('retry-after') || '', 10);
@@ -4356,7 +4503,7 @@ async function requestUsage(url, options) {
     } catch (error) {
       lastError = error && error.message ? error.message : String(error);
       // 已经拿到 HTTP 响应时不能重试，尤其 429 会被一次点击放大成多次上游请求。
-      if (attempt === 5) break;
+      if (process.env.V3_NATIVE_USAGE === '1' || attempt === 5) break;
       await sleep(attempt * 1000);
     }
   }
@@ -4403,7 +4550,7 @@ JS
             stdout=True,
             stderr=True,
             user="root" if account_runtime else WORKER_USER,
-            environment=_claude_exec_env(True),
+            environment=_claude_exec_env(not account_runtime, {"V3_NATIVE_USAGE": "1" if account_runtime else "0"}),
             workdir=WORKER_HOME,
         )
         raw = api.exec_start(ex["Id"])
@@ -6080,6 +6227,7 @@ class Scheduler:
                 if current != "active":
                     break
                 if quota_guard:
+                    quota_guard.refresh_usage(account)
                     quota_guard.consume(account)
                     if (
                         quota_guard.snapshot(account)["blocked"]
@@ -6364,9 +6512,10 @@ class Scheduler:
             if initial_state["status"] in ("stopping", "stopped"):
                 self._update_batch_item_for_run(run_id, "stopped")
                 return
-            if quota_guard and initial_state.get("run_kind") == "normal":
+            if quota_guard and initial_state.get("run_kind") in ("normal", "warmup"):
+                quota_guard.refresh_usage(account)
                 quota_guard.consume(account)
-                if quota_guard.policy_snapshot(account, "normal", source)["blocked"]:
+                if quota_guard.policy_snapshot(account, initial_state["run_kind"], source)["blocked"]:
                     if not initial_state.get("quota_identity"):
                         self._update_attempt(
                             run_id,
@@ -6503,6 +6652,8 @@ class Scheduler:
                     return
                 exit_code = self.runner.wait_worker(wid)
                 if quota_guard:
+                    # 先使缓存失效，再发布终态，避免批次立即用消费前的低额度启动下一条。
+                    quota_guard.invalidate_usage(account)
                     quota_guard.consume(account)
                 run_state = self._get_run_state(run_id)
                 if run_state and run_state["status"] in ("stopping", "stopped"):
@@ -6551,7 +6702,11 @@ class Scheduler:
                 if managed_refresh_thread and managed_refresh_thread.is_alive():
                     managed_refresh_thread.join(timeout=2)
                 self.runner.persist_worker_profile(wid)
+                if wid and quota_guard:
+                    quota_guard.invalidate_usage(account)
                 self.runner.cleanup(sid, wid)
+                if wid and quota_guard:
+                    quota_guard.refresh_usage(account, force=True)
                 if (self._get_run_state(run_id) or {}).get("status") == "quota_wait":
                     archive = (account_runtime.run_artifact_path(run_id, "status.json").parent / "quota"
                         if account_runtime else WORKSPACES_DIR / run_id / ".quota") / f"attempt-{attempt}"
@@ -6776,7 +6931,8 @@ class WarmupScheduler:
                 conn.close()
             if active:
                 return {"started": False, "run_id": None}
-            if candidate and candidate.get("warmup_enabled") and candidate.get("cc2api_account_id") is not None:
+            if candidate and candidate.get("warmup_enabled") and (account_runtime or candidate.get("cc2api_account_id") is not None):
+                quota_guard.refresh_usage(candidate)
                 quota_guard.consume(candidate)
                 state = quota_guard.snapshot(candidate)
                 warmup_state = quota_guard.warmup_snapshot(candidate)
@@ -6797,7 +6953,8 @@ class WarmupScheduler:
         if not account:
             return {"started": False, "run_id": None}
         try:
-            _sync_bound_account_credentials(account, 2400)
+            if account.get("cc2api_account_id") is not None:
+                _sync_bound_account_credentials(account, 2400)
         except Exception as exc:
             self._record_sync_failure(account, exc)
             return {"started": False, "run_id": None}
@@ -6930,14 +7087,13 @@ class WarmupScheduler:
                         return
                     account = dict(account_row)
                     if (
-                        account.get("cc2api_account_id") is None
+                        (not account_runtime and account.get("cc2api_account_id") is None)
                         or account.get("warmup_last_run_id") != run_id
                     ):
                         return
                     if (
                         expected_cc2api_account_id is not None
-                        and int(account["cc2api_account_id"])
-                        != int(expected_cc2api_account_id)
+                        and account["cc2api_account_id"] != expected_cc2api_account_id
                     ):
                         # run 进入终态后可能立即发生改绑；旧 run 不能把认证结果写到新绑定上。
                         return
@@ -6986,7 +7142,7 @@ class WarmupScheduler:
                     conn.execute(
                         "UPDATE accounts SET warmup_enabled=?, warmup_next_run_at=?, "
                         "warmup_last_status=?, warmup_last_error=?, warmup_auth_failures=? "
-                        "WHERE id=? AND cc2api_account_id=?",
+                        "WHERE id=? AND cc2api_account_id IS ?",
                         (
                             int(enabled),
                             next_run_at,
@@ -7011,7 +7167,7 @@ class WarmupScheduler:
         try:
             rows = conn.execute(
                 "SELECT id FROM accounts WHERE enabled=1 AND deleted_at IS NULL "
-                "AND warmup_enabled=1 AND cc2api_account_id IS NOT NULL "
+                "AND warmup_enabled=1 "
                 "AND warmup_next_run_at IS NOT NULL AND warmup_next_run_at<=? ORDER BY id",
                 (now,),
             ).fetchall()
@@ -7035,7 +7191,7 @@ class WarmupScheduler:
                 with conn:
                     row = conn.execute(
                         "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL "
-                        "AND warmup_enabled=1 AND cc2api_account_id IS NOT NULL",
+                        "AND warmup_enabled=1",
                         (account_id,),
                     ).fetchone()
                     if not row:
@@ -7119,7 +7275,7 @@ class WarmupScheduler:
                 with conn:
                     current = conn.execute(
                         "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL "
-                        "AND warmup_enabled=1 AND cc2api_account_id=?",
+                        "AND warmup_enabled=1 AND cc2api_account_id IS ?",
                         (account["id"], account["cc2api_account_id"]),
                     ).fetchone()
                     if not current:
@@ -7178,7 +7334,7 @@ class WarmupScheduler:
                     conn.execute(
                         "UPDATE accounts SET warmup_enabled=?, warmup_next_run_at=?, "
                         "warmup_last_status=?, warmup_last_error=? "
-                        "WHERE id=? AND cc2api_account_id=?",
+                        "WHERE id=? AND cc2api_account_id IS ?",
                         (
                             0 if permanent else 1,
                             None if permanent else time.time() + WARMUP_SYNC_RETRY_SEC,
@@ -7199,7 +7355,7 @@ class WarmupScheduler:
                     conn.execute(
                         "UPDATE accounts SET warmup_enabled=0, warmup_next_run_at=NULL, "
                         "warmup_last_status='paused', warmup_last_error=? "
-                        "WHERE id=? AND cc2api_account_id=?",
+                        "WHERE id=? AND cc2api_account_id IS ?",
                         (
                             _redact_cc2api_error(error),
                             account["id"],
@@ -7833,7 +7989,7 @@ def list_accounts():
             policies = quota_guard.policy_snapshots(account) if quota_guard else {}
             quota_policy = policies.get("normal", {})
             account["quota_policy"] = {key: quota_policy.get(key) for key in (
-                "enabled", "limits", "hit", "unknown", "blocked", "resume_at", "message")}
+                "enabled", "limits", "hit", "unknown", "blocked", "resume_at", "message", "refresh_retry_at")}
             warmup_state = policies.get("warmup", {})
             account["warmup_quota"] = {key: warmup_state.get(key) for key in (
                 "enabled", "limits", "hit", "unknown", "blocked", "sample_used", "resume_at", "message")}
@@ -8027,9 +8183,14 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
                 _require_oauth_owner_transition_idle(account)
 
             enabled = bool(body.enabled)
-            if enabled and target_binding is None:
+            if enabled and target_binding is None and not account_runtime:
                 raise HTTPException(409, "启用定时养号前请先同步并绑定 cc2api OAuth 账号")
-            if binding_changes or enabled:
+            if enabled and target_binding is None:
+                try:
+                    _read_bench_profile_identity(account["name"])
+                except ValueError:
+                    raise HTTPException(409, "本地 OAuth 凭据不完整，请先完成该账号 CLI 登录") from None
+            if binding_changes or (enabled and target_binding is not None):
                 try:
                     profile = _read_bench_profile_identity(account["name"])
                     cc2api_accounts = cc2api_client.list_accounts()
@@ -8150,8 +8311,7 @@ def resume_account_warmup(aid: int):
         try:
             with conn:
                 row = conn.execute(
-                    "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL "
-                    "AND cc2api_account_id IS NOT NULL",
+                    "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL",
                     (aid,),
                 ).fetchone()
                 if not row:
@@ -9575,6 +9735,7 @@ def list_task_batches():
         for item in items:
             account = conn.execute("SELECT * FROM accounts WHERE id=?", (item["account_id"],)).fetchone()
             item["passive_quota"] = _public_quota(dict(account)) if account else {}
+            item["quota_policy"] = _public_quota_policy(dict(account)) if account else {}
         return items
     finally:
         conn.close()
@@ -9904,6 +10065,7 @@ def list_runs(limit: int = 200):
         for item in items:
             account = conn.execute("SELECT * FROM accounts WHERE id=?", (item["account_id"],)).fetchone()
             item["passive_quota"] = _public_quota(dict(account)) if account else {}
+            item["quota_policy"] = _public_quota_policy(dict(account), "warmup" if item["run_kind"] == "warmup" else "normal") if account else {}
         return items
     finally:
         conn.close()
@@ -9922,6 +10084,7 @@ def get_run(rid: str):
         result = dict(row)
         account = conn.execute("SELECT * FROM accounts WHERE id=?", (result["account_id"],)).fetchone()
         result["passive_quota"] = _public_quota(dict(account)) if account else {}
+        result["quota_policy"] = _public_quota_policy(dict(account), "warmup" if result["run_kind"] == "warmup" else "normal") if account else {}
         return result
     finally:
         conn.close()

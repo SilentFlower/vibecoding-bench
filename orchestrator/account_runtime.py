@@ -282,11 +282,9 @@ class AccountRuntime:
         """
         with self._account_lock(account):
             row = self._row(account["name"], account.get("id"), account.get("timezone"))
-            profile_reauth = row["state"] in ("profile_reauth", "profile_reauth_reconcile")
-            if row["state"] == "profile_reauth_reconcile":
-                raise ValueError("账号画像重授权环境需要先完成故障对账")
-            if profile_reauth and not allow_login_recovery:
-                raise ValueError("账号画像已校正，请先完成重新授权")
+            # 历史画像门禁没有凭据失效证据；只迁移生命周期，不旋转画像或 HOME。
+            if row["state"] in ("profile_reauth", "profile_reauth_reconcile"):
+                self._update(row, state="reconcile" if row["state"] == "profile_reauth_reconcile" else "stopped")
             image = self.client.images.get(self.image)
             image_labels = image.attrs["Config"].get("Labels") or {}
             if not self.release_id or image_labels.get("vibebench.product") != "v3" or image_labels.get("vibebench.role") != "account" or image_labels.get("vibebench.release") != self.release_id:
@@ -341,7 +339,7 @@ class AccountRuntime:
                         atomic_json(configuration_path, configuration)
                         (root / "runtime" / "ready").unlink(missing_ok=True)
                         container.start()
-                        self._update(row, state="profile_reauth" if profile_reauth else "starting", generation=generation)
+                        self._update(row, state="starting", generation=generation)
                 else:
                     self._make_room(row)
                     fingerprint = json.loads(row["fingerprint_json"])
@@ -383,7 +381,7 @@ class AccountRuntime:
                         security_opt=["no-new-privileges:true"], volumes=mounts, environment=environment,
                         log_config={"type": "json-file", "config": {"max-size": "10m", "max-file": "3"}})
                     self._update(row, container_id=container.id, generation=generation,
-                        state="profile_reauth" if profile_reauth else "starting")
+                        state="starting")
             deadline = time.monotonic() + 120
             while time.monotonic() < deadline:
                 result = container.exec_run(["test", "-f", "/run/v3/ready"])
@@ -394,7 +392,7 @@ class AccountRuntime:
                         time.sleep(0.25)
                         continue
                     if row["state"] != "cli_reconcile":
-                        self._update(row, state="profile_reauth" if profile_reauth else "ready")
+                        self._update(row, state="ready")
                     break
                 container.reload()
                 if container.status != "running":
@@ -817,10 +815,7 @@ class AccountRuntime:
                 flow_directory = self.execution_flows(account, source, original_flows)
                 flow_path = "/flows/" + str(flow_directory.relative_to(root / "flows"))
                 context = dict(quota_env)
-                inspection_mode = "capture" if task.get("capture_full_http") else (
-                    "quota" if task.get("warmup") and str(quota_env.get("QUOTA_SAMPLE_REQUIRED") or "") == "1"
-                    else "passthrough"
-                )
+                inspection_mode = "capture" if task.get("capture_full_http") else "passthrough"
                 context.update(STATS_FILE=f"{flow_path}/stats.jsonl",
                     CAPTURE_FILE=f"{flow_path}/http_capture.jsonl", CAPTURE_INDEX_FILE=f"{flow_path}/capture_index.json",
                     CAPTURE_FULL_HTTP="1" if task.get("capture_full_http") else "0",
@@ -1506,8 +1501,6 @@ class AccountRuntime:
         """
         if row.get("account_id") is None:
             return "未提交登录草稿不能校正正式账号画像"
-        if row.get("state") in ("profile_reauth", "profile_reauth_reconcile"):
-            return "账号画像已校正，等待重新授权"
         fingerprint = json.loads(row["fingerprint_json"])
         if int(fingerprint.get("profile_version") or 1) >= 2:
             return "账号已经使用固定 profile v2，禁止再次旋转设备画像"
@@ -1587,7 +1580,7 @@ class AccountRuntime:
                 for name in ("sender.json", "context.json", "context-ack.json", "network.pid", "mitm.pid",
                         "ready", "cli-unhealthy", "proxy-ip"):
                     (root / "runtime" / name).unlink(missing_ok=True)
-                self._update(row, fingerprint_json=json.dumps(fingerprint), container_id=None, state="profile_reauth")
+                self._update(row, fingerprint_json=json.dumps(fingerprint), container_id=None, state="stopped")
                 return
             if operation == "reconcile" and (self._root(row) / "runtime" / "login-commit.json").exists():
                 self.reconcile(environment_id)
@@ -1603,8 +1596,8 @@ class AccountRuntime:
                 return
             if operation == "reconcile" and row["state"] == "profile_reauth_reconcile":
                 self.reconcile(environment_id)
-                if self._row(row["name"], row["account_id"])["state"] == "profile_reauth_reconcile":
-                    raise ValueError("画像重授权对账未完成，普通工作继续保持阻断")
+                if self._row(row["name"], row["account_id"])["state"] in ("profile_reauth_reconcile", "reconcile", "cli_reconcile"):
+                    raise ValueError("遗留执行对账未完成")
                 return
             job = None
             if operation != "reconcile":
@@ -1680,8 +1673,8 @@ class AccountRuntime:
                 continue
             record = self._root(row) / "runtime" / "execution.json"
             shared = row["state"] == "cli_reconcile"
-            profile_reauth = row["state"] in ("profile_reauth", "profile_reauth_reconcile")
-            settled_state = "profile_reauth" if profile_reauth else None
+            # 历史画像校正状态按正常对账收口，失败仍保留真实执行和提交门禁。
+            settled_state = None
             try:
                 container = self._container(row) if row["container_id"] else None
             except NotFound:
@@ -1756,8 +1749,7 @@ class AccountRuntime:
                     self._update(row, state=settled_state or (
                         "ready" if container and container.status == "running" else "stopped"))
             except Exception:
-                state = "profile_reauth_reconcile" if profile_reauth else (
-                    "cli_reconcile" if shared else "reconcile")
+                state = "cli_reconcile" if shared else "reconcile"
                 self._update(row, state=state)
 
     def _reconcile_login_import(self, row: dict, container, path: Path) -> None:

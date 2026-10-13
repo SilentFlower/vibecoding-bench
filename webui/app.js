@@ -82,18 +82,18 @@ window.addEventListener('hashchange', navigate);
 async function renderEnvironments() {
   const rows = await API('/environments');
   const view = $('#view');
-  view.innerHTML = '<h2>固定账号环境</h2><p>停止和重建会保留 HOME、身份和证据。画像校正只适用于没有运行历史的未绑定账号，完成后必须重新授权。</p>' +
-    rows.map(row => `<article class="card"><h3>${escapeHTML(row.name)}</h3><p>${escapeHTML(row.state)} · ${row.busy ? '执行中' : '无 CLI 作业'} · ${escapeHTML(row.fingerprint.hostname)} · ${escapeHTML(row.fingerprint.mem)}</p><p>环境 ${escapeHTML(row.environment_id)} · 容器代次 ${row.generation} · profile v${escapeHTML(row.fingerprint.profile_version || 1)} · ${escapeHTML(row.fingerprint.tz)} / ${escapeHTML(row.fingerprint.lang)}</p><p>${escapeHTML(row.identity_status)} · CLI ${escapeHTML((row.cli_versions || []).join(", "))}</p>${['stop', 'rebuild', 'reconcile'].map(operation => `<button data-environment="${escapeHTML(row.environment_id)}" data-operation="${operation}" ${row.busy ? 'disabled' : ''}>${({stop:'停止',rebuild:'重建容器',reconcile:'故障对账'})[operation]}</button>`).join('')}<button data-environment="${escapeHTML(row.environment_id)}" data-operation="reprofile" ${row.can_reprofile ? '' : 'disabled'} title="${escapeHTML(row.reprofile_message || '校正后必须重新授权')}">校正画像并重新授权</button></article>`).join('');
+  view.innerHTML = '<h2>固定账号环境</h2><p>停止和重建会保留 HOME、身份和证据。画像校正只适用于没有运行历史的未绑定账号，保留原 HOME 和登录凭据。</p>' +
+    rows.map(row => `<article class="card"><h3>${escapeHTML(row.name)}</h3><p>${escapeHTML(row.state)} · ${row.busy ? '执行中' : '无 CLI 作业'} · ${escapeHTML(row.fingerprint.hostname)} · ${escapeHTML(row.fingerprint.mem)}</p><p>环境 ${escapeHTML(row.environment_id)} · 容器代次 ${row.generation} · profile v${escapeHTML(row.fingerprint.profile_version || 1)} · ${escapeHTML(row.fingerprint.tz)} / ${escapeHTML(row.fingerprint.lang)}</p><p>${escapeHTML(row.identity_status)} · CLI ${escapeHTML((row.cli_versions || []).join(", "))}</p>${['stop', 'rebuild', 'reconcile'].map(operation => `<button data-environment="${escapeHTML(row.environment_id)}" data-operation="${operation}" ${row.busy ? 'disabled' : ''}>${({stop:'停止',rebuild:'重建容器',reconcile:'故障对账'})[operation]}</button>`).join('')}<button data-environment="${escapeHTML(row.environment_id)}" data-operation="reprofile" ${row.can_reprofile ? '' : 'disabled'} title="${escapeHTML(row.reprofile_message || '校正保留原登录凭据')}">校正画像</button></article>`).join('');
   $$('[data-operation]', view).forEach(button => button.addEventListener('click', async () => {
     const reprofile = button.dataset.operation === 'reprofile';
     const message = reprofile
-      ? '画像校正会生成新的固定设备参数并阻止普通任务，直到该账号重新授权成功。确认继续？'
+      ? '画像校正会生成新的固定环境参数，保留已有登录凭据。确认继续？'
       : '确认在账号空闲时执行此维护操作？持久数据会保留。';
     if (!confirm(message)) return;
     try {
       await API(`/environments/${button.dataset.environment}/maintenance`, { method: 'POST', body: JSON.stringify({ operation: button.dataset.operation }) });
       if (reprofile) {
-        alert('画像已校正并锁定。请在账号页点击“重新授权”，完成后才会恢复任务。');
+        alert('画像已校正，已有登录凭据保留，可继续运行任务。');
         location.hash = '#accounts';
         return;
       }
@@ -171,7 +171,7 @@ function renderWarmupStatus(account) {
       : '';
     return `<div class="warmup-error"><strong>${label}</strong>：${escapeHTML(message)}${resume}</div>`;
   }).join('');
-  if (account.cc2api_account_id == null) {
+  if (account.cc2api_account_id == null && !Number(account.warmup_enabled || 0)) {
     return `<span class="pill pill-queued">未绑定</span>
       ${thresholds ? `<div class="muted">普通任务阈值：${escapeHTML(thresholds)}</div>` : ''}
       ${quotaStatuses}`;
@@ -197,7 +197,7 @@ function renderWarmupStatus(account) {
     ? `<div class="warmup-error" title="${escapeHTML(account.warmup_last_error)}">${escapeHTML(account.warmup_last_error)}</div>`
     : '';
   return `
-    <div><code>cc#${escapeHTML(account.cc2api_account_id)}</code> <span class="pill ${statusClass}">${escapeHTML(status === 'quota_wait' ? '额度等待' : status)}</span></div>
+    <div><code>${account.cc2api_account_id == null ? '本地 CLI' : `cc#${escapeHTML(account.cc2api_account_id)}`}</code> <span class="pill ${statusClass}">${escapeHTML(status === 'quota_wait' ? '额度等待' : status)}</span></div>
     <div>${escapeHTML(account.warmup_interval_min_hours || 3)}-${escapeHTML(account.warmup_interval_max_hours || 5)}h</div>
     <div class="muted">next ${escapeHTML(formatWarmupTime(account.warmup_next_run_at))}</div>
     ${thresholds ? `<div class="muted">普通任务 / 养号阈值：${escapeHTML(thresholds)}</div>` : ''}
@@ -230,8 +230,8 @@ async function renderAccounts() {
         <button class="btn btn-sm" data-quota="${a.id}">额度</button>
         <button class="btn btn-sm" data-cc2-sync="${a.id}">同步</button>
         <button class="btn btn-sm" data-warmup-config="${a.id}">养号 / 额度</button>
-        ${a.cc2api_account_id != null && Number(a.warmup_enabled || 0) === 1 ? `<button class="btn btn-sm btn-primary" data-warmup-now="${a.id}">立即运行</button>` : ''}
-        ${a.cc2api_account_id != null && Number(a.warmup_enabled || 0) !== 1 ? `<button class="btn btn-sm" data-warmup-resume="${a.id}">恢复</button>` : ''}
+        ${Number(a.warmup_enabled || 0) === 1 ? `<button class="btn btn-sm btn-primary" data-warmup-now="${a.id}">立即运行</button>` : ''}
+        ${Number(a.warmup_enabled || 0) !== 1 && (a.cc2api_account_id != null || a.warmup_last_status === 'paused') ? `<button class="btn btn-sm" data-warmup-resume="${a.id}">恢复</button>` : ''}
         ${a.cc2api_account_id == null || RUNTIME_BASE ? `<button class="btn btn-sm" data-relogin="${a.id}">重授权</button>` : ''}
         ${a.cc2api_account_id != null ? `<button class="btn btn-sm btn-danger" data-cc2-unbind="${a.id}">解绑</button>` : ''}
         <button class="btn btn-sm btn-danger" data-del="${a.id}">删除</button>
@@ -403,7 +403,7 @@ async function openWarmupModal(account) {
   try {
     state.cc2apiAccounts = await API('/cc2api/accounts');
   } catch (e) {
-    return alert('加载 cc2api 账号失败: ' + e.message);
+    state.cc2apiAccounts = [];
   }
   const form = $('#warmup-form');
   form.account_id.value = account.id;
@@ -423,7 +423,7 @@ async function openWarmupModal(account) {
   const options = state.cc2apiAccounts.map(item => `
     <option value="${escapeHTML(item.id)}">#${escapeHTML(item.id)} ${escapeHTML(item.name || 'oauth')} · ${escapeHTML(item.email_masked || '-')}</option>
   `).join('');
-  form.cc2api_account_id.innerHTML = '<option value="">未绑定 · 仅保存任务阈值</option>' + options;
+  form.cc2api_account_id.innerHTML = `<option value="">${account.cc2api_account_id == null ? '使用本地 CLI 账号 · 不绑定 cc2api' : '保留当前 cc2api 绑定'}</option>` + options;
   if (account.cc2api_account_id != null) {
     const exists = state.cc2apiAccounts.some(item => String(item.id) === String(account.cc2api_account_id));
     if (!exists) {
@@ -443,17 +443,17 @@ async function openWarmupModal(account) {
 }
 
 /**
- * 未绑定时只开放普通任务阈值，定时养号必须先有 cc2api OAuth 账号。
+ * 本地 OAuth 账号可独立养号，选定绑定后才使用 cc2api 凭据。
  * @param {HTMLFormElement} form 养号与额度配置表单
  * @return {void} 不返回值
  */
 function updateWarmupBindingState(form) {
-  const bound = Boolean(form.cc2api_account_id.value);
-  form.enabled.disabled = !bound;
-  if (!bound) form.enabled.checked = false;
+  const account = state.accounts.find(item => String(item.id) === String(form.account_id.value));
+  const bound = Boolean(form.cc2api_account_id.value || account?.cc2api_account_id);
+  form.enabled.disabled = false;
   $('#warmup-binding-hint').textContent = bound
     ? '定时养号将使用所选 cc2api OAuth 账号；普通任务阈值同时保存。'
-    : '当前未绑定 cc2api；仍可保存普通任务 5h / 7d 阈值，定时养号暂不可启用。';
+    : '使用此账号已有的 CLI OAuth 凭据，可独立启用定时养号与额度阈值。';
 }
 
 /**
@@ -1411,7 +1411,7 @@ async function renderTasks() {
     <tr>
       <td>${b.id}</td>
       <td>${escapeHTML(accMap[b.account_id] || `acc#${b.account_id}`)}</td>
-      <td><span class="pill pill-${b.status}">${escapeHTML(b.status === 'quota_wait' ? '额度等待' : b.status)}</span>${b.status === 'quota_wait' ? renderPassiveQuota(b.passive_quota) : ''}</td>
+      <td><span class="pill pill-${b.status}">${escapeHTML(b.status === 'quota_wait' ? '额度等待' : b.status)}</span>${b.status === 'quota_wait' ? `<div class="warmup-error">${escapeHTML(b.quota_policy?.message || b.passive_quota?.message || '等待最新额度')}</div>${b.quota_policy?.refresh_retry_at ? `<div class="muted">自动重试 ${escapeHTML(formatWarmupTime(b.quota_policy.refresh_retry_at))}</div>` : ''}` : ''}</td>
       <td>${b.done_count || 0}/${b.item_count || 0}</td>
       <td>${b.concurrency}</td>
       <td>${b.interval_min_sec}-${b.interval_max_sec}s</td>
@@ -1938,7 +1938,7 @@ function paintRuns(runs) {
         <td><code>${r.id}</code></td>
         <td>${tname}${kind}</td>
         <td>${escapeHTML(accMap[r.account_id] || `acc#${r.account_id}`)}</td>
-        <td><span class="pill pill-${r.status}" title="${escapeHTML(r.status === 'quota_wait' ? r.error || '额度等待' : '')}">${escapeHTML(r.status === 'quota_wait' ? '额度等待' : r.status)}</span></td>
+        <td><span class="pill pill-${r.status}" title="${escapeHTML(r.status === 'quota_wait' ? r.quota_policy?.message || r.error || '额度等待' : '')}">${escapeHTML(r.status === 'quota_wait' ? '额度等待' : r.status)}</span></td>
         <td>${dur}</td>
         <td>${r.exit_code ?? '-'}</td>
         <td><div class="op-actions run-actions">

@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import subprocess
 import tempfile
 import uuid
 from pathlib import Path
@@ -27,6 +28,10 @@ def main() -> None:
     try:
         with tempfile.TemporaryDirectory(prefix="vibebench-v3-verify-") as temporary:
             root = Path(temporary)
+            subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+                "-subj", "/CN=api.anthropic.com", "-addext", "subjectAltName=DNS:api.anthropic.com",
+                "-keyout", str(root / "native-usage.key"), "-out", str(root / "native-usage.crt")],
+                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             fixtures = repository / "deploy" / "v3" / "fixtures"
             mock = client.containers.run(manifest["images"]["control"]["reference"], ["/fixtures/mock_network.py"], entrypoint="python", detach=True,
                 network=network.name, labels={**labels, "vibebench.role": "verification"},

@@ -92,8 +92,8 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertTrue(self.runtime.run_session_path("internal-run-id").is_dir())
         self.assertFalse((physical / ".claude-home").exists())
 
-    def test_reprofile_requires_empty_unbound_environment_and_blocks_work(self) -> None:
-        """显式校正只接受零历史未绑定账号，并保持重授权门禁。@return None。"""
+    def test_reprofile_requires_empty_unbound_environment_and_preserves_credentials(self) -> None:
+        """显式校正保留 HOME 凭据，不人为要求重新授权。@return None。"""
         with self.database() as connection:
             connection.execute("UPDATE accounts SET cc2api_account_id=NULL WHERE id=1")
             connection.execute("CREATE TABLE tasks(id INTEGER PRIMARY KEY,account_id INTEGER)")
@@ -105,20 +105,15 @@ class AccountRuntimeTests(unittest.TestCase):
         replacement = {"profile_version": 2, "hostname": "b" * 12, "machine_id": "c" * 32,
             "mac": "02:10:20:30:40:50", "tz": "America/Los_Angeles", "lang": "en_US.UTF-8"}
         self.fingerprint.return_value = replacement
+        credentials = self.runtime._root(row) / "home" / ".claude" / ".credentials.json"
+        credentials.parent.mkdir(parents=True)
+        credentials.write_text('{"claudeAiOauth":{"accessToken":"synthetic"}}')
+        before = credentials.read_bytes()
         self.runtime.maintenance(row["environment_id"], "reprofile")
         current = self.runtime._row("synthetic", 1)
-        self.assertEqual("profile_reauth", current["state"])
+        self.assertEqual("stopped", current["state"])
         self.assertEqual("b" * 12, json.loads(current["fingerprint_json"])["hostname"])
-        with self.assertRaisesRegex(ValueError, "重新授权"):
-            self.runtime.ensure({"id": 1, "name": "synthetic"})
-        session = SimpleNamespace(worker_id="synthetic-container", sid="abcdef123456",
-            name="synthetic", profile_dir=self.root / "empty-profile")
-        self.runtime.jobs[current["environment_id"]] = {
-            "row": current,
-            "token": self.runtime.execution_token(session.worker_id, f"login:{session.sid}"),
-        }
-        self.runtime.commit_login(session, 1)
-        self.assertEqual("ready", self.runtime._row("synthetic", 1)["state"])
+        self.assertEqual(before, credentials.read_bytes())
         with self.assertRaisesRegex(ValueError, "profile v2"):
             self.runtime.maintenance(row["environment_id"], "reprofile")
 
@@ -146,17 +141,16 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertFalse(environment["can_reprofile"])
         self.assertIn("profile v2", environment["reprofile_message"])
 
-    def test_reprofile_gate_survives_restart_reconcile(self) -> None:
-        """画像校正后即使管理服务重启，普通工作也必须继续阻断。@return None。"""
+    def test_legacy_reprofile_gate_is_removed_on_restart_reconcile(self) -> None:
+        """管理服务重启迁回正常生命周期，画像与凭据保持。@return None。"""
         with self.database() as connection:
             connection.execute("UPDATE accounts SET cc2api_account_id=NULL WHERE id=1")
         row = self.runtime._row("synthetic", 1)
         self.runtime._update(row, state="profile_reauth")
         self.runtime.reconcile()
         current = self.runtime._row("synthetic", 1)
-        self.assertEqual("profile_reauth", current["state"])
-        with self.assertRaisesRegex(ValueError, "重新授权"):
-            self.runtime.ensure({"id": 1, "name": "synthetic"})
+        self.assertEqual("stopped", current["state"])
+        self.assertEqual(row["fingerprint_json"], current["fingerprint_json"])
 
     def test_reprofile_reconcile_failure_keeps_separate_gate(self) -> None:
         """遗留登录无法收口时保留画像门禁，并阻止直接开始新登录。@return None。"""
@@ -172,9 +166,12 @@ class AccountRuntimeTests(unittest.TestCase):
         with patch.object(self.runtime, "_container", return_value=container):
             self.runtime.reconcile()
         current = self.runtime._row("synthetic", 1)
-        self.assertEqual("profile_reauth_reconcile", current["state"])
-        with self.assertRaisesRegex(ValueError, "故障对账"):
-            self.runtime.ensure({"id": 1, "name": "synthetic"}, allow_login_recovery=True)
+        self.assertEqual("reconcile", current["state"])
+        self.assertTrue((self.runtime._root(row) / "runtime" / "execution.json").exists())
+        self.runtime._update(current, state="profile_reauth_reconcile")
+        with patch.object(self.runtime, "_container", return_value=container):
+            with self.assertRaisesRegex(ValueError, "对账未完成"):
+                self.runtime.maintenance(current["environment_id"], "reconcile")
 
     def test_reprofile_active_login_is_cleaned_without_losing_gate(self) -> None:
         """重启收口遗留登录后仍回到画像重授权门禁。@return None。"""
@@ -189,7 +186,7 @@ class AccountRuntimeTests(unittest.TestCase):
         with patch.object(self.runtime, "_container", return_value=container):
             self.runtime.reconcile()
         container.stop.assert_called_once_with(timeout=5)
-        self.assertEqual("profile_reauth", self.runtime._row("synthetic", 1)["state"])
+        self.assertEqual("stopped", self.runtime._row("synthetic", 1)["state"])
         self.assertFalse((self.runtime._root(row) / "runtime" / "execution.json").exists())
 
     def test_ram_and_swap_limits_remain_frozen_when_global_budget_changes(self) -> None:

@@ -19,8 +19,8 @@ async def verify_warmup_ui(rpc, evaluate, wait_for, session_id: str) -> None:
     await wait_for(f"!{frame}.querySelector('#warmup-modal').classList.contains('hidden')")
     assert await evaluate(f"Array.from({frame}.querySelectorAll('#warmup-form input[name^=quota_]')).every(input=>!input.checked)")
     assert await evaluate(f"{frame}.querySelector('#warmup-form').elements.cc2api_account_id.value") == ""
-    assert await evaluate(f"{frame}.querySelector('#warmup-form').elements.enabled.disabled")
-    assert await evaluate(f"{frame}.querySelector('#warmup-binding-hint').textContent.includes('仍可保存普通任务')")
+    assert not await evaluate(f"{frame}.querySelector('#warmup-form').elements.enabled.disabled")
+    assert await evaluate(f"{frame}.querySelector('#warmup-binding-hint').textContent.includes('可独立启用定时养号')")
 
     await evaluate(f"(() => {{ const doc={frame}; const form=doc.querySelector('#warmup-form');"
         "for (const [window,value] of [['5h','30'],['7d','20']]) {"
@@ -70,10 +70,10 @@ async def verify_warmup_ui(rpc, evaluate, wait_for, session_id: str) -> None:
     assert account["warmup_quota_7d_limit_percent"] == 20
     assert "admission" not in account["warmup_quota"]
     assert account["quota_policy"]["blocked"]
-    assert not account["warmup_quota"]["blocked"]
+    assert account["warmup_quota"]["blocked"]
     await wait_for(f"{frame}.querySelector('#accounts-body').textContent.includes('7d 已用 ≥ 20%')")
-    assert await evaluate(f"{frame}.querySelector('#accounts-body').textContent.includes('普通任务：任务额度未知或窗口已到期')")
-    assert await evaluate(f"{frame}.querySelector('#accounts-body').textContent.includes('养号额度未知或窗口已到期')")
+    assert await evaluate(f"{frame}.querySelector('#accounts-body').textContent.includes('普通任务：等待自动查询最新额度')")
+    assert await evaluate(f"{frame}.querySelector('#accounts-body').textContent.includes('养号：等待自动查询最新额度')")
     await evaluate(f"{frame}.defaultView.location.hash='#environments'")
     await wait_for(f"Boolean({frame}.querySelector('[data-operation=reprofile]'))")
     assert not await evaluate(f"{frame}.querySelector('[data-operation=reprofile]').disabled")
@@ -81,5 +81,5 @@ async def verify_warmup_ui(rpc, evaluate, wait_for, session_id: str) -> None:
     await evaluate(f"(() => {{const doc={frame};doc.defaultView.__reprofileConfirmation='';"
         "doc.defaultView.confirm=message=>{doc.defaultView.__reprofileConfirmation=message;return false;};"
         "doc.querySelector('[data-operation=reprofile]').click();})()")
-    assert await evaluate(f"{frame}.defaultView.__reprofileConfirmation.includes('重新授权')")
-    print("通过：未绑定账号可保存普通任务阈值且不能启用定时养号；画像校正确认提示、双状态、严格输入、保存重读、桌面/390px 与明暗主题正常")
+    assert await evaluate(f"{frame}.defaultView.__reprofileConfirmation.includes('保留已有登录凭据')")
+    print("通过：未绑定账号可独立配置养号，额度等待提示自动查询；画像校正确认提示、双状态、严格输入、保存重读、桌面/390px 与明暗主题正常")

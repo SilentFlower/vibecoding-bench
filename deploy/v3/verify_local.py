@@ -18,9 +18,11 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import docker
 import requests
+import main as orchestrator
 from account_runtime import AccountRuntime, atomic_json
 
 
@@ -283,6 +285,36 @@ def verify() -> None:
         runtime.cleanup(token)
         assert not runtime.jobs
         print("通过：普通任务使用原始 TLS 透传、无自定义 CA 环境，CLI cwd 不暴露内部 run ID 或控制文件")
+        # 只信任测试服务自己的证书；它与 account MITM CA 无关，不进入生产配置。
+        (runtime._root(row) / "home" / "native-usage.crt").write_bytes(Path("/verify/native-usage.crt").read_bytes())
+        Path("/verify/usage-tls.enabled").touch()
+        before_listener = (runtime._root(row) / "runtime" / "network.pid").read_text()
+        probe = object.__new__(orchestrator.Runner)
+        probe.client = client
+        original_environment = orchestrator._claude_exec_env
+
+        def test_environment(use_sidecar, extra=None):
+            """只追加本地测试服务器信任，仍断言正式路径未注入 MITM CA。@return 执行环境。"""
+            assert use_sidecar is False
+            value = original_environment(False, extra)
+            assert not any(key in value for key in ("NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "CURL_CA_BUNDLE"))
+            value["NODE_EXTRA_CA_CERTS"] = "/home/node/native-usage.crt"
+            return value
+
+        try:
+            with patch.object(orchestrator, "account_runtime", runtime), \
+                    patch.object(orchestrator, "PROFILES_DIR", root / "profiles"), \
+                    patch.object(orchestrator, "_claude_exec_env", side_effect=test_environment):
+                usage = probe.query_quota(account)
+            assert usage["ok"] and usage["five_hour"]["utilization"] == 12
+            assert usage["seven_day"]["utilization"] == 23
+            assert before_listener == (runtime._root(row) / "runtime" / "network.pid").read_text()
+            assert not runtime.jobs
+            observation = json.loads(Path("/verify/usage-calls.jsonl").read_text().splitlines()[-1])
+            assert observation == {"path": "/api/oauth/usage", "tls": True}
+            print("通过：真实账号容器通过原生 TLS 查询 usage JSON，监听进程不重启且不使用 MITM CA")
+        finally:
+            Path("/verify/usage-tls.enabled").unlink(missing_ok=True)
         warmup_environment = dict(environment, RUN_ID="synthetic-warmup-native")
         token, _ = runtime.start_run(account, {"id": 1, "warmup": True, "capture_full_http": False},
             "synthetic-warmup-native", warmup_environment,
@@ -334,7 +366,7 @@ def verify() -> None:
                     "QUOTA_WARMUP": "1", "QUOTA_SAMPLE_REQUIRED": "1"})
             execution = wait_cli_started(runtime, client, token)
             quota_context = json.loads((runtime._root(row) / "runtime" / "context-ack.json").read_text())
-            assert quota_context["NETWORK_INSPECTION_MODE"] == "quota" and quota_context["process"] == "recorder"
+            assert quota_context["NETWORK_INSPECTION_MODE"] == "passthrough" and quota_context["process"] == "passthrough"
             assert runtime._sender_active(row) == 1
             prepared_second = dict(prepared, request_id=str(uuid.uuid4()), target_url="http://api.anthropic.com:8081/v1/messages")
             api_response = session.post(binding["endpoint"] + "/internal/send", headers={"Authorization": "Bearer " + binding["secret"],
@@ -473,7 +505,7 @@ def verify() -> None:
         print("PASS: fixed HOME/container, native TLS ClientHello from account, raw body/429/API evidence, non-root isolation, tmux reattach, reauth cancellation, task capture cleanup, idempotent stop and wake")
         print("PASS: continue process-tree/capture cleanup, two accounts using the same mock proxy remain separate, network fault closes sender")
         print("通过：重复重建空实例后保留环境 ID、machine-id 和 HOME")
-        print("真实 OAuth 登录与 TLS 应用响应未执行；CLI 生命周期使用明确的测试替身。")
+        print("真实 OAuth 和公网请求未执行；本地 usage 使用真实 TLS/JSON，CLI 生命周期使用测试替身。")
     except Exception:
         for instance in client.containers.list(all=True, filters={"label": ["vibebench.product=v3", "vibebench.deployment=" + runtime.deployment, "vibebench.role=account"]}):
             print(instance.logs(tail=35).decode(), flush=True)

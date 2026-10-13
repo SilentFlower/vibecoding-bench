@@ -69,7 +69,7 @@ scripts/v3-stack stop --env <独立配置>
 - 清理必须匹配完整执行 token，不接受裸 container ID。停止本代进程组、tmux、UID1000 子进程，把 CLI 网络恢复为空闲 `passthrough`，恢复 hook 后释放租约；不通过停止整个容器清理普通 CLI。
 - `runtime/execution.json` 保存租约模式、owner/generation、driver/tmux/hook 证明。共享清理/心跳/重启对账失败进入 `cli_reconcile`，阻止下一 CLI，健康 API 继续；未知/旧排他记录保守隔离。公共网络或发送器故障仍关闭容器；CLI 专用 Recorder 故障只标记 CLI 不健康。
 
-**CLI 网络模式**：CLI 始终经 `tun0 -> hev-socks5-tunnel -> 127.0.0.1:8080` 使用账号代理。普通任务、已有可信额度的正常养号、登录/重授权和未绑定账号 OAuth 刷新选择 `passthrough`，本地 relay 只完成 SOCKS5 入站与 HTTP CONNECT/SOCKS5 上游握手并复制原始字节，不启动 mitmproxy，也不注入 MITM CA。显式完整抓包选择 `capture`；只有 `QUOTA_SAMPLE_REQUIRED=1` 的养号正式样本和显式额度查询选择 `quota`。模式切换在 `network.lock` 内先核对并定向收口旧 PID，再写原子 ACK；调度器必须逐字段匹配 mode、source、process 才能启动 CLI。代理缺失、认证失败、旧监听未知、ACK 不符或监听退出都失败关闭，不回退直连；relay 的共享空闲计时由任一方向新字节重置。
+**CLI 网络模式**：CLI 始终经 `tun0 -> hev-socks5-tunnel -> 127.0.0.1:8080` 使用账号代理。普通任务、养号、登录/重授权、额度查询和未绑定账号 OAuth 刷新选择 `passthrough`，本地 relay 只完成 SOCKS5 入站与 HTTP CONNECT/SOCKS5 上游握手并复制原始字节，不启动 mitmproxy，也不注入 MITM CA。显式完整抓包选择 `capture`；`quota` 只保留历史格式兼容，v3 不再用模型请求补样。usage 查询复用原生监听并解析返回 JSON，不需要 MITM。模式切换在 `network.lock` 内先核对并定向收口旧 PID，再写原子 ACK；调度器必须逐字段匹配 mode、source、process 才能启动 CLI。代理缺失、认证失败、旧监听未知、ACK 不符或监听退出都失败关闭，不回退直连；relay 的共享空闲计时由任一方向新字节重置。
 
 **HTTPS 与证据**：管理端完成选号、改写、重试和响应分类，目标账号内发送器复用现有 HTTP/TLS 实现实际建立上游连接。每账号独立进程/连接池及代理，API 不经 CLI 网络监听。普通 `passthrough` 不生成 HTTP 明文、stats 或 flow；`quota/capture` 才显式信任当前 CA 并由 Recorder 产生对应证据。绑定、批次、目标、截止时间和秘密不符时拒绝；桥接失败无直连回退，提交不确定不能盲重发。API 被动观察单独写 `flows/api/observations.jsonl`，不混入 run 统计。
 
@@ -90,15 +90,15 @@ bench/flows/<account>/<task>/<run>/    固定兼容链接
 
 `execution_flows()` 在账号锁内固定兼容入口；run 与续聊各有自己的证据组。恢复原 run/session/workspace，仅换 source 子目录；QuotaGuard 登记本代实际观察文件，Recorder 使用同一目录。真实 cwd 和 `.claude/projects` 键只能使用 `project-<摘要>`，原 run/environment ID、`.bench-*`、`.claude-home`、cc2api 刷新标记和 Stop hook 控制文件不能进入 Claude 可见项目树；旧系统生成的已知控制文件须定向迁移到 runtime，不能删除未知用户文件。run 统计读取平铺历史及各 run 执行、排除续聊/API并去重路径；抓包索引和文件列表聚合各代及续聊。原生 flow 不覆盖，历史平铺文件保留。跨目录链接拒绝，未部署的旧 v3 原型 source 链接不自动接管。
 
-**显式画像校正**：`maintenance(..., "reprofile")` 只接受未绑定 cc2api、无 task/run/identity/草稿/提交/活动作业、容器已停止的 legacy 正式环境。操作保留账号/HOME/代理/资源预算，清理旧容器网络与 CA 产物，生成一次 profile v2 并进入 `profile_reauth`。该状态及 `profile_reauth_reconcile` 在管理服务重启后继续阻断普通任务、养号、抓包和发送；只允许该账号登录恢复。真实登录提交成功才回到 ready，之后因 profile v2 永久拒绝再次 reprofile；取消、失败或遗留执行收口失败不能清除门禁。
+**显式画像校正**：`maintenance(..., "reprofile")` 只接受未绑定 cc2api、无 task/run/identity/草稿/提交/活动作业、容器已停止的 legacy 正式环境。操作保留账号/HOME/代理/资源预算，清理旧容器网络与 CA 产物，生成一次 profile v2 并回到 stopped，保留原登录凭据；不因环境字段变化强制重授权。启动时原 `profile_reauth` 迁回正常生命周期；原 `profile_reauth_reconcile` 的真实执行/提交故障仍按 reconcile 隔离。profile v2 永久拒绝再次 reprofile，真实认证失败才要求重新授权。
 
 **部署**：两个最终镜像 control/account；control 按 gateway/orchestrator 两个角色启动，N 个账号共 N+2 个容器，只有 orchestrator 挂 Docker socket。CLI 为 UID1000、无网络能力并禁止提权，服务秘密/控制目录不对项目写入开放。
 
 **资源**：`resource_budget.account_limits(memory: str, swap: str = "0") -> tuple[int, int]` 共用于预检与账号创建；返回 RAM 字节数和 RAM＋swap 总字节数。`V3_ACCOUNT_MEMORY` 支持正整数 m/g，默认 4g；`V3_ACCOUNT_SWAP` 是额外 swap，默认 0，仅接受 0 或正整数 m/g，不接受 -1/无限额。首次保存 `fingerprint_json.mem/swap`；旧缺 swap 字段为 0，改全局配置不重算旧身份或预算。Compose 必须显式传递两参数。
 
-预检分别比较 `MemAvailable` 与 `SwapFree`：RAM 至少为活跃上限×账号 RAM＋1 GiB，显式更高的 `V3_MIN_FREE_MEMORY_BYTES` 优先；swap 足够覆盖活跃账号额外额度，且 Docker `SwapLimit` 为 true。不能以 swap 抵扣 RAM 余量；已有环境保存的 RAM/swap 超过配置时拒绝启动，禁止下调配置掩盖未来唤醒预算。1536m RAM＋2048m swap、活跃 1 对应 Docker Memory=1610612736、MemorySwap=3758096384，预检要求约 2.5 GiB 可用 RAM与2 GiB空闲 swap；默认4g仍需5 GiB RAM。这是额度边界，真实 CLI 峰值另行验证。
+预检分别比较 `MemAvailable` 与 `SwapFree`：RAM 至少为活跃上限×账号 RAM＋可配置 `V3_MEMORY_HEADROOM_BYTES`（默认 256 MiB），显式更高的 `V3_MIN_FREE_MEMORY_BYTES` 优先；swap 足够覆盖活跃账号额外额度，且 Docker `SwapLimit` 为 true。不能以 swap 抵扣 RAM 余量；已有环境保存的 RAM/swap 超过配置时拒绝启动，禁止下调配置掩盖未来唤醒预算。1536m RAM＋2048m swap、活跃 1 对应 Docker Memory=1610612736、MemorySwap=3758096384，预检要求约 1.75 GiB 可用 RAM与2 GiB空闲 swap；默认4g需4.25 GiB RAM。这是额度边界，真实 CLI 峰值另行验证。
 
-清单记录 `schema=3`、`bridge_protocol=1`、`layout_version=1`、默认 CLI、release、父/子仓 revision、dirty 标记、冻结内容 SHA256 及两个 image ID/平台。`images[role].digest` 保留构建机本地 Docker Id；containerd 可用 OCI 索引作为 Id，所以另保存 `config_digest`（docker save 中原始配置字节 SHA256），发布后 `registry_digest` 才是仓库 manifest/索引 digest。换 daemon 时只接受清单固定的配置或 OCI 根，角色/批次/提交/平台仍检查，不能因 ID 语义不同放弃核对。构建先冻结源码，标签/清单不能覆盖。启动检查清单组合、实际镜像 labels、宿主发布端口、名称/网络/挂载 realpath、数据归属及资源预算。
+清单记录 `schema=3`、`bridge_protocol=1`、`layout_version=1`、默认 CLI、release、父/子仓 revision、dirty 标记、冻结内容 SHA256 及两个 image ID/平台。`images[role].digest` 保留构建机本地 Docker Id；containerd 可用 OCI 索引作为 Id，所以另保存 `config_digest`（docker save 中原始配置字节 SHA256），发布后 `registry_digest` 才是仓库 manifest/索引 digest。换 daemon 时只接受清单固定的配置或 OCI 根，角色/批次/提交/平台仍检查，不能因 ID 语义不同放弃核对。构建先冻结源码，标签/清单不能覆盖。启动检查清单组合、实际镜像 labels、宿主发布端口、名称/网络/挂载 realpath、数据归属及资源预算。重复 up 只复用本部署 gateway 的精确 5674 映射，其它进程和外部容器占用仍拒绝。
 
 **发布**：`.github/workflows/v3-build.yml` 只在 v3 ref 发布，联合 build 后使用 GITHUB_TOKEN（contents:read、packages:write）登录 GHCR；两个包为 `ghcr.io/silentflower/vibebench-v3-{control,account}`，标签 `v3-ci-<run_id>-<run_attempt>`，不写 latest/旧包。publish 校验 Action 的仓库、父提交与 run/attempt、干净构建来源和全新输出，独占 `.started` 标记禁止同次重试；失败保留现场，新 attempt 才重跑，不把仓库 denied 当成“未存在”。两件成功、仓库 digest 可核对且镜像包成功才写最终清单；原构建清单不改。
 
@@ -125,11 +125,11 @@ bench 导航项不拆分中英文标签；宽度不超过 1440px 时导航独立
 | 共享租约过期/服务重启 | 保留 API，先确认旧 CLI 收口，再允许下一 CLI |
 | Recorder 撤销失败 | CLI 隔离，禁止下一 CLI；公共网络健康时 API 保留 |
 | 普通任务、正常养号、登录或未绑定 OAuth 刷新 | `passthrough`，无 mitmproxy/CA 环境；代理失败时不直连 |
-| 养号无需样本 / `QUOTA_SAMPLE_REQUIRED=1` / 显式完整抓包 | `passthrough` / `quota` / `capture`，ACK 必须匹配 |
+| 普通任务、养号或 usage 查询 / 显式完整抓包 | passthrough 原生 TLS / capture；usage 查询不切换监听 |
 | relay 长连接持续单向传输 / 双向静默 | 任一方向字节重置共享空闲计时 / 达到期限后关闭 |
 | 同 run/续聊第二代 | 固定入口、新观察游标/flow，旧证据不变 |
 | legacy 环境不满足校正条件或已经 profile v2 | 拒绝 reprofile，不旋转任何身份字段 |
-| reprofile 后重启、取消或收口失败 | 保持 `profile_reauth` 或 `profile_reauth_reconcile`，普通工作继续阻断 |
+| reprofile 成功 / 历史画像门禁 / 真正收口失败 | stopped 保留凭据 / 迁回正常生命周期 / reconcile 保留执行证据 |
 | Claude 可见项目树出现系统控制文件或原始 run ID | 验证失败；控制文件迁入 runtime，session 留在固定 HOME |
 | 错误环境绑定/镜像批次/秘密/目标 | 拒绝发送，不直连、不重放 |
 | 宿主端口/名称/挂载或数据归属冲突 | 启动前拒绝，不操作旧资源 |
@@ -145,8 +145,8 @@ bench 导航项不拆分中英文标签；宽度不超过 1440px 时导航独立
 - 正常：API SSE 运行时启动养号 CLI，取消 CLI 后继续收到新 API 数据；同账号第二个 CLI 仍需等待。
 - 正常：普通任务和可信额度养号经 HTTP CONNECT/SOCKS5 账号代理传递原始 TLS 字节，项目 cwd 只含 `project-<摘要>`；显式抓包切到 capture 后仍产生独立 flow。
 - 基础/历史：停止唤醒或镜像重建保留 HOME、环境 ID 和 machine-id；平铺历史统计/抓包仍可读取，空环境返回可展示状态。
-- 基础/历史：legacy 画像继续固定；满足全部条件时用户显式 reprofile 一次，重启后仍需真实重新授权，完成后 profile v2 不可再次旋转。
-- 错误用法：所有 CLI 都经过 Recorder，或正常养号因为 `QUOTA_WARMUP=1` 总是启用 MITM。正确做法：调度器根据 `QUOTA_SAMPLE_REQUIRED` 选择 quota，其余路径使用 passthrough，CA 只注入本次 quota/capture exec。
+- 基础/历史：legacy 画像继续固定；满足全部条件时用户显式 reprofile 一次，HOME 与原凭据保留，不强制重新授权，profile v2 不可再次旋转。
+- 错误用法：所有 CLI 都经过 Recorder，或正常养号因为 `QUOTA_WARMUP=1` 总是启用 MITM。正确做法：日常 CLI/usage 使用 passthrough，只有显式 capture 注入 CA；阈值数据由执行边界自动 usage 采样更新。
 - 错误用法：用 `/workspaces/<run_id>` 作为容器 cwd，或借兼容链接把 `.claude-home` 写进项目。正确做法：项目、session、控制产物分别归属 projects、HOME 和 runtime，兼容入口只供宿主读取。
 - 错误用法：`run:<rid>:1` 把原 run 链接改到新 source 目录，或者复用旧 `capture.flow`，造成冲突/证据覆盖。正确做法：固定证据组、每代独立目录，游标与 Recorder 共用实际路径，读取端汇总。
 - 错误用法：看到 Docker exec 已创建就算 CLI 正在运行，或用 container.wait 判 run 完成。正确做法：`setsid --wait` 并确认 exec/tmux 实际运行，终态由本执行结果判断。
@@ -162,7 +162,7 @@ bench 导航项不拆分中英文标签；宽度不超过 1440px 时导航独立
 - Rust `cargo fmt --check && cargo test`：画像/改写、weighted FIFO/RPM、共享/排他租约、旧记录/过期/重启、绑定校验、原始字节/有序头/SSE取消、不重放；回环临时 CA 验证 HTTPS 正常响应及错误证书/主机名拒绝。测试 CA 不进入正式客户端。
 - Python orchestrator 回归：原快照与 session 恢复、旧 token/绑定保护、并行与安装续租、证据/游标分代、统计不重复、错误链接拒绝、鉴权和永久额度门禁。
 - `images/account/test_passthrough.py` 与 network-context 回归：HTTP CONNECT、SOCKS5/H 认证、IPv4/IPv6/域名、字节保真、代理失败无直连、静默关闭、跨空闲窗口单向活动，以及 PID/ACK/mode/source 归属。
-- profile/project 回归：独立随机画像、时区-locale 配对、重建固定、legacy 不自动迁移、reprofile 全部前置条件/重启门禁/成功后不可重复；容器内项目顶层只出现匿名目录，项目内部没有 `.bench-*`、`.claude-home`、刷新控制或系统 Stop hook。
+- profile/project 回归：独立随机画像、时区-locale 配对、重建固定、legacy 不自动迁移、reprofile 全部前置条件/历史门禁迁移/凭据保留/成功后不可重复；容器内项目顶层只出现匿名目录，项目内部没有 `.bench-*`、`.claude-home`、刷新控制或系统 Stop hook。
 - Recorder 与部署回归：请求归属冻结、ACK/身份、冲突预检、准确资源归属、停机、备份和导入幂等。
 - 资源/发布回归：1536m＋2048m 实际 Docker 限额，默认/旧缺字段、非法无限值、RAM/swap不足、已固化预算拒绝；当前 Action 来源/attempt、第一/第二件推送失败无完整清单、错误digest/包拒绝、本地标签不覆盖，跨 store ID相同配置可核对。
 - actionlint 核对 ref、权限与 artifact；实际本地 registry 的 push/pull、归档 config 哈希以及双镜像 save/load 核对。CI/GHCR发布结果与指定服务器实时预检/健康/旧服务不变在发布后验收，不能以本地替身称其已完成。

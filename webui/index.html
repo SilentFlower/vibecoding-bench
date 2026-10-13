@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261013-terminal-interactive" />
+  <link rel="stylesheet" href="style.css?v=20261013-quota-auto-refresh" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -407,7 +407,7 @@
             <p class="hint" id="warmup-quota-7d-hint"></p>
           </div>
         </div>
-        <p class="hint">任一阈值命中后，运行中的请求正常收尾，尚未启动的普通任务与养号进入等待；cc2api API 转发不受此阈值控制。普通任务遇到额度未知或窗口到期时等待手动查询；养号仍只允许一次正式请求更新额度。</p>
+        <p class="hint">普通任务与养号在执行前后自动查询额度。任一阈值命中时，正在运行的 CLI 执行完整收尾，后续执行等待；未知、过期或查询失败会自动更新和重试。cc2api API 转发不受此阈值控制。</p>
         <div class="row-end">
           <button type="button" class="btn" data-close="#warmup-modal">cancel</button>
           <button type="submit" class="btn btn-primary">save</button>
@@ -671,6 +671,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20261013-terminal-interactive"></script>
+  <script src="app.js?v=20261013-quota-auto-refresh"></script>
 </body>
 </html>
