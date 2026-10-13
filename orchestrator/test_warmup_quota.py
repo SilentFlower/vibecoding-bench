@@ -212,6 +212,62 @@ class WarmupQuotaTests(unittest.TestCase):
             self.assertEqual(50, published["windows"]["five_hour"]["utilization"])
             self.assertEqual(["five_hour"], published["warmup_quota"]["hit"])
 
+    def test_public_policies_share_one_quota_and_configuration_snapshot(self) -> None:
+        """普通任务和养号公开摘要必须基于同一窗口、阈值与许可读取。@return None。"""
+        self._configure(30)
+        self._state(quota_headers(time.time(), five=600), status=200)
+        low = self.guard.snapshot(self.account)
+        high = {
+            **low,
+            "windows": {
+                "five_hour": {
+                    **low["windows"]["five_hour"],
+                    "utilization": 50,
+                },
+            },
+        }
+        with patch.object(self.guard, "snapshot", side_effect=[low, high]) as snapshot:
+            policies = self.guard.policy_snapshots(self.account)
+        snapshot.assert_called_once_with(self.account)
+        self.assertEqual([], policies["normal"]["hit"])
+        self.assertEqual([], policies["warmup"]["hit"])
+        self.assertFalse(policies["normal"]["blocked"])
+        self.assertFalse(policies["warmup"]["blocked"])
+
+    def test_account_api_returns_both_policy_views_from_one_pair(self) -> None:
+        """账号 API 同时返回普通任务与养号状态，不丢弃任一视图。@return None。"""
+        self._configure(30)
+        policies = {
+            "normal": {
+                "enabled": True,
+                "limits": {"five_hour": 30, "seven_day": None},
+                "hit": [],
+                "unknown": ["five_hour"],
+                "blocked": True,
+                "resume_at": None,
+                "message": "任务额度未知或窗口已到期，请先手动查询额度",
+            },
+            "warmup": {
+                "enabled": True,
+                "limits": {"five_hour": 30, "seven_day": None},
+                "hit": [],
+                "unknown": ["five_hour"],
+                "blocked": False,
+                "sample_used": False,
+                "resume_at": None,
+                "message": "养号额度未知或窗口已到期，等待一次正式请求更新",
+            },
+        }
+        with patch.object(self.guard, "policy_snapshots", return_value=policies) as snapshots:
+            account = main.list_accounts()[0]
+        snapshots.assert_called_once()
+        self.assertTrue(account["quota_policy"]["blocked"])
+        self.assertFalse(account["warmup_quota"]["blocked"])
+        self.assertNotEqual(
+            account["quota_policy"]["message"],
+            account["warmup_quota"]["message"],
+        )
+
     def test_api_config_strict_validation_omission_and_null(self) -> None:
         """配置严格校验，旧客户端不清阈值，null 只关闭单个窗口。@return None。"""
         self._configure(30, 40)
@@ -234,8 +290,8 @@ class WarmupQuotaTests(unittest.TestCase):
         self.assertNotIn("admission", account["warmup_quota"])
         main.cc2api_client.resolve_credentials.assert_not_called()
 
-    def test_actual_start_rechecks_threshold_without_blocking_normal_task(self) -> None:
-        """排队后新额度命中时不创建 worker；同账号普通任务仍可运行。@return None。"""
+    def test_actual_start_rechecks_threshold_for_warmup_and_normal_task(self) -> None:
+        """排队后新额度命中时，养号和普通任务都不创建 worker。@return None。"""
         task = self._run(kind="warmup")
         self._configure(20)
         self._state(quota_headers(time.time(), five=600), status=200)
@@ -248,7 +304,108 @@ class WarmupQuotaTests(unittest.TestCase):
         normal = self._run("normal")
         with patch.object(main, "_sync_bound_account_credentials_locked"):
             self.scheduler._execute("normal", self.account, normal)
-        self.assertEqual("success", main.get_run("normal")["status"])
+        self.assertEqual("quota_wait", main.get_run("normal")["status"])
+        self.assertIn("任务阈值", main.get_run("normal")["error"])
+        self.runner.start_run.assert_not_called()
+
+    def test_normal_task_unknown_waits_without_using_warmup_sample(self) -> None:
+        """普通任务额度未知时直接等待，不领取养号正式请求机会。@return None。"""
+        task = self._run()
+        self._configure(30)
+        self.scheduler._execute("original", self.account, task)
+        run = main.get_run("original")
+        self.assertEqual("quota_wait", run["status"])
+        self.assertIn("手动查询额度", run["error"])
+        conn = main.get_db()
+        try:
+            self.assertEqual(0, conn.execute(
+                "SELECT COUNT(*) FROM warmup_quota_admissions"
+            ).fetchone()[0])
+        finally:
+            conn.close()
+        self.runner.start_run.assert_not_called()
+        main.cc2api_client.refresh_usage.assert_not_called()
+
+    def test_normal_task_known_below_threshold_runs_and_running_task_finishes(self) -> None:
+        """可信低用量允许启动；运行中命中阈值时本次仍正常完成。@return None。"""
+        task = self._run()
+        self._configure(30)
+        self._state(quota_headers(time.time(), five=600), status=200)
+
+        def reach_threshold(_worker):
+            """模拟 worker 运行期间额度升到阈值；返回正常退出码。"""
+            headers = quota_headers(time.time(), five=600)
+            headers["anthropic-ratelimit-unified-5h-utilization"] = "0.3"
+            self._state(headers, status=200)
+            return 0
+
+        self.runner.wait_worker.side_effect = reach_threshold
+        with patch.object(main, "_sync_bound_account_credentials_locked"):
+            self.scheduler._execute("original", self.account, task)
+        self.assertEqual("success", main.get_run("original")["status"])
+        self.runner.start_run.assert_called_once()
+        self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
+
+    def test_normal_wait_resumes_same_run_after_manual_quota_update(self) -> None:
+        """手动额度事实变低后恢复原普通 run、prompt 和执行快照。@return None。"""
+        self._run(status="quota_wait")
+        self._configure(30)
+        with patch.object(self.scheduler, "submit") as submit:
+            self.guard._resume_account(self.account)
+        submit.assert_not_called()
+        self._state(quota_headers(time.time(), five=600), status=200)
+        with patch.object(self.scheduler, "submit") as submit:
+            self.guard._resume_account(self.account)
+        run_id, _, payload = submit.call_args.args
+        self.assertEqual("original", run_id)
+        self.assertEqual("保持原 prompt", payload["prompt"])
+        self.assertEqual("2.1.62", payload["claude_code_version"])
+        self.assertEqual("high", payload["claude_effort_level"])
+        self.assertEqual(1, main.get_run("original")["quota_attempt"])
+
+    def test_normal_wait_resumes_after_threshold_is_disabled(self) -> None:
+        """关闭账号阈值后，未知额度的原普通 run 应恢复。@return None。"""
+        self._run(status="quota_wait")
+        self._configure(30)
+        with patch.object(self.scheduler, "submit") as submit:
+            self.guard._resume_account(self.account)
+        submit.assert_not_called()
+        self._configure(None)
+        with patch.object(self.scheduler, "submit") as submit:
+            self.guard._resume_account(self.account)
+        self.assertEqual("original", submit.call_args.args[0])
+        self.assertEqual(1, main.get_run("original")["quota_attempt"])
+
+    def test_batch_waits_before_creating_item_when_policy_blocks(self) -> None:
+        """批次在阈值命中时不创建下一条 task/run，并进入额度等待。@return None。"""
+        self._configure(20)
+        self._state(quota_headers(time.time(), five=600), status=200)
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO task_batches(id,account_id,name,status,concurrency,timeout_sec) "
+                    "VALUES(1,1,'批次','active',1,1800)"
+                )
+                conn.execute(
+                    "INSERT INTO task_batch_items(batch_id,topic_id,prompt,status) "
+                    "VALUES(1,1,'保持原 prompt','pending')"
+                )
+            before = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+        finally:
+            conn.close()
+        self.scheduler._execute_batch(1)
+        conn = main.get_db()
+        try:
+            self.assertEqual("quota_wait", conn.execute(
+                "SELECT status FROM task_batches WHERE id=1"
+            ).fetchone()[0])
+            self.assertEqual(before, conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0])
+            self.assertEqual("pending", conn.execute(
+                "SELECT status FROM task_batch_items WHERE batch_id=1"
+            ).fetchone()[0])
+        finally:
+            conn.close()
 
     def test_private_control_does_not_poison_shared_quota(self) -> None:
         """Recorder 的阈值暂停保留真实低用量，不制造 unknown 耗尽。@return None。"""

@@ -20,11 +20,11 @@
 | Guide | Description | Status |
 |-------|-------------|--------|
 | [Directory Structure](./directory-structure.md) | 单文件 main.py 内部分节 + 何时拆包 | Filled |
-| [Database Guidelines](./database-guidelines.md) | 裸 sqlite3、幂等升级、绑定/运行快照、被动额度等待、养号阈值/单次更新与原任务恢复 | Filled |
+| [Database Guidelines](./database-guidelines.md) | 裸 sqlite3、幂等升级、绑定/运行快照、被动额度等待、普通任务/养号阈值与原任务恢复 | Filled |
 | [Error Handling](./error-handling.md) | HTTPException + 清理路径吞异常的两套策略 | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | 禁用模式 / 必用模式 / 真跑验收 / Review 清单 | Filled |
 | [Logging Guidelines](./logging-guidelines.md) | P1 不写 log,uvicorn + stats.jsonl 兜底 | Filled |
-| [Topic Prompt Contract](./topic-prompt-contract.md) | Topic prompt 模式、API 字段、持久化与调度一致性 | Filled |
+| [Topic Prompt Contract](./topic-prompt-contract.md) | 英文题库、默认 prompt、同步备份、API 字段与持久化/调度一致性 | Filled |
 | [v3 固定账号环境](./account-runtime-v3.md) | 固定 Docker、独立 API/CLI、关联重授权、授权码投递回执、草稿对账/代理/完整清理与隔离交付 | Filled |
 
 > 镜像构建 / GitHub Actions 与 GHCR 发布 / 远程部署 / Cookie session 鉴权契约,移到独立的 [deploy/](../deploy/index.md) 层,见那边的 image-build-push / remote-deploy / auth-design 三个 spec。本目录只覆盖 orchestrator 内部代码规范。

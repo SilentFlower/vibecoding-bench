@@ -1533,7 +1533,11 @@ def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) 
 
 
 # ============== Topics（SQLite 为主，topics.md 首次 seed）==============
-_CAT_RE = re.compile(r"^##\s+[一二三四五六七八九十百零\d]+、(.+?)（")
+_CAT_RE = re.compile(
+    r"^##\s+(?:[一二三四五六七八九十百零\d]+、|\d+\.\s+)"
+    r"(.+?)(?:（\d+\s*题）|\(\d+\s+topics?\))\s*$",
+    re.IGNORECASE,
+)
 _ITEM_RE = re.compile(r"^-\s+\[[ x]\]\s+(\d+)\.\s+\*\*(.+?)\*\*[:：]?\s*(.*)$")
 
 
@@ -2081,73 +2085,73 @@ _NATURAL_TOPIC_PROMPT_HISTORY_LIMIT = 64
 _NATURAL_TOPIC_PROMPT_NGRAM_SIZE = 4
 
 _NATURAL_TOPIC_PROMPT_STYLE_KEYWORDS = (
-    ("data_ai", ("AI 集成", "AI Agent", "数据可视化", "数据运营", "Dashboard")),
-    ("creative", ("小游戏", "内容创作", "教育", "创意")),
-    (
-        "engineering",
-        ("命令行", "自动化与脚本", "开发者工具", "硬件", "边缘", "安全", "运维"),
-    ),
+    ("data_ai", ("AI Applications", "AI Agents", "Data Visualization", "Data Operations", "Dashboard")),
+    ("creative", ("Games", "Content Creation", "Education", "Creative", "Creativity")),
     (
         "product",
-        ("Web", "浏览器插件", "协作", "商业", "行业", "团队知识", "社区运营"),
+        ("Web", "Browser Extensions", "Collaboration", "Business", "Industry", "Team Knowledge", "Community"),
+    ),
+    (
+        "engineering",
+        ("Command-Line", "Automation", "Developer Tools", "Hardware", "Edge", "Security", "Operations"),
     ),
 )
 
 _NATURAL_TOPIC_PROMPT_STYLE_OPENERS = {
     "engineering": (
-        "想做个「{title}」，属于{category}这类工具。",
-        "这次要实现的是「{title}」，方向归在{category}。",
-        "手头需要一个{category}项目：「{title}」。",
-        "先做一个能用的「{title}」，场景是{category}。",
+        "I want to build {title}, a tool in the {category} category.",
+        "Please implement {title} as a {category} project.",
+        "I need a practical {category} project called {title}.",
+        "Start with a usable version of {title} for the {category} space.",
     ),
     "product": (
-        "想把一个{category}方向的想法做成「{title}」。",
-        "这次准备落地「{title}」，它属于{category}场景。",
-        "有个产品需求叫「{title}」，主要面向{category}。",
-        "先做「{title}」的首版，定位是{category}。",
+        "I want to turn a {category} idea into a product called {title}.",
+        "Please build the first version of {title} for the {category} space.",
+        "The product requirement is {title}, aimed at a {category} use case.",
+        "Create an initial release of {title}, positioned as a {category} product.",
     ),
     "data_ai": (
-        "需要做一个「{title}」，用于{category}方向的数据或智能处理。",
-        "这次的数据或智能项目是「{title}」，归在{category}。",
-        "想把「{title}」这个{category}需求先跑通。",
-        "准备实现一个{category}项目，名字是「{title}」。",
+        "Build {title} for data or intelligent processing in the {category} space.",
+        "The data or AI project for this task is {title}, in the {category} category.",
+        "Implement the core workflow for the {category} project {title}.",
+        "Create a {category} project named {title}.",
     ),
     "creative": (
-        "想做一个可以实际体验的「{title}」，属于{category}。",
-        "这次先把「{title}」这个{category}创意做出来。",
-        "有个{category}方向的小项目：「{title}」。",
-        "准备实现「{title}」，先做成能演示的{category}作品。",
+        "Build an interactive version of {title} in the {category} category.",
+        "Turn the {category} idea {title} into a working project.",
+        "Create a small {category} project called {title}.",
+        "Implement {title} as a demonstrable {category} experience.",
     ),
     "generic": (
-        "我想实现「{title}」，项目分类是{category}。",
-        "这次要做的项目叫「{title}」，属于{category}。",
-        "有个需求想直接落地：「{title}」（{category}）。",
-        "先完成一个「{title}」，场景归在{category}。",
+        "I want to implement {title}, in the {category} category.",
+        "The project for this task is {title}, which belongs to {category}.",
+        "Please turn this requirement into a working project: {title} ({category}).",
+        "Start with a complete first version of {title} for the {category} use case.",
     ),
 }
 
 _NATURAL_TOPIC_PROMPT_REQUIREMENTS = (
-    "主要要解决的是：{description}",
-    "核心需求大致是：{description}",
-    "希望它能覆盖这些事情：{description}",
-    "具体想实现的能力包括：{description}",
-    "需求可以概括为：{description}",
+    "The main problem to solve is: {description}",
+    "The core requirement is: {description}",
+    "It should cover the following workflow: {description}",
+    "The requested capabilities are: {description}",
+    "The requirement can be summarized as follows: {description}",
 )
 
 _NATURAL_TOPIC_PROMPT_DELIVERIES = (
-    "请先在当前工作区把核心流程真正跑通，交付一个可以实际运行的首版。",
-    "代码直接落在现有目录，先做到主要流程可以实际使用。",
-    "先把能启动演示的版本完成在这个工作区里。",
-    "以当前项目中能够跑起来的首版为交付。",
-    "请在手头目录完成可运行版本，优先保证核心流程闭环。",
+    "Implement the core workflow in the current workspace and deliver a runnable first version.",
+    "Write the code in the existing directory and make the primary workflow usable end to end.",
+    "Complete a version in this workspace that can be launched and demonstrated.",
+    "Deliver a working first version that runs in the current project.",
+    "Build a runnable version in the current directory, prioritizing a complete core workflow.",
 )
 
 _NATURAL_TOPIC_PROMPT_REPORTS = (
-    "完成后附上启动命令、实际验证过的场景，以及控制范围时做出的取舍。",
-    "最后写清怎么运行、哪些输入输出已经自测，还有哪些能力被有意留到后续。",
-    "交付时说明运行步骤、检查结果和实现中的关键权衡。",
-    "收尾时给出使用命令、测试情况，并解释首版舍弃了什么。",
-    "做完后告诉我如何把它跑起来、实际检查了哪些路径，以及范围是怎样控制的。",
+    "When finished, include the launch command, the scenarios you verified, and the trade-offs used to control scope.",
+    "Explain how to run it, which inputs and outputs you tested, and which capabilities were intentionally deferred.",
+    "Describe the run steps, validation results, and the key implementation trade-offs in the final report.",
+    "Provide usage commands and test results, and explain what the first version leaves out.",
+    "After completing it, state how to launch it, which paths you checked, and how you kept the scope manageable.",
 )
 
 _NATURAL_TOPIC_PROMPT_LAYOUTS = (
@@ -2167,7 +2171,7 @@ def _topic_prompt_values(topic: dict) -> tuple[str, str, str]:
     :return: `(title, category, description)`
     """
     title = str(topic["title"]).strip()
-    category = str(topic.get("category") or "未分类").strip()
+    category = str(topic.get("category") or "Uncategorized").strip()
     description = str(topic.get("description") or "").strip()
     return title, category, description
 
@@ -2245,7 +2249,7 @@ def _normalize_topic_prompt_fingerprint(prompt: str, topic: dict) -> str:
         reverse=True,
     )
     for value in topic_values:
-        normalized = normalized.replace(value, "topic内容")
+        normalized = normalized.replace(value, "topic content")
     return re.sub(r"[\W_]+", "", normalized.casefold())
 
 
@@ -2384,11 +2388,11 @@ def build_topic_prompt(
     title, category, description = _topic_prompt_values(topic)
     if mode == "canonical":
         return (
-            f"题目：{title}\n"
-            f"分类：{category}\n"
-            f"描述：{description}\n\n"
-            "请在当前目录下实现一个可运行的 MVP。\n"
-            "完成后请说明启动方式、验证方式和主要取舍。"
+            f"Topic: {title}\n"
+            f"Category: {category}\n"
+            f"Description: {description}\n\n"
+            "Implement a runnable MVP in the current directory.\n"
+            "When finished, explain how to launch it, how you validated it, and the main trade-offs."
         )
     if mode != "natural":
         raise ValueError(f"不支持的 topic prompt 模式：{mode}")
@@ -2780,14 +2784,24 @@ class QuotaGuard:
         return {**state, **decision, "source": state.get("source") or "passive", "identity": identity,
                 "recovery_source": recovery_source, "known": bool(state.get("windows"))}
 
-    def warmup_snapshot(self, account: dict, source: Optional[str] = None, *, quota_state: Optional[dict] = None) -> dict:
-        """读取最新账号阈值和单次机会，普通业务不消费此门禁。
+    def policy_snapshot(
+        self,
+        account: dict,
+        workload: Literal["normal", "warmup"],
+        source: Optional[str] = None,
+        *,
+        quota_state: Optional[dict] = None,
+    ) -> dict:
+        """读取普通任务或养号使用的账号级阈值判定。
 
         :param account: 当前账号及身份
+        :param workload: `normal` 普通任务或 `warmup` 养号
         :param source: 实际启动来源；页面/触发检查不指定来源
         :param quota_state: 发布时复用的共用额度快照；省略时读取当前事实
-        :return: 养号判定及内部持久许可，公开接口需移除内部键
+        :return: 阈值判定；养号结果还包含内部持久许可
         """
+        if workload not in ("normal", "warmup"):
+            raise ValueError(f"不支持的额度策略工作负载：{workload}")
         state = self.snapshot(account) if quota_state is None else quota_state
         conn = get_db()
         try:
@@ -2797,17 +2811,122 @@ class QuotaGuard:
                                   (account["id"], state["identity"])).fetchone()
         finally:
             conn.close()
-        decision = warmup_quota_decision(state, {
+        limits = {
             "five_hour": row["warmup_quota_5h_limit_percent"] if row else None,
             "seven_day": row["warmup_quota_7d_limit_percent"] if row else None,
-        }, time.time())
+        }
+        return self._policy_decision(
+            state,
+            limits,
+            workload,
+            source,
+            dict(record) if record else None,
+        )
+
+    def policy_snapshots(
+        self,
+        account: dict,
+        *,
+        quota_state: Optional[dict] = None,
+    ) -> dict[str, dict]:
+        """从同一额度、配置和许可快照生成普通任务与养号判定。
+
+        :param account: 当前账号及身份
+        :param quota_state: 可选的共用额度快照；省略时读取一次当前事实
+        :return: 包含 `normal` 和 `warmup` 的判定字典
+        """
+        state = self.snapshot(account) if quota_state is None else quota_state
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT warmup_quota_5h_limit_percent,warmup_quota_7d_limit_percent "
+                "FROM accounts WHERE id=?",
+                (account["id"],),
+            ).fetchone()
+            record = conn.execute(
+                "SELECT * FROM warmup_quota_admissions WHERE account_id=? AND identity=?",
+                (account["id"], state["identity"]),
+            ).fetchone()
+        finally:
+            conn.close()
+        limits = {
+            "five_hour": row["warmup_quota_5h_limit_percent"] if row else None,
+            "seven_day": row["warmup_quota_7d_limit_percent"] if row else None,
+        }
         admission = dict(record) if record else None
+        return {
+            workload: self._policy_decision(
+                state,
+                limits,
+                workload,
+                admission=admission,
+            )
+            for workload in ("normal", "warmup")
+        }
+
+    def _policy_decision(
+        self,
+        state: dict,
+        limits: dict,
+        workload: Literal["normal", "warmup"],
+        source: Optional[str] = None,
+        admission: Optional[dict] = None,
+    ) -> dict:
+        """基于已固定事实计算单个工作负载的阈值判定。
+
+        :param state: 同一账号身份的额度快照
+        :param limits: 同一时点读取的 5h/7d 阈值
+        :param workload: `normal` 普通任务或 `warmup` 养号
+        :param source: 实际启动来源；页面摘要不指定
+        :param admission: 同一时点读取的养号单次许可
+        :return: 指定工作负载的阈值判定
+        """
+        decision = warmup_quota_decision(state, limits, time.time())
+        if workload == "normal":
+            decision.update(admission=None, sample_used=False)
+            if not decision["enabled"]:
+                return decision
+            if decision["hit"]:
+                names = " / ".join(
+                    "5h" if key == "five_hour" else "7d"
+                    for key in decision["hit"]
+                )
+                decision["message"] = f"{names} 已用达到任务阈值，普通任务等待额度更新"
+            elif decision["sample_required"]:
+                # 普通任务不能借用养号的一次正式请求机会，否则门禁本身仍会产生消费。
+                decision.update(
+                    blocked=True,
+                    resume_at=None,
+                    message="任务额度未知或窗口已到期，请先手动查询额度",
+                )
+            return decision
         used = decision["sample_required"] and warmup_sample_used(decision, admission)
         decision.update(admission=admission, sample_used=bool(used))
         if used and (source is None or admission["source"] != source):
             decision.update(blocked=True, resume_at=None,
                             message="养号单次额度更新机会已使用，等待新的真实额度或调整阈值")
         return decision
+
+    def warmup_snapshot(
+        self,
+        account: dict,
+        source: Optional[str] = None,
+        *,
+        quota_state: Optional[dict] = None,
+    ) -> dict:
+        """兼容读取养号阈值和单次正式请求机会。
+
+        :param account: 当前账号及身份
+        :param source: 实际启动来源；页面/触发检查不指定来源
+        :param quota_state: 发布时复用的共用额度快照；省略时读取当前事实
+        :return: 养号判定及内部持久许可
+        """
+        return self.policy_snapshot(
+            account,
+            "warmup",
+            source,
+            quota_state=quota_state,
+        )
 
     def _admit_warmup(self, account: dict, source: str) -> bool:
         """在实际启动前认领一次额度更新，失败和重启不会重发机会。"""
@@ -2849,19 +2968,32 @@ class QuotaGuard:
                     hashes.add(hashlib.sha256(token.encode()).hexdigest())
             except (OSError, ValueError, AttributeError):
                 pass
-            _write_quota_json(path, {**snapshot, "token_hashes": sorted(hashes),
-                                    "warmup_quota": self.warmup_snapshot(account, quota_state=snapshot)})
+            policies = self.policy_snapshots(account, quota_state=snapshot)
+            _write_quota_json(path, {
+                **snapshot,
+                "token_hashes": sorted(hashes),
+                "quota_policy": policies["normal"],
+                "warmup_quota": policies["warmup"],
+            })
             return snapshot
 
-    def admit(self, account: dict, source: str, warmup: bool = False) -> bool:
+    def admit(
+        self,
+        account: dict,
+        source: str,
+        warmup: bool = False,
+        workload: Optional[Literal["normal", "warmup"]] = None,
+    ) -> bool:
         """
         认领启动机会；到期只放行一个已有正常执行，等待其真实响应。
 
         :param account: 锁内重读的账号行
         :param source: 执行来源及代次
-        :param warmup: 是否为自动养号执行，其他入口不检查养号阈值
+        :param warmup: 兼容旧调用的养号标记
+        :param workload: `normal` 检查普通任务阈值，`warmup` 检查养号阈值，None 只检查共同额度
         :return: 是否可以创建正式 worker
         """
+        effective_workload = workload or ("warmup" if warmup else None)
         with self._lock:
             self.consume(account)
             snapshot = self.snapshot(account)
@@ -2870,7 +3002,15 @@ class QuotaGuard:
                 return False
             if snapshot["retry_ready"] and snapshot.get("recovery_source") not in (None, source):
                 return False
-            if warmup and not self._admit_warmup(account, source):
+            if effective_workload == "normal" and self.policy_snapshot(
+                account,
+                "normal",
+                source,
+                quota_state=snapshot,
+            )["blocked"]:
+                self._publish(account)
+                return False
+            if effective_workload == "warmup" and not self._admit_warmup(account, source):
                 self._publish(account)
                 return False
             if snapshot["retry_ready"]:
@@ -2918,7 +3058,7 @@ class QuotaGuard:
         :param source: run/continue 及其代次
         :param flows: 本次观察所在目录
         :param control: 本次执行独立控制目录
-        :param warmup: 当前执行是否允许使用养号阈值
+        :param warmup: 当前执行是否为养号；只影响 Recorder 的单次请求收尾协议
         :return: sidecar 的内部环境变量
         """
         with self._lock:
@@ -3216,9 +3356,13 @@ class QuotaGuard:
             account = by_id.get(run["account_id"])
             control_status = self._recover_control(account, run) if account else None
             state = self.snapshot(account) if account else {}
-            warmup_guarded = bool(account and run["run_kind"] == "warmup" and self.warmup_snapshot(account)["enabled"])
+            threshold_guarded = False
+            if account and run["run_kind"] == "warmup":
+                threshold_guarded = bool(self.warmup_snapshot(account)["enabled"])
+            elif account and run["run_kind"] == "normal":
+                threshold_guarded = bool(self.policy_snapshot(account, "normal")["blocked"])
             if (run["status"] != "quota_wait" and not state.get("exhausted")
-                    and not run["quota_attempt"] and run["id"] not in observed_runs and not control_status and not warmup_guarded):
+                    and not run["quota_attempt"] and run["id"] not in observed_runs and not control_status and not threshold_guarded):
                 continue
             # 严格清理必须成功才启用自动恢复，覆盖容器已创建但 ID 尚未落库的崩溃点。
             self.runner.cleanup_quota_run(run["id"])
@@ -3247,7 +3391,7 @@ class QuotaGuard:
                 if run["status"] == "stopping":
                     scheduler._update_attempt(run["id"], int(run["quota_attempt"]), status="stopped", ended_at=time.time())
                     scheduler._update_batch_item_for_run(run["id"], "stopped")
-                elif account and (state.get("exhausted") or state.get("account_error") or run["quota_attempt"] or warmup_guarded):
+                elif account and (state.get("exhausted") or state.get("account_error") or run["quota_attempt"] or threshold_guarded):
                     scheduler._mark_quota_wait(run["id"], account, int(run["quota_attempt"]))
                 else:
                     scheduler._update_attempt(run["id"], int(run["quota_attempt"]), status="failed", error="服务重启前执行已中断", ended_at=time.time())
@@ -3348,11 +3492,18 @@ class QuotaGuard:
                 if not current or (parent and (parent["deleted_at"] or parent["status"] not in ("active", "quota_wait"))):
                     continue
                 account = dict(current)
-                if run["run_kind"] == "warmup" and (
-                        not account.get("warmup_enabled") or self.warmup_snapshot(account, source)["blocked"]):
+                workload = (
+                    "warmup" if run["run_kind"] == "warmup"
+                    else "normal" if run["run_kind"] == "normal"
+                    else None
+                )
+                if workload == "warmup" and (
+                        not account.get("warmup_enabled") or self.policy_snapshot(account, workload, source)["blocked"]):
+                    continue
+                if workload == "normal" and self.policy_snapshot(account, workload, source)["blocked"]:
                     continue
                 self.runner.cleanup_quota_run(run["id"])
-                if not self.admit(account, source, warmup=run["run_kind"] == "warmup"):
+                if not self.admit(account, source, workload=workload):
                     continue
                 with _db_lock:
                     conn = get_db()
@@ -3378,13 +3529,17 @@ class QuotaGuard:
         state = self.snapshot(account)
         if state["blocked"] or state["recovery_source"]:
             return
+        normal_policy = self.policy_snapshot(account, "normal", quota_state=state)
         warmup_state = self.warmup_snapshot(account)
         with _db_lock:
             conn = get_db()
             try:
                 with conn:
-                    batches = conn.execute("SELECT id FROM task_batches b WHERE account_id=? AND status='quota_wait' AND deleted_at IS NULL "
-                                           "AND NOT EXISTS(SELECT 1 FROM runs r WHERE r.batch_id=b.id AND r.status IN ('quota_wait','queued','running','stopping'))", (account["id"],)).fetchall()
+                    batches = [] if normal_policy["blocked"] else conn.execute(
+                        "SELECT id FROM task_batches b WHERE account_id=? AND status='quota_wait' AND deleted_at IS NULL "
+                        "AND NOT EXISTS(SELECT 1 FROM runs r WHERE r.batch_id=b.id AND r.status IN ('quota_wait','queued','running','stopping'))",
+                        (account["id"],),
+                    ).fetchall()
                     if state["retry_ready"]:
                         batches = batches[:1]
                     for batch in batches:
@@ -5858,7 +6013,10 @@ class Scheduler:
                     break
                 if quota_guard:
                     quota_guard.consume(account)
-                    if quota_guard.snapshot(account)["blocked"]:
+                    if (
+                        quota_guard.snapshot(account)["blocked"]
+                        or quota_guard.policy_snapshot(account, "normal")["blocked"]
+                    ):
                         self._wait_batch_quota(batch_id, account)
                         break
                 # 先投满并发窗口；之后每次等一个 run 收口再按随机间隔投放下一项。
@@ -6120,7 +6278,7 @@ class Scheduler:
                 return
             self._executing.add((run_id, attempt))
         sem = self._sem(account["id"])
-        sem.acquire()
+        sem_acquired = False
         sid: Optional[str] = None
         wid: Optional[str] = None
         managed_refresh_stop = threading.Event()
@@ -6138,6 +6296,19 @@ class Scheduler:
             if initial_state["status"] in ("stopping", "stopped"):
                 self._update_batch_item_for_run(run_id, "stopped")
                 return
+            if quota_guard and initial_state.get("run_kind") == "normal":
+                quota_guard.consume(account)
+                if quota_guard.policy_snapshot(account, "normal", source)["blocked"]:
+                    if not initial_state.get("quota_identity"):
+                        self._update_attempt(
+                            run_id,
+                            attempt,
+                            quota_identity=_quota_identity(account),
+                        )
+                    self._mark_quota_wait(run_id, account, attempt)
+                    return
+            sem.acquire()
+            sem_acquired = True
             with _oauth_owner_lock(str(account["name"])):
                 conn = get_db()
                 try:
@@ -6185,7 +6356,16 @@ class Scheduler:
                     self._update_attempt(run_id, attempt, execution_model=model)
                 task["model_override"] = model
                 task["warmup"] = current.get("run_kind") == "warmup"
-                if quota_guard and not quota_guard.admit(account, source, warmup=current["run_kind"] == "warmup"):
+                workload = (
+                    "warmup" if current["run_kind"] == "warmup"
+                    else "normal" if current["run_kind"] == "normal"
+                    else None
+                )
+                if quota_guard and not quota_guard.admit(
+                    account,
+                    source,
+                    workload=workload,
+                ):
                     state = quota_guard.snapshot(account)
                     if state.get("account_error"):
                         self._update_attempt(run_id, attempt, status="auth_failed", error=state["message"], ended_at=time.time())
@@ -6318,12 +6498,20 @@ class Scheduler:
                 if warmup_scheduler:
                     warmup_scheduler.handle_run_terminal(run_id, account.get("cc2api_account_id"))
             finally:
-                sem.release()
+                if sem_acquired:
+                    sem.release()
                 with self._execution_lock:
                     self._executing.discard((run_id, attempt))
 
     def _wait_batch_quota(self, batch_id: int, account: dict) -> None:
         state = quota_guard.snapshot(account)
+        if not state.get("blocked"):
+            policy = quota_guard.policy_snapshot(account, "normal", quota_state=state)
+            if policy["blocked"]:
+                state = {**state, **{
+                    "resume_at": policy["resume_at"],
+                    "message": policy["message"],
+                }}
         with _db_lock:
             conn = get_db()
             try:
@@ -6357,11 +6545,19 @@ class Scheduler:
             return
         resume_at = state.get("resume_at")
         current = self._get_run_state(run_id) or {}
-        if current.get("run_kind") == "warmup" and quota_guard and not state.get("blocked"):
-            warmup_state = quota_guard.warmup_snapshot(account)
-            if warmup_state["enabled"]:
-                state = {**state, "message": warmup_state["message"] or "等待原养号会话恢复",
-                         "resume_at": warmup_state["resume_at"]}
+        if quota_guard and not state.get("blocked"):
+            workload = current.get("run_kind")
+            if workload in ("normal", "warmup"):
+                policy = quota_guard.policy_snapshot(account, workload)
+                if policy["enabled"] and (
+                    workload == "warmup" or policy["blocked"]
+                ):
+                    fallback = "等待原养号会话恢复" if workload == "warmup" else "等待任务额度更新"
+                    state = {
+                        **state,
+                        "message": policy["message"] or fallback,
+                        "resume_at": policy["resume_at"],
+                    }
                 resume_at = state["resume_at"]
         if current.get("run_kind") == "capture" and resume_at is not None:
             resume_at = max(resume_at, time.time() + 900)
@@ -7366,14 +7562,14 @@ class AccountIn(BaseModel):
 
 
 class WarmupConfigIn(BaseModel):
-    """账号 cc2api 绑定、养号间隔与独立额度阈值。
+    """账号 cc2api 绑定、养号间隔与普通任务/养号共用额度阈值。
 
     :param cc2api_account_id: 绑定的网关账号
     :param enabled: 是否启用养号
     :param interval_min_hours: 最小随机间隔小时数
     :param interval_max_hours: 最大随机间隔小时数
-    :param warmup_quota_5h_limit_percent: 5h 已用整数阈值；null 关闭，省略保留
-    :param warmup_quota_7d_limit_percent: 7d 已用整数阈值；null 关闭，省略保留
+    :param warmup_quota_5h_limit_percent: 兼容字段名；5h 已用整数阈值，null 关闭，省略保留
+    :param warmup_quota_7d_limit_percent: 兼容字段名；7d 已用整数阈值，null 关闭，省略保留
     """
 
     cc2api_account_id: int
@@ -7563,7 +7759,11 @@ def list_accounts():
             account["timezone_mode"] = "manual" if timezone else "auto"
             account.update(_read_account_oauth_status(account["name"]))
             account["passive_quota"] = _public_quota(account)
-            warmup_state = quota_guard.warmup_snapshot(account) if quota_guard else {}
+            policies = quota_guard.policy_snapshots(account) if quota_guard else {}
+            quota_policy = policies.get("normal", {})
+            account["quota_policy"] = {key: quota_policy.get(key) for key in (
+                "enabled", "limits", "hit", "unknown", "blocked", "resume_at", "message")}
+            warmup_state = policies.get("warmup", {})
             account["warmup_quota"] = {key: warmup_state.get(key) for key in (
                 "enabled", "limits", "hit", "unknown", "blocked", "sample_used", "resume_at", "message")}
             accounts.append(account)
@@ -7730,7 +7930,7 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
     for field in threshold_fields:
         value = getattr(body, field)
         if value is not None and not 1 <= value <= 100:
-            raise HTTPException(400, "养号额度阈值必须为 1-100 的已用百分比整数")
+            raise HTTPException(400, "任务与养号额度阈值必须为 1-100 的已用百分比整数")
     conn = get_db()
     try:
         row = _get_available_account(conn, aid)

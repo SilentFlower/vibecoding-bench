@@ -31,9 +31,9 @@ class TopicPromptTests(unittest.TestCase):
         """
         self.topic = {
             "no": 1,
-            "title": "标准题目",
-            "description": "只使用题库描述",
-            "category": "测试",
+            "title": "Standard Topic",
+            "description": "Use only the library description.",
+            "category": "Command-Line Tools",
         }
 
     def test_canonical_prompt_is_stable(self) -> None:
@@ -43,11 +43,11 @@ class TopicPromptTests(unittest.TestCase):
         :return: None
         """
         expected = (
-            "题目：标准题目\n"
-            "分类：测试\n"
-            "描述：只使用题库描述\n\n"
-            "请在当前目录下实现一个可运行的 MVP。\n"
-            "完成后请说明启动方式、验证方式和主要取舍。"
+            "Topic: Standard Topic\n"
+            "Category: Command-Line Tools\n"
+            "Description: Use only the library description.\n\n"
+            "Implement a runnable MVP in the current directory.\n"
+            "When finished, explain how to launch it, how you validated it, and the main trade-offs."
         )
         self.assertEqual(expected, main.build_topic_prompt(self.topic, "canonical"))
         self.assertEqual(expected, main.build_topic_prompt(self.topic, "canonical"))
@@ -63,25 +63,26 @@ class TopicPromptTests(unittest.TestCase):
         self.assertEqual(main._NATURAL_TOPIC_PROMPT_CANDIDATE_COUNT, len(prompts))
         self.assertEqual(len(prompts), len(set(prompts)))
         for prompt in prompts:
-            self.assertIn("标准题目", prompt)
-            self.assertIn("只使用题库描述", prompt)
-            self.assertIn("测试", prompt)
+            self.assertIn("Standard Topic", prompt)
+            self.assertIn("Use only the library description.", prompt)
+            self.assertIn("Command-Line Tools", prompt)
             self.assertTrue(any(
                 marker in prompt
-                for marker in ("当前工作区", "现有目录", "这个工作区", "当前项目", "手头目录")
+                for marker in ("current workspace", "existing directory", "this workspace", "current project", "current directory")
             ))
             self.assertTrue(any(
                 marker in prompt
-                for marker in ("启动命令", "怎么运行", "运行步骤", "使用命令", "跑起来")
+                for marker in ("launch command", "how to run", "run steps", "usage commands", "how to launch")
             ))
             self.assertTrue(any(
                 marker in prompt
-                for marker in ("实际验证", "自测", "检查结果", "测试情况", "实际检查")
+                for marker in ("verified", "tested", "validation results", "test results", "checked")
             ))
             self.assertTrue(any(
                 marker in prompt
-                for marker in ("取舍", "留到后续", "权衡", "舍弃", "范围是怎样控制")
+                for marker in ("trade-offs", "deferred", "trade-offs", "leaves out", "scope manageable")
             ))
+            self.assertIsNone(re.search(r"[\u3400-\u4dbf\u4e00-\u9fff]", prompt))
 
     def test_all_seed_categories_map_to_defined_styles(self) -> None:
         """
@@ -98,10 +99,25 @@ class TopicPromptTests(unittest.TestCase):
             main._topic_prompt_style(category)
             for category in categories
         })
-        self.assertEqual("engineering", main._topic_prompt_style("命令行工具"))
-        self.assertEqual("product", main._topic_prompt_style("个人效率 Web 应用"))
-        self.assertEqual("data_ai", main._topic_prompt_style("AI 集成应用"))
-        self.assertEqual("creative", main._topic_prompt_style("小游戏"))
+        self.assertEqual("engineering", main._topic_prompt_style("Command-Line Tools"))
+        self.assertEqual("product", main._topic_prompt_style("Personal Productivity Web Apps"))
+        self.assertEqual("data_ai", main._topic_prompt_style("AI Applications"))
+        self.assertEqual("creative", main._topic_prompt_style("Mini Games"))
+
+    def test_seed_parser_accepts_legacy_and_english_category_headings(self) -> None:
+        """首次 seed 解析器同时接受旧中文标题与新英文标题。@return None。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            topics_path = Path(tmp) / "topics.md"
+            topics_path.write_text(
+                "## 十一、旧分类（1 题）\n"
+                "- [ ] 1. **旧题**：旧描述\n"
+                "## 2. New Category (1 topic)\n"
+                "- [ ] 2. **New Topic**: New description.\n",
+                encoding="utf-8",
+            )
+            with patch.object(main, "TOPICS_FILE", topics_path):
+                topics = main.load_seed_topics()
+        self.assertEqual(["旧分类", "New Category"], [topic["category"] for topic in topics])
 
     def test_topic_content_is_removed_before_fingerprint_comparison(self) -> None:
         """
@@ -2835,7 +2851,8 @@ global.fetch = async (_url, options) => {
         self.assertEqual(task["prompt"], submitted_task["prompt"])
         self.assertIn("标准题目", task["prompt"])
         self.assertIn("只使用题库描述", task["prompt"])
-        self.assertNotIn("main", task["prompt"])
+        self.assertNotIn("profiles/main", task["prompt"])
+        self.assertNotIn("cc#7", task["prompt"])
         run_scheduler.submit.assert_called_once()
 
     def test_queued_warmup_syncs_again_before_start_and_reports_running(self) -> None:

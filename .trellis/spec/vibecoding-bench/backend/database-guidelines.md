@@ -586,18 +586,18 @@ if "model_override" not in task:
 
 ---
 
-## Scenario: 账号级养号额度阈值与单次更新
+## Scenario: 账号级任务与养号额度阈值及养号单次更新
 
 ### 1. Scope / Trigger
 
-- 修改养号配置、触发/实际启动/等待恢复、Recorder 请求门禁或 worker 暂停时适用。阈值只作用于 `run_kind='warmup'`；普通任务、批次、抓包、继续对话和网关 API 沿用上文的共同额度保护。
+- 修改账号阈值、普通任务或批次启动/恢复、养号触发/恢复、Recorder 请求门禁或 worker 暂停时适用。阈值作用于 `run_kind='normal'` 和 `run_kind='warmup'`；抓包、继续对话和网关 API 只沿用上文的共同额度保护。
 - 共享额度事实仍来自正式请求或显式手动查询；不为阈值自动调用 usage、refresh_usage、查询 worker 或模型探测。每账号分别配置 5h/7d 通用窗口，默认关闭。
 
 ### 2. Signatures
 
 ```text
 PUT /api/accounts/{aid}/warmup -> {ok, enabled, next_run_at}
-GET /api/accounts -> 账号配置与 warmup_quota 摘要
+GET /api/accounts -> 账号配置、quota_policy 与 warmup_quota 摘要
 accounts.warmup_quota_5h_limit_percent INTEGER NULL
 accounts.warmup_quota_7d_limit_percent INTEGER NULL
 warmup_quota_admissions(account_id INTEGER PRIMARY KEY, identity TEXT NOT NULL,
@@ -614,6 +614,13 @@ warmup_quota_decision(state: dict, limits: dict, now: float) -> dict
 warmup_sample_used(decision: dict, admission: dict | None) -> bool
 QuotaGuard.warmup_snapshot(account: dict, source: Optional[str] = None,
                            *, quota_state: Optional[dict] = None) -> dict
+QuotaGuard.policy_snapshot(account: dict, workload: Literal["normal", "warmup"],
+                           source: Optional[str] = None,
+                           *, quota_state: Optional[dict] = None) -> dict
+QuotaGuard.policy_snapshots(account: dict,
+                            *, quota_state: Optional[dict] = None) -> dict[str, dict]
+QuotaGuard.admit(account: dict, source: str,
+                 workload: Optional[Literal["normal", "warmup"]] = None) -> bool
 QuotaGuard.prepare(account: dict, source: str, flows: Path,
                    control: Path, warmup: bool = False) -> dict
 ```
@@ -622,14 +629,16 @@ QuotaGuard.prepare(account: dict, source: str, flows: Path,
 
 - 两个阈值为 **1～100 的已用百分比整数**，分别启用；NULL/null 关闭，省略字段保留原值。`model_fields_set` 区分省略与明确 null，阈值和既有养号配置在同一事务保存。类型/范围校验先于凭据或数据库写入，不截断小数，不把 bool 当整数。
 - 内部 `limits` 使用 `five_hour`、`seven_day` 两个键，关闭值为 None；只有通用窗口参与。有效用量 `>=` 阈值即命中。高用量缺可信 reset 仍阻断；到期不把旧用量清零，未知不显示成 0%。多个命中窗口取最晚可信 reset，任一缺 reset 时 `resume_at=None`。
-- `warmup_quota_decision()` 返回 enabled、limits、hit、unknown、blocked、sample_required、resume_at、message、policy_key、window_key；不修改共享 exhausted。账号公开摘要只返回 enabled、limits、hit、unknown、blocked、sample_used、resume_at、message，不暴露 identity、source、许可表或内部键。
+- `warmup_quota_decision()` 是两个 workload 共用的窗口计算，不修改共享 exhausted。`normal` 对可信命中以及任一启用窗口未知/到期都 fail-closed，且不认领 `warmup_quota_admissions`；`warmup` 才使用 `sample_required/sample_used` 和下述单次机会。
+- `run_kind='normal'` 在创建 worker 和占用长期并发槽前以 `workload='normal'` 判定。命中或未知时原 run 进入 `quota_wait`；已 running 的普通 run 不接收 `QUOTA_WARMUP` 暂停信号，正常收尾后才阻止后续 run。批次在创建下一项 task/run 前进入 `quota_wait`，恢复后继续原批次。
+- `policy_snapshots()` 必须从同一额度、阈值和许可快照生成 `normal` 与 `warmup` 两份判定。账号 API 的 `quota_policy` 和 `warmup_quota` 分别公开两种语义，页面必须同时展示，不能用一份覆盖另一份；公开字段不含 identity、source、许可记录或内部策略键。
 - 没有仍有效的命中且存在未知/到期窗口时，实际启动前持久认领一个正式养号请求机会。policy_key 由两个实际阈值生成，window_key 保存启用窗口的 reset 及是否到期；不把扫描时间或缺额度响应时间当作新周期。认领匹配账号 identity 和本代 source；同一启动链可读取已有认领，另一个执行/代次不能重复认领。
 - Recorder 发送第一次需更新额度的请求前，在私有控制目录以 `O_EXCL`、0600 创建 `warmup-sample.json`，保存 identity、policy_key、window_key、source，并 fsync 文件及目录。失败、取消、管理服务/Recorder 重启、重复点击或保存相同配置不重发机会；两个窗口仅补齐一个时，仍未知窗口的已用机会继续阻断。新的可信周期或实际阈值变化才重新评估。
-- `QUOTA_WARMUP=1` 仅用于养号，普通/继续执行显式为 0；v3 network-context 白名单传递此键，idle 清空作业上下文。默认 False 的 `admit()`/`prepare()` 不为其他入口增加养号阈值。
+- `QUOTA_WARMUP=1` 仅用于养号 Recorder 的单次请求与排空协议，普通任务/继续执行显式为 0；普通任务阈值由调度器入场判定，不会中途暂停 worker。抓包和继续对话调用 `admit(..., workload=None)`，不能继承账号任务阈值。
 - Recorder 只跟踪已归属当前 OAuth AT 的 messages 流。命中后拒绝后续请求；`response`/`error` 钩子后还须等 `flow.live=False` 才算发送结束，不能在响应头或缓冲正文发送前终止。已有流未排空时写 `warmup-draining.json`（source、status=draining），结束后才发 `pause.json`（warmup_wait=true、status=quota_wait、真实 quota_state）。共享 API 观察同样触发此规则。
 - worker 收尾标记只接受本代 source；收尾期间不因局部拒绝注入重试/总结或误判成功，永久账号异常、用户取消和硬超时仍优先。最终暂停保存原会话并以 43 退出，清理本次 CLI 后释放租约，保留账号容器和独立 API 长流。
 - `record_control_state()` 只有验证真正的 warmup run、账号/代次及 Recorder 私有暂停文件后，才跳过共同 unknown 耗尽补证，并使用该私有文件作为实际 payload；workspace 可写状态不能伪造此豁免。恢复沿用原 run/task/prompt/workspace/主会话及执行快照，停止/关闭/停用/删除/身份变化和永久异常不被自动恢复。
-- `_publish()` 从读取到原子替换全程持有既有 `QuotaGuard._lock`（RLock），包括配置保存入口；养号判定通过 `warmup_snapshot(..., quota_state=snapshot)` 复用同份窗口。不得在锁外发布旧快照，也不得拼接两次读取的窗口/判定。文件 I/O 不放进 `_db_lock` 长事务。
+- `_publish()` 从读取到原子替换全程持有既有 `QuotaGuard._lock`（RLock），包括配置保存入口；普通任务和养号判定通过 `policy_snapshots(..., quota_state=snapshot)` 复用同份窗口、阈值和许可。不得在锁外发布旧快照，也不得拼接两次读取的窗口/判定。文件 I/O 不放进 `_db_lock` 长事务。
 - 页面保存关闭窗口时提交 null，展示已用/剩余、阈值与等待原因；例如已用 30% 对应剩余 70%。已接受请求的后续消耗仍可能超过阈值，阈值不代表精确总额上限。交付需同批 control/account 镜像；回滚前关闭阈值并收口等待工作，保留数据库、HOME、会话和证据。
 
 ### 4. Validation & Error Matrix
@@ -640,6 +649,10 @@ QuotaGuard.prepare(account: dict, source: str, flows: Path,
 | bool、字符串、小数或非整数结构 | Pydantic 422，不进入配置写入 |
 | 整数 0、负数或 >100 | 400，凭据和数据库均不写入 |
 | 任一启用窗口已用等于阈值 | 触发、实际启动和恢复阻断；运行中等已接受流排空后暂停 |
+| 普通 run 的启用窗口未知或到期 | worker 前进入 `quota_wait`，提示手动查询；不领取养号单次机会 |
+| 普通 run 运行中达到阈值 | 当前 run 正常完成；后续普通 run/批次项等待 |
+| 抓包、继续对话或 cc2api API 且仅账号阈值命中 | 不受该阈值阻断，仍遵守共同额度耗尽和认证门禁 |
+| 关闭/提高阈值或手动查询得到低用量 | 原 normal run 按 FIFO 恢复，run/task/prompt/workspace/身份不变 |
 | 两窗口命中且只到期一个 | 仍等待另一个；缺可信 reset 不猜恢复时间 |
 | 首次未知/到期，未使用机会 | 只允许一个正式请求；有效且各启用窗口低于阈值才继续 |
 | 已用机会后仍未知 / 只补齐一个窗口 | 保持等待，扫描/失败/重启不重复请求 |
@@ -651,27 +664,29 @@ QuotaGuard.prepare(account: dict, source: str, flows: Path,
 
 ### 5. Scenarios and Examples
 
-- 正常：5h 阈值 30%、7d 关闭；正式响应达到已用 30% 后，当前流完整结束，下一请求拒绝，原养号 run 等待恢复，同账号 API 保持独立调度。
+- 正常：5h 阈值 30%、7d 关闭；普通 run 在已用 20% 时启动，运行中观察到 30% 后仍完整结束，下一普通 run 等待；同账号 API 保持独立调度。
+- 正常：额度未知时普通 run 不发探测请求并等待手动查询；养号仍可按持久许可发送一次正式请求补齐窗口。
 - 边界：5h/7d 都启用，但一次正式请求只取得 5h 数据；7d 仍未知则继续等待，不能因 5h reset 更新再发请求。默认两项关闭的历史账号沿用原行为。
 - 错误用法：配置发布在锁外先读已用 20%，另一线程已发布 50%，旧发布随后覆盖文件；即使摘要命中 30%，Recorder 从旧窗口重算仍会漏拦。
 - 正确处理：发布读写串行，并将同一快照传入养号判定；不能只补一个文件 rename 或额外读取最新摘要。
 
 ```python
-# 以下片段用于既有 _publish；同份事实同时生成共用状态和养号判定。
+# 同份事实同时生成普通任务与养号判定，公开 API 和发布文件复用这对结果。
 with self._lock:
     snapshot = self.snapshot(account)
-    warmup = self.warmup_snapshot(account, quota_state=snapshot)
+    policies = self.policy_snapshots(account, quota_state=snapshot)
     _write_quota_json(path, {**snapshot, "token_hashes": sorted(hashes),
-                           "warmup_quota": warmup})
+                           "quota_policy": policies["normal"],
+                           "warmup_quota": policies["warmup"]})
 ```
 
 ### 6. Tests Required
 
-- `orchestrator/test_warmup_quota.py`：两个窗口分别/同时/等于命中、独立关闭、缺/不同 reset、未知和到期；StrictInt、范围失败无写入、省略保留/null 关闭、旧库两次升级保留数据。
+- `orchestrator/test_warmup_quota.py`：两个窗口分别/同时/等于命中、独立关闭、缺/不同 reset、未知和到期；普通任务命中/未知/运行中收尾/手动查询与关闭阈值恢复、批次 worker 前等待；StrictInt、范围失败无写入、省略保留/null 关闭、旧库两次升级保留数据。
 - 实际触发、排队启动、等待恢复、失败/重启/重复扫描/点击/保存、部分窗口更新、新周期、策略变化、多账号、停止/关闭/永久门禁/身份变化；自动 usage mock 必须始终未调用，恢复保留原 run 与快照。
 - 并发回归使用实际配置接口和观察文件消费，断言 DB 与共享文件最终同为已用 50%、命中 30% 阈值；一致性回归断言发布窗口与摘要来自同份事实。两项必须能在旧代码上失败。
 - `images/sidecar/test_recorder.py` 及本地 HTTPS/SSE：单次标记跨重启、并行/错误流排空、shared API 更新、控制 I/O/损坏 fail-closed、普通作用域不继承；用正文长度/SHA256 和上游实际请求数验证完整收尾及后续拒绝。
-- 固定 Docker 和浏览器演练：同 run 第二代 HOME/cwd/session/证据保留，API 长流不中断；真实表单保存重读、各窗口关闭、非法值、未知等待、桌面/390px 和明暗主题。合成 CLI/OAuth 不得表述为官方真实账号验收。
+- 固定 Docker 和浏览器演练：同 run 第二代 HOME/cwd/session/证据保留，API 长流不中断；真实表单保存重读、各窗口关闭、非法值、普通任务/养号双摘要、桌面/390px 和明暗主题。合成 CLI/OAuth 不得表述为官方真实账号验收。
 
 ---
 

@@ -363,7 +363,7 @@
         <span class="frame-bl">└</span><span class="frame-br">┘</span>
       </div>
       <div class="modal-titlebar">
-        <span class="modal-titlebar-name">acc / warmup <span class="muted" id="warmup-modal-title"></span></span>
+        <span class="modal-titlebar-name">acc / warmup &amp; quota <span class="muted" id="warmup-modal-title"></span></span>
         <button class="modal-close" data-close="#warmup-modal" aria-label="close">×</button>
       </div>
       <form id="warmup-form" class="form">
@@ -383,6 +383,7 @@
           <input name="enabled" type="checkbox" />
           <span>启用定时养号</span>
         </label>
+        <p class="hint"><strong>普通任务与养号额度控制</strong>：阈值按已用百分比判断。</p>
         <div class="row warmup-interval-row">
           <div class="warmup-quota-panel">
             <label class="toggle-line">
@@ -405,7 +406,7 @@
             <p class="hint" id="warmup-quota-7d-hint"></p>
           </div>
         </div>
-        <p class="hint">任一阈值命中后，当前请求收尾，再暂停养号并保留会话。额度未知或窗口到期后，只允许一次正常养号请求更新额度；仍未知则等待。</p>
+        <p class="hint">任一阈值命中后，运行中的请求正常收尾，尚未启动的普通任务与养号进入等待；cc2api API 转发不受此阈值控制。普通任务遇到额度未知或窗口到期时等待手动查询；养号仍只允许一次正式请求更新额度。</p>
         <div class="row-end">
           <button type="button" class="btn" data-close="#warmup-modal">cancel</button>
           <button type="submit" class="btn btn-primary">save</button>

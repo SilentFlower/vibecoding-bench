@@ -1,733 +1,733 @@
-# Vibecoding 600 选题
+# Vibecoding Project Library: 600 Ideas
 
-> 600 个适合用 AI 辅助编程（vibe coding）方式从 0 到 1 完成的小型/中型项目题目。
-> 每题都尽量满足：**可演示、范围可控、有真实使用价值、验收方向清晰**。
-> 推荐节奏：每题 0.5 ~ 3 天完成 MVP，先跑通主路径，再补错误处理、可视化反馈和部署说明。
+> 600 small and medium-sized projects designed for building from scratch with AI-assisted programming.
+> Each idea aims to be **demonstrable, scoped, useful, and easy to evaluate**.
+> Recommended pace: complete an MVP in 0.5 to 3 days. Build the main path first, then add error handling, clear feedback, and deployment notes.
 
-## 使用方式
+## Usage
 
-1. 任选一题开干，先和 AI 对齐 PRD（功能、技术栈、验收标准、非目标）。
-2. MVP 阶段先跑通“输入 → 处理 → 输出”主链路，再补持久化、异常状态和体验打磨。
-3. 完成后在题目前打勾 `[x]`，并在 `done/` 目录留一个简单回顾（一句话亮点 + 一句话踩坑 + 启动方式）。
-4. 推荐分类轮换，避免连续做同类型题目导致疲劳，也能更全面观察 AI 的工程能力。
+1. Pick any idea and align on the PRD first: features, technology stack, acceptance criteria, and non-goals.
+2. During the MVP stage, complete the "input → processing → output" path before adding persistence, error states, and UX polish.
+3. When finished, mark the idea with `[x]` and add a short review under `done/`: one highlight, one lesson, and the launch command.
+4. Rotate between categories to reduce repetition and evaluate a broader range of engineering skills.
 
 ---
 
-## 一、命令行工具（20 题）
-> 训练点：参数解析、文件 IO、TTY 交互、跨平台兼容。
+## 1. Command-Line Tools (20 topics)
+> Training points: parameter parsing, file IO, TTY interaction, cross-platform compatibility.
 
-- [ ] 1. **Markdown 渲染器**：CLI 输入 Markdown 文件或目录，输出 HTML/PDF，支持主题、目录、代码高亮、图片路径校验和失败报告。
-- [ ] 2. **终端番茄钟**：提供专注/休息循环、键盘控制、提醒音、每日统计、CSV 导出和中断恢复，适合长时间终端使用。
-- [ ] 3. **局域网剪贴板同步**：基于 mDNS 发现局域网设备，支持文本/图片互传、端到端加密、设备信任列表和传输历史。
-- [ ] 4. **批量重命名工具**：支持正则、序号模板、大小写转换、冲突检测、预览 diff 和撤销记录，避免误改真实文件。
-- [ ] 5. **端口/进程查询器**：替代 `lsof -i` 的可读输出，按端口/进程/协议过滤，支持一键复制 kill 命令和风险提示。
-- [ ] 6. **Git Changelog 生成器**：按版本、日期或 Conventional Commit 聚合变更，生成 Markdown/HTML，并自动标注 breaking change。
-- [ ] 7. **JSON/YAML/TOML 互转 + 校验工具**：支持 stdin/文件输入、格式互转、JSONSchema 校验、错误定位和批量目录处理。
-- [ ] 8. **智能历史搜索**：整合 shell history、工作目录和命令频次，提供 fzf 交互、上下文排序和危险命令确认。
-- [ ] 9. **终端打字训练器**：内置代码片段和英文文本，记录 WPM、错误分布、错词回练和本地排行榜。
-- [ ] 10. **终端 LLM 客户端**：支持流式输出、会话存档、模型配置、`/` 命令、文件引用和本地 prompt 模板管理。
+- [ ] 1. **Markdown Renderer**: Accept Markdown files or directories from the CLI and produce HTML or PDF with themes, a table of contents, syntax highlighting, image-path validation, and a failure report.
+- [ ] 2. **Terminal Pomodoro**: Provide focus/rest cycle, keyboard control, reminder sound, daily statistics, CSV export and interruption recovery, suitable for long-term terminal use.
+- [ ] 3. **LAN Clipboard Synchronization**: Discover LAN devices based on mDNS, supporting text/image mutual transmission, end-to-end encryption, device trust list and transmission history.
+- [ ] 4. **Batch Renaming Tool**: Rename files in batches with regular expressions, sequence templates, case conversion, conflict detection, a diff preview, and an undo log.
+- [ ] 5. **Port and Process Inspector**: Present readable port and process information with filters for ports, processes, and protocols, plus copyable termination commands and clear risk warnings.
+- [ ] 6. **Git Changelog Generator**: Aggregate changes by version, date or Conventional Commit, generate Markdown/HTML, and automatically annotate breaking changes.
+- [ ] 7. **JSON, YAML, and TOML Converter**: Convert between JSON, YAML, and TOML from standard input or files, validate JSON Schema, locate errors, and process directories in batches.
+- [ ] 8. **Intelligent History Search**: Integrate shell history, working directory and command frequency, providing fzf interaction, contextual sorting and dangerous command confirmation.
+- [ ] 9. **Terminal Typing Trainer**: Provide built-in code snippets and English passages, then track WPM, error patterns, targeted practice, and local rankings.
+- [ ] 10. **Terminal LLM Client**: Support streaming output, session archiving, model configuration, `/` commands, file references, and local prompt template management.
 
-- [ ] 301. **环境变量对比器**：对比 .env、shell 导出和远程配置差异，高亮密钥是否缺失，支持忽略名单、导出 Markdown 报告和安全脱敏预览。
-- [ ] 302. **日志时间切片工具**：按时间窗、级别和关键词切割大日志，支持 gzip、并发扫描、上下文行数和结果目录索引。
-- [ ] 303. **目录体积侦探**：扫描磁盘占用热点，展示树状 Top N、增长对比、忽略规则和一键生成清理建议清单。
-- [ ] 304. **HTTP 压测小助手**：对单个 API 做轻量压测，支持并发、QPS 限制、延迟直方图、失败样例导出和基线对比。
-- [ ] 305. **证书到期扫描器**：扫描域名或本地证书文件，输出到期日、SAN、签发者和告警阈值，支持批量 CSV 输入。
-- [ ] 306. **Git 工作区快照**：一键打包未提交改动、stash 列表和分支信息为可恢复快照，支持注释、列表和回滚预览。
-- [ ] 307. **CSV 透视命令行**：对 CSV 做 group-by、聚合、过滤和排序，输出表格或新 CSV，支持类型推断和错误行报告。
-- [ ] 308. **本地端口转发面板**：管理多组 ssh/local port forward，支持配置文件、健康检查、一键启停和连接失败重试。
-- [ ] 309. **依赖许可证汇总**：扫描 npm/pip/go 锁文件许可证，标记 copyleft 风险、缺失许可证和生成合规简报。
-- [ ] 310. **图片批量压缩 CLI**：批量压缩 PNG/JPEG/WebP，支持质量预设、尺寸上限、干跑预览和前后体积对比。
+- [ ] 301. **Environment Variable Comparator**: Compare `.env` files, exported shell values, and remote configuration; highlight missing secrets, support ignore rules, redact sensitive values, and export a Markdown report.
+- [ ] 302. **Log Time Slicing Tool**: Slice large logs by time window, level and keyword, support gzip, concurrent scan, context row count and result directory index.
+- [ ] 303. **Directory Volume Detective**: Scan disk usage hotspots, display tree top N, growth comparison, ignore rules and generate a cleanup suggestion list with one click.
+- [ ] 304. **HTTP Load Test Assistant**: Run a lightweight load test against one API with configurable concurrency and QPS limits, latency histograms, failed-sample export, and baseline comparison.
+- [ ] 305. **Certificate Expiration Scanner**: Scan domain names or local certificate files, output expiration date, SAN, issuer and alarm threshold, and support batch CSV input.
+- [ ] 306. **Git Workspace Snapshot**: Package uncommitted changes, stash metadata, and branch information into a recoverable snapshot with notes, listing, and rollback preview commands.
+- [ ] 307. **CSV Pivot Command Line**: Group-by, aggregate, filter and sort CSV, output table or new CSV, support type inference and error row reporting.
+- [ ] 308. **Local Port Forwarding Panel**: Manage multiple groups of ssh/local port forward, support configuration files, health checks, one-command start and stop, and connection failure retries.
+- [ ] 309. **Dependency License Summary**: Scan npm/pip/go lockfile licenses, flag copyleft risks, missing licenses and generate compliance briefings.
+- [ ] 310. **Image Batch Compression CLI**: Compress PNG, JPEG, and WebP files in batches with quality presets, dimension limits, dry-run preview, and before-and-after size comparisons.
 
-## 二、个人效率 Web 应用（30 题）
-> 训练点：前端状态管理、本地持久化、UI/UX 打磨。
+## 2. Personal Productivity Web Apps (30 topics)
+> Training points: front-end state management, local persistence, UI/UX polishing.
 
-- [ ] 11. **极简 Todo**：实现任务、子任务、拖拽排序、键盘全操作、本地存储和完成趋势统计，移动端也要可用。
-- [ ] 12. **番茄钟 + 任务看板**：把番茄数绑定到任务卡片，支持拖拽状态、专注记录、日/周统计和异常中断补记。
-- [ ] 13. **每日 standup 笔记本**：记录昨天/今天/阻塞项，自动生成周报和月报，支持标签、搜索和 Markdown 导出。
-- [ ] 14. **习惯打卡 + 热力图**：支持多习惯、连续天数、补签规则、断签提醒、热力图和数据导入导出。
-- [ ] 15. **Markdown 笔记本**：实现文件夹/标签双视图、双链引用、全文搜索、预览编辑切换和本地文件同步。
-- [ ] 16. **间隔重复闪卡**：实现 SM-2 复习算法，支持卡组、富文本、Anki CSV 导入、复习队列和记忆曲线。
-- [ ] 17. **个人记账**：支持收入/支出录入、商家和标签自动归类、预算预警、月度报表和 CSV 导入。
-- [ ] 18. **时间块周历**：用拖拽方式安排周计划，和 Todo 联动，支持冲突提示、复制上周计划和完成率统计。
-- [ ] 19. **灵感收集箱**：支持图文链接快速保存、标签、全文搜索、稍后处理队列和从剪贴板自动识别内容。
-- [ ] 20. **阅读追踪器**：管理书籍、文章和论文，记录进度、笔记、摘录、评分，并生成年度阅读统计。
-- [ ] 21. **书签管理器**：自动抓取标题、描述和缩略图，支持标签云、全文索引、重复链接检测和离线快照。
-- [ ] 22. **密码管理器**：实现客户端加密、主密码解锁、密码生成、分类搜索、导入导出和空闲自动锁定。
-- [ ] 23. **健康记录**：记录体重、睡眠、运动和主观状态，生成趋势图、目标提醒和异常波动提示。
-- [ ] 24. **个人 RSS 阅读器**：订阅 RSS/Atom，支持未读队列、星标归档、全文抓取、AI 摘要和关键词过滤。
-- [ ] 25. **旅行地图**：导入轨迹和照片定位，展示足迹地图、行程时间线、城市统计和可分享旅行页。
+- [ ] 11. **Minimalist Todo**: Manage tasks and subtasks with drag-and-drop ordering, complete keyboard controls, local persistence, completion trends, and a responsive mobile layout.
+- [ ] 12. **Pomodoro + Task Board**: Bind Pomodoro numbers to task cards, support drag-and-drop status, focus recording, daily/weekly statistics and abnormal interruption supplementary recording.
+- [ ] 13. **Daily Standup Notebook**: Record yesterday/today/blocked items, automatically generate weekly and monthly reports, support tags, search and Markdown export.
+- [ ] 14. **Habit Check-in + Heat Map**: Support multiple habits, consecutive days, re-signing rules, sign-off reminders, heat maps and data import and export.
+- [ ] 15. **Markdown Notebook**: Provide folder and tag views, backlinks, full-text search, edit and preview modes, and synchronization with local files.
+- [ ] 16. **Spaced Repeat Flashcards**: Implement the SM-2 review algorithm, support decks, rich text, Anki CSV import, review queues, and memory curves.
+- [ ] 17. **Personal Accounting**: Support income/expense entry, automatic classification of merchants and tags, budget alerts, monthly reports and CSV import.
+- [ ] 18. **Time Block Weekly Calendar**: Use drag and drop to arrange weekly plans, link with Todo, support conflict prompts, copy last week's plan and completion rate statistics.
+- [ ] 19. **Inspiration Collection Box**: Support quick saving of image and text links, tags, full-text search, later processing queue and automatic content identification from the clipboard.
+- [ ] 20. **Reading Tracker**: Manage books, articles, and papers, record progress, notes, excerpts, ratings, and generate annual reading statistics.
+- [ ] 21. **Bookmark Manager**: Read metadata from user-saved or public links, organize tags, build a local search index, detect duplicates, and create permitted offline snapshots.
+- [ ] 22. **Password Manager**: Implement client-side encryption, master password unlocking, password generation, category search, import and export, and idle automatic locking.
+- [ ] 23. **Health Record**: Record weight, sleep, exercise and subjective status, generate trend charts, goal reminders and abnormal fluctuation prompts.
+- [ ] 24. **Personal RSS Reader**: Subscribe to public or user-authorized RSS/Atom feeds, manage unread and starred items, index permitted article text, summarize entries, and filter by keyword.
+- [ ] 25. **Travel Map**: Import tracks and photo locations, display trail maps, trip timelines, city statistics and shareable travel pages.
 
-- [ ] 311. **会议行动项追踪板**：从会议笔记提取行动项，绑定负责人和截止日期，支持逾期提醒、完成率和周回顾视图。
-- [ ] 312. **个人知识周报复盘**：汇总本周笔记、完成任务和阅读摘录，自动生成复盘模板，支持标签过滤和导出。
-- [ ] 313. **专注白名单计时器**：仅在允许的网站/应用窗口内累计专注时间，展示打断次数、时段分布和日目标完成度。
-- [ ] 314. **订阅服务到期台账**：管理软件订阅名称、费用周期、续费日和取消链接，提前提醒并统计月度固定开销。
-- [ ] 315. **家庭共享采购清单**：多人实时勾选采购项，支持分类、常用模板、缺货备注和历史清单复用。
-- [ ] 316. **个人目标里程碑墙**：把年度目标拆成里程碑和检查点，展示进度条、风险标记和延期原因记录。
-- [ ] 317. **邮箱退订决策箱**：导入邮件列表样例，按发送频率和价值评分，标记保留/退订并导出操作清单。
-- [ ] 318. **通勤路线备忘录**：记录多条通勤方案、耗时、费用和天气影响，支持收藏最优路线和异常日备注。
-- [ ] 319. **数字极简断舍离清单**：盘点账号、文件和设备，设定保留规则，跟踪清理进度和释放空间记录。
-- [ ] 320. **个人技能矩阵看板**：维护技能、熟练度和学习计划，关联练习任务，展示成长轨迹和薄弱项。
-- [ ] 321. **礼物与人情往来本**：记录送礼/收礼对象、日期、场合和回礼计划，支持提醒和年度汇总。
-- [ ] 322. **衣橱穿搭计划器**：管理衣物标签、季节和场合，生成一周穿搭草案，支持清洗状态和缺失单品提示。
-- [ ] 323. **家庭植物养护日历**：为植物设置浇水/施肥周期，展示今日待办、逾期提醒和养护日志照片。
-- [ ] 324. **个人创意孵化漏斗**：把想法按收集、筛选、原型、搁置流转，记录否决原因和再次激活条件。
-- [ ] 325. **周末微冒险规划器**：收集附近活动与兴趣点，生成半日/一日行程草稿，支持预算区间和天气备选方案。
+- [ ] 311. **Meeting Action Item Tracking Board**: Extract action items from meeting notes, bind owners and deadlines, and support overdue reminders, completion rates, and weekly review views.
+- [ ] 312. **Personal Knowledge Weekly Review**: Summarize this week's notes, completed tasks and reading excerpts, automatically generate review templates, support tag filtering and export.
+- [ ] 313. **Focus Whitelist Timer**: Accumulate focus time only within the allowed website/application window, displaying the number of interruptions, time period distribution and daily goal completion.
+- [ ] 314. **Subscription Renewal Tracker**: Track software subscriptions, billing periods, renewal dates, costs, and cancellation links, with advance reminders and monthly totals.
+- [ ] 315. **Family Shared Purchasing List**: Multiple people can check purchasing items in real time, supporting classification, commonly used templates, out-of-stock notes and historical list reuse.
+- [ ] 316. **Personal Goal Milestone Wall**: Break down annual goals into milestones and checkpoints, display progress bars, risk markers and record of delays.
+- [ ] 317. **Email Unsubscribe Decision Box**: Import sample mailing lists, score by sending frequency and value, mark retention/unsubscription and export action list.
+- [ ] 318. **Commuting Route Memo**: Record multiple commuting plans, time consumption, costs and weather effects, and support the collection of optimal routes and notes on unusual days.
+- [ ] 319. **Digital Minimalist Separation List**: Inventory accounts, files and devices, set retention rules, track cleanup progress and release space records.
+- [ ] 320. **Personal Skills Matrix Board**: Maintain skills, proficiency and learning plans, associate practice tasks, and display growth trajectories and weaknesses.
+- [ ] 321. **Gift Exchange Journal**: Record gifts given and received, recipients, dates, occasions, and follow-up plans, with reminders and annual summaries.
+- [ ] 322. **Wardrobe Outfit Planner**: Manage clothing tags, seasons and occasions, generate a week's outfit draft, support cleaning status and missing item reminders.
+- [ ] 323. **Home Plant Care Calendar**: Set watering/fertilizing cycles for plants, display today’s to-dos, overdue reminders and maintenance log photos.
+- [ ] 324. **Personal Creative Incubation Funnel**: Move ideas through collection, screening, prototyping, and shelving while recording rejection reasons and reactivation criteria.
+- [ ] 325. **Weekend Micro-Adventure Planner**: Collect nearby activities and points of interest, generate half-day or full-day itinerary drafts, and provide budget ranges and weather alternatives.
 
-## 三、AI 集成应用（30 题）
-> 训练点：Prompt 工程、RAG、流式输出、API 编排。
+## 3. AI Applications (30 topics)
+> Training points: prompt engineering, RAG, streaming output, and API orchestration.
 
-- [ ] 26. **PDF 智能问答**：上传 PDF 后构建本地向量索引，回答时标注页码引用，支持多文档对比和引用跳转。
-- [ ] 27. **长文章总结 + 思维导图**：输入长文或 URL，生成分层摘要、关键观点、待办提取和 Markmap/Mermaid 导图。
-- [ ] 28. **会议纪要工具**：完成录音上传、转写、说话人分离、摘要、决议、待办归属和纪要导出。
-- [ ] 29. **简历与 JD 匹配评分**：解析简历和岗位描述，给出匹配分、缺失关键词、改写建议和版本对比。
-- [ ] 30. **邮件智能回复草稿**：接入 Gmail 或本地样例邮箱，按语气生成回复，保留上下文引用并支持人工修改。
-- [ ] 31. **AI 单词卡**：输入单词自动生成释义、例句、IPA、词根、TTS 朗读和间隔复习计划。
-- [ ] 32. **图片描述生成器**：上传图片生成多语言 alt text、SEO 描述和无障碍说明，支持批量处理与人工校订。
-- [ ] 33. **AI 口语/面试陪练**：提供题库、实时对话、评分维度、纠音建议、复盘报告和历史表现曲线。
-- [ ] 34. **Code Review Bot**：接 GitHub PR diff，按自定义规则给出 inline 评论、风险分级和可执行修复建议。
-- [ ] 35. **文档翻译保留排版**：上传 docx/pdf，保留标题、表格、图片位置，输出双语预览和术语表。
-- [ ] 36. **AI 表情包生成器**：输入主题生成图片和字幕，支持模板、字体、描边、批量导出和历史版本。
-- [ ] 37. **文章转播客**：把文章转成双人对话脚本，生成分段 TTS 音频，支持试听、重生成和 mp3 导出。
-- [ ] 38. **自然语言日程助手**：解析“下周三下午两点提醒我开会”等表达，生成日程草稿并支持冲突检查。
-- [ ] 39. **AI 写作风格迁移**：输入风格样本和目标文本，生成改写结果，展示改动 diff、语气强度和保留事实检查。
-- [ ] 40. **本地知识库 Chat**：对接 Obsidian/Notion 导出，支持离线检索、在线 LLM 回答、引用来源和索引刷新。
+- [ ] 26. **PDF Intelligent Q&A**: Upload PDFs, build a local vector index, answer with page citations, compare multiple documents, and jump directly to cited passages.
+- [ ] 27. **Long Article Summary + Mind Map**: Enter a long article or URL to generate hierarchical summary, key points, to-do extraction and Markmap/Mermaid map.
+- [ ] 28. **Meeting Minutes Tool**: The system completes recording upload, transcription, speaker separation, summary, resolution, to-do attribution and minutes export.
+- [ ] 29. **Resume and JD Matching Score**: Parse resume and job description, gives matching score, missing keywords, rewriting suggestions and version comparison.
+- [ ] 30. **Smart Email Reply Draft**: Connect to Gmail or a local sample mailbox, generate replies based on tone, retain contextual references and support manual modification.
+- [ ] 31. **AI Word Cards**: Enter words to automatically generate definitions, example sentences, IPA, root words, TTS reading and spaced review plans.
+- [ ] 32. **Image Description Generator**: Upload images to generate multi-language alt text, SEO descriptions and accessibility instructions, supporting batch processing and manual editing.
+- [ ] 33. **AI Speaking and Interview Coach**: Provide a practice library, live conversation, scoring criteria, pronunciation feedback, review reports, and a history of performance trends.
+- [ ] 34. **Code Review Bot**: Connect to a GitHub pull-request diff, apply configurable review rules, add inline comments, classify risks, and suggest actionable fixes.
+- [ ] 35. **Document Translation Preserves Typesetting**: Upload docx/pdf, retain titles, tables, and picture positions, and output bilingual previews and glossaries.
+- [ ] 36. **AI Meme Generator**: Generate meme images and captions from a theme, with templates, font and outline controls, batch export, and version history.
+- [ ] 37. **Article to Podcast**: Convert articles into two-person conversation scripts, generate segmented TTS audio, and support audition, regeneration, and mp3 export.
+- [ ] 38. **Natural Language Schedule Assistant**: Parse expressions such as "remind me to have a meeting next Wednesday at 2 pm", generate a schedule draft and support conflict checking.
+- [ ] 39. **Editorial Tone Consistency Checker**: Review a draft against an organization-owned tone guide, flag inconsistent passages, suggest neutral revisions, show a diff, and verify that factual claims remain unchanged.
+- [ ] 40. **Local Knowledge Base Chat**: Import Obsidian or Notion exports, build a local index, answer with an optional online LLM, cite sources, and refresh the index.
 
-- [ ] 326. **代码注释补全工作台**：上传代码片段生成函数级注释和模块说明，支持语言切换、风格模板和 diff 预览。
-- [ ] 327. **客服话术质检助手**：导入对话样例，按礼貌度、完整性、违规词评分，输出改进建议和案例库。
-- [ ] 328. **多语言 UI 文案校对**：扫描界面文案 CSV，检查语气一致、长度溢出和术语统一，生成修订表。
-- [ ] 329. **需求澄清问卷生成器**：输入一句话需求，生成澄清问题清单、优先级建议和假设列表，可导出给干系人。
-- [ ] 330. **测试用例草稿工厂**：根据功能说明生成边界、异常和回归用例草稿，支持优先级标注和用例集导出。
-- [ ] 331. **发布说明润色器**：把 commit 列表润色为用户向发布说明，区分新功能/修复/破坏性变更，支持多语气。
-- [ ] 332. **设计稿走查批注助手**：上传界面截图，自动列出可用性与无障碍疑点，支持人工确认和导出 issue 列表。
-- [ ] 333. **合同条款风险摘要**：上传合同样例文本，提取关键义务、期限和异常条款摘要，标注需律师复核项（不替代法律意见）。
-- [ ] 334. **学习路径编排器**：根据目标技能生成阶段路径、资源类型和测验检查点，支持进度打卡和路径调整。
-- [ ] 335. **日志根因假设生成器**：粘贴错误栈和近期变更，生成可能根因排序、验证步骤和相关文件猜测。
-- [ ] 336. **产品命名脑暴板**：输入产品定位生成候选名、域名可用性提示和商标冲突提醒占位，支持投票收藏。
-- [ ] 337. **会议角色模拟器**：设定产品/研发/运营角色，对同一议题生成不同立场摘要，帮助预演对齐会。
-- [ ] 338. **数据字段释义助手**：输入表结构或样例行，生成字段业务释义、枚举猜测和血缘备注草稿。
-- [ ] 339. **无障碍文案改写器**：把复杂说明改写成更易读版本，标注阅读等级、保留关键术语并展示改动 diff。
-- [ ] 340. **竞品功能矩阵生成**：输入多个产品页面摘要，提炼功能矩阵、差异点和跟进优先级，支持人工修订。
+- [ ] 326. **Code Comment Completion Workbench**: Upload code snippets to generate function-level comments and module descriptions, supporting language switching, style templates and diff preview.
+- [ ] 327. **Customer Conversation Quality Reviewer**: Import sample conversations, score politeness, completeness, and prohibited terms, then provide improvement suggestions and an example library.
+- [ ] 328. **Multilingual UI Copy Proofreading**: Scan interface copy CSV, check for tone consistency, length overflow and terminology uniformity, and generate a revision table.
+- [ ] 329. **Requirements Clarification Questionnaire Generator**: Enter a sentence of requirements and generate a list of clarification questions, priority suggestions and assumptions, which can be exported to stakeholders.
+- [ ] 330. **Test Case Draft Factory**: Generate draft boundary, error, and regression cases from a feature description, assign priorities, and export a reusable test suite.
+- [ ] 331. **Release Notes Polisher**: Turn commit messages into user-facing release notes, group new features, fixes, and breaking changes, and support several tones.
+- [ ] 332. **Design Draft Review Annotation Assistant**: Upload interface screenshots, automatically list usability and accessibility doubts, and support manual confirmation and export of issue lists.
+- [ ] 333. **Risk Summary of Contract Terms**: Upload the contract sample text, extract key obligations, deadlines and abnormal clause summaries, and mark items that require lawyer review (not a substitute for legal advice).
+- [ ] 334. **The Learning Path Orchestrator**: Generate stage paths, resource types and test checkpoints based on target skills, and support progress check-in and path adjustment.
+- [ ] 335. **Log Root Cause Hypothesis Generator**: The system pastes the error stack and recent changes to generate a possible root cause ranking, verification steps and related file guesses.
+- [ ] 336. **Product Naming Brainstorming Board**: Enter product positioning to generate candidate names, domain name availability reminders and trademark conflict reminder placeholders, and support voting and collection.
+- [ ] 337. **Meeting Role Simulator**: Set product/R&D/operation roles, generate different position summaries on the same issue, and help rehearse alignment meetings.
+- [ ] 338. **Data Field Definition Assistant**: Input table structure or sample rows to generate field business definitions, enumeration guesses, and drafts of lineage notes.
+- [ ] 339. **Accessible Copy Rewriter**: Rewrite complex descriptions into more readable versions, mark reading levels, retain key terms, and display a diff of changes.
+- [ ] 340. **Competitive Product Function Matrix Generation**: Import summaries of several product pages, extract a feature matrix and differentiators, rank follow-up priorities, and support manual revision.
 
-## 四、小游戏（20 题）
-> 训练点：游戏循环、碰撞检测、状态机、AI 对手。
+## 4. Mini Games (20 topics)
+> Training points: Game loop, collision detection, state machine, AI opponent.
 
-- [ ] 41. **贪吃蛇**：实现 Canvas 或终端版本，包含键盘控制、本地排行榜、皮肤、暂停恢复和移动端触控。
-- [ ] 42. **2048**：支持撤销、动画、键盘/触控操作、分数统计、最高分保存和不同棋盘尺寸。
-- [ ] 43. **扫雷**：提供自定义难度、首点安全、旗帜标记、计时榜、键鼠操作和失败回放。
-- [ ] 44. **俄罗斯方块**：实现 hold、下一块预览、幽灵块、连击计分、暂停和可调下落速度。
-- [ ] 45. **五子棋人机**：实现棋盘交互、胜负判断、Alpha-Beta 剪枝 AI、难度档位和复盘记录。
-- [ ] 46. **数独**：支持题目生成、求解器、候选数、提示、错误检查、计步和多难度。
-- [ ] 47. **中文成语 Wordle**：每日一题、输入校验、颜色反馈、提示机制、分享结果和本地题库。
-- [ ] 48. **打砖块 Breakout**：实现物理碰撞、道具、关卡编辑器、生命值、分数和关卡存档。
-- [ ] 49. **Canvas 飞机大战**：包含敌机波次、BOSS、技能冷却、掉落道具、碰撞检测和本地排行榜。
-- [ ] 50. **多人在线井字棋**：使用 WebSocket 实现房间、匹配、观战、断线重连和胜负状态同步。
+- [ ] 41. **Snake**: Implement a Canvas or terminal version with keyboard controls, a local leaderboard, skins, pause and resume, and mobile touch input.
+- [ ] 42. **2048**: Support undo, animation, keyboard/touch operations, score statistics, highest score saving and different board sizes.
+- [ ] 43. **Minesweeper**: Provide custom difficulty, first point safety, flag marking, timing list, keyboard and mouse operation and failure replay.
+- [ ] 44. **Tetris**: Implement hold, next block preview, ghost blocks, combo scoring, pause and adjustable fall speed.
+- [ ] 45. **Gomoku with an AI Opponent**: Implement board interaction, win detection, an Alpha-Beta pruning opponent, difficulty levels, and replay history.
+- [ ] 46. **Sudoku**: Support problem generation, solver, candidate number, hints, error checking, step counting and multiple difficulties.
+- [ ] 47. **Chinese Idioms Wordle**: Publish one Chinese idiom puzzle each day with input validation, color feedback, hints, shareable results, and a local puzzle library.
+- [ ] 48. **Breakout**: Implement physical collisions, props, level editor, health, scores and level archives.
+- [ ] 49. **Canvas Arcade Shooter**: Build an arcade shooter with enemy waves, bosses, skill cooldowns, power-ups, collision detection, and a local leaderboard.
+- [ ] 50. **Multiplayer Online Tic-tac-toe**: Use WebSocket rooms for matchmaking and spectating, synchronize game state, and recover cleanly after a disconnect.
 
-- [ ] 341. **记忆翻牌对对碰**：实现卡牌翻面匹配，支持主题卡组、连击计分、限时模式和本地最高分。
-- [ ] 342. **像素跑酷**：侧视跑酷含跳跃、障碍波次、道具和难度曲线，支持触控和本地排行。
-- [ ] 343. **合成大西瓜变体**：双消合成玩法，自定义物品链、重力与合成表编辑，支持皮肤和撤销一步。
-- [ ] 344. **文字冒险引擎**：用 JSON 配置剧情节点、选项和状态变量，提供编辑器预览和存档读档。
-- [ ] 345. **塔防基础关卡**：实现路径、炮塔升级、波次和资源，支持关卡配置文件和失败重开。
-- [ ] 346. **节奏敲击小游戏**：跟随节拍点击判定 Perfect/Good/Miss，支持自定义谱面、校准和成绩评级。
-- [ ] 347. **迷宫生成与寻路演示**：随机迷宫、玩家操控与 A* 演示层，支持尺寸调节和算法步进可视化。
-- [ ] 348. **双人本地对战乒乓**：实现球拍物理、得分、道具模式和暂停，支持键盘分席与触控虚拟键。
-- [ ] 349. **卡牌构筑 Roguelike 雏形**：战斗-选卡-强化循环，含敌人意图、卡组管理和种子复现。
-- [ ] 350. **城市建造迷你沙盘**：在网格上放置建筑、管理资源和满意度，支持日夜循环和存档。
+- [ ] 341. **Memory Matching Game**: Implement card flipping and matching with themed decks, combo scoring, a timed mode, and a local high score.
+- [ ] 342. **Pixel Parkour**: Build a side-scrolling runner with jumping, obstacle waves, power-ups, a difficulty curve, touch controls, and a local leaderboard.
+- [ ] 343. **Merge Puzzle Variant**: Build a merge puzzle with a customizable item progression, editable gravity and merge rules, skins, and one-step undo.
+- [ ] 344. **Text Adventure Engine**: Use JSON to configure plot nodes, options and state variables, and provide editor preview and archive reading.
+- [ ] 345. **Tower Defense Basic Level**: Implement paths, turret upgrades, waves and resources, and support level configuration files and failed restarts.
+- [ ] 346. **Rhythm Tapping Game**: Follow the beat and click to determine Perfect/Good/Miss. It supports custom music charts, calibration and performance ratings.
+- [ ] 347. **Maze Generation and Pathfinding Demonstration**: Random maze, player control and A* demonstration layer, supporting size adjustment and algorithm step visualization.
+- [ ] 348. **Two-Player Local Pong**: Implement paddle physics, scoring, optional power-ups, and pause controls for two players using split keyboard controls or touch buttons.
+- [ ] 349. **Deck-Building Roguelike Prototype**: Build a combat, card-selection, and upgrade loop with visible enemy intent, deck management, and reproducible random seeds.
+- [ ] 350. **City Construction Mini Sandbox**: Place buildings on a grid, manage resources and satisfaction, simulate a day-night cycle, and save the current city.
 
-## 五、浏览器插件（16 题）
-> 训练点：Manifest v3、Content Script、跨域通信。
+## 5. Browser Extensions (16 topics)
+> Training points: Manifest v3, Content Script, cross-domain communication.
 
-- [ ] 51. **划词翻译 + AI 解释**：实现划词浮窗、上下文解释、例句、收藏本和快捷键，兼容常见网页布局。
-- [ ] 52. **网页一键存档 Markdown**：抓取正文、图片本地化、阅读时间、元数据和可下载 Markdown 包。
-- [ ] 53. **标签页管家**：展示标签页内存、分组、一键挂起、恢复、搜索和会话保存。
-- [ ] 54. **B 站 / YouTube 字幕导出 + AI 总结**：读取字幕、导出 SRT/Markdown，生成章节摘要和重点时间戳。
-- [ ] 55. **自动表单填充**：管理多份身份资料，支持字段映射、域名白名单、预览确认和敏感字段保护。
-- [ ] 56. **手动元素屏蔽器**：点击页面元素生成隐藏规则，支持规则列表、开关、导入导出和站点级生效。
-- [ ] 57. **阅读模式**：去广告提取正文，支持字体、宽度、主题、TTS 朗读、稍后读和站点规则。
-- [ ] 58. **网页变更监控**：定时抓取选定区域，计算 diff，发送浏览器通知并保留历史快照。
+- [ ] 51. **Selection Translator with AI Explanations**: Show a translation popover for selected text with contextual explanations, examples, bookmarks, keyboard shortcuts, and compatibility with common page layouts.
+- [ ] 52. **Web Page to Markdown Archive**: Archive user-authorized or public pages as Markdown, localize permitted images, preserve metadata, estimate reading time, and export a downloadable package.
+- [ ] 53. **Tab Manager**: Display tab memory, grouping, one-command suspend, resume, search and session saving.
+- [ ] 54. **Bilibili/YouTube Subtitle Export + AI Summary**: Read subtitles, export SRT/Markdown, and generate chapter summaries and key timestamps.
+- [ ] 55. **Automatic Form Filling**: Manage multiple identity materials, support field mapping, domain name whitelist, preview confirmation and sensitive field protection.
+- [ ] 56. **Manual Element Blocker**: Click on page elements to generate hidden rules, supporting rule list, switch, import and export, and site-level effect.
+- [ ] 57. **Reading Mode**: Extract the main article into a distraction-free view with font, width, and theme controls, text-to-speech, a read-later list, and site-specific rules.
+- [ ] 58. **Web Page Change Monitor**: Monitor a selected region on a public or user-owned page, calculate diffs, send browser notifications, and retain historical snapshots.
 
-- [ ] 351. **页面性能快照插件**：一键采集 LCP/CLS 近似指标和资源瀑布摘要，导出 JSON 报告并标注大图。
-- [ ] 352. **表单草稿自动暂存**：对可编辑表单定时本地暂存，崩溃后一键恢复，支持站点白名单和敏感字段排除。
-- [ ] 353. **链接死链巡检**：扫描当前页外链状态码，列表展示失败链接、重定向链和建议修复。
-- [ ] 354. **暗色模式强制器**：为无暗色站点注入可调滤镜/CSS，支持域名规则、对比度调节和排除选择器。
-- [ ] 355. **剪藏图片打包下载**：框选页面图片批量下载为 zip，支持去重、最小尺寸过滤和文件名模板。
-- [ ] 356. **阅读进度同步条**：跨设备同步长文阅读位置（导出码或本地账号模拟），显示百分比和上次阅读时间。
-- [ ] 357. **Cookie 分类查看器**：按用途分类展示 Cookie，支持搜索、导出和一键清除指定类（演示级说明）。
-- [ ] 358. **开发者 Header 覆写器**：按域名覆写请求/响应头，支持规则开关、导入导出和仅开发环境生效提示。
+- [ ] 351. **Page Performance Snapshot Plug-in**: Collect LCP/CLS approximate indicators and resource waterfall summary with one click, export JSON report and annotate the big picture.
+- [ ] 352. **Automatically Temporarily Save Form Drafts**: Schedule local temporary storage of editable forms, restore them with one click after a crash, and support site whitelisting and sensitive field exclusion.
+- [ ] 353. **Dead Link Inspection**: Scan the external link status code of the current page, and lists failed links, redirection links and recommended repairs.
+- [ ] 354. **Dark Mode Enforcer**: The system injects adjustable filters/CSS for dark-free sites with support for domain rules, contrast adjustments, and exclude selectors.
+- [ ] 355. **Permitted Image Collection Exporter**: Select images from a user-owned or public page, filter and deduplicate permitted assets, and export them as a zip with configurable file names.
+- [ ] 356. **Reading Progress Synchronization Bar**: Synchronize long text reading position across devices (export code or local account simulation), display percentage and last reading time.
+- [ ] 357. **Cookie Classification Viewer**: Display cookies by purpose, support search, export, and one-command clearing of specified categories (demo-level instructions).
+- [ ] 358. **Developer Header Overwriter**: Override request or response headers by domain with toggleable rules, import and export, and a prominent development-only indicator.
 
-## 六、数据可视化与 Dashboard（20 题）
-> 训练点：图表库、时序数据、实时更新、信息密度设计。
+## 6. Data Visualization and Dashboard (20 topics)
+> Training points: chart library, time series data, real-time updates, information density design.
 
-- [ ] 59. **GitHub 贡献分析**：拉取公开 GitHub 数据，展示语言、项目、星标、贡献热力图和趋势对比。
-- [ ] 60. **加密货币 / 股票实时盘面**：实现自选列表、实时价格、K 线、涨跌告警和本地投资备注。
-- [ ] 61. **本地小屏天气 + 空气质量看板**：适配旧手机/树莓派，展示天气、AQI、预警、时钟和自动刷新。
-- [ ] 62. **家庭智能设备 Dashboard**：模拟 HomeAssistant 风格，管理设备状态、场景联动、历史曲线和离线提示。
-- [ ] 63. **服务器监控**：采集 CPU/内存/磁盘/网络，展示实时曲线、阈值告警和钉钉/Slack 推送。
-- [ ] 64. **个人消费桑基图 + 瀑布图**：导入账单 CSV，自动分类，展示资金流向、预算差额和异常消费。
-- [ ] 65. **团队效率分析**：拉取 Jira/Linear 样例数据，分析周期时间、堵塞点、吞吐量和成员负载。
-- [ ] 66. **健康数据看板**：导入 Apple Health/手环 CSV，展示睡眠、运动、心率和目标完成度。
-- [ ] 67. **论文引用网络图**：解析论文引用数据，使用 D3 展示力导向图、关键节点、聚类和搜索定位。
-- [ ] 68. **公司新闻情感仪表盘**：抓取新闻或导入样例，做情感分类、主题聚类、时间线和风险提醒。
+- [ ] 59. **GitHub Contribution Analysis**: Pull public GitHub data to display languages, projects, stars, contribution heat maps and trend comparisons.
+- [ ] 60. **Cryptocurrency/stock Real-time Disk**: Implement watchlists, real-time prices, K-lines, rise and fall alerts and local investment notes.
+- [ ] 61. **Small-Screen Weather and Air Quality Dashboard**: Optimize a full-screen dashboard for an old phone or Raspberry Pi, showing weather, AQI, alerts, a clock, and automatic refresh.
+- [ ] 62. **Home Smart Device Dashboard**: Simulate the HomeAssistant style and manage device status, scene linkage, historical curves and offline prompts.
+- [ ] 63. **Server Monitoring**: Collect CPU/memory/disk/network, display real-time curves, threshold alarms and DingTalk/Slack push.
+- [ ] 64. **Personal Consumption Sankey Chart + Waterfall Chart**: Import bill CSV, automatically classify, display fund flow, budget balance and abnormal consumption.
+- [ ] 65. **Team Efficiency Analysis**: Pull Jira/Linear sample data and analyze cycle time, congestion points, throughput and member load.
+- [ ] 66. **Health Data Dashboard**: Import Apple Health/band CSV to display sleep, exercise, heart rate and goal completion.
+- [ ] 67. **Paper Citation Network Graph**: Analyze paper citation data and use D3 to display force-directed graphs, key nodes, clustering and search positioning.
+- [ ] 68. **Company News Sentiment Dashboard**: Read public news feeds or local samples, classify sentiment, cluster topics, show a timeline, and highlight items for review.
 
-- [ ] 359. **开源项目活跃度看板**：导入 issue/PR 样例 CSV，展示吞吐、关闭时长、贡献者分布和活跃趋势。
-- [ ] 360. **团队值班热力图**：展示按日的值班覆盖、冲突和空窗，支持导入排班表和导出调整建议。
-- [ ] 361. **网站可用性 SLA 墙**：汇总探测成功率、分位延迟和故障区间，支持服务分组与月度 SLA 计算。
-- [ ] 362. **内容发布节奏日历**：把多渠道发布记录可视化为日历热力，标注空档周和高峰日。
-- [ ] 363. **仓储库位利用率图**：用热力展示库区占用率、滞留天数和拣货热区，支持筛选 SKU 类别。
-- [ ] 364. **校园课表冲突图**：导入课程与教室占用，高亮冲突、空闲教室和建议调课窗口。
-- [ ] 365. **客服工单堆积漏斗**：展示新建/处理中/等待/关闭漏斗，以及平均响应与解决时长趋势。
-- [ ] 366. **设备巡检完成率看板**：按路线和责任人展示巡检计划完成率、漏检点和照片抽检入口。
-- [ ] 367. **活动报名转化漏斗**：从曝光、点击、填写到支付完成的漏斗与渠道对比（样例数据）。
-- [ ] 368. **本地天气对比墙**：多城市温度/降水对比曲线，支持收藏城市、阈值标注和导出图片。
+- [ ] 359. **Open Source Project Activity Dashboard**: Import issue/PR sample CSV to display throughput, shutdown duration, contributor distribution and activity trends.
+- [ ] 360. **Team Duty Heat Map**: Show daily duty coverage, conflicts and vacancies, and support importing schedules and exporting adjustment suggestions.
+- [ ] 361. **Website Availability SLA Wall**: Summarize detection success rate, quantile delay and failure interval, support service grouping and monthly SLA calculation.
+- [ ] 362. **Content Release Rhythm Calendar**: Visualize multi-channel release records as calendar heat, marking gap weeks and peak days.
+- [ ] 363. **Warehouse Space Utilization Map**: Display warehouse utilization, dwell time, and picking hot spots as a heat map, with filtering by SKU category.
+- [ ] 364. **Campus Schedule Conflict Map**: Import courses and classroom occupancy, highlight conflicts, idle classrooms and suggested class adjustment windows.
+- [ ] 365. **Customer Service Ticket Stacking Funnel**: Display the new/processing/waiting/closed funnel, as well as the average response and resolution time trends.
+- [ ] 366. **Equipment Inspection Completion Rate Dashboard**: Display the inspection plan completion rate, missed inspection points, and photo inspection entrances by route and owner.
+- [ ] 367. **Event Registration Conversion Funnel**: Visualize sample conversion data from impressions through clicks, form completion, and payment, with comparisons across channels.
+- [ ] 368. **Local Weather Comparison Dashboard**: Compare temperature and precipitation across saved cities, annotate thresholds, and export the resulting chart as an image.
 
-## 七、自动化与脚本（20 题）
-> 训练点：定时任务、网络爬取、消息推送、错误恢复。
+## 7. Automation and Scripting (20 topics)
+> Training points: scheduled tasks, network crawling, message push, error recovery.
 
-- [ ] 69. **每日新闻日报**：抓取 RSS/网页，去重、分类、AI 摘要，定时通过邮件或聊天机器人推送。
-- [ ] 70. **追番自动下载与归类**：解析订阅源，按规则下载、重命名、抓海报、入库并处理重复文件。
-- [ ] 71. **微信 / Telegram 机器人**：集成提醒、天气、早报、查询和命令帮助，支持多用户权限。
-- [ ] 72. **截图 + OCR 归档**：监听剪贴板截图，自动 OCR、打标签、保存原图和全文搜索。
-- [ ] 73. **自动签到合集**：管理多个站点账号、签到脚本、失败重试、验证码人工介入和结果通知。
-- [ ] 74. **文件夹整理器**：按类型、日期、项目规则归档文件，提供 dry-run、撤销和冲突处理。
-- [ ] 75. **视频按关键词剪辑**：读取字幕，按关键词定位片段，调用 ffmpeg 切片并生成预览清单。
-- [ ] 76. **页面变更监控 + 推送**：配置目标 URL 和 CSS 选择器，定时 diff，支持库存/抢课/抢号场景。
-- [ ] 77. **抢票脚本框架**：抽象登录、查询、下单、人工验证步骤，提供策略插件、节流和失败日志。
-- [ ] 78. **自动周报生成**：汇总 git 提交、日程、消息记录和手动补充，生成可编辑周报草稿。
+- [ ] 69. **Daily News Digest**: Read public RSS feeds or approved web sources, deduplicate and classify entries, generate concise summaries, and deliver a scheduled email or chat digest.
+- [ ] 70. **Personal Media Library Organizer**: Parse user-provided feed metadata and local media files, rename and classify files, fetch permitted artwork, and report duplicates without downloading protected content.
+- [ ] 71. **WeChat / Telegram Robot**: Integrate reminders, weather, morning reports, queries and command help, and support multi-user permissions.
+- [ ] 72. **Screenshot + OCR Archiving**: Monitor clipboard screenshots, automatically OCR, tag, save original images and perform full-text search.
+- [ ] 73. **Recurring Routine Reminder**: Manage recurring personal routines, flexible schedules, missed-item reminders, completion notes, weekly summaries, and notification preferences without logging in to third-party accounts.
+- [ ] 74. **Folder Organizer**: Archive files by type, date, project rules, provide dry-run, undo and conflict handling.
+- [ ] 75. **Video Clipping by Keyword**: Read subtitles, locate clips by keyword, call ffmpeg to slice and generate a preview list.
+- [ ] 76. **Public Event Availability Digest**: Read public or sample event feeds, summarize schedule and availability changes, send a digest, and keep a change history without booking or reserving anything.
+- [ ] 77. **Event Planning Checklist**: Track event dates, public sales announcements, attendee reminders, accessibility notes, and a manual preparation checklist without automating login, purchase, or reservation flows.
+- [ ] 78. **Automatic Weekly Report Generation**: Summarize git commits, schedules, message records, and manual additions to generate an editable weekly report draft.
 
-- [ ] 369. **截图回归对比流水线**：定时打开指定 URL 截图并与基线 diff，输出差异报告和阈值告警。
-- [ ] 370. **备份完整性巡检**：检查备份目录大小、时间戳和抽样解压，失败时发通知并保留巡检日志。
-- [ ] 371. **邮件附件归档机器人**：按规则拉取附件归档到目录结构，去重命名并写索引 JSON。
-- [ ] 372. **域名 DNS 变更哨兵**：定时查询关键记录，发现变更写时间线并通知，支持多域名配置。
-- [ ] 373. **依赖更新 PR 预检**：对依赖升级分支跑安装与冒烟脚本，汇总日志并标记可合并建议。
-- [ ] 374. **静态资源 CDN 预热脚本**：批量提交预热/刷新任务，记录状态、失败重试和完成报告。
-- [ ] 375. **会议室设备开机自检**：检测投影/音响/网络连通（模拟或真实探测），生成会前就绪清单。
-- [ ] 376. **多环境配置漂移扫描**：对比多环境配置键值，输出缺失、多余和差异项，可生成同步工单草稿。
-- [ ] 377. **图片水印批量处理器**：对目录图片批量加水印/缩放/格式转换，支持模板和干跑。
-- [ ] 378. **Slack/飞书日报汇总脚本**：从频道拉取指定标签消息，生成结构化日报草稿并投递到目标会话。
+- [ ] 369. **Screenshot Regression Comparison Pipeline**: Capture approved pages on a schedule, compare screenshots against a baseline, and produce a visual diff report with threshold alerts.
+- [ ] 370. **Backup Integrity Inspection**: Check the backup directory size, timestamp and sample decompression, sends a notification in case of failure and retains the inspection log.
+- [ ] 371. **Email Attachment Archiving Robot**: Pull attachments and archives them into a directory structure according to rules, renames them and writes index JSON.
+- [ ] 372. **Domain Name DNS Change Sentinel**: Query DNS records on a schedule, record a timeline of changes, notify on differences, and support multiple domains.
+- [ ] 373. **Dependency Update PR Pre-check**: Run installation and smoke scripts on the dependency upgrade branch, summarize the logs and mark merging suggestions.
+- [ ] 374. **Static Resource CDN Preheating Script**: Submit preheating/refresh tasks in batches, record status, failure retries and completion reports.
+- [ ] 375. **Conference Room Equipment Power-on Self-test**: Detect projection/audio/network connectivity (simulation or real detection), and generate a pre-meeting ready list.
+- [ ] 376. **Multi-Environment Configuration Drift Scanner**: Compare configuration keys across environments, report missing, extra, and differing values, and generate a draft synchronization ticket.
+- [ ] 377. **Image Watermark Batch Processor**: Add watermarks, resize images, and convert formats in batches, with reusable templates and dry-run preview.
+- [ ] 378. **Slack/Feishu Daily Summary Script**: Pull tagged messages from Slack or Feishu, generate a structured daily digest, and deliver it to a selected conversation.
 
-## 八、内容创作工具（16 题）
-> 训练点：Canvas/SVG、实时协作、导出多格式。
+## 8. Content Creation Tools (16 topics)
+> Training points: Canvas/SVG, real-time collaboration, exporting to multiple formats.
 
-- [ ] 79. **在线 Whiteboard**：实现画笔、图形、文本、选择、撤销、导出和简单协作，体验接近 Excalidraw MVP。
-- [ ] 80. **Mini CodePen**：三栏编辑 HTML/CSS/JS，即时预览，支持错误捕获、本地保存和分享链接。
-- [ ] 81. **简历构建器**：提供多模板、结构化表单、实时预览、PDF 导出、ATS 友好检查和版本管理。
-- [ ] 82. **名片 / 海报生成器**：模板化编辑文字、图片、颜色和尺寸，支持 AI 文案、预览和 PNG/PDF 导出。
-- [ ] 83. **Markdown 协作编辑**：实现多人实时编辑、光标显示、版本历史、预览和冲突恢复。
-- [ ] 84. **SVG 图标库 + 在线编辑器**：管理图标集合，支持路径变换、颜色替换、复制代码和批量导出。
-- [ ] 85. **PPT 自动生成**：输入大纲生成幻灯片结构、版式、配图占位、讲稿和可下载文件。
-- [ ] 86. **视频字幕生成**：上传音视频，调用转写，生成双语字幕、时间轴编辑和烧录导出。
+- [ ] 79. **Online Whiteboard**: Provide drawing tools, shapes, text, selection, undo, export, and lightweight collaboration in an MVP inspired by Excalidraw.
+- [ ] 80. **Mini CodePen**: Offer side-by-side HTML, CSS, and JavaScript editors with a live preview, error capture, local saves, and shareable links.
+- [ ] 81. **Resume Builder**: The system offers multiple templates, structured forms, live preview, PDF export, ATS-friendly checking and version management.
+- [ ] 82. **Business Card/Poster Generator**: Edit text, images, colors, and dimensions in reusable templates, preview the result, and export PNG or PDF files.
+- [ ] 83. **Markdown Collaborative Editing**: Enable multi-person real-time editing, cursor display, version history, preview and conflict recovery.
+- [ ] 84. **SVG Icon Library + Online Editor**: Manage icon collections, support path transformation, color replacement, code copying and batch export.
+- [ ] 85. **PPT Automatically Generated**: Enter the outline to generate slide structure, layout, picture placeholders, lecture notes and downloadable files.
+- [ ] 86. **Video Subtitle Generation**: Upload audio and video, call transcription, generate bilingual subtitles, edit timeline, and burn and export.
 
-- [ ] 379. **分镜脚本时间轴**：管理镜头、时长、旁白和素材状态，支持导出拍摄清单和版本对比。
-- [ ] 380. **字幕时间轴精修器**：导入 SRT，支持波形对齐、批量偏移、合并拆分句和样式预览。
-- [ ] 381. **封面模板批量渲染**：用模板+CSV 批量生成封面图，支持字体安全区和导出规格校验。
-- [ ] 382. **播客章节标记器**：在音频时间轴打章节点，生成 show notes 草稿和平台章节格式。
-- [ ] 383. **素材版权来源台账**：登记素材来源、许可类型、到期日和使用作品，检索时提示风险。
-- [ ] 384. **长文结构大纲编辑器**：树状编辑章节、论点与证据链接，导出 Markdown 并检查悬空引用。
-- [ ] 385. **品牌语气检查清单**：对照语气准则扫描文稿，标记违例句式并给出替换建议占位。
-- [ ] 386. **多平台标题实验室**：为同一内容生成多组标题变体，记录点击反馈样例并沉淀胜出模式。
+- [ ] 379. **Storyboard Timeline**: Manage shots, duration, narration, and asset status, then export a production checklist and compare versions.
+- [ ] 380. **Subtitle Timeline Refiner**: Import SRT, support waveform alignment, batch offset, merge split sentences and style preview.
+- [ ] 381. **Cover Template Batch Rendering**: Use template + CSV to batch generate cover images, supporting font safe zone and export specification verification.
+- [ ] 382. **Podcast Chapter Marker**: Mark chapter points on the audio timeline, generate show notes drafts and platform chapter formats.
+- [ ] 383. **Material Copyright Source Ledger**: Register material sources, license types, expiration dates and used works, and prompt risks during retrieval.
+- [ ] 384. **Long Article Structure Outline Editor**: Edit chapters, arguments and evidence links in a tree view, export to Markdown and check for dangling references.
+- [ ] 385. **Brand Tone Checklist**: Scan the manuscript against the tone guidelines, mark violating sentences and provide replacement suggestions.
+- [ ] 386. **Multi-Platform Title Lab**: Generate title variations for the same content, record sample click feedback, and capture the patterns behind the strongest options.
 
-## 九、教育与学习工具（12 题）
-> 训练点：交互式动画、沙盒执行、可视化教学。
+## 9. Education and Learning Tools (12 topics)
+> Training points: interactive animation, sandbox execution, visual teaching.
 
-- [ ] 87. **在线刷题平台**：实现题目列表、代码编辑器、本地评测、计时、错题本和提交历史。
-- [ ] 88. **算法可视化**：演示排序、最短路径和动态规划，支持单步、速度调节、输入自定义和讲解文案。
-- [ ] 89. **公式即时渲染演练**：提供 KaTeX/Mermaid 练习场，支持实时预览、错误定位和模板库。
-- [ ] 90. **多语言朗读跟读训练**：展示文本、录音、播放、评分、错音定位和复读计划。
-- [ ] 91. **语言互转代码**：把 Python/JS/Go 代码做同义转换，展示差异、运行样例和风险说明。
-- [ ] 92. **SQL 沙盒**：内置示例库和练习题，从基础查询到窗口函数，支持执行、结果对比和提示。
+- [ ] 87. **Coding Practice Platform**: Provide a project list, code editor, local evaluator, timer, mistake review notebook, and submission history.
+- [ ] 88. **Algorithm Visualization**: Demonstrate sorting, shortest-path, and dynamic-programming algorithms with step controls, adjustable speed, custom input, and explanatory text.
+- [ ] 89. **Live Formula Rendering Playground**: Provide a KaTeX and Mermaid practice area with live preview, precise error locations, and reusable templates.
+- [ ] 90. **Multilingual Read-Aloud Practice**: Display practice text, record and play back speech, score pronunciation, locate likely errors, and generate a repetition plan.
+- [ ] 91. **Code Translation Playground**: Translate examples between Python, JavaScript, and Go while showing diffs, runnable samples, and semantic caveats.
+- [ ] 92. **SQL Sandbox**: Provide sample databases and exercises from basic queries through window functions, with execution, result comparison, and hints.
 
-- [ ] 387. **错题本智能归档**：录入错题、知识点与掌握度，生成复习队列和薄弱点雷达图。
-- [ ] 388. **课堂随机点名器**：支持权重、回避连点、历史记录和分组点名，适配投影大屏。
-- [ ] 389. **实验报告模板助手**：按学科模板生成报告骨架，检查必填段完整度并导出 PDF/Markdown。
-- [ ] 390. **词汇量自测 Web**：分级词表抽测，记录正确率曲线和推荐复习列表。
-- [ ] 391. **编程作业自动批注雏形**：对学生代码跑固定测试，生成通过矩阵和常见错误提示（沙箱演示）。
-- [ ] 392. **家长会沟通要点本**：教师记录学生亮点、待改进与行动计划，生成会谈提纲和跟进日期。
+- [ ] 387. **Mistake Review Organizer**: Record missed problems, concepts, and mastery levels, then build a review queue and a weak-area radar chart.
+- [ ] 388. **Classroom Random Student Picker**: Select students with configurable weights, avoid immediate repeats, retain history, support groups, and present clearly on a classroom display.
+- [ ] 389. **Experiment Report Template Assistant**: Generate report skeleton according to subject templates, check the completeness of required paragraphs and export to PDF/Markdown.
+- [ ] 390. **Vocabulary Self-test Web**: Graded vocabulary list sampling, record accuracy curve and recommended review list.
+- [ ] 391. **Programming Assignment Feedback Prototype**: Run fixed tests against student code and generate a pass matrix with safe, common-error feedback in a sandboxed demonstration.
+- [ ] 392. **Parent-Teacher Meeting Notes Planner**: Help teachers record student strengths, areas for improvement, action plans, meeting talking points, and follow-up dates.
 
-## 十、创意与实验（16 题）
-> 训练点：图形/音频处理、跨设备体验、AI 玩法创新。
+## 10. Creativity and Experimentation (16 topics)
+> Training points: graphics/audio processing, cross-device experience, AI gameplay innovation.
 
-- [ ] 93. **像素画板 + GIF 导出**：实现网格绘制、调色板、图层、洋葱皮、帧动画和 GIF 导出。
-- [ ] 94. **节拍器 + 节奏训练**：提供 BPM、拍号、视觉反馈、听觉反馈、节奏练习和准确率统计。
-- [ ] 95. **极简 DAW**：支持多轨录音、波形展示、剪辑、音量调节、节拍网格和 wav 导出。
-- [ ] 96. **ASCII 艺术生成器**：上传图片转字符画，支持密度、字符集、宽度、反色和文本/图片导出。
-- [ ] 97. **AI 古诗生成器**：按题材、格律、押韵生成古诗，展示平仄检查、改写和收藏。
-- [ ] 98. **塔罗占卜 Web 应用**：实现抽牌、牌阵、AI 解读、历史记录、分享图和免责声明。
-- [ ] 99. **AR 名片**：生成二维码，WebXR 扫码后展示 3D 名片、联系方式和交互动效。
-- [ ] 100. **多人协作画板**：实现低延迟 WebSocket 同步、用户光标、撤销栈、房间管理和断线恢复。
+- [ ] 93. **Pixel Artboard + GIF Export**: Implement grid drawing, palette, layers, onion skinning, frame animation and GIF export.
+- [ ] 94. **Metronome + Rhythm Training**: Provide BPM, time signature, visual feedback, auditory feedback, rhythm practice and accuracy statistics.
+- [ ] 95. **Minimalist DAW**: Support multi-track recording, waveform display, editing, volume adjustment, beat grid and wav export.
+- [ ] 96. **ASCII Art Generator**: Upload images to character art, support density, character set, width, inverse color and text/image export.
+- [ ] 97. **AI Ancient Poetry Generator**: Generate ancient poems based on subject matter, meter, and rhyme, and display them for checking, rewriting, and collecting.
+- [ ] 98. **Tarot Divination Web Application**: Implement card drawing, card formation, AI interpretation, historical records, sharing pictures and disclaimers.
+- [ ] 99. **AR Business Card**: Generate a QR code, and WebXR displays the 3D business card, contact information and interactive effects after scanning the code.
+- [ ] 100. **Multi-person Collaboration Drawing Board**: Implement low-latency WebSocket synchronization, user cursor, undo stack, room management and disconnection recovery.
 
-- [ ] 393. **生成艺术参数沙盘**：用滑条控制噪声/色彩/对称参数实时预览，支持随机种子和导出 PNG。
-- [ ] 394. **声音可视化玩具**：麦克风输入驱动粒子/波形，提供多种样式和录屏占位导出。
-- [ ] 395. **ASCII 动画编辑器**：帧编辑 ASCII 动画，支持洋葱皮、播放速度和导出文本/JSON。
-- [ ] 396. **像素画协作画布**：网格像素绘制、调色板、撤销重做，可选分享只读链接。
-- [ ] 397. **故事骰子灵感器**：随机人物/场景/冲突组合，保存灵感卡并扩展短大纲。
-- [ ] 398. **字体配对实验室**：预览标题/正文字体搭配、字重与行高，导出 CSS 片段。
-- [ ] 399. **迷你物理沙盒**：二维刚体、重力与约束演示，可放置形状并录制参数预设。
-- [ ] 400. **颜色无障碍对比检查**：输入色对计算对比度，给出 AA/AAA 结果和替代色建议。
+- [ ] 393. **Generate Artistic Parameter Sandbox**: Use sliders to control real-time preview of noise/color/symmetry parameters, support random seeds and export PNG.
+- [ ] 394. **Audio Visualization Playground**: Drive particles and waveforms from microphone input, offer several visual styles, and include a placeholder workflow for screen-recording export.
+- [ ] 395. **ASCII Animation Editor**: Edit frame-based ASCII animations with onion-skin preview, adjustable playback speed, and text or JSON export.
+- [ ] 396. **Pixel Painting Collaboration Canvas**: Grid pixel painting, color palette, undo and redo, optional sharing of read-only links.
+- [ ] 397. **Story Dice Inspirer**: Random character/scene/conflict combinations, save inspiration cards and expand short outlines.
+- [ ] 398. **Font Pairing Lab**: Preview heading and body font combinations, adjust weight and line height, and export reusable CSS snippets.
+- [ ] 399. **Mini Physics Sandbox**: Simulate 2D rigid bodies, gravity, and constraints, let users place shapes, and save parameter presets.
+- [ ] 400. **Color Accessibility Contrast Check**: Enter a pair of colors, calculate their contrast ratio, report WCAG AA and AAA results, and suggest accessible alternatives.
 
-## 十一、开发者工具与工程平台（40 题）
-> 训练点：代码分析、构建体验、团队协作、工程可观测。
+## 11. Developer Tools and Engineering Platforms (40 topics)
+> Training points: code analysis, building experience, team collaboration, and engineering observability.
 
-- [ ] 101. **本地 API Mock Studio**：可视化定义 REST 接口、响应模板、延迟和错误率，生成 mock server 并记录请求日志。
-- [ ] 102. **OpenAPI 文档对比器**：对比两个 OpenAPI 文件，标注新增、删除、兼容性风险和迁移建议。
-- [ ] 103. **数据库 Schema Diff 工具**：读取两份 SQLite/PostgreSQL schema，输出表字段差异、索引差异和迁移 SQL 草稿。
-- [ ] 104. **Env 配置审计器**：扫描项目 `.env.example`、compose 和代码引用，找出缺失、未使用和敏感变量。
-- [ ] 105. **依赖许可证看板**：解析 package/requirements/go.mod，展示许可证、版本风险、升级建议和导出报告。
-- [ ] 106. **代码片段知识库**：收集团队常用 snippet，支持标签、搜索、变量占位、复制和使用统计。
-- [ ] 107. **CLI 任务运行面板**：把常用命令注册成任务，提供参数表单、实时日志、退出码和历史记录。
-- [ ] 108. **本地 CI 预检器**：读取项目配置，串联 lint/test/build，失败时聚合错误摘要和修复建议。
-- [ ] 109. **日志模式挖掘器**：导入日志文件，自动聚类相似错误，统计频次、时间分布和样例上下文。
-- [ ] 110. **Feature Flag 管理器**：本地管理开关、环境、用户规则和命中日志，提供前端 SDK 示例。
-- [ ] 111. **PR Review 清单生成器**：根据 diff 和项目规则生成 reviewer checklist，按风险分类并支持 Markdown 导出。
-- [ ] 112. **代码复杂度雷达**：扫描函数长度、圈复杂度、重复代码和依赖关系，输出可视化热点。
-- [ ] 113. **本地 Secrets 扫描器**：扫描仓库中的 token、私钥和高风险配置，支持忽略规则和修复建议。
-- [ ] 114. **Docker Compose 可视化器**：解析 compose 文件，展示服务依赖、端口、卷、环境变量和健康检查缺口。
-- [ ] 115. **错误码字典管理器**：维护产品错误码、用户文案、排查步骤和多语言翻译，支持搜索和导出。
-- [ ] 116. **数据库查询收藏夹**：保存常用 SQL、参数模板、执行历史、结果预览和敏感字段遮罩。
-- [ ] 117. **轻量发布检查台**：管理版本号、变更清单、回滚步骤、发布审批和发布后验证项。
-- [ ] 118. **Webhook 调试收件箱**：接收外部 webhook，展示 headers/body、重放请求、签名校验和失败样例。
-- [ ] 119. **包体积分析器**：解析前端构建产物或静态目录，展示大文件、重复资源和压缩收益。
-- [ ] 120. **开发环境体检器**：检查 Git、Docker、Node/Python 版本、端口占用和常用配置，输出修复命令。
+- [ ] 101. **Local API Mock Studio**: Define REST endpoints visually, configure response templates, delays, and error rates, generate a mock server, and record request logs.
+- [ ] 102. **OpenAPI Document Comparator**: Compare two OpenAPI files, marking additions, deletions, compatibility risks, and migration recommendations.
+- [ ] 103. **Database Schema Diff Tool**: Read two SQLite/PostgreSQL schemas and output table field differences, index differences and migration SQL drafts.
+- [ ] 104. **Env Configuration Auditor**: Scan projects `.env.example`, compose and code references for missing, unused and sensitive variables.
+- [ ] 105. **Dependency License Dashboard**: Parse package/requirements/go.mod, display licenses, version risks, upgrade recommendations and export reports.
+- [ ] 106. **Code Snippet Knowledge Base**: Collect reusable team snippets with tags, search, configurable placeholders, one-click copying, and usage statistics.
+- [ ] 107. **CLI Task Running Panel**: Register commonly used commands as tasks and provide parameter forms, real-time logs, exit codes and history records.
+- [ ] 108. **Local CI Prefinger**: Read project configuration, concatenates lint/test/build, and aggregate error summaries and fix suggestions on failure.
+- [ ] 109. **Log Pattern Miner**: Import log files, automatically cluster similar errors, and count frequency, time distribution and sample context.
+- [ ] 110. **Feature Flag Manager**: Manage local feature flags, environments, user targeting rules, and evaluation logs, and provide front-end SDK examples.
+- [ ] 111. **PR Review Checklist Generator**: Generate reviewer checklist based on diff and project rules, categorizes by risk and support Markdown export.
+- [ ] 112. **Code Complexity Radar**: Scan function length, cyclomatic complexity, duplicate code and dependencies, and output visual hot spots.
+- [ ] 113. **Local Secrets Scanner**: Scan repositories for tokens, private keys, and high-risk configurations, supporting ignore rules and fix recommendations.
+- [ ] 114. **Docker Compose Visualizer**: Parse compose files, displaying service dependencies, ports, volumes, environment variables, and health check gaps.
+- [ ] 115. **Error Code Dictionary Manager**: Maintain product error codes, user texts, troubleshooting steps and multi-language translations, and support search and export.
+- [ ] 116. **Database Query Favorites**: Save commonly used SQL, parameter templates, execution history, result previews and sensitive field masks.
+- [ ] 117. **Lightweight Release Checkbench**: Manage version numbers, change lists, rollback steps, release approvals, and post-release verification items.
+- [ ] 118. **Webhook Debug Inbox**: Receive external webhook, display headers/body, replay request, signature verification and failure examples.
+- [ ] 119. **Package Volume Analyzer**: Analyze front-end build products or static directories to display large files, duplicate resources, and compression gains.
+- [ ] 120. **Development Environment Health Checker**: Check Git, Docker, Node/Python versions, port occupancy and common configurations, and output repair commands.
 
-- [ ] 401. **API 故障注入矩阵**：按接口配置延迟、5xx、空响应和限流组合，生成可复用故障场景并导出给联调方。
-- [ ] 402. **本地 HTTPS 证书助手**：一键生成开发证书、信任指引和域名绑定说明，支持多项目配置。
-- [ ] 403. **变更影响测试选择器**：根据改动文件映射测试目录，输出建议回归集和覆盖缺口。
-- [ ] 404. **特性开关控制台**：管理 feature flag、受众百分比和审计日志，提供本地覆盖模式。
-- [ ] 405. **依赖漏洞工单桥**：导入扫描报告生成修复工单，跟踪版本升级状态和验证记录。
-- [ ] 406. **数据库迁移预览器**：解析 migration 文件，展示顺序、危险操作标记和回滚脚本是否存在。
-- [ ] 407. **容器镜像层分析器**：解析镜像历史层大小与文件贡献，标出胖层和可优化点。
-- [ ] 408. **本地消息队列观察台**：可视化队列深度、消费延迟和死信，支持重放样例消息。
-- [ ] 409. **代码所有者覆盖检查**：对照 CODEOWNERS 与目录结构，找出无主路径和冲突规则。
-- [ ] 410. **发布产物校验台**：校验构建产物校验和、签名与版本元数据，记录发布清单。
-- [ ] 411. **开发环境一键初始化**：根据项目模板安装依赖、复制 env 样例和跑健康检查，输出失败步骤。
-- [ ] 412. **GraphQL 查询工作台**：支持 schema 浏览、查询收藏、变量模板和历史记录。
-- [ ] 413. **契约测试结果墙**：汇总消费者契约结果，按服务展示破坏性变更和负责人。
-- [ ] 414. **源码注释待办雷达**：扫描 TODO/FIXME 并关联责任人与期限，生成清理冲刺列表。
-- [ ] 415. **分支寿命监控**：统计长寿分支、落后主干提交数和最后活跃，提醒合并或归档。
-- [ ] 416. **错误码字典中心**：维护错误码、含义、用户文案和排查链接，支持搜索与版本。
-- [ ] 417. **本地多服务进程编排器**：用配置启动前后端/worker，统一日志着色和一键停止。
-- [ ] 418. **SQL 慢查询样例库**：收录慢 SQL、执行计划和优化记录，支持标签与前后对比。
-- [ ] 419. **多租户 Webhook 路由沙箱**：配置按路径/密钥的路由规则与重试策略，注入样例投递并查看命中轨迹与失败回放。
-- [ ] 420. **脚手架模板市场本地版**：浏览/生成项目模板，支持变量替换、预览文件树和版本锁定。
+- [ ] 401. **API Fault Injection Matrix**: Configure delay, 5xx, empty response and current limiting combinations by interface, generate reusable fault scenarios and export them to joint debugging parties.
+- [ ] 402. **Local HTTPS Certificate Assistant**: Generate development certificates, trust guidelines and domain name binding instructions with one click, and support multi-project configuration.
+- [ ] 403. **Change Impact Test Selector**: Map changed files to relevant test directories and output a recommended regression suite with identified coverage gaps.
+- [ ] 404. **Feature Switch Console**: Manage feature flags, audience percentages and audit logs, and provide local coverage mode.
+- [ ] 405. **Dependency Vulnerability Work Order Bridge**: Import dependency scan reports, create remediation work orders, and track version upgrades and verification evidence.
+- [ ] 406. **Database Migration Previewer**: Parse the migration file and display the sequence, dangerous operation flags, and whether the rollback script exists.
+- [ ] 407. **Container Image Layer Analyzer**: Analyze the historical image layer size and file contribution, and mark the fat layer and optimization points.
+- [ ] 408. **Local Message Queue Observation Platform**: Visualize queue depth, consumption delay and dead letters, and support replaying sample messages.
+- [ ] 409. **Code Owner Coverage Check**: Check CODEOWNERS against the directory structure to identify unowned paths and conflicting rules.
+- [ ] 410. **Release Product Verification Bench**: Verify artifact checksums, signatures, and version metadata, then record the result in a release inventory.
+- [ ] 411. **One-click Initialization of the Development Environment**: Install dependencies according to the project template, copy env samples and run health checks, and output failure steps.
+- [ ] 412. **GraphQL Query Workbench**: Support schema browsing, query collections, variable templates, and history.
+- [ ] 413. **Contract Test Results Wall**: Aggregate consumer contract results, displaying breaking changes and owners by service.
+- [ ] 414. **Source Code Comment To-do Radar**: Scan TODO/FIXME and associates owners with deadlines to generate a cleanup sprint list.
+- [ ] 415. **Branch Lifecycle Monitor**: Track long-lived branches, commits behind the main branch, and recent activity, then remind owners to merge or archive stale work.
+- [ ] 416. **Error Code Dictionary Center**: Maintain error codes, meanings, user texts and troubleshooting links, and support search and versions.
+- [ ] 417. **Local Multi-Service Process Orchestrator**: Start local front-end and worker processes from configuration, colorize combined logs, and stop every managed process with one command.
+- [ ] 418. **SQL Slow Query Sample Library**: Include slow SQL, execution plans and optimization records, and support tags and comparison before and after.
+- [ ] 419. **Multi-tenant Webhook Routing Sandbox**: Configure routing rules and retry policies by path/key, inject sample delivery and view hit traces and failure replays.
+- [ ] 420. **Scaffolding Template Market Local Version**: Browse local project templates, substitute variables, preview the generated file tree, and lock template versions.
 
-## 十二、协作与实时系统（30 题）
-> 训练点：WebSocket、冲突处理、权限、在线状态。
+## 12. Collaboration and Real-Time Systems (30 topics)
+> Training points: WebSocket, conflict handling, permissions, online status.
 
-- [ ] 121. **团队决策投票室**：创建投票议题，支持匿名/实名、实时结果、截止时间、导出和权限控制。
-- [ ] 122. **实时排队叫号系统**：实现取号、叫号、窗口状态、等待时间估计和大屏展示。
-- [ ] 123. **多人需求优先级矩阵**：团队拖拽需求卡到价值/成本矩阵，实时同步并生成排序建议。
-- [ ] 124. **在线 Planning Poker**：房间、成员、故事点投票、揭晓、统计和历史记录完整闭环。
-- [ ] 125. **共享剪贴板工作间**：团队共享短文本、链接和文件片段，支持过期时间、搜索和权限。
-- [ ] 126. **协作式 JSON 编辑器**：多人编辑 JSON，支持 schema 校验、格式化、冲突提示和版本回滚。
-- [ ] 127. **实时状态墙**：团队成员更新状态、阻塞项和正在处理事项，支持过滤和自动过期。
-- [ ] 128. **小型客服工作台**：模拟访客消息、客服分配、快捷回复、会话状态和满意度记录。
-- [ ] 129. **多人白噪音房间**：共享播放列表、同步播放状态、房间聊天和专注计时。
-- [ ] 130. **事件报名与签到系统**：活动创建、报名表单、二维码签到、名单导出和迟到统计。
-- [ ] 131. **团队知识卡片评审**：成员提交知识卡，其他人评论、投票、标记过期并生成复习队列。
-- [ ] 132. **在线轮值排班器**：配置成员、假期、规则和公平性指标，自动生成可调整排班表。
-- [ ] 133. **轻量事故指挥室**：记录事故时间线、负责人、状态、行动项和复盘导出。
-- [ ] 134. **远程结对编程计时器**：共享番茄钟、角色轮换、笔记和会后行动项，支持房间链接。
-- [ ] 135. **直播互动弹幕墙**：接收模拟弹幕，支持关键词过滤、抽奖、投票和大屏模式。
+- [ ] 121. **Team Decision-making Voting Room**: Create polls with anonymous or named voting, live results, deadlines, export, and role-based access controls.
+- [ ] 122. **Real-Time Queue and Calling System**: Issue queue numbers, call the next visitor, show service-window status, estimate waiting time, and drive a large display.
+- [ ] 123. **Multi-person Demand Priority Matrix**: The team drags the demand card to the value/cost matrix, synchronizes it in real time and generates ranking suggestions.
+- [ ] 124. **Online Planning Poker**: Complete closed loop of rooms, members, story point voting, reveals, statistics and history.
+- [ ] 125. **Shared Clipboard Workspace**: Share short text, links, and file snippets within a team space, with expiration, search, and access controls.
+- [ ] 126. **Collaborative JSON Editor**: Multiple people can edit JSON, supporting schema verification, formatting, conflict prompts and version rollback.
+- [ ] 127. **Real-time Status Wall**: Team members update status, blocked items, and items being processed, supporting filtering and automatic expiration.
+- [ ] 128. **Small Customer Service Workbench**: Simulate visitor messages, customer service assignments, quick replies, session status and satisfaction records.
+- [ ] 129. **Multiplayer White Noise Room**: Shared playlists, synchronized playback status, room chat and focus timing.
+- [ ] 130. **Event Registration and Sign-in System**: Event creation, registration form, QR code sign-in, list export and lateness statistics.
+- [ ] 131. **Team Knowledge Card Review**: Members submit knowledge cards, others comment, vote, mark as expired and generate a review queue.
+- [ ] 132. **Online Shift Scheduler**: Configure members, holidays, rules and fairness indicators to automatically generate an adjustable schedule.
+- [ ] 133. **Light Incident Command Room**: Record the incident timeline, owner, status, action items and review export.
+- [ ] 134. **Remote Pair Programming Timer**: Share Pomodoros, role rotations, notes and post-meeting action items, with room link support.
+- [ ] 135. **Live Interactive Barrage Wall**: Receive simulated barrage and support keyword filtering, lottery, voting and large screen mode.
 
-- [ ] 421. **多人白板便签墙**：实时便签拖拽、颜色标签和投票点赞，支持房间与导出图片。
-- [ ] 422. **结对编程会话计时**：轮换驾驶/导航角色计时，记录议题和回顾笔记。
-- [ ] 423. **共享光标演示模式**：主持人共享鼠标轨迹与高亮圈，观众跟随页面滚动（演示级）。
-- [ ] 424. **团队心跳站会板**：每人三句话状态实时汇总，支持阻塞标记和会后归档。
-- [ ] 425. **在线投票与估点器**：规划扑克式估点，揭示前后隐藏票、讨论笔记和最终共识。
-- [ ] 426. **共享倒计时发布墙**：全员可见的上线倒计时、检查项勾选和 go/no-go 状态。
-- [ ] 427. **多人大纲共编**：树状大纲实时编辑、锁定节点和评论气泡，支持版本快照。
-- [ ] 428. **远程设计走查房间**：同步浏览设计稿热点，收集批注时间线和决议状态。
-- [ ] 429. **会议室占用实时板**：显示房间占用、预约人和下一场会议，支持快速延长申请。
-- [ ] 430. **事故桥接纪要板**：事故期间实时记事件、决策与参与者，自动生成时间线导出。
-- [ ] 431. **共享剪贴板团队版**：短时共享文本片段到团队房间，自动过期与访问审计。
-- [ ] 432. **在线答疑排队系统**：学员举手排队、导师接单和会话计时，统计等待时长。
-- [ ] 433. **多端演示提词同步**：演讲者与提词屏同步滚动，支持字体大小和分段标记。
-- [ ] 434. **实时问卷脉冲**：会议中推送单题投票，即时柱状结果和匿名模式。
-- [ ] 435. **协作检查清单房间**：发布日多角色勾选同一清单，显示完成进度和阻塞评论。
+- [ ] 421. **Multi-person Whiteboard Note Wall**: Let several participants move notes in real time, apply colors, vote, organize rooms, and export the board as an image.
+- [ ] 422. **Pair Programming Session Timing**: Alternate driving/navigation role timing, record issues and review notes.
+- [ ] 423. **Shared Cursor Presentation Mode**: The host shares the mouse track and highlight circle, and the audience follows the page scrolling (demo level).
+- [ ] 424. **Team Heartbeat Stand-up Board**: Real-time summary of each person's three-sentence status, supporting blocking marking and post-meeting archiving.
+- [ ] 425. **Online Voting and Point Estimator**: Plan poker-style point estimation, revealing the hidden votes before and after, discussion notes and final consensus.
+- [ ] 426. **Shared Release Countdown Wall**: Show a synchronized countdown, checklist completion, blockers, and a go/no-go decision to every participant.
+- [ ] 427. **Multi-person Outline Editing**: Real-time editing of tree outlines, locking nodes and comment bubbles, and supporting version snapshots.
+- [ ] 428. **Remote Design Walkthrough Room**: The system synchronously browse design draft hot spots, collect comment timelines and decision status.
+- [ ] 429. **Conference Room Occupancy Real-time Board**: Display room occupancy, reservations and next meeting, and support quick extension application.
+- [ ] 430. **Incident Bridge Minutes Board**: Record events, decisions and participants in real time during the accident, and automatically generate a timeline for export.
+- [ ] 431. **Shared Clipboard Team Edition**: Short-term sharing of text snippets to team rooms, automatic expiration and access auditing.
+- [ ] 432. **Online Q&A Queuing System**: Students raise their hands to line up, the instructor takes orders, and the conversation is timed to count the waiting time.
+- [ ] 433. **Multi-end Presentation Teleprompter Synchronization**: The speaker and teleprompter screen scroll simultaneously, supporting font size and segmentation marks.
+- [ ] 434. **Real-time Questionnaire Pulse**: Push single-question voting, real-time columnar results and anonymous mode during the meeting.
+- [ ] 435. **Collaborative Checklist Room**: Let multiple roles complete the same release-day checklist while showing progress, ownership, and blocking comments.
 
-## 十三、商业与运营工具（30 题）
-> 训练点：表单流程、数据看板、权限、导入导出。
+## 13. Business and Operational Tools (30 topics)
+> Training points: form process, data dashboard, permissions, import and export.
 
-- [ ] 136. **小型 CRM**：管理客户、联系人、跟进记录、销售阶段、提醒和漏斗报表。
-- [ ] 137. **库存预警系统**：维护商品、库存变动、阈值、供应商和预警通知，支持 CSV 导入。
-- [ ] 138. **报价单生成器**：录入客户、项目、商品和折扣，生成 PDF 报价单并保留版本历史。
-- [ ] 139. **工单流转系统**：提交工单、分配处理人、状态流转、优先级、评论和 SLA 统计。
-- [ ] 140. **订阅收入看板**：导入订阅数据，计算 MRR、流失率、续费提醒和客户分层。
-- [ ] 141. **内容排期日历**：管理渠道、选题、负责人、状态、发布时间和素材链接。
-- [ ] 142. **活动预算追踪器**：记录预算项、实际支出、审批状态和超支预警，输出报表。
-- [ ] 143. **客服 FAQ 维护台**：管理问题、答案、标签、版本、命中统计和待更新提醒。
-- [ ] 144. **问卷结果分析器**：创建问卷或导入 CSV，展示选项分布、交叉分析和开放题摘要。
-- [ ] 145. **门店排班与考勤**：配置员工、班次、请假、打卡记录和异常提醒，生成月度统计。
-- [ ] 146. **发票抬头管理器**：保存公司抬头、税号、地址、开票历史和一键复制。
-- [ ] 147. **供应商评分表**：记录交付、价格、质量和沟通评分，生成雷达图和复评提醒。
-- [ ] 148. **销售线索去重器**：导入多来源线索，按手机号、邮箱和公司名去重，输出合并结果。
-- [ ] 149. **项目成本估算器**：按人天、角色、风险系数和外包费用生成估算，并支持场景对比。
-- [ ] 150. **门店客流热力图**：导入时间段客流数据，展示热力图、峰谷分析和排班建议。
+- [ ] 136. **Small CRM**: Manage accounts, contacts, follow-ups, sales stages, reminders and funnel reports.
+- [ ] 137. **Inventory Warning System**: Maintain products, inventory changes, thresholds, suppliers and warning notifications, and support CSV import.
+- [ ] 138. **Quotation Generator**: Enter customers, projects, products and discounts, generate PDF quotations and retain version history.
+- [ ] 139. **Work Order Flow System**: Submit work orders, assign handlers, status flow, priority, comments and SLA statistics.
+- [ ] 140. **Subscription Revenue Dashboard**: Import subscription data, calculate MRR, churn rate, renewal reminders and customer stratification.
+- [ ] 141. **Content Scheduling Calendar**: Manage channels, topic selection, owner, status, release time and material links.
+- [ ] 142. **Activity Budget Tracker**: Record budget items, actual expenditures, approval status and overspending warnings, and output reports.
+- [ ] 143. **Customer Service FAQ Maintenance Desk**: Manage questions, answers, tags, versions, hit statistics and reminders to be updated.
+- [ ] 144. **Questionnaire Results Analyzer**: Create questionnaires or import CSV to display option distributions, cross-analysis and open question summaries.
+- [ ] 145. **Store Shift Scheduling and Attendance**: Configure employees, shifts, leave requests, punch-in records and anomaly reminders, and generate monthly statistics.
+- [ ] 146. **Invoice Header Manager**: Save company header, tax ID, address, invoicing history and one-command copy.
+- [ ] 147. **Supplier Rating Sheet**: Record delivery, price, quality and communication scores, generate radar charts and re-evaluation reminders.
+- [ ] 148. **Sales Lead Deduplication Tool**: Import leads from multiple sources, remove duplications by phone number, email address and company name, and output the merged results.
+- [ ] 149. **Project Cost Estimator**: Generate estimates by person-day, role, risk factor and outsourcing cost, and support scenario comparison.
+- [ ] 150. **Store Customer Flow Heat Map**: Import customer flow data in time periods to display heat maps, peak and valley analysis and shift scheduling suggestions.
 
-- [ ] 436. **门店排班冲突检测**：录入班次与员工技能，检测超时、连班和缺口，输出调整建议。
-- [ ] 437. **促销活动日历台**：管理活动档期、渠道和素材状态，避免同档冲突并提醒临近上线。
-- [ ] 438. **会员积分规则模拟器**：配置积分获取/消耗规则，用样例订单预演积分变化和异常边界。
-- [ ] 439. **供应商交期跟踪板**：记录 PO、承诺交期、实际到货和延误原因，展示供应商准时率。
-- [ ] 440. **价签变更审批流**：提交价格变更、影响 SKU 与生效时间，支持审批、驳回和生效回执。
-- [ ] 441. **线下活动物料清单**：管理物料种类、数量、负责人与装箱状态，支持签收核对。
-- [ ] 442. **客诉升级路由表**：按问题类型配置升级路径与 SLA，模拟工单流转并统计超时。
-- [ ] 443. **渠道佣金结算表**：录入订单与渠道规则，生成应付明细和差异核对视图。
-- [ ] 444. **门店巡检打分表**：移动友好巡检项打分、拍照和整改任务生成，汇总门店排名。
-- [ ] 445. **库存调拨建议器**：根据销量和库存水位给出调拨建议清单，支持人工调整导出。
-- [ ] 446. **合同续约提醒台**：管理客户合同到期日、续约负责人和谈判状态，提前提醒。
-- [ ] 447. **报价单版本对比**：维护报价版本、条款差异和客户反馈，生成对比表。
-- [ ] 448. **团购成团进度墙**：展示目标人数、当前进度、催促记录和失败回流。
-- [ ] 449. **售后配件申请台**：登记故障机型、配件需求、审批与发货状态，统计高频配件。
-- [ ] 450. **门店能耗周报**：录入水电数据，对比同比/环比并标注异常日，生成周报。
+- [ ] 436. **Store Shift Conflict Detection**: Enter shifts and employee skills, detect overtime, consecutive shifts and gaps, and output adjustment suggestions.
+- [ ] 437. **Promotional Event Calendar Desk**: Manage event schedules, channels, and asset status to avoid conflicts in the same schedule and remind you of upcoming launches.
+- [ ] 438. **Member Points Rule Simulator**: Configure points acquisition/consumption rules, and use sample orders to preview points changes and abnormal boundaries.
+- [ ] 439. **Supplier Delivery Tracking Board**: Record PO, promised delivery, actual arrival and delay reasons, and display supplier on-time rate.
+- [ ] 440. **Price Tag Change Approval Flow**: Submit price changes, affect SKU and effective time, support approval, rejection and effective receipt.
+- [ ] 441. **Offline Activity Material List**: Manage material type, quantity, owner and packing status, and support receipt verification.
+- [ ] 442. **Customer Complaint Upgrade Routing Table**: Configure upgrade paths and SLAs according to problem types, simulate work order flow and count timeouts.
+- [ ] 443. **Channel Commission Settlement Form**: Enter orders and channel rules, and generate payable details and discrepancy verification views.
+- [ ] 444. **Store Inspection Scorecard**: Score inspection items on mobile, attach photos, create corrective tasks, and summarize store rankings.
+- [ ] 445. **Inventory Transfer Suggestion Tool**: Provide a list of transfer suggestions based on sales volume and inventory level, and support manual adjustment and export.
+- [ ] 446. **Contract Renewal Reminder Desk**: Manage customer contract expiration date, renewal owner and negotiation status, and provide advance reminders.
+- [ ] 447. **Quotation Version Comparison**: Maintain quotation versions, term differences and customer feedback, and generate a comparison table.
+- [ ] 448. **Group Purchase Progress Wall**: Display the target number of people, current progress, urging records and failed return.
+- [ ] 449. **After-sales Parts Application Desk**: Register faulty models, parts requirements, approval and delivery status, and collect statistics on high-frequency parts.
+- [ ] 450. **Store Energy Consumption Weekly Report**: Enter water and electricity usage, compare it with prior periods, flag unusual days, and generate a weekly report.
 
-## 十四、AI Agent 与自动化工作流（40 题）
-> 训练点：工具调用、状态机、队列、人工确认。
+## 14. AI Agents and Automated Workflows (40 topics)
+> Training points: tool invocation, state machine, queue, manual confirmation.
 
-- [ ] 151. **研究资料收集 Agent**：给定主题，自动搜索/导入资料、去重、摘要、引用来源并生成阅读清单。
-- [ ] 152. **代码库问答 Agent**：索引仓库文件，回答架构和实现问题，附带文件引用和置信度。
-- [ ] 153. **PR 修复建议 Agent**：读取失败测试和 diff，生成修复计划、补丁建议和风险说明，不自动提交。
-- [ ] 154. **客服分流 Agent**：对用户消息分类、提取实体、推荐 FAQ，并把低置信度请求转人工。
-- [ ] 155. **采购比价 Agent**：抓取或导入多个供应商报价，标准化规格，生成价格/交期/风险对比。
-- [ ] 156. **个人日程整理 Agent**：读取待办、日历和邮件摘要，提出日程安排草稿并等待确认。
-- [ ] 157. **网页资料监控 Agent**：监控指定网页变化，判断是否重要，生成摘要并推送通知。
-- [ ] 158. **日志排障 Agent**：输入日志和配置，自动提取异常模式、搜索历史案例并输出排查步骤。
-- [ ] 159. **数据清洗 Agent**：导入脏 CSV，识别缺失、异常和重复，生成可审阅清洗方案。
-- [ ] 160. **学习路径规划 Agent**：根据目标和时间，生成课程、练习、复盘计划，并根据进度调整。
-- [ ] 161. **文档一致性检查 Agent**：对比 README、API 文档和代码接口，找出过期描述和缺失示例。
-- [ ] 162. **候选人筛选 Agent**：解析简历、岗位要求和面试反馈，生成结构化评分与追问建议。
-- [ ] 163. **多步骤表单填写 Agent**：把自然语言需求映射到复杂表单，逐步确认关键字段并生成提交预览。
-- [ ] 164. **社媒评论处理 Agent**：聚类评论、识别负面反馈、生成回复草稿和升级处理清单。
-- [ ] 165. **会议行动项跟踪 Agent**：从纪要抽取行动项，跟踪状态，定期提醒负责人并汇总进展。
-- [ ] 166. **合同风险扫描 Agent**：上传合同文本，标注付款、违约、期限等风险条款并生成问题清单。
-- [ ] 167. **实验报告生成 Agent**：导入实验数据、图表和备注，生成结论、异常分析和下一步建议。
-- [ ] 168. **多工具旅行规划 Agent**：整合预算、城市、天气和路线约束，生成可修改行程草案。
-- [ ] 169. **Issue 分诊 Agent**：读取 issue 标题正文，自动打标签、估算优先级、找相似问题和建议负责人。
-- [ ] 170. **内容复用 Agent**：把长文拆成微博、公众号、小红书和邮件版本，保留核心观点并适配语气。
+- [ ] 151. **Research Data Collection Agent**: Search approved public sources or import local material for a topic, remove duplicates, summarize findings, cite sources, and produce a reading list.
+- [ ] 152. **Codebase Q&A Agent**: Index repository files and answer architecture or implementation questions with file citations and confidence levels.
+- [ ] 153. **PR Repair Suggestion Agent**: Read failed tests and diffs, generate repair plans, patch suggestions and risk descriptions, and does not automatically submit them.
+- [ ] 154. **Customer Service Diversion Agent**: The system classifies user messages, extracts entities, recommends FAQs, and forwards low-confidence requests to manual work.
+- [ ] 155. **Procurement Price Comparison Agent**: Import user-provided quotations or read approved supplier feeds, normalize specifications, and compare prices, delivery dates, and stated risks.
+- [ ] 156. **Personal Calendar Agent**: Read to-do, calendar and email summaries, proposes a draft schedule and waits for confirmation.
+- [ ] 157. **Web Page Data Monitoring Agent**: Monitor changes in specified web pages, determine whether they are important, generate summaries and push notifications.
+- [ ] 158. **Log Troubleshooting Agent**: Input logs and configurations, automatically extract abnormal patterns, search historical cases, and output troubleshooting steps.
+- [ ] 159. **Data Cleaning Agent**: Import dirty CSV, identifies missing, anomalies and duplications, and generate a reviewable cleaning plan.
+- [ ] 160. **Learning Path Planning Agent**: Generate courses, exercises, and review plans based on goals and time, and adjusts them according to progress.
+- [ ] 161. **Document Consistency Check Agent**: Compare README, API documentation and code interfaces to find out-of-date descriptions and missing examples.
+- [ ] 162. **Candidate Screening Agent**: Parse resumes, job requirements and interview feedback to generate structured scores and follow-up suggestions.
+- [ ] 163. **Multi-step Form Filling Agent**: The system maps natural language requirements to complex forms, confirms key fields step by step and generates submission previews.
+- [ ] 164. **Social Media Comment Processing Agent**: Cluster comments, identifies negative feedback, generate reply drafts, and upgrades processing lists.
+- [ ] 165. **Meeting Action Item Tracking Agent**: Extract action items from minutes, track the status, regularly reminds the owner and summarize the progress.
+- [ ] 166. **Contract Risk Scanning Agent**: Upload the contract text, mark payment, breach of contract, deadline and other risk terms and generate a list of issues.
+- [ ] 167. **Experiment Report Generation Agent**: Import experimental data, charts and notes, and generate conclusions, anomaly analysis and next step suggestions.
+- [ ] 168. **Multi-tool Travel Planning Agent**: Integrate budget, city, weather and route constraints to generate a modifiable itinerary draft.
+- [ ] 169. **Issue Triage Agent**: Read the issue title text, automatically labels, estimates priority, finds similar issues and recommends the owner.
+- [ ] 170. **Content Reuse Agent**: Split long articles into Weibo, public accounts, Xiaohongshu and email versions, retaining the core points and adapting the tone.
 
-- [ ] 451. **多源信息早报 Agent**：聚合 RSS/网页摘要，去重聚类后生成结构化早报并投递。
-- [ ] 452. **工单初分拣 Agent**：根据描述建议分类、优先级和知识库链接，人工确认后入库。
-- [ ] 453. **代码库导览 Agent**：回答某功能在哪实现，返回文件路径引用与简要说明。
-- [ ] 454. **会议安排协调 Agent**：收集参与者空闲与偏好，提出时间候选并生成邀请草稿。
-- [ ] 455. **变更风险预检 Agent**：阅读 PR 描述与 diff 摘要，列出风险点、测试建议和回滚关注。
-- [ ] 456. **文档过期扫描 Agent**：对比文档更新日期与相关代码提交，标记可能过期章节。
-- [ ] 457. **竞品动态周更 Agent**：抓取公开更新日志，汇总新功能与措辞变化，输出周报。
-- [ ] 458. **入库数据清洗 Agent**：按规则清洗 CSV，汇报修正项、丢弃行和人工待审样本。
-- [ ] 459. **发布检查清单 Agent**：根据服务类型生成或勾选发布检查项，阻塞未完成项。
-- [ ] 460. **客服宏回复编排 Agent**：根据意图推荐宏模板并填槽，人工编辑后发送模拟。
-- [ ] 461. **研究资料卡片 Agent**：把长文切成主张-证据卡片，建立标签与引用链接。
-- [ ] 462. **演示站表单填报 Agent**：在受控演示站自动填表并截图校验，失败时定位字段。
-- [ ] 463. **日志噪声降噪 Agent**：聚类重复日志模式，建议采样或忽略规则草稿。
-- [ ] 464. **依赖升级试验 Agent**：在隔离分支尝试小版本升级，汇总测试结果与冲突文件。
-- [ ] 465. **内容合规初审 Agent**：扫描文案敏感词与夸大表述（可配置词表），输出修改建议。
-- [ ] 466. **周计划拆解 Agent**：把目标拆成可执行任务、估时和依赖，写入看板草稿。
-- [ ] 467. **API 示例生成 Agent**：从 OpenAPI 生成多语言调用示例与错误处理片段。
-- [ ] 468. **事故复盘草稿 Agent**：输入时间线素材生成复盘结构、根因候选和改进项清单。
-- [ ] 469. **多工具文件整理 Agent**：按规则重命名归档下载目录，冲突时请求确认并写操作日志。
-- [ ] 470. **学习教练对话 Agent**：按课程大纲提问、批改简答并记录掌握度，生成下次复习点。
+- [ ] 451. **Multi-source Information Morning Report Agent**: Aggregate approved RSS or public web summaries, deduplicate and cluster entries, and deliver a structured morning report.
+- [ ] 452. **Work Order Triage Agent**: Recommend a category, priority, and knowledge-base links from each work-order description, then send the item to a triage queue after manual confirmation.
+- [ ] 453. **Codebase Navigation Agent**: Answer where a requested function is implemented and return cited file paths with concise explanations.
+- [ ] 454. **Meeting Arrangement Coordination Agent**: Collect participants' availability and preferences, proposes time candidates and generate invitation drafts.
+- [ ] 455. **Change Risk Preflight Agent**: Read PR description and diff summary, list risk points, test suggestions and rollback concerns.
+- [ ] 456. **Document Expiration Scan Agent**: Compare the document update date and related code submissions, and mark possible expired chapters.
+- [ ] 457. **Product Update Digest Agent**: Read public release notes, summarize new features and wording changes, cite sources, and produce a weekly digest.
+- [ ] 458. **Inbound Data Cleaning Agent**: The system cleans CSV according to rules, reports correction items, discarded rows and manual samples for review.
+- [ ] 459. **Release Checklist Agent**: Generate or checks release check items based on service type and blocks unfinished items.
+- [ ] 460. **Customer Service Macro Reply Arrangement Agent**: The system recommends macro templates based on intent and fills in slots, and sends simulations after manual editing.
+- [ ] 461. **Research Evidence Card Agent**: Convert user-provided or public articles into claim-and-evidence cards with tags and citation links.
+- [ ] 462. **Demo Station Form Filling Agent**: The system automatically fills in the form at the controlled demo station and takes screenshots for verification, and locates the fields if it fails.
+- [ ] 463. **Log Noise Reduction Agent**: Cluster repeated log patterns, recommends sampling or ignoring rule drafts.
+- [ ] 464. **Dependency Upgrade Test Agent**: Try a small dependency upgrade on an isolated branch, run the selected tests, and summarize results and conflicting files.
+- [ ] 465. **Content Compliance Preliminary Review Agent**: Scan the copy for sensitive words and exaggerated expressions (configurable word list), and output modification suggestions.
+- [ ] 466. **Weekly Plan Dismantling Agent**: Split the goal into executable tasks, estimated time and dependencies, and write it into a Kanban draft.
+- [ ] 467. **API Sample Generation Agent**: Generate multi-language call samples and error handling snippets from OpenAPI.
+- [ ] 468. **Incident Review Draft Agent**: Input timeline materials to generate review structure, root cause candidates and improvement items list.
+- [ ] 469. **Multi-tool File Sorting Agent**: The system renames the archive download directory according to rules, requests confirmation and writes operation logs in case of conflicts.
+- [ ] 470. **Learning Coach Dialogue Agent**: Ask questions from a course outline, evaluate short answers, record mastery, and generate review points for the next session.
 
-## 十五、硬件、边缘与本地优先（30 题）
-> 训练点：本地存储、离线体验、设备适配、传感器数据。
+## 15. Hardware, Edge, and Local-First Apps (30 topics)
+> Training points: local storage, offline experience, device adaptation, sensor data.
 
-- [ ] 171. **离线家庭菜谱盒**：本地保存菜谱、食材、步骤和图片，支持离线搜索、购物清单和份量换算。
-- [ ] 172. **树莓派电子墨水日历**：生成适合墨水屏的日历图片，包含天气、日程、待办和低功耗刷新策略。
-- [ ] 173. **本地照片去重器**：扫描照片目录，按哈希和相似度找重复，提供预览、保留规则和回收站。
-- [ ] 174. **家庭媒体索引器**：扫描视频/音乐目录，抓取元数据，提供搜索、封面和播放记录。
-- [ ] 175. **局域网文件投递箱**：浏览器上传文件到本机或局域网设备，支持一次性链接、过期和下载记录。
-- [ ] 176. **蓝牙设备电量看板**：读取或模拟蓝牙设备电量，展示状态、低电提醒和历史趋势。
-- [ ] 177. **传感器数据记录器**：接收温湿度等数据，落本地 SQLite，展示曲线、阈值告警和导出。
-- [ ] 178. **离线地图标注器**：加载离线地图瓦片或静态底图，添加标记、路径、备注和导出。
-- [ ] 179. **本地音乐练习伴奏器**：管理伴奏、变速不变调、循环片段、节拍器和练习记录。
-- [ ] 180. **家庭用药提醒器**：管理药品、剂量、提醒、库存和服药记录，支持多人档案。
-- [ ] 181. **旧手机信息屏**：做一个全屏 Web 看板，显示时间、天气、日程、倒计时和远程刷新。
-- [ ] 182. **离线翻译词库查询**：导入词库文件，实现本地查词、例句、收藏和最近查询。
-- [ ] 183. **局域网设备扫描器**：扫描本地网段，展示设备、端口、厂商信息和变更提醒。
-- [ ] 184. **个人文件全文索引器**：索引本地文档内容，提供搜索、高亮、标签和隐私保护说明。
-- [ ] 185. **家庭能耗记录器**：录入电表/水表/燃气读数，展示用量趋势、费用估算和异常提醒。
+- [ ] 171. **Offline Family Recipe Box**: Save recipes, ingredients, steps, and photos locally, with offline search, shopping lists, and serving-size conversion.
+- [ ] 172. **Raspberry Pi E-Ink Calendar**: Generate calendar images suitable for ink screens, including weather, schedule, to-do and low-power refresh strategies.
+- [ ] 173. **Local Photo Deduplicator**: Scan photo directories, finds duplicates by hash and similarity, and provide preview, retention rules and recycle bin.
+- [ ] 174. **Home Media Indexer**: Scan local video and music folders, read embedded metadata or approved public catalogs, and provide search, artwork, and playback history.
+- [ ] 175. **LAN File Drop Box**: The browser uploads files to the local machine or LAN device, supporting one-time link, expiration and download records.
+- [ ] 176. **Bluetooth Device Power Display Board**: Read or simulate Bluetooth device power, display status, low battery reminder and historical trends.
+- [ ] 177. **Sensor Data Logger**: Receive data such as temperature and humidity, implement local SQLite, display curves, threshold alarms and export.
+- [ ] 178. **Offline Map Annotator**: Load offline map tiles or static basemaps, add markers, paths, notes and export.
+- [ ] 179. **Local Music Practice Accompaniment**: Manage accompaniment, variable speed and key, loops, metronome and practice records.
+- [ ] 180. **Home Medication Reminder**: Manage medicines, dosages, reminders, inventory and medication records, and support multi-person files.
+- [ ] 181. **Old Mobile Phone Information Screen**: Make a full-screen web signage that displays time, weather, schedule, countdown and remote refresh.
+- [ ] 182. **Offline Translation Thesaurus Query**: Import thesaurus files to realize local word search, example sentences, favorites and recent queries.
+- [ ] 183. **LAN Device Scanner**: Scan the local network segment and display devices, ports, manufacturer information and change reminders.
+- [ ] 184. **Personal Document Full-Text Indexer**: The system indexes local document content, providing search, highlighting, tagging, and privacy protection instructions.
+- [ ] 185. **Home Energy Consumption Recorder**: Input electricity meter/water meter/gas readings, display usage trends, cost estimates and abnormal reminders.
 
-- [ ] 471. **树莓派家庭仪表盘**：本地展示天气、日历和下班倒计时，支持离线缓存与夜间模式。
-- [ ] 472. **USB 设备热插拔日志**：记录插入拔出事件、设备标识与驱动提示，便于排障。
-- [ ] 473. **局域网设备发现地图**：扫描网段主机名与开放端口，标注已知设备与未知设备。
-- [ ] 474. **离线地图兴趣点本**：导入 GPX 与兴趣点，离线浏览与标注，适合户外无网。
-- [ ] 475. **传感器模拟器套件**：模拟温湿度与门磁读数推送到本地 MQTT，供自动化调试。
-- [ ] 476. **边缘日志环形缓冲**：在资源受限设备上滚动存储关键日志，支持导出与水位告警。
-- [ ] 477. **本地优先笔记冲突演示**：双端离线编辑同一笔记，展示冲突标记与合并策略。
-- [ ] 478. **摄像头定时抓拍归档**：按计划抓拍存本地，保留天数策略和缩略图浏览。
-- [ ] 479. **蓝牙信标签到演示**：模拟信标接近触发签到事件，记录时间线与设备电量占位。
-- [ ] 480. **家庭能耗插座模拟板**：模拟多路插座功率曲线，设置阈值告警和日用量汇总。
-- [ ] 481. **离线扫码入库枪 Web**：摄像头扫码录入库存，离线队列联网后同步。
-- [ ] 482. **嵌入式 OTA 状态面板**：展示设备固件版本、升级批次与失败重试（模拟设备群）。
-- [ ] 483. **本地媒体相册机**：树莓派相框模式轮播本地相册，支持天气字幕和远程投放开关。
-- [ ] 484. **串口调试工作台**：Web 串口收发、宏命令、时间戳日志和会话导出。
-- [ ] 485. **边缘规则引擎玩具**：if-this-then-that 规则编辑，本地触发模拟事件并记审计。
+- [ ] 471. **Raspberry Pi Home Dashboard**: The system locally displays weather, calendar and countdown to get off work, and supports offline caching and night mode.
+- [ ] 472. **USB Device Hot Plug Log**: Record insertion and removal events, device identification and driver prompts to facilitate troubleshooting.
+- [ ] 473. **LAN Device Discovery Map**: Scan network segment host names and open ports, and mark known and unknown devices.
+- [ ] 474. **Offline Map Points of Interest Book**: Import GPX and points of interest, browse and annotate offline, suitable for outdoor use without network.
+- [ ] 475. **Sensor Simulator Kit**: Simulate temperature, humidity and door sensor readings and pushes them to local MQTT for automated debugging.
+- [ ] 476. **Edge Log Ring Buffer**: Rolling storage of critical logs on resource-constrained devices, supporting export and water level alarms.
+- [ ] 477. **Local Priority Note Conflict Demonstration**: Edit the same note offline at both ends, demonstrating conflict marking and merging strategies.
+- [ ] 478. **Camera Scheduled Snapshot Archiving**: Save local snapshots according to plan, retention days policy and thumbnail browsing.
+- [ ] 479. **Bluetooth Beacon Proximity Demo**: Simulate Bluetooth beacon proximity, trigger a check-in event, record a timeline, and display device battery usage.
+- [ ] 480. **Household Energy Consumption Socket Simulation Board**: Simulate multi-channel socket power curves, sets threshold alarms and daily usage summary.
+- [ ] 481. **Offline QR Code Scanning Gun Web**: The camera scans the QR code to enter the inventory, and the offline queue is synchronized after being connected to the Internet.
+- [ ] 482. **Embedded OTA Status Panel**: Display device firmware version, upgrade batch and failed retries (simulated device group).
+- [ ] 483. **Local Media Photo Album Machine**: Raspberry Pi photo frame mode rotates local photo albums, supports weather subtitles and remote delivery switch.
+- [ ] 484. **Serial Debugging Workbench**: Web serial port sending and receiving, macro commands, timestamp logs and session export.
+- [ ] 485. **Edge Rule Engine Playground**: Edit if-this-then-that rules, trigger simulated events locally, and record an audit trail.
 
-## 十六、安全与隐私工具（30 题）
-> 训练点：威胁建模、加密、权限、审计日志。
+## 16. Security & Privacy Tools (30 topics)
+> Training points: Threat modeling, encryption, permissions, audit logs.
 
-- [ ] 186. **权限矩阵审计器**：导入用户、角色和权限表，找出过权、缺权、孤儿账号和风险说明。
-- [ ] 187. **安全笔记保险箱**：客户端加密保存敏感笔记，支持主密码、自动锁定、搜索和导出备份。
-- [ ] 188. **钓鱼邮件训练器**：生成模拟邮件、答题训练、风险提示和成绩统计，适合团队安全教育。
-- [ ] 189. **个人数据导出清单**：记录各平台数据导出入口、周期、文件位置和删除请求进度。
-- [ ] 190. **浏览器隐私检查页**：检测常见指纹信息、权限状态、第三方 Cookie 和本地存储暴露。
-- [ ] 191. **文件加密分享工具**：本地加密文件，生成一次性下载包、密码提示和过期策略。
-- [ ] 192. **审计日志查看器**：导入 JSONL 日志，支持筛选、时间线、异常行为标记和导出。
-- [ ] 193. **双因素恢复码管理器**：安全保存恢复码，支持分组、已用标记、加密和打印版导出。
-- [ ] 194. **隐私友好短链接**：生成本地短链，记录访问统计但避免保存敏感参数，支持过期和撤销。
-- [ ] 195. **Cookie 同意管理模拟器**：实现站点 Cookie 分类、同意弹窗、偏好保存和合规说明。
-- [ ] 196. **个人威胁模型画布**：引导填写资产、威胁、攻击面、防护措施和优先级，导出报告。
-- [ ] 197. **敏感截图打码工具**：上传截图后自动或手动打码姓名、邮箱、token，支持撤销和导出。
-- [ ] 198. **SSH 配置检查器**：解析 `~/.ssh/config`，提示弱配置、重复 Host、权限问题和修复命令。
-- [ ] 199. **数据保留策略日历**：管理不同数据类型的保留期限、删除提醒、例外审批和执行记录。
-- [ ] 200. **本地零信任访问面板**：模拟设备、用户、资源和策略，展示访问判定、拒绝原因和审计事件。
+- [ ] 186. **Permission Matrix Auditor**: Import users, roles, and permission tables to identify excessive access, missing permissions, orphaned accounts, and review risks.
+- [ ] 187. **Secure Note Vault**: Encrypt sensitive notes on the client, unlock them with a master password, lock automatically when idle, support search, and export an encrypted backup.
+- [ ] 188. **Suspicious Email Recognition Trainer**: Use curated fictional email samples for classification exercises, explain warning signs, provide safe follow-up guidance, and track training results.
+- [ ] 189. **Personal Data Export List**: Record the data export entry, cycle, file location and deletion request progress of each platform.
+- [ ] 190. **Browser Privacy Checkup Page**: Detect common fingerprint information, permission status, third-party cookies, and local storage exposure.
+- [ ] 191. **File Encryption Sharing Tool**: The system locally encrypt files, generate one-time download package, password prompt and expiration policy.
+- [ ] 192. **Audit Log Viewer**: Import JSONL logs, support filtering, timeline, abnormal behavior marking and export.
+- [ ] 193. **Two-factor Recovery Code Manager**: The system safely save recovery codes, support grouping, marked used, encryption and print version export.
+- [ ] 194. **Privacy-friendly Short Links**: Generate local short links, record access statistics but avoid saving sensitive parameters, and support expiration and revocation.
+- [ ] 195. **Cookie Consent Management Simulator**: Implement site cookie classification, consent pop-ups, preference saving and compliance instructions.
+- [ ] 196. **Personal Threat Model Canvas**: The system guides filling in assets, threats, attack surfaces, protective measures and priorities, and exporting reports.
+- [ ] 197. **Sensitive Screenshot Coding Tool**: Upload a screenshot, automatically or manually redact names, email addresses, and tokens, then preview, undo, and export the sanitized image.
+- [ ] 198. **SSH Configuration Checker**: Parse `~/.ssh/config`, prompts weak configuration, duplicate Host, permission issues and repair commands.
+- [ ] 199. **Data Retention Policy Calendar**: Manage retention periods, deletion reminders, exception approvals, and execution records for different data types.
+- [ ] 200. **Local Zero-trust Access Panel**: Simulate devices, users, resources, and policies, and display access determinations, denial reasons, and audit events.
 
-- [ ] 486. **密钥泄露扫描器**：扫描仓库样例中的 token 形态，分级报告与忽略规则。
-- [ ] 487. **依赖 SBOM 浏览器**：解析 SBOM 展示组件、许可证与版本，支持搜索与导出。
-- [ ] 488. **权限矩阵可视化**：编辑角色-资源-动作矩阵，检测过度授权和空白角色。
-- [ ] 489. **会话异常登录看板**：展示异常地理位置与设备登录样例，支持标记可信与通知。
-- [ ] 490. **隐私政策变更 diff**：对比两版隐私政策，高亮增删条款并生成摘要。
-- [ ] 491. **安全基线自检清单**：按 CIS 风格检查项自评，记录证据链接与整改期限。
-- [ ] 492. **加密笔记分享一次链**：生成一次性只读链接，阅读后失效并记访问尝试。
-- [ ] 493. **附件沙箱预览器**：在隔离预览中打开上传样例文件元数据，限制脚本执行（演示）。
-- [ ] 494. **CORS 配置检查器**：输入响应头样例，解释风险配置并给出收紧建议。
-- [ ] 495. **密钥轮换运行本**：记录密钥版本、轮换窗口与双写验证步骤，跟踪完成状态。
-- [ ] 496. **PII 字段发现扫描**：对样例表结构与日志扫描可能的个人标识字段并分级。
-- [ ] 497. **安全意识推送回执台**：向内网演练名单发送安全提示卡片，统计已读回执、测验得分和复训名单。
-- [ ] 498. **证书透明度订阅提醒**：监控指定域名新证书签发事件（可接公开 API 或模拟），告警异常。
-- [ ] 499. **访问令牌寿命审计**：统计长期未轮换 token，展示拥有者与最后使用时间样例。
-- [ ] 500. **最小权限申请工单**：提交权限申请、期限与理由，审批后生成到期回收任务。
+- [ ] 486. **Key Leakage Scanner**: Scan the token form in the warehouse sample, hierarchical reporting and ignoring rules.
+- [ ] 487. **Depends on SBOM Browser**: Parse SBOM display components, licenses and versions, support search and export.
+- [ ] 488. **Permission Matrix Visualization**: Edit role-resource-action matrix to detect over-authorization and blank roles.
+- [ ] 489. **Session Abnormal Login Dashboard**: Display abnormal geographical location and device login examples, support marking as trustworthy and notification.
+- [ ] 490. **Privacy Policy Changes Diff**: Compare two versions of the privacy policy, highlight added and deleted terms and generate a summary.
+- [ ] 491. **Security Baseline Self-Assessment Checklist**: Run a self-assessment using CIS-inspired checklist items, record evidence links, assign owners, and track remediation deadlines.
+- [ ] 492. **Encrypted Note Sharing Once Link**: Generate a one-time read-only link, which will become invalid after reading and the access attempt will be recorded.
+- [ ] 493. **Attachment Sandbox Previewer**: Turn on uploaded sample file metadata in quarantine preview to limit script execution (demo).
+- [ ] 494. **CORS Configuration Checker**: Input response header samples, explain risky configurations and give tightening recommendations.
+- [ ] 495. **Key Rotation Runbook**: Record the key version, rotation window and double-write verification steps, and track the completion status.
+- [ ] 496. **PII Field Discovery Scan**: Scan sample table structures and logs for possible personally identifiable fields and rank them.
+- [ ] 497. **Security Awareness Push Receipt Desk**: Send security reminder cards to the intranet drill list, and count read receipts, test scores, and retraining lists.
+- [ ] 498. **Certificate Transparency Monitor**: Monitor public certificate-transparency events for a specified domain, or use a local simulator, and alert on unexpected issuance.
+- [ ] 499. **Access Token Life Audit**: Statistics of long-term unrotated tokens, showing examples of owners and last use time.
+- [ ] 500. **Least-Privilege Access Request**: Submit an access request with an expiration date and reason, record approval, and generate a revocation task when access expires.
 
-## 十七、行业工作台与垂直业务（40 题）
-> 训练点：业务建模、表单流转、角色视图、运营闭环。
+## 17. Industry Workbenches and Vertical Apps (40 topics)
+> Training points: business modeling, form flow, role view, operation closed loop.
 
-- [ ] 201. **诊所预约前台**：管理医生排班、患者预约、到诊状态、改期取消和当天候诊队列，输出前台可用的日程视图。
-- [ ] 202. **宠物医院病例本**：记录宠物档案、就诊记录、疫苗提醒、处方和复诊计划，支持主人按宠物查看历史。
-- [ ] 203. **健身房会员管理**：维护会员卡、私教课、到店打卡、续费提醒和课程消耗记录，展示会员活跃状态。
-- [ ] 204. **小型民宿运营台**：管理房态、预订、入住退房、清洁任务和收入统计，支持日期范围查看可售房间。
-- [ ] 205. **餐厅候位与订座板**：记录桌位、预约、候位队列、过号和入座状态，提供前台快速操作视图。
-- [ ] 206. **咖啡店配方成本器**：维护饮品配方、原料价格、杯型和毛利估算，帮助店主比较定价方案。
-- [ ] 207. **维修工单派单台**：录入报修、指派师傅、跟踪上门时间、配件和结算状态，按优先级展示待处理工单。
-- [ ] 208. **家政服务排班器**：管理客户、服务项目、阿姨档期、订单确认和服务反馈，减少排班冲突。
-- [ ] 209. **摄影约拍流程台**：维护客户需求、档期、合同节点、选片进度和交付清单，展示每单当前阶段。
-- [ ] 210. **培训机构课消系统**：管理学员、课程包、上课记录、请假补课和剩余课时提醒，支持班级视图。
-- [ ] 211. **小区物业报修台**：接收业主报修、分类、派工、处理进度和满意度，提供公告与常见问题入口。
-- [ ] 212. **律师案件跟进板**：记录客户、案件节点、材料清单、庭期提醒和费用状态，按案件展示下一步行动。
-- [ ] 213. **心理咨询排程本**：管理来访者、咨询师档期、预约状态、回访提醒和匿名统计，保护敏感信息展示。
-- [ ] 214. **牙科种植流程追踪**：记录患者阶段、影像资料、手术安排、复诊和费用计划，让医生快速查看进度。
-- [ ] 215. **二手车收车评估器**：录入车辆信息、检测项、估价、整备成本和销售状态，生成收车决策摘要。
-- [ ] 216. **婚礼执行清单台**：管理新人需求、供应商、时间线、付款节点和当天任务，支持按角色查看待办。
-- [ ] 217. **生鲜订货汇总器**：收集门店订货需求、库存、供应商报价和到货状态，生成采购汇总清单。
-- [ ] 218. **校车线路管理器**：维护学生、站点、线路、上下车记录和异常提醒，方便调度查看每日运行。
-- [ ] 219. **实验室样本流转台**：记录样本编号、来源、处理步骤、负责人和存放位置，支持状态追踪和异常标记。
-- [ ] 220. **社区活动志愿者台**：管理活动、岗位、报名、签到和服务时长，生成志愿者参与记录。
+- [ ] 201. **Clinic Appointment Front Desk**: Manage clinician schedules, appointments, arrivals, rescheduling, cancellations, and today's waiting queue in a front-desk view.
+- [ ] 202. **Pet Hospital Case Book**: Record pet files, medical records, vaccine reminders, prescriptions and follow-up plans, and support owners to view history by pet.
+- [ ] 203. **Gym Membership Manager**: Manage membership plans, personal-training sessions, facility check-ins, renewal reminders, and class usage while showing each member's current status.
+- [ ] 204. **Small B&B Operation Desk**: Manage room status, reservations, check-in and check-out, cleaning tasks and income statistics, and support viewing available rooms within a date range.
+- [ ] 205. **Restaurant Waiting and Reservation Board**: Record table seats, reservations, waiting queues, check-in and seating status, and provide a quick operation view at the front desk.
+- [ ] 206. **Coffee Shop Recipe Costizer**: Maintain beverage recipes, ingredient prices, cup sizes and gross profit estimates to help shop owners compare pricing plans.
+- [ ] 207. **Maintenance Work Order Dispatching Platform**: Enter repair reports, assign technicians, track door-to-door time, accessories and settlement status, and display pending work orders according to priority.
+- [ ] 208. **Housekeeping Service Scheduler**: Manage customers, service items, schedules, order confirmations and service feedback to reduce scheduling conflicts.
+- [ ] 209. **Photography Appointment Process Table**: Maintain customer needs, schedules, contract nodes, film selection progress and delivery lists, and display the current stage of each order.
+- [ ] 210. **Course Cancellation System for Training Institutions**: Manage students, course packages, class records, leave requests for make-up classes and remaining class reminders, and support class view.
+- [ ] 211. **Community Property Repair Report Desk**: Receive repair reports from owners, categorizes them, dispatches work, processing progress and satisfaction, and provide announcements and entrance to frequently asked questions.
+- [ ] 212. **Lawyer Case Follow-up Board**: Record clients, case nodes, materials list, court date reminders and fee status, and display the next action by case.
+- [ ] 213. **Psychological Consultation Schedule Book**: Manage visitors, counselor schedules, appointment status, return visit reminders and anonymous statistics, and protect the display of sensitive information.
+- [ ] 214. **Dental Implant Process Tracking**: Record patient stages, imaging data, surgical schedules, follow-up visits and cost plans, allowing doctors to quickly check the progress.
+- [ ] 215. **Used Car Closing Evaluator**: Input vehicle information, inspection items, valuation, maintenance costs and sales status, and generate a summary of the car closing decision.
+- [ ] 216. **Wedding Execution List Desk**: Manage the needs of the couple, suppliers, timelines, payment nodes and tasks of the day, and support viewing to-dos by role.
+- [ ] 217. **Fresh Food Order Aggregator**: Collect store ordering requirements, inventory, supplier quotes and arrival status, and generate a purchase summary list.
+- [ ] 218. **School Bus Route Manager**: Maintain students, sites, routes, boarding and alighting records and anomaly reminders to facilitate scheduling and view daily operations.
+- [ ] 219. **Laboratory Sample Transfer Table**: Record sample number, source, processing steps, owner and storage location, and support status tracking and anomaly marking.
+- [ ] 220. **Community Activity Volunteer Desk**: Manage activities, positions, registrations, sign-ins and service hours, and generate volunteer participation records.
 
-- [ ] 501. **餐饮后厨备料单**：按预订与菜单生成备料清单、完成勾选和浪费记录。
-- [ ] 502. **快递站点分拣台**：录入到件、格口分配与异常件，统计时效与遗失。
-- [ ] 503. **健身房私教课预约**：管理教练档期、会员预约、取消规则和课时消耗。
-- [ ] 504. **民宿退房查房清单**：查房项打分、照片与赔付记录，生成下一单可售状态。
-- [ ] 505. **驾校科目进度板**：学员科目进度、教练分配与考试预约提醒。
-- [ ] 506. **洗衣店取送工单**：登记衣物、瑕疵备注、取件码和逾期提醒。
-- [ ] 507. **图书漂流柜管理**：柜格占用、借还记录与滞留催还，支持标签检索。
-- [ ] 508. **社区报修调度台**：居民报修分类、派工、签到完成与满意度回访。
-- [ ] 509. **展会展位搭建进度**：展位任务、物料到货与验收节点，展示延期风险。
-- [ ] 510. **教培试听转化台**：试听预约、到访、意向评级与跟进任务。
-- [ ] 511. **农场采摘预约页**：园区时段容量、预约核销与天气改期通知。
-- [ ] 512. **摄影棚档期看板**：棚室占用、器材借用与客户档期冲突检测。
-- [ ] 513. **汽车美容施工单**：施工项目、技师、质检照片与交车确认。
-- [ ] 514. **共享办公室访客登记**：访客预约、二维码签到与主机确认，导出日报。
-- [ ] 515. **宠物寄养日报**：寄养日记、喂食记录与异常通知家长（非诊疗）。
-- [ ] 516. **婚礼筹备任务树**：供应商、节点截止日期与付款节点提醒。
-- [ ] 517. **景区志愿者排班**：岗位需求、志愿者技能匹配与签到时长统计。
-- [ ] 518. **校园失物招领台**：登记失物与招领、匹配建议与领取核销。
-- [ ] 519. **咖啡豆烘焙批次本**：批次参数、杯测笔记与出杯评分趋势（工艺管理）。
-- [ ] 520. **物流冷链温度抽检**：录入抽检温度点、超限告警与承运商整改记录（非医疗样本）。
+- [ ] 501. **Catering Kitchen Preparation List**: Generate preparation list according to reservation and menu, complete the check and waste records.
+- [ ] 502. **Parcel Sorting Station Dashboard**: Record incoming parcels, sorting-bin assignments, exceptions, processing time, and loss statistics.
+- [ ] 503. **Gym Personal Training Class Reservation**: Manage coaching schedules, membership reservations, cancellation rules and class consumption.
+- [ ] 504. **B&B Check-out Check List**: Check-out item scores, photos and compensation records are generated to generate the next sale status.
+- [ ] 505. **Driving School Subject Progress Board**: Student subject progress, instructor assignment and test appointment reminder.
+- [ ] 506. **Laundry Pickup and Delivery Work Order**: Register garments, condition notes, pickup codes, delivery status, and overdue reminders.
+- [ ] 507. **Community Book Exchange Cabinet**: Track cabinet capacity, borrowing and returns, overdue reminders, and tag-based lookup for a community book exchange.
+- [ ] 508. **Community Repair Report Dispatching Desk**: Classification of residents’ repair reports, dispatch of work, completion of sign-in and return visit of satisfaction.
+- [ ] 509. **Exhibition Booth Construction Progress**: Booth tasks, material arrival and acceptance nodes, showing the risk of delay.
+- [ ] 510. **Training Program Trial Conversion Board**: Track trial-session appointments, attendance, interest ratings, follow-up tasks, and conversion status.
+- [ ] 511. **Farm Picking Reservation Page**: Park time slot capacity, reservation cancellation and weather rescheduling notice.
+- [ ] 512. **Studio Schedule Board**: Studio occupancy, equipment borrowing and customer schedule conflict detection.
+- [ ] 513. **Car Beauty Construction Order**: Construction project, technician, quality inspection photos and vehicle delivery confirmation.
+- [ ] 514. **Shared Office Visitor Registration**: Visitor reservation, QR code sign-in and host confirmation, export daily report.
+- [ ] 515. **Pet Foster Care Daily**: Foster care diary, feeding records and notification of abnormalities to parents (non-diagnosis and treatment).
+- [ ] 516. **Wedding Preparation Task Tree**: Suppliers, node deadlines and payment node reminders.
+- [ ] 517. **Scenic Area Volunteer Schedule**: Job requirements, volunteer skill matching and check-in time statistics.
+- [ ] 518. **Campus Lost and Found Desk**: Registration of lost and found items, matching suggestions and verification of claims.
+- [ ] 519. **Coffee Bean Roasting Batch Book**: Batch parameters, cupping notes and cup scoring trends (process management).
+- [ ] 520. **Logistics Cold Chain Temperature Sampling**: Record cold-chain temperature samples, threshold alerts, carriers, and corrective actions using non-medical sample data.
 
-## 十八、团队知识与内部工具（40 题）
-> 训练点：知识管理、流程协作、权限意识、可检索信息。
+## 18. Team Knowledge and Internal Tools (40 topics)
+> Training points: knowledge management, process collaboration, permission awareness, retrievable information.
 
-- [ ] 221. **内部 SOP 管理器**：维护流程文档、适用岗位、版本、审核状态和过期提醒，让团队快速找到最新操作步骤。
-- [ ] 222. **新人入职任务包**：按岗位生成入职清单、资料链接、导师安排和完成进度，支持 HR 查看批次状态。
-- [ ] 223. **团队术语词典**：收录业务术语、缩写、示例和负责人，支持搜索、待确认词条和变更历史。
-- [ ] 224. **会议室资源预订**：管理会议室、设备、预订冲突、取消和使用统计，提供当天时间轴视图。
-- [ ] 225. **内部问答沉淀台**：团队成员提交问题和答案，支持标签、采纳、过期提醒和高频问题排行。
-- [ ] 226. **客户交接手册**：整理客户背景、联系人、风险点、当前事项和历史沟通，帮助接手人快速了解状态。
-- [ ] 227. **团队复盘资料库**：记录项目复盘、问题、改进项、负责人和跟进状态，支持按主题回看经验。
-- [ ] 228. **内部培训报名台**：发布课程、收集报名、签到、反馈和证书状态，展示培训完成率。
-- [ ] 229. **共享设备借用系统**：管理设备库存、借出归还、损坏记录和预约排队，避免口头借用丢失。
-- [ ] 230. **团队 OKR 进度板**：维护目标、关键结果、负责人、信心值和进展更新，生成周度摘要。
-- [ ] 231. **岗位职责地图**：展示岗位、职责、协作对象和常用文档，帮助新人理解组织分工。
-- [ ] 232. **内部公告确认台**：发布公告、收集阅读确认、追踪未读人员和提醒，适合重要制度通知。
-- [ ] 233. **团队轮值看板**：配置值班角色、成员、换班、节假日和提醒，展示本周和下周安排。
-- [ ] 234. **问题升级路径助手**：按问题类型推荐负责人、响应时限、升级条件和处理记录，降低找人成本。
-- [ ] 235. **项目资料归档器**：按项目整理文档、链接、交付物、归档状态和负责人，支持交付后统一移交。
-- [ ] 236. **内部需求收集箱**：员工提交工具需求、痛点、影响范围和投票，产品负责人可归类和排优先级。
-- [ ] 237. **跨团队依赖跟踪板**：记录依赖事项、对接人、阻塞原因、承诺时间和风险状态，适合项目经理每日查看。
-- [ ] 238. **制度变更对比器**：上传两版制度文本，标记条款变化、影响岗位和待确认问题，输出变更摘要。
-- [ ] 239. **团队技能矩阵**：维护成员技能、熟练度、项目经验和学习计划，帮助排班和培训规划。
-- [ ] 240. **内部工具目录**：登记工具入口、负责人、适用场景、权限申请和故障联系，支持按关键词查找。
+- [ ] 221. **Internal SOP Manager**: Maintain process documents, applicable roles, versions, review status, and expiration reminders so the team can find the latest approved procedure.
+- [ ] 222. **Newcomer Onboarding Task Package**: Generate onboarding checklists, data links, mentor arrangements and completion progress by position, and support HR to check batch status.
+- [ ] 223. **Team Terminology Dictionary**: Include business terms, abbreviations, examples and owners, and support search, pending entries and change history.
+- [ ] 224. **Meeting Room Resource Booking**: Manage meeting rooms, equipment, booking conflicts, cancellations and usage statistics, providing a timeline view of the day.
+- [ ] 225. **Internal Q&A Knowledge Base**: Let team members submit questions and answers, apply tags, accept solutions, flag stale content, and rank frequently viewed entries.
+- [ ] 226. **Customer Handover Manual**: Organize customer background, contacts, risk points, current matters and historical communications to help the person taking over quickly understand the status.
+- [ ] 227. **Team Review Database**: Record project reviews, problems, improvement items, owners and follow-up status, and support review of experiences by topic.
+- [ ] 228. **Internal Training Registration Desk**: Publish courses, collect registrations, sign-ins, feedback and certificate status, and display training completion rates.
+- [ ] 229. **Shared Equipment Borrowing System**: Manage equipment inventory, loan returns, damage records and reservation queues to avoid loss of verbal borrowing.
+- [ ] 230. **Team OKR Progress Board**: Maintain goals, key results, owners, confidence values, and progress updates, and generate weekly summaries.
+- [ ] 231. **Job Responsibility Map**: Display positions, responsibilities, collaboration objects and common documents to help newcomers understand the organizational division of labor.
+- [ ] 232. **Internal Announcement Confirmation Desk**: Publish announcements, collect reading confirmations, track unread people and remind, suitable for important system notifications.
+- [ ] 233. **Team Duty Dashboard**: Configure duty roles, members, shifts, holidays and reminders to display the schedule for this week and next week.
+- [ ] 234. **Problem Escalation Path Assistant**: The system recommends the owner, response time limit, escalation conditions and processing records according to the problem type to reduce the cost of finding people.
+- [ ] 235. **Project Data Archiver**: Organize documents, links, deliverables, archive status and owner by project, supporting unified handover after delivery.
+- [ ] 236. **Internal Requirements Collection Box**: Employees submit tool requirements, pain points, impact areas, and votes, which the Product Owner can categorize and prioritize.
+- [ ] 237. **Cross-team Dependency Tracking Board**: Record dependencies, contacts, blocking reasons, commitment time and risk status, suitable for daily review by project managers.
+- [ ] 238. **System Change Comparator**: Upload two versions of the system text, mark changes in terms, affected positions, and issues to be confirmed, and output a summary of the changes.
+- [ ] 239. **Team Skills Matrix**: Maintain member skills, proficiency, project experience and learning plans to help with shift scheduling and training planning.
+- [ ] 240. **Internal Tool Directory**: Register tool entrance, owner, applicable scenarios, permission application and fault contact, support search by keywords.
 
-- [ ] 521. **决策记录 ADR 墙**：撰写架构决策、上下文与后果，支持状态与关联服务。
-- [ ] 522. **新人 30 日清单**：分角色入职任务、导师确认与进度仪表。
-- [ ] 523. **术语表共建器**：团队术语定义、别名与禁用词，变更订阅通知。
-- [ ] 524. **会议成本计算器**：按参会人级别与时长估算会议成本，提示精简建议。
-- [ ] 525. **内部系统导航目录**：登记内部系统入口、负责人与权限说明，支持搜索。
-- [ ] 526. **RFC 评论工作流**：发布 RFC、分节评论、赞成反对与合并决议。
-- [ ] 527. **故障演练剧本库**：演练场景、步骤、观察指标与复盘模板。
-- [ ] 528. **团队情绪匿名脉冲**：周期匿名打分与主题标签，展示趋势不暴露个人。
-- [ ] 529. **技能内部分享预约**：分享主题、时间与回放链接，统计报名与反馈。
-- [ ] 530. **办公设备借用台**：设备库存、借还与损坏记录，逾期提醒。
-- [ ] 531. **会议室设备故障报修**：报修、处理人与停用公告，关联会议冲突提示。
-- [ ] 532. **跨团队依赖登记**：声明服务依赖、联系人与 SLA 预期，变更通知。
-- [ ] 533. **发布值周手册**：值周职责、联系方式与检查表，交接确认。
-- [ ] 534. **面试题库协作版**：题目、考察点与使用记录，避免短期重复。
-- [ ] 535. **内部 FAQ 投票排序**：投稿 FAQ，投票置顶与过期清理。
-- [ ] 536. **周报聚合阅读器**：按团队拉取周报条目，标签过滤与亮点摘录。
-- [ ] 537. **OKR 复盘会纪要板**：按周期记录目标进展、信心变化、阻塞决策和下周期假设，导出复盘纪要。
-- [ ] 538. **权限交接检查表**：人员离任时系统权限回收清单与双人确认。
-- [ ] 539. **技术雷达内部版**：采纳/试验/评估/暂缓条目，投票与评论。
-- [ ] 540. **会议室无声议程板**：会前粘贴议程与材料链接，会中勾选进度。
+- [ ] 521. **Decision Recording ADR Wall**: Authors architectural decisions, context and consequences, supporting state and associated services.
+- [ ] 522. **30-day Checklist for Newbies**: Onboarding tasks by role, mentor confirmation and progress meter.
+- [ ] 523. **Glossary Builder**: Team term definitions, aliases and banned words, change subscription notifications.
+- [ ] 524. **Meeting Cost Calculator**: Estimate meeting cost from participant roles and duration, show the assumptions, and suggest ways to shorten the meeting.
+- [ ] 525. **Internal System Navigation Directory**: Register internal system entrance, owner and permission description, support search.
+- [ ] 526. **RFC Comment Workflow**: Publish RFCs, section comments, upvotes, and merged resolutions.
+- [ ] 527. **Fault Drill Script Library**: Drill scenarios, steps, observation indicators and review templates.
+- [ ] 528. **Anonymous Team Pulse Survey**: Collect periodic anonymous ratings and topic tags, then show aggregate trends without exposing individuals.
+- [ ] 529. **Skills Internal Sharing Appointment**: Share topics, time and replay links, and count registrations and feedback.
+- [ ] 530. **Office Equipment Loan Desk**: Equipment inventory, loan and damage records, overdue reminders.
+- [ ] 531. **Conference Room Equipment Failure Report for Repair**: Repair report, handler and deactivation announcement, associated meeting conflict prompts.
+- [ ] 532. **Cross-Team Dependency Registry**: Document service dependencies, contacts, SLA expectations, and change-notification preferences.
+- [ ] 533. **Publish the Duty Week Manual**: Duty week responsibilities, contact information and checklist, handover confirmation.
+- [ ] 534. **Collaborative Interview Question Library**: Maintain interview questions, evaluation criteria, and usage history to reduce short-term repetition across interviewers.
+- [ ] 535. **Internal FAQ Voting Sorting**: FAQ submission, voting to the top and expiration cleanup.
+- [ ] 536. **Weekly Report Aggregation Reader**: Pull weekly report entries by team, tag filtering and highlight excerpts.
+- [ ] 537. **OKR Review Meeting Minutes Board**: Record goal progress, changes in confidence, blocking decisions and assumptions for the next cycle on a periodic basis, and export review minutes.
+- [ ] 538. **Permission Handover Checklist**: System permission recovery list and double confirmation when a person leaves office.
+- [ ] 539. **Internal Technology Radar**: Maintain Adopt, Experiment, Evaluate, and Hold entries with votes, comments, ownership, and review dates.
+- [ ] 540. **Silent Agenda Board in Conference Room**: Attach the agenda and reference links before a meeting, then track progress and decisions during the session.
 
-## 十九、数据运营与质量治理（40 题）
-> 训练点：数据导入、清洗、规则校验、可解释报表。
+## 19. Data Operations and Quality Governance (40 topics)
+> Training points: data import, cleaning, rule verification, interpretable reports.
 
-- [ ] 241. **CSV 字段映射向导**：导入不同来源 CSV，手动匹配字段、预览结果、保存映射模板并导出标准数据。
-- [ ] 242. **数据质量巡检台**：配置必填、唯一、范围和格式规则，导入数据后展示错误样例和修复进度。
-- [ ] 243. **重复客户合并助手**：识别疑似重复客户，展示差异字段、合并建议和人工确认结果，保留合并记录。
-- [ ] 244. **指标口径管理器**：维护业务指标定义、计算口径、负责人和变更历史，减少团队报表口径不一致。
-- [ ] 245. **漏斗转化分析器**：导入事件样例，配置漏斗步骤，展示转化率、流失节点和分群对比。
-- [ ] 246. **A/B 实验结果看板**：录入实验组、指标、样本量和结果，展示是否达到预设目标和结论记录。
-- [ ] 247. **数据导入错误收件箱**：接收导入失败记录，按错误类型聚合、分配处理人并标记重试状态。
-- [ ] 248. **运营活动归因表**：记录活动、渠道、成本、线索和转化结果，帮助运营比较投入产出。
-- [ ] 249. **留存 Cohort 看板**：导入用户活跃数据，按注册批次展示留存曲线和关键日期标注。
-- [ ] 250. **异常订单侦测台**：导入订单样例，按金额、频率、地址和退款行为标记异常，供人工复核。
-- [ ] 251. **标签规则调试器**：配置用户标签规则，输入样例用户后展示命中原因和未命中条件。
-- [ ] 252. **埋点验收清单**：维护页面、事件、属性、负责人和验收状态，支持按版本查看埋点覆盖。
-- [ ] 253. **报表订阅中心**：管理报表、订阅人、发送频率和最近发送状态，提供失败重试记录。
-- [ ] 254. **数据字典浏览器**：维护字段名、含义、枚举值、来源和示例，支持搜索和最近更新。
-- [ ] 255. **运营名单分群器**：按条件筛选用户名单，预估人数、保存分群并导出投放清单。
-- [ ] 256. **库存周转分析器**：导入库存和销售样例，计算周转天数、滞销商品和补货建议。
-- [ ] 257. **渠道线索质量评分**：导入不同渠道线索，按完整度、跟进结果和成交情况评分，展示渠道排行。
-- [ ] 258. **退款原因分析台**：汇总退款记录、原因、商品和客服备注，展示高频问题和趋势变化。
-- [ ] 259. **数据脱敏预览器**：上传样例数据，选择脱敏规则，预览姓名、手机号、邮箱等字段的处理效果。
-- [ ] 260. **指标异常复盘本**：记录异常指标、影响范围、排查过程、根因和后续动作，形成可检索复盘库。
+- [ ] 241. **CSV Field Mapping Wizard**: Import CSVs from different sources, manually match fields, preview results, save mapping templates, and export standard data.
+- [ ] 242. **Data Quality Inspection Platform**: Configure required, unique, range and format rules, and display error samples and repair progress after importing data.
+- [ ] 243. **Duplicate Customer Merger Assistant**: The system identifies suspected duplicate customers, displays difference fields, merge suggestions and manual confirmation results, and retains merge records.
+- [ ] 244. **Indicator Caliber Manager**: Maintain business indicator definitions, calculation calibers, owners and change history, and reduces team report caliber inconsistencies.
+- [ ] 245. **Funnel Conversion Analyzer**: Import event samples, configure funnel steps, and display conversion rates, churn nodes, and group comparisons.
+- [ ] 246. **A/B Experiment Results Dashboard**: Enter the experimental group, indicators, sample size and results to show whether the preset goals and conclusion records are achieved.
+- [ ] 247. **Data Import Error Inbox**: Receive import failure records, aggregate them by error type, assigns handlers, and mark retry status.
+- [ ] 248. **Operation Activity Attribution Table**: Record activities, channels, costs, leads and conversion results to help operations compare input and output.
+- [ ] 249. **Retention Cohort Dashboard**: Import user activity data, display retention curves and key date annotations by registration batch.
+- [ ] 250. **Abnormal Order Detection Platform**: Import order samples and mark abnormalities according to amount, frequency, address and refund behavior for manual review.
+- [ ] 251. **Tag Rule Debugger**: Configure user tag rules and display hit reasons and miss conditions after inputting sample users.
+- [ ] 252. **Buried Point Acceptance List**: Maintain pages, events, attributes, owners and acceptance status, and support viewing buried point coverage by version.
+- [ ] 253. **Report Subscription Center**: Manage reports, subscribers, sending frequency and recent sending status, and provide failed retry records.
+- [ ] 254. **Data Dictionary Browser**: Maintain field names, meanings, enumeration values, sources and examples, support search and recent updates.
+- [ ] 255. **Operation List Grouper**: Filter the user list according to conditions, estimate the number of people, save the groups and export the delivery list.
+- [ ] 256. **Inventory Turn Analyzer**: Import inventory and sales samples, calculate turnover days, slow-moving items and replenishment recommendations.
+- [ ] 257. **Channel Lead Quality Score**: Import leads from different channels, score them based on completeness, follow-up results and transaction status, and display channel rankings.
+- [ ] 258. **Refund Reason Analysis Desk**: Summarize refund records, reasons, products and customer service notes to display high-frequency issues and trend changes.
+- [ ] 259. **Data Masking Previewer**: Upload sample data, choose masking rules, and preview transformations for names, phone numbers, email addresses, and other sensitive fields.
+- [ ] 260. **Metric Incident Review Log**: Record anomalous metrics, impact, investigation steps, root causes, and follow-up actions in a searchable review log.
 
-- [ ] 541. **指标血缘简易图**：维护指标到表字段血缘，搜索下游影响。
-- [ ] 542. **数据质量规则沙箱**：配置完整性与唯一性规则，对样例集跑分并展示违规行。
-- [ ] 543. **维度退化检测**：监控枚举维度突增或突减，触发告警样例。
-- [ ] 544. **报表口径变更日志**：记录指标定义变更、生效版本与通知名单。
-- [ ] 545. **埋点事件字典**：事件名、属性、触发页面与负责人，支持废弃标记。
-- [ ] 546. **数据工单 SLA 板**：取数需求受理、排队与交付时效统计。
-- [ ] 547. **样本集版本管理**：通用样本集版本、标签与变更说明（非生物实验）。
-- [ ] 548. **空值率趋势监视**：关键字段空值率日趋势与阈值告警。
-- [ ] 549. **重复主键猎手**：扫描导入表重复键，输出样例与修复建议。
-- [ ] 550. **数据字典评审流**：字段释义提案、评论与批准发布。
-- [ ] 551. **跨系统对账差异表**：两边计数与汇总差异定位与关闭状态。
-- [ ] 552. **标签覆盖率看板**：用户或内容标签覆盖与缺失清单。
-- [ ] 553. **实验流量分配校验**：检查分流比例是否偏离配置，输出告警。
-- [ ] 554. **数据保留策略执行表**：表级保留天数、上次清理与下一次计划。
-- [ ] 555. **CSV 模式漂移检测**：对比历史上传 schema，标记新增或缺失列。
-- [ ] 556. **运营名单去重合并**：名单导入后按规则合并疑似重复并人工确认。
-- [ ] 557. **漏斗步骤配置器**：可视化配置事件步骤与窗口，预览转化。
-- [ ] 558. **数据告警认领台**：告警分配、认领、处理笔记与复发标记。
-- [ ] 559. **指标异常解释笔记**：把异常结论与图表快照沉淀为可检索笔记。
-- [ ] 560. **权限行级策略目录**：登记数据集行级过滤规则与适用角色。
+- [ ] 541. **Simple Diagram of Indicator Lineage**: Maintain the lineage of indicators to table fields and search for downstream effects.
+- [ ] 542. **Data Quality Rule Sandbox**: Configure integrity and uniqueness rules, run the sample set and display the violating lines.
+- [ ] 543. **Dimension Degradation Detection**: Monitor the sudden increase or decrease in enumerated dimensions and triggers alarm samples.
+- [ ] 544. **Report Caliber Change Log**: Record indicator definition changes, effective versions and notification lists.
+- [ ] 545. **Buried Event Dictionary**: Event name, attributes, trigger page and owner, support for abandonment mark.
+- [ ] 546. **Data Request SLA Board**: Track intake, queue time, ownership, and delivery performance for internal data requests against an SLA.
+- [ ] 547. **Sample Set Version Management**: General sample set version, label and change instructions (non-biological experiments).
+- [ ] 548. **Null Value Rate Trend Monitoring**: Key fields Null value rate daily trend and threshold alarm.
+- [ ] 549. **Duplicate Primary Key Hunter**: Scan the imported table for duplicate keys and output samples and repair suggestions.
+- [ ] 550. **Data Dictionary Review Flow**: Field Definition Proposal, Comment and Approval Release.
+- [ ] 551. **Cross-system Reconciliation Difference Table**: Counting and summarizing differences on both sides, positioning and closing status.
+- [ ] 552. **Tag Coverage Dashboard**: List of user or content tag coverage and missing items.
+- [ ] 553. **Experimental Traffic Distribution Verification**: Check whether the distribution ratio deviates from the configuration and output an alarm.
+- [ ] 554. **Data Retention Policy Execution Table**: Table-level retention days, last cleanup, and next schedule.
+- [ ] 555. **CSV Schema Drift Detection**: Compare historical upload schemas and mark new or missing columns.
+- [ ] 556. **Audience List Deduplication and Merge**: Import an audience list, identify likely duplicates using configurable rules, preview proposed merges, and require manual confirmation.
+- [ ] 557. **Funnel Step Configurator**: The system visually configure event steps and windows, and preview conversions.
+- [ ] 558. **Data Alarm Acknowledgment Desk**: Alarm distribution, acknowledgment, processing notes and recurrence marks.
+- [ ] 559. **Metric Anomaly Explanation Notes**: Capture anomaly conclusions and chart snapshots as searchable notes with links to supporting evidence.
+- [ ] 560. **Permission Row-level Policy Directory**: Define row-level filtering rules for datasets, document the applicable roles, and provide a searchable policy directory.
 
-## 二十、创作者商业化与社区运营（40 题）
-> 训练点：内容计划、粉丝运营、商品化流程、反馈闭环。
+## 20. Creator Business and Community Operations (40 topics)
+> Training points: content planning, fan operation, commercialization process, feedback closed loop.
 
-- [ ] 261. **创作者选题池**：收集灵感、平台、目标受众、素材状态和发布时间，支持从想法推进到发布。
-- [ ] 262. **内容表现复盘台**：录入多平台播放、互动、转化和备注，展示热门内容特征和复盘结论。
-- [ ] 263. **赞助合作管理器**：跟踪品牌、报价、交付物、合同节点、付款和复盘，避免合作遗漏。
-- [ ] 264. **社群活动日历**：管理直播、打卡、抽奖、分享会和报名情况，展示即将开始的社区活动。
-- [ ] 265. **粉丝问题收集箱**：汇总评论和私信问题，按主题聚类、标记是否回复并沉淀 FAQ。
-- [ ] 266. **电子书销售小后台**：管理书籍、订单、优惠码、下载权限和退款状态，展示销售趋势。
-- [ ] 267. **课程章节发布器**：维护课程章节、素材、发布状态、学员反馈和更新计划，帮助创作者按节奏交付。
-- [ ] 268. **直播流程提词板**：准备直播环节、话术、商品链接、互动提醒和复盘记录，支持按时间推进。
-- [ ] 269. **会员内容权限表**：管理会员等级、内容包、到期时间和访问记录，方便检查权益是否正确。
-- [ ] 270. **播客节目排期台**：记录嘉宾、主题、录制时间、剪辑状态、发布渠道和推广素材。
-- [ ] 271. **短视频脚本工作台**：拆分开场、主体、转折和结尾，管理素材、拍摄状态和版本对比。
-- [ ] 272. **社群打卡挑战器**：创建挑战、成员报名、每日打卡、补卡规则和排行榜，输出活动复盘。
-- [ ] 273. **商品众筹进度页**：展示目标金额、支持者、档位、生产节点和风险更新，供项目方公开跟进。
-- [ ] 274. **知识星球内容索引**：整理帖子、主题、精华、作者和更新时间，帮助成员快速查找旧内容。
-- [ ] 275. **创作者财务简表**：记录平台收入、赞助、成本、税费和结算状态，生成月度收入视图。
-- [ ] 276. **品牌素材资产库**：管理 logo、封面、字体、模板和使用说明，支持下载和版本标记。
-- [ ] 277. **评论抽奖工具**：导入评论名单，设置过滤规则、抽奖名额和中奖记录，生成可公开的结果页。
-- [ ] 278. **联名项目协作板**：记录合作方、任务、交付物、审核意见和发布时间，展示双方待办。
-- [ ] 279. **内容再分发助手**：把一条内容拆成多平台发布任务，记录标题、封面、发布时间和链接。
-- [ ] 280. **粉丝成长路径图**：设计新粉、活跃粉、付费粉的触点、任务和权益，跟踪每阶段转化。
+- [ ] 261. **Creator Topic Pool**: Collect inspiration, platform, target audience, asset status and release time to support progress from idea to release.
+- [ ] 262. **Content Performance Review Platform**: Input multi-platform playback, interaction, conversion and notes to display popular content features and review conclusions.
+- [ ] 263. **Sponsorship Cooperation Manager**: Track brands, quotes, deliverables, contract nodes, payments and reviews to avoid missing out on cooperation.
+- [ ] 264. **Community Events Calendar**: Manage live broadcasts, check-ins, draws, sharing sessions and registration status, and display upcoming community events.
+- [ ] 265. **Fan Question Collection Box**: Collect questions from comments and private messages, cluster them by topic, track reply status, and turn recurring themes into an FAQ.
+- [ ] 266. **E-book Sales Backend**: Manage books, orders, discount codes, download permissions and refund status, and display sales trends.
+- [ ] 267. **Course Chapter Publisher**: Maintain course chapters, materials, publishing status, student feedback and update plans to help creators deliver at a pace.
+- [ ] 268. **Live Broadcast Process Prompt Board**: Prepare live broadcast links, words, product links, interactive reminders and review records, and support advancement by time.
+- [ ] 269. **Member Content Permission Table**: Manage membership levels, content packages, expiration times and access records to facilitate checking whether the rights and interests are correct.
+- [ ] 270. **Podcast Program Schedule Table**: Record guests, topics, recording time, editing status, release channels and promotional materials.
+- [ ] 271. **Short Video Script Workbench**: Split the opening, main body, transition and ending, manage materials, shooting status and version comparison.
+- [ ] 272. **Social Check-in Challenger**: Create challenges, member registration, daily check-ins, make-up rules and rankings, and output activity reviews.
+- [ ] 273. **Product Crowdfunding Progress Page**: Display the target amount, supporters, levels, production nodes and risk updates for public follow-up by the project party.
+- [ ] 274. **Knowledge Planet Content Index**: Organize posts, topics, essences, authors and update times to help members quickly find old content.
+- [ ] 275. **Creator Financial Summary**: Record platform income, sponsorship, costs, taxes and settlement status, and generate a monthly income view.
+- [ ] 276. **Brand Material Asset Library**: Manage logos, covers, fonts, templates and usage instructions, support downloads and version tags.
+- [ ] 277. **Comment Lottery Tool**: Import the comment list, set filtering rules, lottery quota and winning records, and generate a public results page.
+- [ ] 278. **Joint Project Collaboration Board**: Record partners, tasks, deliverables, review opinions and release time, and display the to-dos of both parties.
+- [ ] 279. **Content Redistribution Assistant**: Split a piece of content into multi-platform publishing tasks, recording the title, cover, publishing time and link.
+- [ ] 280. **Fan Growth Path Map**: Design the touch points, tasks and rights of new fans, active fans, and paying fans, and track conversions at each stage.
 
-- [ ] 561. **内容选题投票箱**：粉丝投票选题，展示票数趋势与最终排期。
-- [ ] 562. **会员续费挽回序列**：配置到期前提醒文案与渠道，跟踪挽回结果。
-- [ ] 563. **周边商品库存看板**：SKU 库存、预售与补货提醒，关联宣传节点。
-- [ ] 564. **社群欢迎流编排**：新成员欢迎步骤、任务与奖励标记。
-- [ ] 565. **联名内容权益表**：记录合作方露出次数、素材与验收状态。
-- [ ] 566. **直播礼物感谢名单**：导入打赏名单生成感谢脚本与置顶名单。
-- [ ] 567. **专栏更新承诺板**：对读者展示更新频率承诺与实际交付。
-- [ ] 568. **粉丝投稿审核台**：投稿队列、审核意见与采用状态。
-- [ ] 569. **线下见面会报名核销**：报名、签到码与物料领取记录。
-- [ ] 570. **内容授权许可库**：对外授权范围、期限与续约提醒。
-- [ ] 571. **社群违规分级处理**：规则等级、处理动作与申诉记录。
-- [ ] 572. **课程作业互评板**：学员互评任务、评分量规与优秀作业展示。
-- [ ] 573. **品牌合作素材验收**：交付物清单、修改轮次与最终确认。
-- [ ] 574. **多平台粉丝增长实验**：记录实验假设、动作与增长结果。
-- [ ] 575. **知识库付费章节门禁**：章节权限、试读与解锁记录（演示）。
-- [ ] 576. **创作者税务资料夹**：收集发票与收入凭证清单（资料管理，非报税计算）。
-- [ ] 577. **活动志愿者招募页**：岗位、报名审核与班次确认。
-- [ ] 578. **内容日历冲突检测**：多账号发布日历，检测撞车与空窗。
-- [ ] 579. **粉丝徽章成就系统**：定义徽章条件、发放记录与展示墙。
-- [ ] 580. **播客广告插播排期**：广告位、客户与集数绑定，避免超卖。
+- [ ] 561. **Content Topic Selection Ballot Box**: Fans vote for topics, showing the trend of votes and the final schedule.
+- [ ] 562. **Member Renewal Redemption Sequence**: Configure reminder copywriting and channels before expiration, and track redemption results.
+- [ ] 563. **Peripheral Product Inventory Board**: SKU inventory, pre-sale and replenishment reminders, associated promotion nodes.
+- [ ] 564. **Community Welcome Flow Arrangement**: New member welcome steps, tasks and reward marks.
+- [ ] 565. **Co-branded Content Rights Table**: Record the number of exposures, materials and acceptance status of the partner.
+- [ ] 566. **Live Broadcast Gift Thank You List**: Import the reward list to generate thank you scripts and pinned lists.
+- [ ] 567. **Column Update Commitment Board**: Show readers the update frequency commitment and actual delivery.
+- [ ] 568. **Fan Submission Review Desk**: Submission queue, review comments and adoption status.
+- [ ] 569. **Offline Meeting Registration Verification**: Registration, sign-in code and material collection records.
+- [ ] 570. **Content Licensing Library**: External licensing scope, period and renewal reminder.
+- [ ] 571. **Classified Handling of Community Violations**: Rule levels, handling actions and appeal records.
+- [ ] 572. **Coursework Peer Evaluation Board**: Students’ mutual evaluation tasks, scoring rubrics and display of excellent assignments.
+- [ ] 573. **Acceptance of Brand Cooperation Materials**: List of deliverables, revision rounds and final confirmation.
+- [ ] 574. **Multi-platform Fan Growth Experiment**: Record experimental hypotheses, actions and growth results.
+- [ ] 575. **Knowledge Base Paid Chapter Access Control**: Chapter permissions, trial reading and unlocking records (demo).
+- [ ] 576. **Creator Tax Folder**: Collect invoices and income voucher lists (data management, non-tax calculation).
+- [ ] 577. **Activity Volunteer Recruitment Page**: Position, registration review and shift confirmation.
+- [ ] 578. **Content Calendar Conflict Detection**: Multiple accounts publish calendars to detect collisions and empty windows.
+- [ ] 579. **Fan Badge Achievement System**: Define badge conditions, issuance records and display wall.
+- [ ] 580. **Podcast Ad Insertion Schedule**: Bind advertising slots to customers and podcast episodes, track availability, and prevent overselling.
 
-## 二十一、运维测试与交付保障（40 题）
-> 训练点：运行观测、质量检查、发布流程、故障恢复。
+## 21. Operations, Testing, and Delivery Assurance (40 topics)
+> Training points: operation observation, quality inspection, release process, fault recovery.
 
-- [ ] 281. **服务健康检查面板**：配置服务地址、检查频率、响应时间和状态历史，展示当前健康和最近异常。
-- [ ] 282. **接口冒烟测试台**：维护接口、请求样例、期望结果和最近执行状态，适合发布前快速验证。
-- [ ] 283. **发布窗口日历**：记录版本、负责人、冻结期、上线时间和回滚联系人，避免冲突发布。
-- [ ] 284. **回滚演练清单**：维护系统、回滚步骤、验证点、演练记录和风险项，帮助团队定期演练。
-- [ ] 285. **配置变更审批台**：提交配置项、影响范围、审批人、发布时间和验证结果，保留变更记录。
-- [ ] 286. **告警降噪规则器**：整理告警、触发条件、静默窗口和归并规则，预览哪些告警会被合并。
-- [ ] 287. **故障时间线记录器**：在故障处理中记录时间点、事件、负责人和决策，事后导出复盘时间线。
-- [ ] 288. **依赖服务状态墙**：展示第三方服务、最近状态、影响范围和替代方案，供客服和研发查看。
-- [ ] 289. **测试用例评审台**：管理需求、测试点、用例、评审意见和执行状态，帮助 QA 跟踪覆盖。
-- [ ] 290. **缺陷生命周期看板**：记录缺陷、严重程度、负责人、修复版本和验证状态，展示积压趋势。
-- [ ] 291. **发布后巡检助手**：按版本生成巡检项、负责人、结果和异常备注，支持发布后统一确认。
-- [ ] 292. **日志样例标注器**：导入日志片段，标注级别、模块、错误类型和处理建议，沉淀排障资料。
-- [ ] 293. **容量估算小工具**：录入用户量、请求量、数据增长和保留周期，输出容量趋势和风险提醒。
-- [ ] 294. **变更影响关系图**：维护服务、接口、队列和依赖关系，输入变更项后展示可能影响范围。
-- [ ] 295. **环境一致性检查器**：对比开发、测试、生产的配置项和版本，标记差异和待确认项。
-- [ ] 296. **灰度发布监控板**：记录灰度批次、用户比例、指标阈值和暂停条件，展示每批结果。
-- [ ] 297. **数据备份验收表**：管理备份任务、最近成功时间、恢复演练和异常记录，提醒长期未验证备份。
-- [ ] 298. **安全修复跟踪台**：登记漏洞、影响系统、修复负责人、截止时间和验证状态，展示逾期风险。
-- [ ] 299. **自动化任务运行簿**：记录定时任务、最近运行、耗时、失败原因和手动重跑入口，便于运维查看。
-- [ ] 300. **上线风险评估表**：按功能范围、数据影响、依赖、回滚难度和验证计划打分，生成发布风险摘要。
+- [ ] 281. **Service Health Check Panel**: Configure service address, check frequency, response time and status history, display current health and recent incidents.
+- [ ] 282. **Interface Smoke Test Bench**: Maintain interfaces, request samples, expected results and recent execution status, suitable for quick verification before release.
+- [ ] 283. **Release Window Calendar**: Record version, owner, freezing period, release time and rollback contact to avoid conflicting releases.
+- [ ] 284. **Rollback Drill Checklist**: Maintain the system, rollback steps, verification points, drill records and risk items to help the team drill regularly.
+- [ ] 285. **Configuration Change Approval Desk**: Submit configuration items, impact scope, approvers, release time and verification results, and keep change records.
+- [ ] 286. **Alert Noise Reduction Rule Builder**: Define alert triggers, silence windows, grouping rules, and routing behavior, then preview which alerts would be merged.
+- [ ] 287. **Fault Timeline Recorder**: Record time points, events, owners and decisions during fault handling, and export the review timeline afterwards.
+- [ ] 288. **Dependent Service Status Wall**: Display third-party services, recent status, scope of impact, and alternatives for customer service and R&D to view.
+- [ ] 289. **Test Case Review Desk**: Manage requirements, test points, use cases, review comments and execution status to help QA track coverage.
+- [ ] 290. **Defect Lifecycle Dashboard**: Record defects, severity, owner, fixed version and verification status, and display backlog trends.
+- [ ] 291. **Post-release Inspection Assistant**: Generate inspection items, owners, results and anomaly notes based on versions, and support unified confirmation after release.
+- [ ] 292. **Log Sample Annotator**: Import log fragments, annotate levels, modules, error types and handling suggestions, and accumulate troubleshooting data.
+- [ ] 293. **Capacity Estimator**: Enter user counts, request volume, data growth, and retention periods to estimate capacity trends and highlight risks.
+- [ ] 294. **Change Impact Diagram**: Maintain services, interfaces, queues and dependencies, and display the possible impact scope after entering changes.
+- [ ] 295. **Environment Consistency Checker**: Compare configuration items and versions of development, testing, and production, and mark differences and items to be confirmed.
+- [ ] 296. **Canary Release Monitoring Board**: Track canary cohorts, traffic percentages, metric thresholds, pause conditions, and the result of each rollout stage.
+- [ ] 297. **Data Backup Acceptance Form**: Manage backup tasks, latest success time, recovery drills and exception records, and remind backups that have not been verified for a long time.
+- [ ] 298. **Security Remediation Tracking Desk**: Register vulnerabilities, affected systems, remediation owners, deadlines and verification status to display overdue risks.
+- [ ] 299. **Automated Job Runbook**: Record scheduled jobs, recent executions, duration, failure reasons, and a controlled manual rerun action for operators.
+- [ ] 300. **Release Risk Assessment Table**: Generate a release risk summary based on functional scope, data impact, dependencies, rollback difficulty, and verification plan scores.
 
 ---
 
-- [ ] 581. **金丝雀观察清单**：记录金丝雀指标、观察窗口与提升或回退决策。
-- [ ] 582. **合成监测脚本库**：管理关键路径合成探测脚本、频率与失败截图。
-- [ ] 583. **发布笔记自动汇编**：从 PR 标签汇编发布说明草稿并附风险提示。
-- [ ] 584. **灾备切换检查表**：切换步骤、验证点与通信模板，支持演练模式。
-- [ ] 585. **配置热更新审计**：记录热更新内容、操作者与回滚点。
-- [ ] 586. **测试环境占用日历**：环境预约、冲突检测与释放提醒。
-- [ ] 587. **缺陷聚类看板**：按模块与错误签名聚类缺陷，展示热点。
-- [ ] 588. **性能基线对比器**：导入两次压测摘要，对比 P95、错误率与回归判定。
-- [ ] 589. **依赖服务演练开关**：模拟依赖故障开关，记录演练结果。
-- [ ] 590. **上线窗口冲突雷达**：多团队上线窗口可视化，标注重叠风险。
-- [ ] 591. **日志采样策略配置**：配置模块采样率与保留期，预估存储占用。
-- [ ] 592. **告警路由模拟器**：输入告警样例，预览通知到人或群与升级链。
-- [ ] 593. **制品晋级流水线视图**：dev 到 staging 到 prod 的制品状态与签字记录。
-- [ ] 594. **回滚一键演练器**：在预发执行回滚剧本 dry-run，输出步骤耗时。
-- [ ] 595. **测试数据重置工具**：一键重置环境种子数据，记录版本与执行人。
-- [ ] 596. **容量水位周报**：汇总 CPU 与存储水位与增长预测（样例），生成周报。
-- [ ] 597. **变更冻结期日历**：维护冻结窗口与例外审批，阻止冲突发布。
-- [ ] 598. **冒烟用例优先级墙**：冒烟集分级、最近失败与负责人。
-- [ ] 599. **多活流量切换面板**：展示单元流量比例与切换审计（模拟）。
-- [ ] 600. **交付物验收检查器**：对照验收清单勾选证据链接，生成放行报告。
+- [ ] 581. **Canary Watch List**: Record canary indicators, observation windows and promotion or rollback decisions.
+- [ ] 582. **Synthetic Monitoring Script Library**: Manage critical path synthetic detection scripts, frequency and failure screenshots.
+- [ ] 583. **Release Notes Assembler**: Assemble draft release notes from PR labels, group changes by type, and attach concise risk warnings.
+- [ ] 584. **Disaster Recovery Switching Checklist**: Switching steps, verification points and communication templates, supporting drill mode.
+- [ ] 585. **Hot Configuration Update Audit**: Record each hot configuration update, operator, validation result, and rollback point.
+- [ ] 586. **Test Environment Reservation Calendar**: Reserve shared test environments, detect conflicts, show current ownership, and remind teams to release unused reservations.
+- [ ] 587. **Defect Clustering Dashboard**: Cluster defects by module and error signature to display hot spots.
+- [ ] 588. **Performance Baseline Comparator**: Import two stress test summaries to compare P95, error rate and regression judgment.
+- [ ] 589. **Dependency Service Drill Switch**: Simulate dependency fault switch and record the drill results.
+- [ ] 590. **Release Window Conflict Radar**: Visualize release windows across teams and highlight overlapping dependencies and schedule risks.
+- [ ] 591. **Log Sampling Policy Configuration**: Configure module sampling rate and retention period, and estimate storage usage.
+- [ ] 592. **Alarm Routing Simulator**: Enter alarm samples, preview notifications to people or groups, and upgrade chains.
+- [ ] 593. **Artifact Promotion Pipeline**: Show an artifact's promotion from development through staging to production, including status, evidence, and approval records.
+- [ ] 594. **One-Click Rollback Drill**: Run a rollback playbook in dry-run mode against a staging environment and report the duration and result of each step.
+- [ ] 595. **Test Data Reset Tool**: Reset environment seed data with one click, record version and executor.
+- [ ] 596. **Capacity Water Level Weekly Report**: Summarize CPU and storage water levels and growth forecasts (sample) to generate a weekly report.
+- [ ] 597. **Change Freeze Calendar**: Maintain change-freeze windows and exception approvals, and warn when a planned release conflicts with a freeze.
+- [ ] 598. **Smoke Use Case Priority Wall**: Smoke set ranking, recent failures and owners.
+- [ ] 599. **Multi-active Traffic Switching Panel**: Display unit traffic proportion and switching audit (simulation).
+- [ ] 600. **Deliverable Acceptance Checker**: Validate evidence links against an acceptance checklist, flag missing proof, and generate a release decision report.
 
-## 进度统计
+## Progress
 
-- 总题目：**600**
-- 已完成：**0**
-- 进行中：**0**
+- Total topics: **600**
+- Completed: **0**
+- In progress: **0**
 
-## 备注
+## Notes
 
-- 题目难度跨度较大，可挑你最有冲动的先做；不必从 1 顺序到 600。
-- 鼓励重复题目用**不同技术栈**再做一次，作为对比训练（例如 41. 贪吃蛇用 Canvas / WebGL / 终端 三种实现）。
-- 完成后欢迎在 `done/<编号>-<标题>/` 下留一个 README，写清“做完之后我学到了什么”。
+- Difficulty varies widely, so start with the idea that interests you most; there is no need to work from 1 to 600 in order.
+- Rebuild an idea with a **different technology stack** for comparison, such as implementing Snake with Canvas, WebGL, and a terminal UI.
+- After completion, add a README under `done/<number>-<title>/` describing what you learned.

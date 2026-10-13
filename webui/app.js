@@ -175,16 +175,22 @@ function renderWarmupStatus(account) {
   const thresholds = [['5h', account.warmup_quota_5h_limit_percent], ['7d', account.warmup_quota_7d_limit_percent]]
     .filter(([, value]) => value != null)
     .map(([name, value]) => `${name} 已用 ≥ ${value}%`).join(' · ');
-  const quota = account.warmup_quota;
-  const quotaStatus = quota?.enabled && quota.message
-    ? `<div class="warmup-error">${escapeHTML(quota.message)}${quota.resume_at ? `<div>恢复机会 ${escapeHTML(formatWarmupTime(quota.resume_at))}</div>` : ''}</div>`
-    : '';
+  const quotaStatuses = [
+    ['普通任务', account.quota_policy],
+    ['养号', account.warmup_quota],
+  ].filter(([, quota]) => quota?.enabled).map(([label, quota]) => {
+    const message = quota.message || (quota.blocked ? '等待额度更新' : '当前可启动');
+    const resume = quota.resume_at
+      ? `<div>恢复机会 ${escapeHTML(formatWarmupTime(quota.resume_at))}</div>`
+      : '';
+    return `<div class="warmup-error"><strong>${label}</strong>：${escapeHTML(message)}${resume}</div>`;
+  }).join('');
   return `
     <div><code>cc#${escapeHTML(account.cc2api_account_id)}</code> <span class="pill ${statusClass}">${escapeHTML(status === 'quota_wait' ? '额度等待' : status)}</span></div>
     <div>${escapeHTML(account.warmup_interval_min_hours || 3)}-${escapeHTML(account.warmup_interval_max_hours || 5)}h</div>
     <div class="muted">next ${escapeHTML(formatWarmupTime(account.warmup_next_run_at))}</div>
-    ${thresholds ? `<div class="muted">阈值：${escapeHTML(thresholds)}</div>` : ''}
-    ${quotaStatus}
+    ${thresholds ? `<div class="muted">普通任务 / 养号阈值：${escapeHTML(thresholds)}</div>` : ''}
+    ${quotaStatuses}
     ${error}
   `;
 }
@@ -212,7 +218,7 @@ async function renderAccounts() {
       <td><div class="op-actions account-actions">
         <button class="btn btn-sm" data-quota="${a.id}">额度</button>
         <button class="btn btn-sm" data-cc2-sync="${a.id}">同步</button>
-        <button class="btn btn-sm" data-warmup-config="${a.id}">养号</button>
+        <button class="btn btn-sm" data-warmup-config="${a.id}">养号 / 额度</button>
         ${a.cc2api_account_id != null && Number(a.warmup_enabled || 0) === 1 ? `<button class="btn btn-sm btn-primary" data-warmup-now="${a.id}">立即运行</button>` : ''}
         ${a.cc2api_account_id != null && Number(a.warmup_enabled || 0) !== 1 ? `<button class="btn btn-sm" data-warmup-resume="${a.id}">恢复</button>` : ''}
         ${a.cc2api_account_id == null || RUNTIME_BASE ? `<button class="btn btn-sm" data-relogin="${a.id}">重授权</button>` : ''}
@@ -378,7 +384,7 @@ async function renderAccounts() {
 }
 
 /**
- * 载入账号养号配置及两个独立阈值。
+ * 载入账号养号配置及普通任务、养号共用的两个独立阈值。
  * @param {Object} account 当前账号
  * @return {Promise<void>} 表单就绪后完成
  */
@@ -426,7 +432,7 @@ async function openWarmupModal(account) {
 }
 
 /**
- * 更新阈值表单的可编辑状态及已用/剩余说明。
+ * 更新账号级阈值表单的可编辑状态及已用/剩余说明。
  * @param {HTMLFormElement} form 养号配置表单
  * @return {void} 不返回值
  */
@@ -439,7 +445,7 @@ function updateWarmupQuotaInputs(form) {
     const value = Number(input.value);
     $(`#warmup-quota-${window}-hint`).textContent = !enabled ? '已关闭，沿用额度用满保护'
       : input.value && Number.isInteger(value) && value >= 1 && value <= 100
-        ? `已用达到 ${value}%（剩余 ${100 - value}%）时暂停养号`
+        ? `已用达到 ${value}%（剩余 ${100 - value}%）时暂停后续普通任务与养号`
         : '请输入 1～100 的已用百分比整数';
   }
 }
@@ -471,7 +477,7 @@ async function saveWarmupConfig(e) {
     closeModal('#warmup-modal');
     await renderAccounts();
   } catch (err) {
-    alert('保存养号配置失败: ' + err.message);
+    alert('保存养号与额度配置失败: ' + err.message);
   } finally {
     button.disabled = false;
   }

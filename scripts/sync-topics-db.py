@@ -8,16 +8,64 @@ from __future__ import annotations
 
 import argparse
 import re
-import shutil
 import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 
-# 分类标题如「## 十一、开发者工具与工程平台（40 题）」；编号段需兼容十一及以上
-_CAT_RE = re.compile(r"^##\s+[一二三四五六七八九十百零\d]+、(.+?)（")
+# 同时兼容旧中文标题与新英文标题，便于旧版材料回滚时继续解析。
+_CAT_RE = re.compile(
+    r"^##\s+(?:[一二三四五六七八九十百零\d]+、|\d+\.\s+)"
+    r"(.+?)(?:（\d+\s*题）|\(\d+\s+topics?\))\s*$",
+    re.IGNORECASE,
+)
 _ITEM_RE = re.compile(r"^-\s+\[[ x]\]\s+(\d+)\.\s+\*\*(.+?)\*\*[:：]?\s*(.*)$")
+_CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
+_HIGH_RISK_PHRASES = (
+    "reverse engineering",
+    "decompilation",
+    "credential harvesting",
+    "session hijacking",
+    "fingerprint spoofing",
+    "account farming",
+    "automated registration",
+    "model extraction",
+    "knowledge distillation",
+    "style imitation",
+    "style transfer",
+    "captcha bypass",
+    "auto-booking",
+    "auto-purchasing",
+    "ticket grabbing",
+    "class grabbing",
+    "number grabbing",
+    "sign-in scripts",
+)
+_UNNATURAL_PHRASES = (
+    "queryer",
+    "mutual conversion",
+    "desensitization",
+    "wrong question",
+    "keynote book",
+    "precipitate",
+    "grayscale release",
+    "online time",
+    "operation and maintenance",
+    "time consuming",
+    "card replenishment",
+    "variable occupancy",
+    "screen recording occupancy",
+    "automatic annotation",
+    "configure hot update",
+    "product promotion pipeline",
+    "number taking",
+    "enters the warehouse",
+    "speech quality inspection",
+    "big watermelon",
+    "word-marking translation",
+    "synonymously",
+)
 
 
 @dataclass(frozen=True)
@@ -66,7 +114,7 @@ def parse_topics(path: Path) -> list[Topic]:
 
 def validate_topics(topics: list[Topic]) -> None:
     """
-    校验题库编号和必填字段，避免把坏数据写入远程库。
+    校验完整英文题库的编号、分类、必填字段和安全短语。
 
     :param topics: 待校验的 topic 列表
     :return: None
@@ -77,14 +125,14 @@ def validate_topics(topics: list[Topic]) -> None:
     duplicates = sorted({no for no in numbers if numbers.count(no) > 1})
     if duplicates:
         raise SystemExit(f"题目编号重复: {duplicates}")
-    # 按分类追加新题时，文档内编号可能不是从头到尾递增；只需集合覆盖 1..N
-    expected = set(range(1, max(numbers or [0]) + 1))
+    # 文档按分类排列而不是按编号排列，集合仍必须精确覆盖固定的 600 个编号。
+    expected = set(range(1, 601))
     actual = set(numbers)
     if actual != expected:
         missing = sorted(expected - actual)
         extra = sorted(actual - expected)
         raise SystemExit(
-            f"题目编号不完整: 期望 1..{max(expected or [0])} 共 {len(expected)} 条，"
+            f"题目编号不完整: 期望 1..600 共 600 条，"
             f"实际 {len(actual)} 条；缺失 {missing[:10]}{'...' if len(missing) > 10 else ''}；"
             f"多余 {extra[:10]}{'...' if len(extra) > 10 else ''}"
         )
@@ -94,6 +142,35 @@ def validate_topics(topics: list[Topic]) -> None:
     ]
     if missing_fields:
         raise SystemExit(f"题目字段缺失: {missing_fields}")
+    categories = {topic.category for topic in topics}
+    if len(categories) != 21:
+        raise SystemExit(f"题目分类数量错误: 期望 21，实际 {len(categories)}")
+    cjk_fields = [
+        topic.no for topic in topics
+        if any(_CJK_RE.search(value) for value in (
+            topic.title,
+            topic.description,
+            topic.category,
+        ))
+    ]
+    if cjk_fields:
+        raise SystemExit(f"题目字段仍包含 CJK 字符: {cjk_fields[:20]}")
+    risky = []
+    for topic in topics:
+        content = f"{topic.title}\n{topic.description}".casefold()
+        matches = [phrase for phrase in _HIGH_RISK_PHRASES if phrase in content]
+        if matches:
+            risky.append((topic.no, matches))
+    if risky:
+        raise SystemExit(f"题目包含高风险目标短语: {risky[:20]}")
+    unnatural = []
+    for topic in topics:
+        content = f"{topic.title}\n{topic.description}".casefold()
+        matches = [phrase for phrase in _UNNATURAL_PHRASES if phrase in content]
+        if matches:
+            unnatural.append((topic.no, matches))
+    if unnatural:
+        raise SystemExit(f"题目包含已知机器直译短语: {unnatural[:20]}")
 
 
 def connect_db(path: Path) -> sqlite3.Connection:
@@ -141,14 +218,20 @@ def plan_sync(conn: sqlite3.Connection, topics: list[Topic]) -> tuple[int, int]:
 
 def backup_db(path: Path) -> Path:
     """
-    备份 SQLite 文件，便于远程同步失败后回滚。
+    用 SQLite backup API 生成一致备份，便于远程同步失败后回滚。
 
     :param path: SQLite 数据库路径
     :return: 备份文件路径
     """
-    stamp = time.strftime("%Y%m%d-%H%M%S")
+    stamp = f"{time.strftime('%Y%m%d-%H%M%S')}-{time.time_ns() % 1_000_000_000:09d}"
     backup_path = path.with_name(f"{path.name}.bak-{stamp}")
-    shutil.copy2(path, backup_path)
+    source = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    destination = sqlite3.connect(backup_path)
+    try:
+        source.backup(destination)
+    finally:
+        destination.close()
+        source.close()
     return backup_path
 
 

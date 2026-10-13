@@ -1730,7 +1730,7 @@ log "Launching tmux session: $SESSION ($CLAUDE_USER $CLAUDE_PERMISSION_MODE mode
 claude_args=(claude --permission-mode "$CLAUDE_PERMISSION_MODE")
 if [ -n "${RESUME_SESSION_ID:-}" ]; then
   claude_args+=(--resume "$RESUME_SESSION_ID")
-  TASK_PROMPT="请从当前会话和文件状态继续完成原任务，不要重新开始。"
+  TASK_PROMPT="Continue the original task from the current session and file state. Do not start over."
 fi
 if [ -n "${CLAUDE_MODEL_OVERRIDE:-}" ]; then
   # 后端已校验模型名字符集；这里用数组参数传递，避免把用户输入拼进 shell。
@@ -1764,10 +1764,10 @@ fi
 # ---------- 6) 等最终 assistant 回复 / Claude 退出 / 超时 ----------
 COMPLETION_IDLE_SEC="${COMPLETION_IDLE_SEC:-10}"
 TIMEOUT_WRAPUP_SEC="${TIMEOUT_WRAPUP_SEC:-600}"
-TIMEOUT_WRAPUP_PROMPT="${TIMEOUT_WRAPUP_PROMPT:-时间快到，请停止扩展功能和长时间验证，优先补齐最小可运行交付。请整理当前已完成内容，必要时说明未完成项和验证降级原因，然后输出最终总结。}"
-AUTH_RECOVERY_PROMPT="${AUTH_RECOVERY_PROMPT:-检测到 OAuth access token 可能刚刷新。请重试刚才失败的请求；如果仍失败，不要打开登录流，请说明认证失败并输出最终总结。}"
+TIMEOUT_WRAPUP_PROMPT="${TIMEOUT_WRAPUP_PROMPT:-Time is running short. Stop expanding the scope or starting lengthy validation, and prioritize a minimal runnable delivery. Organize what is complete, mention any unfinished work or reduced validation when needed, and then provide the final summary.}"
+AUTH_RECOVERY_PROMPT="${AUTH_RECOVERY_PROMPT:-The OAuth access token may have just been refreshed. Retry the request that failed. If it still fails, do not open a login flow; report the authentication failure and provide the final summary.}"
 CLAUDE_API_STALL_WATCHDOG_SEC="${CLAUDE_API_STALL_WATCHDOG_SEC:-400}"
-CLAUDE_API_STALL_RECOVERY_PROMPT="${CLAUDE_API_STALL_RECOVERY_PROMPT:-刚才 Claude API 连接异常导致当前回合卡住。请从当前文件状态继续，优先完成最小可运行版本；不要重新做环境调研，不要安装大型依赖。若时间不足，请立即整理已完成内容、验证方式、未完成项并输出最终总结。}"
+CLAUDE_API_STALL_RECOVERY_PROMPT="${CLAUDE_API_STALL_RECOVERY_PROMPT:-A Claude API connection problem stalled the current turn. Continue from the current file state and prioritize a minimal runnable version. Do not repeat environment research or install large dependencies. If time is short, immediately summarize the completed work, validation method, and unfinished items, then provide the final summary.}"
 log "Waiting for final assistant message or timeout (${TIMEOUT_SEC}s)"
 run_started_at=$(date +%s)
 deadline=$(( $(date +%s) + TIMEOUT_SEC ))

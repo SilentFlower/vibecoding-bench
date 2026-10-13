@@ -8,6 +8,7 @@
 
 - 当单任务、批次、定时养号或抓包 run 根据 topic 生成默认 prompt 时，必须遵循本契约。
 - 当新增 prompt 表达模式、修改 WebUI 模式控件或调整任务创建与调度链路时，必须同步检查本契约。
+- 当修改 `topics.md`、题库同步工具或 worker 自动注入提示时，必须同时遵守英文内容、安全扫描和历史 prompt 不回填约束。
 - `prompt_mode` 只控制创建时的默认文本表达，不进入数据库 schema；已持久化的最终 `prompt` 才是后续调度、恢复和查看的事实来源。
 
 ### 2. Signatures
@@ -37,6 +38,10 @@ def _load_recent_topic_prompt_fingerprints(
     limit: int = 64,
 ) -> deque[frozenset[str]]:
     ...
+
+parse_topics(path: Path) -> list[Topic]
+validate_topics(topics: list[Topic]) -> None
+backup_db(path: Path) -> Path
 ```
 
 请求 DTO 与默认值：
@@ -50,19 +55,23 @@ def _load_recent_topic_prompt_fingerprints(
 
 ### 3. Contracts
 
-- `natural`：按分类风格开场、需求表达、可运行交付、结果说明和布局片段组合候选；每次随机抽取 12 个不同组合，且每个候选都必须保留标题、分类、描述、当前工作区可运行交付、启动、验证和主要取舍语义。
+- `topics.md` 固定包含 600 题、编号集合 1～600 和 21 个英文分类；分类、标题、描述不得含 CJK。明确风险目标和已知机器直译短语由 `validate_topics()` fail-closed，不能在同步时静默改写。
+- `natural`：英文分类风格、开场、需求表达、可运行交付、结果说明和布局片段组合候选；每次随机抽取 12 个不同组合，且每个候选都必须保留英文标题、分类、描述、当前工作区可运行交付、启动、验证和主要取舍语义。
 - 分类风格只改变表达语气，不改变需求内容；现有分类归并为 `engineering`、`product`、`data_ai`、`creative`，未知分类使用 `generic` 回退。
 - 自然候选必须先把当前 topic 的 `description`、`title`、`category` 按长度降序替换为统一占位符，再移除空白和标点并生成 4 字符 n-gram 集合。
 - 候选风险分数是它与近期每条指纹的最高 Jaccard 相似度；选择风险分数最低的候选，平分时随机选择，无历史时直接随机选择候选。
 - 近期窗口固定为 `deque(maxlen=64)`。历史只读查询合并 `tasks.prompt`（`batch_id IS NULL`）和 `task_batch_items.prompt`，关联 `topics` 获取专属字段，不获取 `_db_lock`，不新增 schema 或外部依赖。
 - 单任务、养号和显式 `natural` 抓包各读取一次近期窗口；批次创建只读取一次，并在每个 item 选定后立即把其指纹追加到同一窗口。相似度比较量固定为每项 `12 × 64`。
-- `canonical`：稳定输出规范五段式文本；同一 topic 重复生成必须完全一致，供正式 benchmark 和抓包对比使用。
+- `canonical`：稳定输出 `Topic`、`Category`、`Description` 和英文 MVP/报告说明；同一 topic 重复生成必须完全一致，供正式 benchmark 和抓包对比使用。
 - `prompt_override` 为非空字符串时必须原样优先，不能再调用模式渲染器或读取近期历史；`canonical` 同样不得读取近期历史。
 - WebUI 的单任务和批次表单默认选择 `natural`，抓包表单默认选择 `canonical`；请求字段名必须统一为 `prompt_mode`。
 - 单任务、抓包和养号的最终文本写入 `tasks.prompt`；批次逐项文本写入 `task_batch_items.prompt`。
 - 随机自然 prompt 每个任务只生成一次。数据库记录、`scheduler.submit()` payload、批次恢复和详情查看必须复用同一最终字符串。
-- 不新增 `variant_id`、随机种子或 `prompt_mode` 数据库列，也不修改 `topics.md` 和 topic Markdown 解析契约。
-- Topic prompt 不承载超时、工具权限、认证恢复、网络策略或 worker 收尾指令，这些继续由 harness / worker 负责。
+- 未分类回退固定为 `Uncategorized`，指纹弱化占位符固定为 `topic content`；默认包装不能在英文 topic 外重新引入中文。
+- 新 Markdown 分类标题使用 `## 1. Category (20 topics)`；首次 seed 与同步解析器仍兼容旧 `## 一、分类（20 题）`，条目兼容半角/全角冒号。两个解析器必须对同一文件得到相同 category/title/description。
+- 同步工具默认 dry-run，`--apply` 前使用 SQLite backup API 生成包含已提交 WAL 数据的一致备份，再按 `topic.no` 原位更新。既有 `topics.id`、task/run 数量和已持久化 prompt 不得变化。
+- 不新增 `variant_id`、随机种子或 `prompt_mode` 数据库列。历史 task/run prompt 不翻译、不回填；`prompt_override` 和未来显式环境覆盖原样保留。
+- Topic prompt 不承载超时、工具权限、认证恢复或网络策略。worker 的 resume、timeout wrap-up、OAuth retry 和 Claude API stall 默认注入文本必须为英文，触发时机、重试次数、优先级和退出码保持不变。
 
 ### 4. Validation & Error Matrix
 
@@ -73,7 +82,7 @@ def _load_recent_topic_prompt_fingerprints(
 | API 提交其它模式值 | FastAPI/Pydantic 返回 422，不进入创建逻辑 |
 | 内部直接调用 `build_topic_prompt()` 传入未知模式 | 抛出中文 `ValueError` |
 | `prompt_override` 非空 | 原样返回覆盖文本，忽略 `prompt_mode` |
-| topic 分类为空 | 使用 `未分类` |
+| topic 分类为空 | 使用 `Uncategorized` |
 | 未知 topic 分类 | 使用 `generic` 风格生成，不能阻塞任务创建 |
 | 自然模式无历史样本 | 从 12 个语义完整候选中随机选择 |
 | 存在高相似近期样本 | 优先选择最高历史相似度更低的候选 |
@@ -81,6 +90,10 @@ def _load_recent_topic_prompt_fingerprints(
 | 自定义 prompt 或 `canonical` | 不查询历史，不生成自然候选 |
 | 自然模式重复调用 | 允许选择不同组合，但每次产物内部语义必须完整 |
 | 规范模式重复调用 | 输出必须完全一致 |
+| 题库不是 600 条、编号不完整或分类不是 21 个 | `validate_topics()` 非零退出，不访问数据库 |
+| 分类/标题/描述含 CJK、高风险目标或已知机器直译短语 | 校验失败并报告题号，不自动改写 |
+| 英文分类标题 / 旧中文分类标题 | 两套解析器分别正常解析并保持相同结构 |
+| `--apply` 处理 WAL 数据库 | SQLite backup API 备份包含已提交 WAL；更新后 topic ID 与历史 prompt 不变 |
 
 ### 5. Good / Base / Bad Cases
 
@@ -89,13 +102,16 @@ def _load_recent_topic_prompt_fingerprints(
 - Good：批次开始前加载一次 64 条历史窗口，每生成一个 item 就追加其指纹，后续 item 自动避开近期同构包装。
 - Base：旧 API 客户端不传字段，单任务和批次自动使用 `natural`，抓包自动使用 `canonical`。
 - Base：用户提交自定义 prompt，最终持久化文本与用户输入完全一致。
+- Base：已有 v3 数据库同步英文题库，只更新 600 个 topic 的 title/description/category；历史任务继续展示原 prompt。
 - Bad：自然片段增加指定框架、依赖、架构或超时策略，导致不同组合不再语义等价。
+- Bad：把 `topics.md` 直接复制进已 seed 的运行实例，或用 `shutil.copy2` 备份活动 WAL 数据库，导致题库没有更新或备份不一致。
+- Correct：先 `--validate-only` 和 dry-run，再由同步工具创建 SQLite 一致备份并 `--apply`；回滚恢复该备份。
 - Bad：批次为每个 item 重查全部历史，或把全部已生成指纹无限追加，导致创建耗时随历史量或批次长度无界增长。
 - Bad：持久化前生成一次、调度前再次生成一次，导致数据库记录与 worker 实际输入不一致。
 
 ### 6. Tests Required
 
-- 单元测试生成 12 个自然候选，断言互不相同，并包含 title、category、description、当前工作区可运行交付、启动、验证和取舍语义。
+- 单元测试生成 12 个自然候选，断言互不相同、无 CJK，并包含 title、category、description、当前工作区可运行交付、启动、验证和取舍语义。
 - 遍历 `load_seed_topics()` 的 21 个现有分类，断言全部映射到已定义风格；未知分类断言使用 `generic`。
 - 指纹测试断言不同 topic 套用相同公共包装时得到相同指纹，并覆盖 description 包含 title 的长字段优先替换。
 - 选择器测试构造高相似与低相似候选，断言返回低风险候选。
@@ -105,6 +121,9 @@ def _load_recent_topic_prompt_fingerprints(
 - DTO 测试断言 `TaskIn` / `BatchIn` 默认 `natural`、`CaptureRunIn` 默认 `canonical`，非法值触发 `ValidationError`；自定义与 canonical 断言不读取近期历史。
 - 覆盖优先级测试 mock `build_topic_prompt()`，断言非空自定义 prompt 不调用渲染器。
 - 养号回归测试断言 `tasks.prompt == scheduler.submit()` payload 中的 `prompt`。
+- 题库测试断言恰好 600 题、1～600、21 个英文分类、无 CJK/风险/机器直译短语，并核对 #39/#73/#76 的安全替换。
+- 同步测试覆盖新旧分类标题、WAL 一致备份、按编号更新保留 topic ID 和历史 task prompt。
+- worker 脚本测试提取四类默认注入文本，断言无 CJK，并包含各自的续跑、最小交付、OAuth 重试和 API 卡顿恢复语义。
 - 静态契约检查核对三个 WebUI 表单的 `name="prompt_mode"`、选中默认值和 `app.js` 请求体字段。
 - 提交前运行 Python 编译、后端单元测试、`node --check webui/app.js`，并在暗色、亮色和窄屏下检查分段控件。
 

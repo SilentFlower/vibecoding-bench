@@ -66,6 +66,9 @@ async def verify_warmup_ui(rpc, evaluate, wait_for, session_id: str) -> None:
     assert account["warmup_quota_5h_limit_percent"] is None
     assert account["warmup_quota_7d_limit_percent"] == 20
     assert "admission" not in account["warmup_quota"]
+    assert account["quota_policy"]["blocked"]
+    assert not account["warmup_quota"]["blocked"]
     await wait_for(f"{frame}.querySelector('#accounts-body').textContent.includes('7d 已用 ≥ 20%')")
+    assert await evaluate(f"{frame}.querySelector('#accounts-body').textContent.includes('普通任务：任务额度未知或窗口已到期')")
     assert await evaluate(f"{frame}.querySelector('#accounts-body').textContent.includes('养号额度未知或窗口已到期')")
-    print("通过：真实统一后台阈值配置、严格输入、保存重读、独立关闭、桌面/390px 与明暗主题")
+    print("通过：真实统一后台普通任务/养号双状态、严格输入、保存重读、独立关闭、桌面/390px 与明暗主题")
