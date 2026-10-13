@@ -226,17 +226,20 @@ async function renderAccounts() {
     const id = escapeHTML(draft.environment_id);
     return `<tr class="account-draft-row">
       <td><span class="muted">草稿</span></td><td><strong>${escapeHTML(draft.name)}</strong></td>
-      <td colspan="4"><strong>${escapeHTML(phase)}</strong><div class="muted">${escapeHTML(draft.message || (draft.credentials_present && !draft.credentials_ready ? '保留授权产物；继续后检查认证状态' : '尚未保存账号'))}</div></td>
+      <td><strong>${escapeHTML(phase)}</strong><div class="muted">${escapeHTML(draft.message || (draft.credentials_present && !draft.credentials_ready ? '保留授权产物；继续后检查认证状态' : '尚未保存账号'))}</div></td>
+      <td>${escapeHTML(draft.proxy_known ? (draft.proxy_summary || '未配置代理') : '配置待检查')}</td><td>—</td><td>未提交</td>
       <td>不参与任务与养号</td><td>—</td><td><div class="op-actions account-actions">
         <button type="button" class="btn btn-sm" data-draft-resume="${id}" ${draft.can_resume ? '' : 'disabled'}>继续登录</button>
         <button type="button" class="btn btn-sm" data-draft-restart="${id}" ${draft.can_restart ? '' : 'disabled'}>重新登录</button>
         ${draft.session_id ? `<button type="button" class="btn btn-sm" data-draft-cancel="${id}" ${draft.can_restart ? '' : 'disabled'}>取消登录</button>` : ''}
         <button type="button" class="btn btn-sm btn-danger" data-draft-delete="${id}" ${draft.can_delete ? '' : 'disabled'}>删除草稿</button>
+        ${draft.can_reconcile ? `<button type="button" class="btn btn-sm" data-draft-reconcile="${id}">恢复检查</button>` : ''}
+        ${draft.state === 'reconcile' ? '<a class="btn btn-sm" href="#environments">查看环境</a>' : ''}
       </div></td></tr>`;
   }).join('') || '<tr><td colspan="9" class="muted empty-cell">暂无账号</td></tr>';
 
   body.onclick = async (e) => {
-    const draftId = e.target.dataset.draftResume || e.target.dataset.draftRestart || e.target.dataset.draftCancel || e.target.dataset.draftDelete;
+    const draftId = e.target.dataset.draftResume || e.target.dataset.draftRestart || e.target.dataset.draftCancel || e.target.dataset.draftDelete || e.target.dataset.draftReconcile;
     if (draftId) {
       const draft = state.loginDrafts.find(item => item.environment_id === draftId);
       if (!draft) return;
@@ -245,6 +248,8 @@ async function renderAccounts() {
       try {
         if (e.target.dataset.draftDelete) {
           await API(`/accounts/login-drafts/${draftId}?generation=${encodeURIComponent(draft.generation)}`, { method: 'DELETE' });
+        } else if (e.target.dataset.draftReconcile) {
+          await API(`/accounts/login-drafts/${draftId}/reconcile`, { method: 'POST', body: JSON.stringify({ generation: draft.generation }) });
         } else if (e.target.dataset.draftCancel) {
           await API(`/accounts/login/${draft.session_id}`, { method: 'DELETE' });
         } else {
@@ -725,6 +730,29 @@ async function showAccLoginSession(resp, body, loginState) {
   state.accLogin.environmentId = resp.environment_id || null;
   state.accLogin.draftGeneration = resp.draft_generation || null;
   state.accLogin.authorizationURL = null;
+  loginState.codeMode = Boolean(RUNTIME_BASE || resp.environment_id || resp.reconnectable);
+  loginState.loginPhase = resp.reconnectable ? 'authorizing' : 'unknown';
+  loginState.codeStatus = 'idle';
+  loginState.codeSending = false;
+  $('#acc-code-form').classList.toggle('hidden', !loginState.codeMode);
+  $('#acc-auth-code').value = '';
+  $('#acc-auth-code').type = 'password';
+  $('#acc-code-toggle').textContent = '显示授权码';
+  $('#acc-code-toggle').setAttribute('aria-pressed', 'false');
+  $('#acc-code-status').textContent = '尚未发送';
+  $('#acc-login-input-hint').textContent = loginState.codeMode
+    ? '打开授权链接完成登录，将完整授权码填入下方输入框并发送。终端只显示 CLI 输出；等待认证检查通过后点击“提交保存”。'
+    : '打开授权链接完成登录，将完整授权码粘回终端后按 Enter，再点击“提交保存”。';
+  $('#acc-auth-code').oninput = updateAccCodeControls;
+  $('#acc-code-form').onsubmit = event => { event.preventDefault(); sendAccLoginCode(); };
+  $('#acc-code-toggle').onclick = () => {
+    const input = $('#acc-auth-code');
+    input.type = input.type === 'password' ? 'text' : 'password';
+    $('#acc-code-toggle').textContent = input.type === 'password' ? '显示授权码' : '隐藏授权码';
+    $('#acc-code-toggle').setAttribute('aria-pressed', String(input.type === 'text'));
+  };
+  $('#acc-code-query').onclick = queryAccCodeReceipt;
+  updateAccCodeControls();
   $('#acc-auth-url').value = '';
   $('#acc-login-copy').disabled = true;
   $('#acc-login-open').disabled = true;
@@ -755,7 +783,7 @@ async function showAccLoginSession(resp, body, loginState) {
  */
 async function restartAccLogin() {
   const login = state.accLogin;
-  if (!login || login.closing || login.committing || login.starting) return;
+  if (!login || login.closing || login.committing || login.starting || login.codeSending) return;
   const draft = { environment_id: login.environmentId, generation: login.draftGeneration, name: login.name };
   const account = state.accounts.find(item => item.id === login.accountId);
   await endAccLogin({ alsoCloseModal: true });
@@ -769,13 +797,20 @@ async function restartAccLogin() {
 
 async function attachAccLoginTerminal(wsPath) {
   const login = state.accLogin;
-  const termState = await attachTerminal('#acc-login-xterm', wsPath, 'running', {
+  let termState;
+  try { termState = await attachTerminal('#acc-login-xterm', wsPath, 'running', {
+    readOnly: login.codeMode,
     autoReconnect: login.reconnectable,
     startStopped: !login.reconnectable && Boolean(login.environmentId || RUNTIME_BASE),
     isActive: () => state.accLogin === login && !login.closing,
     onSocket: socket => { if (state.accLogin === login) login.ws = socket; },
     onState: message => { if (state.accLogin === login) $('#acc-login-connection-status').textContent = message; },
-  });
+  }); } catch (error) {
+    if (!login.codeMode) throw error;
+    // 授权码走独立 HTTP；输出组件失败不能阻断认证状态轮询和提交反馈。
+    termState = { stop: message => { if (state.accLogin === login) $('#acc-login-connection-status').textContent = message; }, dispose() {} };
+    $('#acc-login-connection-status').textContent = '输出终端未连接；授权码仍可通过输入框发送';
+  }
   if (state.accLogin !== login) { termState.dispose(); return; }
 
   login.term = termState.term;
@@ -783,7 +818,7 @@ async function attachAccLoginTerminal(wsPath) {
   login.ws = termState.ws;
   login.connection = termState;
   login.onResize = termState.onResize;
-  $('#acc-login-reconnect').disabled = !login.reconnectable;
+  $('#acc-login-reconnect').disabled = !login.reconnectable || typeof termState.reconnect !== 'function';
   if (login.reconnectable || login.environmentId || RUNTIME_BASE) {
     /** 只在当前登录窗内串行查状态，不依赖 WS 首次输出来找链接。 */
     const poll = async () => {
@@ -793,10 +828,12 @@ async function attachAccLoginTerminal(wsPath) {
         const status = await API(`/accounts/login/${login.sid}/status`, { cache: 'no-store' });
         if (state.accLogin !== login || login.closing) return;
         login.authorizationURL = status.authorization_url || null;
+        login.loginPhase = status.phase;
+        updateAccCodeControls();
         $('#acc-auth-url').value = login.authorizationURL || '';
         $('#acc-login-copy').disabled = !login.authorizationURL;
         $('#acc-login-open').disabled = !login.authorizationURL;
-        $('#acc-login-link-status').textContent = status.credentials_ready ? 'CLI 认证检查通过，可以提交保存' : (status.reconnectable ? '等待 CLI 输出授权链接' : status.message || '登录已结束');
+        $('#acc-login-link-status').textContent = status.credentials_ready ? 'CLI 认证检查通过，可以提交保存' : (login.authorizationURL ? '授权链接已就绪，请在下方输入完整授权码并发送' : (status.reconnectable ? '等待 CLI 输出授权链接' : status.message || '登录已结束'));
         $('#acc-login-restart').classList.toggle('hidden', !status.restartable);
         if (!status.reconnectable) {
           login.pollStopped = true;
@@ -808,6 +845,8 @@ async function attachAccLoginTerminal(wsPath) {
         if (state.accLogin !== login || login.closing) return;
         if ([401, 403, 404, 409, 410].includes(error.status)) {
           login.pollStopped = true;
+          login.loginPhase = 'ended';
+          updateAccCodeControls();
           termState.stop(error.message);
           $('#acc-login-reconnect').disabled = true;
           $('#acc-login-restart').classList.toggle('hidden', ![404, 409, 410].includes(error.status));
@@ -848,6 +887,80 @@ async function copyAccLoginURL() {
   $('#acc-login-link-status').textContent = copied ? '授权链接已复制' : '链接已选中，请按 Ctrl+C 或长按复制';
 }
 
+/** 刷新当前授权码长度和操作许可。@return {void} 页面状态同步完成。 */
+function updateAccCodeControls() {
+  const login = state.accLogin;
+  const input = $('#acc-auth-code');
+  const blocked = !login?.codeMode || login.loginPhase !== 'authorizing' || login.closing || login.committing || login.codeSending;
+  input.disabled = blocked || ['sending', 'uncertain'].includes(login?.codeStatus);
+  $('#acc-code-length').textContent = `已输入 ${input.value.length} 个字符`;
+  $('#acc-code-send').disabled = input.disabled || !input.value.trim();
+  $('#acc-code-toggle').disabled = blocked;
+  $('#acc-code-query').classList.toggle('hidden', !login?.codeRequestId || !['sending', 'uncertain'].includes(login.codeStatus));
+  $('#acc-code-query').disabled = Boolean(login?.codeSending);
+}
+
+/**
+ * 提交一次授权码；未知结果只查回执，不保留离线重发队列。
+ * @return {Promise<void>} 投递状态已反馈，认证结果仍由状态轮询确认。
+ */
+async function sendAccLoginCode() {
+  const login = state.accLogin;
+  if (!login?.codeMode || $('#acc-code-send').disabled) return;
+  const code = $('#acc-auth-code').value;
+  if (code.trim().length > 8192 || /[\x00-\x1f\x7f]/.test(code)) {
+    $('#acc-code-status').textContent = '授权码包含控制字符或过长，请复制完整的单行授权码';
+    return;
+  }
+  const requestId = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
+  login.codeRequestId = requestId;
+  login.codeStatus = 'sending';
+  login.codeSending = true;
+  $('#acc-auth-code').value = '';
+  $('#acc-code-status').textContent = '正在发送授权码…';
+  updateAccCodeControls();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const receipt = await API(`/accounts/login/${login.sid}/code`, {
+      method: 'POST', body: JSON.stringify({ request_id: requestId, code }), signal: controller.signal,
+    });
+    if (state.accLogin !== login || login.codeRequestId !== requestId) return;
+    login.codeStatus = receipt.status;
+    $('#acc-code-status').textContent = receipt.message;
+  } catch (error) {
+    if (state.accLogin !== login || login.codeRequestId !== requestId) return;
+    login.codeStatus = [401, 403, 409, 413, 422].includes(error.status) ? 'rejected' : 'uncertain';
+    $('#acc-code-status').textContent = login.codeStatus === 'rejected' ? error.message : '发送结果未知，请查询本次结果并查看 CLI；不会自动重发';
+  } finally {
+    clearTimeout(timer);
+    if (state.accLogin === login) { login.codeSending = false; updateAccCodeControls(); }
+  }
+}
+
+/** 查询当前投递回执，绝不重发授权码。@return {Promise<void>} 本次结果已展示。 */
+async function queryAccCodeReceipt() {
+  const login = state.accLogin;
+  if (!login?.codeRequestId || login.codeSending || login.closing) return;
+  login.codeSending = true;
+  updateAccCodeControls();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const receipt = await API(`/accounts/login/${login.sid}/code/${login.codeRequestId}`, { cache: 'no-store', signal: controller.signal });
+    if (state.accLogin !== login) return;
+    login.codeStatus = receipt.status;
+    $('#acc-code-status').textContent = receipt.message;
+  } catch {
+    if (state.accLogin !== login) return;
+    login.codeStatus = 'uncertain';
+    $('#acc-code-status').textContent = '回执暂时不可查，发送结果未知，请查看 CLI 或取消后重新登录';
+  } finally {
+    clearTimeout(timer);
+    if (state.accLogin === login) { login.codeSending = false; updateAccCodeControls(); }
+  }
+}
+
 /**
  * 挂载终端；登录可重连原 tmux，续聊保持原行为。
  * @param {string} hostSelector 终端宿主。
@@ -872,6 +985,7 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
     fontFamily: '"JetBrains Mono", ui-monospace, Menlo, monospace',
     fontSize: 13,
     cursorBlink: true,
+    disableStdin: Boolean(options.readOnly),
     convertEol: true,
     theme: {
       background: '#0a0b09',
@@ -942,7 +1056,7 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
         inputAllowed = hostSelector !== '#continue-xterm' && initialStatus === 'running';
         socket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
         notify('终端已连接');
-        term.focus();
+        if (!options.readOnly) term.focus();
         if (options.autoReconnect) {
           clearInterval(heartbeatTimer);
           heartbeatTimer = setInterval(() => {
@@ -987,10 +1101,17 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
     }
   };
   const input = term.onData(data => {
+    if (options.readOnly) return;
     if (active() && inputAllowed && ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', data }));
     // 终态原因已经确定；离线输入不能覆盖它或承诺恢复一个死亡的终端。
     else if (active() && !stopped) notify('终端未连接，输入未发送；连接恢复后请重新输入');
   });
+
+  // xterm 只接管内部屏幕；点击黑框内边距后也要将焦点交还终端，不能停在页面上。
+  const focusTerminal = event => {
+    if (event.button === 0 && active() && !stopped) term.focus();
+  };
+  host.addEventListener('click', focusTerminal);
 
   const onResize = () => {
     try { fit.fit(); } catch {}
@@ -1019,6 +1140,7 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
       clearInterval(heartbeatTimer);
       if (ws?.readyState <= WebSocket.OPEN) ws.close();
       input.dispose();
+      host.removeEventListener('click', focusTerminal);
       window.removeEventListener('resize', onResize);
       term.dispose();
     },
@@ -1027,8 +1149,9 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
 
 async function commitAccLogin() {
   const al = state.accLogin;
-  if (!al || !al.sid || al.closing || al.committing) return;
+  if (!al || !al.sid || al.closing || al.committing || al.codeSending) return;
   al.committing = true;
+  updateAccCodeControls();
   const btn = $('#acc-login-commit');
   btn.disabled = true;
   try {
@@ -1050,6 +1173,7 @@ async function commitAccLogin() {
     }
   } finally {
     al.committing = false;
+    if (state.accLogin === al) updateAccCodeControls();
   }
 }
 
@@ -1061,18 +1185,26 @@ async function endAccLogin({ alsoCloseModal = false, skipServerCancel = false } 
     $('#acc-modal-stage').textContent = '正在等待会话启动，随后取消';
     return;
   }
-  if (al.committing) { $('#acc-login-connection-status').textContent = '正在确认提交结果，请稍候再关闭'; return; }
+  if (al.committing || al.codeSending) { $('#acc-login-connection-status').textContent = '正在确认发送或提交结果，请稍候再关闭'; return; }
   al.closing = true;
+  $('#acc-auth-code').value = '';
+  updateAccCodeControls();
   // 先等待服务端确认取消；结果未知时保留弹窗，不能静默丢掉暂存凭据。
   if (al.sid && !skipServerCancel) {
     try { await API(`/accounts/login/${al.sid}`, { method: 'DELETE' }); }
     catch (error) {
       al.closing = false;
+      updateAccCodeControls();
       $('#acc-login-connection-status').textContent = '取消未完成：' + error.message;
       return;
     }
   }
   clearTimeout(al.pollTimer);
+  $('#acc-auth-code').value = '';
+  $('#acc-auth-code').oninput = null;
+  $('#acc-code-form').onsubmit = null;
+  $('#acc-code-toggle').onclick = null;
+  $('#acc-code-query').onclick = null;
   if (al.connection) al.connection.dispose();
   // 1. 关闭 WS
   if (al.ws && al.ws.readyState <= 1) {

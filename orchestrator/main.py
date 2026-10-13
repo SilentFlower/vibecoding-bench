@@ -38,7 +38,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, StrictInt
+from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr, ValidationError
 from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
 
@@ -4535,7 +4535,7 @@ class LoginSession:
 
     __slots__ = ("sid", "name", "sidecar_id", "worker_id", "created_at",
                  "proxy", "profile_dir", "force_reauth", "committed", "home", "version",
-                 "account_id", "binding_id", "identity", "commit_context", "phase", "import_payload", "authorization_url", "auth_method", "environment_id", "draft_generation")
+                 "account_id", "binding_id", "identity", "commit_context", "phase", "import_payload", "authorization_url", "auth_method", "environment_id", "draft_generation", "code_receipts")
 
     def __init__(self, sid: str, name: str, sidecar_id: Optional[str],
                  worker_id: str, proxy: dict, profile_dir: Path,
@@ -4561,6 +4561,7 @@ class LoginSession:
         self.auth_method = None
         self.environment_id = None
         self.draft_generation = None
+        self.code_receipts: dict[str, dict] = {}
 
 
 class ContinueSession:
@@ -5065,9 +5066,24 @@ class LoginManager:
         :return: None；未确认时保留会话
         """
         with self._lock:
-            sessions = [session for session in self.sessions.values() if session.commit_context.get("environment_id") == environment_id]
+            sessions = [session for session in self.sessions.values() if session.commit_context.get("environment_id") == environment_id
+                or session.environment_id == environment_id]
         for session in sessions:
             with _oauth_owner_lock(session.name):
+                if self.get(session.sid) is not session:
+                    continue
+                if session.binding_id is None:
+                    drafts = _login_drafts()
+                    row = drafts.row(environment_id)
+                    if not row or row["account_id"] is not None or row["state"] != "stopped":
+                        continue
+                    record = drafts.guard(row, session.draft_generation)
+                    if (record.get("sid") != session.sid or environment_id in account_runtime.jobs
+                        or (account_runtime._root(row) / "runtime" / "execution.json").exists()):
+                        continue
+                    # 只收口本代已停止的未绑定会话，不让旧名称占用挡住恢复/重登。
+                    self.cleanup(session.sid)
+                    continue
                 if environment_id in account_runtime.jobs or session.commit_context["path"].exists():
                     continue
                 snapshot = cc2api_client.import_status(session.binding_id, session.import_payload["operation_id"]) if session.import_payload else None
@@ -8083,6 +8099,18 @@ class LoginDraftActionIn(BaseModel):
     generation: str
 
 
+class LoginCodeIn(BaseModel):
+    """授权码投递输入；手动校验避免默认 422 回显秘密。
+
+    :param request_id: 本次投递的幂等标识
+    :param code: 完整授权码
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    request_id: StrictStr
+    code: StrictStr
+
+
 def _login_drafts() -> LoginDraftStore:
     if not account_runtime or not login_manager:
         raise HTTPException(409, "登录草稿管理仅在 v3 固定环境中可用")
@@ -8108,7 +8136,8 @@ def _unverified_login_draft(row: dict) -> dict:
         "session_id": None, "reconnectable": False, "credentials_ready": False,
         "credentials_present": False, "container_status": "unknown",
         "message": "草稿记录损坏或归属不一致，请检查环境；自动操作已禁用",
-        "can_resume": False, "can_restart": False, "can_delete": False}
+        "can_resume": False, "can_restart": False, "can_delete": False,
+        "can_reconcile": False, "proxy_known": False, "proxy_summary": None}
 
 
 @app.get("/api/accounts/login-drafts")
@@ -8176,6 +8205,14 @@ def list_login_drafts() -> list[dict]:
             if not acquired:
                 # 初始化/提交可持续较久；列表只读快照，不等待操作锁或改写会话状态。
                 message, allowed = "登录操作进行中，请稍候刷新", False
+            can_reconcile = False
+            if acquired and not pending and phase == "reconcile":
+                try:
+                    drafts.recovery_record(current, record["generation"])
+                    can_reconcile = True
+                except Exception:
+                    # 网络状态未知只禁用该草稿恢复，不能遮住其它账号列表。
+                    pass
             result.append({"draft_id": current["environment_id"], "environment_id": current["environment_id"],
                 "name": current["name"], "generation": record["generation"], "state": phase,
                 "session_id": session.sid if session else None,
@@ -8185,7 +8222,8 @@ def list_login_drafts() -> list[dict]:
                 "container_status": container_status, "message": message,
                 "can_resume": allowed and phase not in ("preparing", "deleting") and bool(session or (profile / ".credentials.json").is_file()),
                 "can_restart": allowed and phase not in ("preparing", "deleting", "submitting"),
-                "can_delete": allowed and phase not in ("preparing", "submitting")})
+                "can_delete": allowed and phase not in ("preparing", "submitting"),
+                "can_reconcile": can_reconcile, **drafts.proxy_summary(current)})
         finally:
             if acquired:
                 owner_lock.release()
@@ -8201,6 +8239,34 @@ def _require_login_draft(environment_id: str, generation: str) -> tuple[LoginDra
     if record["phase"] == "deleting":
         raise ValueError("草稿正在清理，请先完成删除")
     return drafts, row, record
+
+
+@app.post("/api/accounts/login-drafts/{environment_id}/reconcile")
+def reconcile_login_draft(environment_id: str, body: LoginDraftActionIn) -> dict:
+    """受控恢复未绑定草稿，保留 HOME 和未提交授权产物。
+
+    :param environment_id: 原草稿环境 ID
+    :param body: 页面读取的草稿代次
+    :return: 对账完成；冲突或未知结果保持保护
+    """
+    drafts = _login_drafts()
+    row = drafts.row(environment_id)
+    if not row:
+        raise HTTPException(404, "草稿已不存在")
+    try:
+        with _oauth_owner_lock(row["name"]), _profile_lock(row["name"]), account_runtime.environment_lock(environment_id):
+            row = drafts.row(environment_id)
+            if not row:
+                raise ValueError("草稿已不存在")
+            drafts.recovery_record(row, body.generation)
+            account_runtime.maintenance(environment_id, "reconcile")
+        # 收口方法自行取得非重入 owner 锁，代次在内部再次核对。
+        login_manager.cleanup_reconciled(environment_id)
+        return {"ok": True}
+    except (ValueError, KeyError, TypeError):
+        raise HTTPException(409, "草稿有活动工作、保存意图或归属冲突，请刷新或查看环境") from None
+    except Exception:
+        raise HTTPException(503, "恢复检查尚未完成，草稿与产物已保留，请重试") from None
 
 
 @app.post("/api/accounts/login-drafts/{environment_id}/resume")
@@ -8360,6 +8426,87 @@ def login_start(body: LoginStartIn):
     return _login_response(session)
 
 
+def _send_login_code(sid: str, body: LoginCodeIn) -> dict:
+    session = login_manager.get(sid) if login_manager else None
+    if not account_runtime or not session:
+        raise HTTPException(404, "原登录会话不可用，发送结果不能确认")
+    with _oauth_owner_lock(session.name):
+        if login_manager.get(sid) is not session:
+            raise HTTPException(404, "原登录会话已结束，发送结果不能确认")
+        if body.request_id in session.code_receipts:
+            return dict(session.code_receipts[body.request_id])
+        if session.phase != "authorizing" or time.time() >= session.created_at + int(os.environ.get("V3_LOGIN_TTL_SECONDS", "1800")):
+            raise HTTPException(409, "原登录已结束或过期，授权码未发送")
+        if len(session.code_receipts) >= 32:
+            raise HTTPException(409, "本会话发送次数已达上限，请检查登录状态")
+        if session.environment_id:
+            drafts = _login_drafts()
+            row = drafts.row(session.environment_id)
+            if not row:
+                raise HTTPException(409, "草稿已不存在，授权码未发送")
+            try:
+                drafts.guard(row, session.draft_generation)
+            except ValueError:
+                raise HTTPException(409, "草稿正在保存、清理或已换代，授权码未发送") from None
+        receipt = {"request_id": body.request_id, "status": "sending", "message": "正在发送授权码"}
+        session.code_receipts[body.request_id] = receipt
+        try:
+            account_runtime.send_login_code(session, body.request_id, body.code.strip())
+            receipt.update(status="delivered", message="已送到 CLI，等待认证检查；这不代表登录成功")
+        except ValueError:
+            receipt.update(status="rejected", message="原登录终端或环境不可用，授权码未发送，请刷新状态")
+        except Exception:
+            receipt.update(status="uncertain", message="发送结果未知，请查询本次回执并检查 CLI，勿重复发送")
+        return dict(receipt)
+
+
+@app.post("/api/accounts/login/{sid}/code")
+async def login_code(sid: str, request: Request, response: Response) -> dict:
+    """有界接收授权码，返回不包含秘密的投递回执。
+
+    :param sid: 原登录会话
+    :param request: 含请求标识与授权码的正文
+    :param response: 禁止缓存回执
+    :return: 本次投递状态；验证失败只返回固定说明
+    """
+    response.headers["Cache-Control"] = "no-store"
+    payload = bytearray()
+    async for chunk in request.stream():
+        if len(payload) + len(chunk) > 65536:
+            raise HTTPException(413, "授权码请求过长，未发送")
+        payload.extend(chunk)
+    try:
+        body = LoginCodeIn.model_validate(json.loads(payload))
+        if (not re.fullmatch(r"[a-f0-9]{32}", body.request_id) or not 1 <= len(body.code.strip()) <= 8192
+            or any(ord(character) < 32 or ord(character) == 127 for character in body.code)):
+            raise ValueError
+    except (ValueError, TypeError, ValidationError):
+        raise HTTPException(422, "请输入完整授权码；不允许空码、控制字符或超长内容") from None
+    finally:
+        payload.clear()
+    return await asyncio.to_thread(_send_login_code, sid, body)
+
+
+@app.get("/api/accounts/login/{sid}/code/{request_id}")
+def login_code_receipt(sid: str, request_id: str, response: Response) -> dict:
+    """查询已有回执，绝不重新注入授权码。
+
+    :param sid: 原登录会话
+    :param request_id: 原投递请求标识
+    :param response: 禁止缓存回执
+    :return: 已有投递状态；无回执时不能推断未发送
+    """
+    response.headers["Cache-Control"] = "no-store"
+    session = login_manager.get(sid) if login_manager else None
+    if not session or not re.fullmatch(r"[a-f0-9]{32}", request_id):
+        raise HTTPException(404, "原回执不可查，发送结果未知，请检查 CLI 状态")
+    with _oauth_owner_lock(session.name):
+        receipt = session.code_receipts.get(request_id) if login_manager.get(sid) is session else None
+        if receipt is None:
+            raise HTTPException(404, "原回执不可查，发送结果未知，请检查 CLI 状态")
+        return dict(receipt)
+
+
 @app.get("/api/accounts/login/{sid}/status")
 def login_status(sid: str, response: Response) -> dict:
     """提供不含凭据的登录状态与实际授权链接。
@@ -8507,7 +8654,8 @@ async def login_ws(websocket: WebSocket, sid: str):
                 if session.phase != "authorizing":
                     break
                 if msg.get("bytes"):
-                    await loop.sock_sendall(raw, msg["bytes"])
+                    if not account_runtime:
+                        await loop.sock_sendall(raw, msg["bytes"])
                     continue
                 txt = msg.get("text")
                 if not txt:
@@ -8516,7 +8664,8 @@ async def login_ws(websocket: WebSocket, sid: str):
                 try:
                     ev = json.loads(txt)
                 except json.JSONDecodeError:
-                    await loop.sock_sendall(raw, txt.encode())
+                    if not account_runtime:
+                        await loop.sock_sendall(raw, txt.encode())
                     continue
                 if not isinstance(ev, dict) or session.phase != "authorizing":
                     continue
@@ -8532,7 +8681,8 @@ async def login_ws(websocket: WebSocket, sid: str):
                     except Exception:
                         pass
                 elif ev.get("type") == "input":
-                    await loop.sock_sendall(raw, (ev.get("data") or "").encode())
+                    if not account_runtime:
+                        await loop.sock_sendall(raw, (ev.get("data") or "").encode())
         except WebSocketDisconnect:
             pass
         except Exception:
@@ -8798,7 +8948,10 @@ def login_cancel(sid: str):
                     row = drafts.row(session.environment_id)
                     if row and drafts.record(row)["phase"] == "submitting":
                         raise HTTPException(409, "账号保存尚未完成，请先重试提交，不能取消并丢弃产物")
-                login_manager.cleanup(sid)
+                try:
+                    login_manager.cleanup(sid)
+                except Exception:
+                    raise HTTPException(503, "取消清理未完成，草稿与产物已保留；请刷新账号列表后恢复检查") from None
     return {"ok": True}
 
 

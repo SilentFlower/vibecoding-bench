@@ -119,12 +119,14 @@ class LoginDraftStore:
             connection.close()
         return dict(row) if row else next((row for row in self.rows() if row["environment_id"] == environment_id), None)
 
-    def guard(self, row: dict, generation: str | None = None, allow_submitting: bool = False) -> dict:
+    def guard(self, row: dict, generation: str | None = None, allow_submitting: bool = False,
+              allow_reconcile: bool = False) -> dict:
         """证明环境尚未成为正式账号，也没有历史或待确认提交。
 
         :param row: 当前环境行
         :param generation: 可选的页面草稿代次
         :param allow_submitting: 仅继续原本地提交允许读取已保存的同名账号
+        :param allow_reconcile: 仅受控恢复检查允许读取隔离状态，不跳过归属和提交保护
         :return: 通过校验的元数据；冲突时抛 ValueError
         """
         record = self.record(row)
@@ -149,9 +151,55 @@ class LoginDraftStore:
             raise ValueError("保存中的账号归属已改变，不能继续提交")
         if (formal and not pending) or history:
             raise ValueError("账号或历史仍引用此环境，请在环境页检查")
-        if (record["phase"] == "submitting" and not pending) or (root / "runtime" / "login-commit.json").exists() or row["state"] in ("reconcile", "cli_reconcile"):
+        if ((record["phase"] == "submitting" and not pending) or (root / "runtime" / "login-commit.json").exists()
+            or (not allow_reconcile and row["state"] in ("reconcile", "cli_reconcile"))):
             raise ValueError("环境仍需对账，不能删除或重新登录")
         return record
+
+    def recovery_record(self, row: dict, generation: str | None = None) -> dict:
+        """只允许原归属明确、无活动工作的草稿恢复检查。
+
+        :param row: 当前草稿环境
+        :param generation: 页面代次，列表可省略
+        :return: 可受控对账的原草稿记录
+        """
+        record = self.guard(row, generation, allow_reconcile=True)
+        root = self.runtime._root(row)
+        if (record["phase"] in ("preparing", "deleting", "submitting")
+            or not re.fullmatch(r"[a-f0-9]{12}", record.get("sid", ""))
+            or row["environment_id"] in self.runtime.jobs or root.is_symlink() or root.parent.is_symlink()
+            or (root / "runtime").is_symlink()):
+            raise ValueError("草稿正在操作或归属无法核对，请查看环境")
+        path = root / "runtime" / "execution.json"
+        if path.is_symlink():
+            raise ValueError("遗留执行不是本环境的私有记录，请查看环境")
+        if path.exists():
+            proof = json.loads(path.read_text())
+            if (not isinstance(proof, dict) or proof.get("source") != "login:" + record["sid"]
+                or proof.get("container_id") != row["container_id"] or proof.get("generation") != row["generation"]
+                or proof.get("account_id") is not None):
+                raise ValueError("遗留执行归属无法核对，请查看环境")
+        elif row["state"] not in ("reconcile", "cli_reconcile"):
+            raise ValueError("草稿无需恢复检查，请刷新账号列表")
+        if self.runtime._running_sender_active(row):
+            raise ValueError("环境仍有活动发送请求，不能恢复检查")
+        return record
+
+    def proxy_summary(self, row: dict) -> dict:
+        """读取原代理的公开摘要，不返回认证信息。
+
+        :param row: 已核对私有记录归属的环境
+        :return: 协议/主机/端口或明确的未知、未配置状态
+        """
+        try:
+            account = self.account(row)
+            host = account["upstream_socks5_host"]
+            if ":" in host:
+                host = "[" + host + "]"
+            summary = (f"{account['upstream_proxy_scheme']}://{host}:{account['upstream_socks5_port']}" if host else None)
+            return {"proxy_known": True, "proxy_summary": summary}
+        except (ValueError, KeyError, TypeError, OSError):
+            return {"proxy_known": False, "proxy_summary": None}
 
     def account(self, row: dict) -> dict:
         """从原私有配置恢复代理和首次固化时区，不公开发送器秘密。
@@ -163,8 +211,14 @@ class LoginDraftStore:
         if not path.exists():
             raise ValueError("登录准备未完成，请删除草稿后重新配置")
         configuration = json.loads(path.read_text())
-        parsed = urlsplit(configuration.get("proxy_source", configuration["proxy_url"]))
-        if parsed.scheme and (parsed.scheme not in ("http", "socks5", "socks5h") or not parsed.hostname):
+        if not isinstance(configuration, dict) or ("proxy_source" not in configuration and "proxy_url" not in configuration):
+            raise ValueError("原代理配置缺失")
+        source = configuration["proxy_source"] if "proxy_source" in configuration else configuration["proxy_url"]
+        if not isinstance(source, str):
+            raise ValueError("原代理配置无效")
+        parsed = urlsplit(source)
+        if source and (parsed.scheme not in ("http", "socks5", "socks5h") or not parsed.hostname
+            or parsed.path not in ("", "/") or parsed.query or parsed.fragment):
             raise ValueError("原代理配置无法恢复")
         return {"name": row["name"], "timezone": json.loads(row["fingerprint_json"])["tz"],
             "upstream_proxy_scheme": parsed.scheme or "socks5", "upstream_socks5_host": parsed.hostname or "",

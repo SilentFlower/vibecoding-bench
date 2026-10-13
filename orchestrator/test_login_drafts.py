@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from fastapi import HTTPException, Response
+from fastapi.testclient import TestClient
 from account_runtime import AccountRuntime, atomic_json
 from login_drafts import LoginDraftStore
 import main
@@ -400,6 +401,193 @@ class LoginDraftTests(unittest.TestCase):
         with self.assertRaises(HTTPException):
             main.delete_login_draft(self.row["environment_id"], "obsolete-generation")
         self.container.remove.assert_not_called()
+
+    def test_code_http_validation_duplicate_and_unknown_delivery(self) -> None:
+        """真实 ASGI 验证安全错误体与回执，重复及未知结果不能再注入。@return None。"""
+        sid = self._start()["session_id"]
+        self.runtime.send_login_code = Mock()
+        token = "synthetic-service-token" * 2
+        with patch.dict(os.environ, {"V3_INTERNAL_TOKEN": token}):
+            client = TestClient(main.app)
+            self.addCleanup(client.close)
+            headers = {"Authorization": "Bearer " + token}
+            path = f"/api/accounts/login/{sid}/code"
+            self.assertEqual(client.post(path, json={"request_id": "a" * 32, "code": "private-test-code"}).status_code, 401)
+            for code in ("", "private-test-code\n", 123, {"secret": "private-test-code"}, "x" * 8193):
+                result = client.post(path, headers=headers, json={"request_id": "a" * 32, "code": code})
+                self.assertEqual(result.status_code, 422)
+                self.assertNotIn("private-test-code", result.text)
+            too_large = client.post(path, headers=headers, content=b"x" * 65537)
+            self.assertEqual(too_large.status_code, 413)
+            self.runtime.send_login_code.assert_not_called()
+            result = client.post(path, headers=headers, json={"request_id": "a" * 32, "code": "private-test-code"})
+            self.assertEqual(result.json()["status"], "delivered")
+            self.assertEqual(result.headers["cache-control"], "no-store")
+            self.assertNotIn("private-test-code", result.text)
+            duplicate = client.post(path, headers=headers, json={"request_id": "a" * 32, "code": "different-code"})
+            self.assertEqual(duplicate.json(), result.json())
+            self.runtime.send_login_code.assert_called_once()
+            self.runtime.send_login_code.side_effect = RuntimeError("synthetic lost response")
+            unknown = client.post(path, headers=headers, json={"request_id": "b" * 32, "code": "private-test-code"})
+            self.assertEqual(unknown.json()["status"], "uncertain")
+            queried = client.get(path + "/" + "b" * 32, headers=headers)
+            self.assertEqual(queried.json(), unknown.json())
+            client.post(path, headers=headers, json={"request_id": "b" * 32, "code": "private-test-code"})
+            self.assertEqual(self.runtime.send_login_code.call_count, 2)
+
+    def test_code_receipt_limit_and_expired_session(self) -> None:
+        """有界回执不淘汰旧标识；会话过期拒绝新投递。@return None。"""
+        sid = self._start()["session_id"]
+        session = self.manager.get(sid)
+        self.runtime.send_login_code = Mock()
+        for number in range(32):
+            result = main._send_login_code(sid, main.LoginCodeIn(request_id=f"{number:032x}", code="synthetic"))
+            self.assertEqual(result["status"], "delivered")
+        with self.assertRaises(HTTPException):
+            main._send_login_code(sid, main.LoginCodeIn(request_id="f" * 32, code="synthetic"))
+
+        self.assertEqual(main._send_login_code(sid, main.LoginCodeIn(request_id="0" * 32, code="synthetic"))["status"], "delivered")
+        self.assertEqual(self.runtime.send_login_code.call_count, 32)
+        session.code_receipts.clear()
+        session.created_at = 0
+        with self.assertRaises(HTTPException):
+            main._send_login_code(sid, main.LoginCodeIn(request_id="f" * 32, code="synthetic"))
+
+    def test_concurrent_code_requests_deliver_once(self) -> None:
+        """两个同时到达的相同请求只注入一次，并返回同一回执。@return None。"""
+        sid = self._start()["session_id"]
+        entered, release = threading.Event(), threading.Event()
+        receipts, errors = [], []
+
+        def deliver(*args):
+            entered.set()
+            if not release.wait(3):
+                raise RuntimeError("synthetic deadline")
+
+        def submit():
+            try:
+                receipts.append(main._send_login_code(sid, main.LoginCodeIn(request_id="a" * 32, code="synthetic")))
+            except Exception as error:
+                errors.append(error)
+
+        self.runtime.send_login_code = Mock(side_effect=deliver)
+        first, second = threading.Thread(target=submit), threading.Thread(target=submit)
+        first.start()
+        try:
+            self.assertTrue(entered.wait(2))
+            second.start()
+        finally:
+            release.set()
+            first.join(3)
+            if second.ident is not None:
+                second.join(3)
+        self.assertFalse(first.is_alive() or second.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(len(receipts), 2)
+        self.assertEqual(receipts[0], receipts[1])
+        self.runtime.send_login_code.assert_called_once()
+
+    def test_runtime_code_uses_stdin_original_tmux_and_clears_buffer(self) -> None:
+        """完整执行证明绑定原 tmux，秘密不进 argv，失败后仍删 buffer。@return None。"""
+        sid = self._start()["session_id"]
+        session = self.manager.get(sid)
+        raw = Mock()
+        raw.recv.return_value = b""
+        stream = Mock(_sock=raw)
+        self.client.api.exec_create.return_value = {"Id": "code-exec"}
+        self.client.api.exec_start.return_value = stream
+        self.client.api.exec_inspect.return_value = {"Running": False, "ExitCode": 0}
+        self.runtime.send_login_code(session, "a" * 32, "private-test-code")
+        raw.sendall.assert_called_once_with(b"private-test-code")
+        self.assertNotIn("private-test-code", str(self.client.api.exec_create.call_args))
+        self.assertIn(f"/tmp/v3-login-{sid}.sock", self.client.api.exec_create.call_args.args[1])
+        self.assertTrue(any("paste-buffer" in call.args[0] for call in self.container.exec_run.call_args_list))
+        self.assertIn("delete-buffer", self.container.exec_run.call_args.args[0])
+        stream.close.assert_called_once()
+        self.runtime._update(self.row, generation=2)
+        with self.assertRaises(ValueError):
+            self.runtime.send_login_code(session, "b" * 32, "private-test-code")
+        self.assertEqual(raw.sendall.call_count, 1)
+
+    def test_buffer_cleanup_failure_is_uncertain_after_delivery(self) -> None:
+        """可能已注入后的清理异常不能假报未发送，相同标识不得补发。@return None。"""
+        sid = self._start()["session_id"]
+        raw = Mock()
+        raw.recv.return_value = b""
+        self.client.api.exec_create.return_value = {"Id": "code-exec"}
+        self.client.api.exec_start.return_value = Mock(_sock=raw)
+        self.client.api.exec_inspect.return_value = {"Running": False, "ExitCode": 0}
+
+        def execute(argv, **kwargs):
+            if "delete-buffer" in argv:
+                raise ValueError("synthetic buffer cleanup fault")
+            return SimpleNamespace(exit_code=0, output=b"node")
+
+        self.container.exec_run.side_effect = execute
+        body = main.LoginCodeIn(request_id="a" * 32, code="synthetic")
+        self.assertEqual(main._send_login_code(sid, body)["status"], "uncertain")
+        self.assertEqual(main._send_login_code(sid, body)["status"], "uncertain")
+        raw.sendall.assert_called_once_with(b"synthetic")
+
+    def test_reconcile_failed_cleanup_releases_original_name_and_preserves_home(self) -> None:
+        """真实目录/DB 验证旧草稿恢复，不能被遗留名称占用挡住。@return None。"""
+        sid = self._start()["session_id"]
+        identity = self.envroot / "home" / ".claude.json"
+        atomic_json(identity, {"userID": "synthetic-fixed"})
+        before = identity.read_bytes()
+        self.runtime._configure_recorder.side_effect = ValueError("synthetic cleanup fault")
+        with self.assertRaises(HTTPException):
+            main.login_cancel(sid)
+        self.assertTrue(self.manager.has_active_name(self.row["name"]))
+        draft = main.list_login_drafts()[0]
+        self.assertEqual(draft["state"], "reconcile")
+        self.assertTrue(draft["can_reconcile"])
+        self.container.status = "exited"
+        result = main.reconcile_login_draft(self.row["environment_id"], main.LoginDraftActionIn(generation=draft["generation"]))
+        self.assertTrue(result["ok"])
+        self.assertIsNone(self.manager.get(sid))
+        self.assertFalse(self.manager.has_active_name(self.row["name"]))
+        self.assertEqual(identity.read_bytes(), before)
+        restored = main.list_login_drafts()[0]
+        self.assertEqual(restored["state"], "cancelled")
+        self.assertTrue(restored["can_restart"])
+        self.assertTrue(restored["can_delete"])
+
+    def test_reconcile_rejects_live_work_unknown_proof_and_old_generation(self) -> None:
+        """活跃工作、旧页面与未知证明不能经恢复入口解除保护。@return None。"""
+        sid = self._start()["session_id"]
+        store = LoginDraftStore(self.runtime, self.database, main._db_lock)
+        record = store.record(self.row)
+        body = main.LoginDraftActionIn(generation=record["generation"])
+        with self.assertRaises(HTTPException):
+            main.reconcile_login_draft(self.row["environment_id"], body)
+        self.runtime.jobs.clear()
+        self.runtime._update(self.row, state="reconcile")
+        path = self.envroot / "runtime" / "execution.json"
+        proof = json.loads(path.read_text())
+        proof["source"] = "login:another-sid"
+        atomic_json(path, proof)
+        self.assertFalse(main.list_login_drafts()[0]["can_reconcile"])
+        with self.assertRaises(HTTPException):
+            main.reconcile_login_draft(self.row["environment_id"], body)
+        proof["source"] = "login:" + sid
+        atomic_json(path, proof)
+        with self.assertRaises(HTTPException):
+            main.reconcile_login_draft(self.row["environment_id"], main.LoginDraftActionIn(generation="old"))
+        self.container.stop.assert_not_called()
+
+    def test_proxy_summary_is_redacted_and_missing_is_unknown(self) -> None:
+        """草稿代理地址可见，认证信息不进入 JSON，读取失败不冒充直连。@return None。"""
+        self._start()
+        path = self.envroot / "runtime" / "sender.json"
+        atomic_json(path, {"proxy_source": "http://private-user:private-password@proxy.invalid:8081"})
+        draft = main.list_login_drafts()[0]
+        self.assertEqual(draft["proxy_summary"], "http://proxy.invalid:8081")
+        self.assertTrue(draft["proxy_known"])
+        self.assertNotIn("private-user", json.dumps(draft))
+        self.assertNotIn("private-password", json.dumps(draft))
+        path.unlink()
+        self.assertFalse(main.list_login_drafts()[0]["proxy_known"])
 
     def test_status_ended_and_credentials_are_distinct(self) -> None:
         """终端死亡仍明确返回终态，文件存在不能冒充成功登录。@return None。"""

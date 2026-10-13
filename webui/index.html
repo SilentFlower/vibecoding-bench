@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261013-login-drafts" />
+  <link rel="stylesheet" href="style.css?v=20261013-code-feedback" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -527,7 +527,7 @@
           <code id="acc-login-name">—</code>
         </div>
         <div class="login-hint">
-          <strong>下一步：</strong>打开授权链接完成登录，把授权码粘回终端，CLI 登录成功后点击“提交保存”。
+          <strong>下一步：</strong><span id="acc-login-input-hint">打开授权链接完成登录，将完整授权码填入下方输入框并发送。等待认证检查通过后点击“提交保存”。</span>
           已关联账号会同步凭据到原关联账号；重授权期间该账号暂停接收新的请求。
         </div>
         <div class="login-connection">
@@ -544,6 +544,17 @@
             <span id="acc-login-link-status" role="status" aria-live="polite">等待 CLI 输出授权链接</span>
           </div>
         </div>
+        <form id="acc-code-form" class="form login-code hidden" autocomplete="off">
+          <label for="acc-auth-code" class="lbl">授权码</label>
+          <input id="acc-auth-code" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" placeholder="粘贴完整授权码" aria-describedby="acc-code-length acc-code-status" />
+          <div class="login-link-actions">
+            <button type="button" class="btn btn-sm" id="acc-code-toggle" aria-pressed="false">显示授权码</button>
+            <span id="acc-code-length">已输入 0 个字符</span>
+            <button type="submit" class="btn btn-sm btn-primary" id="acc-code-send" disabled>发送到 CLI</button>
+            <button type="button" class="btn btn-sm hidden" id="acc-code-query">查询本次结果</button>
+          </div>
+          <p id="acc-code-status" role="status" aria-live="polite">尚未发送</p>
+        </form>
         <div class="xterm-host" id="acc-login-xterm"></div>
         <div class="row-end">
           <button type="button" class="btn btn-danger" id="acc-login-cancel">取消登录</button>
@@ -657,6 +668,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20261013-login-drafts"></script>
+  <script src="app.js?v=20261013-code-feedback"></script>
 </body>
 </html>

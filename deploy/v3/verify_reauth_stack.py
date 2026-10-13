@@ -1,6 +1,7 @@
 """隔离部署的关联重授权演练；合成 CLI/代理不访问真实 OAuth 或模型。"""
 
 import base64
+import asyncio
 import json
 import shutil
 import sqlite3
@@ -145,8 +146,68 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
                     screenshot = await rpc("Page.captureScreenshot", {"format": "png"}, session_id)
                     Path(f"/tmp/v3-reauth-{width}-{theme}-actions.png").write_bytes(base64.b64decode(screenshot["data"]))
                     await evaluate(f"{doc}.querySelector('.acc-step-terminal').scrollTop=0")
-            # 输入通过当前真实 WS 到原 tmux；没有调用替身的文件写入接口。
-            await evaluate(f"{state}.ws.send(JSON.stringify({{type:'input',data:'synthetic-code\\r'}}))")
+            # 复制链接会把焦点留在只读文本框；用真实输入框、键盘和 Ctrl+V 覆盖投递链。
+            await rpc("Emulation.setDeviceMetricsOverride", {"width": 1280, "height": 900, "deviceScaleFactor": 1, "mobile": False}, session_id)
+            await evaluate(f"{doc}.querySelector('#acc-login-xterm').scrollIntoView({{block:'center'}})")
+            for offset in (1, 5):
+                await evaluate(f"{doc}.querySelector('#acc-auth-url').focus()")
+                point = await evaluate(f"(() => {{const f=document.querySelector('iframe').getBoundingClientRect(),r={doc}.querySelector('#acc-login-xterm').getBoundingClientRect();return {{x:f.left+r.left+{offset},y:f.top+r.top+20}};}})()")
+                await rpc("Input.dispatchMouseEvent", {"type": "mousePressed", **point, "button": "left", "clickCount": 1}, session_id)
+                await rpc("Input.dispatchMouseEvent", {"type": "mouseReleased", **point, "button": "left", "clickCount": 1}, session_id)
+                assert await evaluate(f"{doc}.activeElement.classList.contains('xterm-helper-textarea')"), "点击终端边缘后没有获得输入焦点"
+            await evaluate(f"{doc}.querySelector('#acc-auth-code').scrollIntoView({{block:'center'}})")
+            point = await evaluate(f"(() => {{const f=document.querySelector('iframe').getBoundingClientRect(),r={doc}.querySelector('#acc-auth-code').getBoundingClientRect();return {{x:f.left+r.left+r.width/2,y:f.top+r.top+r.height/2}};}})()")
+            await rpc("Input.dispatchMouseEvent", {"type": "mousePressed", **point, "button": "left", "clickCount": 1}, session_id)
+            await rpc("Input.dispatchMouseEvent", {"type": "mouseReleased", **point, "button": "left", "clickCount": 1}, session_id)
+            assert await evaluate(f"{doc}.activeElement.id") == 'acc-auth-code'
+            await rpc("Input.dispatchKeyEvent", {"type": "keyDown", "key": "a", "code": "KeyA", "text": "a", "windowsVirtualKeyCode": 65}, session_id)
+            await rpc("Input.dispatchKeyEvent", {"type": "keyUp", "key": "a", "code": "KeyA", "windowsVirtualKeyCode": 65}, session_id)
+            assert await evaluate(f"{doc}.querySelector('#acc-code-length').textContent") == '已输入 1 个字符'
+            await rpc("Input.dispatchKeyEvent", {"type": "keyDown", "key": "Backspace", "code": "Backspace", "windowsVirtualKeyCode": 8}, session_id)
+            await rpc("Input.dispatchKeyEvent", {"type": "keyUp", "key": "Backspace", "code": "Backspace", "windowsVirtualKeyCode": 8}, session_id)
+            # 模拟回包丢失：HTTP 实际投递了无效合成码，页面必须查询原回执而不能补发。
+            await evaluate(f"{win}.__originalCodeFetch={win}.fetch;{win}.fetch=async(...args)=>{{const r=await {win}.__originalCodeFetch(...args);if(String(args[0]).endsWith('/code'))throw new Error('synthetic response lost');return r;}}")
+            await rpc("Input.insertText", {"text": "synthetic-wrong"}, session_id)
+            await evaluate(f"{doc}.querySelector('#acc-code-send').scrollIntoView({{block:'center'}})")
+            point = await evaluate(f"(() => {{const f=document.querySelector('iframe').getBoundingClientRect(),r={doc}.querySelector('#acc-code-send').getBoundingClientRect();return {{x:f.left+r.left+r.width/2,y:f.top+r.top+r.height/2}};}})()")
+            await rpc("Input.dispatchMouseEvent", {"type": "mousePressed", **point, "button": "left", "clickCount": 1}, session_id)
+            await rpc("Input.dispatchMouseEvent", {"type": "mouseReleased", **point, "button": "left", "clickCount": 1}, session_id)
+            await wait_for(f"{state}.codeStatus === 'uncertain'")
+            assert await evaluate(f"{doc}.querySelector('#acc-auth-code').value") == ''
+            assert await evaluate(f"{doc}.querySelector('#acc-code-send').disabled")
+            await evaluate(f"{win}.fetch={win}.__originalCodeFetch;{doc}.querySelector('#acc-code-query').click()")
+            await wait_for(f"{state}.codeStatus === 'delivered' && !{state}.codeSending")
+            request_id = await evaluate(f"{state}.codeRequestId")
+            duplicate = browser.post(base + f"/runtime/api/accounts/login/{sid}/code", json={"request_id": request_id, "code": "synthetic-wrong"}, timeout=10)
+            assert duplicate.json()["status"] == "delivered"
+            assert json.loads((home / ".synthetic-code-count.json").read_text())["count"] == 1
+            # 恢复浏览器原生剪贴板，真实 Ctrl+V 触发输入事件；右键原生菜单另列未自动驱动项。
+            await evaluate(f"delete {win}.navigator.clipboard")
+            await rpc("Browser.grantPermissions", {"origin": base, "permissions": ["clipboardReadWrite", "clipboardSanitizedWrite"]})
+            # 真 HTTP 页面没有 Clipboard API；独立回环安全页只写系统剪贴板，原页面仍保持非安全上下文。
+            clipboard_target = await rpc("Target.createTarget", {"url": base + "/login"})
+            clipboard_attached = await rpc("Target.attachToTarget", {"targetId": clipboard_target["targetId"], "flatten": True})
+            try:
+                await asyncio.sleep(0.5)
+                copied = await rpc("Runtime.evaluate", {"expression": "navigator.clipboard.writeText('synthetic-code').then(()=>true)", "awaitPromise": True, "returnByValue": True}, clipboard_attached["sessionId"])
+                assert "exceptionDetails" not in copied and copied["result"].get("value") is True
+            finally:
+                await rpc("Target.closeTarget", {"targetId": clipboard_target["targetId"]})
+            await evaluate(f"{doc}.querySelector('#acc-auth-code').focus()")
+            await rpc("Input.dispatchKeyEvent", {"type": "keyDown", "key": "v", "code": "KeyV", "modifiers": 2, "windowsVirtualKeyCode": 86}, session_id)
+            await rpc("Input.dispatchKeyEvent", {"type": "keyUp", "key": "v", "code": "KeyV", "modifiers": 2, "windowsVirtualKeyCode": 86}, session_id)
+            await wait_for(f"{doc}.querySelector('#acc-auth-code').value === 'synthetic-code'")
+            assert await evaluate(f"{doc}.querySelector('#acc-code-length').textContent") == '已输入 14 个字符'
+            await evaluate(f"{doc}.querySelector('#acc-code-toggle').click()")
+            assert await evaluate(f"{doc}.querySelector('#acc-auth-code').type") == 'text'
+            await evaluate(f"{doc}.querySelector('#acc-code-toggle').click();{doc}.querySelector('#acc-auth-code').focus();{state}.ws.close()")
+            assert await evaluate(f"{state}.ws.readyState") != 1
+            await rpc("Input.dispatchKeyEvent", {"type": "keyDown", "key": "Enter", "code": "Enter", "text": "\r", "windowsVirtualKeyCode": 13}, session_id)
+            await rpc("Input.dispatchKeyEvent", {"type": "keyUp", "key": "Enter", "code": "Enter", "windowsVirtualKeyCode": 13}, session_id)
+            await wait_for(f"{state}.codeStatus === 'delivered'")
+            assert await evaluate(f"{doc}.querySelector('#acc-auth-code').value") == ''
+            assert json.loads((home / ".synthetic-code-count.json").read_text())["count"] == 2
+            print("通过：真实键盘/原生 Ctrl+V、隐藏输入、长度反馈、按钮/Enter、丢回包查询与同标识单次投递、WS 断线独立发送；右键系统菜单未自动驱动")
             try:
                 await wait_for(f"{doc}.querySelector('#acc-login-link-status').textContent.includes('可以提交保存')")
             except TimeoutError:
@@ -213,6 +274,25 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
                 assert database.execute("SELECT access_token,refresh_token FROM accounts WHERE id=?", (gateway_id,)).fetchone() == ("new-access", "new-refresh")
                 assert database.execute("SELECT count(*) FROM oauth_credential_imports WHERE account_id=?", (gateway_id,)).fetchone()[0] == 1
             print("通过：真实 Docker/HTTP 错登拒绝、取消后会话和暂存收口，原关联凭据保持")
+
+            # 模拟输出组件缺失：授权码与认证轮询继续，不能启用不存在的重连方法。
+            await evaluate(f"{win}.__codeVendor={{Terminal:{win}.Terminal,FitAddon:{win}.FitAddon}};{win}.Terminal=undefined;{win}.FitAddon=undefined")
+            try:
+                await evaluate(f"{doc}.querySelector('[data-relogin=\"{account_id}\"]').click();{doc}.querySelector('#acc-form').requestSubmit()")
+                await wait_for(f"Boolean({state}?.sid)")
+                await wait_for(f"Boolean({state}?.connection && {state}?.authorizationURL)")
+                assert await evaluate(f"{doc}.querySelector('#acc-login-reconnect').disabled")
+                assert not await evaluate(f"{doc}.querySelector('#acc-auth-code').disabled")
+                await evaluate(f"{doc}.querySelector('#acc-auth-code').focus()")
+                await rpc("Input.insertText", {"text": "synthetic-wrong"}, session_id)
+                await rpc("Input.dispatchKeyEvent", {"type": "keyDown", "key": "Enter", "code": "Enter", "text": "\r", "windowsVirtualKeyCode": 13}, session_id)
+                await rpc("Input.dispatchKeyEvent", {"type": "keyUp", "key": "Enter", "code": "Enter", "windowsVirtualKeyCode": 13}, session_id)
+                await wait_for(f"{state}.codeStatus === 'delivered' && !{state}.codeSending")
+                await evaluate(f"{doc}.querySelector('#acc-login-cancel').click()")
+                await wait_for(f"{state} === null")
+                print("通过：输出组件加载失败时重连按钮禁用，原生输入、独立HTTP投递及取消仍正常")
+            finally:
+                await evaluate(f"{win}.Terminal={win}.__codeVendor.Terminal;{win}.FitAddon={win}.__codeVendor.FitAddon;delete {win}.__codeVendor")
 
             await verify_login_drafts(client, deployment, data, browser, base, address, rpc, evaluate, wait_for, session_id)
 

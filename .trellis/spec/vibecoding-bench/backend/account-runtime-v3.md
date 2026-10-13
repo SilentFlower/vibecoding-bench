@@ -206,6 +206,59 @@ LoginManager.cleanup_reconciled(environment_id: str) -> None
 - 两侧凭据、回执、设备、策略、租约与暂存前后比对；结束只按随机部署精确标签清理，核对旧哨兵 StartedAt/hash 不变。恢复测试数据后再验证无遗留。
 - 单测/模拟通过不证明真实 OAuth 成功或账号限制解除；上线后由部署负责人安排可用测试账号，经真实 CLI 重授权和正式 API 验收。回滚前收口所有 pending 登录，不删除新回执表。
 
+## Scenario: v3 授权码投递与发送回执
+
+### 1. Scope / Trigger
+
+- 修改授权码输入、`LoginCodeIn`、投递/回执 API、原 tmux stdin 或登录 WS 输入时适用。真实 CLI 可以关闭回显，不能用屏幕未显示授权码推断输入未送达；认证仍由 CLI 完成。
+
+### 2. Signatures
+
+```text
+POST /api/accounts/login/{sid}/code
+  {request_id: string, code: string}
+GET /api/accounts/login/{sid}/code/{request_id}
+  -> {request_id: string, status: string, message: string}
+LoginCodeIn: StrictStr request_id/code；extra=forbid
+AccountRuntime.send_login_code(session, request_id: str, code: str) -> None
+LoginSession.code_receipts: dict[str, dict]
+status = sending | delivered | uncertain | rejected
+```
+
+### 3. Contracts
+
+- 管理 API 沿用既有服务鉴权及 `/accounts/` 桥接；只向 v3 原活跃会话发送。请求正文有界读取，最大 64 KiB；手动校验模型并转换为固定错误，默认 422 不得回显秘密 `input`。request_id 为 32 位小写 hex；code 去首尾空白后为 1–8192 字符，原文拒绝 C0/DEL 控制字符，内部不改写或补猜参数。
+- owner 锁内重读原会话、TTL、phase 和草稿代次。缓存命中只返回原回执；未命中的新请求须为 authorizing、未过期且草稿未保存/清理。每 SID 最多保留 32 个不同标识，不淘汰旧标识后允许重放；回执只含标识、状态、说明，不保存 code，随会话结束清除。成功回执为 `Cache-Control:no-store`。
+- 投递先登记 sending，再在 owner → environment 锁序下核对完整执行 token、原 SID/tmux/socket、容器 ID、环境代次和原执行证明；Docker IO 不持有 SQLite 全局锁。授权码经 Docker exec stdin 进入 `tmux load-buffer -b <request_id> -`，stdin EOF 与 exec 成功确认后在原会话 paste-buffer，再发送 Enter。code 不进入 argv、脚本或持久文件。
+- 临时 tmux buffer 在 finally 中清理。投递前的 ValueError 拒绝为 rejected；可能已注入后的 IO、回包或清理异常均为 uncertain，不能误报“未发送”或自动重复 paste/Enter。delivered 只说明原 tmux 投递完成，认证成功仍须既有 CLI auth status/credentials_ready。
+- GET 只查询原回执，不触发投递；原会话/回执不可查不能推断“尚未发送”。管理器重启不恢复授权码或重发队列。v3 登录 WS 保留输出、resize、ping/pong及同 SID 重连，丢弃旧输入消息；旧版登录与续聊输入保持原分支。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+|---|---|
+| 正文超过 64 KiB | 413，未投递 |
+| 空码、控制字符、超长、错误类型/额外字段或非法请求标识 | 422，固定安全说明，无原始 input |
+| 原会话不存在/非 v3 | POST 404，不宣称投递成功 |
+| 新请求遇到结束/过期会话、保存/清理/换代或已达 32 次 | 409，未开始新投递 |
+| 相同合法标识重复提交 | 返回原回执，不重复注入 |
+| 原执行证明/终端校验 ValueError | 200 + rejected，明确未发送 |
+| 投递或缓冲清理结果无法确认 | 200 + uncertain，不自动补发 |
+| 原回执不可查或非法 GET 标识 | 404，明确结果未知 |
+
+### 5. Scenarios and Examples
+
+- 正常：输入框 POST `{request_id:"32位小写hex",code:"完整授权码"}` 到原 SID，显示 delivered 后继续等 CLI 认证检查；检查通过才提交保存。
+- 基础：WS 断开但原 CLI 活跃，独立 HTTP 仍可投递；输出重连不创建新 CLI。
+- 错误用法：收到 HTTP 超时后生成新标识重发同一授权码。正确处理：GET 原标识回执，未知时检查 CLI 或显式取消/重登。
+- 错误用法：用会回显的合成 CLI 证明真实输入无问题，或把 delivered 当作已登录。正确处理：真实 native 禁网实验验证收到输入，合成成功链验证生命周期，并分别报告验证边界。
+
+### 6. Tests Required
+
+- `test_login_drafts.py`：真实 ASGI 验证鉴权、安全 422/413、no-store、同标识重复/并发单次投递、未知回执、32 次上限及过期拒绝；Docker 替身断言 code 只进 stdin、原 socket 及 buffer 清理，可能已投递的清理异常必须为 uncertain。
+- 测试环境安装 `orchestrator/requirements.txt` 与 `orchestrator/requirements-test.txt`，后者只用于 ASGI 客户端，不新增产品依赖。
+- 隔离 Chrome/HTTP/WS/tmux 验证真实键盘/原生粘贴、按钮/Enter、回包丢失后查询且不重放、WS 断线独立发送；全新 HOME、禁网的真实支持 CLI 验证收到合成无效码，不访问真实 OAuth，不把实验二进制打入正式镜像。
+
 ## Scenario: v3 未提交登录草稿与完整清理
 
 ### 1. Scope / Trigger
@@ -218,6 +271,7 @@ LoginManager.cleanup_reconciled(environment_id: str) -> None
 GET    /api/accounts/login-drafts
 POST   /api/accounts/login-drafts/{environment_id}/resume
 POST   /api/accounts/login-drafts/{environment_id}/restart
+POST   /api/accounts/login-drafts/{environment_id}/reconcile
 DELETE /api/accounts/login-drafts/{environment_id}?generation=<页面代次>
 LoginDraftActionIn: {generation: string}；extra=forbid
 AccountRuntime.recover_login(sid: str, account: dict, version: str, home: str)
@@ -229,10 +283,12 @@ bench/login-drafts/<32位小写hex环境ID>.json
 ### 3. Contracts
 
 - 草稿使用 `account_environments.account_id=NULL`，首次 start 在初始化前写 preparing，成功后写 authorizing；不提前创建正式账号。正式账号列表及任务/养号/额度入口不能把草稿当作可用账号；只有账号页读取独立草稿列表。
-- 列表 DTO 包含 `draft_id/environment_id/name/generation/state/session_id/reconnectable/credentials_ready/credentials_present/container_status/message/can_resume/can_restart/can_delete`。ID 是环境 ID，不能作为正式 account_id；`credentials_present` 只表示文件存在，不能推断认证成功。不返回令牌、代理密码、发送器秘密或 OAuth 参数。
+- 列表 DTO 包含 `draft_id/environment_id/name/generation/state/session_id/reconnectable/credentials_ready/credentials_present/container_status/message/can_resume/can_restart/can_delete/can_reconcile/proxy_known/proxy_summary`。ID 是环境 ID，不能作为正式 account_id；`credentials_present` 只表示文件存在，不能推断认证成功。不返回令牌、代理密码、发送器秘密或 OAuth 参数。代理摘要从原私有 sender 配置提取，仅含协议/主机/端口；known=true且summary=null才是明确未配置，known=false显示待检查，不能冒充直连。
 - 元数据使用 `atomic_json`、0600、原子替换与 fsync，保存在环境目录外。字段为环境/name、sid、字符串 generation、phase、version、home、created_at；保存中还可有 saved_account_id/cleanup_home，删除中有 deleting_at。不保存授权 URL/code/AT/RT 或终端全文。草稿 generation 是逻辑操作代次，与环境整数 generation 不同；旧无标记环境使用 `legacy-<环境generation>`，活动旧会话继续时补齐归属。
 - 有效 phase 为 preparing/authorizing/ready_to_submit/committed/cancelled/ended/interrupted/reconcile/deleting/submitting。`home` 只接受 `/home/node` 或 `/home/node/.v3-login/<12位小写hex SID>`；元数据必须是对象，环境/name 一致、generation 是非空字符串、phase 有效。单条损坏或归属冲突显示 reconcile、generation=unverified、所有操作禁用，不能使其他草稿和正式账号不可见；JSON 或名称结构损坏的孤立标记也保留可见诊断。
 - 列表不阻塞等待 owner 锁；初始化或提交锁仍占用时返回只读快照和操作进行中提示，禁用操作，不在该次查询改写会话状态。
+- reconcile 输入沿用 `LoginDraftActionIn`。只允许原未绑定、SID/代次/环境归属可核对、非 preparing/deleting/submitting、无活动作业/发送请求及未知提交的草稿；原执行证明须匹配 login:SID、容器/环境代次，root/runtime/执行记录链接归属异常拒绝。列表只在可验证条件下开放 can_reconcile，状态读取失败只禁用本条恢复，不遮住其它账号。
+- 恢复使用 owner → profile → environment 锁序，复用既有维护对账并保留 HOME、缓存和授权产物；外层 owner 释放后才调用自行加锁的 cleanup_reconciled。未绑定收口重新核对原 SID/草稿代次、环境 stopped、无作业/执行记录，只解除本代会话与名称占用，不能清理新代。取消清理失败返回固定 503 并保留草稿，不能假报取消成功。
 - resume 有活动会话时继续原 SID/tmux，不启动第二个 CLI。重启后没有原会话但有产物时，在原环境/HOME/代理/版本认领新的维护 SID，实际 `claude auth status` 通过后才允许提交，不创建虚假的旧 tmux。restart 必须显式请求：先收口旧登录，再生成新 SID/草稿代次，仍保留原环境、容器、HOME 身份、代理及 CLI 缓存。
 - 管理容器 `unless-stopped`，账号容器 `restart=no`、按需唤醒；启动 reconcile 收口遗留执行，HOME/草稿保留，状态显示中断或待检查产物。不承诺恢复宕机前已死亡的交互进程，不同时自启所有账号。
 - 本地首次提交先写 submitting，持有 owner → profile 锁；中间 accounts 行保持 enabled=0。只要 submitting 标记仍存在，正式列表和 `_get_available_account` 均隔离该账号；仅原登录恢复路径允许 `allow_login_recovery=True` 穿过本地保存门禁。HOME 镜像成功后先把恢复入口改为主 HOME，再清暂存，失败仍能继续提交。全部保存和清理完成才启用账号、移除标记并缓存幂等结果。submitting 拒绝取消、删除及新登录，不能丢掉未确认产物。
@@ -250,6 +306,7 @@ bench/login-drafts/<32位小写hex环境ID>.json
 | 重启后无产物或 CLI 认证未通过 | 409，不把文件存在当成功 |
 | 单条元数据坏 JSON/结构/HOME/归属 | 该条 reconcile 只读可见，其他条目继续返回 |
 | Docker/IO 未完成或恢复连接未知 | 503，保留可重试资料，不报删除/恢复成功 |
+| 草稿恢复遇到活动工作、未知提交、旧代次或坏归属 | 409，不解除保护；只提供环境诊断 |
 | 提交期间 DB/HOME/清理中断 | 不启用可用账号，保留 submitting，继续原提交 |
 | 重复删除资源已不存在 | ok；正式提交后新草稿删除仍为 409 |
 
@@ -259,6 +316,7 @@ bench/login-drafts/<32位小写hex环境ID>.json
 - 基础：管理器突然退出后发现 interrupted 草稿；没有产物则重新登录，有产物则先验证认证再提交，账号容器仍按需唤醒。
 - 错误用法：只有 credentials 文件就标记已登录，或提交 IO 失败后通过删除放行。正确处理：真实 CLI 认证检查；submitting 保留资料和门禁，继续提交/对账。
 - 错误用法：用旧页面代次删除新登录，或凭账号名称前缀批量删容器。正确处理：锁内重读代次、精确标签和目录归属，仅清专属未提交资源。
+- 基础：取消清理失败进入 reconcile，但原执行可核对且已停止；使用恢复检查收口旧会话，保留 HOME 后开放继续/重登/删除，不把恢复当作删除。
 
 ### 6. Tests Required
 
@@ -266,3 +324,4 @@ bench/login-drafts/<32位小写hex环境ID>.json
 - 必须断言坏 JSON、错环境及 home=null 只隔离单条，另一正式账号仍可读取，坏孤立标记可见且不能删资源；旧非 v3 status 继续按原凭据存在契约返回 credentials_ready，v3 仍须真实认证检查。
 - `verify_stack.py --manifest <最终联合清单> --browser --reauth` 串入 `verify_login_drafts.py`：真实 Docker/Chrome/HTTP/WS/tmux、刷新原 SID、CLI 结束与迟到事件、管理器 SIGKILL 后对账/恢复、原环境提交、鼠标确认完整删除；验证全部专属目录/CID/DB 消失且正式账号保留。
 - 合成 CLI/OAuth 和故障替身必须明确标注，不访问真实 OAuth；按随机部署精确标签清理测试数据与容器，核对旧哨兵不变和最终冻结源码哈希。真实 OAuth/正式 API 另作上线后验证。
+- 清理故障验证 503、can_reconcile 与原 SID/名称释放；拒绝活动工作、未知证明、旧代次及未确认保存，恢复前后 HOME/身份不变。代理 JSON/DOM 不含 userinfo，配置读取失败为 unknown；真实浏览器点恢复后可完整删除草稿而正式账号保留。

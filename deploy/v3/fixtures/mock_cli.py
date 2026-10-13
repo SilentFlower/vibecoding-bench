@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+import termios
 import time
 from pathlib import Path
 from urllib.parse import urlencode
@@ -24,8 +25,16 @@ elif sys.argv[1:] == ["auth", "login"]:
             "code_challenge": "c" * 43, "code_challenge_method": "S256", "state": "s" * 43})
         print(link, flush=True)
         print("请输入合成授权码：", flush=True)
+        # 真实 CLI 关闭回显；替身也隐藏输入，防止验证再次依赖屏幕显示授权码。
+        if sys.stdin.isatty():
+            attributes = termios.tcgetattr(sys.stdin.fileno())
+            attributes[3] &= ~termios.ECHO
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, attributes)
+        input_count = 0
         while True:
             code = sys.stdin.readline().strip()
+            input_count += 1
+            (control_home / ".synthetic-code-count.json").write_text(json.dumps({"count": input_count}))
             if code == "synthetic-exit":
                 sys.exit(0)
             if code == "synthetic-code":

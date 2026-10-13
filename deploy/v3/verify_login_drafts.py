@@ -102,7 +102,9 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
         print("页面继续诊断：", await evaluate(f"[Boolean({state}),{doc}.querySelector('#acc-login-link-status').textContent,{doc}.querySelector('#acc-login-connection-status').textContent,{win}.__draftAlerts]"), flush=True)
         raise
     assert await evaluate(f"{state}.sid") == sid
-    await evaluate(f"{state}.ws.send(JSON.stringify({{type:'input',data:'synthetic-exit\\r'}}))")
+    await evaluate(f"{doc}.querySelector('#acc-auth-code').focus()")
+    await rpc("Input.insertText", {"text": "synthetic-exit"}, session_id)
+    await click_button('#acc-code-send')
     await wait_for(f"!{doc}.querySelector('#acc-login-restart').classList.contains('hidden')")
     ended_message = await evaluate(f"{doc}.querySelector('#acc-login-connection-status').textContent")
     assert "已结束" in ended_message
@@ -128,7 +130,9 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
     assert home.exists() and json.loads((home / ".claude.json").read_text())["userID"] == "d" * 64
     await click_button(f'[data-draft-restart="{environment_id}"]')
     await wait_for(f"Boolean({state}?.authorizationURL && {state}?.ws?.readyState===1)")
-    await evaluate(f"{state}.ws.send(JSON.stringify({{type:'input',data:'synthetic-code\\r'}}))")
+    await evaluate(f"{doc}.querySelector('#acc-auth-code').focus()")
+    await rpc("Input.insertText", {"text": "synthetic-code"}, session_id)
+    await click_button('#acc-code-send')
     await wait_for(f"{doc}.querySelector('#acc-login-link-status').textContent.includes('可以提交保存')")
     print("通过：管理器重启后草稿可见、原账号停止且 HOME 保留，重新登录验证真实 CLI 认证")
 
@@ -160,9 +164,28 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
     delete_binary.chmod(0o755)
     (delete_root / "cli/9.9.9/.ready").touch()
     (delete_root / "home/.synthetic-login.json").write_text(json.dumps({"wait_for_code": True}))
+    (delete_root / "home/.claude.json").write_text(json.dumps({"userID": "e" * 64}))
     response = browser.post(base + "/runtime/api/accounts/login/start", json={"name": name,
         "upstream_proxy_scheme": "socks5h", "upstream_socks5_host": proxy_address, "upstream_socks5_port": 1080}, timeout=60)
     assert response.status_code == 200
+    failed_sid = response.json()["session_id"]
+    draft_container = client.containers.list(filters={"label": ["vibebench.deployment=" + deployment, "vibebench.environment=" + delete_id]})[0]
+    before_home = (delete_root / "home/.claude.json").read_bytes()
+    # 只破坏本次合成容器的 Recorder 入口，复现取消后的隔离保护，不碰正式镜像/账号。
+    assert draft_container.exec_run(["mv", "/usr/local/bin/v3-network-context", "/usr/local/bin/v3-network-context.disabled"]).exit_code == 0
+    assert browser.delete(base + f"/runtime/api/accounts/login/{failed_sid}", timeout=20).status_code == 503
+    failed = next(row for row in browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json() if row["environment_id"] == delete_id)
+    assert failed["state"] == "reconcile" and failed["can_reconcile"]
+    assert failed["proxy_known"] and failed["proxy_summary"] == f"socks5h://{proxy_address}:1080"
+    await evaluate(f"{win}.renderAccounts()")
+    await wait_for(f"Boolean({doc}.querySelector('[data-draft-reconcile=\"{delete_id}\"]'))")
+    assert f"socks5h://{proxy_address}:1080" in await evaluate(f"{doc}.querySelector('#accounts-body').textContent")
+    await click_button(f'[data-draft-reconcile="{delete_id}"]')
+    await wait_for(f"Boolean({doc}.querySelector('[data-draft-delete=\"{delete_id}\"]:not([disabled])'))")
+    assert browser.get(base + f"/runtime/api/accounts/login/{failed_sid}/status", timeout=10).status_code == 404
+    assert (delete_root / "home/.claude.json").read_bytes() == before_home
+    assert not (delete_root / "runtime/execution.json").exists()
+    print("通过：真实清理故障后页面恢复检查收口原 SID，恢复删除操作，HOME 保留且草稿代理可见")
     await evaluate(f"{win}.__draftDeleteConfirmation='';{win}.confirm=message=>{{{win}.__draftDeleteConfirmation=message;return true}};{win}.renderAccounts()")
     await wait_for(f"Boolean({doc}.querySelector('[data-draft-delete=\"{delete_id}\"]'))")
     await click_button(f'[data-draft-delete="{delete_id}"]')

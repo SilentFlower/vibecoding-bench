@@ -17,6 +17,7 @@ import uuid
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from socket import SHUT_WR
 from typing import Callable
 from urllib.parse import quote, unquote, urlsplit
 
@@ -1106,6 +1107,71 @@ class AccountRuntime:
         result = self._container(job["row"]).exec_run(["tmux", "-S", job["tmux_socket"],
             "display-message", "-p", "-t", session.sid, "#{pane_current_command}"])
         return result.exit_code == 0 and result.output.strip() != b"sleep"
+
+    def send_login_code(self, session, request_id: str, code: str) -> None:
+        """经 stdin 向原登录 tmux 投递一次授权码；调用方持有 owner 锁。
+
+        :param session: 当前登录会话
+        :param request_id: 已校验的无秘密请求标识
+        :param code: 已校验的完整授权码，仅用于 stdin
+        :return: None；投递前拒绝为 ValueError，投递结果未知为 RuntimeError
+        """
+        token = self.execution_token(session.worker_id, f"login:{session.sid}")
+        job = self.job_for_container(token)
+        with self.environment_lock(job["row"]["environment_id"]):
+            if self.job_for_container(token) is not job or job.get("heartbeat_failed"):
+                raise ValueError("原登录执行已失效，请刷新状态")
+            row = job["row"]
+            connection = self.database()
+            try:
+                current = connection.execute("SELECT * FROM account_environments WHERE environment_id=?", (row["environment_id"],)).fetchone()
+            finally:
+                connection.close()
+            proof = json.loads((self._root(row) / "runtime" / "execution.json").read_text())
+            if (not current or current["generation"] != row["generation"] or current["container_id"] != session.worker_id
+                or current["state"] in ("reconcile", "cli_reconcile") or proof.get("source") != f"login:{session.sid}"
+                or proof.get("generation") != row["generation"] or proof.get("container_id") != session.worker_id
+                or proof.get("tmux") != session.sid or proof.get("tmux_socket") != job.get("tmux_socket")
+                or job.get("tmux") != session.sid or session.phase != "authorizing" or not self.login_terminal_alive(session)):
+                raise ValueError("原登录终端或环境已改变，请重新检查登录状态")
+            container = self._container(row)
+            command = ["tmux", "-S", job["tmux_socket"]]
+            stream = None
+            try:
+                # code 不进入 argv 或文件；半关闭 stdin 让 load-buffer 确认 EOF 后再 paste。
+                execution = self.client.api.exec_create(container.id,
+                    command + ["load-buffer", "-b", request_id, "-"], stdin=True, tty=False, user="root")
+                stream = self.client.api.exec_start(execution["Id"], socket=True, tty=False)
+                raw = getattr(stream, "_sock", None) or stream
+                raw.settimeout(5)
+                raw.sendall(code.encode("utf-8"))
+                raw.shutdown(SHUT_WR)
+                while raw.recv(4096):
+                    pass
+                inspected = self.client.api.exec_inspect(execution["Id"])
+                if inspected.get("Running") or inspected.get("ExitCode") != 0:
+                    raise RuntimeError("输入缓冲结果未确认")
+                result = container.exec_run(command + ["paste-buffer", "-b", request_id, "-t", session.sid])
+                if result.exit_code:
+                    raise RuntimeError("终端投递结果未确认")
+                result = container.exec_run(command + ["send-keys", "-t", session.sid, "Enter"])
+                if result.exit_code:
+                    raise RuntimeError("终端确认结果未确认")
+            except Exception:
+                # paste/Enter 可能已发生，任何错误均不能驱动自动重放。
+                raise RuntimeError("发送结果未知，请查询回执和 CLI 状态，勿重复发送") from None
+            finally:
+                try:
+                    try:
+                        if stream is not None:
+                            stream.close()
+                    finally:
+                        result = container.exec_run(command + ["delete-buffer", "-b", request_id])
+                        if result.exit_code:
+                            raise RuntimeError("临时输入清理未确认")
+                except Exception:
+                    # 清理也发生在可能投递之后，不能被外层误判为“尚未发送”。
+                    raise RuntimeError("临时输入清理未确认，请检查环境，勿重复发送") from None
 
     def recover_login(self, sid: str, account: dict, version: str, home: str) -> tuple[dict, object]:
         """认领重启后保留的产物，只检查认证，不伪造旧 tmux。
