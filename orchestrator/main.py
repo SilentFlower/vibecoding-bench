@@ -6212,6 +6212,22 @@ class Scheduler:
             self._batch_threads[batch_id] = t
             t.start()
 
+    def recover_active_batches(self) -> None:
+        """恢复 v3 服务重启前仍启用的活动批次，不恢复暂停或已结束批次。
+
+        :return: None；原 item 状态和计划投放时间保持
+        """
+        connection = get_db()
+        try:
+            batches = connection.execute(
+                "SELECT b.id FROM task_batches b JOIN accounts a ON a.id=b.account_id "
+                "WHERE b.status='active' AND b.deleted_at IS NULL AND a.enabled=1 AND a.deleted_at IS NULL",
+            ).fetchall()
+        finally:
+            connection.close()
+        for batch in batches:
+            self.submit_batch(int(batch["id"]))
+
     def _execute_batch(self, batch_id: int) -> None:
         try:
             conn = get_db()
@@ -6240,6 +6256,10 @@ class Scheduler:
             finally:
                 conn.close()
 
+            # 重启恢复不能跳过此前保存的投放间隔；仍由原状态检查处理暂停和停止。
+            if V3_ENABLED and batch.get("next_launch_at") and batch["next_launch_at"] > time.time():
+                if not self._sleep_batch_delay(batch_id, batch["next_launch_at"] - time.time()):
+                    return
             active_runs: list[str] = []
             for idx, item_row in enumerate(items):
                 current = self._get_batch_status(batch_id)
@@ -7458,6 +7478,8 @@ async def lifespan(app: FastAPI):
     oauth_refresh_scheduler.start()
     warmup_scheduler.start()
     quota_guard.start()
+    if V3_ENABLED:
+        scheduler.recover_active_batches()
     try:
         yield
     finally:

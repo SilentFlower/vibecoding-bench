@@ -149,6 +149,27 @@ class AutoUsageTests(unittest.TestCase):
             self.assertEqual("active", conn.execute("SELECT status FROM task_batches WHERE id=1").fetchone()[0])
             self.assertEqual(0, conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0])
 
+    def test_restart_recovers_only_active_batches_and_keeps_saved_delay(self) -> None:
+        """重启重新注册活动批次并保留延迟，不投放暂停、删除或停用账号的批次。@return None。"""
+        deadline = time.time() + 600
+        with main.get_db() as connection:
+            connection.execute("INSERT INTO accounts(id,name,profile_path,enabled) VALUES(2,'disabled','disabled',0)")
+            for batch_id, account_id, status, deleted in ((1, 1, 'active', None),
+                    (2, 1, 'paused', None), (3, 2, 'active', None), (4, 1, 'active', time.time())):
+                connection.execute("INSERT INTO task_batches(id,account_id,name,status,deleted_at,next_launch_at) VALUES(?,?,?, ?,?,?)",
+                    (batch_id, account_id, 'fixture', status, deleted, deadline))
+            connection.execute("INSERT INTO task_batch_items(batch_id,topic_id,prompt,status) VALUES(1,1,'English task','pending')")
+        with patch.object(self.scheduler, "submit_batch") as submit:
+            self.scheduler.recover_active_batches()
+        submit.assert_called_once_with(1)
+        with patch.object(main, "V3_ENABLED", True), patch.object(self.scheduler, "_sleep_batch_delay", return_value=False) as delay:
+            self.scheduler._execute_batch(1)
+        delay.assert_called_once()
+        self.assertGreater(delay.call_args.args[1], 590)
+        with main.get_db() as connection:
+            self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM runs").fetchone()[0])
+            self.assertEqual(deadline, connection.execute("SELECT next_launch_at FROM task_batches WHERE id=1").fetchone()[0])
+
     def test_concurrent_admission_reuses_recent_usage(self) -> None:
         """同时启动复用同账号采样，避免重复查询。@return None。"""
         with ThreadPoolExecutor(max_workers=4) as pool:

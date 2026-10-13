@@ -623,6 +623,7 @@ _public_quota_policy(account, workload="normal") -> dict
 - usage 在固定容器使用 Node 原生 TLS，经账号代理发送 GET JSON；不安装 CLI、不切换监听、不注入 MITM CA。v3 每次网络请求 15 秒截止，不在脚本内反复重试；账号空闲查询仅领取/释放共享 CLI 作业，API 可继续发送。
 - 自动结果 source=automatic，用户查询 source=manual，额度仍按真实窗口解析/合并。公开 quota_policy 只返回 enabled/limits/hit/unknown/blocked/resume_at/message/refresh_retry_at；不返回身份、凭据哈希、许可或内部策略键。
 - 原 run/批次、prompt、workspace 和版本/effort/模型快照在等待恢复时保持；零 run 批次也由 tick 采样并恢复。停止、删除、身份变化和永久认证错误优先。
+- v3 lifespan 在旧执行收口、管理器启动后调用 Scheduler.recover_active_batches，重新注册仍启用账号的 active 批次。_execute_batch 先等待已保存的 next_launch_at，原 item 状态不重置；paused/done/deleted 批次及停用账号不恢复，终态 item 不重跑。旧 runner 的启动行为保持。
 
 ### 4. Validation & Error Matrix
 
@@ -654,6 +655,7 @@ _public_quota_policy(account, workload="normal") -> dict
 
 - test_auto_usage.py：未知启动、消费后高位、reset 自动恢复、失败/429 重试、零 run 批次、并发复用、部分结果不沿用旧窗口、认证错误、原生 CA 环境、绑定不重入锁、未绑定养号终态再调度、全局配置与原 run 快照。
 - 空闲窗口回归：0%＋过去/null reset 恢复零 run 批次并复用近期观察；消费后高位阻断，300 秒后重新采样，非零过去窗口不得放行，活跃窗口不继承旧空闲标记。
+- 重启批次回归：只注册 active 且账号启用、未删除的批次；已有未来 next_launch_at 必须等待，等待被取消时不创建 run，也不清空时间；原终态 item 保持。
 - test_warmup_quota.py/test_quota.py 保留旧 runner 额度与 Recorder 单次许可、停止/删除/永久异常、字段校验和发布一致性回归。
 - 固定 Docker：真实 TLS usage JSON，监听 PID 不变，不信任 MITM CA；普通任务/养号透传、显式抓包、独立 API 长流和重建保持。
 - 真实浏览器：未绑定表单可编辑，等待显示自动查询，画像校正保留凭据提示，1280/390 与明暗主题；合成 OAuth 不冒称真实授权。
