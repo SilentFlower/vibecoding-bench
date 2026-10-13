@@ -66,6 +66,58 @@ class AutoUsageTests(unittest.TestCase):
             self.assertFalse(self.guard.policy_snapshot(self.account, "normal")["blocked"])
         self.runner.query_quota.assert_called_once()
 
+    def test_recent_idle_usage_accepts_old_or_absent_reset(self) -> None:
+        """真实接口的空闲 0% 可携带过去 reset 或 null，零 run 批次仍可启动。@return None。"""
+        with main.get_db() as conn:
+            conn.execute("INSERT INTO task_batches(id,account_id,name,status) VALUES(1,1,'fixture','quota_wait')")
+            conn.execute("INSERT INTO task_batch_items(batch_id,topic_id,prompt,status) VALUES(1,1,'English task','pending')")
+        usage = self._usage(0, 0)
+        usage["five_hour"]["resets_at"] = datetime.fromtimestamp(time.time() - 18000, timezone.utc).isoformat()
+        usage["seven_day"]["resets_at"] = None
+        self.runner.query_quota.return_value = usage
+        with patch.object(self.scheduler, "submit_batch") as submit:
+            self.guard.tick()
+        submit.assert_called_once_with(1)
+        self.assertEqual([], self.guard.policy_snapshot(self.account, "normal")["unknown"])
+        self.assertTrue(self.guard.refresh_usage(self.account))
+        self.runner.query_quota.assert_called_once()
+        self.guard.invalidate_usage(self.account)
+        self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
+        self.runner.query_quota.return_value = self._usage(75)
+        self.assertTrue(self.guard.refresh_usage(self.account))
+        self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
+
+    def test_idle_usage_cache_expires_and_does_not_accept_nonzero_old_window(self) -> None:
+        """空闲事实仍受缓存时限约束；过去窗口的非零数据不能冒充新周期。@return None。"""
+        now = time.time()
+        usage = self._usage(0)
+        usage["five_hour"]["resets_at"] = None
+        self.runner.query_quota.return_value = usage
+        self.assertTrue(self.guard.refresh_usage(self.account))
+        with patch.object(main.time, "time", return_value=now + 301):
+            self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
+            self.assertTrue(self.guard.refresh_usage(self.account))
+        self.assertEqual(2, self.runner.query_quota.call_count)
+        usage = self._usage(10)
+        usage["five_hour"]["resets_at"] = datetime.fromtimestamp(now - 1, timezone.utc).isoformat()
+        self.runner.query_quota.return_value = usage
+        self.assertFalse(self.guard.refresh_usage(self.account, force=True))
+        self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
+
+    def test_active_zero_window_does_not_inherit_idle_marker(self) -> None:
+        """新活跃窗口必须清掉旧空闲标记，跨 reset 后仍重新采样。@return None。"""
+        idle = self._usage(0)
+        idle["five_hour"]["resets_at"] = None
+        self.runner.query_quota.return_value = idle
+        self.assertTrue(self.guard.refresh_usage(self.account))
+        now = time.time()
+        active = self._usage(0)
+        active["five_hour"]["resets_at"] = datetime.fromtimestamp(now + 30, timezone.utc).isoformat()
+        self.runner.query_quota.return_value = active
+        self.assertTrue(self.guard.refresh_usage(self.account, force=True))
+        with patch.object(main.time, "time", return_value=now + 31):
+            self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
+
     def test_failure_retries_later_and_does_not_send_model_requests(self) -> None:
         """查询失败有间隔重试；等待期间不启动 CLI。@return None。"""
         task = self._run()

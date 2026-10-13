@@ -618,6 +618,7 @@ _public_quota_policy(account, workload="normal") -> dict
 - 执行前、执行后和有等待工作的后台 tick 调用 refresh_usage。启用窗口未知、reset 到期、观察早于进程启动或超过 300 秒、消费后 dirty、最近查询失败，都等待自动更新。两个阈值都关闭时不增加自动 usage 请求；空闲无工作账号不被定期唤醒。
 - owner 锁串行采样、改绑、重授权和手动查询；HTTP/Docker IO 不在数据库锁或额度锁内执行。owner 是不可重入 Lock，绑定查询使用 _sync_bound_account_credentials_locked，不再次调用获取锁的包装。已有 CLI/登录忙时顺延，不切换其网络或抢占执行。
 - 近期成功观察复用；执行终态发布前 invalidate_usage，收口后强制采样，避免批次下一条使用消费前的旧低位数据。自动查询必须为每个启用窗口提供本次有效数据，不能用旧窗口补齐部分返回。
+- usage 接口刚返回数值 0% 时，reset 可以是过去时间或 null，表示空闲窗口而非查询失败。record_manual_usage 保存真实 reset 和 usage_idle=true；v3 阈值判定在近期 manual/automatic 观察中接受该空闲事实，仍受启动后采样、300 秒缓存和消费后 dirty 约束。正常活跃窗口清掉旧 usage_idle；非零过去窗口仍需更新，不为任何窗口伪造未来 reset。
 - 查询失败保留真实旧事实并保持等待，默认至少 60 秒重试；429 的整数 Retry-After 可延长至最多一天。认证/环境/代理错误显示脱敏原因，不把错误当 0%，不发模型请求探测，不自动清除永久认证门禁。手动完整低位核实保留原恢复规则。
 - usage 在固定容器使用 Node 原生 TLS，经账号代理发送 GET JSON；不安装 CLI、不切换监听、不注入 MITM CA。v3 每次网络请求 15 秒截止，不在脚本内反复重试；账号空闲查询仅领取/释放共享 CLI 作业，API 可继续发送。
 - 自动结果 source=automatic，用户查询 source=manual，额度仍按真实窗口解析/合并。公开 quota_policy 只返回 enabled/limits/hit/unknown/blocked/resume_at/message/refresh_retry_at；不返回身份、凭据哈希、许可或内部策略键。
@@ -629,6 +630,7 @@ _public_quota_policy(account, workload="normal") -> dict
 | --- | --- |
 | 未知/过期且有待执行工作 | 原生 usage 自动采样，低于阈值自动恢复 |
 | 本次返回缺启用窗口 | 等待并间隔重试，不沿用消费前的旧低位窗口 |
+| 最新 usage 为 0% 且 reset 过去/null | 接受空闲事实，批次恢复；消费后或缓存过期重新查询 |
 | 任一窗口用量等于阈值 | 阻止下一 run，运行中 CLI 完整结束 |
 | 失败/429/401/403 | 脱敏原因与重试时间可见，不创建模型请求 |
 | 并发启动或重复 tick | 同账号近期采样复用，无查询风暴 |
@@ -642,6 +644,7 @@ _public_quota_policy(account, workload="normal") -> dict
 
 - 5h 阈值 70%，首次未知：自动 usage 返回 10% 后任务启动；收尾查询返回 75%，下一条等待；窗口重置后自动查询低位，沿原批次继续。
 - 600 题批次尚无 run：额度查询失败时仍显示等待及重试时间；下一次采样成功后创建第一条 run，不需要用户点额度按钮。
+- 空闲账号的 GET usage 返回 0%，reset 保留上一次周期：记录这次新观察并启动，不把旧 reset 当成接口故障；缓存过期仍重新查询，不能把历史零值永久当成可用额度。
 - 未绑定账号持有本地 RT/AT：独立养号，停止及恢复正常；无需创建网关账号，未来显式绑定才移交刷新权。
 - 错误用法：普通任务取消 MITM，却继续等待人工查额度。正确做法：保留原生 TLS，使用有界、串行的 usage 采样和自动重试。
 - 错误用法：消费后只查询到 5h，就用旧 7d 的 0% 放行。正确做法：本次采样必须覆盖全部启用窗口。
@@ -650,6 +653,7 @@ _public_quota_policy(account, workload="normal") -> dict
 ### 6. Tests Required
 
 - test_auto_usage.py：未知启动、消费后高位、reset 自动恢复、失败/429 重试、零 run 批次、并发复用、部分结果不沿用旧窗口、认证错误、原生 CA 环境、绑定不重入锁、未绑定养号终态再调度、全局配置与原 run 快照。
+- 空闲窗口回归：0%＋过去/null reset 恢复零 run 批次并复用近期观察；消费后高位阻断，300 秒后重新采样，非零过去窗口不得放行，活跃窗口不继承旧空闲标记。
 - test_warmup_quota.py/test_quota.py 保留旧 runner 额度与 Recorder 单次许可、停止/删除/永久异常、字段校验和发布一致性回归。
 - 固定 Docker：真实 TLS usage JSON，监听 PID 不变，不信任 MITM CA；普通任务/养号透传、显式抓包、独立 API 长流和重建保持。
 - 真实浏览器：未绑定表单可编辑，等待显示自动查询，画像校正保留凭据提示，1280/390 与明暗主题；合成 OAuth 不冒称真实授权。

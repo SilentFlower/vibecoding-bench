@@ -42,7 +42,7 @@ from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr, ValidationErro
 from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
 
-from quota_protocol import merge_quota_observation, quota_decision, quota_observation, warmup_quota_decision, warmup_sample_used
+from quota_protocol import merge_quota_observation, quota_decision, quota_observation, quota_timestamp, warmup_quota_decision, warmup_sample_used
 from account_runtime import AccountRuntime, RuntimeBusy, atomic_json, derive_v3_fingerprint
 from login_terminal import authorization_url
 from login_drafts import LoginDraftStore
@@ -2792,9 +2792,8 @@ class QuotaGuard:
             windows = state.get("windows") or {}
             limits = {"five_hour": account.get("warmup_quota_5h_limit_percent"),
                 "seven_day": account.get("warmup_quota_7d_limit_percent")}
-            fresh = not warmup_quota_decision(state, limits, now)["unknown"] and all(
+            fresh = not self._policy_decision(state, limits, "normal")["unknown"] and all(
                 windows.get(window, {}).get("utilization") is not None
-                and (windows.get(window, {}).get("reset_at") or 0) > now
                 and now - (windows.get(window, {}).get("observed_at") or 0) < 300
                 and (windows.get(window, {}).get("observed_at") or 0) >= self._started_at
                 for window, field in (("five_hour", "warmup_quota_5h_limit_percent"),
@@ -2984,6 +2983,13 @@ class QuotaGuard:
         """
         decision = warmup_quota_decision(state, limits, time.time())
         if account_runtime:
+            # usage 接口的空闲窗口可能保留上次 reset 或返回 null；近期的明确 0% 仍是有效事实。
+            windows = state.get("windows") or {}
+            decision["unknown"] = [key for key in decision["unknown"] if not (
+                state.get("source") in ("automatic", "manual")
+                and windows.get(key, {}).get("usage_idle")
+                and windows.get(key, {}).get("utilization") == 0
+            )]
             refresh = state.get("usage_refresh") or {}
             stale = any(
                 ((state.get("windows") or {}).get(key, {}).get("observed_at") or 0) < self._started_at
@@ -3430,7 +3436,20 @@ class QuotaGuard:
                 headers[f"anthropic-ratelimit-unified-{name}-utilization"] = str(float(window["utilization"]) / 100)
                 headers[f"anthropic-ratelimit-unified-{name}-reset"] = window.get("resets_at")
         with self._lock:
-            observation = quota_observation(headers, 200, time.time())
+            now = time.time()
+            observation = quota_observation(headers, 200, now)
+            for window in observation["windows"].values():
+                window["usage_idle"] = False
+            for key in ("five_hour", "seven_day", "seven_day_fable"):
+                window = usage.get(key)
+                if not isinstance(window, dict) or type(window.get("utilization")) not in (int, float) or window["utilization"] != 0:
+                    continue
+                reset = quota_timestamp(window.get("resets_at"))
+                if window.get("resets_at") is None or (reset is not None and reset <= now):
+                    # 不伪造未来重置时间，只记录接口刚确认的空闲窗口；消费后仍会强制重新查询。
+                    observation["windows"][key] = {"observed_at": now, "utilization": 0.0,
+                        "reset_at": reset, "resets_at": window.get("resets_at"),
+                        "rejected": False, "exhausted": False, "usage_idle": True}
             observation["origin"] = source
             self._observe(account, _quota_identity(account), observation)
             # 显式人工核实只影响未来新操作，已经收口的认证失败 run 不会自动重跑。
