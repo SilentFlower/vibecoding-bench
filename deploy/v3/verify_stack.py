@@ -142,8 +142,25 @@ def main() -> None:
                     from verify_warmup_browser import verify_warmup_ui
                     exercise = verify_warmup_ui
                     with sqlite3.connect(data / "bench" / "db.sqlite") as database:
-                        database.execute("INSERT INTO accounts(name,profile_path,timezone,cc2api_account_id,warmup_enabled) "
-                                         "VALUES('warmup-ui-fixture','profiles/warmup-ui-fixture','Asia/Tokyo',7,0)")
+                        account_id = database.execute("INSERT INTO accounts(name,profile_path,timezone,cc2api_account_id,warmup_enabled) "
+                            "VALUES('warmup-ui-fixture','profiles/warmup-ui-fixture','Asia/Tokyo',NULL,0)").lastrowid
+                    orchestrator = client.containers.list(filters={"label": ["vibebench.deployment=" + deployment, "vibebench.role=orchestrator"]})[0]
+                    code = "import main,docker;from account_runtime import AccountRuntime;" \
+                        "r=AccountRuntime(docker.from_env(),main.BENCH_DATA,main.HOST_BENCH_DATA,main.get_db,main.derive_v3_fingerprint,main.cc2api_client);" \
+                        f"print(r._row('warmup-ui-fixture',{account_id},'Asia/Tokyo')['environment_id']);r.heartbeat_pool.shutdown()"
+                    created = orchestrator.exec_run(["python", "-c", code])
+                    assert created.exit_code == 0, "合成阈值环境创建失败"
+                    environment_id = created.output.decode().strip().splitlines()[-1]
+                    with sqlite3.connect(data / "bench" / "db.sqlite") as database:
+                        fingerprint = json.loads(database.execute(
+                            "SELECT fingerprint_json FROM account_environments WHERE environment_id=?",
+                            (environment_id,),
+                        ).fetchone()[0])
+                        fingerprint.pop("profile_version", None)
+                        database.execute(
+                            "UPDATE account_environments SET fingerprint_json=? WHERE environment_id=?",
+                            (json.dumps(fingerprint), environment_id),
+                        )
                 try:
                     with ExitStack() as fixtures:
                         if args.reauth:

@@ -1558,9 +1558,14 @@ if [ -n "${ACC_NAME:-}" ] && [ "${V3_PERSISTENT_HOME:-0}" != "1" ]; then
   log "Wrote /etc/machine-id from ACC_NAME hash"
 fi
 
-# ---------- 1) MITM CA 注入 ----------
+# ---------- 1) 按网络模式注入 MITM CA ----------
 CA_PEM=/etc/mitm/mitmproxy-ca-cert.pem
-if [ -f "$CA_PEM" ]; then
+NETWORK_INSPECTION_MODE="${NETWORK_INSPECTION_MODE:-capture}"
+TLS_SHELL_EXPORT=""
+TLS_EXEC_ENV=""
+if [ "$NETWORK_INSPECTION_MODE" = "passthrough" ]; then
+  log "Using native TLS passthrough without MITM trust overrides"
+elif [ -f "$CA_PEM" ]; then
   log "Installing MITM CA into system + runtime trust stores"
   if [ "${V3_PERSISTENT_HOME:-0}" != "1" ]; then
     cp "$CA_PEM" /usr/local/share/ca-certificates/mitm.crt
@@ -1571,6 +1576,8 @@ if [ -f "$CA_PEM" ]; then
   export REQUESTS_CA_BUNDLE="$CA_PEM"
   export CURL_CA_BUNDLE="$CA_PEM"
   export GIT_SSL_CAINFO="$CA_PEM"
+  TLS_SHELL_EXPORT="export NODE_EXTRA_CA_CERTS='$CA_PEM' SSL_CERT_FILE='$CA_PEM' REQUESTS_CA_BUNDLE='$CA_PEM' CURL_CA_BUNDLE='$CA_PEM' GIT_SSL_CAINFO='$CA_PEM'; "
+  TLS_EXEC_ENV="NODE_EXTRA_CA_CERTS='$CA_PEM' SSL_CERT_FILE='$CA_PEM' REQUESTS_CA_BUNDLE='$CA_PEM' CURL_CA_BUNDLE='$CA_PEM' GIT_SSL_CAINFO='$CA_PEM'"
 else
   log "WARN: no MITM CA at $CA_PEM, traffic will NOT be decrypted"
 fi
@@ -1668,13 +1675,26 @@ chown -R "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME" /workspace || true
 # 在场,settings.json 也仍生效(两个文件互不替代)。
 write_default_settings
 
-# Stop hook 放到当前 workspace 的 project-local settings。
-# 官方 user-local 路径不是 ~/.claude/settings.local.json；放错位置会导致 hook
-# 不加载，worker 只能等 timeout。workspace 是每个 run 独立目录，不污染 profile。
-# hook 只作为“Claude 停过一轮”的观测信号，成功仍由 JSONL 最新对话消息判断，
-# 避免工具调用中间态被误判为 success。
-mkdir -p /workspace/.claude
-cat > /workspace/.claude/settings.local.json <<'EOF'
+# Stop hook 只作为“Claude 停过一轮”的观测信号，成功仍由 JSONL 最新对话消息判断，
+# 避免工具调用中间态被误判为 success。固定账号 HOME 会在作业结束后恢复原 hooks，
+# 因此无需把控制配置写进 Claude 可见项目树。
+if [ "${V3_PERSISTENT_HOME:-0}" = "1" ]; then
+  node - "$CLAUDE_DIR/settings.json" <<'JS'
+const fs = require('fs');
+const path = process.argv[2];
+const settings = JSON.parse(fs.readFileSync(path, 'utf8'));
+settings.hooks = {
+  ...(settings.hooks && typeof settings.hooks === 'object' ? settings.hooks : {}),
+  Stop: [{matcher: '', hooks: [{type: 'command', command: 'date +%s >> /tmp/claude-stop-seen'}]}],
+};
+const temporary = `${path}.tmp.${process.pid}`;
+fs.writeFileSync(temporary, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
+fs.renameSync(temporary, path);
+JS
+else
+  # 旧版每-run HOME 仍使用 project-local 配置，保持原有生命周期。
+  mkdir -p /workspace/.claude
+  cat > /workspace/.claude/settings.local.json <<'EOF'
 {
   "hooks": {
     "Stop": [
@@ -1688,6 +1708,7 @@ cat > /workspace/.claude/settings.local.json <<'EOF'
   }
 }
 EOF
+fi
 chown -R "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME" /workspace || true
 rm -f /tmp/claude-done /tmp/claude-stop-seen
 rm -f /tmp/claude-exited /tmp/claude-exit-code
@@ -1713,11 +1734,8 @@ start_profile_credentials_sync
 # Claude Code 的 bypassPermissions 不能以 root 跑，所以入口脚本只用 root
 # 做 CA/DNS/文件属主准备，真正的 TUI 进程切到 node 用户、同一 HOME。
 #
-# CA 环境变量必须显式带进 send-keys 的命令行:tmux 启的 shell 是新 bash 进程,
-# entrypoint 当前 shell 里 export 的 NODE_EXTRA_CA_CERTS 等不会自动继承(它们没有
-# 写到 /etc/profile)。Node 默认不读系统 ca-certificates,只信 NODE_EXTRA_CA_CERTS;
-# 不带的话 claude 一连 api.anthropic.com 就 UNABLE_TO_VERIFY_LEAF_SIGNATURE → 表现
-# 为 TUI 上的 "FailedToOpenSocket"。
+# quota/capture 的 CA 环境变量必须显式带进 send-keys；passthrough 则必须保持空值，
+# 让 Claude Code/Node 使用系统公开 CA 并自己生成 TLS ClientHello。
 #
 # orchestrator 已在创建 worker 前 exec 进 sidecar 等待通用 DNS resolver 就绪。
 # 这里保留短兜底,防止 worker /etc/resolv.conf 覆盖后仍遇到极短瞬时竞态。
@@ -1739,7 +1757,7 @@ if [ -n "${CLAUDE_MODEL_OVERRIDE:-}" ]; then
 fi
 tmux new-session -d -s "$SESSION" -x 220 -y 60
 tmux send-keys -t "$SESSION" \
-  "export NODE_EXTRA_CA_CERTS='$CA_PEM' SSL_CERT_FILE='$CA_PEM' REQUESTS_CA_BUNDLE='$CA_PEM' CURL_CA_BUNDLE='$CA_PEM' GIT_SSL_CAINFO='$CA_PEM' HOME='$CLAUDE_HOME' && cd /workspace && runuser -u '$CLAUDE_USER' -- env HOME='$CLAUDE_HOME' NODE_EXTRA_CA_CERTS='$CA_PEM' SSL_CERT_FILE='$CA_PEM' REQUESTS_CA_BUNDLE='$CA_PEM' CURL_CA_BUNDLE='$CA_PEM' GIT_SSL_CAINFO='$CA_PEM' $(printf '%q ' "${claude_args[@]}"); code=\$?; echo; echo \"[entrypoint] claude exited with code \$code\"; echo \$code >/tmp/claude-exit-code; touch /tmp/claude-exited; sleep 3600" Enter
+  "${TLS_SHELL_EXPORT}export HOME='$CLAUDE_HOME' && cd /workspace && runuser -u '$CLAUDE_USER' -- env HOME='$CLAUDE_HOME' ${TLS_EXEC_ENV} $(printf '%q ' "${claude_args[@]}"); code=\$?; echo; echo \"[entrypoint] claude exited with code \$code\"; echo \$code >/tmp/claude-exit-code; touch /tmp/claude-exited; sleep 3600" Enter
 
 # 等 claude TUI 就绪
 sleep 6

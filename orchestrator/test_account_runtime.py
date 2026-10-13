@@ -9,7 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from account_runtime import AccountRuntime, atomic_json
+from account_runtime import AccountRuntime, atomic_json, derive_v3_fingerprint, locale_for_timezone
 import main
 
 
@@ -34,7 +34,8 @@ class AccountRuntimeTests(unittest.TestCase):
             connection.execute("INSERT INTO accounts VALUES(1,'synthetic',7)")
         self.client = Mock()
         self.gateway = Mock()
-        self.fingerprint = Mock(return_value={"hostname": "fixed", "machine_id": "a" * 32, "mac": "02:00:00:00:00:01", "tz": "UTC", "lang": "en_US.UTF-8"})
+        self.fingerprint = Mock(return_value={"profile_version": 2, "hostname": "fixed", "machine_id": "a" * 32,
+            "mac": "02:00:00:00:00:01", "tz": "UTC", "lang": "en_US.UTF-8"})
         environment = patch.dict(os.environ, {"V3_DEPLOYMENT_ID": "test", "V3_ACCOUNT_IMAGE": "v3-test",
             "V3_NETWORK": "vibebench-v3-test", "V3_MAX_ACTIVE_ACCOUNTS": "1",
             "V3_ACCOUNT_MEMORY": "4g", "V3_ACCOUNT_SWAP": "0"})
@@ -50,7 +51,146 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual(initial["environment_id"], renamed["environment_id"])
         self.assertEqual(initial["fingerprint_json"], renamed["fingerprint_json"])
         self.assertEqual(renamed["name"], "renamed")
-        self.fingerprint.assert_called_once_with("synthetic")
+        self.fingerprint.assert_called_once_with(None)
+
+    def test_profile_v2_is_random_and_locale_matches_timezone(self) -> None:
+        """新画像字段必须独立随机，美国与伦敦时区使用一致 locale。@return None。"""
+        first = derive_v3_fingerprint("America/Los_Angeles")
+        second = derive_v3_fingerprint("America/Los_Angeles")
+        self.assertEqual(2, first["profile_version"])
+        self.assertEqual("en_US.UTF-8", first["lang"])
+        self.assertEqual("en_GB.UTF-8", locale_for_timezone("Europe/London"))
+        self.assertEqual("UTC", main._normalize_account_timezone("UTC"))
+        self.assertRegex(first["hostname"], r"^[0-9a-f]{12}$")
+        self.assertRegex(first["machine_id"], r"^[0-9a-f]{32}$")
+        self.assertRegex(first["mac"], r"^[0-9a-f]{2}(?::[0-9a-f]{2}){5}$")
+        self.assertEqual(0x02, int(first["mac"].split(":")[0], 16) & 0x03)
+        self.assertNotEqual(
+            (first["hostname"], first["machine_id"], first["mac"]),
+            (second["hostname"], second["machine_id"], second["mac"]),
+        )
+
+    def test_project_view_uses_opaque_physical_directory(self) -> None:
+        """CLI 的真实 cwd 不含 run ID，旧路径只保留宿主兼容链接。@return None。"""
+        row = self.runtime._row("synthetic", 1)
+        compatibility = self.runtime._root(row) / "workspaces" / "internal-run-id"
+        compatibility.mkdir(parents=True)
+        (compatibility / "fixture.txt").write_text("synthetic")
+        cwd = self.runtime._project_view(row, "internal-run-id")
+        alias = Path(cwd).name
+        physical = self.runtime._root(row) / "projects" / alias
+        self.assertRegex(cwd, r"^/home/node/projects/project-[0-9a-f]{12}$")
+        self.assertTrue(compatibility.is_symlink())
+        self.assertEqual(physical.resolve(), compatibility.resolve())
+        self.assertEqual("synthetic", (physical / "fixture.txt").read_text())
+        self.assertNotIn("internal-run-id", cwd)
+        self.assertEqual([alias], [path.name for path in physical.parent.iterdir()])
+        with self.database() as connection:
+            connection.execute("CREATE TABLE runs(id TEXT PRIMARY KEY,environment_id TEXT)")
+            connection.execute("INSERT INTO runs VALUES(?,?)", ("internal-run-id", row["environment_id"]))
+        self.runtime._session_view(row, "internal-run-id", cwd)
+        self.assertTrue(self.runtime.run_session_path("internal-run-id").is_dir())
+        self.assertFalse((physical / ".claude-home").exists())
+
+    def test_reprofile_requires_empty_unbound_environment_and_blocks_work(self) -> None:
+        """显式校正只接受零历史未绑定账号，并保持重授权门禁。@return None。"""
+        with self.database() as connection:
+            connection.execute("UPDATE accounts SET cc2api_account_id=NULL WHERE id=1")
+            connection.execute("CREATE TABLE tasks(id INTEGER PRIMARY KEY,account_id INTEGER)")
+            connection.execute("CREATE TABLE runs(id TEXT PRIMARY KEY,account_id INTEGER)")
+        row = self.runtime._row("synthetic", 1)
+        legacy = json.loads(row["fingerprint_json"])
+        legacy.pop("profile_version")
+        self.runtime._update(row, fingerprint_json=json.dumps(legacy))
+        replacement = {"profile_version": 2, "hostname": "b" * 12, "machine_id": "c" * 32,
+            "mac": "02:10:20:30:40:50", "tz": "America/Los_Angeles", "lang": "en_US.UTF-8"}
+        self.fingerprint.return_value = replacement
+        self.runtime.maintenance(row["environment_id"], "reprofile")
+        current = self.runtime._row("synthetic", 1)
+        self.assertEqual("profile_reauth", current["state"])
+        self.assertEqual("b" * 12, json.loads(current["fingerprint_json"])["hostname"])
+        with self.assertRaisesRegex(ValueError, "重新授权"):
+            self.runtime.ensure({"id": 1, "name": "synthetic"})
+        session = SimpleNamespace(worker_id="synthetic-container", sid="abcdef123456",
+            name="synthetic", profile_dir=self.root / "empty-profile")
+        self.runtime.jobs[current["environment_id"]] = {
+            "row": current,
+            "token": self.runtime.execution_token(session.worker_id, f"login:{session.sid}"),
+        }
+        self.runtime.commit_login(session, 1)
+        self.assertEqual("ready", self.runtime._row("synthetic", 1)["state"])
+        with self.assertRaisesRegex(ValueError, "profile v2"):
+            self.runtime.maintenance(row["environment_id"], "reprofile")
+
+    def test_reprofile_rejects_existing_task_history(self) -> None:
+        """已有任务历史时不能旋转画像。@return None。"""
+        with self.database() as connection:
+            connection.execute("UPDATE accounts SET cc2api_account_id=NULL WHERE id=1")
+            connection.execute("CREATE TABLE tasks(id INTEGER PRIMARY KEY,account_id INTEGER)")
+            connection.execute("CREATE TABLE runs(id TEXT PRIMARY KEY,account_id INTEGER)")
+            connection.execute("INSERT INTO tasks(account_id) VALUES(1)")
+        row = self.runtime._row("synthetic", 1)
+        legacy = json.loads(row["fingerprint_json"])
+        legacy.pop("profile_version")
+        self.runtime._update(row, fingerprint_json=json.dumps(legacy))
+        with self.assertRaisesRegex(ValueError, "任务或运行历史"):
+            self.runtime.maintenance(row["environment_id"], "reprofile")
+
+    def test_environment_api_checks_reprofile_before_redacting_fingerprint_json(self) -> None:
+        """环境响应先完成画像门禁判断，再移除内部 JSON 字段。@return None。"""
+        self.runtime._row("synthetic", 1)
+        with patch.object(main, "get_db", self.database), patch.object(main, "account_runtime", self.runtime):
+            environment = main.v3_environments()[0]
+        self.assertIn("fingerprint", environment)
+        self.assertNotIn("fingerprint_json", environment)
+        self.assertFalse(environment["can_reprofile"])
+        self.assertIn("profile v2", environment["reprofile_message"])
+
+    def test_reprofile_gate_survives_restart_reconcile(self) -> None:
+        """画像校正后即使管理服务重启，普通工作也必须继续阻断。@return None。"""
+        with self.database() as connection:
+            connection.execute("UPDATE accounts SET cc2api_account_id=NULL WHERE id=1")
+        row = self.runtime._row("synthetic", 1)
+        self.runtime._update(row, state="profile_reauth")
+        self.runtime.reconcile()
+        current = self.runtime._row("synthetic", 1)
+        self.assertEqual("profile_reauth", current["state"])
+        with self.assertRaisesRegex(ValueError, "重新授权"):
+            self.runtime.ensure({"id": 1, "name": "synthetic"})
+
+    def test_reprofile_reconcile_failure_keeps_separate_gate(self) -> None:
+        """遗留登录无法收口时保留画像门禁，并阻止直接开始新登录。@return None。"""
+        with self.database() as connection:
+            connection.execute("UPDATE accounts SET cc2api_account_id=NULL WHERE id=1")
+        row = self.runtime._row("synthetic", 1)
+        self.runtime._update(row, container_id="legacy-container", generation=1, state="profile_reauth")
+        atomic_json(self.runtime._root(row) / "runtime" / "execution.json", {
+            "source": "login:old", "lease": None,
+        })
+        container = Mock()
+        container.stop.side_effect = ValueError("synthetic stop failure")
+        with patch.object(self.runtime, "_container", return_value=container):
+            self.runtime.reconcile()
+        current = self.runtime._row("synthetic", 1)
+        self.assertEqual("profile_reauth_reconcile", current["state"])
+        with self.assertRaisesRegex(ValueError, "故障对账"):
+            self.runtime.ensure({"id": 1, "name": "synthetic"}, allow_login_recovery=True)
+
+    def test_reprofile_active_login_is_cleaned_without_losing_gate(self) -> None:
+        """重启收口遗留登录后仍回到画像重授权门禁。@return None。"""
+        with self.database() as connection:
+            connection.execute("UPDATE accounts SET cc2api_account_id=NULL WHERE id=1")
+        row = self.runtime._row("synthetic", 1)
+        self.runtime._update(row, container_id="legacy-container", generation=1, state="profile_reauth")
+        atomic_json(self.runtime._root(row) / "runtime" / "execution.json", {
+            "source": "login:old", "lease": None,
+        })
+        container = Mock(status="running")
+        with patch.object(self.runtime, "_container", return_value=container):
+            self.runtime.reconcile()
+        container.stop.assert_called_once_with(timeout=5)
+        self.assertEqual("profile_reauth", self.runtime._row("synthetic", 1)["state"])
+        self.assertFalse((self.runtime._root(row) / "runtime" / "execution.json").exists())
 
     def test_ram_and_swap_limits_remain_frozen_when_global_budget_changes(self) -> None:
         """新账号使用选定总额度，后续全局预算不能改变既有身份或限额。
@@ -359,7 +499,7 @@ class AccountRuntimeTests(unittest.TestCase):
         container.exec_run.return_value = SimpleNamespace(exit_code=1)
         self.client.api.exec_inspect.side_effect = [{"Running": True}] + [{"Running": False}] * 6
         self.runtime.jobs.clear()
-        with patch.object(self.runtime, "_container", return_value=container), patch.object(self.runtime, "_configure_recorder"), patch.object(self.runtime, "_running_sender_active") as sender:
+        with patch.object(self.runtime, "_container", return_value=container), patch.object(self.runtime, "_configure_network_context"), patch.object(self.runtime, "_running_sender_active") as sender:
             self.runtime.reconcile()
             sender.assert_not_called()
         container.stop.assert_not_called()
@@ -377,7 +517,7 @@ class AccountRuntimeTests(unittest.TestCase):
         container = Mock(status="running")
         container.exec_run.return_value = SimpleNamespace(exit_code=1)
         self.gateway._request.side_effect = OSError("synthetic unavailable")
-        with patch.object(self.runtime, "_container", return_value=container), patch.object(self.runtime, "_configure_recorder"):
+        with patch.object(self.runtime, "_container", return_value=container), patch.object(self.runtime, "_configure_network_context"):
             self.runtime._renew_job(job)
         container.stop.assert_not_called()
         self.assertEqual(self.runtime._row("synthetic", 1)["state"], "cli_reconcile")
@@ -399,8 +539,8 @@ class AccountRuntimeTests(unittest.TestCase):
         job = self.runtime.claim(row, {"cc2api_account_id": 7}, "run:shared")
         container = Mock()
         container.exec_run.return_value = SimpleNamespace(exit_code=1)
-        with patch.object(self.runtime, "_container", return_value=container), patch.object(self.runtime, "_configure_recorder", side_effect=ValueError("synthetic recorder failure")):
-            with self.assertRaisesRegex(ValueError, "recorder failure"):
+        with patch.object(self.runtime, "_container", return_value=container), patch.object(self.runtime, "_configure_network_context", side_effect=ValueError("synthetic network failure")):
+            with self.assertRaisesRegex(ValueError, "network failure"):
                 self.runtime.cleanup(job["token"])
         container.stop.assert_not_called()
         self.assertEqual(row["state"], "cli_reconcile")

@@ -62,7 +62,7 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
         orchestrator = client.containers.list(filters={"label": ["vibebench.deployment=" + deployment, "vibebench.role=orchestrator"]})[0]
         # 使用真实模型/迁移创建环境行，避免演练脚本复制固定环境的数据结构。
         code = "import main,docker;from account_runtime import AccountRuntime;" \
-            "r=AccountRuntime(docker.from_env(),main.BENCH_DATA,main.HOST_BENCH_DATA,main.get_db,main.derive_fingerprint,main.cc2api_client);" \
+            "r=AccountRuntime(docker.from_env(),main.BENCH_DATA,main.HOST_BENCH_DATA,main.get_db,main.derive_v3_fingerprint,main.cc2api_client);" \
             f"print(r._row({name!r},{account_id})['environment_id']);r.heartbeat_pool.shutdown()"
         result = orchestrator.exec_run(["python", "-c", code])
         assert result.exit_code == 0, "合成环境行创建失败"

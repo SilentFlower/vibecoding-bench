@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""固定账号进程监督；CLI 抓包故障隔离 CLI，保留独立发送器。"""
+"""固定账号进程监督；CLI 网络故障隔离 CLI，保留独立发送器。"""
 import fcntl
 import json
 import os
@@ -20,13 +20,14 @@ def main() -> None:
     root.mkdir(exist_ok=True, mode=0o700)
     root.chmod(0o700)
     (root / "ready").unlink(missing_ok=True)
+    (root / "network.pid").unlink(missing_ok=True)
     (root / "mitm.pid").unlink(missing_ok=True)
     Path("/tmp/sidecar-ready").unlink(missing_ok=True)
     machine_id = os.environ["V3_MACHINE_ID"]
     if not re.fullmatch(r"[a-f0-9]{32}", machine_id):
         raise RuntimeError("环境 machine-id 不合法")
     Path("/etc/machine-id").write_text(machine_id + "\n")
-    # CLI 只需证书公钥，不能读取 /ca 中的私钥或服务配置。
+    # passthrough 不信任 MITM CA；quota/capture 切换时才发布公钥并显式注入对应 CLI。
     Path("/etc/mitm").mkdir(exist_ok=True)
     children = []
     stopping = False
@@ -47,10 +48,6 @@ def main() -> None:
             if stopping or network.poll() is not None or time.monotonic() > deadline:
                 raise RuntimeError("网络启动未完成")
             time.sleep(0.2)
-        subprocess.run(["cp", "/ca/mitmproxy-ca-cert.pem", "/etc/mitm/mitmproxy-ca-cert.pem"], check=True)
-        subprocess.run(["cp", "/ca/mitmproxy-ca-cert.pem", "/usr/local/share/ca-certificates/v3-account.crt"], check=True)
-        subprocess.run(["update-ca-certificates"], check=True, stdout=subprocess.DEVNULL)
-        Path("/etc/mitm/mitmproxy-ca-cert.pem").chmod(0o644)
         sender_path = root / "sender.json"
         configuration = json.loads(sender_path.read_text())
         original_proxy = configuration.get("proxy_source", configuration["proxy_url"])
@@ -75,10 +72,10 @@ def main() -> None:
                 except BlockingIOError:
                     pass
                 else:
-                    pid = int((root / "mitm.pid").read_text())
+                    pid = int((root / "network.pid").read_text())
                     status = Path(f"/proc/{pid}/stat")
                     if not status.exists() or status.read_text().split()[2] == "Z":
-                        # Recorder 只服务 CLI；它退出不能连带中断已接受的 API 流。
+                        # 网络监听只服务 CLI；它退出不能连带中断已接受的 API 流。
                         (root / "cli-unhealthy").touch()
                     else:
                         (root / "cli-unhealthy").unlink(missing_ok=True)

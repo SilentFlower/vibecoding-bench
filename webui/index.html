@@ -369,8 +369,9 @@
       <form id="warmup-form" class="form">
         <input type="hidden" name="account_id" />
         <label><span class="lbl">$ cc2api_account</span>
-          <select name="cc2api_account_id" required></select>
+          <select name="cc2api_account_id"></select>
         </label>
+        <p class="hint" id="warmup-binding-hint"></p>
         <div class="row warmup-interval-row">
           <label><span class="lbl">$ min_hours</span>
             <input name="interval_min_hours" type="number" min="1" max="720" required />
@@ -469,9 +470,10 @@
           <input name="name" required pattern="[A-Za-z0-9_\-]+" placeholder="main" />
         </label>
         <label><span class="lbl">$ timezone</span>
-          <span class="hint inline">auto = 按账号名从内置池派生；不包含 Asia/Shanghai</span>
+          <span class="hint inline">auto = v3 使用 UTC；旧运行模式按账号名从内置池派生</span>
           <select name="timezone">
             <option value="">auto</option>
+            <option value="UTC">UTC</option>
             <option value="Asia/Tokyo">Asia/Tokyo</option>
             <option value="Asia/Singapore">Asia/Singapore</option>
             <option value="Asia/Seoul">Asia/Seoul</option>

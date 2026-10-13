@@ -97,7 +97,8 @@ class BoundReauthTests(unittest.TestCase):
             connection.execute("INSERT INTO account_quota_states(account_id,identity,state_json,updated_at) VALUES(1,'synthetic-identity','{\"blocked\":true}',1)")
         self.client = Mock()
         self.runtime = AccountRuntime(self.client, self.root, self.root, database,
-            lambda name: {"hostname": "fixed", "machine_id": "a" * 32, "mac": "02:00:00:00:00:01", "tz": "UTC", "lang": "en_US.UTF-8"}, self.gateway)
+            lambda timezone: {"profile_version": 2, "hostname": "fixed", "machine_id": "a" * 32,
+                "mac": "02:00:00:00:00:01", "tz": timezone or "UTC", "lang": "en_US.UTF-8"}, self.gateway)
         self.addCleanup(self.runtime.heartbeat_pool.shutdown)
         self.row = self.runtime._row("synthetic", 1)
         self.runtime._update(self.row, container_id="fixed-container", generation=1, state="ready")
@@ -115,7 +116,7 @@ class BoundReauthTests(unittest.TestCase):
         self.container.exec_run.side_effect = lambda argv, **kwargs: SimpleNamespace(exit_code=1 if argv[0] == "pgrep" else 0, output=b"")
         self.client.containers.get.return_value = self.container
         self.client.images.get.return_value.attrs = {"Config": {"Labels": {"vibebench.product": "v3", "vibebench.role": "account", "vibebench.release": "synthetic-reauth"}}}
-        self.runtime._configure_recorder = Mock()
+        self.runtime._configure_network_context = Mock()
         self.runtime._running_sender_active = Mock(return_value=0)
         self.lease = None
         self.snapshot = None

@@ -658,6 +658,49 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             login_manager.start("login-account", {}, timezone="Asia/Singapore")
             self._assert_worker_version(calls, "login", "2.1.280")
 
+    def test_v3_oauth_refresh_uses_fixed_passthrough_environment(self) -> None:
+        """v3 未绑定账号刷新必须复用固定容器，且不注入 Recorder CA。@return None。"""
+        environment_root = self.base / "environments" / "synthetic"
+        credentials = environment_root / "home" / ".claude" / ".credentials.json"
+        credentials.parent.mkdir(parents=True)
+        credentials.write_text(json.dumps({"claudeAiOauth": {
+            "accessToken": "new-access",
+            "refreshToken": "new-refresh",
+            "expiresAt": int(time.time() * 1000) + 3600000,
+        }}))
+        row = {"environment_id": "synthetic", "container_id": "fixed-container"}
+        container = Mock(id="fixed-container")
+        runtime = Mock()
+        runtime.ensure.return_value = (row, container)
+        runtime.claim.return_value = {"token": "fixed-token", "source": "oauth-refresh:synthetic"}
+        runtime._root.return_value = environment_root
+        runner = object.__new__(main.Runner)
+        runner.client = Mock()
+        runner._exec_oauth_refresh_probe = Mock(return_value={"refreshed": True})
+        account = {
+            "id": 1,
+            "name": "main",
+            "enabled": 1,
+            "deleted_at": None,
+            "cc2api_account_id": None,
+            "upstream_socks5_host": "proxy.invalid",
+            "upstream_socks5_port": 1080,
+        }
+        with patch.object(main, "account_runtime", runtime), \
+                patch.object(main, "_read_account_oauth_status", return_value={"oauth_token_state": "expired", "oauth_expires_in_sec": 0}), \
+                patch.object(main, "effective_claude_code_version", return_value="2.1.293"), \
+                patch.object(main.uuid, "uuid4", return_value=Mock(hex="synthetic")):
+            self.assertTrue(runner.refresh_account_oauth_token(account))
+        runtime.ensure.assert_called_once_with(account)
+        runtime.claim.assert_called_once_with(row, account, "oauth-refresh:synthetic", exclusive=True)
+        runtime._configure_network_context.assert_called_once_with(container, {
+            "NETWORK_INSPECTION_MODE": "passthrough",
+            "QUOTA_SOURCE": "oauth-refresh:synthetic",
+        })
+        runner._exec_oauth_refresh_probe.assert_called_once_with("fixed-token", use_mitm=False)
+        runtime.cleanup.assert_called_once_with("fixed-token")
+        runner.client.containers.run.assert_not_called()
+
     def test_run_creation_paths_persist_and_submit_runtime_identity_snapshot(self) -> None:
         """
         普通、抓包、批次和养号 run 都应保存并提交创建时的运行身份。
@@ -2759,7 +2802,7 @@ global.fetch = async (_url, options) => {
         main.init_db()
         # 使用真实模型补齐固定环境表，调度/发送器仍是本用例的隔离替身。
         with patch.dict(os.environ, {"V3_DEPLOYMENT_ID": "warmup-unit", "V3_ACCOUNT_IMAGE": "fake", "V3_NETWORK": "fake"}):
-            schema_runtime = AccountRuntime(Mock(), main.BENCH_DATA, main.BENCH_DATA, main.get_db, main.derive_fingerprint, Mock())
+            schema_runtime = AccountRuntime(Mock(), main.BENCH_DATA, main.BENCH_DATA, main.get_db, main.derive_v3_fingerprint, Mock())
         schema_runtime.heartbeat_pool.shutdown()
         profile = main.PROFILES_DIR / "main"
         profile.mkdir(parents=True)

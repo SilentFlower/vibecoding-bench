@@ -41,7 +41,9 @@ class LoginDraftTests(unittest.TestCase):
             "V3_NETWORK": "fake", "V3_RELEASE": "fake", "V3_ACCOUNT_MEMORY": "1536m"})
         env.start()
         self.addCleanup(env.stop)
-        self.runtime = AccountRuntime(self.client, self.root, self.root, database, lambda name: {"tz": "Asia/Tokyo"}, Mock())
+        self.runtime = AccountRuntime(self.client, self.root, self.root, database,
+            lambda timezone: {"profile_version": 2, "hostname": "fixed", "machine_id": "a" * 32,
+                "mac": "02:00:00:00:00:01", "tz": timezone or "Asia/Tokyo", "lang": "ja_JP.UTF-8"}, Mock())
         self.addCleanup(self.runtime.heartbeat_pool.shutdown)
         self.row = self.runtime._row("new-draft")
         self.runtime._update(self.row, container_id="draft-container", generation=1, state="ready")
@@ -49,7 +51,7 @@ class LoginDraftTests(unittest.TestCase):
         self.container.exec_run.side_effect = lambda argv, **kwargs: SimpleNamespace(exit_code=1 if argv[0] == "pgrep" else 0, output=b"")
         self.client.containers.get.return_value = self.container
         self.runtime._running_sender_active = Mock(return_value=0)
-        self.runtime._configure_recorder = Mock()
+        self.runtime._configure_network_context = Mock()
         self.envroot = self.runtime._root(self.row)
         (self.envroot / "home" / ".claude").mkdir(parents=True)
         atomic_json(self.envroot / "runtime" / "sender.json", {"proxy_url": "", "binding": {"account_id": 0}})
@@ -535,7 +537,7 @@ class LoginDraftTests(unittest.TestCase):
         identity = self.envroot / "home" / ".claude.json"
         atomic_json(identity, {"userID": "synthetic-fixed"})
         before = identity.read_bytes()
-        self.runtime._configure_recorder.side_effect = ValueError("synthetic cleanup fault")
+        self.runtime._configure_network_context.side_effect = ValueError("synthetic cleanup fault")
         with self.assertRaises(HTTPException):
             main.login_cancel(sid)
         self.assertTrue(self.manager.has_active_name(self.row["name"]))

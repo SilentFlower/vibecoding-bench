@@ -2,6 +2,7 @@
 """仅用于隔离生命周期测试的 CLI 替身，不打入产品镜像。"""
 import json
 import os
+import socket
 import sys
 import termios
 import time
@@ -51,7 +52,12 @@ elif sys.argv[1:] == ["auth", "login"]:
     while True:
         time.sleep(1)
 else:
-    (Path.cwd() / ".synthetic-invocation.json").write_text(json.dumps({"args": sys.argv[1:], "cwd": str(Path.cwd()), "home": str(home)}))
+    if os.environ.get("SYNTHETIC_TLS_PROBE") == "1":
+        with socket.create_connection(("api.anthropic.com", 443), timeout=5) as connection:
+            connection.sendall(bytes.fromhex("1603030003010203"))
+    tls_keys = ("NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "GIT_SSL_CAINFO")
+    (Path.cwd() / ".synthetic-invocation.json").write_text(json.dumps({"args": sys.argv[1:], "cwd": str(Path.cwd()), "home": str(home),
+        "network_mode": os.environ.get("NETWORK_INSPECTION_MODE"), "tls_environment": sorted(key for key in tls_keys if os.environ.get(key))}))
     print("Synthetic task pane", flush=True)
     while True:
         time.sleep(1)

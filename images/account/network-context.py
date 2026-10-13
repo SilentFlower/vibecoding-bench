@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""在账号无 CLI 作业时切换 Recorder；网络设备和 CA 始终保留。"""
+"""在账号无 CLI 作业时切换原始透传或受控 Recorder。"""
 import fcntl
 import json
 import os
+import shutil
 import signal
 import socket
 import subprocess
@@ -10,63 +11,197 @@ import time
 from pathlib import Path
 
 
+_NETWORK_MODES = {"passthrough", "quota", "capture"}
+
+
+def _listener_identity(pid: int) -> tuple[str, str] | None:
+    """
+    读取监听进程状态，并拒绝把复用 PID 当成本系统进程。
+
+    :param pid: pid 文件记录的进程号
+    :return: 进程状态和内核启动时刻；进程已消失时为 None
+    """
+    process = Path(f"/proc/{pid}")
+    try:
+        fields = (process / "stat").read_text().split()
+        command = (process / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", errors="replace")
+    except FileNotFoundError:
+        return None
+    state, started_at = fields[2], fields[21]
+    if state == "Z":
+        return state, started_at
+    if "v3-passthrough" not in command and "mitmdump" not in command:
+        raise RuntimeError("旧网络监听 PID 已被未知进程占用")
+    return state, started_at
+
+
+def _owned_process_state(pid: int, started_at: str) -> str | None:
+    """
+    核对原进程是否仍存在，避免 PID 复用后误杀其它进程。
+
+    :param pid: 已验证监听进程号
+    :param started_at: 初次验证得到的内核启动时刻
+    :return: 原进程状态；已退出或 PID 被复用时为 None
+    """
+    try:
+        fields = Path(f"/proc/{pid}/stat").read_text().split()
+    except FileNotFoundError:
+        return None
+    return fields[2] if fields[21] == started_at else None
+
+
+def _terminate_listener(pid_file: Path) -> None:
+    """
+    停止上一网络监听进程并确认连接已经收口。
+
+    :param pid_file: 保存监听进程 PID 的文件
+    :return: None
+    """
+    if not pid_file.exists():
+        return
+    pid = int(pid_file.read_text())
+    identity = _listener_identity(pid)
+    if identity is None:
+        pid_file.unlink(missing_ok=True)
+        return
+    state, started_at = identity
+    if state == "Z":
+        pid_file.unlink(missing_ok=True)
+        return
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pid_file.unlink(missing_ok=True)
+        return
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        state = _owned_process_state(pid, started_at)
+        if state is None or state == "Z":
+            pid_file.unlink(missing_ok=True)
+            return
+        time.sleep(0.1)
+    # relay/Recorder 已通过私有 PID 和 cmdline 双重确认；优雅退出失效时必须定向强制收口，不能让新旧模式并存。
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pid_file.unlink(missing_ok=True)
+        return
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        state = _owned_process_state(pid, started_at)
+        if state is None or state == "Z":
+            pid_file.unlink(missing_ok=True)
+            return
+        time.sleep(0.1)
+    raise RuntimeError("旧网络监听进程未完成强制收口")
+
+
+def _restore_capture_ca() -> None:
+    """
+    抓包模式启动前恢复持久 CA 私钥。
+
+    :return: None
+    """
+    source = Path("/ca")
+    target = Path("/root/.mitmproxy")
+    target.mkdir(parents=True, exist_ok=True, mode=0o700)
+    for name in ("mitmproxy-ca.pem", "mitmproxy-ca-cert.pem"):
+        if (source / name).is_file():
+            shutil.copy2(source / name, target / name)
+
+
+def _publish_capture_ca(process: subprocess.Popen) -> None:
+    """
+    等待 mitmproxy CA 就绪并发布仅供本次 CLI 显式信任的证书。
+
+    :param process: 当前 Recorder 进程
+    :return: None
+    """
+    source = Path("/root/.mitmproxy")
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError("新抓包进程在 CA 就绪前退出")
+        if (source / "mitmproxy-ca-cert.pem").is_file():
+            break
+        time.sleep(0.1)
+    else:
+        raise RuntimeError("抓包 CA 未在截止时间内就绪")
+    Path("/ca").mkdir(exist_ok=True)
+    Path("/etc/mitm").mkdir(exist_ok=True)
+    for name in ("mitmproxy-ca.pem", "mitmproxy-ca-cert.pem"):
+        if (source / name).is_file():
+            shutil.copy2(source / name, Path("/ca") / name)
+    shutil.copy2(source / "mitmproxy-ca-cert.pem", "/etc/mitm/mitmproxy-ca-cert.pem")
+    Path("/etc/mitm/mitmproxy-ca-cert.pem").chmod(0o644)
+
+
 def main() -> None:
-    """停止旧 Recorder 连接，启动新上下文并写入确认。
+    """停止旧监听，启动新网络上下文并写入确认。
 
     :return: None，失败以非零退出码报告
     """
     root = Path("/run/v3")
     with (root / "network.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        pid_file = root / "mitm.pid"
-        if pid_file.exists():
-            pid = int(pid_file.read_text())
-            try:
-                os.kill(pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-            deadline = time.monotonic() + 10
-            while time.monotonic() < deadline:
-                # 僵尸已无连接，由 PID1 回收；PID 记录仅允许同一镜像的 mitmdump。
-                status = Path(f"/proc/{pid}/stat")
-                if not status.exists() or status.read_text().split()[2] == "Z":
-                    break
-                time.sleep(0.1)
-            else:
-                raise RuntimeError("旧抓包进程未完成收口")
+        pid_file = root / "network.pid"
+        legacy_pid = root / "mitm.pid"
+        _terminate_listener(pid_file if pid_file.exists() else legacy_pid)
+        legacy_pid.unlink(missing_ok=True)
+        (root / "context-ack.json").unlink(missing_ok=True)
         context_file = root / "context.json"
         context = json.loads(context_file.read_text()) if context_file.exists() else {}
+        mode = str(context.get("NETWORK_INSPECTION_MODE") or "passthrough")
+        if mode not in _NETWORK_MODES:
+            raise RuntimeError("网络检查模式不合法")
         environment = dict(os.environ)
         environment["V3_ACCOUNT"] = "1"
-        # Recorder 是 root 网络服务；CA 生成目录不能随 CLI HOME 改到账号用户目录。
-        environment["HOME"] = "/root"
+        proxy_ip = root / "proxy-ip"
+        if proxy_ip.is_file():
+            # 默认路由切到 tun 后不能再递归解析代理主机；复用启动阶段固化的 IP。
+            environment["UPSTREAM_SOCKS5_HOST"] = proxy_ip.read_text().strip()
         permitted = {"STATS_FILE", "CAPTURE_FILE", "CAPTURE_INDEX_FILE", "CAPTURE_FULL_HTTP",
             "CAPTURE_MAX_BODY_BYTES", "CAPTURE_SCOPE", "CAPTURE_MODE", "CAPTURE_TARGETS", "QUOTA_SOURCE", "QUOTA_IDENTITY", "QUOTA_STATE_FILE",
-            "QUOTA_SIGNAL_FILE", "QUOTA_OBSERVATIONS_FILE", "QUOTA_CREDENTIALS_FILE", "QUOTA_WARMUP"}
+            "QUOTA_SIGNAL_FILE", "QUOTA_OBSERVATIONS_FILE", "QUOTA_CREDENTIALS_FILE", "QUOTA_WARMUP",
+            "NETWORK_INSPECTION_MODE"}
         environment.update({key: str(value) for key, value in context.items() if key in permitted})
-        environment.setdefault("STATS_FILE", "/run/v3/idle-stats.jsonl")
-        command = ["proxychains4", "-q", "mitmdump", "--mode", "socks5",
-            "--listen-host", "127.0.0.1", "--listen-port", "8080", "-s", "/sidecar/recorder.py"]
-        if context.get("CAPTURE_FULL_HTTP") != "1":
-            command += ["--ignore-hosts", r"^(platform\.claude\.com)$"]
-        if context.get("SAVE_FULL_FLOWS") == "1":
-            command += ["--save-stream-file", str(Path(context["STATS_FILE"]).parent / "capture.flow")]
-        with open("/var/log/mitmdump.log", "ab") as log:
+        if mode == "passthrough":
+            command = ["python3", "/usr/local/bin/v3-passthrough"]
+            process_kind = "passthrough"
+            log_path = "/var/log/v3-passthrough.log"
+        else:
+            # Recorder 是 root 网络服务；CA 生成目录不能随 CLI HOME 改到账号用户目录。
+            environment["HOME"] = "/root"
+            environment.setdefault("STATS_FILE", "/run/v3/idle-stats.jsonl")
+            _restore_capture_ca()
+            command = ["proxychains4", "-q", "mitmdump", "--mode", "socks5",
+                "--listen-host", "127.0.0.1", "--listen-port", "8080", "-s", "/sidecar/recorder.py"]
+            if context.get("SAVE_FULL_FLOWS") == "1":
+                command += ["--save-stream-file", str(Path(context["STATS_FILE"]).parent / "capture.flow")]
+            process_kind = "recorder"
+            log_path = "/var/log/mitmdump.log"
+        with open(log_path, "ab") as log:
             process = subprocess.Popen(command, env=environment, stdout=log, stderr=log)
         pid_file.write_text(str(process.pid))
         for _ in range(80):
             if process.poll() is not None:
-                raise RuntimeError("新抓包进程启动失败")
+                raise RuntimeError("新网络监听进程启动失败")
             try:
                 with socket.create_connection(("127.0.0.1", 8080), timeout=0.1):
+                    if process_kind == "recorder":
+                        _publish_capture_ca(process)
                     temporary = root / "context-ack.tmp"
-                    temporary.write_text(json.dumps({"QUOTA_SOURCE": context.get("QUOTA_SOURCE", "")}))
+                    temporary.write_text(json.dumps({
+                        "QUOTA_SOURCE": context.get("QUOTA_SOURCE", ""),
+                        "NETWORK_INSPECTION_MODE": mode,
+                        "process": process_kind,
+                    }))
                     temporary.replace(root / "context-ack.json")
                     return
             except OSError:
                 time.sleep(0.1)
         process.terminate()
-        raise RuntimeError("新抓包监听未就绪")
+        raise RuntimeError("新网络监听未就绪")
 
 
 if __name__ == "__main__":

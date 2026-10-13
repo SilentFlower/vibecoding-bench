@@ -30,7 +30,7 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
     state = win + ".eval('state.accLogin')"
     orchestrator = client.containers.list(filters={"label": ["vibebench.deployment=" + deployment, "vibebench.role=orchestrator"]})[0]
     code = "import main,docker;from account_runtime import AccountRuntime;" \
-        "r=AccountRuntime(docker.from_env(),main.BENCH_DATA,main.HOST_BENCH_DATA,main.get_db,main.derive_fingerprint,main.cc2api_client);" \
+        "r=AccountRuntime(docker.from_env(),main.BENCH_DATA,main.HOST_BENCH_DATA,main.get_db,main.derive_v3_fingerprint,main.cc2api_client);" \
         f"print(r._row({name!r})['environment_id']);r.heartbeat_pool.shutdown()"
     created = orchestrator.exec_run(["python", "-c", code])
     assert created.exit_code == 0
@@ -112,7 +112,12 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
     await evaluate(f"{state}.term.paste('must-not-replay\\r')")
     assert await evaluate(f"{doc}.querySelector('#acc-login-connection-status').textContent") == ended_message
     await click_button('#acc-login-restart')
-    await wait_for(f"Boolean({state}?.authorizationURL && {state}.sid !== '{sid}')")
+    try:
+        await wait_for(f"Boolean({state}?.authorizationURL && {state}.sid !== '{sid}')")
+    except TimeoutError:
+        print("草稿重新登录诊断：", browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json(), flush=True)
+        print("页面重新登录诊断：", await evaluate(f"[{win}.__draftAlerts,Boolean({state}),{doc}.querySelector('#acc-login-connection-status').textContent]"), flush=True)
+        raise
     assert await evaluate(f"{state}.environmentId") == environment_id
     assert json.loads((home / ".claude.json").read_text())["userID"] == "d" * 64
     with sqlite3.connect(bench_db) as connection:

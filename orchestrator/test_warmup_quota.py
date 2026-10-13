@@ -107,6 +107,31 @@ class WarmupQuotaTests(unittest.TestCase):
         self.runner.query_quota.assert_not_called()
         main.cc2api_client.refresh_usage.assert_not_called()
 
+    def test_prepare_marks_only_unknown_warmup_as_quota_sample(self) -> None:
+        """养号仅在领取未知额度机会时请求 Recorder，可信低位继续透传。@return None。"""
+        self._configure()
+        source = "run:sample:0"
+        self.assertTrue(self.guard.admit(self.account, source, warmup=True))
+        unknown = self.guard.prepare(
+            self.account,
+            source,
+            self.base / "unknown-flows",
+            self.base / "unknown-controls",
+            warmup=True,
+        )
+        self.assertEqual("1", unknown["QUOTA_SAMPLE_REQUIRED"])
+
+        now = time.time()
+        self._state(quota_headers(now, five=600), status=200)
+        known = self.guard.prepare(
+            self.account,
+            "run:known:0",
+            self.base / "known-flows",
+            self.base / "known-controls",
+            warmup=True,
+        )
+        self.assertEqual("0", known["QUOTA_SAMPLE_REQUIRED"])
+
     def test_failed_partial_update_remains_waiting(self) -> None:
         """只取得一个启用窗口时仍等待，重复扫描不再提交养号。@return None。"""
         self._configure(30, 40)
@@ -289,6 +314,28 @@ class WarmupQuotaTests(unittest.TestCase):
         self.assertEqual(40, account["warmup_quota_7d_limit_percent"])
         self.assertNotIn("admission", account["warmup_quota"])
         main.cc2api_client.resolve_credentials.assert_not_called()
+
+    def test_unbound_account_can_save_thresholds_but_cannot_enable_warmup(self) -> None:
+        """未绑定账号可保存普通任务阈值，定时养号仍须绑定。@return None。"""
+        conn = main.get_db()
+        try:
+            with conn:
+                conn.execute("UPDATE accounts SET cc2api_account_id=NULL,warmup_enabled=0 WHERE id=1")
+        finally:
+            conn.close()
+        main.update_account_warmup(1, main.WarmupConfigIn(
+            enabled=False,
+            warmup_quota_5h_limit_percent=70,
+            warmup_quota_7d_limit_percent=85,
+        ))
+        account = main.list_accounts()[0]
+        self.assertIsNone(account["cc2api_account_id"])
+        self.assertEqual(70, account["warmup_quota_5h_limit_percent"])
+        self.assertEqual(85, account["warmup_quota_7d_limit_percent"])
+        with self.assertRaises(main.HTTPException) as error:
+            main.update_account_warmup(1, main.WarmupConfigIn(enabled=True))
+        self.assertEqual(409, error.exception.status_code)
+        self.assertIn("同步并绑定", error.exception.detail)
 
     def test_actual_start_rechecks_threshold_for_warmup_and_normal_task(self) -> None:
         """排队后新额度命中时，养号和普通任务都不创建 worker。@return None。"""

@@ -7,6 +7,7 @@ import base64
 import copy
 import json
 import os
+import re
 import shutil
 import socket
 import sqlite3
@@ -43,7 +44,7 @@ def wait_cli_started(runtime: AccountRuntime, client, token: str) -> str:
             if pane.exit_code == 0 and b"Synthetic task pane" in pane.output:
                 return job["exec"]
         elif state.get("ExitCode") is not None:
-            transcript = runtime._root(job["row"]) / "workspaces" / job["run_id"] / ".bench-transcript.log"
+            transcript = runtime.run_artifact_path(job["run_id"], "transcript.log")
             raise AssertionError(("合成 CLI 提前退出", state["ExitCode"], transcript.read_text()[-1000:] if transcript.exists() else ""))
         time.sleep(0.1)
     raise AssertionError(("合成 CLI 未在截止时间内进入 tmux", last_pane.decode(errors="replace")[-1000:]))
@@ -187,12 +188,19 @@ def verify() -> None:
         connection.execute("CREATE TABLE accounts(id INTEGER PRIMARY KEY,name TEXT,cc2api_account_id INTEGER)")
         connection.execute("INSERT INTO accounts VALUES(1,'synthetic',NULL)")
         connection.execute("CREATE TABLE runs(id TEXT PRIMARY KEY)")
-        connection.execute("INSERT INTO runs VALUES('synthetic-run')")
+        connection.executemany("INSERT INTO runs VALUES(?)", [("synthetic-run",), ("synthetic-warmup-native",)])
     client = docker.from_env()
     account = {"id": 1, "name": "synthetic", "upstream_proxy_scheme": "socks5", "upstream_socks5_host": args.proxy_ip, "upstream_socks5_port": 1080}
-    runtime = AccountRuntime(client, root, Path(os.environ["VERIFY_HOST_ROOT"]) / "data", database,
-        lambda name: {"hostname": "synthetic-fixed", "machine_id": ("a" if name == "synthetic" else "b") * 32,
-            "mac": "02:00:00:00:00:71" if name == "synthetic" else "02:00:00:00:00:72", "mem": "4g", "tz": "UTC", "lang": "en_US.UTF-8"}, None)
+    profile_sequence = iter((("synthetic-fixed", "a" * 32, "02:00:00:00:00:71"),
+        ("synthetic-two", "b" * 32, "02:00:00:00:00:72")))
+
+    def fingerprint(timezone: str | None) -> dict:
+        """返回两个彼此独立的合成账号画像，不读取真实环境。"""
+        hostname, machine_id, mac = next(profile_sequence)
+        return {"profile_version": 2, "hostname": hostname, "machine_id": machine_id,
+            "mac": mac, "mem": "4g", "tz": timezone or "UTC", "lang": "en_US.UTF-8"}
+
+    runtime = AccountRuntime(client, root, Path(os.environ["VERIFY_HOST_ROOT"]) / "data", database, fingerprint, None)
     row = runtime._row(account["name"], account["id"])
     cached = runtime._root(row) / "cli" / "9.9.9"
     binary = cached / "node_modules" / ".bin" / "claude"
@@ -247,18 +255,50 @@ def verify() -> None:
         time.sleep(0.3)
         runtime.cleanup(runtime.execution_token(container.id, "login:abcdef654321"))
         assert (runtime._root(row) / "home" / ".claude" / ".credentials.json").read_bytes() == original
-        environment = {"CLAUDE_CODE_VERSION": "9.9.9", "TASK_PROMPT": "Synthetic only", "RUN_ID": "synthetic-run", "TIMEOUT_SEC": "120", "TIMEOUT_WRAPUP_SEC": "0"}
-        token, _ = runtime.start_run(account, {"id": 1, "capture_full_http": True}, "synthetic-run", environment, {})
+        environment = {"CLAUDE_CODE_VERSION": "9.9.9", "TASK_PROMPT": "Synthetic only", "RUN_ID": "synthetic-run", "TIMEOUT_SEC": "120", "TIMEOUT_WRAPUP_SEC": "0",
+            "SYNTHETIC_TLS_PROBE": "1"}
+        tls_before = len(Path("/verify/tls.jsonl").read_text().splitlines())
+        token, _ = runtime.start_run(account, {"id": 1, "capture_full_http": False}, "synthetic-run", environment, {})
         wait_cli_started(runtime, client, token)
+        normal_context = runtime.job_for_container(token)["context"]
+        workspace = runtime._root(row) / "workspaces" / "synthetic-run"
+        invocation = json.loads((workspace / ".synthetic-invocation.json").read_text())
+        assert invocation["cwd"].startswith("/home/node/projects/project-") and "synthetic-run" not in invocation["cwd"]
+        assert invocation["network_mode"] == "passthrough" and invocation["tls_environment"] == []
+        visible_projects = container.exec_run(["find", "/home/node/projects", "-mindepth", "1", "-maxdepth", "1", "-printf", "%f\n"])
+        assert visible_projects.exit_code == 0
+        assert all(re.fullmatch(rb"project-[0-9a-f]{12}", name) for name in visible_projects.output.splitlines())
+        assert not any((workspace / name).exists() for name in (
+            ".bench-status.json", ".bench-transcript.log", ".bench-session-baseline.json",
+            ".cc2api-oauth-refresh-request.json", ".cc2api-oauth-refresh-result.json", ".claude-home",
+        ))
+        assert not (workspace / ".claude" / "settings.local.json").exists()
+        acknowledgement = json.loads((runtime._root(row) / "runtime" / "context-ack.json").read_text())
+        assert acknowledgement["NETWORK_INSPECTION_MODE"] == "passthrough" and acknowledgement["process"] == "passthrough"
+        tls_after = [json.loads(line) for line in Path("/verify/tls.jsonl").read_text().splitlines()]
+        assert len(tls_after) == tls_before + 1
+        assert tls_after[-1]["length"] == 8 and tls_after[-1]["payload_prefix"] == "1603030003010203"
+        normal_flow = runtime._root(row) / "flows" / Path(normal_context["STATS_FILE"]).relative_to("/flows").parent
+        assert not any((normal_flow / name).exists() for name in ("stats.jsonl", "http_capture.jsonl", "capture.flow"))
         runtime.cleanup(token)
         assert not runtime.jobs
+        print("通过：普通任务使用原始 TLS 透传、无自定义 CA 环境，CLI cwd 不暴露内部 run ID 或控制文件")
+        warmup_environment = dict(environment, RUN_ID="synthetic-warmup-native")
+        token, _ = runtime.start_run(account, {"id": 1, "warmup": True, "capture_full_http": False},
+            "synthetic-warmup-native", warmup_environment,
+            {"QUOTA_SOURCE": "run:synthetic-warmup-native:0", "QUOTA_WARMUP": "1",
+                "QUOTA_SAMPLE_REQUIRED": "0"})
+        wait_cli_started(runtime, client, token)
+        warmup_invocation = json.loads((runtime._root(row) / "workspaces" / "synthetic-warmup-native" / ".synthetic-invocation.json").read_text())
+        assert warmup_invocation["network_mode"] == "passthrough" and warmup_invocation["tls_environment"] == []
+        runtime.cleanup(token)
+        print("通过：已有可信额度的正常养号保持 passthrough，不加载 Recorder CA")
         # 用同一 run 的不同 source 验证额度恢复，不能用两个独立 run 绕过目录换代。
         flows = root / "flows" / account["name"] / "1" / "synthetic-run"
         target = flows.resolve()
         old_flow = runtime.execution_flows(account, "run:synthetic-run:0", flows)
         (old_flow / "stats.jsonl").write_text('{"flow_id":"synthetic-evidence","usage":{"input_tokens":1}}\n')
         evidence = {path: path.read_bytes() for path in old_flow.iterdir() if path.is_file()}
-        workspace = runtime._root(row) / "workspaces" / "synthetic-run"
         token, _ = runtime.start_run(account, {"id": 1, "capture_full_http": True, "quota_attempt": 1}, "synthetic-run",
             dict(environment, QUOTA_SOURCE="run:synthetic-run:1", RESUME_SESSION_ID="synthetic-session"),
             {"QUOTA_SOURCE": "run:synthetic-run:1", "QUOTA_IDENTITY": "synthetic-quota"})
@@ -269,7 +309,9 @@ def verify() -> None:
         assert context["STATS_FILE"] != "/flows/" + str(old_flow.relative_to(runtime._root(row) / "flows")) + "/stats.jsonl"
         invocation = json.loads((workspace / ".synthetic-invocation.json").read_text())
         assert invocation["args"][invocation["args"].index("--resume") + 1] == "synthetic-session"
-        assert invocation["cwd"] == "/workspaces/synthetic-run" and invocation["home"] == "/home/node"
+        assert invocation["cwd"].startswith("/home/node/projects/project-") and "synthetic-run" not in invocation["cwd"]
+        assert invocation["home"] == "/home/node" and invocation["network_mode"] == "capture"
+        assert invocation["tls_environment"] == ["CURL_CA_BUNDLE", "GIT_SSL_CAINFO", "NODE_EXTRA_CA_CERTS", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE"]
         runtime.cleanup(token)
         assert all(path.read_bytes() == data for path, data in evidence.items())
         assert (resumed_flow / "capture.flow").exists()
@@ -286,10 +328,13 @@ def verify() -> None:
             events = stream.iter_lines(chunk_size=1)
             assert next(events).startswith(b"data: ")
             assert runtime._sender_active(row) == 1
-            token, _ = runtime.start_run(account, {"id": 1, "warmup": True, "capture_full_http": True}, "synthetic-parallel",
+            token, _ = runtime.start_run(account, {"id": 1, "warmup": True, "capture_full_http": False}, "synthetic-parallel",
                 dict(environment, RUN_ID="synthetic-parallel", QUOTA_SOURCE="run:synthetic-parallel"),
-                {"QUOTA_SOURCE": "run:synthetic-parallel", "QUOTA_IDENTITY": "synthetic-quota"})
+                {"QUOTA_SOURCE": "run:synthetic-parallel", "QUOTA_IDENTITY": "synthetic-quota",
+                    "QUOTA_WARMUP": "1", "QUOTA_SAMPLE_REQUIRED": "1"})
             execution = wait_cli_started(runtime, client, token)
+            quota_context = json.loads((runtime._root(row) / "runtime" / "context-ack.json").read_text())
+            assert quota_context["NETWORK_INSPECTION_MODE"] == "quota" and quota_context["process"] == "recorder"
             assert runtime._sender_active(row) == 1
             prepared_second = dict(prepared, request_id=str(uuid.uuid4()), target_url="http://api.anthropic.com:8081/v1/messages")
             api_response = session.post(binding["endpoint"] + "/internal/send", headers={"Authorization": "Bearer " + binding["secret"],
@@ -319,20 +364,20 @@ def verify() -> None:
             assert not client.api.exec_inspect(execution)["Running"]
             assert runtime._row(account["name"], account["id"])["state"] == "ready"
             assert runtime._sender_active(row) == 1
-            recorder_pid = int((runtime._root(row) / "runtime" / "mitm.pid").read_text())
-            container.exec_run(["kill", "-TERM", str(recorder_pid)])
+            listener_pid = int((runtime._root(row) / "runtime" / "network.pid").read_text())
+            container.exec_run(["kill", "-TERM", str(listener_pid)])
             unhealthy = runtime._root(row) / "runtime" / "cli-unhealthy"
             deadline = time.monotonic() + 5
             while not unhealthy.exists() and time.monotonic() < deadline:
                 time.sleep(0.1)
-            assert unhealthy.exists(), "Recorder 退出应隔离 CLI"
-            assert runtime._sender_active(row) == 1, "CLI Recorder 故障不能停止独立 API"
+            assert unhealthy.exists(), "CLI 网络监听退出应隔离下一作业"
+            assert runtime._sender_active(row) == 1, "CLI 网络监听故障不能停止独立 API"
             try:
                 runtime.claim(row, account, "run:recorder-unhealthy")
             except ValueError:
                 pass
             else:
-                raise AssertionError("Recorder 不健康时不能开始下一 CLI")
+                raise AssertionError("CLI 网络监听不健康时不能开始下一 CLI")
             runtime.maintenance(row["environment_id"], "reconcile")
             assert runtime._row(account["name"], account["id"])["state"] == "ready"
             assert runtime._sender_active(row) == 1
@@ -362,25 +407,45 @@ def verify() -> None:
         source = "continue:abcdef111111:0"
         token, _ = runtime.begin_continue(account, {"id": "synthetic-run", "claude_code_version": "9.9.9", "capture_full_http": True},
             "abcdef111111", {"QUOTA_SOURCE": source}, flows / "continue-abcdef111111")
-        handle = runtime.job_for_container(token)["handle"]
+        continuation_job = runtime.job_for_container(token)
+        handle = continuation_job["handle"]
         execution = client.api.exec_create(container.id, ["setsid", "--wait", "bash", "-c",
             "echo $$ > /run/v3/job-" + handle + ".pid; exec setpriv --reuid=1000 --regid=1000 --init-groups --bounding-set=-all --no-new-privs sh -c 'sleep 120 & wait'"],
-            workdir="/workspaces/synthetic-run")["Id"]
+            workdir=continuation_job["cwd"])["Id"]
         runtime.register_exec(token, execution)
         client.api.exec_start(execution, detach=True)
         time.sleep(0.3)
         runtime.cleanup(token)
         assert not client.api.exec_inspect(execution)["Running"]
-        assert json.loads((runtime._root(row) / "runtime" / "context-ack.json").read_text())["QUOTA_SOURCE"] == ""
+        acknowledgement = json.loads((runtime._root(row) / "runtime" / "context-ack.json").read_text())
+        assert acknowledgement["QUOTA_SOURCE"] == "" and acknowledgement["NETWORK_INSPECTION_MODE"] == "passthrough"
         with database() as connection:
             connection.execute("INSERT INTO accounts VALUES(2,'synthetic-two',NULL)")
-        second = {**account, "id": 2, "name": "synthetic-two"}
+        second = {**account, "id": 2, "name": "synthetic-two", "upstream_proxy_scheme": "http", "upstream_socks5_port": 1081}
         runtime.limit = 2
         second_row = runtime._row(second["name"], 2)
         second_cache = runtime._root(second_row) / "cli" / "9.9.9"
         shutil.copytree(cached, second_cache)
         second_row, second_container = runtime.ensure(second, "9.9.9")
         assert second_row["environment_id"] != row["environment_id"] and second_container.id != first_id
+        second_profile = root / "profiles" / second["name"]
+        atomic_json(second_profile / ".credentials.json", {"claudeAiOauth": {
+            "accessToken": "synthetic-http-access", "refreshToken": "synthetic-http-refresh",
+            "expiresAt": int(time.time() * 1000) + 3600000}})
+        runtime.sync_credentials(second_row, second)
+        with database() as connection:
+            connection.execute("INSERT INTO runs(id) VALUES('synthetic-http')")
+        tls_before = len(Path("/verify/tls.jsonl").read_text().splitlines())
+        http_environment = dict(environment, RUN_ID="synthetic-http")
+        http_token, _ = runtime.start_run(second, {"id": 1, "capture_full_http": False}, "synthetic-http", http_environment, {})
+        wait_cli_started(runtime, client, http_token)
+        http_invocation = json.loads((runtime._root(second_row) / "workspaces" / "synthetic-http" / ".synthetic-invocation.json").read_text())
+        assert http_invocation["network_mode"] == "passthrough" and http_invocation["tls_environment"] == []
+        tls_after = [json.loads(line) for line in Path("/verify/tls.jsonl").read_text().splitlines()]
+        assert len(tls_after) == tls_before + 1
+        assert tls_after[-1]["length"] == 8 and tls_after[-1]["payload_prefix"] == "1603030003010203"
+        runtime.cleanup(http_token)
+        print("通过：普通任务经 SOCKS5 与 HTTP CONNECT 上游均保持合成 TLS 字节不变")
         second_configuration = json.loads((runtime._root(second_row) / "runtime" / "sender.json").read_text())
         second_binding = second_configuration["binding"]
         prepared.update(environment_id=second_row["environment_id"], generation=second_row["generation"], request_id=str(uuid.uuid4()),

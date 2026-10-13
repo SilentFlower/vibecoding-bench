@@ -82,12 +82,21 @@ window.addEventListener('hashchange', navigate);
 async function renderEnvironments() {
   const rows = await API('/environments');
   const view = $('#view');
-  view.innerHTML = '<h2>固定账号环境</h2><p>停止和重建会保留 HOME、身份和证据。活动任务与 API 请求期间不能维护。</p>' +
-    rows.map(row => `<article class="card"><h3>${escapeHTML(row.name)}</h3><p>${escapeHTML(row.state)} · ${row.busy ? '执行中' : '无 CLI 作业'} · ${escapeHTML(row.fingerprint.hostname)} · ${escapeHTML(row.fingerprint.mem)}</p><p>环境 ${escapeHTML(row.environment_id)} · 容器代次 ${row.generation}</p><p>${escapeHTML(row.identity_status)} · CLI ${escapeHTML((row.cli_versions || []).join(", "))}</p>${['stop', 'rebuild', 'reconcile'].map(operation => `<button data-environment="${escapeHTML(row.environment_id)}" data-operation="${operation}" ${row.busy ? 'disabled' : ''}>${({stop:'停止',rebuild:'重建容器',reconcile:'故障对账'})[operation]}</button>`).join('')}</article>`).join('');
+  view.innerHTML = '<h2>固定账号环境</h2><p>停止和重建会保留 HOME、身份和证据。画像校正只适用于没有运行历史的未绑定账号，完成后必须重新授权。</p>' +
+    rows.map(row => `<article class="card"><h3>${escapeHTML(row.name)}</h3><p>${escapeHTML(row.state)} · ${row.busy ? '执行中' : '无 CLI 作业'} · ${escapeHTML(row.fingerprint.hostname)} · ${escapeHTML(row.fingerprint.mem)}</p><p>环境 ${escapeHTML(row.environment_id)} · 容器代次 ${row.generation} · profile v${escapeHTML(row.fingerprint.profile_version || 1)} · ${escapeHTML(row.fingerprint.tz)} / ${escapeHTML(row.fingerprint.lang)}</p><p>${escapeHTML(row.identity_status)} · CLI ${escapeHTML((row.cli_versions || []).join(", "))}</p>${['stop', 'rebuild', 'reconcile'].map(operation => `<button data-environment="${escapeHTML(row.environment_id)}" data-operation="${operation}" ${row.busy ? 'disabled' : ''}>${({stop:'停止',rebuild:'重建容器',reconcile:'故障对账'})[operation]}</button>`).join('')}<button data-environment="${escapeHTML(row.environment_id)}" data-operation="reprofile" ${row.can_reprofile ? '' : 'disabled'} title="${escapeHTML(row.reprofile_message || '校正后必须重新授权')}">校正画像并重新授权</button></article>`).join('');
   $$('[data-operation]', view).forEach(button => button.addEventListener('click', async () => {
-    if (!confirm('确认在账号空闲时执行此维护操作？持久数据会保留。')) return;
+    const reprofile = button.dataset.operation === 'reprofile';
+    const message = reprofile
+      ? '画像校正会生成新的固定设备参数并阻止普通任务，直到该账号重新授权成功。确认继续？'
+      : '确认在账号空闲时执行此维护操作？持久数据会保留。';
+    if (!confirm(message)) return;
     try {
       await API(`/environments/${button.dataset.environment}/maintenance`, { method: 'POST', body: JSON.stringify({ operation: button.dataset.operation }) });
+      if (reprofile) {
+        alert('画像已校正并锁定。请在账号页点击“重新授权”，完成后才会恢复任务。');
+        location.hash = '#accounts';
+        return;
+      }
       await renderEnvironments();
     } catch (error) {
       alert(error.message);
@@ -149,8 +158,23 @@ function formatWarmupTime(value) {
  * @return {string} 已转义的状态 HTML
  */
 function renderWarmupStatus(account) {
+  const thresholds = [['5h', account.warmup_quota_5h_limit_percent], ['7d', account.warmup_quota_7d_limit_percent]]
+    .filter(([, value]) => value != null)
+    .map(([name, value]) => `${name} 已用 ≥ ${value}%`).join(' · ');
+  const quotaStatuses = [
+    ['普通任务', account.quota_policy],
+    ['养号', account.warmup_quota],
+  ].filter(([, quota]) => quota?.enabled).map(([label, quota]) => {
+    const message = quota.message || (quota.blocked ? '等待额度更新' : '当前可启动');
+    const resume = quota.resume_at
+      ? `<div>恢复机会 ${escapeHTML(formatWarmupTime(quota.resume_at))}</div>`
+      : '';
+    return `<div class="warmup-error"><strong>${label}</strong>：${escapeHTML(message)}${resume}</div>`;
+  }).join('');
   if (account.cc2api_account_id == null) {
-    return '<span class="pill pill-queued">未绑定</span>';
+    return `<span class="pill pill-queued">未绑定</span>
+      ${thresholds ? `<div class="muted">普通任务阈值：${escapeHTML(thresholds)}</div>` : ''}
+      ${quotaStatuses}`;
   }
   const enabled = Number(account.warmup_enabled || 0) === 1;
   const status = String(account.warmup_last_status || (enabled ? 'scheduled' : 'off'));
@@ -172,19 +196,6 @@ function renderWarmupStatus(account) {
   const error = account.warmup_last_error
     ? `<div class="warmup-error" title="${escapeHTML(account.warmup_last_error)}">${escapeHTML(account.warmup_last_error)}</div>`
     : '';
-  const thresholds = [['5h', account.warmup_quota_5h_limit_percent], ['7d', account.warmup_quota_7d_limit_percent]]
-    .filter(([, value]) => value != null)
-    .map(([name, value]) => `${name} 已用 ≥ ${value}%`).join(' · ');
-  const quotaStatuses = [
-    ['普通任务', account.quota_policy],
-    ['养号', account.warmup_quota],
-  ].filter(([, quota]) => quota?.enabled).map(([label, quota]) => {
-    const message = quota.message || (quota.blocked ? '等待额度更新' : '当前可启动');
-    const resume = quota.resume_at
-      ? `<div>恢复机会 ${escapeHTML(formatWarmupTime(quota.resume_at))}</div>`
-      : '';
-    return `<div class="warmup-error"><strong>${label}</strong>：${escapeHTML(message)}${resume}</div>`;
-  }).join('');
   return `
     <div><code>cc#${escapeHTML(account.cc2api_account_id)}</code> <span class="pill ${statusClass}">${escapeHTML(status === 'quota_wait' ? '额度等待' : status)}</span></div>
     <div>${escapeHTML(account.warmup_interval_min_hours || 3)}-${escapeHTML(account.warmup_interval_max_hours || 5)}h</div>
@@ -412,11 +423,7 @@ async function openWarmupModal(account) {
   const options = state.cc2apiAccounts.map(item => `
     <option value="${escapeHTML(item.id)}">#${escapeHTML(item.id)} ${escapeHTML(item.name || 'oauth')} · ${escapeHTML(item.email_masked || '-')}</option>
   `).join('');
-  form.cc2api_account_id.innerHTML = options || (
-    account.cc2api_account_id != null
-      ? `<option value="${escapeHTML(account.cc2api_account_id)}">#${escapeHTML(account.cc2api_account_id)} 当前绑定</option>`
-      : '<option value="">暂无可用账号</option>'
-  );
+  form.cc2api_account_id.innerHTML = '<option value="">未绑定 · 仅保存任务阈值</option>' + options;
   if (account.cc2api_account_id != null) {
     const exists = state.cc2apiAccounts.some(item => String(item.id) === String(account.cc2api_account_id));
     if (!exists) {
@@ -426,9 +433,27 @@ async function openWarmupModal(account) {
       );
     }
     form.cc2api_account_id.value = String(account.cc2api_account_id);
+  } else {
+    form.cc2api_account_id.value = '';
   }
+  form.cc2api_account_id.onchange = () => updateWarmupBindingState(form);
+  updateWarmupBindingState(form);
   $('#warmup-modal-title').textContent = `#${account.id} ${account.name}`;
   openModal('#warmup-modal');
+}
+
+/**
+ * 未绑定时只开放普通任务阈值，定时养号必须先有 cc2api OAuth 账号。
+ * @param {HTMLFormElement} form 养号与额度配置表单
+ * @return {void} 不返回值
+ */
+function updateWarmupBindingState(form) {
+  const bound = Boolean(form.cc2api_account_id.value);
+  form.enabled.disabled = !bound;
+  if (!bound) form.enabled.checked = false;
+  $('#warmup-binding-hint').textContent = bound
+    ? '定时养号将使用所选 cc2api OAuth 账号；普通任务阈值同时保存。'
+    : '当前未绑定 cc2api；仍可保存普通任务 5h / 7d 阈值，定时养号暂不可启用。';
 }
 
 /**
@@ -461,13 +486,15 @@ async function saveWarmupConfig(e) {
   const button = form.querySelector('button[type="submit"]');
   const accountId = Number(form.account_id.value);
   const payload = {
-    cc2api_account_id: Number(form.cc2api_account_id.value),
     enabled: form.enabled.checked,
     interval_min_hours: Number(form.interval_min_hours.value),
     interval_max_hours: Number(form.interval_max_hours.value),
     warmup_quota_5h_limit_percent: form.quota_5h_enabled.checked ? Number(form.warmup_quota_5h_limit_percent.value) : null,
     warmup_quota_7d_limit_percent: form.quota_7d_enabled.checked ? Number(form.warmup_quota_7d_limit_percent.value) : null,
   };
+  if (form.cc2api_account_id.value) {
+    payload.cc2api_account_id = Number(form.cc2api_account_id.value);
+  }
   button.disabled = true;
   try {
     await API(`/accounts/${accountId}/warmup`, {

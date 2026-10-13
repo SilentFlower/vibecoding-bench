@@ -59,7 +59,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential pkg-config git curl wget unzip \
     ca-certificates locales tmux jq ripgrep tini util-linux iproute2 iptables iputils-ping \
     proxychains4 unbound dnsutils procps \
-    && sed -i -E 's/^# (en_US|ja_JP|ko_KR|de_DE|fr_FR)\.UTF-8 UTF-8/\1.UTF-8 UTF-8/' /etc/locale.gen \
+    && sed -i -E 's/^# (en_US|en_GB|ja_JP|ko_KR|de_DE|fr_FR)\.UTF-8 UTF-8/\1.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen && rm -rf /var/lib/apt/lists/*
 COPY --from=frontend /usr/local/bin/node /usr/local/bin/node
 COPY --from=frontend /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
@@ -75,6 +75,7 @@ COPY images/sidecar /sidecar
 COPY images/account/init.py /usr/local/bin/v3-account-init
 COPY images/account/network-context.py /usr/local/bin/v3-network-context
 COPY images/account/cli-version.sh /usr/local/bin/v3-cli-version
+COPY images/account/passthrough.py /usr/local/bin/v3-passthrough
 COPY --from=backend /source/cc2api/target/release/account-sender /usr/local/bin/account-sender
 RUN chmod 755 /usr/local/bin/v3-* && mkdir -p /workspaces /run/v3
 WORKDIR /home/node

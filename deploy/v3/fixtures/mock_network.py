@@ -55,6 +55,50 @@ def read_exact(connection, size):
     return result
 
 
+def serve_dns(connection):
+    """在当前代理隧道内返回合成 A 记录。@param connection 已建立的代理连接；@return None。"""
+    while True:
+        try:
+            size = struct.unpack("!H", read_exact(connection, 2))[0]
+            query = read_exact(connection, size)
+        except EOFError:
+            return
+        end = 12
+        while query[end]:
+            end += 1 + query[end]
+        end += 5
+        answer = query[:2] + b"\x81\x80" + query[4:6] + b"\x00\x01\x00\x00\x00\x00" + query[12:end]
+        answer += b"\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x3c\x00\x04" + ipaddress.ip_address("198.18.0.10").packed
+        connection.sendall(struct.pack("!H", len(answer)) + answer)
+
+
+def record_tls(connection, peer):
+    """记录隔离 TLS 探针的来源、长度和有限前缀。@param connection 代理连接；@param peer 来源 IP；@return None。"""
+    hello = connection.recv(16384)
+    with open("/fixtures-data/tls.jsonl", "a") as output:
+        output.write(json.dumps({"peer": peer, "record_type": hello[0] if hello else None,
+            "length": len(hello), "payload_prefix": hello[:32].hex()}) + "\n")
+
+
+def forward_http(connection):
+    """把隔离代理的 8081 隧道转到本地合成 HTTP。@param connection 代理连接；@return None。"""
+    with socket.create_connection(("127.0.0.1", 8081)) as upstream:
+        def forward(source, destination):
+            """转发有限本地字节并在结束时关闭写侧。"""
+            try:
+                while part := source.recv(65536):
+                    destination.sendall(part)
+            finally:
+                try:
+                    destination.shutdown(socket.SHUT_WR)
+                except OSError:
+                    pass
+        thread = threading.Thread(target=forward, args=(connection, upstream), daemon=True)
+        thread.start()
+        forward(upstream, connection)
+        thread.join(timeout=2)
+
+
 class Socks(socketserver.BaseRequestHandler):
     """只转发到本地 HTTP，DNS 返回合成 IPv4，公网地址不建立连接。"""
 
@@ -77,39 +121,41 @@ class Socks(socketserver.BaseRequestHandler):
             return
         connection.sendall(b"\x05\x00\x00\x01" + b"\x00" * 6)
         if port == 53:
-            while True:
-                try:
-                    size = struct.unpack("!H", read_exact(connection, 2))[0]
-                    query = read_exact(connection, size)
-                except EOFError:
-                    return
-                end = 12
-                while query[end]:
-                    end += 1 + query[end]
-                end += 5
-                answer = query[:2] + b"\x81\x80" + query[4:6] + b"\x00\x01\x00\x00\x00\x00" + query[12:end]
-                answer += b"\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x3c\x00\x04" + ipaddress.ip_address("198.18.0.10").packed
-                connection.sendall(struct.pack("!H", len(answer)) + answer)
+            serve_dns(connection)
         elif port == 443:
-            hello = connection.recv(16384)
-            with open("/fixtures-data/tls.jsonl", "a") as output:
-                output.write(json.dumps({"peer": self.client_address[0], "record_type": hello[0] if hello else None}) + "\n")
+            record_tls(connection, self.client_address[0])
         else:
-            with socket.create_connection(("127.0.0.1", 8081)) as upstream:
-                def forward(source, destination):
-                    """转发有限本地字节并在结束时关闭写侧。"""
-                    try:
-                        while part := source.recv(65536):
-                            destination.sendall(part)
-                    finally:
-                        try:
-                            destination.shutdown(socket.SHUT_WR)
-                        except OSError:
-                            pass
-                thread = threading.Thread(target=forward, args=(connection, upstream), daemon=True)
-                thread.start()
-                forward(upstream, connection)
-                thread.join(timeout=2)
+            forward_http(connection)
+
+
+class HttpConnect(socketserver.BaseRequestHandler):
+    """提供隔离 HTTP CONNECT 上游，覆盖 DNS、TLS 和本地 HTTP。"""
+
+    def handle(self):
+        """解析 CONNECT 后复用合成隧道处理器，返回 None。"""
+        connection = self.request
+        request = b""
+        while b"\r\n\r\n" not in request:
+            part = connection.recv(4096)
+            if not part or len(request) + len(part) > 65536:
+                return
+            request += part
+        try:
+            method, target, _ = request.split(b"\r\n", 1)[0].decode("ascii").split(" ", 2)
+            _, port_text = target.rsplit(":", 1)
+            port = int(port_text)
+        except (ValueError, UnicodeDecodeError):
+            return
+        if method != "CONNECT" or port not in (53, 8081, 443):
+            connection.sendall(b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n")
+            return
+        connection.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+        if port == 53:
+            serve_dns(connection)
+        elif port == 443:
+            record_tls(connection, self.client_address[0])
+        else:
+            forward_http(connection)
 
 
 class Server(socketserver.ThreadingTCPServer):
@@ -120,4 +166,5 @@ class Server(socketserver.ThreadingTCPServer):
 
 if __name__ == "__main__":
     threading.Thread(target=ThreadingHTTPServer(("0.0.0.0", 8081), Handler).serve_forever, daemon=True).start()
+    threading.Thread(target=Server(("0.0.0.0", 1081), HttpConnect).serve_forever, daemon=True).start()
     Server(("0.0.0.0", 1080), Socks).serve_forever()

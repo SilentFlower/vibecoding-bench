@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from fastapi import Request, Response, WebSocket
-from account_runtime import AccountRuntime
+from account_runtime import AccountRuntime, derive_v3_fingerprint
 import main
 
 
@@ -118,7 +118,7 @@ class V3AuthTests(unittest.TestCase):
             connection.executescript(main._SCHEMA)
         with patch.dict(os.environ, {"V3_DEPLOYMENT_ID": "auth-unit", "V3_ACCOUNT_IMAGE": "fake",
             "V3_NETWORK": "fake", "V3_RELEASE": "fake"}):
-            runtime = AccountRuntime(Mock(), self.root, self.root, self.database, main.derive_fingerprint, Mock())
+            runtime = AccountRuntime(Mock(), self.root, self.root, self.database, derive_v3_fingerprint, Mock())
         self.addCleanup(runtime.heartbeat_pool.shutdown)
         row = runtime._row("synthetic")
         container = Mock(id="synthetic-container")

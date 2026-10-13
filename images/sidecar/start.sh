@@ -110,16 +110,18 @@ for i in $(seq 1 40); do
   if ss -ltn 2>/dev/null | grep ':8080 ' >/dev/null; then break; fi
   sleep 0.25
 done
-for i in $(seq 1 20); do
-  if [ -f /root/.mitmproxy/mitmproxy-ca-cert.pem ]; then break; fi
-  sleep 0.25
-done
+if [ "${V3_ACCOUNT:-0}" != "1" ]; then
+  for i in $(seq 1 20); do
+    if [ -f /root/.mitmproxy/mitmproxy-ca-cert.pem ]; then break; fi
+    sleep 0.25
+  done
 
-# 持久化 CA
-if [ -f /root/.mitmproxy/mitmproxy-ca-cert.pem ] && [ ! -f /ca/mitmproxy-ca-cert.pem ]; then
-  log "Persisting newly generated CA to /ca"
-  cp /root/.mitmproxy/mitmproxy-ca.pem /ca/ 2>/dev/null || true
-  cp /root/.mitmproxy/mitmproxy-ca-cert.pem /ca/
+  # 旧版每-run sidecar 启动即使用 Recorder，继续在这里持久化 CA。
+  if [ -f /root/.mitmproxy/mitmproxy-ca-cert.pem ] && [ ! -f /ca/mitmproxy-ca-cert.pem ]; then
+    log "Persisting newly generated CA to /ca"
+    cp /root/.mitmproxy/mitmproxy-ca.pem /ca/ 2>/dev/null || true
+    cp /root/.mitmproxy/mitmproxy-ca-cert.pem /ca/
+  fi
 fi
 
 # ---------- 4) 创建 tun0 ----------
