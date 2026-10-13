@@ -1,7 +1,9 @@
 """固定环境状态及故障收口测试，不使用真实账号或 Docker daemon。"""
 import json
 import os
+import re
 import sqlite3
+import subprocess
 import tempfile
 import threading
 import unittest
@@ -125,6 +127,48 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual(before, credentials.read_bytes())
         with self.assertRaisesRegex(ValueError, "profile v2"):
             self.runtime.maintenance(row["environment_id"], "reprofile")
+
+    def test_generated_v3_driver_does_not_install_private_stop_hook(self) -> None:
+        """实际生成 driver 并执行设置片段，防止 CLI 写私有控制目录而反复触发 Stop。@return None。"""
+        row = self.runtime._row("synthetic", 1)
+        root = self.runtime._root(row)
+        settings = root / "home/.claude/settings.json"
+        atomic_json(settings, {"model": "opus[1m]"})
+        with self.database() as connection:
+            connection.execute("CREATE TABLE runs(id TEXT PRIMARY KEY,environment_id TEXT,environment_generation INTEGER,execution_source TEXT,runtime_release TEXT)")
+            connection.execute("INSERT INTO runs(id) VALUES('driver-test')")
+        container = Mock(id="synthetic-container")
+        job = {"row": row, "token": "synthetic-token"}
+        self.client.api.exec_create.return_value = {"Id": "synthetic-exec"}
+        source = Path(__file__).resolve().parents[1] / "images/worker/entrypoint.sh"
+        with patch.object(self.runtime, "_cli_setup") as setup, \
+                patch.object(self.runtime, "sync_credentials"), \
+                patch.object(self.runtime, "_save_execution"), \
+                patch.object(self.runtime, "_configure_network_context"), \
+                patch.dict(os.environ, {"V3_WORKER_SCRIPT": str(source)}):
+            setup.return_value.__enter__.return_value = (row, container, job)
+            self.runtime.start_run({"id": 1, "name": "synthetic"}, {"id": 1}, "driver-test",
+                {"CLAUDE_CODE_VERSION": "2.1.293"}, {})
+        script = (root / "runtime" / f"job-{job['handle']}.sh").read_text()
+        fragment = re.search(r'node - "\$CLAUDE_DIR/settings.json" <<\x27JS\x27\n(.*?)\nJS', script, re.S)
+        self.assertIsNotNone(fragment)
+        result = subprocess.run(["node", "-", str(settings)], input=fragment.group(1),
+            capture_output=True, text=True, timeout=10)
+        self.assertEqual(0, result.returncode, result.stderr)
+        persisted = json.loads(settings.read_text())
+        self.assertNotIn("Stop", persisted["hooks"])
+        self.assertEqual("opus[1m]", persisted["model"])
+        subprocess.run(["bash", "-n"], input=script, text=True, check=True, timeout=10)
+        session = root / "home/.claude/projects" / job["cwd"].replace("/", "-") / "complete.jsonl"
+        session.parent.mkdir(parents=True, exist_ok=True)
+        session.write_text(json.dumps({"type": "assistant", "message": {"role": "assistant",
+            "content": [{"type": "text", "text": "Task complete."}], "stop_reason": "end_turn"}}) + "\n")
+        classifier = re.search(r"^classify_claude_completion\(\) \{.*?^\}", script, re.M | re.S)
+        self.assertIsNotNone(classifier)
+        result = subprocess.run(["bash", "-c", classifier.group(0) + "\nclassify_claude_completion 0\n"],
+            env={**os.environ, "CLAUDE_DIR": str(root / "home/.claude")},
+            capture_output=True, text=True, timeout=10)
+        self.assertEqual(0, result.returncode, result.stderr)
 
     def test_reprofile_rejects_existing_task_history(self) -> None:
         """已有任务历史时不能旋转画像。@return None。"""

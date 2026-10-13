@@ -791,6 +791,9 @@ class AccountRuntime:
                     except OSError:
                         pass
                 source_script = Path(os.environ.get("V3_WORKER_SCRIPT", "/opt/v3/worker.sh")).read_text()
+                # v3 的私有控制树不向 CLI 开放写入；完成判定已有主会话 JSONL，无需另注入 Stop hook。
+                source_script = source_script.replace(
+                    "  Stop: [{matcher: '', hooks: [{type: 'command', command: 'date +%s >> /tmp/claude-stop-seen'}]}],\n", "")
                 # v3 控制文件不放进 Claude 可见项目树；兼容 driver 仍由单一脚本生成。
                 control_paths = {
                     "/workspace/.bench-status.json": f"/run/v3/runs/{run_id}/status.json",
