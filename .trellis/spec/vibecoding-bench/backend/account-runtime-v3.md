@@ -90,6 +90,8 @@ bench/flows/<account>/<task>/<run>/    固定兼容链接
 
 `execution_flows()` 在账号锁内固定兼容入口；run 与续聊各有自己的证据组。恢复原 run/session/workspace，仅换 source 子目录；QuotaGuard 登记本代实际观察文件，Recorder 使用同一目录。真实 cwd 和 `.claude/projects` 键只能使用 `project-<摘要>`，原 run/environment ID、`.bench-*`、`.claude-home`、cc2api 刷新标记和 Stop hook 控制文件不能进入 Claude 可见项目树；旧系统生成的已知控制文件须定向迁移到 runtime，不能删除未知用户文件。run 统计读取平铺历史及各 run 执行、排除续聊/API并去重路径；抓包索引和文件列表聚合各代及续聊。原生 flow 不覆盖，历史平铺文件保留。跨目录链接拒绝，未部署的旧 v3 原型 source 链接不自动接管。
 
+`_project_view()` 在启动 CLI 前给固定 HOME 的 `.claude.json.projects[cwd]` 设置 `hasTrustDialogAccepted=true`，仅限当前系统专属物理项目目录；原子合并并保留 userID、OAuth 身份、其他项目及未知设置。持久 HOME 不走旧 worker 的顶层配置初始化，需显式保存本项目的确认标记。未登录或异常授权仍按原认证入口处理，不信任任意外部目录。
+
 **显式画像校正**：`maintenance(..., "reprofile")` 只接受未绑定 cc2api、无 task/run/identity/草稿/提交/活动作业、容器已停止的 legacy 正式环境。操作保留账号/HOME/代理/资源预算，清理旧容器网络与 CA 产物，生成一次 profile v2 并回到 stopped，保留原登录凭据；不因环境字段变化强制重授权。启动时原 `profile_reauth` 迁回正常生命周期；原 `profile_reauth_reconcile` 的真实执行/提交故障仍按 reconcile 隔离。profile v2 永久拒绝再次 reprofile，真实认证失败才要求重新授权。
 
 **部署**：两个最终镜像 control/account；control 按 gateway/orchestrator 两个角色启动，N 个账号共 N+2 个容器，只有 orchestrator 挂 Docker socket。CLI 为 UID1000、无网络能力并禁止提权，服务秘密/控制目录不对项目写入开放。
@@ -163,6 +165,7 @@ bench 导航项不拆分中英文标签；宽度不超过 1440px 时导航独立
 - Python orchestrator 回归：原快照与 session 恢复、旧 token/绑定保护、并行与安装续租、证据/游标分代、统计不重复、错误链接拒绝、鉴权和永久额度门禁。
 - `images/account/test_passthrough.py` 与 network-context 回归：HTTP CONNECT、SOCKS5/H 认证、IPv4/IPv6/域名、字节保真、代理失败无直连、静默关闭、跨空闲窗口单向活动，以及 PID/ACK/mode/source 归属。
 - profile/project 回归：独立随机画像、时区-locale 配对、重建固定、legacy 不自动迁移、reprofile 全部前置条件/历史门禁迁移/凭据保留/成功后不可重复；容器内项目顶层只出现匿名目录，项目内部没有 `.bench-*`、`.claude-home`、刷新控制或系统 Stop hook。
+- 目录信任回归：实际 `_project_view()` 写入当前 cwd 的信任标记，同时原账号 userID/OAuth 和其他项目配置保持；生产验收必须观察真实会话响应或工具调用，不能只凭 runs.status=running 宣称题目已执行。
 - Recorder 与部署回归：请求归属冻结、ACK/身份、冲突预检、准确资源归属、停机、备份和导入幂等。
 - 资源/发布回归：1536m＋2048m 实际 Docker 限额，默认/旧缺字段、非法无限值、RAM/swap不足、已固化预算拒绝；当前 Action 来源/attempt、第一/第二件推送失败无完整清单、错误digest/包拒绝、本地标签不覆盖，跨 store ID相同配置可核对。
 - actionlint 核对 ref、权限与 artifact；实际本地 registry 的 push/pull、归档 config 哈希以及双镜像 save/load 核对。CI/GHCR发布结果与指定服务器实时预检/健康/旧服务不变在发布后验收，不能以本地替身称其已完成。

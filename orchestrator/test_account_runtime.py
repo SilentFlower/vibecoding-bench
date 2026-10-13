@@ -73,6 +73,10 @@ class AccountRuntimeTests(unittest.TestCase):
     def test_project_view_uses_opaque_physical_directory(self) -> None:
         """CLI 的真实 cwd 不含 run ID，旧路径只保留宿主兼容链接。@return None。"""
         row = self.runtime._row("synthetic", 1)
+        configuration = self.runtime._root(row) / "home" / ".claude.json"
+        original = {"oauthAccount": {"accountUuid": "synthetic"}, "userID": "fixed-user",
+            "projects": {"/other/project": {"allowedTools": ["Read"]}}}
+        atomic_json(configuration, original)
         compatibility = self.runtime._root(row) / "workspaces" / "internal-run-id"
         compatibility.mkdir(parents=True)
         (compatibility / "fixture.txt").write_text("synthetic")
@@ -85,6 +89,11 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual("synthetic", (physical / "fixture.txt").read_text())
         self.assertNotIn("internal-run-id", cwd)
         self.assertEqual([alias], [path.name for path in physical.parent.iterdir()])
+        persisted = json.loads(configuration.read_text())
+        self.assertEqual(original["oauthAccount"], persisted["oauthAccount"])
+        self.assertEqual(original["userID"], persisted["userID"])
+        self.assertEqual(original["projects"]["/other/project"], persisted["projects"]["/other/project"])
+        self.assertTrue(persisted["projects"][cwd]["hasTrustDialogAccepted"])
         with self.database() as connection:
             connection.execute("CREATE TABLE runs(id TEXT PRIMARY KEY,environment_id TEXT)")
             connection.execute("INSERT INTO runs VALUES(?,?)", ("internal-run-id", row["environment_id"]))

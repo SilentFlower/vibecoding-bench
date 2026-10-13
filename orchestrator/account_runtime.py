@@ -1061,7 +1061,17 @@ class AccountRuntime:
             view.mkdir(mode=0o755)
             os.chown(view, 1000, 1000)
             compatibility.symlink_to(os.path.relpath(view, compatibility.parent), target_is_directory=True)
-        return f"/home/node/projects/{alias}"
+        cwd = f"/home/node/projects/{alias}"
+        configuration = self._root(row) / "home" / ".claude.json"
+        if configuration.is_file():
+            value = json.loads(configuration.read_text())
+            projects = value.get("projects") if isinstance(value.get("projects"), dict) else {}
+            project = projects.get(cwd) if isinstance(projects.get(cwd), dict) else {}
+            # 这里只信任本系统为当前任务创建的专属目录，避免首屏确认吞掉原题。
+            value["projects"] = {**projects, cwd: {**project, "hasTrustDialogAccepted": True}}
+            atomic_json(configuration, value)
+            os.chown(configuration, 1000, 1000)
+        return cwd
 
     def _session_view(self, row: dict, run_id: str, cwd: str | None = None) -> None:
         """
