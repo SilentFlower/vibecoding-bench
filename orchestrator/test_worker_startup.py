@@ -158,3 +158,63 @@ tmux() {
         self.assertTrue(persisted["hasSeenAutoDefaultNudge"])
         self.assertEqual(initial["oauthAccount"], persisted["oauthAccount"])
         self.assertEqual(["Read"], persisted["projects"]["/workspace"]["allowedTools"])
+
+    def test_persistent_home_patches_gates_without_replacing_existing_state(self) -> None:
+        """
+        实际 v3 启动分支补齐推荐标记，同时保留身份、凭据、会话和缓存。
+
+        :return: None
+        """
+        initial = {
+            "oauthAccount": {"accountUuid": "synthetic-account"},
+            "userID": "synthetic-user",
+            "hasSeenAutoDefaultNudge": False,
+            "projects": {
+                "/workspace": {"allowedTools": ["Read"]},
+                "/other-project": {"hasTrustDialogAccepted": False},
+            },
+        }
+        configuration = self.base / ".claude.json"
+        configuration.write_text(json.dumps(initial), encoding="utf-8")
+        retained = {
+            ".claude/.credentials.json": b'{"claudeAiOauth":{"accessToken":"synthetic-only"}}',
+            ".claude/projects/-workspace/session.jsonl": b'{"type":"user"}\n',
+            ".claude/cache/marker": b"existing-cache",
+        }
+        for relative, content in retained.items():
+            path = self.base / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        # 执行真实条件分支，避免只测试补齐函数而漏掉 v3 没有调用它的问题。
+        start = self.source.index('mkdir -p "$CLAUDE_DIR"', self.source.index("# ---------- 2)"))
+        end = self.source.index('strip_managed_refresh_token "$CLAUDE_DIR/.credentials.json" || true', start)
+        script = self._functions("patch_top_config_gates") + "\n" + self.source[start:end]
+        environment = {
+            **os.environ,
+            "CLAUDE_HOME": str(self.base),
+            "CLAUDE_DIR": str(self.base / ".claude"),
+            "V3_PERSISTENT_HOME": "1",
+        }
+        for has_configuration in (True, False):
+            with self.subTest(has_configuration=has_configuration):
+                if not has_configuration:
+                    configuration.unlink()
+                result = subprocess.run(
+                    ["bash", "-c", "set -euo pipefail\n" + script],
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                self.assertEqual(0, result.returncode, result.stderr)
+                if has_configuration:
+                    persisted = json.loads(configuration.read_text())
+                    self.assertTrue(persisted["hasSeenAutoDefaultNudge"])
+                    self.assertEqual(initial["oauthAccount"], persisted["oauthAccount"])
+                    self.assertEqual(initial["userID"], persisted["userID"])
+                    self.assertEqual(["Read"], persisted["projects"]["/workspace"]["allowedTools"])
+                    self.assertEqual(initial["projects"]["/other-project"], persisted["projects"]["/other-project"])
+                else:
+                    self.assertFalse(configuration.exists())
+                for relative, content in retained.items():
+                    self.assertEqual(content, (self.base / relative).read_bytes())

@@ -1643,7 +1643,8 @@ trap 'terminate_task_mode 130' INT
 # 不能让它躺在 $HOME/.claude/ 子目录里(那里 claude 不会读顶层配置)。
 mkdir -p "$CLAUDE_DIR"
 if [ "${V3_PERSISTENT_HOME:-0}" = "1" ]; then
-  : # 运行 HOME 已由管理端发布 AT；保留会话、顶层配置与缓存。
+  # 固定 HOME 不复制 profile，但已有顶层配置仍需补齐首次引导标记。
+  patch_top_config_gates
 elif [ -d /mnt/profile ]; then
   log "Copying account profile from /mnt/profile -> $CLAUDE_DIR"
   if [ -n "${RESUME_SESSION_ID:-}" ]; then
