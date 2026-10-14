@@ -29,6 +29,8 @@ POST /api/environments/{environment_id}/maintenance
 
 AccountRuntime.execution_flows(account: dict, source: str, flows: Path) -> Path
 AccountRuntime.start_run(account, task, run_id, worker_env, quota_env) -> tuple[str, str]
+AccountRuntime.execution_environment(row: dict) -> dict[str, str]
+V3_DEFAULT_TIMEZONE = "America/Los_Angeles"
 AccountRuntime.cleanup(container_id: str) -> None
 AccountRuntime.run_session_path(run_id: str) -> Path
 AccountRuntime.reprofile_blocker(row: dict) -> str | None
@@ -58,7 +60,7 @@ scripts/v3-stack stop --env <独立配置>
 
 **数据与凭据**：cc2api 拥有绑定账号、代理、OAuth 和唯一刷新权；bench 拥有环境、任务、持久目录及证据。两侧通过受控 API 协作。绑定 CLI HOME 仅发布 AT，删除 RT；401 沿用 managed 刷新流程。身份导入仅接受 Recorder 实际观测且与登录账号归属一致的设备身份，来源未知或冲突时阻止同步；不把 Linux machine-id 当成 device_id。
 
-**环境**：每账号一个固定 account 容器、完整 `/home/node` 和版本缓存。新环境的 `fingerprint_json.profile_version=2`；hostname 为独立随机 12 位小写十六进制，machine-id 为独立随机 32 位小写十六进制，MAC 为独立随机的本地管理单播地址。时区来自账号显式配置，locale 与地区成组持久化；未配置时使用 UTC + `en_US.UTF-8`。环境 ID、profile、RAM/swap 不随 run、改名、停止唤醒或容器重建重算；旧记录缺 `profile_version` 时保持 legacy。重建可换 container ID，但保留 HOME 和环境身份。容器 DNS 为 `v3-<deployment_sha256前12位>-account-<environment_id>`，完整归属由产品/部署/角色/环境 labels 校验。只按本部署精确标签维护，不用宽前缀或 prune。
+**环境**：每账号一个固定 account 容器、完整 `/home/node` 和版本缓存。新环境的 `fingerprint_json.profile_version=2`；hostname 为独立随机 12 位小写十六进制，machine-id 为独立随机 32 位小写十六进制，MAC 为独立随机的本地管理单播地址。时区来自账号显式配置，locale 与地区成组持久化；未配置的新环境使用 `America/Los_Angeles` + `en_US.UTF-8`，IANA 时区自动处理夏令时；已有 UTC 或其它画像保持，generation=0 的已登记画像也不重算。环境 ID、profile、RAM/swap 不随 run、改名、停止唤醒或容器重建重算；旧记录缺 `profile_version` 时保持 legacy。重建可换 container ID，但保留 HOME 和环境身份。容器 DNS 为 `v3-<deployment_sha256前12位>-account-<environment_id>`，完整归属由产品/部署/角色/环境 labels 校验。只按本部署精确标签维护，不用宽前缀或 prune。
 
 **调度**：
 
@@ -67,7 +69,9 @@ scripts/v3-stack stop --env <独立配置>
 - CLI 安装在认领后执行，不持有环境生命周期锁；API 就绪不安装 CLI。原 weighted slot/FIFO/RPM/粘性请求和 SSE permit 规则保留，OAuth resolve 不等待 CLI 租约。
 - driver 和续聊 wrapper 使用 `setsid --wait`，Docker exec 生命周期必须跟随实际进程。tmux 登录 shell 显式保留选定 CLI 缓存 PATH。
 - v3 生成 driver 时去除内部时间戳 Stop hook；UID1000 无权写 root 私有 runtime 树，该信号也没有消费者。完成仍由真实主会话 JSONL 的最新稳定最终 assistant 文本判定，不需要放宽控制目录权限。原 hooks 在作业收口时按快照恢复。
-- `_cli_setup()` 在已认领的环境锁内合并固定 HOME 的 `settings.json.env.DISABLE_AUTOUPDATER="1"`，保留其他 env/model/hooks 并发布为 UID1000 文件。普通任务、抓包、登录和续聊的 CLI 准备共用此入口；CLI 版本继续由管理端精确缓存与全局运行配置选择。
+- `_cli_setup()` 在已认领的环境锁内合并固定 HOME 的 `settings.json.env.DISABLE_AUTOUPDATER="1"` 及画像的 TZ/LANG/LC_ALL，保留其他 env/model/hooks 并发布为 UID1000 文件。普通任务、抓包、登录和续聊的 CLI 准备共用此入口；CLI 版本继续由管理端精确缓存与全局运行配置选择。
+- 实际任务 driver 在合并 worker_env 后覆盖画像的 TZ/LANG/LC_ALL；登录 tmux 命令、短命令、OAuth 探测和续聊 PTY 使用同源值。账号列表 `effective_timezone` 优先只读既有画像，否则返回显式配置或新默认；GET 不创建环境，不再把旧账号名派生值当作 v3 有效设置。
+- 正式普通任务／养号／恢复及非抓包续聊临时安装 `/usr/local/bin/v3-cli-quota` 状态栏包装，只消费官方 rate_limits 与当前主会话的真实响应；不新增 usage 或模型请求。先落盘原 statusLine 及本代命令，收口／重启对账在停止进程后仅恢复仍由本代管理的字段，保留用户运行中改写；具体采集与周期认领见 [额度契约](./database-guidelines.md)。
 - 清理必须匹配完整执行 token，不接受裸 container ID。停止本代进程组、tmux、UID1000 子进程，把 CLI 网络恢复为空闲 `passthrough`，恢复 hook 后释放租约；不通过停止整个容器清理普通 CLI。
 - `runtime/execution.json` 保存租约模式、owner/generation、driver/tmux/hook 证明。共享清理/心跳/重启对账失败进入 `cli_reconcile`，阻止下一 CLI，健康 API 继续；未知/旧排他记录保守隔离。公共网络或发送器故障仍关闭容器；CLI 专用 Recorder 故障只标记 CLI 不健康。
 
@@ -90,13 +94,13 @@ bench/environments/<environment_id>/
 bench/flows/<account>/<task>/<run>/    固定兼容链接
 ```
 
-`execution_flows()` 在账号锁内固定兼容入口；run 与续聊各有自己的证据组。恢复原 run/session/workspace，仅换 source 子目录；QuotaGuard 登记本代实际观察文件，Recorder 使用同一目录。真实 cwd 和 `.claude/projects` 键只能使用 `project-<摘要>`，原 run/environment ID、`.bench-*`、`.claude-home`、cc2api 刷新标记和 Stop hook 控制文件不能进入 Claude 可见项目树；旧系统生成的已知控制文件须定向迁移到 runtime，不能删除未知用户文件。run 统计读取平铺历史及各 run 执行、排除续聊/API并去重路径；抓包索引和文件列表聚合各代及续聊。原生 flow 不覆盖，历史平铺文件保留。跨目录链接拒绝，未部署的旧 v3 原型 source 链接不自动接管。
+`execution_flows()` 在账号锁内固定兼容入口；run 与续聊各有自己的证据组。恢复原 run/session/workspace，仅换 source 子目录；QuotaGuard 登记本代实际观察文件，Recorder 使用同一目录。真实 cwd 和 `.claude/projects` 键只能使用 `project-<摘要>`，原 run/environment ID、`.bench-*`、`.claude-home`、cc2api 刷新标记和 Stop hook 控制文件不能进入 Claude 可见项目树；旧系统生成的已知控制文件须定向迁移到 runtime，不能删除未知用户文件。v3 Runner 不再创建 per-run `.claude-home`；准备项目时仅用 rmdir 清理该非链接空目录，既有可核对 session 链接按原归属清理，非空／未知链接及其链接父目录保留。旧 runner 的 per-run HOME 保持。run 统计读取平铺历史及各 run 执行、排除续聊/API并去重路径；抓包索引和文件列表聚合各代及续聊。原生 flow 不覆盖，历史平铺文件保留。跨目录链接拒绝，未部署的旧 v3 原型 source 链接不自动接管。
 
 `_project_view()` 在启动 CLI 前给固定 HOME 的 `.claude.json.projects[cwd]` 设置 `hasTrustDialogAccepted=true`，仅限当前系统专属物理项目目录；原子合并并保留 userID、OAuth 身份、其他项目及未知设置。持久 HOME 不走旧 worker 的顶层配置初始化，需显式保存本项目的确认标记。未登录或异常授权仍按原认证入口处理，不信任任意外部目录。
 
 **显式画像校正**：`maintenance(..., "reprofile")` 只接受未绑定 cc2api、无 task/run/identity/草稿/提交/活动作业、容器已停止的 legacy 正式环境。操作保留账号/HOME/代理/资源预算，清理旧容器网络与 CA 产物，生成一次 profile v2 并回到 stopped，保留原登录凭据；不因环境字段变化强制重授权。启动时原 `profile_reauth` 迁回正常生命周期；原 `profile_reauth_reconcile` 的真实执行/提交故障仍按 reconcile 隔离。profile v2 永久拒绝再次 reprofile，真实认证失败才要求重新授权。
 
-**部署**：两个最终镜像 control/account；control 按 gateway/orchestrator 两个角色启动，N 个账号共 N+2 个容器，只有 orchestrator 挂 Docker socket。CLI 为 UID1000、无网络能力并禁止提权，服务秘密/控制目录不对项目写入开放。
+**部署**：两个最终镜像 control/account；control 按 gateway/orchestrator 两个角色启动，N 个账号共 N+2 个容器，只有 orchestrator 挂 Docker socket。CLI 为 UID1000、无网络能力并禁止提权，服务秘密/控制目录不对项目写入开放。root 管理的 `v3-account-init`、`v3-network-context`、`v3-cli-version`、`v3-passthrough` 和 `/sidecar` 为 0700；本地 CLI 额度采集 `v3-cli-quota` 为 0755，中文源码注释不必删除。
 
 **资源**：`resource_budget.account_limits(memory: str, swap: str = "0") -> tuple[int, int]` 共用于预检与账号创建；返回 RAM 字节数和 RAM＋swap 总字节数。`V3_ACCOUNT_MEMORY` 支持正整数 m/g，默认 4g；`V3_ACCOUNT_SWAP` 是额外 swap，默认 0，仅接受 0 或正整数 m/g，不接受 -1/无限额。首次保存 `fingerprint_json.mem/swap`；旧缺 swap 字段为 0，改全局配置不重算旧身份或预算。Compose 必须显式传递两参数。
 
@@ -124,6 +128,10 @@ bench 导航项不拆分中英文标签；宽度不超过 1440px 时导航独立
 
 | 条件 | 结果 |
 | --- | --- |
+| 新环境未指定时区 / 已保存 UTC 画像 | 洛杉矶＋美国英语 UTF-8 / 沿用 UTC，展示与执行一致 |
+| worker_env 或 HOME settings.env 含旧 ja_JP 值 | 按已固化画像覆盖 TZ/LANG/LC_ALL，其他 env 保持 |
+| `.claude-home` 空目录 / 非空或未知链接 | 只移除空目录 / 保留内容与链接 |
+| UID1000 读取管理脚本 / 执行 collector | 拒绝读取 / 允许本地执行 |
 | API 活动或排队，普通 CLI 认领 | 共享认领，不关闭 API 入场 |
 | 两个 CLI 同账号竞争 | 只认领一个；低优先级养号顺延 |
 | 活动 API/CLI，空闲维护 | 拒绝，不中断已接受工作 |
@@ -148,11 +156,13 @@ bench 导航项不拆分中英文标签；宽度不超过 1440px 时导航独立
 
 ### 5. Scenarios and Examples
 
+- 正常：首次未指定时区使用洛杉矶；改名或重建后沿用已保存值，旧 worker_env 不影响实际 locale。
+- 错误用法：只设置容器默认 LANG，却在 exec 注入旧日文 LANG/LC_ALL。正确做法：所有实际 CLI 入口与 HOME settings.env 从画像同源覆盖。
 - 正常：API SSE 运行时启动养号 CLI，取消 CLI 后继续收到新 API 数据；同账号第二个 CLI 仍需等待。
 - 正常：普通任务和可信额度养号经 HTTP CONNECT/SOCKS5 账号代理传递原始 TLS 字节，项目 cwd 只含 `project-<摘要>`；显式抓包切到 capture 后仍产生独立 flow。
 - 基础/历史：停止唤醒或镜像重建保留 HOME、环境 ID 和 machine-id；平铺历史统计/抓包仍可读取，空环境返回可展示状态。
 - 基础/历史：legacy 画像继续固定；满足全部条件时用户显式 reprofile 一次，HOME 与原凭据保留，不强制重新授权，profile v2 不可再次旋转。
-- 错误用法：所有 CLI 都经过 Recorder，或正常养号因为 `QUOTA_WARMUP=1` 总是启用 MITM。正确做法：日常 CLI/usage 使用 passthrough，只有显式 capture 注入 CA；阈值数据由执行边界自动 usage 采样更新。
+- 错误用法：所有 CLI 都经过 Recorder，或正常养号因为 `QUOTA_WARMUP=1` 总是启用 MITM。正确做法：日常 CLI/usage 使用 passthrough，只有显式 capture 注入 CA；阈值数据由正式响应及 CLI 本地状态栏被动更新，usage 仅保留显式手动查询。
 - 错误用法：用 `/workspaces/<run_id>` 作为容器 cwd，或借兼容链接把 `.claude-home` 写进项目。正确做法：项目、session、控制产物分别归属 projects、HOME 和 runtime，兼容入口只供宿主读取。
 - 错误用法：`run:<rid>:1` 把原 run 链接改到新 source 目录，或者复用旧 `capture.flow`，造成冲突/证据覆盖。正确做法：固定证据组、每代独立目录，游标与 Recorder 共用实际路径，读取端汇总。
 - 错误用法：看到 Docker exec 已创建就算 CLI 正在运行，或用 container.wait 判 run 完成。正确做法：`setsid --wait` 并确认 exec/tmux 实际运行，终态由本执行结果判断。
@@ -168,6 +178,8 @@ bench 导航项不拆分中英文标签；宽度不超过 1440px 时导航独立
 - Rust `cargo fmt --check && cargo test`：画像/改写、weighted FIFO/RPM、共享/排他租约、旧记录/过期/重启、绑定校验、原始字节/有序头/SSE取消、不重放；回环临时 CA 验证 HTTPS 正常响应及错误证书/主机名拒绝。测试 CA 不进入正式客户端。
 - Python orchestrator 回归：原快照与 session 恢复、旧 token/绑定保护、并行与安装续租、证据/游标分代、统计不重复、错误链接拒绝、鉴权和永久额度门禁。
 - `images/account/test_passthrough.py` 与 network-context 回归：HTTP CONNECT、SOCKS5/H 认证、IPv4/IPv6/域名、字节保真、代理失败无直连、静默关闭、跨空闲窗口单向活动，以及 PID/ACK/mode/source 归属。
+- 环境回归：默认 LA/en_US、显式 UTC/Tokyo、既有画像和页面 GET 不分配；真实 Runner → AccountRuntime 启动、HOME settings.env、登录与续聊使用同源值；实际 UID1000 locale/date/ls 符合设置。
+- 文件权限回归：UID1000 不能读取四个 root 脚本及 /sidecar，仍能执行 collector；root 初始化、版本准备、监听切换与 Recorder 保持；空目录清理不删除非空目录、未知链接或主 session。
 - profile/project 回归：独立随机画像、时区-locale 配对、重建固定、legacy 不自动迁移、reprofile 全部前置条件/历史门禁迁移/凭据保留/成功后不可重复；容器内项目顶层只出现匿名目录，项目内部没有 `.bench-*`、`.claude-home`、刷新控制或系统 Stop hook。
 - 目录信任回归：实际 `_project_view()` 写入当前 cwd 的信任标记，同时原账号 userID/OAuth 和其他项目配置保持；生产验收必须观察真实会话响应或工具调用，不能只凭 runs.status=running 宣称题目已执行。
 - Stop hook 回归：调用实际 start_run 生成 driver，执行其中 Node 设置片段，断言不注入 Stop；执行生成脚本的完成判定函数，在没有 Stop 信号文件时仍识别最终 assistant。保留 shell 语法校验，不能靠给 runtime 树开放写权限消除错误。

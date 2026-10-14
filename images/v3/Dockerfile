@@ -76,8 +76,11 @@ COPY images/account/init.py /usr/local/bin/v3-account-init
 COPY images/account/network-context.py /usr/local/bin/v3-network-context
 COPY images/account/cli-version.sh /usr/local/bin/v3-cli-version
 COPY images/account/passthrough.py /usr/local/bin/v3-passthrough
+COPY orchestrator/cli_quota.py /usr/local/bin/v3-cli-quota
 COPY --from=backend /source/cc2api/target/release/account-sender /usr/local/bin/account-sender
-RUN chmod 755 /usr/local/bin/v3-* && mkdir -p /workspaces /run/v3
+RUN chmod 700 /usr/local/bin/v3-account-init /usr/local/bin/v3-network-context \
+    /usr/local/bin/v3-cli-version /usr/local/bin/v3-passthrough /sidecar \
+    && chmod 755 /usr/local/bin/v3-cli-quota && mkdir -p /workspaces /run/v3
 WORKDIR /home/node
 ARG V3_RELEASE
 ARG V3_PARENT_REV

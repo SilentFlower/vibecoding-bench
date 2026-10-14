@@ -3,6 +3,7 @@
 import json
 import os
 import socket
+import subprocess
 import sys
 import termios
 import time
@@ -15,6 +16,7 @@ if "--version" in sys.argv:
 elif sys.argv[1:] == ["auth", "status"]:
     print(json.dumps({"loggedIn": (home / ".claude" / ".credentials.json").exists(), "authMethod": "oauth"}))
 elif sys.argv[1:] == ["auth", "login"]:
+    (home / ".synthetic-login-environment.json").write_text(json.dumps({key: os.environ.get(key) for key in ("TZ", "LANG", "LC_ALL")}))
     control_home = home.parents[1] if home.parent.name == ".v3-login" else home
     control_file = control_home / ".synthetic-login.json"
     control = json.loads(control_file.read_text()) if control_file.exists() else {}
@@ -57,7 +59,11 @@ else:
             connection.sendall(bytes.fromhex("1603030003010203"))
     tls_keys = ("NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "GIT_SSL_CAINFO")
     (Path.cwd() / ".synthetic-invocation.json").write_text(json.dumps({"args": sys.argv[1:], "cwd": str(Path.cwd()), "home": str(home),
-        "network_mode": os.environ.get("NETWORK_INSPECTION_MODE"), "tls_environment": sorted(key for key in tls_keys if os.environ.get(key))}))
+        "network_mode": os.environ.get("NETWORK_INSPECTION_MODE"), "tls_environment": sorted(key for key in tls_keys if os.environ.get(key)),
+        "environment": {key: os.environ.get(key) for key in ("TZ", "LANG", "LC_ALL")},
+        "locale": subprocess.check_output(["locale"], text=True),
+        "date": subprocess.check_output(["date", "-d", "2026-10-14 12:00:00 UTC"], text=True),
+        "ls": subprocess.check_output(["ls", "-l", "--time-style=locale", str(home)], text=True)}))
     print("Synthetic task pane", flush=True)
     while True:
         time.sleep(1)

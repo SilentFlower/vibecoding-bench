@@ -6,6 +6,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 
@@ -47,6 +48,27 @@ class EnglishTopicLibraryTests(unittest.TestCase):
             )
             topics = SYNC.parse_topics(path)
         self.assertEqual(["旧分类", "New Category"], [topic.category for topic in topics])
+
+    def test_excluded_domains_are_rejected_but_ordinary_apps_remain_valid(self) -> None:
+        """拒绝用户排除主题，同时允许天气 API、文件遍历和课程练习。@return None。"""
+        topics = SYNC.parse_topics(ROOT / "topics.md")
+        for description in (
+            "Train a neural model with labeled examples.", "Fine-tune an LLM on a dataset.",
+            "Implement a DNS proxy.", "Scan network hosts and open ports.", "Capture TCP packets.",
+            "Review security vulnerabilities.", "Build a gene and protein analysis tool.",
+            "Manage medical prescriptions and vaccine records.",
+        ):
+            with self.subTest(description=description):
+                modified = [replace(topics[0], description=description), *topics[1:]]
+                with self.assertRaisesRegex(SystemExit, "用户排除"):
+                    SYNC.validate_topics(modified)
+        for description in (
+            "Call a weather API and display a forecast.", "Scan local folders and summarize disk usage.",
+            "Track training courses, lesson attendance, and certificates.", "Configure an existing LLM client.",
+            "Visualize a paper citation network graph.",
+        ):
+            with self.subTest(description=description):
+                SYNC.validate_topics([replace(topics[0], description=description), *topics[1:]])
 
     def test_sqlite_backup_captures_committed_wal_data(self) -> None:
         """SQLite backup API 应包含仍在 WAL 中的已提交数据。@return None。"""

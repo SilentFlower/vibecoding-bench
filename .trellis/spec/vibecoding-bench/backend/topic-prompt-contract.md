@@ -56,6 +56,8 @@ backup_db(path: Path) -> Path
 ### 3. Contracts
 
 - `topics.md` 固定包含 600 题、编号集合 1～600 和 21 个英文分类；分类、标题、描述不得含 CJK。明确风险目标和已知机器直译短语由 `validate_topics()` fail-closed，不能在同步时静默改写。
+- 题库主题按用户选择排除模型训练／微调、网络协议／代理／网络扫描与安全，以及生物／医疗；普通联网应用、现成 LLM 客户端、文件遍历、课程练习与引用关系图保留。`validate_topics()` 的 `_EXCLUDED_TOPIC_PATTERNS` 检查分类／标题／描述，匹配时非零退出并报告题号，不静默替换。该范围是题库偏好，不代表服务商的违规判定。
+- 原安全分类改为 `Organization and Recordkeeping Tools`，30 个原编号保持；分类中的 Recordkeeping 映射到 `product`，其余生成／同步契约保持。
 - `natural`：英文分类风格、开场、需求表达、可运行交付、结果说明和布局片段组合候选；每次随机抽取 12 个不同组合，且每个候选都必须保留英文标题、分类、描述、当前工作区可运行交付、启动、验证和主要取舍语义。
 - 分类风格只改变表达语气，不改变需求内容；现有分类归并为 `engineering`、`product`、`data_ai`、`creative`，未知分类使用 `generic` 回退。
 - 自然候选必须先把当前 topic 的 `description`、`title`、`category` 按长度降序替换为统一占位符，再移除空白和标点并生成 4 字符 n-gram 集合。
@@ -92,11 +94,15 @@ backup_db(path: Path) -> Path
 | 规范模式重复调用 | 输出必须完全一致 |
 | 题库不是 600 条、编号不完整或分类不是 21 个 | `validate_topics()` 非零退出，不访问数据库 |
 | 分类/标题/描述含 CJK、高风险目标或已知机器直译短语 | 校验失败并报告题号，不自动改写 |
+| 模型训练、DNS proxy、网络扫描、安全或生物医疗主题 | 校验失败并报告用户排除主题，不访问数据库 |
+| 天气 API、普通文件扫描、课程证书、LLM 客户端或引用关系图 | 通过主题范围校验，不按泛关键词误排除 |
 | 英文分类标题 / 旧中文分类标题 | 两套解析器分别正常解析并保持相同结构 |
 | `--apply` 处理 WAL 数据库 | SQLite backup API 备份包含已提交 WAL；更新后 topic ID 与历史 prompt 不变 |
 
 ### 5. Good / Base / Bad Cases
 
+- Good：将 LAN Device Scanner 原编号替换为 Home Equipment Inventory，安全分类改为组织与记录工具；同步仍保留 topic ID 和历史 prompt。
+- Bad：因 training 或 certificate 单词就删除课程练习，或把日常文件 scan 当网络扫描。Correct：检查完整领域表达，保留普通应用并用拒绝／保留两组测试验证。
 - Good：正式横向 benchmark 显式传 `canonical`，得到稳定 prompt；抓包默认即为该模式。
 - Good：养号先生成一次自然 prompt，再把同一字符串传给 `_create_task_and_run()` 和 `scheduler.submit()`。
 - Good：批次开始前加载一次 64 条历史窗口，每生成一个 item 就追加其指纹，后续 item 自动避开近期同构包装。
@@ -122,6 +128,7 @@ backup_db(path: Path) -> Path
 - 覆盖优先级测试 mock `build_topic_prompt()`，断言非空自定义 prompt 不调用渲染器。
 - 养号回归测试断言 `tasks.prompt == scheduler.submit()` payload 中的 `prompt`。
 - 题库测试断言恰好 600 题、1～600、21 个英文分类、无 CJK/风险/机器直译短语，并核对 #39/#73/#76 的安全替换。
+- 主题校验测试替换一条合法样本，分别验证训练模型／微调 LLM、DNS proxy、端口扫描、TCP、安全、生物和医疗被拒绝；天气 API、文件扫描、课程证书、现成 LLM 及引用关系图保持通过。核对新 Recordkeeping 分类不落入 generic。
 - 同步测试覆盖新旧分类标题、WAL 一致备份、按编号更新保留 topic ID 和历史 task prompt。
 - worker 脚本测试提取四类默认注入文本，断言无 CJK，并包含各自的续跑、最小交付、OAuth 重试和 API 卡顿恢复语义。
 - 静态契约检查核对三个 WebUI 表单的 `name="prompt_mode"`、选中默认值和 `app.js` 请求体字段。

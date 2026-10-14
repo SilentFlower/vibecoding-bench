@@ -43,7 +43,8 @@ from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
 
 from quota_protocol import merge_quota_observation, quota_decision, quota_observation, quota_timestamp, warmup_quota_decision, warmup_sample_used
-from account_runtime import AccountRuntime, RuntimeBusy, atomic_json, derive_v3_fingerprint
+from account_runtime import AccountRuntime, RuntimeBusy, V3_DEFAULT_TIMEZONE, atomic_json, derive_v3_fingerprint
+from cli_quota import statusline_quota_observation
 from login_terminal import authorization_url
 from login_drafts import LoginDraftStore
 
@@ -2089,7 +2090,7 @@ _NATURAL_TOPIC_PROMPT_STYLE_KEYWORDS = (
     ("creative", ("Games", "Content Creation", "Education", "Creative", "Creativity")),
     (
         "product",
-        ("Web", "Browser Extensions", "Collaboration", "Business", "Industry", "Team Knowledge", "Community"),
+        ("Web", "Browser Extensions", "Collaboration", "Business", "Industry", "Team Knowledge", "Community", "Recordkeeping"),
     ),
     (
         "engineering",
@@ -2566,6 +2567,29 @@ def _format_quota_result(raw: dict) -> dict:
     }
 
 
+def _quota_account_error(result: dict) -> str | None:
+    """从手动额度失败的结构化错误中识别明确永久账号状态。
+
+    :param result: 既有标准化查询结果，包含原始 error/status
+    :return: account_on_hold、invalid_grant 或 None；普通状态码不推断封禁
+    """
+    raw = result.get("raw")
+    if result.get("ok") or not isinstance(raw, dict):
+        return None
+    status = raw.get("status")
+    if status is not None and (type(status) is not int or not 400 <= status < 500 or status == 429):
+        return None
+    error = raw.get("error")
+    if isinstance(error, str) and error.startswith("HTTP "):
+        try:
+            body = json.loads(error.partition(": ")[2])
+            error = body.get("error") if isinstance(body, dict) else None
+        except ValueError:
+            return None
+    code = (error.get("code") or error.get("type")) if isinstance(error, dict) else error
+    return code if code in ("account_on_hold", "invalid_grant") else None
+
+
 # ============== 账号指纹派生 ==============
 # 让 Anthropic 端遥测看到的设备画像满足:同账号跨 run 一致 / 跨账号不同。
 # 派生纯函数 stateless,同名输入必出同结果;输入由 _ACC_NAME_RE 收紧字符集
@@ -2650,7 +2674,7 @@ def _effective_account_timezone(
 
     :param account_or_name: accounts 表行字典或账号名
     :param explicit_timezone: 临时显式时区；None 时读取账号行 `timezone`
-    :return: 显式时区或账号名派生时区
+    :return: v3 已固化时区、首次默认或旧模式派生时区
     """
     if isinstance(account_or_name, str):
         account_name = account_or_name
@@ -2663,6 +2687,16 @@ def _effective_account_timezone(
             else account_or_name.get("timezone")
         )
     normalized = _normalize_account_timezone(timezone)
+    if account_runtime:
+        # 页面和旧 Runner 的准备阶段只读已有记录，不能为展示创建新环境。
+        connection = account_runtime.database()
+        try:
+            account_id = account_or_name.get("id") if isinstance(account_or_name, dict) else None
+            row = connection.execute("SELECT fingerprint_json FROM account_environments WHERE account_id=? OR name=?",
+                (account_id, account_name)).fetchone()
+        finally:
+            connection.close()
+        return AccountRuntime.execution_environment(dict(row))["TZ"] if row else normalized or V3_DEFAULT_TIMEZONE
     return normalized or derive_fingerprint(account_name)["tz"]
 
 
@@ -2745,7 +2779,7 @@ def _write_quota_json(path: Path, payload: dict) -> None:
 
 class QuotaGuard:
     """
-    消费真实响应并维护额度门禁，v3 阈值按执行边界自动采样。
+    消费真实响应并维护额度门禁，v3 自动执行只读取本地被动观察。
 
     :param runner: 既有容器运行器
     """
@@ -2761,102 +2795,6 @@ class QuotaGuard:
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
-        self._usage_refresh: dict[int, dict] = {}
-        self._started_at = time.time()
-
-    def refresh_usage(self, account: dict, force: bool = False) -> bool:
-        """为 v3 阈值自动查询真实额度，同账号复用缓存并间隔重试。
-
-        :param account: 当前账号行
-        :param force: 执行收尾后忽略近期成功缓存
-        :return: 额度已更新或无需查询时为 True，仍等待时为 False
-        """
-        if not account_runtime or not any(account.get(key) is not None for key in (
-                "warmup_quota_5h_limit_percent", "warmup_quota_7d_limit_percent")):
-            return True
-        # owner 锁与手动查询、改绑、登录共用；不得在数据库锁或额度锁内做网络 IO。
-        with _oauth_owner_lock(str(account["name"])):
-            conn = get_db()
-            try:
-                current = _get_available_account(conn, int(account["id"]))
-            finally:
-                conn.close()
-            if not current:
-                return False
-            account = dict(current)
-            state = self.snapshot(account)
-            now = time.time()
-            retry = state.get("usage_refresh") or {}
-            if state.get("account_error") or (retry.get("retry_at") or 0) > now:
-                return False
-            windows = state.get("windows") or {}
-            limits = {"five_hour": account.get("warmup_quota_5h_limit_percent"),
-                "seven_day": account.get("warmup_quota_7d_limit_percent")}
-            fresh = not self._policy_decision(state, limits, "normal")["unknown"] and all(
-                windows.get(window, {}).get("utilization") is not None
-                and now - (windows.get(window, {}).get("observed_at") or 0) < 300
-                and (windows.get(window, {}).get("observed_at") or 0) >= self._started_at
-                for window, field in (("five_hour", "warmup_quota_5h_limit_percent"),
-                                      ("seven_day", "warmup_quota_7d_limit_percent"))
-                if account.get(field) is not None
-            )
-            if fresh and not force and not retry.get("dirty") and not retry.get("error"):
-                return True
-            if login_manager and login_manager.has_active_name(str(account["name"])):
-                return False
-            with account_runtime.lock:
-                if any(job["row"].get("account_id") == account["id"] for job in account_runtime.jobs.values()):
-                    return False
-            result = {}
-            try:
-                result = self.runner.query_quota(account)
-                if not result.get("ok"):
-                    raise ValueError("额度接口未返回有效数据")
-                observation = self.record_manual_usage(account, result, source="automatic")
-                if any(key not in observation["windows"] for key, field in (
-                    ("five_hour", "warmup_quota_5h_limit_percent"),
-                    ("seven_day", "warmup_quota_7d_limit_percent"),
-                ) if account.get(field) is not None):
-                    raise ValueError("额度接口缺少启用窗口的有效数据")
-                return True
-            except Exception as exc:
-                # 接口/网络故障保留旧事实，不能把查询失败当成 0% 或反复请求。
-                raw = result.get("raw") or {}
-                status = raw.get("status") if isinstance(raw, dict) else None
-                retry_after = raw.get("retry_after_sec") if isinstance(raw, dict) else None
-                delay = max(60, min(retry_after, 86400)) if type(retry_after) is int else 60
-                message = "自动额度查询失败，稍后重试；可手动查询核实"
-                if status in (401, 403):
-                    message = "额度查询认证失败，请重新授权或手动核实"
-                elif isinstance(exc, ValueError):
-                    for marker, explanation in (
-                        ("对账", "账号环境需要故障对账，额度查询尚未执行"),
-                        ("提交", "原登录保存尚未完成，请完成保存"),
-                        ("代理", "账号代理配置不可用，请检查环境"),
-                        ("凭据", "本地 OAuth 凭据不可用，请重新授权或手动核实"),
-                    ):
-                        if marker in str(exc):
-                            message = explanation
-                            break
-                with self._lock:
-                    self._usage_refresh[int(account["id"])] = {
-                        "identity": state["identity"], "retry_at": time.time() + delay,
-                        "error": message, "dirty": True,
-                    }
-                self._publish(account)
-                return False
-
-    def invalidate_usage(self, account: dict) -> None:
-        """执行产生消费后使旧缓存失效，后续工作等待自动采样。
-
-        :param account: 完成执行的账号
-        :return: None
-        """
-        if account_runtime:
-            with self._lock:
-                self._usage_refresh[int(account["id"])] = {
-                    "identity": _quota_identity(account), "dirty": True,
-                }
 
     def snapshot(self, account: dict) -> dict:
         """
@@ -2878,10 +2816,7 @@ class QuotaGuard:
         if state.get("account_error"):
             decision.update(blocked=True, retry_ready=False, resume_at=None, exhausted=[],
                             message=f"{state['account_error']}：账号异常，需重新授权或人工核实")
-        refresh = self._usage_refresh.get(int(account["id"])) or {}
-        refresh = refresh if refresh.get("identity") == identity else {}
         return {**state, **decision, "source": state.get("source") or "passive", "identity": identity,
-                "usage_refresh": {key: refresh[key] for key in ("error", "retry_at", "dirty") if key in refresh},
                 "recovery_source": recovery_source, "known": bool(state.get("windows"))}
 
     def policy_snapshot(
@@ -2983,30 +2918,34 @@ class QuotaGuard:
         """
         decision = warmup_quota_decision(state, limits, time.time())
         if account_runtime:
-            # usage 接口的空闲窗口可能保留上次 reset 或返回 null；近期的明确 0% 仍是有效事实。
             windows = state.get("windows") or {}
-            decision["unknown"] = [key for key in decision["unknown"] if not (
-                state.get("source") in ("automatic", "manual")
-                and windows.get(key, {}).get("usage_idle")
-                and windows.get(key, {}).get("utilization") == 0
-            )]
-            refresh = state.get("usage_refresh") or {}
-            stale = any(
-                ((state.get("windows") or {}).get(key, {}).get("observed_at") or 0) < self._started_at
-                or time.time() - ((state.get("windows") or {}).get(key, {}).get("observed_at") or 0) >= 300
-                for key, limit in limits.items() if limit is not None
-            )
-            needs_refresh = bool(decision["unknown"] or stale or refresh.get("dirty") or refresh.get("error"))
+            renewal = [key for key in decision["unknown"] if limits.get(key) is not None
+                and (windows.get(key, {}).get("reset_at") or float("inf")) <= time.time()
+                and (windows.get(key, {}).get("utilization") or 0) >= limits[key]]
+            periods = json.loads(decision["window_key"])
+            for key, period in periods.items():
+                period.append(limits[key])
+            for key in ("five_hour", "seven_day", "unknown"):
+                window = windows.get(key, {})
+                reset = window.get("reset_at")
+                if window.get("exhausted") and reset is not None and reset <= time.time():
+                    renewal.append("common:" + key)
+                    periods["common:" + key] = [reset]
+            # 共同耗尽不受阈值开关影响；持久周期键也覆盖尚未取得新观察的恢复。
+            decision.update(policy_key="v3-passive-recovery", window_key=json.dumps(periods, sort_keys=True))
+            # 已命中阈值的旧窗口到期后，只让一个已有执行更新；首次未知不制造人工查询门禁。
+            used = bool(renewal) and warmup_sample_used({**decision, "unknown": renewal}, admission)
             label = "普通任务" if workload == "normal" else "养号"
-            decision.update(admission=None, sample_used=False, sample_required=False,
-                blocked=bool(decision["hit"]) or (decision["enabled"] and needs_refresh),
-                refresh_retry_at=refresh.get("retry_at"))
+            decision.update(admission=admission, sample_used=bool(used), sample_required=bool(renewal),
+                blocked=bool(decision["hit"]) or bool(used and (source is None or admission["source"] != source)),
+                refresh_retry_at=None)
             if decision["hit"]:
                 names = " / ".join("5h" if key == "five_hour" else "7d" for key in decision["hit"])
-                decision["message"] = f"{names} 已用达到阈值，{label}等待额度更新"
-            elif decision["enabled"] and needs_refresh:
-                decision.update(resume_at=refresh.get("retry_at"),
-                    message=refresh.get("error") or "等待自动查询最新额度，无需手动操作")
+                decision["message"] = f"{names} 已用达到阈值，{label}等待窗口重置或被动额度更新"
+            elif used:
+                decision.update(resume_at=None, message="本窗口的正常恢复机会已使用，等待被动额度更新；可手动核实")
+            elif decision["unknown"]:
+                decision.update(resume_at=None, message="额度未知，将从正常任务响应更新")
             else:
                 decision["message"] = ""
             return decision
@@ -3056,9 +2995,13 @@ class QuotaGuard:
             quota_state=quota_state,
         )
 
-    def _admit_warmup(self, account: dict, source: str) -> bool:
-        """在实际启动前认领一次额度更新，失败和重启不会重发机会。"""
-        decision = self.warmup_snapshot(account, source)
+    def _admit_warmup(self, account: dict, source: str, workload: Optional[str] = "warmup") -> bool:
+        """复用持久许可认领正式执行更新；v3 普通任务与养号共享恢复机会。"""
+        decision = self.policy_snapshot(account, workload or "normal", source)
+        if workload is None and account_runtime:
+            # 续聊／抓包忽略百分比阈值，但不能绕过共同耗尽的持久单次恢复。
+            decision = self._policy_decision(self.snapshot(account),
+                {"five_hour": None, "seven_day": None}, "normal", source, decision["admission"])
         if decision["blocked"]:
             return False
         if not decision["sample_required"] or decision["sample_used"]:
@@ -3138,7 +3081,7 @@ class QuotaGuard:
             )["blocked"]:
                 self._publish(account)
                 return False
-            if effective_workload == "warmup" and not self._admit_warmup(account, source):
+            if (account_runtime or effective_workload == "warmup") and not self._admit_warmup(account, source, effective_workload):
                 self._publish(account)
                 return False
             if snapshot["retry_ready"]:
@@ -3201,15 +3144,18 @@ class QuotaGuard:
                     quota_state=snapshot,
                 )["sample_required"]
             )
-            path = flows / "passive-quota.jsonl"
-            offset = path.stat().st_size if path.exists() else 0
+            paths = [(source, flows / "passive-quota.jsonl")]
+            if account_runtime:
+                paths.append(("cli:" + source, flows / "cli/cli-quota.jsonl"))
             with _db_lock:
                 conn = get_db()
                 try:
                     with conn:
-                        conn.execute("INSERT OR IGNORE INTO quota_observation_cursors"
-                                     "(source,account_id,identity,path,byte_offset) VALUES(?,?,?,?,?)",
-                                     (source, account["id"], snapshot["identity"], str(path), offset))
+                        for observation_source, path in paths:
+                            offset = path.stat().st_size if path.exists() else 0
+                            conn.execute("INSERT OR IGNORE INTO quota_observation_cursors"
+                                         "(source,account_id,identity,path,byte_offset) VALUES(?,?,?,?,?)",
+                                         (observation_source, account["id"], snapshot["identity"], str(path), offset))
                 finally:
                     conn.close()
             return {"QUOTA_SOURCE": source, "QUOTA_IDENTITY": snapshot["identity"],
@@ -3309,10 +3255,14 @@ class QuotaGuard:
                             if event.get("source") == row["source"] and event.get("identity") == identity:
                                 ts = float(event["ts"])
                                 if 0 < ts <= time.time() + 5:
-                                    observation = quota_observation(event.get("headers") or {}, int(event["status"]), ts)
+                                    if row["source"].startswith("cli:"):
+                                        if event.get("origin") == "cli":
+                                            observation = statusline_quota_observation(event.get("rate_limits"), ts)
+                                    else:
+                                        observation = quota_observation(event.get("headers") or {}, int(event["status"]), ts)
                                     if event.get("origin") == "api":
                                         observation["origin"] = "api"
-                                    if event.get("account_error") == "account_on_hold":
+                                    if not row["source"].startswith("cli:") and event.get("account_error") == "account_on_hold":
                                         observation["account_error"] = "account_on_hold"
                         except (ValueError, TypeError, KeyError, AttributeError):
                             pass
@@ -3420,11 +3370,11 @@ class QuotaGuard:
 
     def record_manual_usage(self, account: dict, usage: dict, source: str = "manual") -> dict:
         """
-        合并手动或自动 usage 查询的可信窗口。
+        合并用户手动 usage 查询的可信窗口。
 
         :param account: 查询对应账号
         :param usage: 已标准化的手动额度结果
-        :param source: manual 用户查询或 automatic 调度采样
+        :param source: 观察来源；默认 manual，兼容历史导入来源
         :return: 本次有效窗口观察；失败结果返回空对象
         """
         if not usage.get("ok"):
@@ -3446,7 +3396,7 @@ class QuotaGuard:
                     continue
                 reset = quota_timestamp(window.get("resets_at"))
                 if window.get("resets_at") is None or (reset is not None and reset <= now):
-                    # 不伪造未来重置时间，只记录接口刚确认的空闲窗口；消费后仍会强制重新查询。
+                    # 不伪造未来重置时间，只记录本次人工查询确认的空闲窗口。
                     observation["windows"][key] = {"observed_at": now, "utilization": 0.0,
                         "reset_at": reset, "resets_at": window.get("resets_at"),
                         "rejected": False, "exhausted": False, "usage_idle": True}
@@ -3464,7 +3414,6 @@ class QuotaGuard:
                             conn.execute("UPDATE account_quota_states SET state_json=? WHERE account_id=?", (json.dumps(state), account["id"]))
                     finally:
                         conn.close()
-            self._usage_refresh.pop(int(account["id"]), None)
             self._publish(account)
             return observation
 
@@ -3592,20 +3541,6 @@ class QuotaGuard:
             if self._stop.is_set():
                 break
             try:
-                if account_runtime:
-                    conn = get_db()
-                    try:
-                        pending = conn.execute(
-                            "SELECT 1 WHERE EXISTS(SELECT 1 FROM runs WHERE account_id=? AND deleted_at IS NULL "
-                            "AND status IN ('queued','quota_wait')) OR EXISTS(SELECT 1 FROM task_batches WHERE "
-                            "account_id=? AND deleted_at IS NULL AND status IN ('active','quota_wait')) "
-                            "OR EXISTS(SELECT 1 FROM accounts WHERE id=? AND warmup_enabled=1 AND warmup_last_status='quota_wait')",
-                            (account["id"], account["id"], account["id"]),
-                        ).fetchone()
-                    finally:
-                        conn.close()
-                    if pending:
-                        self.refresh_usage(account)
                 self.consume(account)
                 if continue_manager:
                     continue_manager.quota_tick(account)
@@ -3770,7 +3705,7 @@ def _public_quota(account: dict) -> dict:
 
 
 def _public_quota_policy(account: dict, workload: Literal["normal", "warmup"] = "normal") -> dict:
-    """返回页面需要的阈值和自动采样摘要，省略内部身份与许可。
+    """返回页面需要的阈值和被动等待摘要，省略内部身份与许可。
 
     :param account: 当前账号
     :param workload: 普通任务或养号
@@ -3851,7 +3786,8 @@ class Runner:
 
         # 容器内创建运行目录（docker 会按宿主路径挂载到子容器）
         (BENCH_DATA / "workspaces" / run_id).mkdir(parents=True, exist_ok=True)
-        (BENCH_DATA / "workspaces" / run_id / ".claude-home").mkdir(parents=True, exist_ok=True)
+        if not account_runtime:
+            (BENCH_DATA / "workspaces" / run_id / ".claude-home").mkdir(parents=True, exist_ok=True)
         (BENCH_DATA / "flows" / acc_name / str(task["id"]) / run_id).mkdir(parents=True, exist_ok=True)
         CA_DIR.mkdir(parents=True, exist_ok=True)
         _persist_default_claude_settings(BENCH_DATA / "profiles" / acc_name)
@@ -4569,7 +4505,8 @@ JS
             stdout=True,
             stderr=True,
             user="root" if account_runtime else WORKER_USER,
-            environment=_claude_exec_env(not account_runtime, {"V3_NATIVE_USAGE": "1" if account_runtime else "0"}),
+            environment=_claude_exec_env(not account_runtime, {"V3_NATIVE_USAGE": "1" if account_runtime else "0",
+                **(account_runtime.execution_environment(account_runtime.job_for_container(worker_id)["row"]) if account_runtime else {})}),
             workdir=WORKER_HOME,
         )
         raw = api.exec_start(ex["Id"])
@@ -4872,6 +4809,7 @@ JS
             command = account_runtime.cli_command(["sh", "-c", script])
             environment = _claude_exec_env(use_mitm, {
                 "HOME": "/home/node",
+                **account_runtime.execution_environment(job["row"]),
                 "CLAUDE_CODE_VERSION": effective_claude_code_version(),
                 "OAUTH_REFRESH_BUFFER_SEC": str(OAUTH_REFRESH_BUFFER_SEC),
             })
@@ -5068,7 +5006,7 @@ class LoginManager:
                 "invalid account name: must match [a-zA-Z0-9_-]+"
             )
         # v3 时区来自显式账号配置，不能再把账号名 hash 当作设备画像来源。
-        tz = (_normalize_account_timezone(timezone) or "UTC") if account_runtime else _effective_account_timezone(name, timezone)
+        tz = _normalize_account_timezone(timezone) if account_runtime else _effective_account_timezone(name, timezone)
         with self._lock:
             if name in self._name_locks:
                 raise ValueError(
@@ -5096,7 +5034,8 @@ class LoginManager:
                 configuration = cc2api_client._request("GET", f"/admin/runtime/accounts/{binding_id}/config") if binding_id is not None else None
                 account.update(upstream_proxy_scheme=proxy.get("scheme"),
                     upstream_socks5_host=proxy.get("host"), upstream_socks5_port=proxy.get("port"),
-                    upstream_socks5_user=proxy.get("user"), upstream_socks5_pass=proxy.get("pass"), timezone=tz)
+                    upstream_socks5_user=proxy.get("user"), upstream_socks5_pass=proxy.get("pass"),
+                    timezone=tz if timezone is not None else account.get("timezone"))
                 version = version or effective_claude_code_version()
                 if not existing:
                     drafts = _login_drafts()
@@ -6266,7 +6205,6 @@ class Scheduler:
                 if current != "active":
                     break
                 if quota_guard:
-                    quota_guard.refresh_usage(account)
                     quota_guard.consume(account)
                     if (
                         quota_guard.snapshot(account)["blocked"]
@@ -6552,7 +6490,6 @@ class Scheduler:
                 self._update_batch_item_for_run(run_id, "stopped")
                 return
             if quota_guard and initial_state.get("run_kind") in ("normal", "warmup"):
-                quota_guard.refresh_usage(account)
                 quota_guard.consume(account)
                 if quota_guard.policy_snapshot(account, initial_state["run_kind"], source)["blocked"]:
                     if not initial_state.get("quota_identity"):
@@ -6691,8 +6628,7 @@ class Scheduler:
                     return
                 exit_code = self.runner.wait_worker(wid)
                 if quota_guard:
-                    # 先使缓存失效，再发布终态，避免批次立即用消费前的低额度启动下一条。
-                    quota_guard.invalidate_usage(account)
+                    # 先消费最后的本地观察，再发布终态，让批次看到本次执行产生的额度。
                     quota_guard.consume(account)
                 run_state = self._get_run_state(run_id)
                 if run_state and run_state["status"] in ("stopping", "stopped"):
@@ -6741,11 +6677,9 @@ class Scheduler:
                 if managed_refresh_thread and managed_refresh_thread.is_alive():
                     managed_refresh_thread.join(timeout=2)
                 self.runner.persist_worker_profile(wid)
-                if wid and quota_guard:
-                    quota_guard.invalidate_usage(account)
                 self.runner.cleanup(sid, wid)
                 if wid and quota_guard:
-                    quota_guard.refresh_usage(account, force=True)
+                    quota_guard.consume(account)
                 if (self._get_run_state(run_id) or {}).get("status") == "quota_wait":
                     archive = (account_runtime.run_artifact_path(run_id, "status.json").parent / "quota"
                         if account_runtime else WORKSPACES_DIR / run_id / ".quota") / f"attempt-{attempt}"
@@ -6971,7 +6905,6 @@ class WarmupScheduler:
             if active:
                 return {"started": False, "run_id": None}
             if candidate and candidate.get("warmup_enabled") and (account_runtime or candidate.get("cc2api_account_id") is not None):
-                quota_guard.refresh_usage(candidate)
                 quota_guard.consume(candidate)
                 state = quota_guard.snapshot(candidate)
                 warmup_state = quota_guard.warmup_snapshot(candidate)
@@ -8524,7 +8457,11 @@ def query_account_quota(aid: int):
             try:
                 result = runner.query_quota(current)
                 if quota_guard:
-                    quota_guard.record_manual_usage(current, result)
+                    account_error = _quota_account_error(result)
+                    if account_error:
+                        quota_guard.record_auth_failure(current, account_error)
+                    else:
+                        quota_guard.record_manual_usage(current, result)
                 return result
             except (ValueError, ConnectionError) as exc:
                 raise HTTPException(409, _redact_cc2api_error(exc))
@@ -10533,6 +10470,7 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
                     "TERM": "xterm-256color", "COLUMNS": "120", "LINES": "36",
                     **({"PATH": f"/cli/{job['version']}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin"} if account_runtime else {}),
                     **({"NETWORK_INSPECTION_MODE": job["network_inspection_mode"]} if account_runtime else {}),
+                    **(account_runtime.execution_environment(job["row"]) if account_runtime else {}),
                     "CONTINUE_SESSION_ID": session.session_id, "CLAUDE_PERMISSION_MODE": session.permission_mode,
                     **({"CLAUDE_MODEL_OVERRIDE": session.run.get("execution_model") or session.run.get("capture_model_override")}
                        if session.run.get("execution_model") or session.run.get("capture_model_override") else {}),

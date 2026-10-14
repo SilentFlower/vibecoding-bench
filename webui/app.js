@@ -536,7 +536,8 @@ function renderAccountTimezone(account) {
 function renderPassiveQuota(quota) {
   if (quota?.account_error) return `<div class="passive-quota">${escapeHTML(quota.message)}</div>`;
   if (!quota?.known) return '<div class="passive-quota muted">被动额度：未知</div>';
-  const source = quota.source === 'manual' ? '额度记录（手动更新）' : '被动额度';
+  const source = quota.source === 'manual' ? '额度记录（手动更新）'
+    : quota.source === 'automatic' ? '额度记录（历史查询）' : '被动额度';
   const windows = ['five_hour', 'seven_day'].map(key => {
     const window = quota.windows?.[key];
     const name = key === 'five_hour' ? '5h' : '7d';
@@ -1411,7 +1412,7 @@ async function renderTasks() {
     <tr>
       <td>${b.id}</td>
       <td>${escapeHTML(accMap[b.account_id] || `acc#${b.account_id}`)}</td>
-      <td><span class="pill pill-${b.status}">${escapeHTML(b.status === 'quota_wait' ? '额度等待' : b.status)}</span>${b.status === 'quota_wait' ? `<div class="warmup-error">${escapeHTML(b.quota_policy?.message || b.passive_quota?.message || '等待最新额度')}</div>${b.quota_policy?.refresh_retry_at ? `<div class="muted">自动重试 ${escapeHTML(formatWarmupTime(b.quota_policy.refresh_retry_at))}</div>` : ''}` : ''}</td>
+      <td><span class="pill pill-${b.status}">${escapeHTML(b.status === 'quota_wait' ? '额度等待' : b.status)}</span>${b.status === 'quota_wait' ? `<div class="warmup-error">${escapeHTML(b.quota_policy?.message || b.passive_quota?.message || '等待最新额度')}</div>` : ''}</td>
       <td>${b.done_count || 0}/${b.item_count || 0}</td>
       <td>${b.concurrency}</td>
       <td>${b.interval_min_sec}-${b.interval_max_sec}s</td>

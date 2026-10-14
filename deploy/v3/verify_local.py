@@ -23,7 +23,7 @@ from unittest.mock import patch
 import docker
 import requests
 import main as orchestrator
-from account_runtime import AccountRuntime, atomic_json
+from account_runtime import AccountRuntime, atomic_json, derive_v3_fingerprint
 
 
 def wait_cli_started(runtime: AccountRuntime, client, token: str) -> str:
@@ -199,8 +199,8 @@ def verify() -> None:
     def fingerprint(timezone: str | None) -> dict:
         """返回两个彼此独立的合成账号画像，不读取真实环境。"""
         hostname, machine_id, mac = next(profile_sequence)
-        return {"profile_version": 2, "hostname": hostname, "machine_id": machine_id,
-            "mac": mac, "mem": "4g", "tz": timezone or "UTC", "lang": "en_US.UTF-8"}
+        return {**derive_v3_fingerprint(timezone), "hostname": hostname, "machine_id": machine_id,
+            "mac": mac, "mem": "4g"}
 
     runtime = AccountRuntime(client, root, Path(os.environ["VERIFY_HOST_ROOT"]) / "data", database, fingerprint, None)
     row = runtime._row(account["name"], account["id"])
@@ -215,6 +215,10 @@ def verify() -> None:
         row, container = runtime.ensure(account, "9.9.9")
         first_id, first_generation = container.id, row["generation"]
         check = container.exec_run(runtime.cli_command(["sh", "-c", "test ! -r /run/v3/sender.json && test ! -r /ca/mitmproxy-ca.pem && grep '^CapEff:' /proc/self/status"])); assert check.exit_code == 0 and b"0000000000000000" in check.output
+        private_files = ["/sidecar", *("/usr/local/bin/v3-" + name for name in ("account-init", "network-context", "cli-version", "passthrough"))]
+        for path in private_files:
+            assert container.exec_run(runtime.cli_command(["test", "-r", path])).exit_code != 0, path
+        assert container.exec_run(runtime.cli_command(["test", "-x", "/usr/local/bin/v3-cli-quota"])).exit_code == 0
         machine = container.exec_run(["cat", "/etc/machine-id"]).output
         configuration_path = runtime._root(row) / "runtime" / "sender.json"
         configuration = json.loads(configuration_path.read_text())
@@ -241,6 +245,8 @@ def verify() -> None:
         verify_gateway_binding(configuration_path, hello["peer"])
         row, container, profile, home = runtime.begin_login("abcdef123456", account, "9.9.9", False)
         time.sleep(0.5)
+        expected_environment = {"TZ": "America/Los_Angeles", "LANG": "en_US.UTF-8", "LC_ALL": "en_US.UTF-8"}
+        assert json.loads((runtime._root(row) / "home/.synthetic-login-environment.json").read_text()) == expected_environment
         before = container.exec_run(["tmux", "-S", "/tmp/v3-login-abcdef123456.sock", "display-message", "-p", "#{pane_pid}"]).output
         for _ in range(2):
             attach = client.api.exec_create(container.id, ["tmux", "-S", "/tmp/v3-login-abcdef123456.sock", "attach", "-t", "abcdef123456"], stdin=True, tty=True)["Id"]
@@ -258,15 +264,19 @@ def verify() -> None:
         runtime.cleanup(runtime.execution_token(container.id, "login:abcdef654321"))
         assert (runtime._root(row) / "home" / ".claude" / ".credentials.json").read_bytes() == original
         environment = {"CLAUDE_CODE_VERSION": "9.9.9", "TASK_PROMPT": "Synthetic only", "RUN_ID": "synthetic-run", "TIMEOUT_SEC": "120", "TIMEOUT_WRAPUP_SEC": "0",
-            "SYNTHETIC_TLS_PROBE": "1"}
+            "SYNTHETIC_TLS_PROBE": "1", "TZ": "Asia/Tokyo", "LANG": "ja_JP.UTF-8", "LC_ALL": "ja_JP.UTF-8"}
         tls_before = len(Path("/verify/tls.jsonl").read_text().splitlines())
-        token, _ = runtime.start_run(account, {"id": 1, "capture_full_http": False}, "synthetic-run", environment, {})
+        token, _ = runtime.start_run(account, {"id": 1, "capture_full_http": False}, "synthetic-run", environment,
+            {"QUOTA_SOURCE": "run:synthetic-run:0", "QUOTA_IDENTITY": "synthetic-quota"})
         wait_cli_started(runtime, client, token)
         normal_context = runtime.job_for_container(token)["context"]
         workspace = runtime._root(row) / "workspaces" / "synthetic-run"
         invocation = json.loads((workspace / ".synthetic-invocation.json").read_text())
         assert invocation["cwd"].startswith("/home/node/projects/project-") and "synthetic-run" not in invocation["cwd"]
         assert invocation["network_mode"] == "passthrough" and invocation["tls_environment"] == []
+        assert invocation["environment"] == expected_environment
+        assert "LANG=en_US.UTF-8" in invocation["locale"] and "PDT" in invocation["date"]
+        assert not re.search(r"[\u3400-\u9fff]", invocation["date"] + invocation["ls"])
         visible_projects = container.exec_run(["find", "/home/node/projects", "-mindepth", "1", "-maxdepth", "1", "-printf", "%f\n"])
         assert visible_projects.exit_code == 0
         assert all(re.fullmatch(rb"project-[0-9a-f]{12}", name) for name in visible_projects.output.splitlines())
@@ -282,7 +292,16 @@ def verify() -> None:
         assert tls_after[-1]["length"] == 8 and tls_after[-1]["payload_prefix"] == "1603030003010203"
         normal_flow = runtime._root(row) / "flows" / Path(normal_context["STATS_FILE"]).relative_to("/flows").parent
         assert not any((normal_flow / name).exists() for name in ("stats.jsonl", "http_capture.jsonl", "capture.flow"))
+        settings_path = runtime._root(row) / "home/.claude/settings.json"
+        installed = json.loads(settings_path.read_text())["statusLine"]
+        assert "v3-cli-quota" in installed["command"], "driver 清除了本次临时采集配置"
+        writable = container.exec_run(["setpriv", "--reuid=1000", "--regid=1000", "--init-groups", "python3", "-c",
+            "import json,pathlib; settings=json.loads(pathlib.Path('/home/node/.claude/settings.json').read_text());"
+            "import shlex; config=json.loads(pathlib.Path(shlex.split(settings['statusLine']['command'])[-1]).read_text());"
+            "pathlib.Path(config['output']).write_text('')"])
+        assert writable.exit_code == 0, "CLI 无法穿过当前额度输出目录"
         runtime.cleanup(token)
+        assert "statusLine" not in json.loads(settings_path.read_text()), "退出后遗留本代采集配置"
         assert not runtime.jobs
         print("通过：普通任务使用原始 TLS 透传、无自定义 CA 环境，CLI cwd 不暴露内部 run ID 或控制文件")
         # 只信任测试服务自己的证书；它与 account MITM CA 无关，不进入生产配置。
@@ -323,6 +342,7 @@ def verify() -> None:
         wait_cli_started(runtime, client, token)
         warmup_invocation = json.loads((runtime._root(row) / "workspaces" / "synthetic-warmup-native" / ".synthetic-invocation.json").read_text())
         assert warmup_invocation["network_mode"] == "passthrough" and warmup_invocation["tls_environment"] == []
+        assert warmup_invocation["environment"] == expected_environment
         runtime.cleanup(token)
         print("通过：已有可信额度的正常养号保持 passthrough，不加载 Recorder CA")
         # 用同一 run 的不同 source 验证额度恢复，不能用两个独立 run 绕过目录换代。
@@ -343,6 +363,7 @@ def verify() -> None:
         assert invocation["args"][invocation["args"].index("--resume") + 1] == "synthetic-session"
         assert invocation["cwd"].startswith("/home/node/projects/project-") and "synthetic-run" not in invocation["cwd"]
         assert invocation["home"] == "/home/node" and invocation["network_mode"] == "capture"
+        assert invocation["environment"] == expected_environment
         assert invocation["tls_environment"] == ["CURL_CA_BUNDLE", "GIT_SSL_CAINFO", "NODE_EXTRA_CA_CERTS", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE"]
         runtime.cleanup(token)
         assert all(path.read_bytes() == data for path, data in evidence.items())
@@ -384,7 +405,7 @@ def verify() -> None:
             assert runtime._sender_active(row) == 1 and not runtime.jobs
             old_token = token
             # 再建一轮 CLI 并模拟调度器重启；从落盘句柄清理，不停止 API 容器。
-            token, _ = runtime.start_run(account, {"id": 1, "capture_full_http": True}, "synthetic-restart",
+            token, _ = runtime.start_run(account, {"id": 1, "capture_full_http": False}, "synthetic-restart",
                 dict(environment, RUN_ID="synthetic-restart", QUOTA_SOURCE="run:synthetic-restart"),
                 {"QUOTA_SOURCE": "run:synthetic-restart", "QUOTA_IDENTITY": "synthetic-quota"})
             execution = wait_cli_started(runtime, client, token)
@@ -393,6 +414,7 @@ def verify() -> None:
             assert client.api.exec_inspect(execution)["Running"]
             runtime.jobs.clear()
             runtime.reconcile()
+            assert "statusLine" not in json.loads(settings_path.read_text()), "重启对账未恢复状态栏"
             assert not client.api.exec_inspect(execution)["Running"]
             assert runtime._row(account["name"], account["id"])["state"] == "ready"
             assert runtime._sender_active(row) == 1

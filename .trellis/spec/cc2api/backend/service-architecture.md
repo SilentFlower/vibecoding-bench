@@ -265,6 +265,7 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 - 上游接口：`GET https://api.anthropic.com/api/oauth/usage`
 - 后端入口：`service::oauth::fetch_usage(token, proxy_url).await -> Result<serde_json::Value, AppError>`
 - 账号刷新：`AccountService::refresh_usage(id).await -> Result<serde_json::Value, AppError>`
+- 后台服务：`UsagePollerService::new(account_svc, interval: Duration, enabled: bool)`；`run()` 在 disabled 时直接返回
 - 被动解析：`gateway::extract_passive_usage(headers) -> Option<serde_json::Value>`
 - 被动写入：`AccountService::update_passive_usage(id, partial, UsageObservationKind).await -> Result<(), AppError>`
 - 管理端接口：`POST /admin/accounts/:id/usage -> { status: "ok", usage }`
@@ -281,7 +282,7 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 - 后端归一化只能补稳定字段，不得删除 `limits`、`spend`、`extra_usage` 等原始字段，方便排查上游变化。
 - 前端展示应优先读取稳定字段；为了兼容旧缓存，也可从 `usage_data.limits` 回退提取 Fable。
 - Gateway 必须从 Anthropic unified 响应头被动解析 `5h`、`7d` 与 Fable 专属 `7d_oi`；`7d_oi` 归一化为稳定字段 `seven_day_fable`。窗口必须同时具备合法 `utilization` 与未来合理范围内的 `reset`，缺失或异常时不得覆盖已有数据。
-- 普通业务请求无论成功或 429 都不得调用 usage API。主动查询只允许两个显式入口：`auto_poll_usage=true` 的 active OAuth 账号由 `UsagePollerService` 定时刷新，以及管理员手动调用 `/admin/accounts/:id/usage`。
+- 普通业务请求无论成功或 429 都不得调用 usage API。v3（`V3_RUNTIME_URL.trim()` 非空）关闭 `UsagePollerService`，历史 `auto_poll_usage=true` 也不触发查询，不改账号原开关；管理员手动 `/admin/accounts/:id/usage` 仍可查询。非 v3 保留 active OAuth＋`auto_poll_usage=true` 的定时刷新。
 - 成功响应、PrimePoller 成功和显式 usage 查询使用 `UsageObservationKind::Allowed`；429 使用按窗口构造的 `RejectedWindows`。窗口 `status=rejected` 时视为拒绝，`status=allowed` 时明确视为允许；缺少明确状态时才用 `surpassed-threshold=true/正数` 或 `utilization >= 1.0` 兜底。旧 reset 已到期、新 reset 已推进，且窗口本身未被拒绝时，若旧值和新值仍处于 97% 以上高位，必须保存新 reset 并把首次新周期 utilization 归零；只有真实拒绝窗口保留高位值。
 - 被动与主动写入都必须保留本次观察未包含的窗口和扩展字段，包括 `seven_day_sonnet`、`limits`、`spend`、`extra_usage`。
 
@@ -300,7 +301,8 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 | 旧 99%/100% reset 已到期，成功样本给出新 reset 但仍是高位 | 新 reset 保留，首次 utilization 写 0 |
 | 同一新 reset 的后续完整样本 | 按响应头真实值正常更新 |
 | `auto_poll_usage=false` | 后台 poller 不查询该账号 usage |
-| 管理员手动刷新或 `auto_poll_usage=true` | 允许主动查询 usage，结果仍经过 rollover 合并 |
+| v3 且历史 `auto_poll_usage=true` | poller 不运行，不访问 usage；业务响应被动合并保持 |
+| 管理员手动刷新 / 非 v3 且 `auto_poll_usage=true` | 允许主动查询 usage，结果仍经过 rollover 合并 |
 | 上游返回 401/403/429 | 维持现有 `AppError` 分类，不吞错误体 |
 
 ### 5. Good/Base/Bad Cases
@@ -308,6 +310,7 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 - Good：usage 先返回 session/weekly all 两个 `scope: null` limit，后返回 Fable scoped limit；解析器跳过前两项并补出 `seven_day_fable`。
 - Good：Fable 成功响应带 `7d_oi utilization/reset`，Gateway 收到响应头后异步写入 `seven_day_fable`，整个请求生命周期不访问 usage API。
 - Good：旧 7d 为 99% 且 reset 已过期，下一次成功响应把 reset 推到下周但仍回 99%；合并层保存新 reset 并返回 0%，后续同 reset 的真实样本可继续更新。
+- Base：非 v3 沿用账号开关轮询；v3 即使开关为 true 仍禁用 poller，手动查询可用。
 - Base：只返回传统 `five_hour` / `seven_day`；保留已有 Fable 数据，不主动补查。
 - Bad：直接假设 `limits[0]` 就是 Fable，或遇到第一个 `scope: null` 用 `?` 提前返回，导致真实 Fable 项被漏掉。
 - Bad：在 Fable body EOF 或 429 后自动调用 usage API，绕过 `auto_poll_usage` 显式开关。
@@ -319,6 +322,7 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 - `service::gateway` 单测覆盖：5h/7d/7d_oi 完整解析、秒/毫秒 reset、缺失字段、非法数值和异常时间。
 - `service::account` 单测覆盖：Allowed rollover 高位清零、已下降值采用、同周期后续更新、RejectedWindows 仅保留明确拒绝窗口高位及未观察字段不丢失。
 - `service::gateway` 单测覆盖：429 按窗口 `status` 判定拒绝，显式 `allowed` 优先于高位 utilization，缺少 status 时兼容数值型 `surpassed-threshold`。
+- `UsagePollerService` 使用真实 SQLite 账号与本地 TCP 代理，验证 disabled 零连接、enabled 保留轮询；账号 auto_poll_usage 不被改写。
 - 静态搜索必须确认 `refresh_usage` 只由 usage poller 和管理端手动接口等显式入口调用，不存在 Gateway 请求后刷新链路。
 - `cc2api/web` 构建必须通过 `npm run build`，确保 `UsageData` 类型与 `Accounts.vue` 展示同步。
 - 改动 `fetch_usage` 后至少跑 `cargo test`，确认账号调度和 usage 相关共享测试不回归。

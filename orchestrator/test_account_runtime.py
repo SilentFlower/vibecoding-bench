@@ -59,6 +59,11 @@ class AccountRuntimeTests(unittest.TestCase):
     def test_profile_v2_is_random_and_locale_matches_timezone(self) -> None:
         """新画像字段必须独立随机，美国与伦敦时区使用一致 locale。@return None。"""
         first = derive_v3_fingerprint("America/Los_Angeles")
+        default = derive_v3_fingerprint()
+        self.assertEqual("America/Los_Angeles", default["tz"])
+        self.assertEqual("en_US.UTF-8", default["lang"])
+        self.assertEqual("UTC", derive_v3_fingerprint("UTC")["tz"])
+        self.assertEqual("ja_JP.UTF-8", derive_v3_fingerprint("Asia/Tokyo")["lang"])
         second = derive_v3_fingerprint("America/Los_Angeles")
         self.assertEqual(2, first["profile_version"])
         self.assertEqual("en_US.UTF-8", first["lang"])
@@ -72,6 +77,83 @@ class AccountRuntimeTests(unittest.TestCase):
             (first["hostname"], first["machine_id"], first["mac"]),
             (second["hostname"], second["machine_id"], second["mac"]),
         )
+
+    def test_statusline_snapshot_is_persisted_and_original_settings_are_restored(self) -> None:
+        """状态栏采集先保存执行证明，收口仅恢复自己的字段。@return None。"""
+        account = {"id": 1, "name": "synthetic", "cc2api_account_id": None}
+        row = self.runtime._row("synthetic", 1)
+        settings = self.runtime._root(row) / "home/.claude/settings.json"
+        original = {"model": "original-model", "env": {"CUSTOM": "keep"},
+            "statusLine": {"type": "command", "command": "printf original", "padding": 2}}
+        atomic_json(settings, original)
+        source = "run:synthetic:0"
+        job = {"row": row, "account": account, "source": source, "lease": None, "exclusive": False}
+        flows = self.runtime.execution_flows(account, source, self.root / "flows/synthetic/1/synthetic")
+        self.runtime._install_cli_quota(job, "/home/node/projects/project-synthetic", flows, "synthetic-identity")
+        installed = json.loads(settings.read_text())
+        record = json.loads((self.runtime._root(row) / "runtime/execution.json").read_text())
+        self.assertEqual(original["statusLine"], record["statusline_before"]["value"])
+        self.assertIn("v3-cli-quota", installed["statusLine"]["command"])
+        self.assertEqual(original["model"], installed["model"])
+        self.assertEqual(0o700, (flows / "cli").stat().st_mode & 0o777)
+        self.assertEqual(0o710, flows.stat().st_mode & 0o777)
+        self.assertEqual("printf original", json.loads((flows / "cli/config.json").read_text())["previous_command"])
+        self.runtime._restore_cli_quota({"row": row, **record})
+        self.assertEqual(original, json.loads(settings.read_text()))
+
+    def test_effective_timezone_uses_saved_environment_without_allocating(self) -> None:
+        """默认展示不创建环境，已有画像优先于改名和临时配置。@return None。"""
+        with patch.object(main, "account_runtime", self.runtime):
+            self.assertEqual("America/Los_Angeles", main._effective_account_timezone("new"))
+            self.assertEqual("Asia/Tokyo", main._effective_account_timezone("new", "Asia/Tokyo"))
+            with self.database() as connection:
+                self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM account_environments").fetchone()[0])
+            row = self.runtime._row("synthetic", 1)
+            self.assertEqual("UTC", main._effective_account_timezone({"id": 1, "name": "renamed"}, "Asia/Tokyo"))
+            self.assertEqual(row["fingerprint_json"], self.runtime._row("renamed", 1)["fingerprint_json"])
+
+    def test_session_view_removes_only_empty_or_verified_legacy_home(self) -> None:
+        """空目录可移除；非空、外部链接及未知 session 链接保留。@return None。"""
+        row = self.runtime._row("synthetic", 1)
+        cwd = self.runtime._project_view(row, "cleanup-test")
+        legacy = self.runtime._root(row) / "workspaces/cleanup-test/.claude-home"
+        legacy.mkdir()
+        self.runtime._session_view(row, "cleanup-test", cwd)
+        self.assertFalse(legacy.exists())
+        legacy.mkdir()
+        (legacy / "user.txt").write_text("keep")
+        self.runtime._session_view(row, "cleanup-test", cwd)
+        self.assertEqual("keep", (legacy / "user.txt").read_text())
+        (legacy / "user.txt").unlink()
+        legacy.rmdir()
+        outside = self.root / "outside"
+        outside.mkdir()
+        legacy.symlink_to(outside, target_is_directory=True)
+        self.runtime._session_view(row, "cleanup-test", cwd)
+        self.assertTrue(legacy.is_symlink())
+        self.assertTrue(outside.is_dir())
+        legacy.unlink()
+        (legacy / "projects").mkdir(parents=True)
+        view = legacy / "projects/-workspace"
+        view.symlink_to(outside, target_is_directory=True)
+        self.runtime._session_view(row, "cleanup-test", cwd)
+        self.assertTrue(view.is_symlink())
+        view.unlink()
+        session = self.runtime._root(row) / "home/.claude/projects" / cwd.replace("/", "-")
+        view.symlink_to(session, target_is_directory=True)
+        self.runtime._session_view(row, "cleanup-test", cwd)
+        self.assertFalse(legacy.exists())
+        self.assertTrue(session.is_dir())
+
+    def test_statusline_restore_preserves_explicit_user_change(self) -> None:
+        """运行期间用户替换状态栏时，旧快照不能覆盖用户的新配置。@return None。"""
+        row = self.runtime._row("synthetic", 1)
+        settings = self.runtime._root(row) / "home/.claude/settings.json"
+        current = {"statusLine": {"type": "command", "command": "printf user-change"}}
+        atomic_json(settings, current)
+        self.runtime._restore_cli_quota({"row": row, "statusline_before": {"present": False, "value": None},
+            "statusline_command": "managed-command"})
+        self.assertEqual(current, json.loads(settings.read_text()))
 
     def test_project_view_uses_opaque_physical_directory(self) -> None:
         """CLI 的真实 cwd 不含 run ID，旧路径只保留宿主兼容链接。@return None。"""
@@ -139,18 +221,36 @@ class AccountRuntimeTests(unittest.TestCase):
             connection.execute("CREATE TABLE runs(id TEXT PRIMARY KEY,environment_id TEXT,environment_generation INTEGER,execution_source TEXT,runtime_release TEXT)")
             connection.execute("INSERT INTO runs(id) VALUES('driver-test')")
         container = Mock(id="synthetic-container")
-        job = {"row": row, "token": "synthetic-token"}
+        job = {"row": row, "token": "synthetic-token", "source": "run:driver-test:0"}
         self.client.api.exec_create.return_value = {"Id": "synthetic-exec"}
         source = Path(__file__).resolve().parents[1] / "images/worker/entrypoint.sh"
+        runner = object.__new__(main.Runner)
+        runner.client = self.client
+        runner._quota_mounts = Mock(return_value=({"QUOTA_IDENTITY": "synthetic-identity"}, {}, {}))
         with patch.object(self.runtime, "_cli_setup") as setup, \
                 patch.object(self.runtime, "sync_credentials"), \
                 patch.object(self.runtime, "_save_execution"), \
                 patch.object(self.runtime, "_configure_network_context"), \
+                patch.multiple(main, account_runtime=self.runtime, BENCH_DATA=self.root, HOST_BENCH_DATA=self.root,
+                    WORKSPACES_DIR=self.root / "workspaces", FLOWS_DIR=self.root / "flows", CA_DIR=self.root / "ca"), \
                 patch.dict(os.environ, {"V3_WORKER_SCRIPT": str(source)}):
             setup.return_value.__enter__.return_value = (row, container, job)
-            self.runtime.start_run({"id": 1, "name": "synthetic"}, {"id": 1}, "driver-test",
-                {"CLAUDE_CODE_VERSION": "2.1.293"}, {})
+            with patch.object(main, "derive_fingerprint", return_value={"tz": "Asia/Tokyo", "lang": "ja_JP.UTF-8"}):
+                runner.start_run("driver-test", {"id": 1, "name": "synthetic"},
+                    {"id": 1, "prompt": "Synthetic only", "claude_code_version": "2.1.293", "model_override": ""})
+        self.assertFalse((root / "workspaces/driver-test/.claude-home").exists())
+        executed = self.client.api.exec_create.call_args.kwargs["environment"]
+        self.assertEqual("UTC", executed["TZ"])
+        self.assertEqual("en_US.UTF-8", executed["LANG"])
+        self.assertEqual("en_US.UTF-8", executed["LC_ALL"])
         script = (root / "runtime" / f"job-{job['handle']}.sh").read_text()
+        defaults = re.search(r"^write_default_settings\(\) \{.*?^\}$", script, re.M | re.S)
+        self.assertIsNotNone(defaults)
+        local_defaults = defaults.group(0).replace(f"/run/v3/jobs/{job['handle']}/", str(root / "runtime/jobs" / job["handle"]) + "/")
+        subprocess.run(["bash", "-c", local_defaults + "\nwrite_default_settings\n"],
+            env={**os.environ, "CLAUDE_DIR": str(settings.parent), "CLAUDE_CODE_EFFORT_LEVEL": "max"},
+            capture_output=True, text=True, check=True, timeout=10)
+        self.assertEqual(job["statusline_command"], json.loads(settings.read_text())["statusLine"]["command"])
         fragment = re.search(r'node - "\$CLAUDE_DIR/settings.json" <<\x27JS\x27\n(.*?)\nJS', script, re.S)
         self.assertIsNotNone(fragment)
         result = subprocess.run(["node", "-", str(settings)], input=fragment.group(1),
@@ -158,6 +258,7 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
 
         persisted = json.loads(settings.read_text())
+        self.assertEqual(job["statusline_command"], persisted["statusLine"]["command"])
         self.assertNotIn("Stop", persisted["hooks"])
         self.assertEqual("opus[1m]", persisted["model"])
         subprocess.run(["bash", "-n"], input=script, text=True, check=True, timeout=10)
@@ -176,7 +277,8 @@ class AccountRuntimeTests(unittest.TestCase):
         """真实 CLI 准备关闭自动更新，其他模型、env 与 hooks 保持。@return None。"""
         row = self.runtime._row("synthetic", 1)
         settings = self.runtime._root(row) / "home/.claude/settings.json"
-        original = {"model": "sonnet", "env": {"CLAUDE_CODE_EFFORT_LEVEL": "xhigh", "DISABLE_AUTOUPDATER": "0"},
+        original = {"model": "sonnet", "env": {"CLAUDE_CODE_EFFORT_LEVEL": "xhigh", "DISABLE_AUTOUPDATER": "0",
+            "TZ": "Asia/Tokyo", "LANG": "ja_JP.UTF-8", "LC_ALL": "ja_JP.UTF-8"},
             "hooks": {"UserPromptSubmit": []}}
         atomic_json(settings, original)
         container = Mock()
@@ -188,6 +290,9 @@ class AccountRuntimeTests(unittest.TestCase):
             with self.runtime._cli_setup({"id": 1, "name": "synthetic"}, "run:test", "2.1.293"):
                 current = json.loads(settings.read_text())
         self.assertEqual("1", current["env"]["DISABLE_AUTOUPDATER"])
+        self.assertEqual("UTC", current["env"]["TZ"])
+        self.assertEqual("en_US.UTF-8", current["env"]["LANG"])
+        self.assertEqual("en_US.UTF-8", current["env"]["LC_ALL"])
         self.assertEqual(original["env"]["CLAUDE_CODE_EFFORT_LEVEL"], current["env"]["CLAUDE_CODE_EFFORT_LEVEL"])
         self.assertEqual(original["model"], current["model"])
         self.assertEqual(original["hooks"], current["hooks"])
@@ -411,9 +516,11 @@ class AccountRuntimeTests(unittest.TestCase):
                 runner._quota_mounts(account, "run", f"continue:sid:{generation}", flows)
         with self.database() as connection:
             cursors = [dict(row) for row in connection.execute("SELECT * FROM quota_observation_cursors ORDER BY source")]
-        self.assertEqual(2, len(cursors))
-        self.assertNotEqual(cursors[0]["path"], cursors[1]["path"])
-        self.assertTrue(all(Path(row["path"]).parent.is_dir() for row in cursors))
+        self.assertEqual(4, len(cursors))
+        self.assertEqual(4, len({row["path"] for row in cursors}))
+        for row in cursors:
+            path = Path(row["path"])
+            self.assertTrue((path.parent.parent if row["source"].startswith("cli:") else path.parent).is_dir())
 
     def test_stale_cleanup_cannot_stop_new_execution_in_same_container(self) -> None:
         """固定容器 ID 相同仍须匹配执行来源。@return None。"""

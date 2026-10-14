@@ -1,9 +1,10 @@
-"""验证原生 TLS 下的无人值守额度采样、恢复和本地账号养号。"""
+"""验证 v3 被动额度、手动查询、原任务恢复和本地账号养号。"""
 import json
 import threading
 import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from cli_quota import statusline_quota_observation
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
@@ -31,8 +32,7 @@ class AutoUsageTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         self.runtime = runtime
-        self.runner.query_quota.side_effect = None
-        self.runner.query_quota.return_value = self._usage(10)
+        self.runner.query_quota.side_effect = AssertionError("v3 自动路径禁止主动查询")
         with main.get_db() as conn:
             conn.execute("UPDATE accounts SET warmup_quota_5h_limit_percent=70,warmup_quota_7d_limit_percent=85 WHERE id=1")
             self.account = dict(conn.execute("SELECT * FROM accounts WHERE id=1").fetchone())
@@ -44,110 +44,150 @@ class AutoUsageTests(unittest.TestCase):
             "five_hour": {"utilization": five, "resets_at": datetime.fromtimestamp(now + 3600, timezone.utc).isoformat()},
             "seven_day": {"utilization": seven, "resets_at": datetime.fromtimestamp(now + 86400, timezone.utc).isoformat()}}
 
-    def test_unknown_task_queries_before_execution_and_updates_after_consumption(self) -> None:
-        """未知额度自动查询；当前任务收尾后高用量阻止下一条。@return None。"""
+    def _passive(self, five=10, seven=20, observed=None, reset=None) -> None:
+        """注入正常响应的数据；参数为百分比与时间，返回 None。"""
+        now = time.time() if observed is None else observed
+        observation = statusline_quota_observation({
+            "five_hour": {"used_percentage": five, "resets_at": reset or now + 3600},
+            "seven_day": {"used_percentage": seven, "resets_at": now + 86400},
+        }, now)
+        self.guard._observe(self.account, main._quota_identity(self.account), observation)
+
+    def test_unknown_task_runs_without_usage_and_passive_high_value_stops_next(self) -> None:
+        """首次未知可运行，正式响应达到阈值后下一条等待；无 usage 请求。@return None。"""
         task = self._run()
-        self.runner.query_quota.side_effect = [self._usage(10), self._usage(75)]
+        def completed(worker):
+            """模拟当前任务真实响应产生额度，返回退出码。"""
+            self._passive(75)
+            return 0
+        self.runner.wait_worker.side_effect = completed
         self.scheduler._execute("original", self.account, task)
         self.assertEqual("success", main.get_run("original")["status"])
-        self.assertEqual(2, self.runner.query_quota.call_count)
-        next_task = self._run("next")
-        self.scheduler._execute("next", self.account, next_task)
+        self.scheduler._execute("next", self.account, self._run("next"))
         self.assertEqual("quota_wait", main.get_run("next")["status"])
         self.assertEqual(1, self.runner.start_run.call_count)
-        self.assertEqual("automatic", self.guard.snapshot(self.account)["source"])
+        self.runner.query_quota.assert_not_called()
+        self.assertEqual("cli", self.guard.snapshot(self.account)["source"])
 
-    def test_expired_window_refreshes_without_manual_query(self) -> None:
-        """5h 重置自动采样，不让旧高位额度永久阻断。@return None。"""
+    def test_old_observation_does_not_trigger_time_based_usage_query(self) -> None:
+        """超过原五分钟缓存也只使用有效窗口，后台不主动补查。@return None。"""
         now = time.time()
-        self._state(test_quota.quota_headers(now, five=1), status=429)
-        with patch.object(main.time, "time", return_value=now + 2):
-            self.assertTrue(self.guard.refresh_usage(self.account))
+        self._passive(10, observed=now)
+        with patch.object(main.time, "time", return_value=now + 301):
             self.assertFalse(self.guard.policy_snapshot(self.account, "normal")["blocked"])
-        self.runner.query_quota.assert_called_once()
+            for _ in range(3):
+                self.guard.tick()
+        self.runner.query_quota.assert_not_called()
+        main.cc2api_client.refresh_usage.assert_not_called()
 
-    def test_recent_idle_usage_accepts_old_or_absent_reset(self) -> None:
-        """真实接口的空闲 0% 可携带过去 reset 或 null，零 run 批次仍可启动。@return None。"""
+    def test_expired_threshold_admits_only_one_existing_execution(self) -> None:
+        """已命中窗口重置后，普通任务与养号共享一个持久更新机会。@return None。"""
+        now = time.time()
+        self._passive(75, observed=now, reset=now + 1)
+        self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
+        with patch.object(main.time, "time", return_value=now + 2):
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                results = list(pool.map(lambda n: self.guard.admit(self.account, f"run:restore:{n}",
+                    workload="normal" if n % 2 else "warmup"), range(4)))
+            self.assertEqual(1, sum(results))
+            self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
+            self._passive(10, observed=now + 2)
+            self.assertFalse(self.guard.policy_snapshot(self.account, "normal")["blocked"])
+        self.runner.query_quota.assert_not_called()
+
+    def test_incomplete_recovery_does_not_issue_another_update_opportunity(self) -> None:
+        """一次正常恢复仍缺原阻断窗口时，重启不重新发机会。@return None。"""
+        now = time.time()
+        self._passive(75, observed=now, reset=now + 1)
+        with patch.object(main.time, "time", return_value=now + 2):
+            self.assertTrue(self.guard.admit(self.account, "run:restore:1", workload="normal"))
+            self.guard._observe(self.account, main._quota_identity(self.account),
+                statusline_quota_observation({"seven_day": {"used_percentage": 20, "resets_at": now + 86400}}, now + 2))
+            self.guard.release(self.account, "run:restore:1")
+            restarted = main.QuotaGuard(self.runner)
+            self.assertFalse(restarted.admit(self.account, "run:restore:2", workload="normal"))
+        self.runner.query_quota.assert_not_called()
+
+    def test_zero_run_batch_resumes_without_usage_query(self) -> None:
+        """尚未创建第一条 run 的批次能正常启动，不靠 usage 解锁。@return None。"""
         with main.get_db() as conn:
             conn.execute("INSERT INTO task_batches(id,account_id,name,status) VALUES(1,1,'fixture','quota_wait')")
             conn.execute("INSERT INTO task_batch_items(batch_id,topic_id,prompt,status) VALUES(1,1,'English task','pending')")
-        usage = self._usage(0, 0)
-        usage["five_hour"]["resets_at"] = datetime.fromtimestamp(time.time() - 18000, timezone.utc).isoformat()
-        usage["seven_day"]["resets_at"] = None
-        self.runner.query_quota.return_value = usage
         with patch.object(self.scheduler, "submit_batch") as submit:
             self.guard.tick()
         submit.assert_called_once_with(1)
-        self.assertEqual([], self.guard.policy_snapshot(self.account, "normal")["unknown"])
-        self.assertTrue(self.guard.refresh_usage(self.account))
-        self.runner.query_quota.assert_called_once()
-        self.guard.invalidate_usage(self.account)
-        self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
-        self.runner.query_quota.return_value = self._usage(75)
-        self.assertTrue(self.guard.refresh_usage(self.account))
-        self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
+        self.runner.query_quota.assert_not_called()
 
-    def test_idle_usage_cache_expires_and_does_not_accept_nonzero_old_window(self) -> None:
-        """空闲事实仍受缓存时限约束；过去窗口的非零数据不能冒充新周期。@return None。"""
+    def test_common_exhaustion_without_thresholds_has_one_persistent_recovery(self) -> None:
+        """阈值关闭也不能对已耗尽窗口反复投放无新观察的恢复。@return None。"""
+        with main.get_db() as connection:
+            connection.execute("UPDATE accounts SET warmup_quota_5h_limit_percent=NULL,warmup_quota_7d_limit_percent=NULL WHERE id=1")
         now = time.time()
-        usage = self._usage(0)
-        usage["five_hour"]["resets_at"] = None
-        self.runner.query_quota.return_value = usage
-        self.assertTrue(self.guard.refresh_usage(self.account))
-        with patch.object(main.time, "time", return_value=now + 301):
-            self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
-            self.assertTrue(self.guard.refresh_usage(self.account))
-        self.assertEqual(2, self.runner.query_quota.call_count)
-        usage = self._usage(10)
-        usage["five_hour"]["resets_at"] = datetime.fromtimestamp(now - 1, timezone.utc).isoformat()
-        self.runner.query_quota.return_value = usage
-        self.assertFalse(self.guard.refresh_usage(self.account, force=True))
-        self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
+        self._passive(100, observed=now, reset=now + 1)
+        with patch.object(main.time, "time", return_value=now + 2):
+            self.assertTrue(self.guard.admit(self.account, "run:restore:1", workload="normal"))
+            self.guard.release(self.account, "run:restore:1")
+            restarted = main.QuotaGuard(self.runner)
+            self.assertFalse(restarted.admit(self.account, "run:restore:2", workload="warmup"))
+            self._passive(10, observed=now + 2)
+            self.assertTrue(restarted.admit(self.account, "run:restore:3", workload="normal"))
+        self.runner.query_quota.assert_not_called()
 
-    def test_active_zero_window_does_not_inherit_idle_marker(self) -> None:
-        """新活跃窗口必须清掉旧空闲标记，跨 reset 后仍重新采样。@return None。"""
-        idle = self._usage(0)
-        idle["five_hour"]["resets_at"] = None
-        self.runner.query_quota.return_value = idle
-        self.assertTrue(self.guard.refresh_usage(self.account))
+    def test_continue_ignores_threshold_but_shares_common_recovery(self) -> None:
+        """续聊不受百分比阈值限制，却与普通任务共享共同耗尽的单次恢复。@return None。"""
         now = time.time()
-        active = self._usage(0)
-        active["five_hour"]["resets_at"] = datetime.fromtimestamp(now + 30, timezone.utc).isoformat()
-        self.runner.query_quota.return_value = active
-        self.assertTrue(self.guard.refresh_usage(self.account, force=True))
-        with patch.object(main.time, "time", return_value=now + 31):
-            self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
+        self._passive(75, observed=now)
+        self.assertTrue(self.guard.admit(self.account, "continue:synthetic:1"))
+        self.assertFalse(self.guard.admit(self.account, "run:normal:1", workload="normal"))
+        self._passive(100, observed=now + 0.1, reset=now + 1)
+        with patch.object(main.time, "time", return_value=now + 2):
+            self.assertTrue(self.guard.admit(self.account, "continue:synthetic:2"))
+            self.guard.release(self.account, "continue:synthetic:2")
+            self.assertFalse(self.guard.admit(self.account, "run:normal:2", workload="normal"))
+            self.assertFalse(self.guard.admit(self.account, "continue:synthetic:3"))
+        self.runner.query_quota.assert_not_called()
 
-    def test_failure_retries_later_and_does_not_send_model_requests(self) -> None:
-        """查询失败有间隔重试；等待期间不启动 CLI。@return None。"""
-        task = self._run()
-        self.runner.query_quota.return_value = {"ok": False, "raw": {"status": 429, "retry_after_sec": 120}}
-        self.scheduler._execute("original", self.account, task)
+    def test_manual_query_is_once_and_permanent_error_stops_background_recovery(self) -> None:
+        """用户查询明确返回暂停时停止恢复，后续 tick 不重查。@return None。"""
+        self._run(status="quota_wait")
+        self.runner.query_quota.side_effect = None
+        self.runner.query_quota.return_value = {"ok": False, "raw": {"status": 403,
+            "error": 'HTTP 403: {"error":{"type":"account_on_hold"}}'}}
+        main.query_account_quota(1)
         for _ in range(3):
             self.guard.tick()
         self.runner.query_quota.assert_called_once()
-        self.runner.start_run.assert_not_called()
-        policy = self.guard.policy_snapshot(self.account, "normal")
-        self.assertIn("自动额度查询失败", policy["message"])
-        retry = policy["refresh_retry_at"]
-        self.assertGreater(retry, time.time() + 110)
-        self.runner.query_quota.return_value = self._usage(10)
-        with patch.object(main.time, "time", return_value=retry + 1), patch.object(self.scheduler, "submit") as submit:
-            self.guard.tick()
-        submit.assert_called_once()
-        self.assertEqual("queued", main.get_run("original")["status"])
+        self.assertEqual("account_on_hold", self.guard.snapshot(self.account)["account_error"])
+        self.assertEqual("auth_failed", main.get_run("original")["status"])
 
-    def test_zero_run_batch_is_resumed_by_automatic_usage(self) -> None:
-        """尚未创建第一条 run 的批次也能由自动采样恢复。@return None。"""
-        with main.get_db() as conn:
-            conn.execute("INSERT INTO task_batches(id,account_id,name,status) VALUES(1,1,'fixture','quota_wait')")
-            conn.execute("INSERT INTO task_batch_items(batch_id,topic_id,prompt,status) VALUES(1,1,'English task','pending')")
-        with patch.object(self.scheduler, "submit_batch") as submit:
-            self.guard.tick()
-        submit.assert_called_once_with(1)
-        with main.get_db() as conn:
-            self.assertEqual("active", conn.execute("SELECT status FROM task_batches WHERE id=1").fetchone()[0])
-            self.assertEqual(0, conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0])
+    def test_manual_network_failure_is_not_permanent_and_does_not_retry(self) -> None:
+        """网络／普通认证失败不猜测封禁，也不安排后台查询。@return None。"""
+        self.runner.query_quota.side_effect = None
+        self.runner.query_quota.return_value = {"ok": False, "raw": {"status": 401, "error": "Invalid token"}}
+        main.query_account_quota(1)
+        self.guard.tick()
+        self.runner.query_quota.assert_called_once()
+        self.assertFalse(self.guard.snapshot(self.account).get("account_error"))
+        self.assertIsNone(self.guard.policy_snapshot(self.account, "normal")["refresh_retry_at"])
+
+    def test_cli_observation_file_reaches_shared_quota_state(self) -> None:
+        """正式执行的 CLI 文件进入现有游标；本地字段不能伪造永久账号错误。@return None。"""
+        source = "run:synthetic:0"
+        flows = self.base / "flows/fixture/1/synthetic"
+        context = self.guard.prepare(self.account, source, flows, self.base / "controls")
+        directory = flows / "cli"
+        directory.mkdir()
+        now = time.time()
+        event = {"source": "cli:" + source, "identity": context["QUOTA_IDENTITY"], "ts": now,
+            "origin": "cli", "session_id": "synthetic", "response_id": "response-1",
+            "rate_limits": {"five_hour": {"used_percentage": 75, "resets_at": now + 3600}},
+            "account_error": "account_on_hold"}
+        (directory / "cli-quota.jsonl").write_text(json.dumps(event) + "\n")
+        self.guard.consume(self.account)
+        self.assertEqual(75, self.guard.snapshot(self.account)["windows"]["five_hour"]["utilization"])
+        self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
+        self.assertFalse(self.guard.snapshot(self.account).get("account_error"))
+        self.runner.query_quota.assert_not_called()
 
     def test_restart_recovers_only_active_batches_and_keeps_saved_delay(self) -> None:
         """重启重新注册活动批次并保留延迟，不投放暂停、删除或停用账号的批次。@return None。"""
@@ -170,30 +210,6 @@ class AutoUsageTests(unittest.TestCase):
             self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM runs").fetchone()[0])
             self.assertEqual(deadline, connection.execute("SELECT next_launch_at FROM task_batches WHERE id=1").fetchone()[0])
 
-    def test_concurrent_admission_reuses_recent_usage(self) -> None:
-        """同时启动复用同账号采样，避免重复查询。@return None。"""
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            self.assertTrue(all(pool.map(lambda _: self.guard.refresh_usage(self.account), range(4))))
-        self.runner.query_quota.assert_called_once()
-
-    def test_missing_enabled_window_and_auth_error_are_visible(self) -> None:
-        """不完整额度和认证错误不会伪装成功，也不会高速重查。@return None。"""
-        self.runner.query_quota.return_value = {"ok": True, "five_hour": self._usage()["five_hour"]}
-        self.assertFalse(self.guard.refresh_usage(self.account))
-        self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
-        self.guard._usage_refresh.clear()
-        self.runner.query_quota.return_value = {"ok": False, "raw": {"status": 401}}
-        self.assertFalse(self.guard.refresh_usage(self.account))
-        self.assertIn("认证失败", self.guard.policy_snapshot(self.account, "normal")["message"])
-
-    def test_partial_result_cannot_reuse_consumption_before_cache(self) -> None:
-        """消费后缺失的窗口不能用旧低位数据代替新采样。@return None。"""
-        self.assertTrue(self.guard.refresh_usage(self.account))
-        self.guard.invalidate_usage(self.account)
-        self.runner.query_quota.return_value = {"ok": True, "five_hour": self._usage()["five_hour"]}
-        self.assertFalse(self.guard.refresh_usage(self.account, force=True))
-        self.assertTrue(self.guard.policy_snapshot(self.account, "normal")["blocked"])
-
     def test_native_quota_probe_does_not_inject_mitm_certificates(self) -> None:
         """查询实际 exec 使用原生 TLS，错误也保持结构化返回。@return None。"""
         runner = object.__new__(main.Runner)
@@ -201,11 +217,14 @@ class AutoUsageTests(unittest.TestCase):
         runner.client.api.exec_create.return_value = {"Id": "probe"}
         runner.client.api.exec_start.return_value = json.dumps(self._usage()).encode()
         runner.client.api.exec_inspect.return_value = {"ExitCode": 0}
-        with patch.object(self.runtime, "job_for_container", return_value={"row": {"container_id": "container"}}):
+        row = self.runtime._row(self.account["name"], self.account["id"])
+        with patch.object(self.runtime, "job_for_container", return_value={"row": {**row, "container_id": "container"}}):
             result = runner._exec_quota_probe("container")
         self.assertTrue(result["ok"])
         environment = runner.client.api.exec_create.call_args.kwargs["environment"]
         self.assertEqual("1", environment["V3_NATIVE_USAGE"])
+        self.assertEqual("America/Los_Angeles", environment["TZ"])
+        self.assertEqual("en_US.UTF-8", environment["LANG"])
         self.assertFalse(any(key in environment for key in (
             "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "GIT_SSL_CAINFO")))
 

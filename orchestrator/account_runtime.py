@@ -26,6 +26,7 @@ from resource_budget import account_limits
 
 
 NETWORK_INSPECTION_MODES = {"passthrough", "quota", "capture"}
+V3_DEFAULT_TIMEZONE = "America/Los_Angeles"
 
 
 def locale_for_timezone(timezone: str | None) -> str:
@@ -35,7 +36,7 @@ def locale_for_timezone(timezone: str | None) -> str:
     :param timezone: IANA 时区名；空值使用英语回退
     :return: 账号镜像已生成的 UTF-8 locale
     """
-    value = timezone or "UTC"
+    value = timezone or V3_DEFAULT_TIMEZONE
     if value == "Asia/Tokyo":
         return "ja_JP.UTF-8"
     if value == "Asia/Seoul":
@@ -53,7 +54,7 @@ def derive_v3_fingerprint(timezone: str | None = None) -> dict[str, object]:
     """
     生成首次随机且可持久化的 v3 账号画像。
 
-    :param timezone: 账号显式 IANA 时区；空值使用 UTC
+    :param timezone: 账号显式 IANA 时区；空值使用洛杉矶时区
     :return: profile v2 指纹字段
     """
     mac = bytearray(secrets.token_bytes(6))
@@ -64,7 +65,7 @@ def derive_v3_fingerprint(timezone: str | None = None) -> dict[str, object]:
         "hostname": secrets.token_hex(6),
         "machine_id": secrets.token_hex(16),
         "mac": ":".join(f"{value:02x}" for value in mac),
-        "tz": timezone or "UTC",
+        "tz": timezone or V3_DEFAULT_TIMEZONE,
         "lang": locale_for_timezone(timezone),
     }
 
@@ -297,12 +298,6 @@ class AccountRuntime:
             draft_path = self.data / "login-drafts" / (row["environment_id"] + ".json")
             if draft_path.exists() and json.loads(draft_path.read_text()).get("phase") == "submitting" and not allow_login_recovery:
                 raise ValueError("原登录保存尚未完成，请先继续登录提交")
-            if int(row["generation"]) == 0 and account.get("timezone"):
-                fingerprint = json.loads(row["fingerprint_json"])
-                if fingerprint.get("profile_version") == 2:
-                    fingerprint["tz"] = account["timezone"]
-                    fingerprint["lang"] = locale_for_timezone(account["timezone"])
-                    self._update(row, fingerprint_json=json.dumps(fingerprint))
             root = self._root(row)
             root.mkdir(parents=True, exist_ok=True, mode=0o700)
             for name in ("home", "projects", "workspaces", "flows", "controls", "ca", "cli", "runtime"):
@@ -630,7 +625,7 @@ class AccountRuntime:
             "account_id": job["account"].get("cc2api_account_id"), "phase": "claimed",
             "exclusive": job.get("exclusive", True), "container_id": job["row"].get("container_id"),
             "generation": job["row"]["generation"]}
-        for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before"):
+        for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before", "statusline_before", "statusline_command"):
             if key in job:
                 execution[key] = job[key]
         atomic_json(self._root(job["row"]) / "runtime" / "execution.json", execution)
@@ -662,6 +657,7 @@ class AccountRuntime:
                     raise ValueError("执行尚未停止")
                 if job.get("exclusive", True) and self._running_sender_active(row):
                     raise ValueError("账号发送连接尚未收口")
+                self._restore_cli_quota(job)
                 if job["account"].get("cc2api_account_id") is None:
                     credentials = self._root(row) / "home" / ".claude" / ".credentials.json"
                     if credentials.exists():
@@ -710,6 +706,16 @@ class AccountRuntime:
                     except Exception:
                         pass
 
+    @staticmethod
+    def execution_environment(row: dict) -> dict[str, str]:
+        """从已固化画像提取实际 CLI 环境，避免上层旧派生值覆盖。
+
+        :param row: 含 fingerprint_json 的持久环境行
+        :return: TZ、LANG 和 LC_ALL 环境变量
+        """
+        fingerprint = json.loads(row["fingerprint_json"])
+        return {"TZ": fingerprint["tz"], "LANG": fingerprint["lang"], "LC_ALL": fingerprint["lang"]}
+
     @contextmanager
     def _cli_setup(self, account: dict, source: str, version: str,
                    idle_only: bool = False, exclusive: bool = False, allow_inactive_login: bool = False):
@@ -726,7 +732,7 @@ class AccountRuntime:
                 settings = self._root(row) / "home/.claude/settings.json"
                 value = json.loads(settings.read_text()) if settings.is_file() else {}
                 environment = value.get("env") if isinstance(value.get("env"), dict) else {}
-                value["env"] = {**environment, "DISABLE_AUTOUPDATER": "1"}
+                value["env"] = {**environment, "DISABLE_AUTOUPDATER": "1", **self.execution_environment(row)}
                 atomic_json(settings, value)
                 os.chown(settings, 1000, 1000)
                 yield row, container, job
@@ -801,6 +807,10 @@ class AccountRuntime:
                 # v3 的私有控制树不向 CLI 开放写入；完成判定已有主会话 JSONL，无需另注入 Stop hook。
                 source_script = source_script.replace(
                     "  Stop: [{matcher: '', hooks: [{type: 'command', command: 'date +%s >> /tmp/claude-stop-seen'}]}],\n", "")
+                if quota_env.get("QUOTA_IDENTITY") and not task.get("capture_full_http"):
+                    # 正式任务也调用默认设置函数；本代临时采集必须保留到 CLI 读取设置后。
+                    source_script = source_script.replace(
+                        "(.[0] | del(.hooks, .statusLine)) * .[1]", "(.[0] | del(.hooks)) * .[1]")
                 # v3 控制文件不放进 Claude 可见项目树；兼容 driver 仍由单一脚本生成。
                 control_paths = {
                     "/workspace/.bench-status.json": f"/run/v3/runs/{run_id}/status.json",
@@ -823,6 +833,8 @@ class AccountRuntime:
                 script_path.chmod(0o700)
                 original_flows = self.data / "flows" / account["name"] / str(task["id"]) / run_id
                 flow_directory = self.execution_flows(account, source, original_flows)
+                if not task.get("capture_full_http"):
+                    self._install_cli_quota(job, cwd, flow_directory, quota_env.get("QUOTA_IDENTITY"))
                 flow_path = "/flows/" + str(flow_directory.relative_to(root / "flows"))
                 context = dict(quota_env)
                 inspection_mode = "capture" if task.get("capture_full_http") else "passthrough"
@@ -848,6 +860,7 @@ class AccountRuntime:
                 self._configure_network_context(container, context)
                 (root / "runtime" / f"tmux-{handle}").mkdir(exist_ok=True, mode=0o700)
                 environment = dict(worker_env)
+                environment.update(self.execution_environment(row))
                 environment.update(V3_PERSISTENT_HOME="1", USE_SIDECAR_DNS="1", HOME="/home/node",
                     PATH=f"/cli/{worker_env['CLAUDE_CODE_VERSION']}/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
                     QUOTA_SIGNAL_FILE=context.get("QUOTA_SIGNAL_FILE", ""), TMUX_TMPDIR=f"/run/v3/tmux-{handle}",
@@ -873,6 +886,72 @@ class AccountRuntime:
             except Exception:
                 self.cleanup(job["token"])
                 raise
+
+    def _install_cli_quota(self, job: dict, cwd: str, flows: Path, identity: str | None) -> None:
+        """为正式执行安装本地状态栏采集，先保存可跨重启恢复的原设置。
+
+        :param job: 已领取的本代 CLI 执行
+        :param cwd: 当前专属项目目录
+        :param flows: 本代证据目录
+        :param identity: 已登记额度游标的账号身份；未启用采集时为空
+        :return: None
+        """
+        if not identity:
+            return
+        root = self._root(job["row"])
+        relative = flows.relative_to(root / "flows")
+        # 只赋予穿过本次路径的权限；UID1000 不获得父目录列表或私有 runtime 写权限。
+        current = root / "flows"
+        for part in (None, *relative.parts):
+            if part is not None:
+                current /= part
+            if current.is_symlink():
+                raise ValueError("额度采集目录不能是链接")
+            current.chmod(0o710)
+            os.chown(current, 0, 1000)
+        directory = flows / "cli"
+        if directory.is_symlink():
+            raise ValueError("额度采集目录不能是链接")
+        directory.mkdir(exist_ok=True, mode=0o700)
+        os.chown(directory, 1000, 1000)
+        settings = root / "home/.claude/settings.json"
+        value = json.loads(settings.read_text()) if settings.is_file() else {}
+        original = value.get("statusLine")
+        configuration = directory / "config.json"
+        container_directory = "/flows/" + str(directory.relative_to(root / "flows"))
+        command = "/usr/local/bin/v3-cli-quota --config " + shlex.quote(container_directory + "/config.json")
+        job["statusline_before"] = {"present": "statusLine" in value, "value": original}
+        job["statusline_command"] = command
+        self._save_execution(job)
+        atomic_json(configuration, {"source": "cli:" + job["source"], "identity": identity, "cwd": cwd,
+            "session_dir": "/home/node/.claude/projects/" + cwd.replace("/", "-"),
+            "output": container_directory + "/cli-quota.jsonl", "started_at": time.time(),
+            "previous_command": original.get("command") if isinstance(original, dict) else None})
+        os.chown(configuration, 1000, 1000)
+        value["statusLine"] = {**(original if isinstance(original, dict) else {}), "type": "command", "command": command}
+        atomic_json(settings, value)
+        os.chown(settings, 1000, 1000)
+
+    def _restore_cli_quota(self, job: dict) -> None:
+        """在进程收口后恢复本代状态栏设置，保留执行期间用户明确改写的配置。
+
+        :param job: 本代执行或重启后恢复的执行记录
+        :return: None
+        """
+        snapshot = job.get("statusline_before")
+        if not snapshot:
+            return
+        settings = self._root(job["row"]) / "home/.claude/settings.json"
+        value = json.loads(settings.read_text()) if settings.is_file() else {}
+        current = value.get("statusLine")
+        if not isinstance(current, dict) or current.get("command") != job.get("statusline_command"):
+            return
+        if snapshot["present"]:
+            value["statusLine"] = snapshot["value"]
+        else:
+            value.pop("statusLine", None)
+        atomic_json(settings, value)
+        os.chown(settings, 1000, 1000)
 
     def _configure_network_context(self, container, context: dict) -> None:
         """
@@ -1102,6 +1181,9 @@ class AccountRuntime:
 
         # 旧兼容层曾把 .claude-home 写进项目树；只移除本系统创建且仍指向当前 session 的链接。
         legacy_home = self._root(row) / "workspaces" / run_id / ".claude-home"
+        # 此目录仅为旧 Runner 遗留；只清空目录，不跟随用户链接或删除内容。
+        if legacy_home.is_symlink() or (legacy_home / "projects").is_symlink():
+            return
         legacy_view = legacy_home / "projects" / "-workspace"
         if legacy_view.is_symlink() and legacy_view.resolve() == project.resolve():
             legacy_view.unlink()
@@ -1110,6 +1192,10 @@ class AccountRuntime:
                     directory.rmdir()
                 except OSError:
                     break
+        try:
+            legacy_home.rmdir()
+        except OSError:
+            pass
 
     def run_session_path(self, run_id: str) -> Path:
         """
@@ -1241,6 +1327,7 @@ class AccountRuntime:
             command = ["setpriv", "--reuid=1000", "--regid=1000", "--init-groups", "--bounding-set=-all",
                 "--inh-caps=-all", "--ambient-caps=-all", "--no-new-privs", "env", f"HOME={cli_home}",
                 f"PATH=/cli/{version}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin",
+                *(f"{key}={value}" for key, value in self.execution_environment(row).items()),
                 "claude", "auth", "login"]
             try:
                 job.update(tmux=sid, tmux_socket=socket_path, home=cli_home, version=version)
@@ -1275,7 +1362,8 @@ class AccountRuntime:
         """
         job = self.job_for_container(container_id)
         return self._container(job["row"]).exec_run(self.cli_command(command),
-            environment={"HOME": home, "PATH": f"/cli/{version}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin"},
+            environment={"HOME": home, "PATH": f"/cli/{version}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin",
+                **self.execution_environment(job["row"])},
             workdir=home)
 
     def job_for_container(self, container_id: str) -> dict:
@@ -1499,6 +1587,8 @@ class AccountRuntime:
                     QUOTA_OBSERVATIONS_FILE=f"{flow_path}/passive-quota.jsonl",
                     QUOTA_CREDENTIALS_FILE="/home/node/.claude/.credentials.json",
                     NETWORK_INSPECTION_MODE="capture" if run.get("capture_full_http") else "passthrough")
+                if not run.get("capture_full_http"):
+                    self._install_cli_quota(job, cwd, flow_directory, context.get("QUOTA_IDENTITY"))
                 if run.get("capture_full_http"):
                     context.update(CAPTURE_FULL_HTTP="1", SAVE_FULL_FLOWS="1",
                         CAPTURE_FILE=f"{flow_path}/http_capture.jsonl", CAPTURE_INDEX_FILE=f"{flow_path}/capture_index.json")
@@ -1720,7 +1810,7 @@ class AccountRuntime:
                         job = {"row": row, "account": {"cc2api_account_id": execution.get("account_id")},
                             "source": execution["source"], "lease": lease, "exclusive": False, "claimed": True,
                             "token": self.execution_token(row["container_id"] or row["environment_id"], execution["source"])}
-                        for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before"):
+                        for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before", "statusline_before", "statusline_command"):
                             if key in execution:
                                 job[key] = execution[key]
                         with self.environment_lock(row["environment_id"]):

@@ -14,32 +14,32 @@
 ---
 
 ## 1. Command-Line Tools (20 topics)
-> Training points: parameter parsing, file IO, TTY interaction, cross-platform compatibility.
+> Practice areas: parameter parsing, file IO, TTY interaction, cross-platform compatibility.
 
 - [ ] 1. **Markdown Renderer**: Accept Markdown files or directories from the CLI and produce HTML or PDF with themes, a table of contents, syntax highlighting, image-path validation, and a failure report.
 - [ ] 2. **Terminal Pomodoro**: Provide focus/rest cycle, keyboard control, reminder sound, daily statistics, CSV export and interruption recovery, suitable for long-term terminal use.
-- [ ] 3. **LAN Clipboard Synchronization**: Discover LAN devices based on mDNS, supporting text/image mutual transmission, end-to-end encryption, device trust list and transmission history.
+- [ ] 3. **Clipboard Snippet Shelf**: Save clipboard text locally, organize snippets with tags, search recent entries, pin favorites, and export a reusable collection.
 - [ ] 4. **Batch Renaming Tool**: Rename files in batches with regular expressions, sequence templates, case conversion, conflict detection, a diff preview, and an undo log.
-- [ ] 5. **Port and Process Inspector**: Present readable port and process information with filters for ports, processes, and protocols, plus copyable termination commands and clear risk warnings.
+- [ ] 5. **Command Alias Organizer**: Manage shell aliases, group commands by project, preview configuration changes, detect duplicate names, and export a local configuration file.
 - [ ] 6. **Git Changelog Generator**: Aggregate changes by version, date or Conventional Commit, generate Markdown/HTML, and automatically annotate breaking changes.
 - [ ] 7. **JSON, YAML, and TOML Converter**: Convert between JSON, YAML, and TOML from standard input or files, validate JSON Schema, locate errors, and process directories in batches.
 - [ ] 8. **Intelligent History Search**: Integrate shell history, working directory and command frequency, providing fzf interaction, contextual sorting and dangerous command confirmation.
 - [ ] 9. **Terminal Typing Trainer**: Provide built-in code snippets and English passages, then track WPM, error patterns, targeted practice, and local rankings.
 - [ ] 10. **Terminal LLM Client**: Support streaming output, session archiving, model configuration, `/` commands, file references, and local prompt template management.
 
-- [ ] 301. **Environment Variable Comparator**: Compare `.env` files, exported shell values, and remote configuration; highlight missing secrets, support ignore rules, redact sensitive values, and export a Markdown report.
+- [ ] 301. **Environment Variable Comparator**: Compare local configuration files and exported shell values, highlight missing variables, support ignore rules, and export a Markdown report.
 - [ ] 302. **Log Time Slicing Tool**: Slice large logs by time window, level and keyword, support gzip, concurrent scan, context row count and result directory index.
 - [ ] 303. **Directory Volume Detective**: Scan disk usage hotspots, display tree top N, growth comparison, ignore rules and generate a cleanup suggestion list with one click.
-- [ ] 304. **HTTP Load Test Assistant**: Run a lightweight load test against one API with configurable concurrency and QPS limits, latency histograms, failed-sample export, and baseline comparison.
-- [ ] 305. **Certificate Expiration Scanner**: Scan domain names or local certificate files, output expiration date, SAN, issuer and alarm threshold, and support batch CSV input.
+- [ ] 304. **Local Function Benchmark CLI**: Benchmark selected local functions using fixed sample inputs, configurable repetitions, duration histograms, and saved baseline comparisons.
+- [ ] 305. **Document Deadline Inspector**: Read document due dates from a CSV, group upcoming deadlines, apply reminder thresholds, and export a prioritized checklist.
 - [ ] 306. **Git Workspace Snapshot**: Package uncommitted changes, stash metadata, and branch information into a recoverable snapshot with notes, listing, and rollback preview commands.
 - [ ] 307. **CSV Pivot Command Line**: Group-by, aggregate, filter and sort CSV, output table or new CSV, support type inference and error row reporting.
-- [ ] 308. **Local Port Forwarding Panel**: Manage multiple groups of ssh/local port forward, support configuration files, health checks, one-command start and stop, and connection failure retries.
+- [ ] 308. **Terminal Workspace Launcher**: Save named working directories and command presets, open a selected workspace, show recent choices, and export launcher configuration.
 - [ ] 309. **Dependency License Summary**: Scan npm/pip/go lockfile licenses, flag copyleft risks, missing licenses and generate compliance briefings.
 - [ ] 310. **Image Batch Compression CLI**: Compress PNG, JPEG, and WebP files in batches with quality presets, dimension limits, dry-run preview, and before-and-after size comparisons.
 
 ## 2. Personal Productivity Web Apps (30 topics)
-> Training points: front-end state management, local persistence, UI/UX polishing.
+> Practice areas: front-end state management, local persistence, UI/UX polishing.
 
 - [ ] 11. **Minimalist Todo**: Manage tasks and subtasks with drag-and-drop ordering, complete keyboard controls, local persistence, completion trends, and a responsive mobile layout.
 - [ ] 12. **Pomodoro + Task Board**: Bind Pomodoro numbers to task cards, support drag-and-drop status, focus recording, daily/weekly statistics and abnormal interruption supplementary recording.
@@ -52,8 +52,8 @@
 - [ ] 19. **Inspiration Collection Box**: Support quick saving of image and text links, tags, full-text search, later processing queue and automatic content identification from the clipboard.
 - [ ] 20. **Reading Tracker**: Manage books, articles, and papers, record progress, notes, excerpts, ratings, and generate annual reading statistics.
 - [ ] 21. **Bookmark Manager**: Read metadata from user-saved or public links, organize tags, build a local search index, detect duplicates, and create permitted offline snapshots.
-- [ ] 22. **Password Manager**: Implement client-side encryption, master password unlocking, password generation, category search, import and export, and idle automatic locking.
-- [ ] 23. **Health Record**: Record weight, sleep, exercise and subjective status, generate trend charts, goal reminders and abnormal fluctuation prompts.
+- [ ] 22. **Personal Collection Catalog**: Catalog household collections with photos, tags, storage locations, purchase notes, search, and CSV import and export.
+- [ ] 23. **Daily Activity Journal**: Record daily activities, memorable moments, mood notes, and photos, then browse a calendar and export selected entries.
 - [ ] 24. **Personal RSS Reader**: Subscribe to public or user-authorized RSS/Atom feeds, manage unread and starred items, index permitted article text, summarize entries, and filter by keyword.
 - [ ] 25. **Travel Map**: Import tracks and photo locations, display trail maps, trip timelines, city statistics and shareable travel pages.
 
@@ -69,12 +69,12 @@
 - [ ] 320. **Personal Skills Matrix Board**: Maintain skills, proficiency and learning plans, associate practice tasks, and display growth trajectories and weaknesses.
 - [ ] 321. **Gift Exchange Journal**: Record gifts given and received, recipients, dates, occasions, and follow-up plans, with reminders and annual summaries.
 - [ ] 322. **Wardrobe Outfit Planner**: Manage clothing tags, seasons and occasions, generate a week's outfit draft, support cleaning status and missing item reminders.
-- [ ] 323. **Home Plant Care Calendar**: Set watering/fertilizing cycles for plants, display today’s to-dos, overdue reminders and maintenance log photos.
+- [ ] 323. **Home Appliance Care Calendar**: Schedule appliance cleaning and maintenance, show upcoming tasks, record completion notes and photos, and flag overdue items.
 - [ ] 324. **Personal Creative Incubation Funnel**: Move ideas through collection, screening, prototyping, and shelving while recording rejection reasons and reactivation criteria.
 - [ ] 325. **Weekend Micro-Adventure Planner**: Collect nearby activities and points of interest, generate half-day or full-day itinerary drafts, and provide budget ranges and weather alternatives.
 
 ## 3. AI Applications (30 topics)
-> Training points: prompt engineering, RAG, streaming output, and API orchestration.
+> Practice areas: prompt engineering, RAG, streaming output, and API orchestration.
 
 - [ ] 26. **PDF Intelligent Q&A**: Upload PDFs, build a local vector index, answer with page citations, compare multiple documents, and jump directly to cited passages.
 - [ ] 27. **Long Article Summary + Mind Map**: Enter a long article or URL to generate hierarchical summary, key points, to-do extraction and Markmap/Mermaid map.
@@ -109,7 +109,7 @@
 - [ ] 340. **Competitive Product Function Matrix Generation**: Import summaries of several product pages, extract a feature matrix and differentiators, rank follow-up priorities, and support manual revision.
 
 ## 4. Mini Games (20 topics)
-> Training points: Game loop, collision detection, state machine, AI opponent.
+> Practice areas: Game loop, collision detection, state machine, AI opponent.
 
 - [ ] 41. **Snake**: Implement a Canvas or terminal version with keyboard controls, a local leaderboard, skins, pause and resume, and mobile touch input.
 - [ ] 42. **2048**: Support undo, animation, keyboard/touch operations, score statistics, highest score saving and different board sizes.
@@ -134,7 +134,7 @@
 - [ ] 350. **City Construction Mini Sandbox**: Place buildings on a grid, manage resources and satisfaction, simulate a day-night cycle, and save the current city.
 
 ## 5. Browser Extensions (16 topics)
-> Training points: Manifest v3, Content Script, cross-domain communication.
+> Practice areas: Manifest v3, Content Script, page interaction and local preferences.
 
 - [ ] 51. **Selection Translator with AI Explanations**: Show a translation popover for selected text with contextual explanations, examples, bookmarks, keyboard shortcuts, and compatibility with common page layouts.
 - [ ] 52. **Web Page to Markdown Archive**: Archive user-authorized or public pages as Markdown, localize permitted images, preserve metadata, estimate reading time, and export a downloadable package.
@@ -147,30 +147,30 @@
 
 - [ ] 351. **Page Performance Snapshot Plug-in**: Collect LCP/CLS approximate indicators and resource waterfall summary with one click, export JSON report and annotate the big picture.
 - [ ] 352. **Automatically Temporarily Save Form Drafts**: Schedule local temporary storage of editable forms, restore them with one click after a crash, and support site whitelisting and sensitive field exclusion.
-- [ ] 353. **Dead Link Inspection**: Scan the external link status code of the current page, and lists failed links, redirection links and recommended repairs.
+- [ ] 353. **Page Heading Outline Inspector**: Extract page headings, highlight skipped levels and duplicate labels, preview the document outline, and export suggested corrections.
 - [ ] 354. **Dark Mode Enforcer**: The system injects adjustable filters/CSS for dark-free sites with support for domain rules, contrast adjustments, and exclude selectors.
 - [ ] 355. **Permitted Image Collection Exporter**: Select images from a user-owned or public page, filter and deduplicate permitted assets, and export them as a zip with configurable file names.
 - [ ] 356. **Reading Progress Synchronization Bar**: Synchronize long text reading position across devices (export code or local account simulation), display percentage and last reading time.
-- [ ] 357. **Cookie Classification Viewer**: Display cookies by purpose, support search, export, and one-command clearing of specified categories (demo-level instructions).
-- [ ] 358. **Developer Header Overwriter**: Override request or response headers by domain with toggleable rules, import and export, and a prominent development-only indicator.
+- [ ] 357. **Browser Reading List Organizer**: Collect pages into a reading list, add priorities and tags, search saved entries, and import or export a local collection.
+- [ ] 358. **Page Typography Previewer**: Preview font families, line spacing, text width, and heading scales on the current page, save named presets, and reset changes.
 
 ## 6. Data Visualization and Dashboard (20 topics)
-> Training points: chart library, time series data, real-time updates, information density design.
+> Practice areas: chart library, time series data, real-time updates, information density design.
 
 - [ ] 59. **GitHub Contribution Analysis**: Pull public GitHub data to display languages, projects, stars, contribution heat maps and trend comparisons.
 - [ ] 60. **Cryptocurrency/stock Real-time Disk**: Implement watchlists, real-time prices, K-lines, rise and fall alerts and local investment notes.
 - [ ] 61. **Small-Screen Weather and Air Quality Dashboard**: Optimize a full-screen dashboard for an old phone or Raspberry Pi, showing weather, AQI, alerts, a clock, and automatic refresh.
 - [ ] 62. **Home Smart Device Dashboard**: Simulate the HomeAssistant style and manage device status, scene linkage, historical curves and offline prompts.
-- [ ] 63. **Server Monitoring**: Collect CPU/memory/disk/network, display real-time curves, threshold alarms and DingTalk/Slack push.
+- [ ] 63. **Local Build Duration Dashboard**: Import build logs and show duration trends, slow stages, result counts, and comparisons between saved runs.
 - [ ] 64. **Personal Consumption Sankey Chart + Waterfall Chart**: Import bill CSV, automatically classify, display fund flow, budget balance and abnormal consumption.
 - [ ] 65. **Team Efficiency Analysis**: Pull Jira/Linear sample data and analyze cycle time, congestion points, throughput and member load.
-- [ ] 66. **Health Data Dashboard**: Import Apple Health/band CSV to display sleep, exercise, heart rate and goal completion.
+- [ ] 66. **Reading Pace Dashboard**: Import reading sessions and page counts, display weekly progress, completion estimates, and comparisons by book or genre.
 - [ ] 67. **Paper Citation Network Graph**: Analyze paper citation data and use D3 to display force-directed graphs, key nodes, clustering and search positioning.
 - [ ] 68. **Company News Sentiment Dashboard**: Read public news feeds or local samples, classify sentiment, cluster topics, show a timeline, and highlight items for review.
 
 - [ ] 359. **Open Source Project Activity Dashboard**: Import issue/PR sample CSV to display throughput, shutdown duration, contributor distribution and activity trends.
 - [ ] 360. **Team Duty Heat Map**: Show daily duty coverage, conflicts and vacancies, and support importing schedules and exporting adjustment suggestions.
-- [ ] 361. **Website Availability SLA Wall**: Summarize detection success rate, quantile delay and failure interval, support service grouping and monthly SLA calculation.
+- [ ] 361. **Workshop Delivery Punctuality Wall**: Import delivery schedules and completion dates, calculate on-time rates, group delays by team, and export monthly comparisons.
 - [ ] 362. **Content Release Rhythm Calendar**: Visualize multi-channel release records as calendar heat, marking gap weeks and peak days.
 - [ ] 363. **Warehouse Space Utilization Map**: Display warehouse utilization, dwell time, and picking hot spots as a heat map, with filtering by SKU category.
 - [ ] 364. **Campus Schedule Conflict Map**: Import courses and classroom occupancy, highlight conflicts, idle classrooms and suggested class adjustment windows.
@@ -180,7 +180,7 @@
 - [ ] 368. **Local Weather Comparison Dashboard**: Compare temperature and precipitation across saved cities, annotate thresholds, and export the resulting chart as an image.
 
 ## 7. Automation and Scripting (20 topics)
-> Training points: scheduled tasks, network crawling, message push, error recovery.
+> Practice areas: scheduled tasks, file processing, reminders, error recovery.
 
 - [ ] 69. **Daily News Digest**: Read public RSS feeds or approved web sources, deduplicate and classify entries, generate concise summaries, and deliver a scheduled email or chat digest.
 - [ ] 70. **Personal Media Library Organizer**: Parse user-provided feed metadata and local media files, rename and classify files, fetch permitted artwork, and report duplicates without downloading protected content.
@@ -196,16 +196,16 @@
 - [ ] 369. **Screenshot Regression Comparison Pipeline**: Capture approved pages on a schedule, compare screenshots against a baseline, and produce a visual diff report with threshold alerts.
 - [ ] 370. **Backup Integrity Inspection**: Check the backup directory size, timestamp and sample decompression, sends a notification in case of failure and retains the inspection log.
 - [ ] 371. **Email Attachment Archiving Robot**: Pull attachments and archives them into a directory structure according to rules, renames them and writes index JSON.
-- [ ] 372. **Domain Name DNS Change Sentinel**: Query DNS records on a schedule, record a timeline of changes, notify on differences, and support multiple domains.
+- [ ] 372. **Folder Change Journal**: Record local file additions, edits, and removals on a schedule, show a change timeline, and export selected observations.
 - [ ] 373. **Dependency Update PR Pre-check**: Run installation and smoke scripts on the dependency upgrade branch, summarize the logs and mark merging suggestions.
-- [ ] 374. **Static Resource CDN Preheating Script**: Submit preheating/refresh tasks in batches, record status, failure retries and completion reports.
-- [ ] 375. **Conference Room Equipment Power-on Self-test**: Detect projection/audio/network connectivity (simulation or real detection), and generate a pre-meeting ready list.
+- [ ] 374. **Static Asset Size Reporter**: Inspect a local build folder, group assets by type and size, compare saved snapshots, and export a size-budget report.
+- [ ] 375. **Conference Room Preparation Checklist**: Track furniture, presentation materials, seating, and room setup before meetings, assign owners, and retain completion notes.
 - [ ] 376. **Multi-Environment Configuration Drift Scanner**: Compare configuration keys across environments, report missing, extra, and differing values, and generate a draft synchronization ticket.
 - [ ] 377. **Image Watermark Batch Processor**: Add watermarks, resize images, and convert formats in batches, with reusable templates and dry-run preview.
 - [ ] 378. **Slack/Feishu Daily Summary Script**: Pull tagged messages from Slack or Feishu, generate a structured daily digest, and deliver it to a selected conversation.
 
 ## 8. Content Creation Tools (16 topics)
-> Training points: Canvas/SVG, real-time collaboration, exporting to multiple formats.
+> Practice areas: Canvas/SVG, real-time collaboration, exporting to multiple formats.
 
 - [ ] 79. **Online Whiteboard**: Provide drawing tools, shapes, text, selection, undo, export, and lightweight collaboration in an MVP inspired by Excalidraw.
 - [ ] 80. **Mini CodePen**: Offer side-by-side HTML, CSS, and JavaScript editors with a live preview, error capture, local saves, and shareable links.
@@ -226,7 +226,7 @@
 - [ ] 386. **Multi-Platform Title Lab**: Generate title variations for the same content, record sample click feedback, and capture the patterns behind the strongest options.
 
 ## 9. Education and Learning Tools (12 topics)
-> Training points: interactive animation, sandbox execution, visual teaching.
+> Practice areas: interactive animation, sandbox execution, visual teaching.
 
 - [ ] 87. **Coding Practice Platform**: Provide a project list, code editor, local evaluator, timer, mistake review notebook, and submission history.
 - [ ] 88. **Algorithm Visualization**: Demonstrate sorting, shortest-path, and dynamic-programming algorithms with step controls, adjustable speed, custom input, and explanatory text.
@@ -243,7 +243,7 @@
 - [ ] 392. **Parent-Teacher Meeting Notes Planner**: Help teachers record student strengths, areas for improvement, action plans, meeting talking points, and follow-up dates.
 
 ## 10. Creativity and Experimentation (16 topics)
-> Training points: graphics/audio processing, cross-device experience, AI gameplay innovation.
+> Practice areas: graphics/audio processing, cross-device experience, AI gameplay innovation.
 
 - [ ] 93. **Pixel Artboard + GIF Export**: Implement grid drawing, palette, layers, onion skinning, frame animation and GIF export.
 - [ ] 94. **Metronome + Rhythm Training**: Provide BPM, time signature, visual feedback, auditory feedback, rhythm practice and accuracy statistics.
@@ -264,12 +264,12 @@
 - [ ] 400. **Color Accessibility Contrast Check**: Enter a pair of colors, calculate their contrast ratio, report WCAG AA and AAA results, and suggest accessible alternatives.
 
 ## 11. Developer Tools and Engineering Platforms (40 topics)
-> Training points: code analysis, building experience, team collaboration, and engineering observability.
+> Practice areas: code analysis, building experience, team collaboration, and engineering observability.
 
 - [ ] 101. **Local API Mock Studio**: Define REST endpoints visually, configure response templates, delays, and error rates, generate a mock server, and record request logs.
 - [ ] 102. **OpenAPI Document Comparator**: Compare two OpenAPI files, marking additions, deletions, compatibility risks, and migration recommendations.
 - [ ] 103. **Database Schema Diff Tool**: Read two SQLite/PostgreSQL schemas and output table field differences, index differences and migration SQL drafts.
-- [ ] 104. **Env Configuration Auditor**: Scan projects `.env.example`, compose and code references for missing, unused and sensitive variables.
+- [ ] 104. **Environment Template Comparator**: Compare project configuration templates, highlight missing and unused keys, group differences by file, and export a review checklist.
 - [ ] 105. **Dependency License Dashboard**: Parse package/requirements/go.mod, display licenses, version risks, upgrade recommendations and export reports.
 - [ ] 106. **Code Snippet Knowledge Base**: Collect reusable team snippets with tags, search, configurable placeholders, one-click copying, and usage statistics.
 - [ ] 107. **CLI Task Running Panel**: Register commonly used commands as tasks and provide parameter forms, real-time logs, exit codes and history records.
@@ -278,20 +278,20 @@
 - [ ] 110. **Feature Flag Manager**: Manage local feature flags, environments, user targeting rules, and evaluation logs, and provide front-end SDK examples.
 - [ ] 111. **PR Review Checklist Generator**: Generate reviewer checklist based on diff and project rules, categorizes by risk and support Markdown export.
 - [ ] 112. **Code Complexity Radar**: Scan function length, cyclomatic complexity, duplicate code and dependencies, and output visual hot spots.
-- [ ] 113. **Local Secrets Scanner**: Scan repositories for tokens, private keys, and high-risk configurations, supporting ignore rules and fix recommendations.
+- [ ] 113. **Repository File Convention Checker**: Check file names, folder structure, trailing whitespace, and required project documents against configurable conventions and export suggested edits.
 - [ ] 114. **Docker Compose Visualizer**: Parse compose files, displaying service dependencies, ports, volumes, environment variables, and health check gaps.
 - [ ] 115. **Error Code Dictionary Manager**: Maintain product error codes, user texts, troubleshooting steps and multi-language translations, and support search and export.
 - [ ] 116. **Database Query Favorites**: Save commonly used SQL, parameter templates, execution history, result previews and sensitive field masks.
 - [ ] 117. **Lightweight Release Checkbench**: Manage version numbers, change lists, rollback steps, release approvals, and post-release verification items.
-- [ ] 118. **Webhook Debug Inbox**: Receive external webhook, display headers/body, replay request, signature verification and failure examples.
+- [ ] 118. **Local Event Timeline Explorer**: Import JSON event samples, filter by type and time, inspect payload fields, compare related events, and export selected records.
 - [ ] 119. **Package Volume Analyzer**: Analyze front-end build products or static directories to display large files, duplicate resources, and compression gains.
-- [ ] 120. **Development Environment Health Checker**: Check Git, Docker, Node/Python versions, port occupancy and common configurations, and output repair commands.
+- [ ] 120. **Project Tool Version Checklist**: Compare local Git, Node, Python, and package-manager versions with project requirements and show a reproducible setup checklist.
 
 - [ ] 401. **API Fault Injection Matrix**: Configure delay, 5xx, empty response and current limiting combinations by interface, generate reusable fault scenarios and export them to joint debugging parties.
-- [ ] 402. **Local HTTPS Certificate Assistant**: Generate development certificates, trust guidelines and domain name binding instructions with one click, and support multi-project configuration.
+- [ ] 402. **Development Fixture Library**: Manage reusable local fixture files, attach descriptions and tags, preview contents, compare versions, and export selected bundles.
 - [ ] 403. **Change Impact Test Selector**: Map changed files to relevant test directories and output a recommended regression suite with identified coverage gaps.
 - [ ] 404. **Feature Switch Console**: Manage feature flags, audience percentages and audit logs, and provide local coverage mode.
-- [ ] 405. **Dependency Vulnerability Work Order Bridge**: Import dependency scan reports, create remediation work orders, and track version upgrades and verification evidence.
+- [ ] 405. **Dependency Upgrade Planning Board**: Record desired dependency versions, compatibility notes, owners, target dates, and completed verification steps in an upgrade checklist.
 - [ ] 406. **Database Migration Previewer**: Parse the migration file and display the sequence, dangerous operation flags, and whether the rollback script exists.
 - [ ] 407. **Container Image Layer Analyzer**: Analyze the historical image layer size and file contribution, and mark the fat layer and optimization points.
 - [ ] 408. **Local Message Queue Observation Platform**: Visualize queue depth, consumption delay and dead letters, and support replaying sample messages.
@@ -305,11 +305,11 @@
 - [ ] 416. **Error Code Dictionary Center**: Maintain error codes, meanings, user texts and troubleshooting links, and support search and versions.
 - [ ] 417. **Local Multi-Service Process Orchestrator**: Start local front-end and worker processes from configuration, colorize combined logs, and stop every managed process with one command.
 - [ ] 418. **SQL Slow Query Sample Library**: Include slow SQL, execution plans and optimization records, and support tags and comparison before and after.
-- [ ] 419. **Multi-tenant Webhook Routing Sandbox**: Configure routing rules and retry policies by path/key, inject sample delivery and view hit traces and failure replays.
+- [ ] 419. **Sample Event Rule Playground**: Apply configurable rules to imported JSON event samples, show matching decisions and transformations, and compare rule versions.
 - [ ] 420. **Scaffolding Template Market Local Version**: Browse local project templates, substitute variables, preview the generated file tree, and lock template versions.
 
 ## 12. Collaboration and Real-Time Systems (30 topics)
-> Training points: WebSocket, conflict handling, permissions, online status.
+> Practice areas: shared editing, conflict handling, activity views, updates.
 
 - [ ] 121. **Team Decision-making Voting Room**: Create polls with anonymous or named voting, live results, deadlines, export, and role-based access controls.
 - [ ] 122. **Real-Time Queue and Calling System**: Issue queue numbers, call the next visitor, show service-window status, estimate waiting time, and drive a large display.
@@ -344,7 +344,7 @@
 - [ ] 435. **Collaborative Checklist Room**: Let multiple roles complete the same release-day checklist while showing progress, ownership, and blocking comments.
 
 ## 13. Business and Operational Tools (30 topics)
-> Training points: form process, data dashboard, permissions, import and export.
+> Practice areas: form process, data dashboard, permissions, import and export.
 
 - [ ] 136. **Small CRM**: Manage accounts, contacts, follow-ups, sales stages, reminders and funnel reports.
 - [ ] 137. **Inventory Warning System**: Maintain products, inventory changes, thresholds, suppliers and warning notifications, and support CSV import.
@@ -379,7 +379,7 @@
 - [ ] 450. **Store Energy Consumption Weekly Report**: Enter water and electricity usage, compare it with prior periods, flag unusual days, and generate a weekly report.
 
 ## 14. AI Agents and Automated Workflows (40 topics)
-> Training points: tool invocation, state machine, queue, manual confirmation.
+> Practice areas: tool invocation, state machine, queue, manual confirmation.
 
 - [ ] 151. **Research Data Collection Agent**: Search approved public sources or import local material for a topic, remove duplicates, summarize findings, cite sources, and produce a reading list.
 - [ ] 152. **Codebase Q&A Agent**: Index repository files and answer architecture or implementation questions with file citations and confidence levels.
@@ -424,13 +424,13 @@
 - [ ] 470. **Learning Coach Dialogue Agent**: Ask questions from a course outline, evaluate short answers, record mastery, and generate review points for the next session.
 
 ## 15. Hardware, Edge, and Local-First Apps (30 topics)
-> Training points: local storage, offline experience, device adaptation, sensor data.
+> Practice areas: local storage, offline experience, device adaptation, sensor data.
 
 - [ ] 171. **Offline Family Recipe Box**: Save recipes, ingredients, steps, and photos locally, with offline search, shopping lists, and serving-size conversion.
 - [ ] 172. **Raspberry Pi E-Ink Calendar**: Generate calendar images suitable for ink screens, including weather, schedule, to-do and low-power refresh strategies.
 - [ ] 173. **Local Photo Deduplicator**: Scan photo directories, finds duplicates by hash and similarity, and provide preview, retention rules and recycle bin.
 - [ ] 174. **Home Media Indexer**: Scan local video and music folders, read embedded metadata or approved public catalogs, and provide search, artwork, and playback history.
-- [ ] 175. **LAN File Drop Box**: The browser uploads files to the local machine or LAN device, supporting one-time link, expiration and download records.
+- [ ] 175. **Local File Packaging Desk**: Select local files, preview folder structure and archive size, apply naming templates, create a zip, and keep package history.
 - [ ] 176. **Bluetooth Device Power Display Board**: Read or simulate Bluetooth device power, display status, low battery reminder and historical trends.
 - [ ] 177. **Sensor Data Logger**: Receive data such as temperature and humidity, implement local SQLite, display curves, threshold alarms and export.
 - [ ] 178. **Offline Map Annotator**: Load offline map tiles or static basemaps, add markers, paths, notes and export.
@@ -438,13 +438,13 @@
 - [ ] 180. **Home Medication Reminder**: Manage medicines, dosages, reminders, inventory and medication records, and support multi-person files.
 - [ ] 181. **Old Mobile Phone Information Screen**: Make a full-screen web signage that displays time, weather, schedule, countdown and remote refresh.
 - [ ] 182. **Offline Translation Thesaurus Query**: Import thesaurus files to realize local word search, example sentences, favorites and recent queries.
-- [ ] 183. **LAN Device Scanner**: Scan the local network segment and display devices, ports, manufacturer information and change reminders.
+- [ ] 183. **Home Equipment Inventory**: Record equipment models, room locations, purchase dates, manuals, and maintenance notes with search and reminder views.
 - [ ] 184. **Personal Document Full-Text Indexer**: The system indexes local document content, providing search, highlighting, tagging, and privacy protection instructions.
 - [ ] 185. **Home Energy Consumption Recorder**: Input electricity meter/water meter/gas readings, display usage trends, cost estimates and abnormal reminders.
 
 - [ ] 471. **Raspberry Pi Home Dashboard**: The system locally displays weather, calendar and countdown to get off work, and supports offline caching and night mode.
 - [ ] 472. **USB Device Hot Plug Log**: Record insertion and removal events, device identification and driver prompts to facilitate troubleshooting.
-- [ ] 473. **LAN Device Discovery Map**: Scan network segment host names and open ports, and mark known and unknown devices.
+- [ ] 473. **Room Layout Inventory Map**: Place household equipment on a simple floor plan, attach item details, filter by room, and export an inventory sheet.
 - [ ] 474. **Offline Map Points of Interest Book**: Import GPX and points of interest, browse and annotate offline, suitable for outdoor use without network.
 - [ ] 475. **Sensor Simulator Kit**: Simulate temperature, humidity and door sensor readings and pushes them to local MQTT for automated debugging.
 - [ ] 476. **Edge Log Ring Buffer**: Rolling storage of critical logs on resource-constrained devices, supporting export and water level alarms.
@@ -455,49 +455,49 @@
 - [ ] 481. **Offline QR Code Scanning Gun Web**: The camera scans the QR code to enter the inventory, and the offline queue is synchronized after being connected to the Internet.
 - [ ] 482. **Embedded OTA Status Panel**: Display device firmware version, upgrade batch and failed retries (simulated device group).
 - [ ] 483. **Local Media Photo Album Machine**: Raspberry Pi photo frame mode rotates local photo albums, supports weather subtitles and remote delivery switch.
-- [ ] 484. **Serial Debugging Workbench**: Web serial port sending and receiving, macro commands, timestamp logs and session export.
+- [ ] 484. **Text Format Debugging Workbench**: Compare line endings, encodings, delimiters, and indentation in local text files, preview conversions, and export corrected copies.
 - [ ] 485. **Edge Rule Engine Playground**: Edit if-this-then-that rules, trigger simulated events locally, and record an audit trail.
 
-## 16. Security & Privacy Tools (30 topics)
-> Training points: Threat modeling, encryption, permissions, audit logs.
+## 16. Organization and Recordkeeping Tools (30 topics)
+> Practice areas: structured records, search, printable layouts, reusable templates.
 
-- [ ] 186. **Permission Matrix Auditor**: Import users, roles, and permission tables to identify excessive access, missing permissions, orphaned accounts, and review risks.
-- [ ] 187. **Secure Note Vault**: Encrypt sensitive notes on the client, unlock them with a master password, lock automatically when idle, support search, and export an encrypted backup.
-- [ ] 188. **Suspicious Email Recognition Trainer**: Use curated fictional email samples for classification exercises, explain warning signs, provide safe follow-up guidance, and track training results.
-- [ ] 189. **Personal Data Export List**: Record the data export entry, cycle, file location and deletion request progress of each platform.
-- [ ] 190. **Browser Privacy Checkup Page**: Detect common fingerprint information, permission status, third-party cookies, and local storage exposure.
-- [ ] 191. **File Encryption Sharing Tool**: The system locally encrypt files, generate one-time download package, password prompt and expiration policy.
-- [ ] 192. **Audit Log Viewer**: Import JSONL logs, support filtering, timeline, abnormal behavior marking and export.
-- [ ] 193. **Two-factor Recovery Code Manager**: The system safely save recovery codes, support grouping, marked used, encryption and print version export.
-- [ ] 194. **Privacy-friendly Short Links**: Generate local short links, record access statistics but avoid saving sensitive parameters, and support expiration and revocation.
-- [ ] 195. **Cookie Consent Management Simulator**: Implement site cookie classification, consent pop-ups, preference saving and compliance instructions.
-- [ ] 196. **Personal Threat Model Canvas**: The system guides filling in assets, threats, attack surfaces, protective measures and priorities, and exporting reports.
-- [ ] 197. **Sensitive Screenshot Coding Tool**: Upload a screenshot, automatically or manually redact names, email addresses, and tokens, then preview, undo, and export the sanitized image.
-- [ ] 198. **SSH Configuration Checker**: Parse `~/.ssh/config`, prompts weak configuration, duplicate Host, permission issues and repair commands.
-- [ ] 199. **Data Retention Policy Calendar**: Manage retention periods, deletion reminders, exception approvals, and execution records for different data types.
-- [ ] 200. **Local Zero-trust Access Panel**: Simulate devices, users, resources, and policies, and display access determinations, denial reasons, and audit events.
+- [ ] 186. **Household Storage Label Designer**: Design printable labels with room names, item lists, colors, and QR text, preview label sheets, and export PDF.
+- [ ] 187. **Recipe Variation Notebook**: Save recipe variations, ingredient substitutions, preparation notes, and photos, compare versions, and export a printable recipe card.
+- [ ] 188. **Travel Packing Checklist Builder**: Create packing lists by trip type, assign bags, mark packed items, reuse templates, and print a compact checklist.
+- [ ] 189. **Personal Keepsake Archive**: Catalog keepsakes with photos, dates, stories, tags, and storage locations, then browse a timeline and export an album.
+- [ ] 190. **Stationery Collection Planner**: Track stationery items, quantities, locations, favorite combinations, and restocking notes with search and a compact dashboard.
+- [ ] 191. **Printable Planner Page Designer**: Arrange weekly planner blocks, notes, and checklists on a page, choose typography, preview margins, and export PDF.
+- [ ] 192. **Purchase Receipt Organizer**: Import receipt photos and manually entered details, group purchases by shop and month, search notes, and export a CSV summary.
+- [ ] 193. **Neighborhood Event Scrapbook**: Record attended events, dates, photos, participants, and reflections, then create a searchable timeline and printable highlights.
+- [ ] 194. **Craft Material Inventory**: Track craft materials, colors, quantities, storage bins, and project assignments, with low-stock reminders and CSV export.
+- [ ] 195. **Project Reference Card Library**: Store concise reference cards with code snippets, diagrams, tags, and revision notes, then search and print selected cards.
+- [ ] 196. **Personal Decision Journal**: Record choices, alternatives, expected outcomes, and later reflections, compare outcomes, and export periodic reviews.
+- [ ] 197. **Room Decoration Mood Board**: Arrange images, color palettes, measurements, and furniture notes on a board, compare layouts, and export a presentation image.
+- [ ] 198. **Community Borrowing Ledger**: Record shared items, borrowers, pickup and return dates, condition notes, and reminders with a searchable lending view.
+- [ ] 199. **Personal Paperwork Checklist**: Track documents needed for routine errands, add deadlines and completion notes, reuse checklist templates, and print selected lists.
+- [ ] 200. **Creative Session Notes Organizer**: Record creative sessions, ideas, materials, and next actions, filter by project, and export a weekly progress notebook.
 
-- [ ] 486. **Key Leakage Scanner**: Scan the token form in the warehouse sample, hierarchical reporting and ignoring rules.
-- [ ] 487. **Depends on SBOM Browser**: Parse SBOM display components, licenses and versions, support search and export.
-- [ ] 488. **Permission Matrix Visualization**: Edit role-resource-action matrix to detect over-authorization and blank roles.
-- [ ] 489. **Session Abnormal Login Dashboard**: Display abnormal geographical location and device login examples, support marking as trustworthy and notification.
-- [ ] 490. **Privacy Policy Changes Diff**: Compare two versions of the privacy policy, highlight added and deleted terms and generate a summary.
-- [ ] 491. **Security Baseline Self-Assessment Checklist**: Run a self-assessment using CIS-inspired checklist items, record evidence links, assign owners, and track remediation deadlines.
-- [ ] 492. **Encrypted Note Sharing Once Link**: Generate a one-time read-only link, which will become invalid after reading and the access attempt will be recorded.
-- [ ] 493. **Attachment Sandbox Previewer**: Turn on uploaded sample file metadata in quarantine preview to limit script execution (demo).
-- [ ] 494. **CORS Configuration Checker**: Input response header samples, explain risky configurations and give tightening recommendations.
-- [ ] 495. **Key Rotation Runbook**: Record the key version, rotation window and double-write verification steps, and track the completion status.
-- [ ] 496. **PII Field Discovery Scan**: Scan sample table structures and logs for possible personally identifiable fields and rank them.
-- [ ] 497. **Security Awareness Push Receipt Desk**: Send security reminder cards to the intranet drill list, and count read receipts, test scores, and retraining lists.
-- [ ] 498. **Certificate Transparency Monitor**: Monitor public certificate-transparency events for a specified domain, or use a local simulator, and alert on unexpected issuance.
-- [ ] 499. **Access Token Life Audit**: Statistics of long-term unrotated tokens, showing examples of owners and last use time.
-- [ ] 500. **Least-Privilege Access Request**: Submit an access request with an expiration date and reason, record approval, and generate a revocation task when access expires.
+- [ ] 486. **Local Folder Tag Notebook**: Attach descriptive tags and notes to local folder paths, group related folders, find recent entries, and export a catalog.
+- [ ] 487. **Collection Exhibit Planner**: Arrange selected collection items into exhibits, add captions and display positions, preview a layout, and print an exhibit guide.
+- [ ] 488. **Weekend Task Shuffle Board**: Organize household tasks by time and effort, shuffle a balanced weekend plan, mark completion, and reuse successful plans.
+- [ ] 489. **Presentation Rehearsal Log**: Record rehearsal duration, slide notes, speaking reminders, and feedback, compare sessions, and export a revision checklist.
+- [ ] 490. **Photo Print Order Planner**: Select local photos, assign print sizes and quantities, preview crop choices, estimate paper use, and export an order sheet.
+- [ ] 491. **Celebration Budget Worksheet**: Plan decorations, food, venue supplies, and shared costs, compare estimates with actual spending, and export a budget sheet.
+- [ ] 492. **Reading Discussion Card Builder**: Create discussion cards from book notes, group questions by chapter, mark reviewed cards, and export a printable meeting pack.
+- [ ] 493. **Workshop Supply Checklist**: Plan materials by activity and participant count, record packed quantities, mark shortages, and export preparation sheets.
+- [ ] 494. **Everyday Repair Notes Library**: Record household repair notes, parts, before-and-after photos, costs, and follow-up dates, with tags and search.
+- [ ] 495. **Local Text Template Catalog**: Organize reusable text templates with placeholders, preview filled examples, track revisions, and export selected template sets.
+- [ ] 496. **Personal Milestone Photo Wall**: Arrange photos and notes around dated milestones, filter by theme, adjust the layout, and export a poster.
+- [ ] 497. **Club Attendance Summary Desk**: Import club attendance sheets, group sessions by month, show participation totals, and prepare printable member summaries.
+- [ ] 498. **Hobby Project Materials Estimator**: Enter project dimensions and material presets, calculate quantities and cost estimates, save scenarios, and export a shopping sheet.
+- [ ] 499. **Board Game Score History**: Record players, games, rounds, and scores, display trends and personal bests, and export selected match histories.
+- [ ] 500. **Handmade Item Order Notebook**: Track handmade orders, colors, quantities, preparation steps, due dates, and pickup notes with a simple progress board.
 
 ## 17. Industry Workbenches and Vertical Apps (40 topics)
-> Training points: business modeling, form flow, role view, operation closed loop.
+> Practice areas: business modeling, form flow, role view, operation closed loop.
 
-- [ ] 201. **Clinic Appointment Front Desk**: Manage clinician schedules, appointments, arrivals, rescheduling, cancellations, and today's waiting queue in a front-desk view.
-- [ ] 202. **Pet Hospital Case Book**: Record pet files, medical records, vaccine reminders, prescriptions and follow-up plans, and support owners to view history by pet.
+- [ ] 201. **Art Studio Booking Desk**: Manage studio rooms, instructors, workshop appointments, arrivals, rescheduling, cancellations, and a daily attendance queue.
+- [ ] 202. **Instrument Repair Case Book**: Record instruments, reported defects, repair steps, parts, estimates, and pickup dates, with a searchable service history.
 - [ ] 203. **Gym Membership Manager**: Manage membership plans, personal-training sessions, facility check-ins, renewal reminders, and class usage while showing each member's current status.
 - [ ] 204. **Small B&B Operation Desk**: Manage room status, reservations, check-in and check-out, cleaning tasks and income statistics, and support viewing available rooms within a date range.
 - [ ] 205. **Restaurant Waiting and Reservation Board**: Record table seats, reservations, waiting queues, check-in and seating status, and provide a quick operation view at the front desk.
@@ -531,15 +531,15 @@
 - [ ] 512. **Studio Schedule Board**: Studio occupancy, equipment borrowing and customer schedule conflict detection.
 - [ ] 513. **Car Beauty Construction Order**: Construction project, technician, quality inspection photos and vehicle delivery confirmation.
 - [ ] 514. **Shared Office Visitor Registration**: Visitor reservation, QR code sign-in and host confirmation, export daily report.
-- [ ] 515. **Pet Foster Care Daily**: Foster care diary, feeding records and notification of abnormalities to parents (non-diagnosis and treatment).
+- [ ] 515. **Board Game Lending Journal**: Track borrowed games, borrowers, return dates, missing pieces, and condition notes, with reminders and a searchable lending history.
 - [ ] 516. **Wedding Preparation Task Tree**: Suppliers, node deadlines and payment node reminders.
 - [ ] 517. **Scenic Area Volunteer Schedule**: Job requirements, volunteer skill matching and check-in time statistics.
 - [ ] 518. **Campus Lost and Found Desk**: Registration of lost and found items, matching suggestions and verification of claims.
 - [ ] 519. **Coffee Bean Roasting Batch Book**: Batch parameters, cupping notes and cup scoring trends (process management).
-- [ ] 520. **Logistics Cold Chain Temperature Sampling**: Record cold-chain temperature samples, threshold alerts, carriers, and corrective actions using non-medical sample data.
+- [ ] 520. **Warehouse Condition Log**: Record room temperature and humidity samples, annotate storage areas, display trends, and attach inspection notes and follow-up tasks.
 
 ## 18. Team Knowledge and Internal Tools (40 topics)
-> Training points: knowledge management, process collaboration, permission awareness, retrievable information.
+> Practice areas: knowledge management, process collaboration, permission awareness, retrievable information.
 
 - [ ] 221. **Internal SOP Manager**: Maintain process documents, applicable roles, versions, review status, and expiration reminders so the team can find the latest approved procedure.
 - [ ] 222. **Newcomer Onboarding Task Package**: Generate onboarding checklists, data links, mentor arrangements and completion progress by position, and support HR to check batch status.
@@ -584,7 +584,7 @@
 - [ ] 540. **Silent Agenda Board in Conference Room**: Attach the agenda and reference links before a meeting, then track progress and decisions during the session.
 
 ## 19. Data Operations and Quality Governance (40 topics)
-> Training points: data import, cleaning, rule verification, interpretable reports.
+> Practice areas: data import, cleaning, rule verification, interpretable reports.
 
 - [ ] 241. **CSV Field Mapping Wizard**: Import CSVs from different sources, manually match fields, preview results, save mapping templates, and export standard data.
 - [ ] 242. **Data Quality Inspection Platform**: Configure required, unique, range and format rules, and display error samples and repair progress after importing data.
@@ -613,7 +613,7 @@
 - [ ] 544. **Report Caliber Change Log**: Record indicator definition changes, effective versions and notification lists.
 - [ ] 545. **Buried Event Dictionary**: Event name, attributes, trigger page and owner, support for abandonment mark.
 - [ ] 546. **Data Request SLA Board**: Track intake, queue time, ownership, and delivery performance for internal data requests against an SLA.
-- [ ] 547. **Sample Set Version Management**: General sample set version, label and change instructions (non-biological experiments).
+- [ ] 547. **Illustration Asset Version Ledger**: Maintain versions of illustration files, descriptions, tags, and change notes, compare revisions, and export a selected collection.
 - [ ] 548. **Null Value Rate Trend Monitoring**: Key fields Null value rate daily trend and threshold alarm.
 - [ ] 549. **Duplicate Primary Key Hunter**: Scan the imported table for duplicate keys and output samples and repair suggestions.
 - [ ] 550. **Data Dictionary Review Flow**: Field Definition Proposal, Comment and Approval Release.
@@ -629,7 +629,7 @@
 - [ ] 560. **Permission Row-level Policy Directory**: Define row-level filtering rules for datasets, document the applicable roles, and provide a searchable policy directory.
 
 ## 20. Creator Business and Community Operations (40 topics)
-> Training points: content planning, fan operation, commercialization process, feedback closed loop.
+> Practice areas: content planning, fan operation, commercialization process, feedback closed loop.
 
 - [ ] 261. **Creator Topic Pool**: Collect inspiration, platform, target audience, asset status and release time to support progress from idea to release.
 - [ ] 262. **Content Performance Review Platform**: Input multi-platform playback, interaction, conversion and notes to display popular content features and review conclusions.
@@ -674,9 +674,9 @@
 - [ ] 580. **Podcast Ad Insertion Schedule**: Bind advertising slots to customers and podcast episodes, track availability, and prevent overselling.
 
 ## 21. Operations, Testing, and Delivery Assurance (40 topics)
-> Training points: operation observation, quality inspection, release process, fault recovery.
+> Practice areas: operation observation, quality inspection, release process, fault recovery.
 
-- [ ] 281. **Service Health Check Panel**: Configure service address, check frequency, response time and status history, display current health and recent incidents.
+- [ ] 281. **Scheduled Task Result Panel**: Import job execution records, show the latest result and duration, filter failures, and compare trends across recurring jobs.
 - [ ] 282. **Interface Smoke Test Bench**: Maintain interfaces, request samples, expected results and recent execution status, suitable for quick verification before release.
 - [ ] 283. **Release Window Calendar**: Record version, owner, freezing period, release time and rollback contact to avoid conflicting releases.
 - [ ] 284. **Rollback Drill Checklist**: Maintain the system, rollback steps, verification points, drill records and risk items to help the team drill regularly.
@@ -693,7 +693,7 @@
 - [ ] 295. **Environment Consistency Checker**: Compare configuration items and versions of development, testing, and production, and mark differences and items to be confirmed.
 - [ ] 296. **Canary Release Monitoring Board**: Track canary cohorts, traffic percentages, metric thresholds, pause conditions, and the result of each rollout stage.
 - [ ] 297. **Data Backup Acceptance Form**: Manage backup tasks, latest success time, recovery drills and exception records, and remind backups that have not been verified for a long time.
-- [ ] 298. **Security Remediation Tracking Desk**: Register vulnerabilities, affected systems, remediation owners, deadlines and verification status to display overdue risks.
+- [ ] 298. **Documentation Correction Tracker**: Register document issues, affected pages, owners, deadlines, and review results, and display overdue corrections.
 - [ ] 299. **Automated Job Runbook**: Record scheduled jobs, recent executions, duration, failure reasons, and a controlled manual rerun action for operators.
 - [ ] 300. **Release Risk Assessment Table**: Generate a release risk summary based on functional scope, data impact, dependencies, rollback difficulty, and verification plan scores.
 
@@ -706,7 +706,7 @@
 - [ ] 585. **Hot Configuration Update Audit**: Record each hot configuration update, operator, validation result, and rollback point.
 - [ ] 586. **Test Environment Reservation Calendar**: Reserve shared test environments, detect conflicts, show current ownership, and remind teams to release unused reservations.
 - [ ] 587. **Defect Clustering Dashboard**: Cluster defects by module and error signature to display hot spots.
-- [ ] 588. **Performance Baseline Comparator**: Import two stress test summaries to compare P95, error rate and regression judgment.
+- [ ] 588. **Page Render Baseline Comparator**: Import local page-render timing samples, compare percentiles across versions, highlight slower pages, and export a performance report.
 - [ ] 589. **Dependency Service Drill Switch**: Simulate dependency fault switch and record the drill results.
 - [ ] 590. **Release Window Conflict Radar**: Visualize release windows across teams and highlight overlapping dependencies and schedule risks.
 - [ ] 591. **Log Sampling Policy Configuration**: Configure module sampling rate and retention period, and estimate storage usage.
@@ -717,7 +717,7 @@
 - [ ] 596. **Capacity Water Level Weekly Report**: Summarize CPU and storage water levels and growth forecasts (sample) to generate a weekly report.
 - [ ] 597. **Change Freeze Calendar**: Maintain change-freeze windows and exception approvals, and warn when a planned release conflicts with a freeze.
 - [ ] 598. **Smoke Use Case Priority Wall**: Smoke set ranking, recent failures and owners.
-- [ ] 599. **Multi-active Traffic Switching Panel**: Display unit traffic proportion and switching audit (simulation).
+- [ ] 599. **Release Stage Progress Panel**: Display deliverables moving through draft, review, staging, and completion, with owner notes, timestamps, and stage summaries.
 - [ ] 600. **Deliverable Acceptance Checker**: Validate evidence links against an acceptance checklist, flag missing proof, and generate a release decision report.
 
 ## Progress

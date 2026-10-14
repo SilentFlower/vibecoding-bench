@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 
 from fastapi import HTTPException, Response
 from fastapi.testclient import TestClient
-from account_runtime import AccountRuntime, atomic_json
+from account_runtime import AccountRuntime, atomic_json, derive_v3_fingerprint
 from login_drafts import LoginDraftStore
 import main
 
@@ -86,6 +86,25 @@ class LoginDraftTests(unittest.TestCase):
             main.delete_login_draft(self.row["environment_id"], draft["generation"])
         main.login_cancel(second["session_id"])
         self.assertEqual(main.list_login_drafts()[0]["state"], "cancelled")
+
+    def test_new_login_uses_default_fingerprint_without_turning_auto_into_manual(self) -> None:
+        """登录草稿默认洛杉矶，账号请求仍保留自动配置语义。@return None。"""
+        self.runtime.fingerprint = derive_v3_fingerprint
+
+        def begin(sid, account, version, force):
+            """替代 Docker 登录，保留真实新草稿创建及已传入账号字段。"""
+            self.assertIsNone(account["timezone"])
+            row = self.runtime._row(account["name"], timezone=account["timezone"])
+            profile = self.runtime._root(row) / "home/.claude"
+            profile.mkdir(parents=True)
+            return row, self.container, profile, "/home/node"
+
+        with patch.object(self.runtime, "begin_login", side_effect=begin):
+            session = self.manager.start("new-default", {})
+        row = self.runtime._row(session.name)
+        fingerprint = json.loads(row["fingerprint_json"])
+        self.assertEqual("America/Los_Angeles", fingerprint["tz"])
+        self.assertEqual("en_US.UTF-8", fingerprint["lang"])
 
     def test_active_legacy_session_is_adopted_before_commit(self) -> None:
         """旧活跃会话继续时补齐标记，仍用原 SID 并能正常提交。@return None。"""

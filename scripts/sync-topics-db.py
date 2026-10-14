@@ -67,6 +67,24 @@ _UNNATURAL_PHRASES = (
     "synonymously",
 )
 
+# 这是用户选择的题库范围，不把普通联网应用、文件遍历或课程练习当作排除主题。
+_EXCLUDED_TOPIC_PATTERNS = (
+    ("模型训练或微调", re.compile(
+        r"\b(?:train(?:ing|ed)?|retrain(?:ing)?|fine[- ]?tun(?:e|ing))\b[^.\n]{0,100}\b(?:models?|llms?|neural)\b"
+        r"|\b(?:models?|llms?|neural)\b[^.\n]{0,100}\b(?:train(?:ing|ed)?|retrain(?:ing)?|fine[- ]?tun(?:e|ing))\b", re.I)),
+    ("网络协议、代理或扫描", re.compile(
+        r"\b(?:dns|mdns|ssh|socks5?|tcp|udp|proxy|proxies|subnets?|packet capture|port forwarding)\b"
+        r"|\b(?:lan|network|device|port)\s+(?:scanner|scanning|discovery|protocols?)\b"
+        r"|\b(?:scan|scanning)\b[^.\n]{0,80}\b(?:network|ports?|hosts?|domains?)\b"
+        r"|\b(?:http load test|webhook|header overwriter|https? certificate|tls certificate|certificate expiration|certificate transparency|cors|traffic switching)\b", re.I)),
+    ("安全类", re.compile(
+        r"\b(?:security|cybersecurity|vulnerabilit(?:y|ies)|phishing|fingerprint|password|encryption|encrypted|zero[- ]trust)\b"
+        r"|\b(?:threat model|secrets? scanner|key leakage|key rotation|access token|two-factor|recovery code|cookie consent)\b", re.I)),
+    ("生物或医疗", re.compile(
+        r"\b(?:biolog\w*|genom\w*|dna|rna|proteins?|bacteria\w*|viruses?|molecul\w*|drugs?|medical|clinical|clinic|hospital|vaccine\w*|prescriptions?)\b"
+        r"|\b(?:health record|health data|heart rate|plant care|pet foster)\b", re.I)),
+)
+
 
 @dataclass(frozen=True)
 class Topic:
@@ -163,6 +181,14 @@ def validate_topics(topics: list[Topic]) -> None:
             risky.append((topic.no, matches))
     if risky:
         raise SystemExit(f"题目包含高风险目标短语: {risky[:20]}")
+    excluded = []
+    for topic in topics:
+        content = f"{topic.category}\n{topic.title}\n{topic.description}"
+        matches = [name for name, pattern in _EXCLUDED_TOPIC_PATTERNS if pattern.search(content)]
+        if matches:
+            excluded.append((topic.no, matches))
+    if excluded:
+        raise SystemExit(f"题目包含用户排除的主题: {excluded[:20]}")
     unnatural = []
     for topic in topics:
         content = f"{topic.title}\n{topic.description}".casefold()
