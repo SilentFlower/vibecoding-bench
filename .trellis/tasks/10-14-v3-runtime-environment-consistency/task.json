@@ -1,0 +1,572 @@
+{
+  "id": "v3-runtime-environment-consistency",
+  "name": "v3-runtime-environment-consistency",
+  "title": "v3 固定执行环境与题库主题修复",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-14",
+  "completedAt": "2026-10-14",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-14T15:52:36Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-14T15:06:15Z",
+      "contextKey": "codex_01a13a4b-ce60-7443-b00e-14ee1e95e1f5",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "c7a40a0d66f2c83c0634b53ff66cbd8ba48bb4a1",
+        "status": [
+          {
+            "status": " M",
+            "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/account-hold-comparison.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/recovery-contracts.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/telemetry-evidence.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/worker-contracts.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/research/current-evidence.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/task.json"
+          },
+          {
+            "status": " M",
+            "path": "cc2api"
+          },
+          {
+            "status": "??",
+            "path": "deploy/v3/fixtures/official_cli_quota.py"
+          },
+          {
+            "status": "??",
+            "path": "deploy/v3/fixtures/quota_statusline.py"
+          },
+          {
+            "status": "??",
+            "path": "deploy/v3/verify_cli_quota.py"
+          },
+          {
+            "status": " M",
+            "path": "deploy/v3/verify_local.py"
+          },
+          {
+            "status": " M",
+            "path": "images/v3/Dockerfile"
+          },
+          {
+            "status": " M",
+            "path": "orchestrator/account_runtime.py"
+          },
+          {
+            "status": "??",
+            "path": "orchestrator/cli_quota.py"
+          },
+          {
+            "status": " M",
+            "path": "orchestrator/main.py"
+          },
+          {
+            "status": " M",
+            "path": "orchestrator/test_account_runtime.py"
+          },
+          {
+            "status": " M",
+            "path": "orchestrator/test_auto_usage.py"
+          },
+          {
+            "status": "??",
+            "path": "orchestrator/test_cli_quota.py"
+          },
+          {
+            "status": " M",
+            "path": "webui/app.js"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "c7a40a0d66f2c83c0634b53ff66cbd8ba48bb4a1",
+            "status": [
+              {
+                "status": " M",
+                "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/account-hold-comparison.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/recovery-contracts.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/telemetry-evidence.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/worker-contracts.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/research/current-evidence.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/task.json"
+              },
+              {
+                "status": " M",
+                "path": "cc2api"
+              },
+              {
+                "status": "??",
+                "path": "deploy/v3/fixtures/official_cli_quota.py"
+              },
+              {
+                "status": "??",
+                "path": "deploy/v3/fixtures/quota_statusline.py"
+              },
+              {
+                "status": "??",
+                "path": "deploy/v3/verify_cli_quota.py"
+              },
+              {
+                "status": " M",
+                "path": "deploy/v3/verify_local.py"
+              },
+              {
+                "status": " M",
+                "path": "images/v3/Dockerfile"
+              },
+              {
+                "status": " M",
+                "path": "orchestrator/account_runtime.py"
+              },
+              {
+                "status": "??",
+                "path": "orchestrator/cli_quota.py"
+              },
+              {
+                "status": " M",
+                "path": "orchestrator/main.py"
+              },
+              {
+                "status": " M",
+                "path": "orchestrator/test_account_runtime.py"
+              },
+              {
+                "status": " M",
+                "path": "orchestrator/test_auto_usage.py"
+              },
+              {
+                "status": "??",
+                "path": "orchestrator/test_cli_quota.py"
+              },
+              {
+                "status": " M",
+                "path": "webui/app.js"
+              }
+            ],
+            "worktreeDiffSha256": "78c357dcfe78425a207f23948cc9b3b101855021c8dd22dbde4c324c58f50068",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md",
+                "sha256": "8ba4e9f26af89b42e2ce20fe88bee62e3e03bbf35a9718e02c96b7c4c27b5745"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl",
+                "sha256": "91534c2dd15014470e9266e207fea31ca117537fb0f5c74e7880d9954b2c8399"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md",
+                "sha256": "0af15a1ee3eef2ad7d75bbfeee48ce78a7a5c47a977ab65e650f68ea3e85a50d"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl",
+                "sha256": "3f8050ff392e2bb0ed37ce8865bfe3b7c4e341c8fe89c01bd643386fc186c2e1"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md",
+                "sha256": "bd30f98dafc1b6726301d7d44183be17d2f1782d63cba44ec47bffd2c875c43f"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md",
+                "sha256": "34b4876aefc2ba9cb2c345839e614f18611050f2f429e4cbf69d52dc9fb79715"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md",
+                "sha256": "1e907d1a7f469f49b46a4a9644156c8af2379164e5064b88ef069acc74b5fbc0"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md",
+                "sha256": "3b96b5901fa58216e783fafaf84f7c5e370c70aba8c2de82b5ed42bf5b6513df"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md",
+                "sha256": "95db129ed16d1a85e3ef21361ec506332a4cec902f20ec91cafa76c49a681819"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json",
+                "sha256": "53a52a996c4db18c5b422746b488099f45c1dedc4d18b245d500e92a02edcdef"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/brief.md",
+                "sha256": "b96632b24c8289b8912f782b091022a148037914057f48a591925e82dd982143"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/check.jsonl",
+                "sha256": "6a334cbc38658f19938380b89767461ca59ab44677025b5654085f075cebbcd5"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/design.md",
+                "sha256": "a50397b8ef738d04bd160907a594f00969ce2aecdbbd59a0087d567d4b395580"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.jsonl",
+                "sha256": "d289c33e827e2e5a17529626199f34a5a5bbb411451a5491e4150776cecf7428"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.md",
+                "sha256": "905c420bd2ff3d396634bd5cc2972b0504a0e0d9c28e12b1ceb53bddabef8691"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/prd.md",
+                "sha256": "17ef0f84dc4dbd14d6393b2bef47064184a7f6e2516129cce05e8a3fcc476347"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/account-hold-comparison.md",
+                "sha256": "76ba3752b38a4dc32ce8a4d2a9a6dc8f10f4bcbf5bfb6e642bb058bd16ce762c"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/recovery-contracts.md",
+                "sha256": "5b305441324f8f6c72568be289a1a7a07751f2eef77113916ac5063f6dbb002a"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/telemetry-evidence.md",
+                "sha256": "8cf11213eee1518660d1903b475964fca7710fb210865ec3fa7ab79decadf841"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/worker-contracts.md",
+                "sha256": "f89688bd7de8ff0a9eadfb4d97294660f0681ef6b97697627fe5b5eae419c649"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/task.json",
+                "sha256": "cf64ee2d3af29224a9c79d6abbf27541482ca0e090ec218b51f660b0a7fa54f5"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/brief.md",
+                "sha256": "59fe498b7e300b0f8f39e3589eb696f62f5955d3be8a352020b784d91d460f08"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/check.jsonl",
+                "sha256": "1706622e8a35e707d89458d1461251dd98e688398bc25a4945cd0d50505b3f5f"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/design.md",
+                "sha256": "f4940a74480c7c2dcdea8f5b5ffbb517cdf00c01ddd9e5f1240f1569357d7129"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.jsonl",
+                "sha256": "1706622e8a35e707d89458d1461251dd98e688398bc25a4945cd0d50505b3f5f"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.md",
+                "sha256": "07fcc5dce5dfd24802e161edbf3333aab4ab7f68a87b48dc72571560a34b7b57"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/prd.md",
+                "sha256": "2f44e4092380c3b2d0a417e5b93c6480749464ef8ac6e0cdb27a09e79ff72edf"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/research/current-evidence.md",
+                "sha256": "fe7eae8555792ab821aa320773548af89312dcfd45112bcdbc3f09f2c14b56b5"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/task.json",
+                "sha256": "877d2412d6e23987cebe2eac73b928ad4dd47dce313f2cc4d4419e3477e12469"
+              },
+              {
+                "path": "deploy/v3/fixtures/official_cli_quota.py",
+                "sha256": "704798ea7eb1d4ad91574adbf4d82493a77db16d23da00def9e4e145f6971993"
+              },
+              {
+                "path": "deploy/v3/fixtures/quota_statusline.py",
+                "sha256": "a7ef4beaaafc0238e5839a6f832db96a44a190f44b899c0adc7b71b0fa868e42"
+              },
+              {
+                "path": "deploy/v3/verify_cli_quota.py",
+                "sha256": "f898f66832bfd617e229fe1a75dd9117dccacb97222adebe3aa7b430f535ebdf"
+              },
+              {
+                "path": "orchestrator/cli_quota.py",
+                "sha256": "c2f024a398433d7b6bbd002c1164ca19294a97646ce5f7a67e778000778cb22f"
+              },
+              {
+                "path": "orchestrator/test_cli_quota.py",
+                "sha256": "962dde5661a8109227cac4b0ff243e182fff678e7c5ead16f5712f9793948d1e"
+              }
+            ],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "1188f2bd840692a0b552cb94e32933a6eaba09c4060194aed6d4e6b26e69c18a"
+          },
+          {
+            "root": "cc2api",
+            "head": "4f1ed1f208cdf831c56d03026e249a758b248fa7",
+            "status": [
+              {
+                "status": " M",
+                "path": "src/main.rs"
+              },
+              {
+                "status": " M",
+                "path": "src/service/usage_poller.rs"
+              }
+            ],
+            "worktreeDiffSha256": "153b917d7ff8bdb79934ce42f48a28a82feaafc445f2c36f828b70c5e6abcb5c",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "fc7a2c9ec3b99e20ab3cc46f71f67519ce8ec70649b0a946f90f437665256800"
+          }
+        ],
+        "fingerprint": "bae5b637d73999468a5c38c877d995e04ebe340e4689021f8d3b46060dfb426b"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "完成 v3 持久环境一致性、洛杉矶默认值、空目录与管理脚本权限修复",
+      "替换 67 道题并同步主题校验和分类风格",
+      "完成 Full Check-All、单测及隔离 Docker／浏览器验收",
+      "同步账号环境、被动额度、题库与网关运行规范",
+      "完成两仓业务提交及推送，包含已验收被动额度依赖"
+    ],
+    "partialStep": null,
+    "nextStep": "由独立发布流程核对联合镜像、备份并同步线上题库，再进行正式账号环境验收",
+    "notes": "本次未部署；已有账号画像、HOME、会话和历史 prompt 保留。其他任务记录及原有协议规范修改保持未提交。",
+    "updatedAt": "2026-10-14T15:52:36Z"
+  }
+}

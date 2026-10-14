@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md", "reason": "固定环境权威、执行入口、项目控制文件和权限边界"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "实际类、中文注释、数据库及回归要求"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/state-management.md", "reason": "账号有效时区展示与后端权威值"}
+{"file": ".trellis/tasks/10-14-v3-runtime-environment-consistency/research/current-evidence.md", "reason": "远程输出与代码根因及兼容边界"}
+{"file": ".trellis/spec/vibecoding-bench/backend/topic-prompt-contract.md", "reason": "用户追加题库主题替换、英文校验与历史不回填"}
