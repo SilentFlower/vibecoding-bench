@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import threading
 import unittest
+from contextlib import closing
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -32,8 +33,8 @@ class AccountRuntimeTests(unittest.TestCase):
 
         self.database = database
         with database() as connection:
-            connection.execute("CREATE TABLE accounts(id INTEGER PRIMARY KEY, name TEXT, cc2api_account_id INTEGER)")
-            connection.execute("INSERT INTO accounts VALUES(1,'synthetic',7)")
+            connection.execute("CREATE TABLE accounts(id INTEGER PRIMARY KEY, name TEXT, cc2api_account_id INTEGER, enabled INTEGER DEFAULT 1, deleted_at REAL)")
+            connection.execute("INSERT INTO accounts(id,name,cc2api_account_id) VALUES(1,'synthetic',7)")
         self.client = Mock()
         self.gateway = Mock()
         self.fingerprint = Mock(return_value={"profile_version": 2, "hostname": "fixed", "machine_id": "a" * 32,
@@ -214,6 +215,36 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertNotIn("fingerprint_json", environment)
         self.assertFalse(environment["can_reprofile"])
         self.assertIn("profile v2", environment["reprofile_message"])
+
+    def test_environment_api_hides_deleted_accounts_and_preserves_history(self) -> None:
+        """隐藏已删除账号，保留停用账号、登录草稿及历史数据。@return None。"""
+        with closing(self.database()) as connection, connection:
+            connection.executemany("INSERT INTO accounts(id,name,enabled,deleted_at) VALUES(?,?,?,?)", [
+                (2, "disabled", 0, None),
+                (3, "deleted", 0, 1.0),
+                (4, "removed", 1, None),
+            ])
+            connection.execute("CREATE TABLE runs(id TEXT PRIMARY KEY,account_id INTEGER,environment_id TEXT)")
+        self.runtime._row("synthetic", 1)
+        self.runtime._row("disabled", 2)
+        deleted = self.runtime._row("deleted", 3)
+        self.runtime._row("removed", 4)
+        self.runtime._row("pending")
+        evidence = self.runtime._root(deleted) / "flows" / "history.txt"
+        evidence.parent.mkdir(parents=True)
+        evidence.write_text("历史证据")
+        with closing(self.database()) as connection, connection:
+            connection.execute("DELETE FROM accounts WHERE id=4")
+            connection.execute("INSERT INTO runs VALUES(?,?,?)", ("historical-run", 3, deleted["environment_id"]))
+        with patch.object(main, "get_db", self.database), patch.object(main, "account_runtime", self.runtime):
+            environments = main.v3_environments()
+        self.assertEqual(["disabled", "pending", "synthetic"], [row["name"] for row in environments])
+        with closing(self.database()) as connection:
+            self.assertEqual(5, connection.execute("SELECT COUNT(*) FROM account_environments").fetchone()[0])
+            self.assertEqual(1.0, connection.execute("SELECT deleted_at FROM accounts WHERE id=3").fetchone()[0])
+            history = connection.execute("SELECT account_id,environment_id FROM runs WHERE id='historical-run'").fetchone()
+        self.assertEqual((3, deleted["environment_id"]), tuple(history))
+        self.assertEqual("历史证据", evidence.read_text())
 
     def test_legacy_reprofile_gate_is_removed_on_restart_reconcile(self) -> None:
         """管理服务重启迁回正常生命周期，画像与凭据保持。@return None。"""
@@ -466,7 +497,7 @@ class AccountRuntimeTests(unittest.TestCase):
     def test_slow_other_account_setup_does_not_block_lease_heartbeat(self) -> None:
         """实际 ensure 在等待容器时，另一个账号仍能在正常周期续租。@return None。"""
         with self.database() as connection:
-            connection.execute("INSERT INTO accounts VALUES(2,'other',NULL)")
+            connection.execute("INSERT INTO accounts(id,name,cc2api_account_id) VALUES(2,'other',NULL)")
         self.runtime.release_id = "test"
         self.client.images.get.return_value.attrs = {"Config": {"Labels": {"vibebench.product": "v3", "vibebench.role": "account", "vibebench.release": "test"}}}
         entered, finish, renewed = threading.Event(), threading.Event(), threading.Event()

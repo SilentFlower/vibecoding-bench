@@ -10837,13 +10837,22 @@ def v3_transport(account_id: int):
 
 
 @app.get("/api/environments")
-def v3_environments():
-    """列出环境状态及固化基础参数，排除服务秘密和凭据。"""
+def v3_environments() -> list[dict]:
+    """列出未删除账号和登录草稿的环境，排除服务秘密和凭据。
+
+    :return: 按名称排序的环境状态及固化基础参数
+    """
     if not account_runtime:
         return []
     connection = get_db()
     try:
-        rows = [dict(row) for row in connection.execute("SELECT * FROM account_environments ORDER BY name")]
+        # 已删除账号的环境仅保留历史；未绑定草稿和未删除的停用账号仍需可见。
+        rows = [dict(row) for row in connection.execute(
+            "SELECT e.* FROM account_environments e "
+            "WHERE e.account_id IS NULL OR EXISTS ("
+            "SELECT 1 FROM accounts a WHERE a.id=e.account_id AND a.deleted_at IS NULL) "
+            "ORDER BY e.name"
+        )]
     finally:
         connection.close()
     for row in rows:
