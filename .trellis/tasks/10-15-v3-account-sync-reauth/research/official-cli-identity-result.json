@@ -1,0 +1,8 @@
+{
+  "version": "2.1.293 (Claude Code)",
+  "network": "none",
+  "requests": 2,
+  "matches_userID": true,
+  "matches_machineID": false,
+  "account_uuid_matches": true
+}
