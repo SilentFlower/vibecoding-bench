@@ -32,6 +32,7 @@ const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
 const state = {
   accounts: [],
+  accountLoginMessage: '',
   cc2apiAccounts: [],
   topics: [],
   tasks: [],
@@ -216,6 +217,9 @@ async function renderAccounts() {
   } catch (e) { return alert('加载账号失败: ' + e.message); }
 
   const body = $('#accounts-body');
+  const loginResult = $('#account-login-result');
+  loginResult.textContent = state.accountLoginMessage;
+  loginResult.classList.toggle('hidden', !state.accountLoginMessage);
   body.innerHTML = state.accounts.map(a => `
     <tr>
       <td>${a.id}</td>
@@ -1185,6 +1189,10 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
   };
 }
 
+/**
+ * 提交登录并展示本地保存或关联账号凭据同步的实际结果。
+ * @return {Promise<void>} 提交、窗口收口及结果展示完成
+ */
 async function commitAccLogin() {
   const al = state.accLogin;
   if (!al || !al.sid || al.closing || al.committing || al.codeSending) return;
@@ -1198,12 +1206,15 @@ async function commitAccLogin() {
       body: JSON.stringify(al.body || { name: al.name }),
     });
     if (state.accLogin !== al) return;
-    const action = r.credentials_synced ? '已重授权并同步关联账号' : (al.mode === 'relogin' ? '已重新授权' : '账号已保存');
+    const action = r.credentials_synced ? '已重授权并同步关联账号' : (r.credentials_synced === false
+      ? `${al.mode === 'relogin' ? '已重新授权' : '账号已保存'}，仅保存到本地，尚未关联 cc2api`
+      : (al.mode === 'relogin' ? '已重新授权' : '账号已保存'));
     if (al.term) al.term.write(`\r\n\x1b[32m[完成] ${action} (#${r.id})\x1b[0m\r\n`);
     // commit 成功后服务端已清容器；前端关 WS + 弹窗 + 刷列表
     al.committing = false;
     await endAccLogin({ alsoCloseModal: true, skipServerCancel: true });
-    renderAccounts();
+    state.accountLoginMessage = `最近一次登录保存：${al.name}：${action}`;
+    await renderAccounts();
   } catch (e) {
     if (state.accLogin === al) {
       btn.disabled = false;

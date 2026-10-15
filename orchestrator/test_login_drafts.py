@@ -176,6 +176,8 @@ class LoginDraftTests(unittest.TestCase):
             with self.assertRaises(HTTPException):
                 action()
         result = main.login_commit(sid, main.LoginStartIn(name=session.name))
+        self.assertFalse(result["credentials_synced"])
+        self.assertIsNone(result["cc2api_account_id"])
         self.assertEqual(main.list_login_drafts(), [])
         self.assertEqual(main.login_commit(sid, main.LoginStartIn(name=session.name)), result)
         with self.assertRaises(HTTPException):

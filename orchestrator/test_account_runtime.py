@@ -34,6 +34,7 @@ class AccountRuntimeTests(unittest.TestCase):
         self.database = database
         with database() as connection:
             connection.execute("CREATE TABLE accounts(id INTEGER PRIMARY KEY, name TEXT, cc2api_account_id INTEGER, enabled INTEGER DEFAULT 1, deleted_at REAL)")
+            connection.execute("CREATE TABLE app_settings(key TEXT PRIMARY KEY, value TEXT)")
             connection.execute("INSERT INTO accounts(id,name,cc2api_account_id) VALUES(1,'synthetic',7)")
         self.client = Mock()
         self.gateway = Mock()
@@ -55,6 +56,99 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual(initial["fingerprint_json"], renamed["fingerprint_json"])
         self.assertEqual(renamed["name"], "renamed")
         self.fingerprint.assert_called_once_with(None)
+
+    def _identity_configuration(self) -> tuple[dict, Path, Path]:
+        """准备无任务、无抓包记录的合成官方登录身份。
+
+        :return: 固定环境、HOME 配置与管理 profile 配置路径
+        """
+        row = self.runtime._row("synthetic", 1)
+        home = self.runtime._root(row) / "home" / ".claude.json"
+        profile = self.root / "profiles" / row["name"] / ".claude.json"
+        top = {"userID": "d" * 64, "machineID": "e" * 64,
+            "oauthAccount": {"accountUuid": "synthetic-account", "emailAddress": "synthetic@example.invalid"}}
+        atomic_json(home, top)
+        atomic_json(profile, top)
+        return row, home, profile
+
+    def test_native_cli_identity_import_needs_no_capture_or_model_task(self) -> None:
+        """完成登录即可导出同一 userID，不能生成或混用 machineID。@return None。"""
+        row, home, profile = self._identity_configuration()
+        before = (home.read_bytes(), profile.read_bytes())
+        container = Mock()
+        container.exec_run.return_value = SimpleNamespace(exit_code=0, output=json.dumps({
+            "platform_raw": "linux", "arch": "x64", "node_version": "v22", "linux_kernel": "synthetic"}).encode())
+        self.runtime.ensure = Mock(return_value=(row, container))
+        exported = self.runtime.identity_import({"id": 1, "name": "synthetic"}, "2.1.293")
+        self.assertEqual("d" * 64, exported["device_id"])
+        self.assertEqual("cli:2.1.293:config.userID", exported["source"])
+        self.assertEqual(row["environment_id"], exported["environment_id"])
+        self.assertFalse((self.runtime._root(row) / "runtime/identity.json").exists())
+        self.assertEqual(before, (home.read_bytes(), profile.read_bytes()))
+        container.exec_run.assert_called_once()
+
+    def test_cli_identity_rejects_invalid_device_or_different_login(self) -> None:
+        """缺失、异常字段与账号归属变化不能使用另一个设备字段兜底。@return None。"""
+        for value in (None, [], 123, "D" * 64, "d" * 32):
+            with self.subTest(value=value):
+                row, home, _ = self._identity_configuration()
+                top = json.loads(home.read_text())
+                top["userID"] = value
+                atomic_json(home, top)
+                with self.assertRaisesRegex(ValueError, "缺少有效设备身份"):
+                    self.runtime.read_cli_identity(row, "2.1.293")
+        row, home, profile = self._identity_configuration()
+        atomic_json(profile, {"oauthAccount": {"accountUuid": "another-account"}})
+        with self.assertRaisesRegex(ValueError, "账号归属不一致"):
+            self.runtime.read_cli_identity(row, "2.1.293")
+        home.write_text("{")
+        with self.assertRaisesRegex(ValueError, "缺失或损坏"):
+            self.runtime.read_cli_identity(row, "2.1.293")
+
+    def test_local_identity_never_overrides_malformed_or_conflicting_observation(self) -> None:
+        """已有请求证据的格式、来源、账号与设备冲突均保持拒绝。@return None。"""
+        row, _, _ = self._identity_configuration()
+        path = self.runtime._root(row) / "runtime/identity.json"
+        observed = {"device_id": "d" * 64, "account_uuid": "synthetic-account",
+            "source": "cli:/v1/messages:metadata.user_id.device_id"}
+        for value in (None, [], {**observed, "conflict": True}, {**observed, "device_id": "e" * 64},
+                {**observed, "device_id": []}, {**observed, "source": "unknown"},
+                {**observed, "account_uuid": "another-account"}):
+            with self.subTest(observation=value):
+                path.parent.mkdir(exist_ok=True)
+                path.write_text(json.dumps(value))
+                before = path.read_bytes()
+                with self.assertRaises(ValueError):
+                    self.runtime.read_cli_identity(row, "2.1.293")
+                self.assertEqual(before, path.read_bytes())
+        atomic_json(path, observed)
+        self.assertEqual("d" * 64, self.runtime.read_cli_identity(row, "2.1.293")["device_id"])
+
+    def test_unverified_cli_version_requires_real_request_evidence(self) -> None:
+        """未知版本不能猜测 userID 映射，但保留已有正式请求观察的兼容。@return None。"""
+        row, _, _ = self._identity_configuration()
+        with self.assertRaisesRegex(ValueError, "版本.*尚未验证"):
+            self.runtime.read_cli_identity(row, "9.9.9")
+        observed = {"device_id": "f" * 64, "account_uuid": "synthetic-account",
+            "source": "cli:/v1/messages:metadata.user_id.device_id"}
+        atomic_json(self.runtime._root(row) / "runtime/identity.json", observed)
+        self.assertEqual(observed, self.runtime.read_cli_identity(row, "9.9.9"))
+
+    def test_environment_identity_status_is_readonly_and_does_not_wait_for_maintenance(self) -> None:
+        """环境列表不唤醒容器；维护期间返回待核对状态并释放已取得的锁。@return None。"""
+        row, _, _ = self._identity_configuration()
+        with patch.object(main, "get_db", self.database), patch.object(main, "account_runtime", self.runtime), \
+                patch.object(main, "effective_claude_code_version", return_value="2.1.293"):
+            self.assertEqual("已确认 CLI 本地设备身份", main.v3_environments()[0]["identity_status"])
+            guard = main._profile_lock(row["name"])
+            with guard:
+                self.assertIn("正在维护", main.v3_environments()[0]["identity_status"])
+            self.assertTrue(main._oauth_owner_lock(row["name"]).acquire(blocking=False))
+            main._oauth_owner_lock(row["name"]).release()
+            atomic_json(self.runtime._root(row) / "runtime/identity.json", {"conflict": True})
+            self.assertIn("冲突", main.v3_environments()[0]["identity_status"])
+        self.client.containers.run.assert_not_called()
+        self.client.containers.get.assert_not_called()
 
     def test_profile_v2_is_random_and_locale_matches_timezone(self) -> None:
         """新画像字段必须独立随机，美国与伦敦时区使用一致 locale。@return None。"""

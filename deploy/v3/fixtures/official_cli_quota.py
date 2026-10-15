@@ -28,7 +28,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         """处理本地合成请求，返回 None。"""
         body = self.rfile.read(int(self.headers.get('Content-Length', '0')))
-        requests_seen.append({'method':'POST','path':self.path,'model':json.loads(body).get('model')})
+        payload = json.loads(body)
+        user_id = payload.get('metadata', {}).get('user_id')
+        identity = json.loads(user_id) if isinstance(user_id, str) else {}
+        requests_seen.append({'method':'POST','path':self.path,'model':payload.get('model'),
+            'device_identity':{key:identity.get(key) for key in ('device_id','account_uuid')}})
         if '/messages' in self.path:
             model = json.loads(body).get('model', 'claude-opus-4-6')
             self.send_response(200)
@@ -74,7 +78,9 @@ threading.Thread(target=server.serve_forever,daemon=True).start()
 config = {'source':'cli:run:synthetic-official','identity':'synthetic-identity','cwd':str(cwd),'session_dir':str(home / '.claude/projects/-workspace'), 'output':'/lab/cli-quota.jsonl','started_at':started,'previous_command':'printf ORIGINAL_STATUSLINE'}
 (root / 'quota-config.json').write_text(json.dumps(config))
 (home / '.claude/settings.json').write_text(json.dumps({'statusLine':{'type':'command','command':'python3 /lab/wrapper.py' if collect else 'printf ORIGINAL_STATUSLINE'}, 'autoMemoryEnabled':False,'model':'claude-opus-4-6','skipDangerousModePermissionPrompt':True,'permissions':{'defaultMode':'bypassPermissions'}}))
-(home / '.claude.json').write_text(json.dumps({'hasCompletedOnboarding':True,'bypassPermissionsModeAccepted':True,'hasSeenAutoDefaultNudge':True,'projects':{'/workspace':{'hasTrustDialogAccepted':True}}}))
+(home / '.claude.json').write_text(json.dumps({'userID':'a'*64,'machineID':'b'*64,
+    'oauthAccount':{'accountUuid':'synthetic-account','emailAddress':'synthetic@example.invalid','organizationUuid':'synthetic-org'},
+    'hasCompletedOnboarding':True,'bypassPermissionsModeAccepted':True,'hasSeenAutoDefaultNudge':True,'projects':{'/workspace':{'hasTrustDialogAccepted':True}}}))
 (home / '.claude/.credentials.json').write_text(json.dumps({'claudeAiOauth':{'accessToken':'synthetic-oauth','refreshToken':'synthetic-refresh','expiresAt':(started+36000)*1000,'scopes':['user:inference','user:profile'],'subscriptionType':'max','rateLimitTier':'default_claude_max_5x'}}))
 subprocess.run(['chown','-R','1000:1000','/home/node','/workspace','/lab'],check=True)
 master, slave = pty.openpty()

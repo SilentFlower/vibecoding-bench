@@ -27,6 +27,8 @@ from resource_budget import account_limits
 
 NETWORK_INSPECTION_MODES = {"passthrough", "quota", "capture"}
 V3_DEFAULT_TIMEZONE = "America/Los_Angeles"
+CLI_CONFIG_IDENTITY_SOURCES = {"2.1.293": "cli:2.1.293:config.userID"}
+CLI_REQUEST_IDENTITY_SOURCE = "cli:/v1/messages:metadata.user_id.device_id"
 
 
 def locale_for_timezone(timezone: str | None) -> str:
@@ -1737,24 +1739,61 @@ class AccountRuntime:
             (self._root(row) / "runtime" / "execution.json").unlink(missing_ok=True)
             self._update(row, state="stopped", **({"container_id": None} if operation == "rebuild" else {}))
 
+    def read_cli_identity(self, row: dict, version: str) -> dict:
+        """只读核验官方 CLI 的本地身份及已有请求观察，不创建环境。
+
+        :param row: 已登记的固定环境；调用方按 owner、profile、environment 顺序保护读取
+        :param version: 目标 CLI 的精确版本
+        :return: 无凭据的设备、账号和来源；缺失或冲突时抛出 ValueError
+        """
+        root = self._root(row)
+        identity_file = root / "runtime" / "identity.json"
+        has_observation = identity_file.exists()
+        try:
+            top = json.loads((root / "home" / ".claude.json").read_text())
+            profile = json.loads((self.data / "profiles" / row["name"] / ".claude.json").read_text())
+            observed = json.loads(identity_file.read_text()) if has_observation else None
+        except (OSError, ValueError):
+            raise ValueError("CLI 身份配置缺失或损坏，请检查固定环境的登录产物") from None
+        if not isinstance(top, dict) or not isinstance(profile, dict):
+            raise ValueError("CLI 身份配置格式无效，已阻止同步")
+        oauth = top.get("oauthAccount")
+        profile_oauth = profile.get("oauthAccount")
+        account_uuid = oauth.get("accountUuid") if isinstance(oauth, dict) else None
+        if not isinstance(account_uuid, str) or not account_uuid.strip() or not isinstance(profile_oauth, dict) \
+                or account_uuid != profile_oauth.get("accountUuid"):
+            raise ValueError("CLI 设备身份与当前登录账号归属不一致，已阻止同步")
+        if has_observation:
+            if not isinstance(observed, dict) or observed.get("conflict") \
+                    or not isinstance(observed.get("device_id"), str) \
+                    or not re.fullmatch(r"[a-f0-9]{64}", observed["device_id"]) \
+                    or observed.get("source") != CLI_REQUEST_IDENTITY_SOURCE:
+                raise ValueError("客户端设备身份观察损坏或存在冲突，已阻止同步")
+            if observed.get("account_uuid") != account_uuid:
+                raise ValueError("观测设备身份与当前登录账号归属不一致，已阻止同步")
+        source = CLI_CONFIG_IDENTITY_SOURCES.get(version)
+        if source:
+            # 此映射已由指定官方版本的隔离请求验证；不能按字段名推定其它版本或 machineID。
+            device_id = top.get("userID")
+            if not isinstance(device_id, str) or not re.fullmatch(r"[a-f0-9]{64}", device_id):
+                raise ValueError("CLI 登录产物缺少有效设备身份，请检查固定 HOME")
+            if observed is not None and observed["device_id"] != device_id:
+                raise ValueError("本地 CLI 设备身份与历史请求观察冲突，已阻止同步")
+            return {"device_id": device_id, "account_uuid": account_uuid, "source": source}
+        if observed is not None:
+            return {key: observed[key] for key in ("device_id", "account_uuid", "source")}
+        raise ValueError("当前 CLI 版本的设备身份来源尚未验证，暂不能同步到 cc2api")
+
     def identity_import(self, account: dict, version: str) -> dict:
-        """导出实际 CLI 请求确认的设备字段及可测量的基础环境。
+        """导出已核验的 CLI 设备字段及可测量的基础环境。
 
         :param account: 新导入的 bench 账号
         :param version: 当前 CLI 基础版本
         :return: 无凭据的身份载荷；缺少证据时阻止导入
         """
         row, container = self.ensure(account, version)
-        identity_file = self._root(row) / "runtime" / "identity.json"
-        if not identity_file.exists():
-            raise ValueError("设备身份尚未确认：请先在该固定环境完成一次 CLI 任务，再同步账号")
-        identity = json.loads(identity_file.read_text())
-        if identity.get("conflict") or not re.fullmatch(r"[a-f0-9]{64}", identity.get("device_id", "")):
-            raise ValueError("客户端设备身份存在冲突，已阻止同步")
-        top = self._root(row) / "home" / ".claude.json"
-        oauth_account = json.loads(top.read_text()).get("oauthAccount", {}) if top.exists() else {}
-        if not identity.get("account_uuid") or identity["account_uuid"] != oauth_account.get("accountUuid"):
-            raise ValueError("观测设备身份与当前登录账号归属不一致，已阻止同步")
+        with self.environment_lock(row["environment_id"]):
+            identity = self.read_cli_identity(row, version)
         probe = '''const os=require('os');const fs=require('fs');const distro=Object.fromEntries(fs.readFileSync('/etc/os-release','utf8').split('\\n').filter(x=>x.includes('=')).map(x=>{const i=x.indexOf('=');return[x.slice(0,i),x.slice(i+1).replace(/^"|"$/g,'')]}));console.log(JSON.stringify({platform_raw:process.platform,arch:process.arch,node_version:process.version,linux_distro_id:distro.ID||'',linux_distro_version:distro.VERSION_ID||'',linux_kernel:os.release()}));'''
         result = container.exec_run(self.cli_command(["node", "-e", probe]))
         if result.exit_code:

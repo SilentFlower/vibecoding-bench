@@ -42,22 +42,9 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
     try:
         proxy.reload()
         address = next(iter(proxy.attrs["NetworkSettings"]["Networks"].values()))["IPAddress"]
-        response = browser.post(base + "/admin/accounts", headers=authorization, timeout=10,
-            json={"name": name, "email": "synthetic@example.invalid", "auth_type": "oauth",
-                  "access_token": "old-access", "refresh_token": "old-refresh", "expires_at": int(time.time()) + 3600,
-                  "account_uuid": "synthetic-account", "organization_uuid": "synthetic-org",
-                  "proxy_url": f"socks5h://{address}:1080", "auto_poll_usage": False, "auto_telemetry": False})
-        assert response.status_code == 201, response.status_code
-        gateway_id = response.json()["id"]
-        device_id = response.json()["device_id"]
-        assert browser.get(base + f"/admin/accounts/{gateway_id}/oauth-credentials/import/" + "a" * 32,
-                           headers=authorization, timeout=5).status_code == 401, "管理密码不能代替内部凭据导入证明"
-        with sqlite3.connect(gateway_db) as database:
-            database.execute("UPDATE accounts SET status='disabled',auth_error=?,disable_reason=?,rate_limited_at=?,rate_limit_reset_at=? WHERE id=?",
-                             ("401 OAuth 认证恢复失败", "401 OAuth 认证恢复失败", "2026-01-01T00:00:00Z", "2099-01-01T00:00:00Z", gateway_id))
         with sqlite3.connect(bench_db) as database:
-            cursor = database.execute("INSERT INTO accounts(name,profile_path,timezone,cc2api_account_id,enabled,warmup_enabled,warmup_quota_5h_limit_percent) VALUES(?,?,?,?,0,0,30)",
-                                      (name, "profiles/" + name, "Asia/Tokyo", gateway_id))
+            cursor = database.execute("INSERT INTO accounts(name,profile_path,timezone,upstream_proxy_scheme,upstream_socks5_host,upstream_socks5_port,enabled,warmup_enabled,warmup_quota_5h_limit_percent) VALUES(?,?,?,?,?,?,1,0,30)",
+                                      (name, "profiles/" + name, "Asia/Tokyo", "socks5h", address, 1080))
             account_id = cursor.lastrowid
         orchestrator = client.containers.list(filters={"label": ["vibebench.deployment=" + deployment, "vibebench.role=orchestrator"]})[0]
         # 使用真实模型/迁移创建环境行，避免演练脚本复制固定环境的数据结构。
@@ -73,17 +60,38 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
         profile = data / "bench/profiles" / name
         profile.mkdir(parents=True)
         home.mkdir(parents=True)
+        device_id = "d" * 64
         top = {"userID": device_id, "preserved": True, "oauthAccount": {"emailAddress": "synthetic@example.invalid",
                "accountUuid": "synthetic-account", "organizationUuid": "synthetic-org"}}
         credentials = {"claudeAiOauth": {"accessToken": "old-access", "refreshToken": "old-refresh", "expiresAt": int(time.time() * 1000) + 3600000}}
         (profile / ".credentials.json").write_text(json.dumps(credentials))
         (profile / ".claude.json").write_text(json.dumps(top))
         (home / ".claude.json").write_text(json.dumps(top))
-        binary = environment_root / "cli/9.9.9/node_modules/.bin/claude"
-        binary.parent.mkdir(parents=True)
-        shutil.copy2(REPO / "deploy/v3/fixtures/mock_cli.py", binary)
-        binary.chmod(0o755)
-        (environment_root / "cli/9.9.9/.ready").touch()
+        for version in ("2.1.293", "9.9.9"):
+            binary = environment_root / f"cli/{version}/node_modules/.bin/claude"
+            binary.parent.mkdir(parents=True)
+            shutil.copy2(REPO / "deploy/v3/fixtures/mock_cli.py", binary)
+            binary.chmod(0o755)
+            (environment_root / f"cli/{version}/.ready").touch()
+        # 此处只验证同步产品链；官方二进制与字段映射另由禁网的 verify_cli_quota 验证。
+        with sqlite3.connect(bench_db) as database:
+            database.execute("INSERT INTO app_settings(key,value) VALUES('claude_code_version','2.1.293') ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+        response = browser.post(base + f"/runtime/api/accounts/{account_id}/cc2api/sync", timeout=90)
+        assert response.status_code == 200, response.status_code
+        assert response.json()["created"]
+        gateway_id = response.json()["cc2api_account"]["id"]
+        with sqlite3.connect(gateway_db) as database:
+            assert database.execute("SELECT device_id FROM accounts WHERE id=?", (gateway_id,)).fetchone() == (device_id,)
+            database.execute("UPDATE accounts SET status='disabled',auth_error=?,disable_reason=?,rate_limited_at=?,rate_limit_reset_at=? WHERE id=?",
+                             ("401 OAuth 认证恢复失败", "401 OAuth 认证恢复失败", "2026-01-01T00:00:00Z", "2099-01-01T00:00:00Z", gateway_id))
+        with sqlite3.connect(bench_db) as database:
+            assert database.execute("SELECT count(*) FROM runs WHERE account_id=?", (account_id,)).fetchone()[0] == 0
+            database.execute("DELETE FROM app_settings WHERE key='claude_code_version'")
+            database.execute("UPDATE accounts SET enabled=0 WHERE id=?", (account_id,))
+        assert not (environment_root / "runtime/identity.json").exists()
+        assert browser.get(base + f"/admin/accounts/{gateway_id}/oauth-credentials/import/" + "a" * 32,
+                           headers=authorization, timeout=5).status_code == 401, "管理密码不能代替内部凭据导入证明"
+        print("通过：未跑任务、无抓包身份文件的固定账号经正式同步 API 创建并绑定，网关保存原 userID；未调用真实模型或额度")
         control = {"wait_for_code": True, "access_token": "new-access", "refresh_token": "new-refresh",
                    "email": "synthetic@example.invalid", "account_uuid": "synthetic-account", "organization_uuid": "synthetic-org"}
         (home / ".synthetic-login.json").write_text(json.dumps(control))
@@ -233,6 +241,7 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
             await rpc("Input.dispatchMouseEvent", {"type": "mouseReleased", **point, "button": "left", "clickCount": 1}, session_id)
             await wait_for(f"{doc}.querySelector('#acc-modal').classList.contains('hidden')")
             assert await evaluate(f"{state} === null")
+            await wait_for(f"{doc}.querySelector('#account-login-result').textContent.includes('已重授权并同步关联账号')")
             with sqlite3.connect(gateway_db) as database:
                 row = database.execute("SELECT access_token,refresh_token,status,auth_error,disable_reason,rate_limit_reset_at,device_id FROM accounts WHERE id=?", (gateway_id,)).fetchone()
                 assert row == ("new-access", "new-refresh", "active", "", "", "2099-01-01T00:00:00Z", device_id), "网关同步或策略保留失败"

@@ -8,8 +8,8 @@
 
 | Guide | Description | Status |
 |-------|-------------|--------|
-| [Service Architecture](./service-architecture.md) | Axum 分层、Gateway/后台任务、OAuth 重授权回执与迟到回包条件写入 | Filled |
-| [Settings & Database](./settings-database.md) | settings 默认值、热刷新、SQLx Any、SQLite/Postgres 双栈迁移规则 | Filled |
+| [Service Architecture](./service-architecture.md) | Axum 分层、Gateway/后台任务、CLI 身份导入、OAuth 重授权回执与迟到回包条件写入 | Filled |
+| [Settings & Database](./settings-database.md) | settings 默认值、热刷新、SQLx Any、账号创建提交可见性、SQLite/Postgres 双栈迁移规则 | Filled |
 | [Testing & Quality](./testing-quality.md) | Rust 格式、单测策略、网关回归、敏感数据边界和 review 清单 | Filled |
 | [v3 账号运行环境](../../vibecoding-bench/backend/account-runtime-v3.md) | 共享 CLI/排他维护、管理桥与账号内 HTTPS 的跨项目共同契约 | Filled |
 

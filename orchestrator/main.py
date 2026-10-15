@@ -28,7 +28,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from collections import deque
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import ExitStack, asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Literal, Optional, Sequence
 
@@ -7993,6 +7993,16 @@ def list_cc2api_accounts():
     ]
 
 
+def _v3_cli_identity(account: dict) -> dict:
+    """在既有账号 owner 锁内保护 profile 与固定环境的身份导出。
+
+    :param account: 当前 bench 账号
+    :return: 已核验的无凭据 CLI 身份载荷
+    """
+    with _profile_lock(account["name"]):
+        return account_runtime.identity_import(account, effective_claude_code_version())
+
+
 @app.post("/api/accounts/{aid}/cc2api/sync")
 def sync_account_to_cc2api(aid: int):
     """
@@ -8045,7 +8055,7 @@ def sync_account_to_cc2api(aid: int):
                     created = matched is None
                     if matched is None:
                         matched = cc2api_client.create_account({
-                            **({"cli_identity": account_runtime.identity_import(account, effective_claude_code_version())} if account_runtime else {}),
+                            **({"cli_identity": _v3_cli_identity(account)} if account_runtime else {}),
                             "name": account["name"],
                             "email": profile["email"],
                             "auth_type": "oauth",
@@ -8062,7 +8072,7 @@ def sync_account_to_cc2api(aid: int):
                     raise ValueError("匹配到的 cc2api 账号不是 active OAuth 账号")
                 _validate_cc2api_identity(profile, matched)
                 if account_runtime and existing_binding is None and not created:
-                    observed = account_runtime.identity_import(account, effective_claude_code_version())
+                    observed = _v3_cli_identity(account)
                     if matched.get("device_id") != observed["device_id"]:
                         raise ValueError("已有 cc2api 设备身份与 CLI 观测不一致，保留已有身份并阻止绑定")
                 cc2api_account_id = int(matched.get("id") or 0)
@@ -8180,7 +8190,7 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
                         raise ValueError("选择的 cc2api 账号不可用")
                     _validate_cc2api_identity(profile, selected)
                     if account_runtime and binding_changes:
-                        observed = account_runtime.identity_import(account, effective_claude_code_version())
+                        observed = _v3_cli_identity(account)
                         if selected.get("device_id") != observed["device_id"]:
                             raise ValueError("已有 cc2api 设备身份与 CLI 观测不一致，保留已有身份并阻止绑定")
                     _require_cc2api_binding_available(aid, int(target_binding))
@@ -9327,6 +9337,8 @@ def _login_commit_locked(sid: str, body: LoginStartIn):
         "name": name,
         "auth_method": status.get("authMethod"),
     }
+    if account_runtime:
+        result.update(cc2api_account_id=None, credentials_synced=False)
     if session.environment_id:
         if cleanup_home:
             if not re.fullmatch(r"/home/node/\.v3-login/[a-f0-9]{12}", cleanup_home):
@@ -10798,9 +10810,19 @@ def v3_environments() -> list[dict]:
         row["fingerprint"] = json.loads(row.pop("fingerprint_json"))
         with account_runtime.lock:
             row["busy"] = row["environment_id"] in account_runtime.jobs
-        identity_path = account_runtime._root(row) / "runtime" / "identity.json"
-        identity = json.loads(identity_path.read_text()) if identity_path.exists() else {}
-        row["identity_status"] = "冲突，已阻止同步" if identity.get("conflict") else ("已观测 CLI 设备身份" if identity.get("device_id") else "待 CLI 任务观测，暂不能同步到 cc2api")
+        try:
+            with ExitStack() as locks:
+                # 列表只取可立即获得的一致快照，不能等待登录或同步持有的维护锁。
+                for guard in (_oauth_owner_lock(row["name"]), _profile_lock(row["name"]),
+                        account_runtime.environment_lock(row["environment_id"])):
+                    if not guard.acquire(blocking=False):
+                        raise RuntimeBusy("账号正在维护，设备身份待核对")
+                    locks.callback(guard.release)
+                identity = account_runtime.read_cli_identity(row, effective_claude_code_version())
+            row["identity_status"] = ("已确认 CLI 本地设备身份" if ":config.userID" in identity["source"]
+                else "已观测 CLI 设备身份")
+        except ValueError as error:
+            row["identity_status"] = str(error)
         row["can_reprofile"] = blocker is None
         row["reprofile_message"] = blocker
         row["runtime_release"] = account_runtime.release_id

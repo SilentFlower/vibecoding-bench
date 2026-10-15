@@ -174,6 +174,7 @@ authorization_url(pane: str) -> str | None
 - URL 来源为真实 CLI tmux pane：输入最多 65536 字符，剥 ANSI、最多拼 13 条连续 URL 字符硬换行，候选不超过 8192 字符；先拼完整 query 再校验，到续行上限仍有后续则拒绝有效前缀。仅接受 HTTPS 精确组合 `claude.com /cai/oauth/authorize`、`claude.ai /oauth/authorize`、`platform.claude.com /oauth/authorize`，无 fragment，PKCE 必需参数单一非空、code/S256、43 字符 base64url challenge/state；redirect 主机为 platform.claude.com 或 console.anthropic.com 的 HTTPS。不生成或补猜参数；CLI 升级须核对实际形状，不能把白名单主机/路径交叉组合。
 - URL 以 textarea.value/textContent 展示；打开用 `_blank`、`noopener,noreferrer`。复制依次尝试安全 Clipboard、选中完整文本的 execCommand，再明确手动复制；未复制不报成功。URL 不进入持久缓存或日志。
 - 会话过期、鉴权失效或进入提交阶段后停止重连/心跳与输入，status 停止条件也终止轮询；终端和窗口留供诊断。输出组件加载失败时，v3独立输入及认证轮询继续，没有重连方法时禁用重连按钮。发送/查询中不允许并发关闭或保存；关闭、成功提交或确认取消后清授权码、表单监听、socket、xterm、resize与state，迟到回包核对原窗口/SID/请求。取消失败保窗。窄屏要能滚动，所有按钮可实际点击，复用 .form 明暗样式并同步资源版本。
+- 提交完成按服务端 `credentials_synced` 显示结果：true 为已重授权并同步原关联账号；v3 的 false 为仅保存本地、尚未关联 cc2api。账号页通过 `account-login-result` 的 textContent 和 role=status 保留最近一次保存结果，不能只写入即将关闭的终端。旧版缺该字段时沿用原提示；结果不写 localStorage。
 - v3 status 200 可返回 ended、message 和 restartable，不能继续显示普通断线提示；重新连接仅用于活跃原 SID，重新登录才生成新 SID。ready_to_submit 已经通过服务端认证检查，可停止终端后提交；恢复窗口用 startStopped 避免连接不存在的 tmux。
 - 账号页将草稿作为独立行展示，`state.accounts` 和正式任务下拉不混入草稿。所有动作传页面 generation，操作许可来自 DTO；删除确认说明未提交授权产物也将清除，失败刷新可见状态。启动与恢复期间关窗仍等待 SID，再确认取消；清理未知不丢 state。
 - 草稿使用独立代理列，proxy_known=false显示配置待检查，known=true且summary为空才显示未配置。can_reconcile开放“恢复检查”，reconcile状态保留“查看环境”；恢复传原generation并刷新许可，不能用UI绕过坏归属或提交保护。
@@ -213,3 +214,4 @@ authorization_url(pane: str) -> str | None
 - 用真实键盘、原生 Ctrl+V 和按钮/Enter验证输入长度/显示切换，不能用ws.send或赋值假称真实输入通过；覆盖回包丢失后query且同标识只投递一次、WS断线独立发送、关闭清码。无法自动驱动右键系统菜单时明确记录未执行项，真实CLI禁网校验与合成成功链分开报告。
 - 故障注入后实际鼠标点草稿恢复，验证原SID收口、HOME保留、代理脱敏可见及删除恢复；1280/390明暗主题均验证输入与提交可操作。
 - 模拟 Terminal/FitAddon 缺失，验证输出降级后重连禁用、原生输入/独立HTTP发送/状态轮询/取消仍正常。
+- 已绑定重授权与未绑定草稿保存后，实际页面可见结果分别包含“已重授权并同步关联账号”和“仅保存到本地，尚未关联 cc2api”；API 回包、两端数据库和 HOME 凭据共同验证，不能仅检查文案。

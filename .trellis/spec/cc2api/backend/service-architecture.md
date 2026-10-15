@@ -977,3 +977,43 @@ web/src/components/Settings.vue 控件和文案
 | 网关读 body 后继续转发原 request | 上游收到空 body 或旧 body | 明确重建 request body |
 | 粘性会话遇到限流直接换号 | Claude Code prompt cache 被破坏 | 粘性请求等待或本地返回 |
 | CCH 之前/之后插入 body 改写顺序不清 | 请求签名不匹配真实客户端 | 所有 body 改写先完成，再统一算 CCH |
+
+## Scenario: v3 CLI 本地身份来源导入
+
+### 1. Scope / Trigger
+
+- 修改 `POST /admin/accounts` 的 `cli_identity`、来源白名单或首次 CLI 账号同步时适用。固定 HOME 读取及两端同步见 [v3 身份契约](../../vibecoding-bench/backend/account-runtime-v3.md#scenario-v3-原生-tls-账号身份与同步)。
+
+### 2. Signatures
+
+```text
+CliIdentityImport {device_id, environment_id, source, canonical_env, canonical_prompt}
+CliIdentityImport::has_confirmed_source() -> bool
+AccountService::create_cli_account(&mut Account) -> Result<(), AppError>
+```
+
+### 3. Contracts
+
+- 仅在既有管理 Bearer 与有效 `x-v3-service-token` 校验后导入；普通管理密码不能代替内部服务证明。
+- 原 `cli:/v1/messages:metadata.user_id.device_id` 来源继续支持。新增 `cli:2.1.293:config.userID` 仅接受 canonical_env.version / version_base 同为 `2.1.293`，依据独立官方 CLI 禁网请求实证，不开放任意版本或配置字段。
+- 服务层继续校验设备 ID、Linux 运行环境和 prompt 环境并直接保存已确认身份，不随机生成替代设备；已有账号通过绑定流程检查，不能借首次导入覆盖旧设备。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+|---|---|
+| 合法内部证明、环境与已验证来源 | 按原设备创建账号 |
+| 缺内部证明／未知 source／配置来源版本不匹配 | 401，不创建账号 |
+| 设备或运行环境不完整 | 400，不创建账号 |
+
+### 5. Scenarios and Examples
+
+- 正常：bench 读取 2.1.293 固定 HOME 的有效 userID，并以准确来源创建账号；保持同一设备。
+- 基础：旧正式请求观察仍走原来源，未验证版本不得假称已验证本地映射。
+- 错误用法：只放开 source 字符串而不绑定版本。正确处理：白名单来源与 version / version_base 同时匹配，并保留内部鉴权及服务层校验。
+
+### 6. Tests Required
+
+- `cli_identity_sources_require_verified_version`：精确版本通过，版本／version_base 不匹配、未来版本和 machineID 来源拒绝；旧观察兼容。
+- `cli_identity_import_requires_internal_service_proof`：只有管理 Bearer 的 HTTP 请求返回 401。
+- v3 隔离同步／重授权堆栈：正式同步请求创建后核对实际 SQLite 的 device_id 与持久 userID 相等，再验证重授权凭据和原账号保持；不访问真实 OAuth／模型。

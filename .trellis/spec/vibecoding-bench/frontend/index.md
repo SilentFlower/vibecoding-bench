@@ -24,7 +24,7 @@
 |-------|-------------|--------|
 | [Directory Structure](./directory-structure.md) | 三文件结构 + app.js 节顺序 + 命名约定 | Filled |
 | [Component Guidelines](./component-guidelines.md) | `<template>` + render 函数对 + modal 收口模式 | Filled |
-| [Hook Guidelines](./hook-guidelines.md) | 原生 JS 生命周期、登录输入/发送回执/终端输出、授权链接、草稿恢复及取消收口 | Filled |
+| [Hook Guidelines](./hook-guidelines.md) | 原生 JS 生命周期、登录输入/发送回执/终端输出、授权链接、重授权结果、草稿恢复及取消收口 | Filled |
 | [State Management](./state-management.md) | 单 `state` 对象 + 直接赋值 + 显式 render 触发 | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | 零构建保活、跨主题、`escapeHTML`、Review 清单 | Filled |
 | [Type Safety](./type-safety.md) | 无 TS;后端 Pydantic + 前端 `escapeHTML` + 约定 | Filled |

@@ -43,6 +43,11 @@ def verify(image: str, binary: Path) -> None:
         assert baseline["version"] == collected["version"]
         assert baseline["requests"] and baseline["requests"] == collected["requests"], "采集增加了网络请求"
         assert all("usage" not in item["path"] for item in collected["requests"]), "出现主动额度查询"
+        if collected["version"].startswith("2.1.293 "):
+            messages = [item for item in collected["requests"] if "/messages" in item["path"]]
+            assert messages and all(item["device_identity"] == {"device_id": "a" * 64,
+                "account_uuid": "synthetic-account"} for item in messages), "官方 CLI 身份与已验证 userID 映射不符"
+            print("通过：官方 2.1.293 的真实请求身份匹配持久 userID／账号 UUID，与独立 machineID 区分")
         events = [json.loads(line) for line in (collected["quota"] or "").splitlines()]
         assert len(events) == 1, "正常响应未产生唯一被动观察"
         event = events[0]

@@ -61,6 +61,45 @@ web/src/components/Accounts.vue
 - 前端展示前只做格式化，不反推出业务窗口。
 - usage window、RPM window、telemetry session 过期时间不能混用。
 
+## Scenario: 创建账号的提交可见性
+
+### 1. Scope / Trigger
+
+- 修改账号创建、SQLite 连接模式或首次同步后的凭据解析时适用。创建成功必须表示其它连接已可读取，不能依赖下一次创建或同池查询才完成提交。
+
+### 2. Signatures
+
+```rust
+pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
+```
+
+- `INSERT INTO accounts (...) VALUES (...) RETURNING id, created_at, updated_at`，同时支持 SQLite／PostgreSQL。
+
+### 3. Contracts
+
+- `AccountStore::create` 通过 `fetch_all` 完整消费单行 RETURNING 及执行结束，再回填账号 ID 和时间并返回成功；空结果保持 NotFound 错误。不能使用只取首行的 `fetch_one` 提前确认写入。
+- SQLite WAL 的独立读连接不等待未完成的写语句；只通过原连接重读会掩盖提交可见性缺陷。不得用固定延时或重试 404 替代写入完成保证。
+- 创建返回后，正式同步流程可立即调用凭据解析并切换绑定；SQL、字段、重复邮箱处理及 schema 保持既有契约。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+|---|---|
+| 创建成功 | 独立连接立即读到返回 ID，后续凭据解析正常 |
+| 重复邮箱或 SQL 执行失败 | 返回错误，不报告新账号创建成功 |
+| RETURNING 无记录 | NotFound，不回填伪造 ID |
+
+### 5. Scenarios and Examples
+
+- 正常：首次同步创建账号后，紧接的凭据解析读取同一账号，无需用户再次点击同步。
+- 基础：SQLite WAL 下用另一个连接池读取刚创建 ID，计数为 1；时间与 OAuth 字段继续通过现有回归。
+- 错误用法：`fetch_one` 取得 ID 后立即返回 201，独立连接尚读不到记录。正确处理：完整消费执行结果，并用独立连接证明提交已完成。
+
+### 6. Tests Required
+
+- `test_create_is_committed_before_independent_read`：使用生产 `init_db` 的 WAL 模式、独立 reader 连接池；创建返回后立即按 ID 查询，必须为 1。不得改成同池读取或添加等待。
+- `account_store_timestamp_test`：原时间／空值／OAuth／策略字段回归保持；v3 联合堆栈通过正式同步 API 创建后立即解析凭据并绑定。
+
 ## Common Mistakes
 
 | 反模式 | 风险 | 正确做法 |

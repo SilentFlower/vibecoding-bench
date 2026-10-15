@@ -58,7 +58,7 @@ scripts/v3-stack stop --env <独立配置>
 
 ### 3. Contracts
 
-**数据与凭据**：cc2api 拥有绑定账号、代理、OAuth 和唯一刷新权；bench 拥有环境、任务、持久目录及证据。两侧通过受控 API 协作。绑定 CLI HOME 仅发布 AT，删除 RT；401 沿用 managed 刷新流程。身份导入仅接受 Recorder 实际观测且与登录账号归属一致的设备身份，来源未知或冲突时阻止同步；不把 Linux machine-id 当成 device_id。
+**数据与凭据**：cc2api 拥有绑定账号、代理、OAuth 和唯一刷新权；bench 拥有环境、任务、持久目录及证据。两侧通过受控 API 协作。绑定 CLI HOME 仅发布 AT，删除 RT；401 沿用 managed 刷新流程。身份导入接受 Recorder 实际请求观察，或经指定官方版本实测验证的本地字段映射，并核对登录账号归属；来源未知或冲突时阻止同步。当前 2.1.293 的 device_id 来自固定 HOME 的 `.claude.json.userID`，不能用 Linux machine-id 或独立 machineID 替代，详见下方身份同步场景。
 
 **环境**：每账号一个固定 account 容器、完整 `/home/node` 和版本缓存。新环境的 `fingerprint_json.profile_version=2`；hostname 为独立随机 12 位小写十六进制，machine-id 为独立随机 32 位小写十六进制，MAC 为独立随机的本地管理单播地址。时区来自账号显式配置，locale 与地区成组持久化；未配置的新环境使用 `America/Los_Angeles` + `en_US.UTF-8`，IANA 时区自动处理夏令时；已有 UTC 或其它画像保持，generation=0 的已登记画像也不重算。环境 ID、profile、RAM/swap 不随 run、改名、停止唤醒或容器重建重算；旧记录缺 `profile_version` 时保持 legacy。重建可换 container ID，但保留 HOME 和环境身份。容器 DNS 为 `v3-<deployment_sha256前12位>-account-<environment_id>`，完整归属由产品/部署/角色/环境 labels 校验。只按本部署精确标签维护，不用宽前缀或 prune。
 
@@ -370,3 +370,54 @@ bench/login-drafts/<32位小写hex环境ID>.json
 - `verify_stack.py --manifest <最终联合清单> --browser --reauth` 串入 `verify_login_drafts.py`：真实 Docker/Chrome/HTTP/WS/tmux、刷新原 SID、CLI 结束与迟到事件、管理器 SIGKILL 后对账/恢复、原环境提交、鼠标确认完整删除；验证全部专属目录/CID/DB 消失且正式账号保留。
 - 合成 CLI/OAuth 和故障替身必须明确标注，不访问真实 OAuth；按随机部署精确标签清理测试数据与容器，核对旧哨兵不变和最终冻结源码哈希。真实 OAuth/正式 API 另作上线后验证。
 - 清理故障验证 503、can_reconcile 与原 SID/名称释放；拒绝活动工作、未知证明、旧代次及未确认保存，恢复前后 HOME/身份不变。代理 JSON/DOM 不含 userinfo，配置读取失败为 unknown；真实浏览器点恢复后可完整删除草稿而正式账号保留。
+
+## Scenario: v3 原生 TLS 账号身份与同步
+
+### 1. Scope / Trigger
+
+- 修改首次同步、已有账号绑定、环境身份状态、CLI 版本或网络模式时适用。切换原生 TLS 后不能继续要求普通任务生成只有 Recorder 才能写出的身份文件。
+
+### 2. Signatures
+
+```text
+POST /api/accounts/{aid}/cc2api/sync
+  -> {ok, created, cc2api_account: {id, ...}}
+AccountRuntime.read_cli_identity(row: dict, version: str) -> dict
+AccountRuntime.identity_import(account: dict, version: str) -> dict
+source = cli:/v1/messages:metadata.user_id.device_id
+       | cli:2.1.293:config.userID
+CLI payload: device_id, environment_id, source, canonical_env, canonical_prompt
+```
+
+### 3. Contracts
+
+- 官方 2.1.293 经无外网实际请求验证：`metadata.user_id.device_id` 等于 `.claude.json.userID`，与独立 `machineID` 区分。只有该精确版本开放本地来源；新版本须另做隔离验证，不根据同名字段猜测。
+- 固定 HOME 的 userID 必须为 64 位小写 hex，账号 UUID 必须非空且与管理 profile 一致。不能生成新设备、只按邮箱匹配或回退 Linux machine-id。已完成登录无需额外模型任务或完整抓包。
+- 已有 `runtime/identity.json` 的 JSON、来源、冲突标记、设备格式及账号归属均须校验；已验证版本的本地设备与旧观察不同仍阻止同步，不能覆盖证据。未知版本只接受已有正式请求观察。
+- 同步按 owner → profile → environment 锁序读取；环境 GET 尝试非阻塞取得同序锁，维护时返回待核对状态，不创建／唤醒环境、不生成证据文件。身份状态必须反映实际校验，不只检查文件存在。
+- cc2api 仍要求内部服务证明及合法环境；本地来源必须与 canonical_env.version 和 version_base 均为 2.1.293 精确匹配。已有设备不自动替换。
+- 已绑定重授权成功返回 `credentials_synced:true` 与原绑定 ID；未绑定 v3 保存返回 `credentials_synced:false, cc2api_account_id:null`。浏览器授权完成不代表保存成功，首次绑定仍须显式同步。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+|---|---|
+| 2.1.293 登录产物齐全，无任务／无 Recorder 文件 | 可导出原设备并同步 |
+| userID 缺失／类型错误／非 64 位小写 hex，或 UUID 不符 | 409，准确错误，不替代身份 |
+| 历史观察损坏、未知来源、冲突或账号不符 | 409，保留原观察 |
+| 未验证版本且无请求观察 | 409，提示版本身份来源未验证 |
+| 来源与版本不符、缺内部服务证明 | cc2api 401，不创建账号 |
+| GET 遇到维护锁 | 显示设备身份待核对，不等待维护完成 |
+
+### 5. Scenarios and Examples
+
+- 正常：官方 2.1.293 登录后按原生 TLS 模式点击同步，cc2api 保存同一 userID；之后已绑定重授权更新原账号凭据。
+- 基础：未绑定账号重授权仅保存本地，页面明确尚未关联；未知版本有历史请求观察时沿用旧来源。
+- 错误用法：为了补身份让用户反复跑普通任务，或直接用 machineID 兜底。正确处理：对已验证版本读取官方持久 userID，并保留所有冲突保护。
+
+### 6. Tests Required
+
+- `test_account_runtime.py`：无任务／无抓包导出、缺失及错误类型、UUID 不符、损坏／冲突观察、未知版本、GET 不唤醒及维护锁释放。
+- `verify_cli_quota.py`：真实官方 2.1.293、不同的合成 userID／machineID、两条本地请求身份相符；采集前后请求完全一致且零 usage，Docker network=none。
+- `verify_reauth_stack.py`：空 runs 表、无 identity.json，经正式同步 API 创建及绑定后核对网关 device_id；真实页面重授权后检查两端 DB、profile、AT-only HOME、回执、原账号／设备／策略和可见结果提示。
+- `test_login_drafts.py` 与 `verify_login_drafts.py`：未绑定提交返回明确 false/null，页面显示仅本地保存。官方 CLI 实证与合成成功链分别报告，不以替身冒充官方验证。

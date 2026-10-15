@@ -154,6 +154,7 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
         raise
     await click_button('#acc-login-commit')
     await wait_for(f"{doc}.querySelector('#acc-modal').classList.contains('hidden')")
+    await wait_for(f"{doc}.querySelector('#account-login-result').textContent.includes('仅保存到本地，尚未关联 cc2api')")
     with sqlite3.connect(bench_db) as connection:
         account_id = connection.execute("SELECT id FROM accounts WHERE name=?", (name,)).fetchone()[0]
         assert connection.execute("SELECT account_id FROM account_environments WHERE environment_id=?", (environment_id,)).fetchone()[0] == account_id
