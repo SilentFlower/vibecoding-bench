@@ -82,6 +82,8 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
         gateway_id = response.json()["cc2api_account"]["id"]
         with sqlite3.connect(gateway_db) as database:
             assert database.execute("SELECT device_id FROM accounts WHERE id=?", (gateway_id,)).fetchone() == (device_id,)
+            policy_before = database.execute("SELECT billing_mode,upstream_session_pool_enabled,upstream_session_pool_size,upstream_session_refresh_policy,concurrency,rpm_limit,upstream_session_ttl_minutes FROM accounts WHERE id=?", (gateway_id,)).fetchone()
+            assert policy_before == ('rewrite', 1, 4, 'owner_only', 4, 50, 60)
             database.execute("UPDATE accounts SET status='disabled',auth_error=?,disable_reason=?,rate_limited_at=?,rate_limit_reset_at=? WHERE id=?",
                              ("401 OAuth 认证恢复失败", "401 OAuth 认证恢复失败", "2026-01-01T00:00:00Z", "2099-01-01T00:00:00Z", gateway_id))
         with sqlite3.connect(bench_db) as database:
@@ -246,6 +248,7 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
                 row = database.execute("SELECT access_token,refresh_token,status,auth_error,disable_reason,rate_limit_reset_at,device_id FROM accounts WHERE id=?", (gateway_id,)).fetchone()
                 assert row == ("new-access", "new-refresh", "active", "", "", "2099-01-01T00:00:00Z", device_id), "网关同步或策略保留失败"
                 assert database.execute("SELECT count(*) FROM oauth_credential_imports WHERE account_id=?", (gateway_id,)).fetchone()[0] == 1
+                assert database.execute("SELECT billing_mode,upstream_session_pool_enabled,upstream_session_pool_size,upstream_session_refresh_policy,concurrency,rpm_limit,upstream_session_ttl_minutes FROM accounts WHERE id=?", (gateway_id,)).fetchone() == policy_before
             with sqlite3.connect(bench_db) as database:
                 assert database.execute("SELECT cc2api_account_id,enabled,warmup_enabled,warmup_quota_5h_limit_percent FROM accounts WHERE id=?", (account_id,)).fetchone() == (gateway_id, 0, 0, 30)
                 assert database.execute("SELECT container_id FROM account_environments WHERE environment_id=?", (environment_id,)).fetchone()[0] == original_container
@@ -315,7 +318,13 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
             finally:
                 await evaluate(f"{win}.Terminal={win}.__codeVendor.Terminal;{win}.FitAddon={win}.__codeVendor.FitAddon;delete {win}.__codeVendor")
 
-            await verify_login_drafts(client, deployment, data, browser, base, address, rpc, evaluate, wait_for, session_id)
+            try:
+                await verify_login_drafts(client, deployment, data, browser, base, address, rpc, evaluate, wait_for, session_id)
+            except Exception:
+                response = browser.get(base + '/runtime/api/accounts/login-drafts', timeout=10)
+                print('草稿恢复诊断：', response.status_code, response.json(), flush=True)
+                print('草稿页面诊断：', await evaluate(f"[Boolean({state}),{win}.__draftAlerts,{doc}.querySelector('#accounts-body').textContent,{doc}.querySelector('#acc-login-connection-status').textContent]"), flush=True)
+                raise
 
         yield exercise
     finally:

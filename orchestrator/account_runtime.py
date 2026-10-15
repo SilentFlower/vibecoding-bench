@@ -22,6 +22,7 @@ from typing import Callable
 from urllib.parse import quote, unquote, urlsplit
 
 from docker.errors import NotFound
+from process_metrics import validate_process_metrics
 from resource_budget import account_limits
 
 
@@ -274,13 +275,14 @@ class AccountRuntime:
         return container
 
     def ensure(self, account: dict, version: str | None = None, allow_inactive_login: bool = False,
-               allow_login_recovery: bool = False) -> tuple[dict, object]:
+               allow_login_recovery: bool = False, preserve_proxy: bool = False) -> tuple[dict, object]:
         """创建或唤醒固定环境，沿用首次固化参数。
 
         :param account: bench 账号或登录草稿
         :param version: 可选目标 CLI 版本；发送器准备无需 CLI
         :param allow_inactive_login: 仅显式重授权允许读取非 active OAuth 配置
         :param allow_login_recovery: 仅恢复原登录提交可进入本地保存门禁
+        :param preserve_proxy: 指标读取只核对权威代理，不回写账号代理字段
         :return: 环境记录与 Docker container
         """
         with self._account_lock(account):
@@ -296,7 +298,11 @@ class AccountRuntime:
                 configuration = self.gateway._request("GET", f"/admin/runtime/accounts/{account['cc2api_account_id']}/config")
                 if configuration["auth_type"] != "oauth" or (configuration["status"] != "active" and not allow_inactive_login):
                     raise ValueError("绑定账号认证类型或状态不可用")
-                self._sync_proxy(account, configuration)
+                if preserve_proxy:
+                    if self._proxy(account) != configuration["proxy_url"]:
+                        raise ValueError("代理配置不一致，请先完成账号配置维护")
+                else:
+                    self._sync_proxy(account, configuration)
             draft_path = self.data / "login-drafts" / (row["environment_id"] + ".json")
             if draft_path.exists() and json.loads(draft_path.read_text()).get("phase") == "submitting" and not allow_login_recovery:
                 raise ValueError("原登录保存尚未完成，请先继续登录提交")
@@ -1802,9 +1808,49 @@ class AccountRuntime:
         environment.update(platform="Linux", terminal="tmux", package_managers="npm", runtimes="node",
             version=version, version_base=version, build_time="", deployment_environment="", vcs="git")
         return {"device_id": identity["device_id"], "environment_id": row["environment_id"],
-            "source": identity["source"], "canonical_env": environment,
+            "source": identity["source"], "canonical_env": environment, "canonical_process": self.process_import(row, container, version),
             "canonical_prompt": {"platform": "linux", "shell": "bash", "os_version": environment["linux_kernel"],
                 "working_dir": "/home/node"}}
+
+    def process_import(self, row: dict, container, version: str) -> dict:
+        """读取 root 管理的实测指标，不启动模型或执行额外登录。
+
+        :param row: 已确认环境行。
+        :param container: 当前环境的 Docker 容器。
+        :param version: 当前 CLI 版本。
+        :return: 可导入的进程指标；损坏或预算不符时拒绝。
+        """
+        result = container.exec_run(["python3", "/usr/local/bin/v3-process-metrics", "read", version])
+        if result.exit_code:
+            raise ValueError("实际进程指标读取失败，请检查环境采样状态")
+        try:
+            value = validate_process_metrics(json.loads(result.output), row["environment_id"], version)
+            fingerprint = json.loads(row["fingerprint_json"])
+            expected, _ = account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))
+            if value["constrained_memory"] != expected:
+                raise ValueError("实际容器内存限制与固化预算不一致")
+            return value
+        except (KeyError, TypeError, json.JSONDecodeError):
+            raise ValueError("进程指标响应损坏") from None
+
+    def process_identity_import(self, account: dict, version: str) -> dict:
+        """导出原绑定的指标和非秘密身份，不读取或刷新 OAuth 凭据。
+
+        :param account: 当前已绑定账号。
+        :param version: 当前官方 CLI 版本。
+        :return: 独立进程导入载荷。
+        """
+        row, container = self.ensure(account, preserve_proxy=True)
+        with self.environment_lock(row["environment_id"]):
+            identity = self.read_cli_identity(row, version)
+            top = json.loads((self._root(row) / "home/.claude.json").read_text())
+            email = top.get("oauthAccount", {}).get("emailAddress")
+            if not isinstance(email, str) or not email.strip():
+                raise ValueError("CLI 登录身份缺少邮箱，无法核对原关联账号")
+            process = self.process_import(row, container, version)
+        return {"device_id": identity["device_id"], "account_uuid": identity["account_uuid"],
+            "email": email.strip(), "environment_id": row["environment_id"], "cli_version": version,
+            "canonical_process": process}
 
     def reconcile(self, environment_id: str | None = None) -> None:
         """启动时按持久模式收口遗留执行，共享 CLI 保留独立 API。

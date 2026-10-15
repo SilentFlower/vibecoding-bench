@@ -77,9 +77,12 @@ COPY images/account/network-context.py /usr/local/bin/v3-network-context
 COPY images/account/cli-version.sh /usr/local/bin/v3-cli-version
 COPY images/account/passthrough.py /usr/local/bin/v3-passthrough
 COPY orchestrator/cli_quota.py /usr/local/bin/v3-cli-quota
+COPY orchestrator/process_metrics.py /usr/local/bin/process_metrics.py
+COPY orchestrator/process_metrics.py /usr/local/bin/v3-process-metrics
 COPY --from=backend /source/cc2api/target/release/account-sender /usr/local/bin/account-sender
 RUN chmod 700 /usr/local/bin/v3-account-init /usr/local/bin/v3-network-context \
-    /usr/local/bin/v3-cli-version /usr/local/bin/v3-passthrough /sidecar \
+    /usr/local/bin/v3-cli-version /usr/local/bin/v3-passthrough /usr/local/bin/process_metrics.py \
+    /usr/local/bin/v3-process-metrics /sidecar \
     && chmod 755 /usr/local/bin/v3-cli-quota && mkdir -p /workspaces /run/v3
 WORKDIR /home/node
 ARG V3_RELEASE
@@ -90,3 +93,15 @@ LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELE
     org.opencontainers.image.source="https://github.com/SilentFlower/vibecoding-bench" \
     org.opencontainers.image.revision=$V3_PARENT_REV
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/v3-account-init"]
+
+# 显式测试目标覆盖二进制，正式 control/account 目标完全不依赖此阶段。
+FROM backend AS verification-backend
+RUN cargo build --locked --release --bins --features v3-verification
+
+FROM control AS verification-control
+COPY --from=verification-backend /source/cc2api/target/release/claude-code-gateway /app/claude-code-gateway
+LABEL vibebench.verification="extra-ca"
+
+FROM account AS verification-account
+COPY --from=verification-backend /source/cc2api/target/release/account-sender /usr/local/bin/account-sender
+LABEL vibebench.verification="extra-ca"

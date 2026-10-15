@@ -232,11 +232,13 @@ async function renderAccounts() {
       <td>${a.enabled ? '✓' : '✗'}</td>
       <td><div class="op-actions account-actions">
         <button class="btn btn-sm" data-quota="${a.id}">额度</button>
-        <button class="btn btn-sm" data-cc2-sync="${a.id}">同步</button>
+        ${a.cc2api_account_id == null ? `<button type="button" class="btn btn-sm" data-cc2-create="${a.id}">创建 cc2api 账号</button>
+        <button type="button" class="btn btn-sm" data-cc2-bind="${a.id}">关联已有账号</button>` :
+          (RUNTIME_BASE ? `<button type="button" class="btn btn-sm" data-cc2-process="${a.id}">更新进程指标</button>` : '')}
         <button class="btn btn-sm" data-warmup-config="${a.id}">养号 / 额度</button>
         ${Number(a.warmup_enabled || 0) === 1 ? `<button class="btn btn-sm btn-primary" data-warmup-now="${a.id}">立即运行</button>` : ''}
         ${Number(a.warmup_enabled || 0) !== 1 && (a.cc2api_account_id != null || a.warmup_last_status === 'paused') ? `<button class="btn btn-sm" data-warmup-resume="${a.id}">恢复</button>` : ''}
-        ${a.cc2api_account_id == null || RUNTIME_BASE ? `<button class="btn btn-sm" data-relogin="${a.id}">重授权</button>` : ''}
+        ${a.cc2api_account_id == null || RUNTIME_BASE ? `<button class="btn btn-sm" data-relogin="${a.id}">重新授权</button>` : ''}
         ${a.cc2api_account_id != null ? `<button class="btn btn-sm btn-danger" data-cc2-unbind="${a.id}">解绑</button>` : ''}
         <button class="btn btn-sm btn-danger" data-del="${a.id}">删除</button>
       </div></td>
@@ -283,7 +285,9 @@ async function renderAccounts() {
     const id = e.target.dataset.del;
     const quotaId = e.target.dataset.quota;
     const reloginId = e.target.dataset.relogin;
-    const syncId = e.target.dataset.cc2Sync;
+    const createId = e.target.dataset.cc2Create;
+    const bindId = e.target.dataset.cc2Bind;
+    const processId = e.target.dataset.cc2Process;
     const warmupConfigId = e.target.dataset.warmupConfig;
     const warmupNowId = e.target.dataset.warmupNow;
     const warmupResumeId = e.target.dataset.warmupResume;
@@ -305,14 +309,25 @@ async function renderAccounts() {
       if (account) openAccLoginModal(account);
       return;
     }
-    if (syncId) {
+    if (bindId) {
+      const account = state.accounts.find(a => String(a.id) === String(bindId));
+      if (!account) return;
+      e.target.disabled = true;
+      try { await openCc2apiBindingModal(account); }
+      catch (error) { alert('加载可关联账号失败：' + error.message); }
+      finally { e.target.disabled = false; }
+      return;
+    }
+    if (createId || processId) {
       e.target.disabled = true;
       try {
-        const result = await API(`/accounts/${syncId}/cc2api/sync`, { method: 'POST' });
-        alert(result.created ? '已创建 cc2api 账号并完成绑定' : '已关联现有 cc2api 账号并同步凭据');
+        const result = await API(`/accounts/${createId || processId}/cc2api/${createId ? 'create' : 'process'}`, { method: 'POST' });
+        state.accountLoginMessage = createId
+          ? `已创建 cc2api 账号 #${result.cc2api_account.id} 并完成关联`
+          : `已更新 cc2api 账号 #${result.cc2api_account_id} 的进程指标${result.canonical_process.observation?.sample_count ? '' : '；CLI RSS 尚未采集'}`;
         await renderAccounts();
       } catch (err) {
-        alert('同步 cc2api 失败: ' + err.message);
+        alert((createId ? '创建 cc2api 账号失败：' : '更新进程指标失败：') + err.message);
       } finally {
         e.target.disabled = false;
       }
@@ -396,6 +411,49 @@ async function renderAccounts() {
   };
   $('#acc-modal-close').onclick = () => endAccLogin({ alsoCloseModal: true });
   $('#warmup-form').onsubmit = saveWarmupConfig;
+  $('#cc2api-binding-form').onsubmit = saveCc2apiBinding;
+}
+
+/**
+ * 独立选择已有 cc2api 账号，关联动作不修改养号设置。
+ * @param {Object} account 当前未关联的本地账号
+ * @return {Promise<void>} 候选账号加载后显示窗口
+ */
+async function openCc2apiBindingModal(account) {
+  state.cc2apiAccounts = await API('/cc2api/accounts');
+  const form = $('#cc2api-binding-form');
+  form.account_id.value = account.id;
+  const available = state.cc2apiAccounts.filter(item => !state.accounts.some(a =>
+    a.cc2api_account_id != null && Number(a.cc2api_account_id) === Number(item.id)));
+  form.cc2api_account_id.innerHTML = '<option value="">请选择已有账号</option>' + available.map(item =>
+    `<option value="${escapeHTML(item.id)}">#${escapeHTML(item.id)} ${escapeHTML(item.name || 'OAuth')} · ${escapeHTML(item.email_masked || '-')}</option>`).join('');
+  form.querySelector('button[type="submit"]').disabled = available.length === 0;
+  $('#cc2api-binding-hint').textContent = available.length
+    ? '关联会核对登录身份和设备，保留目标账号配置；不会创建账号或修改养号设置。'
+    : '当前没有可关联的账号。可先在账号页创建 cc2api 账号。';
+  $('#cc2api-binding-title').textContent = `#${account.id} ${account.name}`;
+  openModal('#cc2api-binding-modal');
+}
+
+/**
+ * 提交用户显式选择的关联目标，完成后保留明确结果。
+ * @param {SubmitEvent} event 关联表单提交事件
+ * @return {Promise<void>} 关联结束并刷新账号列表
+ */
+async function saveCc2apiBinding(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  button.disabled = true;
+  try {
+    const result = await API(`/accounts/${Number(form.account_id.value)}/cc2api/bind`, {
+      method: 'POST', body: JSON.stringify({ cc2api_account_id: Number(form.cc2api_account_id.value) }),
+    });
+    state.accountLoginMessage = `已关联现有 cc2api 账号 #${result.cc2api_account.id}，保留该账号原配置`;
+    closeModal('#cc2api-binding-modal');
+    await renderAccounts();
+  } catch (error) { alert('关联已有账号失败：' + error.message); }
+  finally { button.disabled = false; }
 }
 
 /**
@@ -404,11 +462,6 @@ async function renderAccounts() {
  * @return {Promise<void>} 表单就绪后完成
  */
 async function openWarmupModal(account) {
-  try {
-    state.cc2apiAccounts = await API('/cc2api/accounts');
-  } catch (e) {
-    state.cc2apiAccounts = [];
-  }
   const form = $('#warmup-form');
   form.account_id.value = account.id;
   form.interval_min_hours.value = account.warmup_interval_min_hours || 3;
@@ -424,39 +477,22 @@ async function openWarmupModal(account) {
     input.oninput = () => updateWarmupQuotaInputs(form);
   }
   updateWarmupQuotaInputs(form);
-  const options = state.cc2apiAccounts.map(item => `
-    <option value="${escapeHTML(item.id)}">#${escapeHTML(item.id)} ${escapeHTML(item.name || 'oauth')} · ${escapeHTML(item.email_masked || '-')}</option>
-  `).join('');
-  form.cc2api_account_id.innerHTML = `<option value="">${account.cc2api_account_id == null ? '使用本地 CLI 账号 · 不绑定 cc2api' : '保留当前 cc2api 绑定'}</option>` + options;
-  if (account.cc2api_account_id != null) {
-    const exists = state.cc2apiAccounts.some(item => String(item.id) === String(account.cc2api_account_id));
-    if (!exists) {
-      form.cc2api_account_id.insertAdjacentHTML(
-        'afterbegin',
-        `<option value="${escapeHTML(account.cc2api_account_id)}">#${escapeHTML(account.cc2api_account_id)} 当前绑定</option>`,
-      );
-    }
-    form.cc2api_account_id.value = String(account.cc2api_account_id);
-  } else {
-    form.cc2api_account_id.value = '';
-  }
-  form.cc2api_account_id.onchange = () => updateWarmupBindingState(form);
   updateWarmupBindingState(form);
   $('#warmup-modal-title').textContent = `#${account.id} ${account.name}`;
   openModal('#warmup-modal');
 }
 
 /**
- * 本地 OAuth 账号可独立养号，选定绑定后才使用 cc2api 凭据。
+ * 本地 OAuth 账号可独立养号，已有绑定时使用 cc2api 凭据。
  * @param {HTMLFormElement} form 养号与额度配置表单
  * @return {void} 不返回值
  */
 function updateWarmupBindingState(form) {
   const account = state.accounts.find(item => String(item.id) === String(form.account_id.value));
-  const bound = Boolean(form.cc2api_account_id.value || account?.cc2api_account_id);
+  const bound = account?.cc2api_account_id != null;
   form.enabled.disabled = false;
   $('#warmup-binding-hint').textContent = bound
-    ? '定时养号将使用所选 cc2api OAuth 账号；普通任务阈值同时保存。'
+    ? `定时养号使用已关联的 cc2api 账号 #${account.cc2api_account_id}；此处只修改养号与额度设置。`
     : '使用此账号已有的 CLI OAuth 凭据，可独立启用定时养号与额度阈值。';
 }
 
@@ -480,7 +516,7 @@ function updateWarmupQuotaInputs(form) {
 }
 
 /**
- * 原子保存绑定、养号间隔及阈值，关闭窗口显式提交 null。
+ * 原子保存养号间隔及阈值，关闭额度限制时显式提交 null。
  * @param {SubmitEvent} e 配置提交事件
  * @return {Promise<void>} 保存并刷新账号状态后完成
  */
@@ -496,9 +532,6 @@ async function saveWarmupConfig(e) {
     warmup_quota_5h_limit_percent: form.quota_5h_enabled.checked ? Number(form.warmup_quota_5h_limit_percent.value) : null,
     warmup_quota_7d_limit_percent: form.quota_7d_enabled.checked ? Number(form.warmup_quota_7d_limit_percent.value) : null,
   };
-  if (form.cc2api_account_id.value) {
-    payload.cc2api_account_id = Number(form.cc2api_account_id.value);
-  }
   button.disabled = true;
   try {
     await API(`/accounts/${accountId}/warmup`, {

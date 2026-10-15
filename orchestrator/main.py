@@ -704,7 +704,7 @@ class Cc2ApiClient:
                 "Authorization": f"Bearer {self.admin_password}",
                 **({"x-v3-service-token": os.environ.get("V3_INTERNAL_TOKEN", "")} if
                     (path == "/admin/accounts" and body and body.get("cli_identity"))
-                    or re.fullmatch(r"/admin/accounts/[0-9]+/oauth-credentials/import(?:/[a-f0-9]{32})?", path) else {}),
+                    or re.fullmatch(r"/admin/accounts/[0-9]+/(?:oauth-credentials/import(?:/[a-f0-9]{32})?|cli-process/import)", path) else {}),
             },
         )
         try:
@@ -8011,6 +8011,88 @@ def sync_account_to_cc2api(aid: int):
     :param aid: bench accounts.id
     :return: 绑定结果和脱敏 cc2api 账号摘要
     """
+    return _associate_account_to_cc2api(aid, "sync")
+
+
+class Cc2apiBindingIn(BaseModel):
+    """显式关联已有账号的请求体，仅接受目标账号 ID。"""
+
+    model_config = ConfigDict(extra="forbid")
+    cc2api_account_id: StrictInt
+
+
+@app.post("/api/accounts/{aid}/cc2api/create")
+def create_account_in_cc2api(aid: int) -> dict:
+    """仅创建并关联新 cc2api 账号，不自动改为关联已有账号。
+
+    :param aid: bench 账号 ID。
+    :return: 新建账号的脱敏结果。
+    """
+    return _associate_account_to_cc2api(aid, "create")
+
+
+@app.post("/api/accounts/{aid}/cc2api/bind")
+def bind_account_to_cc2api(aid: int, body: Cc2apiBindingIn) -> dict:
+    """仅关联显式选择的已有账号，不创建账号或修改养号设置。
+
+    :param aid: bench 账号 ID。
+    :param body: 目标 cc2api 账号 ID。
+    :return: 已关联账号的脱敏结果。
+    """
+    if body.cc2api_account_id <= 0:
+        raise HTTPException(400, "请选择有效的 cc2api 账号")
+    return _associate_account_to_cc2api(aid, "bind", body.cc2api_account_id)
+
+
+@app.post("/api/accounts/{aid}/cc2api/process")
+def update_account_process(aid: int) -> dict:
+    """只更新原关联账号的进程指标，不解析或刷新凭据。
+
+    :param aid: bench 账号 ID。
+    :return: 指标更新结果，不包含秘密。
+    """
+    if not account_runtime:
+        raise HTTPException(409, "进程实测仅支持 v3 固定账号环境")
+    connection = get_db()
+    try:
+        account = _get_available_account(connection, aid)
+        if not account:
+            raise HTTPException(404, "账号不存在或已停用")
+        account = dict(account)
+    finally:
+        connection.close()
+    with _oauth_owner_lock(account["name"]):
+        connection = get_db()
+        try:
+            account = dict(_get_available_account(connection, aid) or {})
+        finally:
+            connection.close()
+        if not account:
+            raise HTTPException(404, "账号不存在或已停用")
+        if account.get("cc2api_account_id") is None:
+            raise HTTPException(409, "账号尚未关联 cc2api，无法更新进程指标")
+        _require_oauth_owner_transition_idle(account)
+        try:
+            with _profile_lock(account["name"]):
+                payload = account_runtime.process_identity_import(account, effective_claude_code_version())
+            result = cc2api_client._request("POST",
+                f"/admin/accounts/{int(account['cc2api_account_id'])}/cli-process/import", payload)
+        except ConnectionError as exc:
+            raise HTTPException(502, _redact_cc2api_error(exc))
+        except (ValueError, RuntimeError) as exc:
+            raise HTTPException(409, _redact_cc2api_error(exc))
+    return {"ok": True, "cc2api_account_id": account["cc2api_account_id"],
+        "canonical_process": result["canonical_process"]}
+
+
+def _associate_account_to_cc2api(aid: int, action: str, target_id: Optional[int] = None) -> dict:
+    """复用创建/关联的所有权保护，由入口显式限定动作。
+
+    :param aid: bench 账号 ID。
+    :param action: create、bind 或旧接口 sync。
+    :param target_id: 显式关联的目标 ID。
+    :return: 绑定结果与脱敏账号摘要。
+    """
     conn = get_db()
     try:
         row = _get_available_account(conn, aid)
@@ -8030,6 +8112,8 @@ def sync_account_to_cc2api(aid: int):
             finally:
                 conn.close()
             existing_binding = account.get("cc2api_account_id")
+            if existing_binding is not None and action != "sync":
+                raise HTTPException(409, "账号已经关联 cc2api，无需再次创建或关联")
             if existing_binding is None:
                 _require_oauth_owner_transition_idle(account)
             try:
@@ -8051,7 +8135,14 @@ def sync_account_to_cc2api(aid: int):
                         raise ValueError("当前绑定的 cc2api 账号不存在")
                     created = False
                 else:
-                    matched = _find_cc2api_account_for_profile(profile, cc2api_accounts)
+                    if action == "bind":
+                        matched = next((item for item in cc2api_accounts if int(item.get("id") or 0) == target_id), None)
+                        if matched is None:
+                            raise ValueError("所选 cc2api 账号不存在，未创建或关联任何账号")
+                    else:
+                        matched = _find_cc2api_account_for_profile(profile, cc2api_accounts)
+                        if action == "create" and matched is not None:
+                            raise ValueError("已有匹配的 cc2api 账号，请使用“关联已有账号”")
                     created = matched is None
                     if matched is None:
                         matched = cc2api_client.create_account({
@@ -8067,6 +8158,12 @@ def sync_account_to_cc2api(aid: int):
                             "organization_uuid": profile.get("organization_uuid"),
                             "subscription_type": profile.get("subscription_type"),
                             "allow_fast_mode": False,
+                            "billing_mode": "rewrite",
+                            "upstream_session_pool_enabled": True,
+                            "upstream_session_pool_size": 4,
+                            "upstream_session_refresh_policy": "owner_only",
+                            "concurrency": 4,
+                            "rpm_limit": 50,
                         })
                 if not _cc2api_account_is_active_oauth(matched):
                     raise ValueError("匹配到的 cc2api 账号不是 active OAuth 账号")
@@ -8101,12 +8198,13 @@ def sync_account_to_cc2api(aid: int):
                             if current_binding is not None and int(current_binding) != cc2api_account_id:
                                 raise HTTPException(409, "bench 账号已绑定其他 cc2api 账号")
                             if current_binding is None:
-                                conn.execute(
-                                    "UPDATE accounts SET cc2api_account_id=?, warmup_enabled=0, "
-                                    "warmup_next_run_at=NULL, warmup_last_status='off', warmup_last_error=NULL "
-                                    "WHERE id=?",
-                                    (cc2api_account_id, aid),
-                                )
+                                if action == "sync":
+                                    conn.execute(
+                                        "UPDATE accounts SET cc2api_account_id=?, warmup_enabled=0, "
+                                        "warmup_next_run_at=NULL, warmup_last_status='off', warmup_last_error=NULL "
+                                        "WHERE id=?", (cc2api_account_id, aid))
+                                else:
+                                    conn.execute("UPDATE accounts SET cc2api_account_id=? WHERE id=?", (cc2api_account_id, aid))
                     except sqlite3.IntegrityError:
                         raise HTTPException(409, "该 cc2api 账号已绑定其他 bench 账号")
                     finally:

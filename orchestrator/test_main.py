@@ -2214,6 +2214,132 @@ global.fetch = async (_url, options) => {
         self.assertEqual("sync_failed", row["warmup_last_status"])
         self.assertGreaterEqual(row["warmup_next_run_at"], now + main.WARMUP_SYNC_RETRY_SEC - 2)
 
+    def _prepare_cc2api_action(self, matched: bool = True) -> Mock:
+        """准备独立创建/关联动作的数据与权威凭据替身。
+
+        :param matched: 是否已有同身份账号。
+        :return: 当前测试的 cc2api 客户端。
+        """
+        main.init_db()
+        profile = main.PROFILES_DIR / 'main'
+        profile.mkdir(parents=True)
+        (profile / '.credentials.json').write_text(json.dumps({'claudeAiOauth': {
+            'accessToken': 'old-access', 'refreshToken': 'old-refresh', 'expiresAt': 1}}))
+        (profile / '.claude.json').write_text(json.dumps({'oauthAccount': {
+            'emailAddress': 'main@example.test', 'accountUuid': 'uuid-main'}}))
+        connection = main.get_db()
+        try:
+            with connection:
+                connection.execute("INSERT INTO accounts(name,profile_path,warmup_enabled,warmup_next_run_at,"
+                    "warmup_last_status) VALUES('main','profiles/main',1,123456789,'scheduled')")
+        finally:
+            connection.close()
+        remote = {'id': 7, 'name': 'existing', 'email': 'main@example.test', 'status': 'active',
+            'auth_type': 'oauth', 'account_uuid': 'uuid-main', 'billing_mode': 'strip', 'concurrency': 2,
+            'rpm_limit': 17, 'upstream_session_pool_enabled': False, 'upstream_session_pool_size': 2,
+            'upstream_session_refresh_policy': 'mapped_request'}
+        client = Mock()
+        client.list_accounts.return_value = [remote] if matched else []
+        client.create_account.return_value = remote
+        client.resolve_credentials.return_value = {'account_id': 7, 'access_token': 'current-access',
+            'refresh_token': 'current-refresh', 'expires_at': int(time.time() * 1000) + 3600000}
+        for name, value in (('cc2api_client', client), ('account_runtime', None), ('login_manager', None), ('continue_manager', None)):
+            manager = patch.object(main, name, value)
+            manager.start()
+            self.addCleanup(manager.stop)
+        return client
+
+    def test_explicit_create_rejects_existing_match_without_binding_or_refresh(self) -> None:
+        """创建发现已有身份时不能自动关联或先覆盖本地凭据。
+
+        :return: None。
+        """
+        client = self._prepare_cc2api_action()
+        before = (main.PROFILES_DIR / 'main/.credentials.json').read_bytes()
+        with self.assertRaises(main.HTTPException) as failure:
+            main.create_account_in_cc2api(1)
+        self.assertEqual(409, failure.exception.status_code)
+        self.assertIn('关联已有账号', failure.exception.detail)
+        client.create_account.assert_not_called()
+        client.resolve_credentials.assert_not_called()
+        self.assertEqual(before, (main.PROFILES_DIR / 'main/.credentials.json').read_bytes())
+
+    def test_explicit_create_sends_six_defaults_and_preserves_warmup(self) -> None:
+        """显式创建提交六项配置，不能顺便关闭已有本地养号设置。
+
+        :return: None。
+        """
+        client = self._prepare_cc2api_action(False)
+        result = main.create_account_in_cc2api(1)
+        self.assertTrue(result['created'])
+        payload = client.create_account.call_args.args[0]
+        self.assertEqual({'billing_mode': 'rewrite', 'upstream_session_pool_enabled': True,
+            'upstream_session_pool_size': 4, 'upstream_session_refresh_policy': 'owner_only',
+            'concurrency': 4, 'rpm_limit': 50}, {key: payload[key] for key in (
+                'billing_mode', 'upstream_session_pool_enabled', 'upstream_session_pool_size',
+                'upstream_session_refresh_policy', 'concurrency', 'rpm_limit')})
+        connection = main.get_db()
+        try:
+            row = connection.execute('SELECT cc2api_account_id,warmup_enabled,warmup_next_run_at,warmup_last_status FROM accounts WHERE id=1').fetchone()
+        finally:
+            connection.close()
+        self.assertEqual((7, 1, 123456789, 'scheduled'), tuple(row))
+
+    def test_explicit_bind_never_creates_or_changes_warmup(self) -> None:
+        """关联只使用指定目标，错误目标不能回退创建。
+
+        :return: None。
+        """
+        client = self._prepare_cc2api_action()
+        with self.assertRaises(main.HTTPException):
+            main.bind_account_to_cc2api(1, main.Cc2apiBindingIn(cc2api_account_id=99))
+        client.create_account.assert_not_called()
+        client.resolve_credentials.assert_not_called()
+        result = main.bind_account_to_cc2api(1, main.Cc2apiBindingIn(cc2api_account_id=7))
+        self.assertFalse(result['created'])
+        client.create_account.assert_not_called()
+        connection = main.get_db()
+        try:
+            row = connection.execute('SELECT cc2api_account_id,warmup_enabled,warmup_next_run_at,warmup_last_status FROM accounts WHERE id=1').fetchone()
+        finally:
+            connection.close()
+        self.assertEqual((7, 1, 123456789, 'scheduled'), tuple(row))
+        with self.assertRaises(main.HTTPException):
+            main.create_account_in_cc2api(1)
+
+    def test_process_action_does_not_resolve_credentials_or_change_account(self) -> None:
+        """指标动作不读取 profile 凭据，不刷新 OAuth 或修改账号策略。
+
+        :return: None。
+        """
+        client = self._prepare_cc2api_action()
+        runtime = Mock()
+        runtime.process_identity_import.return_value = {'canonical_process': {'observation': {'sample_count': 0}}}
+        client._request.return_value = {'canonical_process': {'observation': {'sample_count': 0}}}
+        with patch.object(main, 'account_runtime', runtime), patch.object(main, '_login_save_pending', return_value=False):
+            with self.assertRaises(main.HTTPException):
+                main.update_account_process(1)
+            runtime.process_identity_import.assert_not_called()
+            connection = main.get_db()
+            try:
+                with connection:
+                    connection.execute('UPDATE accounts SET cc2api_account_id=7 WHERE id=1')
+                before = dict(connection.execute('SELECT * FROM accounts WHERE id=1').fetchone())
+            finally:
+                connection.close()
+            with patch.object(main, '_read_bench_profile_identity', side_effect=AssertionError('指标动作不能读取凭据')):
+                result = main.update_account_process(1)
+            self.assertEqual(7, result['cc2api_account_id'])
+            connection = main.get_db()
+            try:
+                after = dict(connection.execute('SELECT * FROM accounts WHERE id=1').fetchone())
+            finally:
+                connection.close()
+            self.assertEqual(before, after)
+        client.resolve_credentials.assert_not_called()
+        client.create_account.assert_not_called()
+        self.assertEqual('/admin/accounts/7/cli-process/import', client._request.call_args.args[1])
+
     def test_sync_links_existing_cc2api_account_without_create(self) -> None:
         """匹配到现有 cc2api 账号时只关联并以 cc2api 凭据覆盖 bench。"""
         main.init_db()

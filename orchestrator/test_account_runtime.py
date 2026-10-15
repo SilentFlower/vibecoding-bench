@@ -6,6 +6,7 @@ import sqlite3
 import subprocess
 import tempfile
 import threading
+import time
 import unittest
 from contextlib import closing
 from pathlib import Path
@@ -76,8 +77,12 @@ class AccountRuntimeTests(unittest.TestCase):
         row, home, profile = self._identity_configuration()
         before = (home.read_bytes(), profile.read_bytes())
         container = Mock()
-        container.exec_run.return_value = SimpleNamespace(exit_code=0, output=json.dumps({
-            "platform_raw": "linux", "arch": "x64", "node_version": "v22", "linux_kernel": "synthetic"}).encode())
+        container.exec_run.side_effect = [SimpleNamespace(exit_code=0, output=json.dumps({
+            "platform_raw": "linux", "arch": "x64", "node_version": "v22", "linux_kernel": "synthetic"}).encode()),
+            SimpleNamespace(exit_code=0, output=json.dumps({'constrained_memory': 4 * 1024 ** 3, 'observation': {
+                'source': 'v3:procfs:cli', 'environment_id': row['environment_id'], 'cli_version': '2.1.293',
+                'observed_at': time.time(), 'sample_count': 0, 'sampled_at': None,
+                'rss_bytes': None, 'rss_min_bytes': None, 'rss_max_bytes': None}}).encode())]
         self.runtime.ensure = Mock(return_value=(row, container))
         exported = self.runtime.identity_import({"id": 1, "name": "synthetic"}, "2.1.293")
         self.assertEqual("d" * 64, exported["device_id"])
@@ -85,7 +90,9 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual(row["environment_id"], exported["environment_id"])
         self.assertFalse((self.runtime._root(row) / "runtime/identity.json").exists())
         self.assertEqual(before, (home.read_bytes(), profile.read_bytes()))
-        container.exec_run.assert_called_once()
+        self.assertEqual(2, container.exec_run.call_count)
+        self.assertEqual(4 * 1024 ** 3, exported['canonical_process']['constrained_memory'])
+        self.assertIsNone(exported['canonical_process']['observation']['rss_bytes'])
 
     def test_cli_identity_rejects_invalid_device_or_different_login(self) -> None:
         """缺失、异常字段与账号归属变化不能使用另一个设备字段兜底。@return None。"""

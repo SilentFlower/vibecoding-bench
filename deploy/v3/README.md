@@ -81,3 +81,23 @@ python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --brows
 scripts/v3-stack import-offline --env /absolute/path/v3.env --source /absolute/path/metadata.json
 scripts/v3-stack import-offline --env /absolute/path/v3.env --source /absolute/path/metadata.json --apply
 ```
+
+## 完整账号转发与进程指标验收
+
+`verify_forwarding.py` 使用真实管理桥、调度器、两个账号容器和独立 HTTP CONNECT/SOCKS 代理，验证正式 API 的成功 JSON、完整 SSE、慢流取消、共享 CLI 租约、账号隔离和故障关闭。网关的公网连接在本次网络命名空间内被阻断并计数；代理只连接本地 HTTPS 夹具。浏览器实际操作创建、关联和指标更新，并交叉核对 SQLite、发送器证据及账号卡片。RSS 来自在容器中运行的官方 2.1.293 原生 CLI，不发送真实模型请求。
+
+本地 HTTPS 需显式构建 `verification-control` / `verification-account` 测试目标。构建仍复用 `manage.py` 的源码冻结和联合清单，唯一发送逻辑差异是 `v3-verification` 编译特性读取临时 CA；保留证书签名和主机名校验。正式 `control` / `account` 目标不依赖这些阶段，也没有运行时追加 CA 或关闭 TLS 校验的开关。测试镜像和标注 `verification_only` 的清单不得发布或用于生产。
+
+```bash
+# 需要本地 Docker、OpenSSL、Chrome/Chromium，以及包含 requests/docker/websockets 的 Python 环境。
+# 批次、清单和输出目录都必须是全新的；官方二进制由调用方提供，不下载、不读真实凭据。
+python3 deploy/v3/verify_forwarding.py --build --release verify-process-local \
+  --manifest /absolute/path/v3-verification.json
+python3 deploy/v3/verify_forwarding.py --manifest /absolute/path/v3-verification.json \
+  --cli-binary /absolute/path/official-2.1.293/claude.exe \
+  --output /absolute/path/new-verification-results
+```
+
+结果目录包含脱敏场景结果、代理/上游与发送器关联证据、进程观察和页面截图。失败也保留已完成证据，再清理本次随机标签的容器/网络；不会删除其它部署。旧重授权页面回归继续使用正式镜像执行 `verify_stack.py --browser --reauth`。
+
+测试替身成功只证明隔离业务链路。生产发送器经账号代理完成非模型 HTTPS 往返、真实 Anthropic 模型推理是另外两项验收；受限账号不能用来证明成功推理。

@@ -386,7 +386,8 @@ AccountRuntime.read_cli_identity(row: dict, version: str) -> dict
 AccountRuntime.identity_import(account: dict, version: str) -> dict
 source = cli:/v1/messages:metadata.user_id.device_id
        | cli:2.1.293:config.userID
-CLI payload: device_id, environment_id, source, canonical_env, canonical_prompt
+CLI payload: device_id, environment_id, source, canonical_env, canonical_prompt,
+             canonical_process（可选，实测格式见下方独立动作契约）
 ```
 
 ### 3. Contracts
@@ -411,7 +412,7 @@ CLI payload: device_id, environment_id, source, canonical_env, canonical_prompt
 
 ### 5. Scenarios and Examples
 
-- 正常：官方 2.1.293 登录后按原生 TLS 模式点击同步，cc2api 保存同一 userID；之后已绑定重授权更新原账号凭据。
+- 正常：官方 2.1.293 登录后按原生 TLS 模式显式创建或关联，cc2api 保存同一 userID；旧 sync API 保持兼容，已绑定重授权更新原账号凭据。
 - 基础：未绑定账号重授权仅保存本地，页面明确尚未关联；未知版本有历史请求观察时沿用旧来源。
 - 错误用法：为了补身份让用户反复跑普通任务，或直接用 machineID 兜底。正确处理：对已验证版本读取官方持久 userID，并保留所有冲突保护。
 
@@ -421,3 +422,67 @@ CLI payload: device_id, environment_id, source, canonical_env, canonical_prompt
 - `verify_cli_quota.py`：真实官方 2.1.293、不同的合成 userID／machineID、两条本地请求身份相符；采集前后请求完全一致且零 usage，Docker network=none。
 - `verify_reauth_stack.py`：空 runs 表、无 identity.json，经正式同步 API 创建及绑定后核对网关 device_id；真实页面重授权后检查两端 DB、profile、AT-only HOME、回执、原账号／设备／策略和可见结果提示。
 - `test_login_drafts.py` 与 `verify_login_drafts.py`：未绑定提交返回明确 false/null，页面显示仅本地保存。官方 CLI 实证与合成成功链分别报告，不以替身冒充官方验证。
+
+## Scenario: v3 独立账号动作、真实进程指标与完整转发验收
+
+### 1. Scope / Trigger
+
+- 修改 bench → cc2api 创建/关联、进程观察、账号卡片或 v3 转发验收时适用。设备来源沿用上方原生身份契约；凭据更新沿用重授权事务，不能把指标更新接到 OAuth 刷新路径。
+
+### 2. Signatures
+
+```text
+POST /api/accounts/{aid}/cc2api/create
+POST /api/accounts/{aid}/cc2api/bind  {cc2api_account_id: StrictInt > 0}
+POST /api/accounts/{aid}/cc2api/process
+POST /admin/accounts/:id/cli-process/import
+AccountRuntime.ensure(..., preserve_proxy: bool = False)
+AccountRuntime.process_identity_import(account: dict, version: str) -> dict
+AccountRuntime.process_import(row: dict, container, version: str) -> dict
+process_metrics.sample_process_metrics(root, proc, cli, cgroup) -> dict
+AccountService::import_cli_process(id: i64, input: &CliProcessImport) -> Result<Value, AppError>
+AccountStore::update_cli_process(account: &Account, process: &Value) -> Result<(), AppError>
+```
+
+`CliProcessImport` 为 `device_id/email/account_uuid/environment_id/cli_version/canonical_process`，拒绝其它顶层字段。内部导入同时要求管理员鉴权、v3 服务证明和运行门禁。响应为 `{ok, account_id, canonical_process}`；bench 指标响应使用 `cc2api_account_id`，均不含凭据。
+
+### 3. Contracts
+
+- 页面未关联时显示“创建 cc2api 账号”“关联已有账号”，已关联时显示“更新进程指标”；“重新授权”保持独立。关联选择从养号表单移出，后者只保存养号/额度。按钮状态不能替代服务端绑定/身份/占用校验。
+- 创建只接受未关联账号；匹配到现有身份返回冲突及关联提示，不自动切换。关联接受显式目标，只匹配该账号，不创建；按原所有权保护镜像 cc2api 权威凭据，保留养号和目标策略。新 UI 不再调用 `/cc2api/sync`，旧 sync 和 warmup 绑定字段保持兼容。
+- 真正创建的载荷显式设置 `billing_mode="rewrite"`、`upstream_session_pool_enabled=true`、`upstream_session_pool_size=4`、`upstream_session_refresh_policy="owner_only"`、`concurrency=4`、`rpm_limit=50`。TTL 时长沿用默认 60 分钟；不修改 cc2api 手工创建的全局默认，不覆盖关联、指标更新、重复兼容同步或重授权后的既有策略。
+- 指标更新持有 owner → profile → environment 锁序，仅核对代理配置，不能调用 `_sync_proxy` 回写代理或解析/刷新 OAuth。内部服务在排他配置门禁下拒绝活动/等待请求；不为指标写入 quiesce/停止在途发送器。存储只条件更新原身份的 `canonical_process/updated_at`，不能把旧 Account 副本整行写回而覆盖轮换后的凭据/策略。
+- 实际 cgroup v2 `memory.max` 或 v1 `memory.limit_in_bytes` 提供 RAM 上限；零只表示明确的无限制。读取失败不能当作无限制，导入须与固化 RAM 预算交叉核对，不能把 RAM＋swap 或容器占用当作 RAM 限制/RSS。
+- root 监督循环每两秒只读 procfs；只采 UID1000、root 所有且组/其它用户不可写、已完成版本缓存中的原生 `/cli/<version>/node_modules/@anthropic-ai/claude-code/bin/claude.exe`。核对进程启动时刻防 PID 复用，不读取命令正文或环境变量，不把 Node 探针/发送器当 CLI。
+- Docker 默认无 SYS_PTRACE；仅在读 exe 链接时匹配账号 fsuid/fsgid，立即恢复后由 root 核对缓存，不能增加容器权限。root 私有 `runtime/process-metrics.json` 使用 schema=1、环境归属及最多 32 个版本，私有锁内原子写入、0600、文件 fsync；坏记录保留并拒绝导入。采样不发请求、不启动额外模型任务，普通观察失败不停止 API。
+- `canonical_process.observation` 固定 `source="v3:procfs:cli"`、32 位小写 hex `environment_id`、精确 `cli_version`、UTC 秒 `observed_at/sampled_at`、整数 `sample_count`、字节 `rss_bytes/rss_min_bytes/rss_max_bytes`。内存/样本计数必须非负且小于 2^53；时间有限且不超当前 60 秒，采样时刻不晚于观察时刻。count=0 时采样时间及三个 RSS 都为 null；count>0 时它们必须齐全且 `0 < min <= rss <= max < 2^53`。
+- 容器上限可独立导入；RSS 没样本显示“未采集”，有样本显示真实时间。v3 observation 不填旧兼容默认堆/CPU/RSS 范围，上游只发送有依据的 constrainedMemory 和可选 rss，内部来源元数据不进入遥测。普通旧账号画像沿用既有兼容，已有 v3 账号通过独立按钮补齐，不批量迁移设备或凭据。
+- 完整转发验收使用真实调度器、空 SQLite、随机部署、两账号发送器、HTTP CONNECT/SOCKS 与本地 HTTPS 上游；来源 IP、合成标记、发送器 request_id 和响应哈希须可关联。正式 messages JSON/SSE、实际 CLI/API 并行、取消收口和失败关闭分别验收，不能以 ClientHello/502 或 runs-stream 代替成功业务响应。
+- 隔离构建仅显式启用 Cargo `v3-verification` 与 Docker `verification-control/verification-account`，临时根位于 `/run/v3/verification-ca.der`，仍验证签名与主机名。正式 control/account 不依赖这些阶段，不含该读取路径，不新增运行时 CA/跳过校验开关。测试镜像/清单不发布；生产非模型 HTTPS 与真实模型推理分别报告，受限账号不用于模型探测。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 已关联时创建/关联、创建遇已有匹配、关联目标不存在 | bench 409，不自动创建/改绑 |
+| 非 v3 或未关联时更新指标 | 409；不可用账号 404 |
+| 代理不一致、来源/版本/样本/内存预算错误 | 409，不改目标进程、代理或凭据 |
+| 内部证明缺失/伪造 | cc2api 401，不写库 |
+| 活动/等待 API 或 CLI 维护占用 | 内部拒绝，原数据与在途流保持；bench 返回受控 409/502 |
+| 新账号无 CLI 样本 | 上限准确，RSS null / 未采集 |
+| 发送路径、代理、证书/主机名、绑定/代次/目标错误 | 明确失败，无直连回退和不安全重放 |
+
+### 5. Scenarios and Examples
+
+- 正常：未关联账号点击创建，六项为 rewrite/开启/4/owner_only/4/50；已存在则显式选择关联，保留管理员自定义 strip/关闭/2/mapped_request/2/17。关联后更新指标只改进程字段。
+- 基础：`constrained_memory=1610612736`、`sample_count=0`、`sampled_at/rss_*=null`，页面显示容器上限 1.50G 与 CLI RSS 未采集；之后真实 CLI 样本补齐 RSS 和时间，停止/重启不伪造新样本。
+- 错误用法：点击“更新进程指标”顺便 resolve OAuth，或把缺失堆数据填成静态默认值。正确处理：独立身份/观察载荷与条件列更新，未知项不发送。
+- 错误用法：首个 session ID 未改变就判定池无效，或丢弃 urllib3 读取器后再测试“在途”拒绝。正确处理：前四个属主可保留 ID，第五个映射到四成员内；保留读取器并先断言 active>0，再取消及核对上游 completed=false。
+
+### 6. Tests Required
+
+- `test_process_metrics.py`：真实跨 UID procfs 路径及文件身份恢复、v1/v2/无限/损坏 cgroup、官方缓存/权限/PID/RSS、空样本、持久化及归属冲突；`test_account_runtime.py` 断言预算核对和原身份导出。
+- `test_main.py`：创建冲突不刷新/关联、六项载荷、显式关联不创建/改养号、未关联指标拒绝、更新不读凭据或改账号。Rust service/store 测试覆盖坏来源/身份/版本/样本、条件列写入与并发凭据/策略保护；identity/rewriter 测试覆盖对象及 base64 中未知堆/CPU 不外发、旧画像兼容。
+- `verify_forwarding.py --build ...` 复用 canonical 冻结与联合清单；实际浏览器点击三入口、明暗与 1440/720px、官方 CLI RSS → API/SQLite/卡片。正式 `/v1/messages` JSON/SSE 响应哈希、Billing 与 5→4 session、两账号隔离、实际官方 CLI 与 API 并行、取消及全部故障场景均通过；网关专属网络命名空间的公网阻断计数为零，结束按本次精确标签清理。
+- 正式镜像继续跑 `verify_stack.py --browser --reauth`，核对原 ID、AT-only HOME、完整 profile、六项策略/TTL、错误登录/取消/草稿恢复及旧哨兵。页面驱动等首次列表事件处理器就绪，避免人为并发初始查询；失败保留脱敏证据。
+- `cargo fmt --check && cargo test`、Python 全量及前端构建保持。可用账号的真实 Anthropic 推理单独验收，不用测试替身/生产非模型 200 冒充。

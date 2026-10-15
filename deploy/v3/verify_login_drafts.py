@@ -51,6 +51,8 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
         """等待新文档完成，避免误点刷新前的旧按钮。@return None。"""
         await evaluate(f"{win}.__draftReloadMarker=true;{win}.location.reload()")
         await wait_for(f"Boolean({doc}?.readyState==='complete' && !{win}.__draftReloadMarker && {doc}.querySelector('#add-account'))")
+        # 页面脚本已加载不等于首次账号查询已完成；重复渲染会并发争用草稿只读快照锁。
+        await wait_for(f"typeof {doc}.querySelector('#accounts-body').onclick === 'function'")
 
     async def restart_manager():
         """模拟本次管理器突然退出，等待对账恢复后载入新文档。@return None。"""
@@ -126,7 +128,6 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
 
     await restart_manager()
     # 管理器启动 reconcile 收口原执行；刷新列表只发现草稿，不创建新 CLI。
-    await evaluate(f"{win}.renderAccounts()")
     await wait_for(f"{doc}.querySelector('#accounts-body').textContent.includes('登录已中断')")
     interrupted = browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json()[0]
     assert interrupted["state"] == "interrupted" and interrupted["session_id"] is None
@@ -143,8 +144,12 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
 
     # 产物已写但尚未提交，再重启：继续只验证产物，不启动另一个授权 CLI。
     await restart_manager()
-    await evaluate(f"{win}.renderAccounts()")
-    await wait_for(f"Boolean({doc}.querySelector('[data-draft-resume=\"{environment_id}\"]:not([disabled])'))")
+    try:
+        await wait_for(f"Boolean({doc}.querySelector('[data-draft-resume=\"{environment_id}\"]:not([disabled])'))")
+    except TimeoutError:
+        print("重启后草稿入口诊断：", browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json(), flush=True)
+        print("重启后草稿按钮诊断：", await evaluate(f"{doc}.querySelector('#accounts-body').textContent"), flush=True)
+        raise
     await click_button(f'[data-draft-resume="{environment_id}"]')
     try:
         await wait_for(f"{doc}.querySelector('#acc-login-link-status').textContent.includes('可以提交保存')")

@@ -10,6 +10,8 @@ import time
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
+from process_metrics import sample_process_metrics
+
 
 def main() -> None:
     """恢复固定环境，检查健康并监督内部服务。
@@ -63,6 +65,7 @@ def main() -> None:
         sender = subprocess.Popen(["/usr/local/bin/account-sender"])
         children.append(sender)
         (root / "ready").touch()
+        next_metrics_at = 0.0
         while not stopping:
             if any(process.poll() is not None for process in children):
                 raise RuntimeError("账号内部服务退出")
@@ -79,6 +82,14 @@ def main() -> None:
                         (root / "cli-unhealthy").touch()
                     else:
                         (root / "cli-unhealthy").unlink(missing_ok=True)
+            if time.monotonic() >= next_metrics_at:
+                try:
+                    sample_process_metrics(root)
+                    (root / "process-metrics-error").unlink(missing_ok=True)
+                except (OSError, ValueError, KeyError, TypeError):
+                    # 观察失败只影响指标导入，不能连带中断已接受的 API 流。
+                    (root / "process-metrics-error").touch()
+                next_metrics_at = time.monotonic() + 2
             time.sleep(0.2)
     finally:
         (root / "ready").unlink(missing_ok=True)

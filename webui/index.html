@@ -357,6 +357,24 @@
   </div>
 
   <!-- cc2api 绑定与养号配置 -->
+  <div class="modal hidden" id="cc2api-binding-modal">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-titlebar">
+        <span class="modal-titlebar-name">关联已有账号 <span class="muted" id="cc2api-binding-title"></span></span>
+        <button type="button" class="modal-close" data-close="#cc2api-binding-modal" aria-label="关闭关联窗口">×</button>
+      </div>
+      <form id="cc2api-binding-form" class="form">
+        <input type="hidden" name="account_id" />
+        <label><span class="lbl">cc2api 账号</span><select name="cc2api_account_id" required></select></label>
+        <p class="hint" id="cc2api-binding-hint"></p>
+        <div class="row-end">
+          <button type="button" class="btn" data-close="#cc2api-binding-modal">取消</button>
+          <button type="submit" class="btn btn-primary">确认关联</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal hidden" id="warmup-modal">
     <div class="modal-card modal-card-sm">
       <div class="modal-frame" aria-hidden="true">
@@ -369,9 +387,6 @@
       </div>
       <form id="warmup-form" class="form">
         <input type="hidden" name="account_id" />
-        <label><span class="lbl">$ cc2api_account</span>
-          <select name="cc2api_account_id"></select>
-        </label>
         <p class="hint" id="warmup-binding-hint"></p>
         <div class="row warmup-interval-row">
           <label><span class="lbl">$ min_hours</span>
@@ -672,6 +687,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20261015-account-sync-reauth"></script>
+  <script src="app.js?v=20261016-process-sync-actions"></script>
 </body>
 </html>
