@@ -546,3 +546,64 @@ runtime/credential-handoff.json -> {schema: 1, account_id, environment_id,
 - `test_deleted_binding.py`：真实异常链/SQLite/运行时，保持原门禁回归，增加正常/悬空解绑 RT 交接、失败作业收尾、独立轮换、旧 AT-only 同源补齐、坏文件/身份冲突、HOME/access 写入故障、重启保留意图及重复恢复、来源变化/改绑拒绝，以及本地删除不依赖 RT。
 - `test_login_drafts.py`：合成成功凭据具备真实 CLI 的 expiry；未提交 AT-only 草稿仍可取消，不污染正式 profile，保存失败和重试门禁保持。
 - `verify_stack.py --manifest <同批正式清单> --browser --deleted-binding`：随机部署经正式创建/绑定、远端删除、重启与页面解绑，核对两库和 RT 交接；真实 scheduler/runner/容器执行仅替换 OAuth 探测为失败，收尾后再次页面创建成功，HOME 回到 AT-only。保留原身份、统一会话/退出与旧哨兵验证，不访问真实 OAuth/usage/模型，只清理本次标签资源。
+
+## Scenario: v3 三角色 Docker 隔离与 OAuth 出口
+
+### 1. Scope / Trigger
+
+- 修改固定账号布局、权限/挂载、网络策略、资源预算、OAuth 客户端或账号迁移/部署验证时适用。本节是布局 2 对前述单容器约定的增量契约；普通 API/CLI 调度、凭据所有权与业务协议继续沿用。
+
+### 2. Signatures
+
+```text
+account_environments.container_id TEXT                 # CLI，保留原字段
+account_environments.network_container_id TEXT
+account_environments.sender_container_id TEXT
+account_environments.isolation_version INTEGER DEFAULT 0
+account_isolation.ISOLATION_VERSION = 2
+ROLE_COLUMNS = {cli: container_id, sender: sender_container_id, network: network_container_id}
+ROLE_LABELS = {cli: account, sender: account-sender, network: account-network}
+isolated_account_limits(memory: str, swap: str = "0") -> dict[str, tuple[int, int]]
+cc2api/src/service/oauth.rs: validate_oauth_proxy(proxy_url, runtime_url, deployment_id)
+```
+
+### 3. Contracts
+
+- 一个逻辑环境登记 network/CLI/sender 三个容器，共用同批 account 镜像；control/account 仍为两个交付镜像，清单 layout_version=2。三个角色严格核对 product/deployment/environment/role/release/isolation-version 标签；不能靠名称前缀或第一个环境容器推断角色。发送绑定继续核对环境、整数 generation、批次与秘密。
+- network 持有 TUN/NET_ADMIN；CLI 为 UID1000、sender 为 UID1001，业务角色 cap_drop=ALL、no-new-privileges、根只读、独立 PID/挂载，加入本账号 network 容器的 netns。hostname/MAC 只配置在网络所有者，machine-id 两处只读挂载；保留原 HOME、userID、画像和最新凭据。
+- network 只挂本账号网络控制、版本缓存写入区、私有 CA、CLI 证据/控制及必要 AT 快照，不挂完整 HOME。CLI 不挂 sender 秘密、代理密码、私有 CA 或其他账号额度，/flows/api 用空只读目录遮蔽；sender 只读私有配置并写自己的 API 证据。
+- CLI 的 runtime 父目录 root:GID1000 0750，drivers/runs/jobs 由管理端保护父目录；单作业 group.pid 与 tmux 位于受控 jobs/<handle> 子目录。sender 配置目录 root:GID1001 0750、文件 0640，通过目录挂载接收原子替换。管理 JSON 使用逐级 O_NOFOLLOW 目录 fd、相对原子替换；读取限普通文件和 16 MiB，chown 不跟随账号链接。
+- 网络过滤器在本账号 netns 原子安装 INPUT/FORWARD/OUTPUT 默认 DROP，先拒绝 Docker DNS 127.0.0.11，再开放回环、既有连接、指定代理 TCP、TUN；其他私网和 IPv6 拒绝。sender 8091 入站仅允许核验过的本部署 gateway/orchestrator 及桥网关。网络 ready 最多等 120 秒，确认前不启动业务；删路由/网络进程故障不能回退 bridge 直连，不修改宿主共享规则。
+- 服务端 OAuth 仍由 gateway 的原 HTTP/TLS 客户端发出，账号 netns 防火墙不能保护它。`V3_RUNTIME_URL` 或 `V3_DEPLOYMENT_ID` 任一非空时，空串/空白代理在创建 OAuth 客户端前返回 ServiceUnavailable；授权交换、刷新和 usage 共用该入口。非空非法代理解析失败也不得直连；两个标识均为空的独立部署保留原空代理语义。不伪造浏览器网页授权的出口。
+- 总 RAM/swap 来自已保存画像：network 256 MiB、sender 128 MiB、CLI 取剩余且至少 512 MiB，额外 swap 只归 CLI；Docker memswap 为角色 RAM 加其额外 swap。CPU 按 CLI:network:sender=6:1:1 分配，pids 分别为 512/128/128；CLI /tmp 为 128 MiB noexec。部署预检、容量及停止不能漏计辅助角色或放大账号总预算。
+- 创建按网络 ready 再业务角色，逐个登记；失败停止本代已创建实例并保留对账证据，未知/部分角色不能 ready。停止按 CLI→sender→network；维护、备份、草稿删除与孤儿处理核对完整角色集合。管理端重启与 CLI 单次取消保留健康 API/SSE；CLI 单独异常仅关闭下一 CLI。
+- 布局 0 的已有实例只在显式空闲重建时转换，GET/普通发送不能静默迁移。先停机备份，转换保存私有 isolation-upgrade 快照；回退保留最新 HOME/凭据，不恢复旧 RT/数据库覆盖轮换结果。未创建实例的新行保持布局 0，受控 ensure 才登记 2。
+- 业务指标取 CLI 实际 PID/cgroup，管理端写私有观察记录。验证 CA 仅供 verification 镜像，sender 的只读 /run/v3 下嵌套 CA bind 必须预置目标；正式镜像不读取该 CA。测试依赖的系统目录仍只读，故障注入使用网络私有运行记录。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| CLI/sender 修改系统目录、路由或读取其他角色秘密 | 拒绝；本账号 HOME/项目可写与执行 |
+| 网络 ready 超时、标签冲突或部分角色创建 | 不发布可用绑定，保留 reconcile/证据 |
+| 删除默认路由后落到 bridge | 默认 DROP 内核计数增加，不直连 |
+| v3 空白代理，包括只剩部署标识的配置 | OAuth 客户端创建前拒绝；不轮换 AT/RT 或停用账号 |
+| 独立部署两个 v3 标识均为空 | 保留显式直连兼容语义 |
+| 账号总 RAM 不足 896 MiB | 明确拒绝，不能静默加配 |
+| CLI 取消或管理端重启时 API 长流健康 | sender 不重启，流完整或按原取消语义收口 |
+| 旧布局仍有活动/提交未决或回退凭据来源不明 | 拒绝转换/覆盖，保留原资料 |
+
+### 5. Scenarios and Examples
+
+- 正常：1536m RAM + 2048m 额外 swap 分配为 CLI 1152m RAM + 2048m swap、network 256m、sender 128m；JSON/SSE 和官方 CLI 本地工具可并行。
+- 基础：已有固定环境停机后显式重建，保留环境 ID、HOME、machine-id 与最新凭据；角色缺失先对账完整集合。
+- 错误用法：认为账号网络防火墙已保护 gateway 的所有 OAuth 请求。正确处理：OAuth 公共入口按 v3 标识拒绝空代理，并实测连接尝试为 0。
+- 错误用法：`containers.list(environment)[0]` 后执行 tmux，或 mv 只读系统程序制造故障。正确处理：显式选择 account/account-network，使用私有运行记录注入并在 finally 恢复。
+- 错误用法：用创建时缓存的 StartedAt 判断后续长流是否被重启。正确处理：流首字节之后 reload sender，比较本次在途重启前后的实时状态及完整响应哈希。
+
+### 6. Tests Required
+
+- 账号运行时单元覆盖角色登记/归属、部分创建/孤儿收口、总预算、旧行与受控转换、身份/凭据保持、链接逃逸拒绝。Rust `cargo fmt --check`、`cargo test --locked` 覆盖 v3 两种标识及部分配置、空白代理拒绝、独立部署兼容。
+- `verify_forwarding.py` 标准入口覆盖真实权限/秘密、官方 CLI 本地工具、HTTP CONNECT/SOCKS5 的 OAuth/JSON/SSE、4 成员池、CLI/API 并行取消、管理端重启、错误证书/代理/绑定拒绝。空代理回归核对 AT/RT/oauth_expires_at/status 保持，最终 gateway 公网连接尝试内核计数必须为 0；SQL 字段以 AccountStore 的实际映射为准。
+- `verify_stack.py --browser --reauth` 覆盖草稿取消故障、恢复及完整删除；账号冷启动等待可用 150 秒，普通 DOM 仍为 15 秒。`--deleted-binding` 保留 RT 交接与再次创建回归。脚本不得依赖诊断 wrapper 才通过。
+- `run_local_verification.py` 使用同批正式清单与显式旧 control/account 镜像验收真实转换及离线回退、透传/Recorder、路由故障和总预算；分别记录本地夹具、正式非模型与真实模型证据，不以隔离承诺免封。

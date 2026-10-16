@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import hashlib
+import ipaddress
 import json
 import socket
 import sqlite3
@@ -18,7 +19,7 @@ import requests
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed, InvalidStatus
 
-from manage import REPO
+from manage import REPO, COMPOSE
 
 
 async def verify_websocket(base: str, cookie: str, ticket: str) -> None:
@@ -102,7 +103,18 @@ def main() -> None:
         configuration = root / "v3.env"
         configuration.write_text("".join(f"{key}={value}\n" for key, value in values.items()))
         configuration.chmod(0o600)
-        manager = ["python3", str(REPO / "deploy/v3/manage.py")]
+        used = [ipaddress.ip_network(item['Subnet']) for existing in client.networks.list()
+            for item in existing.attrs.get('IPAM', {}).get('Config') or [] if item.get('Subnet')]
+        routes = json.loads(subprocess.check_output(['ip','-j','route','show']))
+        used.extend(ipaddress.ip_network(item['dst']) for item in routes if item.get('dst') not in (None,'default'))
+        subnet = next(candidate for index in range(200,250)
+            for candidate in [ipaddress.ip_network(f'10.233.{index}.0/24')]
+            if not any(candidate.overlaps(item) for item in used if item.version == 4))
+        compose = root / 'compose.yml'
+        compose.write_text(COMPOSE.read_text() + f'    ipam:\n      config:\n        - subnet: {subnet}\n')
+        wrapper = root / 'manage.py'
+        wrapper.write_text(f'import sys\nfrom pathlib import Path\nsys.path.insert(0,{str(REPO / "deploy/v3")!r})\nimport manage\nmanage.COMPOSE=Path({str(compose)!r})\nmanage.main()\n')
+        manager = ["python3", str(wrapper)]
         try:
             for action in ("check", "up"):
                 subprocess.run(manager + [action, "--env", str(configuration)], check=True, cwd=REPO)

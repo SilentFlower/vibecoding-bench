@@ -14,6 +14,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from account_runtime import AccountRuntime, atomic_json, derive_v3_fingerprint, locale_for_timezone
+from account_isolation import ROLE_COLUMNS, role_labels
 import main
 
 
@@ -38,6 +39,7 @@ class AccountRuntimeTests(unittest.TestCase):
             connection.execute("CREATE TABLE app_settings(key TEXT PRIMARY KEY, value TEXT)")
             connection.execute("INSERT INTO accounts(id,name,cc2api_account_id) VALUES(1,'synthetic',7)")
         self.client = Mock()
+        self.client.containers.list.return_value = []
         self.gateway = Mock()
         self.fingerprint = Mock(return_value={"profile_version": 2, "hostname": "fixed", "machine_id": "a" * 32,
             "mac": "02:00:00:00:00:01", "tz": "UTC", "lang": "en_US.UTF-8"})
@@ -48,6 +50,30 @@ class AccountRuntimeTests(unittest.TestCase):
         self.addCleanup(environment.stop)
         self.runtime = AccountRuntime(self.client, self.root, self.root, database, self.fingerprint, self.gateway)
         self.addCleanup(self.runtime.heartbeat_pool.shutdown)
+
+    def _isolated_docker(self, network=None) -> dict:
+        """提供具有独立角色、标签及来源网络的 Docker 替身。@return 容器登记。"""
+        self.runtime.release_id = "test"
+        self.client.images.get.return_value.attrs = {"Config": {"Labels": {
+            "vibebench.product": "v3", "vibebench.role": "account", "vibebench.release": "test",
+            "vibebench.isolation-version": "2"}}}
+        self.client.networks.get.return_value.attrs = {"IPAM": {"Config": [{"Gateway": "192.0.2.1"}]}}
+        self.client.containers.list.return_value = []
+        containers = {}
+
+        def create(image, **options):
+            """模拟实际独立容器创建，保留配置供断言。"""
+            role = options["labels"]["vibebench.role"]
+            container = network if role == "account-network" and network is not None else Mock()
+            container.id, container.status, container.labels = role + "-new", "running", options["labels"]
+            if container is not network:
+                container.exec_run.return_value = SimpleNamespace(exit_code=0, output=b"")
+            containers[container.id] = container
+            return container
+
+        self.client.containers.run.side_effect = create
+        self.client.containers.get.side_effect = lambda identifier: containers[identifier]
+        return containers
 
     def test_rename_keeps_environment_and_frozen_fingerprint(self) -> None:
         """改名和重复读取不能重新派生身份。@return None。"""
@@ -344,7 +370,7 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual("UTC", executed["TZ"])
         self.assertEqual("en_US.UTF-8", executed["LANG"])
         self.assertEqual("en_US.UTF-8", executed["LC_ALL"])
-        script = (root / "runtime" / f"job-{job['handle']}.sh").read_text()
+        script = (root / "runtime/drivers" / f"job-{job['handle']}.sh").read_text()
         defaults = re.search(r"^write_default_settings\(\) \{.*?^\}$", script, re.M | re.S)
         self.assertIsNotNone(defaults)
         local_defaults = defaults.group(0).replace(f"/run/v3/jobs/{job['handle']}/", str(root / "runtime/jobs" / job["handle"]) + "/")
@@ -507,17 +533,12 @@ class AccountRuntimeTests(unittest.TestCase):
         """
         with patch.dict(os.environ, {"V3_ACCOUNT_MEMORY": "1536m", "V3_ACCOUNT_SWAP": "2048m"}):
             row = self.runtime._row("synthetic", 1)
-        self.runtime.release_id = "test"
-        self.client.images.get.return_value.attrs = {"Config": {"Labels": {
-            "vibebench.product": "v3", "vibebench.role": "account", "vibebench.release": "test"}}}
-        container = Mock(id="new-container", status="running")
-        container.exec_run.return_value = SimpleNamespace(exit_code=0)
-        self.client.containers.run.return_value = container
+        self._isolated_docker()
         with patch.object(self.runtime, "_make_room"), patch.object(self.runtime, "_sender_active", return_value=0), patch.object(self.runtime, "_ensure_version"):
-            current, _ = self.runtime.ensure({"id": 1, "name": "synthetic"}, "2.1.280")
-        limits = self.client.containers.run.call_args.kwargs
-        self.assertEqual(limits["mem_limit"], 1536 * 1024**2)
-        self.assertEqual(limits["memswap_limit"], 3584 * 1024**2)
+            current, _ = self.runtime.ensure({"id": 1, "name": "synthetic", "upstream_socks5_host": "192.0.2.2", "upstream_socks5_port": 1080}, "2.1.280")
+        limits = [call.kwargs for call in self.client.containers.run.call_args_list]
+        self.assertEqual(sum(item["mem_limit"] for item in limits), 1536 * 1024**2)
+        self.assertEqual(sum(item["memswap_limit"] for item in limits), 3584 * 1024**2)
         self.assertEqual(current["fingerprint_json"], row["fingerprint_json"])
 
     def test_old_fingerprint_missing_swap_preserves_no_swap(self) -> None:
@@ -529,17 +550,12 @@ class AccountRuntimeTests(unittest.TestCase):
         fingerprint = json.loads(row["fingerprint_json"])
         del fingerprint["swap"]
         self.runtime._update(row, fingerprint_json=json.dumps(fingerprint))
-        self.runtime.release_id = "test"
-        self.client.images.get.return_value.attrs = {"Config": {"Labels": {
-            "vibebench.product": "v3", "vibebench.role": "account", "vibebench.release": "test"}}}
-        container = Mock(id="legacy-container", status="running")
-        container.exec_run.return_value = SimpleNamespace(exit_code=0)
-        self.client.containers.run.return_value = container
+        self._isolated_docker()
         with patch.dict(os.environ, {"V3_ACCOUNT_SWAP": "2048m"}), patch.object(self.runtime, "_make_room"), patch.object(self.runtime, "_sender_active", return_value=0), patch.object(self.runtime, "_ensure_version"):
-            self.runtime.ensure({"id": 1, "name": "synthetic"}, "2.1.280")
-        limits = self.client.containers.run.call_args.kwargs
-        self.assertEqual(limits["mem_limit"], 4 * 1024**3)
-        self.assertEqual(limits["memswap_limit"], limits["mem_limit"])
+            self.runtime.ensure({"id": 1, "name": "synthetic", "upstream_socks5_host": "192.0.2.2", "upstream_socks5_port": 1080}, "2.1.280")
+        limits = [call.kwargs for call in self.client.containers.run.call_args_list]
+        self.assertEqual(sum(item["mem_limit"] for item in limits), 4 * 1024**3)
+        self.assertTrue(all(item["memswap_limit"] == item["mem_limit"] for item in limits))
 
     def test_unlimited_swap_is_rejected_before_account_registration(self) -> None:
         """非法预算不能留下新账号环境记录。
@@ -676,28 +692,27 @@ class AccountRuntimeTests(unittest.TestCase):
         with self.database() as connection:
             for field in ("upstream_proxy_scheme", "upstream_socks5_host", "upstream_socks5_port", "upstream_socks5_user", "upstream_socks5_pass"):
                 connection.execute(f"ALTER TABLE accounts ADD COLUMN {field} TEXT")
-        self.runtime.release_id = "test"
-        self.client.images.get.return_value.attrs = {"Config": {"Labels": {"vibebench.product": "v3", "vibebench.role": "account", "vibebench.release": "test"}}}
+        containers = self._isolated_docker()
         row = self.runtime._row("synthetic", 1)
-        self.runtime._update(row, generation=3, container_id="old-container")
+        self.runtime._update(row, generation=3, isolation_version=2,
+            **{column: "old-" + role for role, column in ROLE_COLUMNS.items()})
         root = self.runtime._root(row)
         (root / "home").mkdir(parents=True)
-        (root / "home" / "marker").write_text("preserved")
-        atomic_json(root / "runtime" / "sender.json", {"proxy_url": "http://old.invalid:80", "binding": {}})
-        old = Mock(id="old-container", status="exited", labels={**self.runtime._labels(row), "vibebench.release": "test"})
-        new = Mock(id="new-container", status="running")
-        new.exec_run.return_value = SimpleNamespace(exit_code=0)
-        self.client.containers.get.return_value = old
-        self.client.containers.run.return_value = new
+        (root / "home/marker").write_text("preserved")
+        atomic_json(self.runtime._sender_config(row), {"proxy_url": "http://old.invalid:80", "binding": {}})
+        for role, column in ROLE_COLUMNS.items():
+            containers[row[column]] = Mock(id=row[column], status="exited", labels=role_labels(self.runtime, row, role))
+        old = list(containers.values())
         self.gateway._request.return_value = {"proxy_url": "http://u%40name:p%3Aword@new.invalid:8080", "auth_type": "oauth", "status": "active"}
         account = {"id": 1, "name": "synthetic", "cc2api_account_id": 7, "upstream_socks5_host": "old.invalid"}
-        with patch.object(self.runtime, "_make_room"), patch.object(self.runtime, "_sender_active", return_value=0), patch.object(self.runtime, "_ensure_version"):
+        with patch("account_isolation.socket.getaddrinfo", return_value=[(None,None,None,None,("192.0.2.3",8080))]), patch.object(self.runtime, "_make_room"), patch.object(self.runtime, "_sender_active", return_value=0), patch.object(self.runtime, "_ensure_version"):
             current, _ = self.runtime.ensure(account, "2.1.280")
-        old.remove.assert_called_once_with()
+        for container in old:
+            container.remove.assert_called_once_with()
         self.assertEqual(current["generation"], 4)
         self.assertEqual(current["fingerprint_json"], row["fingerprint_json"])
         self.assertEqual((root / "home" / "marker").read_text(), "preserved")
-        self.assertEqual(self.client.containers.run.call_args.kwargs["environment"]["UPSTREAM_SOCKS5_USER"], "u@name")
+        self.assertEqual(self.client.containers.run.call_args_list[0].kwargs["environment"]["UPSTREAM_SOCKS5_USER"], "u@name")
         with self.database() as connection:
             saved = dict(connection.execute("SELECT * FROM accounts WHERE id=1").fetchone())
         self.assertEqual(self.runtime._proxy(saved), self.gateway._request.return_value["proxy_url"])
@@ -719,7 +734,7 @@ class AccountRuntimeTests(unittest.TestCase):
             return SimpleNamespace(exit_code=0)
 
         container.exec_run.side_effect = exec_run
-        self.client.containers.run.return_value = container
+        self._isolated_docker(container)
         row = self.runtime._row("synthetic", 1)
         job = {"row": row, "account": {"cc2api_account_id": 7}, "claimed": True,
             "lease": {"owner": "run:healthy", "generation": "same-lease"}}
@@ -735,7 +750,7 @@ class AccountRuntimeTests(unittest.TestCase):
         def setup_other():
             """执行真实环境准备，记录线程异常。"""
             try:
-                self.runtime.ensure({"id": 2, "name": "other"}, "2.1.280")
+                self.runtime.ensure({"id": 2, "name": "other", "upstream_socks5_host": "192.0.2.2", "upstream_socks5_port": 1080}, "2.1.280")
             except Exception as error:
                 errors.append(error)
 
@@ -882,15 +897,16 @@ class AccountRuntimeTests(unittest.TestCase):
 
     def test_api_transport_never_installs_cli_and_preserves_cli_reconciliation(self) -> None:
         """CLI 安装失败或待对账不应阻止健康发送器。@return None。"""
-        self.runtime.release_id = "test"
-        self.client.images.get.return_value.attrs = {"Config": {"Labels": {"vibebench.product": "v3", "vibebench.role": "account", "vibebench.release": "test"}}}
+        containers = self._isolated_docker()
         row = self.runtime._row("synthetic", 1)
-        self.runtime._update(row, container_id="container", generation=1, state="cli_reconcile")
+        self.runtime._update(row, isolation_version=2, generation=1, state="cli_reconcile",
+            **{column: role for role, column in ROLE_COLUMNS.items()})
         configuration = {"proxy_url": "", "binding": {"account_id": 7}, "quota_identity": ""}
-        atomic_json(self.runtime._root(row) / "runtime" / "sender.json", configuration)
-        container = Mock(status="running", labels={**self.runtime._labels(row), "vibebench.release": "test"})
-        container.exec_run.return_value = SimpleNamespace(exit_code=0)
-        self.client.containers.get.return_value = container
+        atomic_json(self.runtime._sender_config(row), configuration)
+        for role in ROLE_COLUMNS:
+            container = Mock(status="running", labels=role_labels(self.runtime, row, role))
+            container.exec_run.return_value = SimpleNamespace(exit_code=0)
+            containers[role] = container
         self.gateway._request.return_value = {"proxy_url": "", "auth_type": "oauth", "status": "active"}
         account = {"id": 1, "name": "synthetic", "cc2api_account_id": 7,
             "upstream_proxy_scheme": "socks5", "upstream_socks5_host": "", "upstream_socks5_port": 1080,
@@ -899,6 +915,119 @@ class AccountRuntimeTests(unittest.TestCase):
             self.assertEqual(self.runtime.transport(account, "9.9.9"), configuration["binding"])
             installer.assert_not_called()
         self.assertEqual(self.runtime._row("synthetic", 1)["state"], "cli_reconcile")
+
+    def test_three_role_permissions_and_secret_mount_boundaries(self) -> None:
+        """普通角色不携带网络权限或其他角色秘密，配额合计保持。@return None。"""
+        self._isolated_docker()
+        account = {"id": 1, "name": "synthetic", "upstream_socks5_host": "192.0.2.2", "upstream_socks5_port": 1080,
+            "upstream_socks5_user": "synthetic-user", "upstream_socks5_pass": "synthetic-password"}
+        with patch.object(self.runtime, "_make_room"), patch.object(self.runtime, "_sender_active", return_value=0):
+            row, _ = self.runtime.ensure(account)
+        roles = {call.kwargs["labels"]["vibebench.role"]: call.kwargs for call in self.client.containers.run.call_args_list}
+        self.assertEqual(3, len(roles))
+        for role, uid in (("account", "1000:1000"), ("account-sender", "1001:1001")):
+            options = roles[role]
+            self.assertEqual(uid, options["user"])
+            self.assertEqual(["ALL"], options["cap_drop"])
+            self.assertTrue(options["read_only"])
+            self.assertEqual(["no-new-privileges:true"], options["security_opt"])
+            self.assertNotIn("devices", options)
+            self.assertNotIn("UPSTREAM_SOCKS5_PASS", options["environment"])
+        cli = roles["account"]
+        mounted = {value["bind"]: value["mode"] for value in cli["volumes"].values()}
+        self.assertEqual("ro", mounted["/flows/api"])
+        self.assertNotIn("/ca", mounted)
+        self.assertNotIn(str(self.runtime._sender_config(row).parent), cli["volumes"])
+        self.assertEqual(2_000_000_000, sum(value["nano_cpus"] for value in roles.values()))
+        network = roles["account-network"]
+        self.assertNotIn("/home/node", {value["bind"] for value in network["volumes"].values()})
+
+    def test_partial_creation_retains_evidence_and_stops_known_roles(self) -> None:
+        """发送器创建失败不能留下可运行业务或假报 ready。@return None。"""
+        containers = self._isolated_docker()
+        original = self.client.containers.run.side_effect
+
+        def fail_sender(image, **options):
+            """只在第三角色注入 Docker 创建故障。"""
+            if options["labels"]["vibebench.role"] == "account-sender":
+                raise RuntimeError("synthetic create failure")
+            return original(image, **options)
+
+        self.client.containers.run.side_effect = fail_sender
+        with patch.object(self.runtime, "_make_room"), self.assertRaisesRegex(RuntimeError, "create failure"):
+            self.runtime.ensure({"id": 1, "name": "synthetic", "upstream_socks5_host": "192.0.2.2", "upstream_socks5_port": 1080})
+        row = self.runtime._row("synthetic", 1)
+        self.assertEqual("reconcile", row["state"])
+        self.assertIsNone(row["sender_container_id"])
+        self.assertEqual(2, len(containers))
+        for container in containers.values():
+            container.stop.assert_called_once_with(timeout=5)
+        # 先核对所有归属再执行停止，避免一半已停、另一半其实属于其他部署。
+        containers[row["container_id"]].labels["vibebench.deployment"] = "foreign"
+        for container in containers.values():
+            container.stop.reset_mock()
+        with self.assertRaisesRegex(ValueError, "归属"):
+            self.runtime._stop_environment(row, remove=True)
+        for container in containers.values():
+            container.stop.assert_not_called()
+
+    def test_rebuild_collects_exact_orphan_after_create_registration_gap(self) -> None:
+        """创建后登记前中断的角色可按精确标签收口，不漏预算或留下名称冲突。@return None。"""
+        self._isolated_docker()
+        row = self.runtime._row("synthetic", 1)
+        self.runtime._update(row, isolation_version=2, state="reconcile")
+        orphan = Mock(id="orphan", labels=role_labels(self.runtime, row, "network"))
+        self.client.containers.list.return_value = [orphan]
+        self.runtime._stop_environment(row, remove=True)
+        orphan.stop.assert_called_once_with(timeout=5)
+        orphan.remove.assert_called_once_with()
+        self.assertTrue(all(row[column] is None for column in ROLE_COLUMNS.values()))
+
+    def test_legacy_upgrade_requires_explicit_rebuild_and_preserves_latest_home(self) -> None:
+        """旧环境只在显式排空重建升级，备份不回写凭据。@return None。"""
+        self._isolated_docker()
+        with self.database() as connection:
+            connection.execute("UPDATE accounts SET cc2api_account_id=NULL WHERE id=1")
+        row = self.runtime._row("synthetic", 1)
+        self.runtime._update(row, generation=8, container_id="legacy", state="stopped")
+        root = self.runtime._root(row)
+        atomic_json(root / "home/.claude.json", {"userID": "d" * 64})
+        atomic_json(root / "home/.claude/.credentials.json", {"latest": "synthetic-latest-rotation"})
+        before = (root / "home/.claude/.credentials.json").read_bytes()
+        old = Mock(id="legacy", labels=self.runtime._labels(row), status="exited")
+        self.client.containers.get.side_effect = lambda identifier: old
+        with self.assertRaisesRegex(ValueError, "空闲重建"):
+            self.runtime.ensure({"id": 1, "name": "synthetic"})
+        self.runtime.maintenance(row["environment_id"], "rebuild")
+        current = self.runtime._row("synthetic", 1)
+        self.assertEqual(2, current["isolation_version"])
+        self.assertEqual(8, current["generation"])
+        self.assertEqual(row["fingerprint_json"], current["fingerprint_json"])
+        self.assertEqual(before, (root / "home/.claude/.credentials.json").read_bytes())
+        self.assertTrue((root / "runtime/isolation-upgrade/before.sqlite").is_file())
+        self.assertIsNone(current["container_id"])
+        old.remove.assert_called_once_with()
+
+    def test_atomic_json_and_identity_reject_link_parent_escape(self) -> None:
+        """JSON 读写不能沿业务链接访问宿主其他目录，最终文件替换不改变链接目标。@return None。"""
+        outside = self.root / "private-other"
+        outside.mkdir()
+        target = outside / "identity.json"
+        atomic_json(target, {"userID": "e" * 64})
+        before = target.read_bytes()
+        link = self.root / "account-link"
+        link.symlink_to(outside, target_is_directory=True)
+        with self.assertRaises(OSError):
+            atomic_json(link / "identity.json", {"bad": True})
+        self.assertEqual(before, target.read_bytes())
+        row, home, _ = self._identity_configuration()
+        home.unlink()
+        home.symlink_to(target)
+        with self.assertRaisesRegex(ValueError, "缺失或损坏"):
+            self.runtime.read_cli_identity(row, "2.1.293")
+        atomic_json(home, {"local": True})
+        self.assertFalse(home.is_symlink())
+        self.assertEqual(before, target.read_bytes())
 
     def test_atomic_json_concurrent_writers_leave_complete_private_document(self) -> None:
         """凭据写入并发时不得共用临时文件或留下半个 JSON。@return None。"""

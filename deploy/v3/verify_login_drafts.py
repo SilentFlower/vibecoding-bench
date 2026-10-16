@@ -7,6 +7,7 @@ import time
 from requests import RequestException
 
 from manage import REPO
+from verify_browser import ACCOUNT_STARTUP_TIMEOUT
 
 
 async def verify_login_drafts(client, deployment, data, browser, base, proxy_address, rpc, evaluate, wait_for, session_id):
@@ -79,14 +80,15 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
 
     await evaluate(f"{doc}.querySelector('#add-account').click()")
     await evaluate(f"(() => {{const f={doc}.querySelector('#acc-form');f.elements.name.value='{name}';f.elements.upstream_proxy_scheme.value='socks5h';f.elements.upstream_socks5_host.value='{proxy_address}';f.elements.upstream_socks5_port.value='1080';f.requestSubmit();}})()")
-    await wait_for(f"Boolean({state}?.authorizationURL)")
+    await wait_for(f"Boolean({state}?.authorizationURL)", timeout=ACCOUNT_STARTUP_TIMEOUT)
     sid = await evaluate(f"{state}.sid")
     assert await evaluate(f"{doc}.querySelector('#acc-auth-url').value.startsWith('https://claude.com/cai/oauth/authorize?')")
     draft = browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json()[0]
     assert draft["environment_id"] == environment_id and draft["state"] == "authorizing"
     assert not any(row["name"] == name for row in browser.get(base + "/runtime/api/accounts", timeout=10).json())
     assert not await evaluate(f"{win}.eval('state.accounts').some(a=>a.name==='{name}')")
-    container = client.containers.list(filters={"label": ["vibebench.deployment=" + deployment, "vibebench.environment=" + environment_id]})[0]
+    container = client.containers.list(filters={"label": ["vibebench.deployment=" + deployment,
+        "vibebench.environment=" + environment_id, "vibebench.role=account"]})[0]
     container.reload()
     original_container = container.id
     assert container.attrs["HostConfig"]["RestartPolicy"]["Name"] == "no"
@@ -115,7 +117,7 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
     assert await evaluate(f"{doc}.querySelector('#acc-login-connection-status').textContent") == ended_message
     await click_button('#acc-login-restart')
     try:
-        await wait_for(f"Boolean({state}?.authorizationURL && {state}.sid !== '{sid}')")
+        await wait_for(f"Boolean({state}?.authorizationURL && {state}.sid !== '{sid}')", timeout=ACCOUNT_STARTUP_TIMEOUT)
     except TimeoutError:
         print("草稿重新登录诊断：", browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json(), flush=True)
         print("页面重新登录诊断：", await evaluate(f"[{win}.__draftAlerts,Boolean({state}),{doc}.querySelector('#acc-login-connection-status').textContent]"), flush=True)
@@ -135,7 +137,7 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
     assert container.status != "running"
     assert home.exists() and json.loads((home / ".claude.json").read_text())["userID"] == "d" * 64
     await click_button(f'[data-draft-restart="{environment_id}"]')
-    await wait_for(f"Boolean({state}?.authorizationURL && {state}?.ws?.readyState===1)")
+    await wait_for(f"Boolean({state}?.authorizationURL && {state}?.ws?.readyState===1)", timeout=ACCOUNT_STARTUP_TIMEOUT)
     await evaluate(f"{doc}.querySelector('#acc-auth-code').focus()")
     await rpc("Input.insertText", {"text": "synthetic-code"}, session_id)
     await click_button('#acc-code-send')
@@ -152,7 +154,7 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
         raise
     await click_button(f'[data-draft-resume="{environment_id}"]')
     try:
-        await wait_for(f"{doc}.querySelector('#acc-login-link-status').textContent.includes('可以提交保存')")
+        await wait_for(f"{doc}.querySelector('#acc-login-link-status').textContent.includes('可以提交保存')", timeout=ACCOUNT_STARTUP_TIMEOUT)
     except TimeoutError:
         print("重启后提交诊断：", browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json(), flush=True)
         print("重启后页面诊断：", await evaluate(f"[Boolean({state}),{doc}.querySelector('#acc-login-link-status').textContent,{doc}.querySelector('#acc-login-connection-status').textContent]"), flush=True)
@@ -185,11 +187,19 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
         "upstream_proxy_scheme": "socks5h", "upstream_socks5_host": proxy_address, "upstream_socks5_port": 1080}, timeout=60)
     assert response.status_code == 200
     failed_sid = response.json()["session_id"]
-    draft_container = client.containers.list(filters={"label": ["vibebench.deployment=" + deployment, "vibebench.environment=" + delete_id]})[0]
+    network_container = client.containers.list(filters={"label": ["vibebench.deployment=" + deployment,
+        "vibebench.environment=" + delete_id, "vibebench.role=account-network"]})[0]
     before_home = (delete_root / "home/.claude.json").read_bytes()
-    # 只破坏本次合成容器的 Recorder 入口，复现取消后的隔离保护，不碰正式镜像/账号。
-    assert draft_container.exec_run(["mv", "/usr/local/bin/v3-network-context", "/usr/local/bin/v3-network-context.disabled"]).exit_code == 0
-    assert browser.delete(base + f"/runtime/api/accounts/login/{failed_sid}", timeout=20).status_code == 503
+    # 网络上下文属于 network 角色；只破坏私有运行记录，保留只读系统边界。
+    pid_file = delete_root / "runtime/network/network.pid"
+    original_pid = pid_file.read_bytes()
+    injected = network_container.exec_run(["python3", "-c",
+        "from pathlib import Path;Path('/run/v3/network.pid').write_text('invalid-fixture-pid\\n')"])
+    assert injected.exit_code == 0
+    try:
+        assert browser.delete(base + f"/runtime/api/accounts/login/{failed_sid}", timeout=20).status_code == 503
+    finally:
+        pid_file.write_bytes(original_pid)
     failed = next(row for row in browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json() if row["environment_id"] == delete_id)
     assert failed["state"] == "reconcile" and failed["can_reconcile"]
     assert failed["proxy_known"] and failed["proxy_summary"] == f"socks5h://{proxy_address}:1080"
@@ -221,5 +231,6 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
         connection.execute("DELETE FROM account_environments WHERE environment_id=? AND account_id=?", (environment_id, account_id))
     container.reload()
     assert container.labels.get("vibebench.deployment") == deployment and container.labels.get("vibebench.environment") == environment_id
-    container.stop(timeout=5)
-    container.remove()
+    for instance in client.containers.list(all=True, filters={"label": ["vibebench.product=v3", "vibebench.deployment=" + deployment, "vibebench.environment=" + environment_id]}):
+        instance.stop(timeout=5)
+        instance.remove()

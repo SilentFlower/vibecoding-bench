@@ -26,3 +26,18 @@ def account_limits(memory: str, swap: str = "0") -> tuple[int, int]:
     """
     ram = memory_bytes(memory)
     return ram, ram + memory_bytes(swap, allow_zero=True)
+
+
+def isolated_account_limits(memory: str, swap: str = "0") -> dict[str, tuple[int, int]]:
+    """在原账号合计上限内划分三个角色，额外 swap 只交给 CLI。
+
+    :param memory: 已固化的账号合计 RAM。
+    :param swap: 已固化的账号额外 swap。
+    :return: 各角色的 RAM 与 RAM 加 swap 上限；不足时拒绝。
+    """
+    ram, total = account_limits(memory, swap)
+    network, sender = 256 * 1024 ** 2, 128 * 1024 ** 2
+    cli = ram - network - sender
+    if cli < 512 * 1024 ** 2:
+        raise ValueError("账号内存不足以容纳隔离网络、发送器和 CLI，请先明确调整资源预算")
+    return {"network": (network, network), "sender": (sender, sender), "cli": (cli, cli + total - ram)}

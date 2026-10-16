@@ -59,8 +59,12 @@ fi
 if [ "${V3_ACCOUNT:-0}" = "1" ]; then
   printf '%s' "$UPSTREAM_HOST_IP" > /run/v3/proxy-ip
 fi
+if [ "${V3_ISOLATION_VERSION:-0}" = "2" ]; then
+  # 规则位于本账号命名空间，先默认拒绝，再启动任何代理、DNS 或业务服务。
+  /usr/local/bin/v3-network-guard
+fi
 
-cat > /etc/proxychains4.conf <<EOF
+cat > "${PROXYCHAINS_CONF_FILE:-/etc/proxychains4.conf}" <<EOF
 strict_chain
 proxy_dns
 remote_dns_subnet 224
@@ -145,7 +149,8 @@ if [ -n "$ETH_GW" ] && [ -n "$ETH_IF" ]; then
 fi
 
 # ---------- 5) hev 配置:tun 流量 → 127.0.0.1:8080 (mitm) ----------
-cat > /etc/hev-socks5-tunnel.yml <<EOF
+HEV_CONFIG="${V3_HEV_CONFIG:-/etc/hev-socks5-tunnel.yml}"
+cat > "$HEV_CONFIG" <<EOF
 tunnel:
   name: tun0
   mtu: 8500
@@ -161,7 +166,7 @@ misc:
 EOF
 
 log "Starting hev-socks5-tunnel"
-hev-socks5-tunnel /etc/hev-socks5-tunnel.yml &
+hev-socks5-tunnel "$HEV_CONFIG" &
 HEV_PID=$!
 
 # 等 hev 把 tun0 接管完(link down→up 周期完毕),再切默认路由。
@@ -197,8 +202,9 @@ fi
 #   worker → UDP 53 → unbound(127.0.0.1) → TCP 53 → 1.1.1.1 → tun → hev →
 #   proxychains → 上游代理 TCP 隧道 → 解析成功
 # tcp-upstream:yes 是关键,强制对 forward-addr 走 TCP。
-mkdir -p /etc/unbound
-cat > /etc/unbound/sidecar.conf <<'EOF'
+UNBOUND_CONFIG="${V3_UNBOUND_CONFIG:-/etc/unbound/sidecar.conf}"
+mkdir -p "$(dirname "$UNBOUND_CONFIG")"
+cat > "$UNBOUND_CONFIG" <<'EOF'
 server:
   verbosity: 0
   interface: 127.0.0.1
@@ -222,7 +228,7 @@ forward-zone:
   forward-addr: 8.8.8.8
 EOF
 log "Starting unbound (DNS UDP→TCP bridge)"
-unbound -d -c /etc/unbound/sidecar.conf >/var/log/unbound.log 2>&1 &
+unbound -d -c "$UNBOUND_CONFIG" >/var/log/unbound.log 2>&1 &
 UNBOUND_PID=$!
 
 for i in $(seq 1 20); do
@@ -232,7 +238,9 @@ done
 
 # DNS 指向 unbound;worker 共享 netns 但不共享 mount ns,worker entrypoint 也要
 # 自行写一份 /etc/resolv.conf(这里只管 sidecar 自己的解析)。
-echo "nameserver 127.0.0.1" > /etc/resolv.conf
+if [ "${V3_ISOLATION_VERSION:-0}" != "2" ]; then
+  echo "nameserver 127.0.0.1" > /etc/resolv.conf
+fi
 
 # readiness 只验证通用 resolver 链路,不是按业务域名维护白名单。后续 Claude
 # 访问任意网页时仍走同一个 127.0.0.1:53 → unbound → tun → 上游代理出口。

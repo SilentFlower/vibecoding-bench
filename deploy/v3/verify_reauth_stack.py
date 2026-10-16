@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from manage import REPO
+from verify_browser import ACCOUNT_STARTUP_TIMEOUT
 from verify_login_drafts import verify_login_drafts
 
 
@@ -115,13 +116,14 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
             await evaluate(f"{doc}.querySelector('[data-relogin=\"{account_id}\"]').click()")
             assert await evaluate(f"{doc}.querySelector('#acc-form').elements.timezone.disabled")
             await evaluate(f"{doc}.querySelector('#acc-form').requestSubmit()")
-            await wait_for(f"Boolean({state}?.sid && {state}?.connection && {state}?.authorizationURL)")
+            await wait_for(f"Boolean({state}?.sid && {state}?.connection && {state}?.authorizationURL)", timeout=ACCOUNT_STARTUP_TIMEOUT)
             sid = await evaluate(f"{state}.sid")
             url = await evaluate(f"{doc}.querySelector('#acc-auth-url').value")
             assert url.startswith("https://claude.ai/oauth/authorize?")
             await evaluate(f"{win}.open=(...args)=>{{{win}.__syntheticOpened=args;return null}};{doc}.querySelector('#acc-login-open').click()")
             assert await evaluate(f"{win}.__syntheticOpened") == [url, "_blank", "noopener,noreferrer"]
-            container = client.containers.list(filters={"label": ["vibebench.deployment=" + deployment, "vibebench.environment=" + environment_id]})[0]
+            container = client.containers.list(filters={"label": ["vibebench.deployment=" + deployment,
+                "vibebench.environment=" + environment_id, "vibebench.role=account"]})[0]
             original_container = container.id
             pane = container.exec_run(["tmux", "-S", f"/tmp/v3-login-{sid}.sock", "list-sessions"])
             assert pane.exit_code == 0

@@ -8,9 +8,9 @@ import re
 import secrets
 import shlex
 import shutil
+import sqlite3
 import threading
 import time
-import tempfile
 import urllib.error
 import urllib.request
 import uuid
@@ -18,13 +18,15 @@ from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from socket import SHUT_WR
+from stat import S_ISREG
 from typing import Callable
 from urllib.error import HTTPError
 from urllib.parse import quote, unquote, urlsplit
 
-from docker.errors import NotFound
-from process_metrics import validate_process_metrics
-from resource_budget import account_limits
+from docker.errors import DockerException, NotFound
+from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, ROLE_LABELS, create_environment, role_container
+from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_process_metrics
+from resource_budget import account_limits, isolated_account_limits
 
 
 NETWORK_INSPECTION_MODES = {"passthrough", "quota", "capture"}
@@ -74,6 +76,43 @@ def derive_v3_fingerprint(timezone: str | None = None) -> dict[str, object]:
     }
 
 
+def _directory_fd(path: Path, create: bool = False) -> int:
+    absolute = path.absolute()
+    if '..' in absolute.parts:
+        raise ValueError('账号文件路径不能包含上级目录')
+    directory = os.open(absolute.anchor, os.O_DIRECTORY)
+    try:
+        for part in absolute.parts[1:]:
+            if create:
+                try:
+                    os.mkdir(part, dir_fd=directory)
+                except FileExistsError:
+                    pass
+            following = os.open(part, os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+            os.close(directory)
+            directory = following
+        return directory
+    except Exception:
+        os.close(directory)
+        raise
+
+
+def _read_json(path: Path):
+    directory = _directory_fd(path.parent)
+    try:
+        descriptor = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+        with os.fdopen(descriptor, 'rb') as source:
+            metadata = os.fstat(source.fileno())
+            if not S_ISREG(metadata.st_mode) or metadata.st_size > 16 * 1024 ** 2:
+                raise ValueError('账号配置必须为大小受限的普通 JSON 文件')
+            raw = source.read(16 * 1024 ** 2 + 1)
+            if len(raw) > 16 * 1024 ** 2:
+                raise ValueError('账号配置超过 JSON 大小上限')
+            return json.loads(raw)
+    finally:
+        os.close(directory)
+
+
 def atomic_json(path: Path, value: dict, mode: int = 0o600) -> None:
     """原子保存受限 JSON。
 
@@ -82,23 +121,26 @@ def atomic_json(path: Path, value: dict, mode: int = 0o600) -> None:
     :param mode: 文件权限
     :return: None
     """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
-    temporary = Path(temporary_name)
+    directory = _directory_fd(path.parent, create=True)
+    temporary = path.name + "." + uuid.uuid4().hex
     try:
+        # 目录逐级以 fd 固定；不能先检查链接、随后再沿可被业务进程替换的路径写入。
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            mode, dir_fd=directory)
         with os.fdopen(descriptor, "w") as output:
-            os.chmod(temporary, mode)
+            os.fchmod(output.fileno(), mode)
             json.dump(value, output, ensure_ascii=False)
             output.flush()
             os.fsync(output.fileno())
-        temporary.replace(path)
-        directory = os.open(path.parent, os.O_DIRECTORY)
+        os.replace(temporary, path.name, src_dir_fd=directory, dst_dir_fd=directory)
+        os.fsync(directory)
+    finally:
         try:
-            os.fsync(directory)
+            os.unlink(temporary, dir_fd=directory)
+        except FileNotFoundError:
+            pass
         finally:
             os.close(directory)
-    finally:
-        temporary.unlink(missing_ok=True)
 
 
 class RuntimeBusy(ValueError):
@@ -106,7 +148,7 @@ class RuntimeBusy(ValueError):
 
 
 class AccountRuntime:
-    """每账号仅一个固定容器；执行结束不销毁 HOME 或网络。
+    """管理每账号的固定逻辑环境和隔离角色；执行结束保留 HOME 与网络。
 
     :param client: Docker SDK 客户端
     :param data: 调度器本地数据根
@@ -145,6 +187,11 @@ class AccountRuntime:
                     account_id INTEGER UNIQUE, fingerprint_json TEXT NOT NULL,
                     generation INTEGER NOT NULL DEFAULT 0, container_id TEXT,
                     state TEXT NOT NULL DEFAULT 'stopped')""")
+                environment_columns = {row["name"] for row in connection.execute("PRAGMA table_info(account_environments)")}
+                for column, kind in (("network_container_id", "TEXT"), ("sender_container_id", "TEXT"),
+                        ("isolation_version", "INTEGER NOT NULL DEFAULT 0")):
+                    if column not in environment_columns:
+                        connection.execute(f"ALTER TABLE account_environments ADD COLUMN {column} {kind}")
                 columns = {row["name"] for row in connection.execute("PRAGMA table_info(runs)")}
                 if columns:
                     for column, kind in (("environment_id", "TEXT"), ("environment_generation", "INTEGER"),
@@ -167,7 +214,7 @@ class AccountRuntime:
         with self.lock:
             row = self._row(account["name"], account.get("id"), account.get("timezone"))
             draft_path = self.data / "login-drafts" / (row["environment_id"] + ".json")
-            if draft_path.exists() and json.loads(draft_path.read_text()).get("phase") == "deleting":
+            if draft_path.exists() and _read_json(draft_path).get("phase") == "deleting":
                 raise ValueError("登录草稿正在清理，禁止唤醒或重建")
         return self.environment_lock(row["environment_id"])
 
@@ -244,11 +291,12 @@ class AccountRuntime:
             fingerprint["swap"] = os.environ.get("V3_ACCOUNT_SWAP", "0")
             account_limits(fingerprint["mem"], fingerprint["swap"])
             with connection:
-                connection.execute("INSERT INTO account_environments(environment_id,name,account_id,fingerprint_json) VALUES(?,?,?,?)",
-                                   (environment_id, name, account_id, json.dumps(fingerprint)))
+                connection.execute("INSERT INTO account_environments(environment_id,name,account_id,fingerprint_json,isolation_version) VALUES(?,?,?,?,?)",
+                                   (environment_id, name, account_id, json.dumps(fingerprint), 0))
             return {"environment_id": environment_id, "name": name, "account_id": account_id,
                     "fingerprint_json": json.dumps(fingerprint), "generation": 0,
-                    "container_id": None, "state": "stopped"}
+                    "container_id": None, "network_container_id": None, "sender_container_id": None,
+                    "isolation_version": 0, "state": "stopped"}
         finally:
             connection.close()
 
@@ -270,10 +318,105 @@ class AccountRuntime:
                 "vibebench.environment": row["environment_id"], "vibebench.role": "account"}
 
     def _container(self, row: dict):
+        if row.get("isolation_version") == ISOLATION_VERSION:
+            return role_container(self, row, "cli")
         container = self.client.containers.get(row["container_id"])
         if any(container.labels.get(key) != value for key, value in self._labels(row).items()):
             raise ValueError("容器部署归属不匹配，拒绝操作")
         return container
+
+    def _network_runtime(self, row: dict) -> Path:
+        return self._root(row) / "runtime" / "network" if row.get("isolation_version") == ISOLATION_VERSION else self._root(row) / "runtime"
+
+    def _cli_runtime(self, row: dict) -> Path:
+        return self._root(row) / "runtime" / "cli" if row.get("isolation_version") == ISOLATION_VERSION else self._root(row) / "runtime"
+
+    def _sender_config(self, row: dict) -> Path:
+        parent = self._root(row) / "runtime"
+        return (parent / "sender" if row.get("isolation_version") == ISOLATION_VERSION else parent) / "sender.json"
+
+    def _write_sender_config(self, row: dict, configuration: dict) -> None:
+        path = self._sender_config(row)
+        atomic_json(path, configuration, 0o640 if row.get("isolation_version") == ISOLATION_VERSION else 0o600)
+        if row.get("isolation_version") == ISOLATION_VERSION:
+            os.chown(path, 0, 1001, follow_symlinks=False)
+
+    def _wait_network(self, row: dict) -> None:
+        network = self._network_container(row)
+        deadline = time.monotonic() + 120
+        while network.exec_run(["test", "-f", "/run/v3/ready"]).exit_code:
+            network.reload()
+            if network.status != "running" or time.monotonic() >= deadline:
+                raise ValueError("账号隔离网络未就绪，业务请求未启动")
+            time.sleep(0.25)
+
+    def _network_container(self, row: dict):
+        return role_container(self, row, "network") if row.get("isolation_version") == ISOLATION_VERSION else self._container(row)
+
+    def role_status(self, row: dict) -> dict:
+        """只读核对环境角色状态，不唤醒容器或改变生命周期。
+
+        :param row: 持久环境行。
+        :return: 各角色的有限状态；不返回配置或服务秘密。
+        """
+        result = {}
+        roles = ROLE_COLUMNS if row.get("isolation_version") == ISOLATION_VERSION else ("cli",)
+        for role in roles:
+            try:
+                if not row.get(ROLE_COLUMNS[role]):
+                    result[role] = "未创建"
+                    continue
+                container = role_container(self, row, role) if row.get("isolation_version") == ISOLATION_VERSION else self._container(row)
+                container.reload()
+                result[role] = str(container.status)
+            except NotFound:
+                result[role] = "缺失"
+            except ValueError:
+                result[role] = "归属或批次不匹配"
+            except DockerException:
+                result[role] = "状态未知"
+        return result
+
+    def _stop_environment(self, row: dict, remove: bool = False) -> None:
+        """按角色归属停止完整环境，保留持久数据；停止失败不假报成功。
+
+        :param row: 已确认的环境记录。
+        :param remove: 是否在停止后移除运行实例。
+        :return: None。
+        """
+        containers = []
+        for role in ("cli", "sender", "network") if row.get("isolation_version") == ISOLATION_VERSION else ("cli",):
+            if not row.get(ROLE_COLUMNS[role]):
+                continue
+            try:
+                containers.append(role_container(self, row, role, allow_old_release=True)
+                    if row.get("isolation_version") == ISOLATION_VERSION else self._container(row))
+            except NotFound:
+                continue
+        if row.get("isolation_version") == ISOLATION_VERSION:
+            # Docker 创建成功与 DB 登记之间可能中断；精确标签补收孤儿，不能靠名字猜归属。
+            expected = self._labels(row)
+            expected.pop("vibebench.role")
+            instances = self.client.containers.list(all=True, filters={"label": [
+                key + "=" + value for key, value in expected.items()]})
+            known = {container.id for container in containers}
+            for container in instances:
+                if (any(container.labels.get(key) != value for key, value in expected.items())
+                        or container.labels.get("vibebench.role") not in ROLE_LABELS.values()
+                        or container.labels.get("vibebench.isolation-version") != str(ISOLATION_VERSION)):
+                    raise ValueError("孤立角色归属不匹配，拒绝操作")
+                if container.id not in known:
+                    containers.append(container)
+                    known.add(container.id)
+        if row.get("isolation_version") == ISOLATION_VERSION:
+            order = {ROLE_LABELS[role]: index for index, role in enumerate(("cli", "sender", "network"))}
+            containers.sort(key=lambda current: order[current.labels["vibebench.role"]])
+        for container in containers:
+            container.stop(timeout=5)
+        if remove:
+            for container in containers:
+                container.remove()
+            self._update(row, container_id=None, sender_container_id=None, network_container_id=None)
 
     def ensure(self, account: dict, version: str | None = None, allow_inactive_login: bool = False,
                allow_login_recovery: bool = False, preserve_proxy: bool = False) -> tuple[dict, object]:
@@ -305,7 +448,7 @@ class AccountRuntime:
                 else:
                     self._sync_proxy(account, configuration)
             draft_path = self.data / "login-drafts" / (row["environment_id"] + ".json")
-            if draft_path.exists() and json.loads(draft_path.read_text()).get("phase") == "submitting" and not allow_login_recovery:
+            if draft_path.exists() and _read_json(draft_path).get("phase") == "submitting" and not allow_login_recovery:
                 raise ValueError("原登录保存尚未完成，请先继续登录提交")
             root = self._root(row)
             if (root / "runtime/credential-handoff.json").exists():
@@ -314,98 +457,76 @@ class AccountRuntime:
             for name in ("home", "projects", "workspaces", "flows", "controls", "ca", "cli", "runtime"):
                 (root / name).mkdir(exist_ok=True, mode=0o700)
             for name in ("home", "projects"):
-                os.chown(root / name, 1000, 1000)
+                os.chown(root / name, 1000, 1000, follow_symlinks=False)
             if row["state"] == "reconcile":
                 raise ValueError("账号环境需要先对账，拒绝自动放行")
+            if row.get("isolation_version") != ISOLATION_VERSION:
+                if row["generation"] or row.get("container_id"):
+                    raise ValueError("旧账号环境需要先空闲重建以升级 Docker 隔离，身份和 HOME 保留")
+                self._update(row, isolation_version=ISOLATION_VERSION)
+            if image_labels.get("vibebench.isolation-version") != str(ISOLATION_VERSION):
+                raise ValueError("账号镜像不支持当前隔离布局，请使用同批新镜像")
             with self.capacity_lock:
-                try:
-                    container = self._container(row) if row["container_id"] else None
-                except NotFound:
-                    container = None
-                if container:
-                    if container.labels.get("vibebench.release") != self.release_id:
-                        raise ValueError("账号容器属于旧 v3 批次，请空闲重建后使用")
-                    container.reload()
-                    configuration_path = root / "runtime" / "sender.json"
-                    configuration = json.loads(configuration_path.read_text())
+                present = [bool(row.get(column)) for column in ROLE_COLUMNS.values()]
+                if any(present) and not all(present):
+                    self._update(row, state="reconcile")
+                    raise ValueError("账号隔离角色登记不完整，需要先对账")
+                if all(present):
+                    try:
+                        containers = {role: role_container(self, row, role) for role in ROLE_COLUMNS}
+                        for current in containers.values():
+                            current.reload()
+                    except NotFound:
+                        self._update(row, state="reconcile")
+                        raise ValueError("账号隔离角色缺失，需要先对账") from None
+                    configuration = _read_json(self._sender_config(row))
                     if configuration.get("proxy_source", configuration["proxy_url"]) != self._proxy(account):
-                        if container.status == "running" or row["environment_id"] in self.jobs:
+                        if any(current.status == "running" for current in containers.values()) or row["environment_id"] in self.jobs:
                             raise ValueError("代理已改变，请先空闲维护账号环境")
-                        # 配置事务已经停止旧发送器；只替换停止实例，HOME 和身份保持原值。
-                        container.remove()
-                        self._update(row, container_id=None, state="stopped")
-                        container = None
-                if container:
-                    if container.status != "running":
+                        self._stop_environment(row, remove=True)
+                        present = [False]
+                    elif not any(current.status == "running" for current in containers.values()):
                         self._make_room(row)
-                        configuration_path = root / "runtime" / "sender.json"
-                        configuration = json.loads(configuration_path.read_text())
                         generation = int(row["generation"]) + 1
                         configuration["binding"].update(generation=generation, secret=secrets.token_hex(32))
-                        atomic_json(configuration_path, configuration)
-                        (root / "runtime" / "ready").unlink(missing_ok=True)
-                        container.start()
-                        self._update(row, state="starting", generation=generation)
-                else:
+                        self._write_sender_config(row, configuration)
+                        (self._network_runtime(row) / "ready").unlink(missing_ok=True)
+                        self._update(row, generation=generation, state="starting")
+                        try:
+                            containers["network"].start()
+                            self._wait_network(row)
+                            containers["cli"].start()
+                            containers["sender"].start()
+                        except Exception:
+                            self._update(row, state="reconcile")
+                            self._stop_environment(row)
+                            raise
+                    elif containers["network"].status != "running" or containers["sender"].status != "running":
+                        self._update(row, state="reconcile")
+                        raise ValueError("账号公共网络或发送器退出，需要先对账")
+                    elif containers["cli"].status != "running":
+                        self._update(row, state="cli_reconcile")
+                if not any(present):
                     self._make_room(row)
-                    fingerprint = json.loads(row["fingerprint_json"])
-                    generation = int(row["generation"]) + 1
-                    # DNS 单标签上限为 63 字符；完整部署归属保存在 labels 中。
                     deployment_key = hashlib.sha256(self.deployment.encode()).hexdigest()[:12]
                     name = f"v3-{deployment_key}-account-{row['environment_id']}"
-                    binding = {"account_id": int(account.get("cc2api_account_id") or 0),
-                        "environment_id": row["environment_id"], "generation": generation,
-                        "endpoint": f"http://{name}:8091", "secret": secrets.token_hex(32), "release_id": self.release_id}
-                    proxy = self._proxy(account)
-                    atomic_json(root / "runtime" / "sender.json", {"binding": binding,
-                        "proxy_url": proxy, "allowed_origin": "https://api.anthropic.com",
-                        "evidence_file": "/flows/api/observations.jsonl", "quota_identity": ""})
-                    environment = {"V3_MACHINE_ID": fingerprint["machine_id"], "HOME": "/home/node",
-                        "TZ": fingerprint["tz"], "LANG": fingerprint["lang"],
-                        "LC_ALL": fingerprint["lang"], "V3_SENDER_CONFIG": "/run/v3/sender.json",
-                        "DNS_READY_HOST": os.environ.get("DNS_READY_HOST", "example.com"),
-                        "UPSTREAM_PROXY_SCHEME": account.get("upstream_proxy_scheme") or "socks5",
-                        "UPSTREAM_SOCKS5_HOST": account.get("upstream_socks5_host") or "",
-                        "UPSTREAM_SOCKS5_PORT": str(account.get("upstream_socks5_port") or 1080),
-                        "UPSTREAM_SOCKS5_USER": account.get("upstream_socks5_user") or "",
-                        "UPSTREAM_SOCKS5_PASS": account.get("upstream_socks5_pass") or ""}
-                    host_root = self.host_data / root.relative_to(self.data)
-                    mounts = {str(host_root / source): {"bind": target, "mode": "rw"} for source, target in (
-                        ("home", "/home/node"), ("projects", "/home/node/projects"), ("flows", "/flows"),
-                        ("controls", "/controls"), ("ca", "/ca"), ("cli", "/cli"), ("runtime", "/run/v3"))}
-                    quota = self.data / "quota"
-                    quota.mkdir(parents=True, exist_ok=True, mode=0o700)
-                    mounts[str(self.host_data / "quota")] = {"bind": "/quota-accounts", "mode": "ro"}
-                    # swap 跟随首次预算固化；旧环境缺字段时保持禁用，不能随全局配置放大。
-                    memory, memory_swap = account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))
-                    container = self.client.containers.run(self.image, name=name, detach=True,
-                        auto_remove=False, labels={**self._labels(row), "vibebench.release": self.release_id}, network=self.network,
-                        hostname=fingerprint["hostname"], mac_address=fingerprint["mac"],
-                        mem_limit=memory, memswap_limit=memory_swap,
-                        nano_cpus=int(float(os.environ.get("V3_ACCOUNT_CPUS", "2")) * 1_000_000_000),
-                        cap_add=["NET_ADMIN"], devices=["/dev/net/tun:/dev/net/tun"],
-                        security_opt=["no-new-privileges:true"], volumes=mounts, environment=environment,
-                        log_config={"type": "json-file", "config": {"max-size": "10m", "max-file": "3"}})
-                    self._update(row, container_id=container.id, generation=generation,
-                        state="starting")
-            deadline = time.monotonic() + 120
-            while time.monotonic() < deadline:
-                result = container.exec_run(["test", "-f", "/run/v3/ready"])
-                if result.exit_code == 0:
+                    create_environment(self, row, account, name, atomic_json)
+                self._wait_network(row)
+                container = self._container(row)
+                deadline = time.monotonic() + 30
+                while True:
                     try:
                         self._sender_active(row)
+                        break
                     except (OSError, urllib.error.URLError):
-                        time.sleep(0.25)
-                        continue
-                    if row["state"] != "cli_reconcile":
-                        self._update(row, state="ready")
-                    break
-                container.reload()
-                if container.status != "running":
-                    raise ValueError("账号环境启动失败")
-                time.sleep(0.25)
-            else:
-                raise ValueError("账号环境未在截止时间内就绪")
+                        sender = role_container(self, row, "sender")
+                        sender.reload()
+                        if sender.status != "running" or time.monotonic() >= deadline:
+                            self._update(row, state="reconcile")
+                            raise ValueError("账号发送器尚未就绪") from None
+                        time.sleep(0.1)
+                if row["state"] != "cli_reconcile":
+                    self._update(row, state="ready")
         # 版本缓存准备不持有环境生命周期锁，API 不等待 CLI 安装。
         if version is not None:
             self._ensure_version(container, version)
@@ -414,9 +535,21 @@ class AccountRuntime:
     def _ensure_version(self, container, version: str) -> None:
         if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9._-]+)?", version):
             raise ValueError("CLI 版本格式不合法")
-        result = container.exec_run(["timeout", "--kill-after=5", "180", "/usr/local/bin/v3-cli-version", version])
+        network = (self._network_container(self._row_for_container(container))
+            if container.labels.get("vibebench.isolation-version") == str(ISOLATION_VERSION) else container)
+        result = network.exec_run(["timeout", "--kill-after=5", "180", "/usr/local/bin/v3-cli-version", version])
         if result.exit_code != 0:
             raise ValueError("固定环境 CLI 版本准备失败")
+
+    def _row_for_container(self, container) -> dict:
+        connection = self.database()
+        try:
+            row = connection.execute("SELECT * FROM account_environments WHERE container_id=?", (container.id,)).fetchone()
+        finally:
+            connection.close()
+        if not row:
+            raise ValueError("CLI 容器没有当前环境登记")
+        return dict(row)
 
     @staticmethod
     def _proxy(account: dict) -> str:
@@ -453,11 +586,11 @@ class AccountRuntime:
         home = self._root(row) / "home"
         destination = home / ".claude/.credentials.json"
         try:
-            credentials = json.loads(path.read_text())
+            credentials = _read_json(path)
             if not destination.exists():
                 self._local_oauth(credentials)
                 return credentials
-            current = json.loads(destination.read_text())
+            current = _read_json(destination)
             oauth = current.get("claudeAiOauth") if isinstance(current, dict) else None
             if not isinstance(oauth, dict):
                 raise ValueError("本地 HOME 凭据损坏，请恢复同账号完整凭据或重新授权")
@@ -467,7 +600,7 @@ class AccountRuntime:
                 if not take_ownership:
                     return current
             source = self._local_oauth(credentials)
-            identities = [json.loads((folder / ".claude.json").read_text()) for folder in (profile, home)]
+            identities = [_read_json(folder / ".claude.json") for folder in (profile, home)]
             expected = identities[0]
             if (not isinstance(expected, dict) or not isinstance(identities[1], dict)
                     or not isinstance(expected.get("userID"), str) or not expected["userID"]
@@ -507,19 +640,27 @@ class AccountRuntime:
         if not path.exists():
             return
         credentials = (self._local_credentials(row, account, take_ownership)
-            if account.get("cc2api_account_id") is None else json.loads(path.read_text()))
+            if account.get("cc2api_account_id") is None else _read_json(path))
         home = self._root(row) / "home"
         destination = home / ".claude" / ".credentials.json"
         if account.get("cc2api_account_id") is not None:
             credentials.get("claudeAiOauth", {}).pop("refreshToken", None)
         atomic_json(destination, credentials)
-        os.chown(destination.parent, 1000, 1000)
-        os.chown(destination, 1000, 1000)
+        os.chown(destination.parent, 1000, 1000, follow_symlinks=False)
+        os.chown(destination, 1000, 1000, follow_symlinks=False)
         access = self._root(row) / "runtime" / "access" / ".credentials.json"
         atomic_json(access, credentials)
+        if row.get("isolation_version") == ISOLATION_VERSION:
+            access.parent.chmod(0o750)
+            os.chown(access.parent, 0, 1000, follow_symlinks=False)
+            os.chown(access, 1000, 1000, follow_symlinks=False)
+            network_access = self._network_runtime(row) / "access" / ".credentials.json"
+            snapshot = json.loads(json.dumps(credentials))
+            snapshot.get("claudeAiOauth", {}).pop("refreshToken", None)
+            atomic_json(network_access, snapshot)
         if not (home / ".claude.json").exists() and (profile / ".claude.json").exists():
             shutil.copy2(profile / ".claude.json", home / ".claude.json")
-            os.chown(home / ".claude.json", 1000, 1000)
+            os.chown(home / ".claude.json", 1000, 1000, follow_symlinks=False)
 
     def transport(self, account: dict, version: str) -> dict:
         """返回只用于服务间调用的当前传输绑定。
@@ -529,8 +670,8 @@ class AccountRuntime:
         :return: 当前账号传输绑定，含受限服务秘密
         """
         row, _ = self.ensure(account)
-        config_path = self._root(row) / "runtime" / "sender.json"
-        config = json.loads(config_path.read_text())
+        config_path = self._sender_config(row)
+        config = _read_json(config_path)
         binding = config["binding"]
         if config.get("proxy_source", config["proxy_url"]) != self._proxy(account):
             raise ValueError("代理配置已改变，请空闲重建环境后再使用")
@@ -538,11 +679,11 @@ class AccountRuntime:
         if binding["account_id"] != account["cc2api_account_id"] or config.get("quota_identity") != identity:
             binding["account_id"] = int(account["cc2api_account_id"])
             config["quota_identity"] = identity
-            atomic_json(config_path, config)
+            self._write_sender_config(row, config)
         return binding
 
     def _sender_active(self, row: dict) -> int:
-        binding = json.loads((self._root(row) / "runtime" / "sender.json").read_text())["binding"]
+        binding = _read_json(self._sender_config(row))["binding"]
         request = urllib.request.Request(binding["endpoint"] + "/internal/status",
             headers={"Authorization": "Bearer " + binding["secret"]})
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -555,10 +696,10 @@ class AccountRuntime:
         return int(value["active"])
 
     def _running_sender_active(self, row: dict) -> int:
-        if not row.get("container_id"):
+        if not row.get("sender_container_id" if row.get("isolation_version") == ISOLATION_VERSION else "container_id"):
             return 0
         try:
-            container = self._container(row)
+            container = role_container(self, row, "sender", allow_old_release=True) if row.get("isolation_version") == ISOLATION_VERSION else self._container(row)
         except NotFound:
             return 0
         container.reload()
@@ -582,7 +723,7 @@ class AccountRuntime:
             take_ownership = handoff_credentials and account.get("cc2api_account_id") is not None and target_id is None
             if handoff_credentials and handoff.exists():
                 try:
-                    pending = json.loads(handoff.read_text())
+                    pending = _read_json(handoff)
                     valid = (isinstance(pending, dict) and pending.get("schema") == 1
                         and pending.get("account_id") == account["id"]
                         and pending.get("environment_id") == row["environment_id"]
@@ -620,11 +761,7 @@ class AccountRuntime:
                 if take_ownership:
                     # 交接所需资料先校验，身份/完整性冲突不能先清空本地绑定。
                     local_credentials = self._local_credentials(row, account, True)
-                if row.get("container_id"):
-                    try:
-                        self._container(row).stop(timeout=5)
-                    except NotFound:
-                        pass
+                self._stop_environment(row)
                 # 已解析的旧 API 请求只能遇到停止的实例；下一唤醒轮换秘密和代次。
                 self._update(row, state="stopped")
                 if local_credentials is not None and not handoff.exists():
@@ -670,13 +807,13 @@ class AccountRuntime:
         :return: 本代执行句柄
         """
         with self.environment_lock(row["environment_id"]):
-            if not exclusive and (self._root(row) / "runtime" / "cli-unhealthy").exists():
+            if not exclusive and (self._network_runtime(row) / "cli-unhealthy").exists():
                 self._update(row, state="cli_reconcile")
             if row["state"] in ("reconcile", "cli_reconcile"):
                 raise ValueError("账号 CLI 需要先对账，拒绝开始下一作业")
             with self.lock:
                 pending = self._root(row) / "runtime" / "login-commit.json"
-                if pending.exists() and source != f"login:{json.loads(pending.read_text())['sid']}":
+                if pending.exists() and source != f"login:{_read_json(pending)['sid']}":
                     raise ValueError("重授权提交尚未收口，请先对账")
                 if row["environment_id"] in self.jobs:
                     if idle_only:
@@ -743,7 +880,7 @@ class AccountRuntime:
             "account_id": job["account"].get("cc2api_account_id"), "phase": "claimed",
             "exclusive": job.get("exclusive", True), "container_id": job["row"].get("container_id"),
             "generation": job["row"]["generation"]}
-        for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before", "statusline_before", "statusline_command"):
+        for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before", "statusline_before", "statusline_command", "version"):
             if key in job:
                 execution[key] = job[key]
         atomic_json(self._root(job["row"]) / "runtime" / "execution.json", execution)
@@ -753,7 +890,7 @@ class AccountRuntime:
         if job.get("exclusive", True):
             try:
                 if job.get("claimed", True):
-                    self._container(job["row"]).stop(timeout=5)
+                    self._stop_environment(job["row"])
             finally:
                 self._update(job["row"], state="reconcile")
         else:
@@ -779,7 +916,7 @@ class AccountRuntime:
                 if row.get("account_id") is not None and job["account"].get("cc2api_account_id") is None:
                     credentials = self._root(row) / "home" / ".claude" / ".credentials.json"
                     if credentials.exists():
-                        current = json.loads(credentials.read_text())
+                        current = _read_json(credentials)
                         self._local_oauth(current)
                         atomic_json(self.data / "profiles" / row["name"] / ".credentials.json", current)
                 self._lease(job, "release")
@@ -825,6 +962,16 @@ class AccountRuntime:
                         self.cleanup(job["token"])
                     except Exception:
                         pass
+        elif job["row"].get("isolation_version") == ISOLATION_VERSION and job.get("version"):
+            try:
+                with self.environment_lock(job["row"]["environment_id"]):
+                    with self.lock:
+                        if self.jobs.get(job["row"]["environment_id"]) is not job:
+                            return
+                    self._sample_cli_metrics(job["row"], self._container(job["row"]))
+            except (OSError, ValueError, RuntimeError, DockerException):
+                # 指标缺失不改变认证/执行状态；独立导入会准确返回采样错误。
+                pass
 
     @staticmethod
     def execution_environment(row: dict) -> dict[str, str]:
@@ -850,11 +997,11 @@ class AccountRuntime:
                         raise ValueError("CLI 准备期间租约失效，执行未启动")
                 # CLI 版本由管理端固定，禁止账号 CLI 自行写入 root 管理的版本缓存。
                 settings = self._root(row) / "home/.claude/settings.json"
-                value = json.loads(settings.read_text()) if settings.is_file() else {}
+                value = _read_json(settings) if settings.is_file() else {}
                 environment = value.get("env") if isinstance(value.get("env"), dict) else {}
                 value["env"] = {**environment, "DISABLE_AUTOUPDATER": "1", **self.execution_environment(row)}
                 atomic_json(settings, value)
-                os.chown(settings, 1000, 1000)
+                os.chown(settings, 1000, 1000, follow_symlinks=False)
                 yield row, container, job
         except Exception:
             self.cleanup(job["token"])
@@ -876,7 +1023,7 @@ class AccountRuntime:
                 self.sync_credentials(row, account)
                 root = self._root(row)
                 settings = root / "home" / ".claude" / "settings.json"
-                job["hooks_before"] = json.loads(settings.read_text()).get("hooks") if settings.exists() else None
+                job["hooks_before"] = _read_json(settings).get("hooks") if settings.exists() else None
                 cwd = self._project_view(row, run_id)
                 workspace = root / "projects" / Path(cwd).name
                 legacy = self.data / "workspaces" / run_id
@@ -894,14 +1041,14 @@ class AccountRuntime:
                 controls = root / "controls" / handle
                 controls.mkdir(parents=True, exist_ok=True, mode=0o700)
                 (root / "controls").chmod(0o750)
-                os.chown(root / "controls", 0, 1000)
+                os.chown(root / "controls", 0, 1000, follow_symlinks=False)
                 controls.chmod(0o750)
-                os.chown(controls, 0, 1000)
+                os.chown(controls, 0, 1000, follow_symlinks=False)
                 runtime_run = root / "runtime" / "runs" / run_id
                 runtime_job = root / "runtime" / "jobs" / handle
                 for directory in (runtime_run, runtime_job):
                     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-                    os.chown(directory, 1000, 1000)
+                    os.chown(directory, 1000, 1000, follow_symlinks=False)
                 control_files = {
                     ".bench-status.json": runtime_run / "status.json",
                     ".bench-transcript.log": runtime_run / "transcript.log",
@@ -947,10 +1094,13 @@ class AccountRuntime:
                 script = script.replace("/workspace", cwd).replace("/tmp/", f"/run/v3/jobs/{handle}/")
                 script = script.replace("/mnt/profile", "/run/v3/access")
                 # tmux 的登录 shell 会改写 PATH，显式传入本代已选定的 CLI 缓存。
-                script = script.replace("runuser -u '$CLAUDE_USER' -- env", "setpriv --reuid=1000 --regid=1000 --init-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env PATH='$PATH'")
-                script_path = root / "runtime" / f"job-{handle}.sh"
+                script = script.replace("runuser -u '$CLAUDE_USER' -- env", "env PATH='$PATH'")
+                script_path = root / "runtime" / "drivers" / f"job-{handle}.sh"
+                script_path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
+                os.chown(script_path.parent, 0, 1000, follow_symlinks=False)
                 script_path.write_text(script)
-                script_path.chmod(0o700)
+                os.chown(script_path, 0, 1000, follow_symlinks=False)
+                script_path.chmod(0o750)
                 original_flows = self.data / "flows" / account["name"] / str(task["id"]) / run_id
                 flow_directory = self.execution_flows(account, source, original_flows)
                 if not task.get("capture_full_http"):
@@ -975,24 +1125,23 @@ class AccountRuntime:
                             context[key] = f"{flow_path}/passive-quota.jsonl"
                         elif local.name == "state.json":
                             context[key] = f"/quota-accounts/{account['id']}/state.json"
-                context["QUOTA_CREDENTIALS_FILE"] = "/home/node/.claude/.credentials.json"
-                atomic_json(root / "runtime" / "context.json", context)
+                context["QUOTA_CREDENTIALS_FILE"] = "/run/v3/access/.credentials.json"
+                atomic_json(self._network_runtime(row) / "context.json", context)
                 self._configure_network_context(container, context)
-                (root / "runtime" / f"tmux-{handle}").mkdir(exist_ok=True, mode=0o700)
                 environment = dict(worker_env)
                 environment.update(self.execution_environment(row))
                 environment.update(V3_PERSISTENT_HOME="1", USE_SIDECAR_DNS="1", HOME="/home/node",
                     PATH=f"/cli/{worker_env['CLAUDE_CODE_VERSION']}/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-                    QUOTA_SIGNAL_FILE=context.get("QUOTA_SIGNAL_FILE", ""), TMUX_TMPDIR=f"/run/v3/tmux-{handle}",
+                    QUOTA_SIGNAL_FILE=context.get("QUOTA_SIGNAL_FILE", ""), TMUX_TMPDIR=f"/run/v3/jobs/{handle}",
                     QUOTA_WARMUP="1" if inspection_mode == "quota" else "0",
                     NETWORK_INSPECTION_MODE=inspection_mode)
                 ex = self.client.api.exec_create(container.id,
                     # setsid 默认可能先返回，必须让 exec 生命周期跟随真实 driver。
-                    ["setsid", "--wait", "bash", "-c", f"echo $$ > /run/v3/job-{handle}.pid; exec bash /run/v3/job-{handle}.sh"],
+                    ["setsid", "--wait", "bash", "-c", f"echo $$ > /run/v3/jobs/{handle}/group.pid; exec bash /run/v3/drivers/job-{handle}.sh"],
                     environment=environment, workdir=cwd)
                 job.update(exec=ex["Id"], run_id=run_id, context=context, handle=handle, cwd=cwd,
                     network_inspection_mode=inspection_mode, tmux=f"claude-{run_id}",
-                    tmux_socket=f"/run/v3/tmux-{handle}/tmux-0/default")
+                    tmux_socket=f"/run/v3/jobs/{handle}/tmux-1000/default", version=worker_env["CLAUDE_CODE_VERSION"])
                 self._save_execution(job)
                 connection = self.database()
                 try:
@@ -1028,14 +1177,14 @@ class AccountRuntime:
             if current.is_symlink():
                 raise ValueError("额度采集目录不能是链接")
             current.chmod(0o710)
-            os.chown(current, 0, 1000)
+            os.chown(current, 0, 1000, follow_symlinks=False)
         directory = flows / "cli"
         if directory.is_symlink():
             raise ValueError("额度采集目录不能是链接")
         directory.mkdir(exist_ok=True, mode=0o700)
-        os.chown(directory, 1000, 1000)
+        os.chown(directory, 1000, 1000, follow_symlinks=False)
         settings = root / "home/.claude/settings.json"
-        value = json.loads(settings.read_text()) if settings.is_file() else {}
+        value = _read_json(settings) if settings.is_file() else {}
         original = value.get("statusLine")
         configuration = directory / "config.json"
         container_directory = "/flows/" + str(directory.relative_to(root / "flows"))
@@ -1047,10 +1196,10 @@ class AccountRuntime:
             "session_dir": "/home/node/.claude/projects/" + cwd.replace("/", "-"),
             "output": container_directory + "/cli-quota.jsonl", "started_at": time.time(),
             "previous_command": original.get("command") if isinstance(original, dict) else None})
-        os.chown(configuration, 1000, 1000)
+        os.chown(configuration, 1000, 1000, follow_symlinks=False)
         value["statusLine"] = {**(original if isinstance(original, dict) else {}), "type": "command", "command": command}
         atomic_json(settings, value)
-        os.chown(settings, 1000, 1000)
+        os.chown(settings, 1000, 1000, follow_symlinks=False)
 
     def _restore_cli_quota(self, job: dict) -> None:
         """在进程收口后恢复本代状态栏设置，保留执行期间用户明确改写的配置。
@@ -1062,7 +1211,7 @@ class AccountRuntime:
         if not snapshot:
             return
         settings = self._root(job["row"]) / "home/.claude/settings.json"
-        value = json.loads(settings.read_text()) if settings.is_file() else {}
+        value = _read_json(settings) if settings.is_file() else {}
         current = value.get("statusLine")
         if not isinstance(current, dict) or current.get("command") != job.get("statusline_command"):
             return
@@ -1071,7 +1220,7 @@ class AccountRuntime:
         else:
             value.pop("statusLine", None)
         atomic_json(settings, value)
-        os.chown(settings, 1000, 1000)
+        os.chown(settings, 1000, 1000, follow_symlinks=False)
 
     def _configure_network_context(self, container, context: dict) -> None:
         """
@@ -1084,13 +1233,15 @@ class AccountRuntime:
         mode = str(context.get("NETWORK_INSPECTION_MODE") or "passthrough")
         if mode not in NETWORK_INSPECTION_MODES:
             raise ValueError("网络检查模式不合法")
-        result = container.exec_run(["/usr/local/bin/v3-network-context"])
+        network = (self._network_container(self._row_for_container(container))
+            if container.labels.get("vibebench.isolation-version") == str(ISOLATION_VERSION) else container)
+        result = network.exec_run(["/usr/local/bin/v3-network-context"])
         if result.exit_code != 0:
             output = result.output.decode("utf-8", errors="replace") if isinstance(result.output, bytes) else str(result.output or "")
             detail = output.strip().splitlines()
             suffix = f"：{detail[-1][:240]}" if detail else ""
             raise ValueError("网络上下文切换失败，执行未启动" + suffix)
-        acknowledgement = container.exec_run(["cat", "/run/v3/context-ack.json"])
+        acknowledgement = network.exec_run(["cat", "/run/v3/context-ack.json"])
         if acknowledgement.exit_code != 0:
             raise ValueError("网络上下文确认不匹配")
         payload = json.loads(acknowledgement.output)
@@ -1142,7 +1293,7 @@ class AccountRuntime:
                 if self.jobs.get(job["row"]["environment_id"]) is not job:
                     return
             commit_path = self._root(job["row"]) / "runtime" / "login-commit.json"
-            if commit_path.exists() and json.loads(commit_path.read_text()).get("phase") != "mirrored":
+            if commit_path.exists() and _read_json(commit_path).get("phase") != "mirrored":
                 raise ValueError("重授权提交结果尚未确认，必须先对账")
             container = self._container(job["row"])
             try:
@@ -1154,7 +1305,9 @@ class AccountRuntime:
                 if job.get("exec"):
                     inspected = self.client.api.exec_inspect(job["exec"])
                     if inspected.get("Running"):
-                        pid_path = self._root(job["row"]) / "runtime" / f"job-{job['handle']}.pid"
+                        pid_path = (self._root(job["row"]) / "runtime/jobs" / job['handle'] / "group.pid"
+                            if job["row"].get("isolation_version") == ISOLATION_VERSION
+                            else self._cli_runtime(job["row"]) / f"job-{job['handle']}.pid")
                         pid = int(pid_path.read_text().strip())
                         if pid > 1:
                             container.exec_run(["kill", "-TERM", "--", f"-{pid}"])
@@ -1171,25 +1324,30 @@ class AccountRuntime:
                             if self.client.api.exec_inspect(job["exec"]).get("Running"):
                                 raise ValueError("执行未完成收口，禁止下一 CLI 作业")
                 # 一个账号只有一个 CLI 执行，收口该 UID 的全部子进程，防止项目服务器遗留。
-                container.exec_run(["pkill", "-TERM", "-u", "1000"])
-                deadline = time.monotonic() + 3
-                while container.exec_run(["pgrep", "-u", "1000"]).exit_code == 0 and time.monotonic() < deadline:
-                    time.sleep(0.1)
-                container.exec_run(["pkill", "-KILL", "-u", "1000"])
-                if container.exec_run(["pgrep", "-u", "1000"]).exit_code == 0:
-                    raise ValueError("账号子进程尚未完成收口，禁止下一 CLI 作业")
+                if job["row"].get("isolation_version") == ISOLATION_VERSION:
+                    result = container.exec_run(["python3", "-I", "/usr/local/bin/v3-cli-control", "stop"])
+                    if result.exit_code:
+                        raise ValueError("账号子进程尚未完成收口，禁止下一 CLI 作业")
+                else:
+                    container.exec_run(["pkill", "-TERM", "-u", "1000"])
+                    deadline = time.monotonic() + 3
+                    while container.exec_run(["pgrep", "-u", "1000"]).exit_code == 0 and time.monotonic() < deadline:
+                        time.sleep(0.1)
+                    container.exec_run(["pkill", "-KILL", "-u", "1000"])
+                    if container.exec_run(["pgrep", "-u", "1000"]).exit_code == 0:
+                        raise ValueError("账号子进程尚未完成收口，禁止下一 CLI 作业")
                 idle_context = {"NETWORK_INSPECTION_MODE": "passthrough", "QUOTA_SOURCE": ""}
-                atomic_json(self._root(job["row"]) / "runtime" / "context.json", idle_context)
+                atomic_json(self._network_runtime(job["row"]) / "context.json", idle_context)
                 self._configure_network_context(container, idle_context)
                 if "hooks_before" in job:
                     settings = self._root(job["row"]) / "home" / ".claude" / "settings.json"
-                    value = json.loads(settings.read_text()) if settings.exists() else {}
+                    value = _read_json(settings) if settings.exists() else {}
                     if job["hooks_before"] is None:
                         value.pop("hooks", None)
                     else:
                         value["hooks"] = job["hooks_before"]
                     atomic_json(settings, value)
-                    os.chown(settings, 1000, 1000)
+                    os.chown(settings, 1000, 1000, follow_symlinks=False)
                 if job.get("tmux") and job.get("home", "/home/node") != "/home/node" and job["account"].get("cc2api_account_id") is not None:
                     # RT 必须在释放排他门禁前销毁，避免普通 CLI 形成第二条刷新链。
                     shutil.rmtree(self._root(job["row"]) / "home" / ".v3-login" / job["tmux"], ignore_errors=False)
@@ -1250,8 +1408,10 @@ class AccountRuntime:
         compatibility_root = root / "workspaces"
         projects.mkdir(parents=True, exist_ok=True)
         compatibility_root.mkdir(parents=True, exist_ok=True)
-        os.chown(projects, 1000, 1000)
+        os.chown(projects, 1000, 1000, follow_symlinks=False)
         view = projects / alias
+        if view.is_symlink():
+            raise ValueError("项目物理目录不能是符号链接")
         compatibility = compatibility_root / run_id
         if compatibility.is_symlink():
             if compatibility.resolve() != view.resolve():
@@ -1268,18 +1428,18 @@ class AccountRuntime:
             compatibility.symlink_to(os.path.relpath(view, compatibility.parent), target_is_directory=True)
         else:
             view.mkdir(mode=0o755)
-            os.chown(view, 1000, 1000)
+            os.chown(view, 1000, 1000, follow_symlinks=False)
             compatibility.symlink_to(os.path.relpath(view, compatibility.parent), target_is_directory=True)
         cwd = f"/home/node/projects/{alias}"
         configuration = self._root(row) / "home" / ".claude.json"
         if configuration.is_file():
-            value = json.loads(configuration.read_text())
+            value = _read_json(configuration)
             projects = value.get("projects") if isinstance(value.get("projects"), dict) else {}
             project = projects.get(cwd) if isinstance(projects.get(cwd), dict) else {}
             # 这里只信任本系统为当前任务创建的专属目录，避免首屏确认吞掉原题。
             value["projects"] = {**projects, cwd: {**project, "hasTrustDialogAccepted": True}}
             atomic_json(configuration, value)
-            os.chown(configuration, 1000, 1000)
+            os.chown(configuration, 1000, 1000, follow_symlinks=False)
         return cwd
 
     def _session_view(self, row: dict, run_id: str, cwd: str | None = None) -> None:
@@ -1295,9 +1455,9 @@ class AccountRuntime:
         project_key = (cwd or f"/workspaces/{run_id}").replace("/", "-")
         project = home / ".claude" / "projects" / project_key
         project.mkdir(parents=True, exist_ok=True)
-        os.chown(project, 1000, 1000)
+        os.chown(project, 1000, 1000, follow_symlinks=False)
         for parent in (project.parent, project.parent.parent):
-            os.chown(parent, 1000, 1000)
+            os.chown(parent, 1000, 1000, follow_symlinks=False)
 
         # 旧兼容层曾把 .claude-home 写进项目树；只移除本系统创建且仍指向当前 session 的链接。
         legacy_home = self._root(row) / "workspaces" / run_id / ".claude-home"
@@ -1366,8 +1526,11 @@ class AccountRuntime:
 
     def _make_room(self, requested: dict) -> None:
         running = self.client.containers.list(filters={"label": ["vibebench.product=v3",
-            f"vibebench.deployment={self.deployment}", "vibebench.role=account"]})
-        if len(running) < self.limit:
+            f"vibebench.deployment={self.deployment}"]})
+        running = [container for container in running if container.labels.get("vibebench.role")
+            in ("account", "account-network", "account-sender")]
+        active_environments = {container.labels.get("vibebench.environment") or container.id for container in running}
+        if requested["environment_id"] in active_environments or len(active_environments) < self.limit:
             return
         connection = self.database()
         try:
@@ -1382,7 +1545,7 @@ class AccountRuntime:
                 try:
                     with self.lock:
                         busy = row["environment_id"] in self.jobs
-                    if busy or row["container_id"] not in {container.id for container in running}:
+                    if busy or row["environment_id"] not in active_environments:
                         continue
                     account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
                     account = dict(account) if account else {"name": row["name"]}
@@ -1390,7 +1553,7 @@ class AccountRuntime:
                         job = self.claim(row, account, f"idle:{uuid.uuid4().hex}", idle_only=True, exclusive=True)
                     except (ValueError, RuntimeError):
                         continue
-                    self._container(row).stop(timeout=5)
+                    self._stop_environment(row)
                     self._update(row, state="stopped")
                     (self._root(row) / "runtime" / "execution.json").unlink(missing_ok=True)
                     self._lease(job, "release")
@@ -1415,21 +1578,21 @@ class AccountRuntime:
         with self._cli_setup(account, f"login:{sid}", version, exclusive=True,
             allow_inactive_login=force and account.get("cc2api_account_id") is not None) as (row, container, job):
             idle_context = {"NETWORK_INSPECTION_MODE": "passthrough", "QUOTA_SOURCE": f"login:{sid}"}
-            atomic_json(self._root(row) / "runtime" / "context.json", idle_context)
+            atomic_json(self._network_runtime(row) / "context.json", idle_context)
             self._configure_network_context(container, idle_context)
             home = self._root(row) / "home"
             cli_home = "/home/node"
             if force:
                 staged = home / ".v3-login" / sid
-                staged.mkdir(parents=True, exist_ok=True)
+                staged_descriptor = _directory_fd(staged, create=True)
+                os.close(staged_descriptor)
                 for source in (home / ".claude.json", home / ".claude" / "settings.json"):
                     if source.exists():
                         target = staged / (".claude.json" if source.name == ".claude.json" else ".claude/settings.json")
-                        target.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(source, target)
+                        atomic_json(target, _read_json(source))
                 top = staged / ".claude.json"
                 if top.exists():
-                    configuration = json.loads(top.read_text())
+                    configuration = _read_json(top)
                     # 只保留设备与本地设置；新身份必须由本次 CLI 登录重新写出。
                     configuration.pop("oauthAccount", None)
                     atomic_json(top, configuration)
@@ -1438,14 +1601,13 @@ class AccountRuntime:
             profile = home / ".claude"
             profile.mkdir(exist_ok=True)
             for current, dirs, files in os.walk(home if force else profile):
-                os.chown(current, 1000, 1000)
+                os.chown(current, 1000, 1000, follow_symlinks=False)
                 for name in files:
-                    os.chown(Path(current) / name, 1000, 1000)
+                    os.chown(Path(current) / name, 1000, 1000, follow_symlinks=False)
             if force:
-                os.chown(home.parent, 1000, 1000)
+                os.chown(home.parent, 1000, 1000, follow_symlinks=False)
             socket_path = f"/tmp/v3-login-{sid}.sock"
-            command = ["setpriv", "--reuid=1000", "--regid=1000", "--init-groups", "--bounding-set=-all",
-                "--inh-caps=-all", "--ambient-caps=-all", "--no-new-privs", "env", f"HOME={cli_home}",
+            command = ["env", f"HOME={cli_home}",
                 f"PATH=/cli/{version}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin",
                 *(f"{key}={value}" for key, value in self.execution_environment(row).items()),
                 "claude", "auth", "login"]
@@ -1463,13 +1625,12 @@ class AccountRuntime:
 
     @staticmethod
     def cli_command(command: list[str]) -> list[str]:
-        """生成去掉所有能力的非 root CLI 命令。
+        """保留实际 argv；普通用户与能力边界由整个 CLI 容器提供。
 
         :param command: 实际 argv
-        :return: 不经过字符串拼接的 setpriv argv
+        :return: 不经过字符串拼接的命令副本
         """
-        return ["setpriv", "--reuid=1000", "--regid=1000", "--init-groups", "--bounding-set=-all",
-            "--inh-caps=-all", "--ambient-caps=-all", "--no-new-privs", "--", *command]
+        return list(command)
 
     def exec_cli(self, container_id: str, command: list[str], home: str, version: str):
         """在 passthrough 网络中执行短期 CLI 子命令。
@@ -1513,8 +1674,8 @@ class AccountRuntime:
             source = session.profile_dir.parent / relative
             target = destination / relative
             if source.exists() and source.resolve() != target.resolve():
-                atomic_json(target, json.loads(source.read_text()))
-                os.chown(target, 1000, 1000)
+                atomic_json(target, _read_json(source))
+                os.chown(target, 1000, 1000, follow_symlinks=False)
         if row["state"] == "profile_reauth":
             self._update(row, state="ready")
         job["row"] = row
@@ -1572,7 +1733,7 @@ class AccountRuntime:
                 current = connection.execute("SELECT * FROM account_environments WHERE environment_id=?", (row["environment_id"],)).fetchone()
             finally:
                 connection.close()
-            proof = json.loads((self._root(row) / "runtime" / "execution.json").read_text())
+            proof = _read_json(self._root(row) / "runtime" / "execution.json")
             if (not current or current["generation"] != row["generation"] or current["container_id"] != session.worker_id
                 or current["state"] in ("reconcile", "cli_reconcile") or proof.get("source") != f"login:{session.sid}"
                 or proof.get("generation") != row["generation"] or proof.get("container_id") != session.worker_id
@@ -1585,7 +1746,7 @@ class AccountRuntime:
             try:
                 # code 不进入 argv 或文件；半关闭 stdin 让 load-buffer 确认 EOF 后再 paste。
                 execution = self.client.api.exec_create(container.id,
-                    command + ["load-buffer", "-b", request_id, "-"], stdin=True, tty=False, user="root")
+                    command + ["load-buffer", "-b", request_id, "-"], stdin=True, tty=False)
                 stream = self.client.api.exec_start(execution["Id"], socket=True, tty=False)
                 raw = getattr(stream, "_sock", None) or stream
                 raw.settimeout(5)
@@ -1629,7 +1790,7 @@ class AccountRuntime:
         """
         with self._cli_setup(account, f"login:{sid}", version, exclusive=True) as (row, container, job):
             idle_context = {"NETWORK_INSPECTION_MODE": "passthrough", "QUOTA_SOURCE": f"login:{sid}"}
-            atomic_json(self._root(row) / "runtime" / "context.json", idle_context)
+            atomic_json(self._network_runtime(row) / "context.json", idle_context)
             self._configure_network_context(container, idle_context)
             job.update(home=home, version=version)
             self._save_execution(job)
@@ -1655,25 +1816,25 @@ class AccountRuntime:
             raise ValueError("重授权环境或凭据归属不匹配")
         profile = self.data / "profiles" / account["name"]
         credentials_path = profile / ".credentials.json"
-        credentials = json.loads(credentials_path.read_text())
+        credentials = _read_json(credentials_path)
         oauth = credentials.get("claudeAiOauth")
         if not isinstance(oauth, dict) or any(not isinstance(snapshot.get(key), str) or not snapshot[key]
             for key in ("access_token", "refresh_token")) or type(snapshot.get("expires_at")) is not int:
             raise ValueError("权威凭据不完整，重授权尚未完成")
         oauth.update(accessToken=snapshot["access_token"], refreshToken=snapshot["refresh_token"], expiresAt=snapshot["expires_at"])
         atomic_json(credentials_path, credentials)
-        os.chown(credentials_path, 1000, 1000)
+        os.chown(credentials_path, 1000, 1000, follow_symlinks=False)
         home = self._root(row) / "home"
         identity = record["identity"]
         for top in (profile / ".claude.json", home / ".claude.json"):
-            value = json.loads(top.read_text()) if top.exists() else {}
+            value = _read_json(top) if top.exists() else {}
             oauth_account = value.setdefault("oauthAccount", {})
             # 只更新经验证的登录身份，保留 userID 等原设备字段与本地配置。
             for source, target in (("email", "emailAddress"), ("account_uuid", "accountUuid"), ("organization_uuid", "organizationUuid")):
                 if identity.get(source):
                     oauth_account[target] = identity[source]
             atomic_json(top, value)
-            os.chown(top, 1000, 1000)
+            os.chown(top, 1000, 1000, follow_symlinks=False)
         self.sync_credentials(row, account)
         record["phase"] = "mirrored"
         atomic_json(self._root(row) / "runtime" / "login-commit.json", record)
@@ -1696,6 +1857,9 @@ class AccountRuntime:
                 self._session_view(row, run["id"], cwd)
                 handle = hashlib.sha256(context["QUOTA_SOURCE"].encode()).hexdigest()[:20]
                 root = self._root(row)
+                runtime_job = root / 'runtime/jobs' / handle
+                runtime_job.mkdir(parents=True, exist_ok=True, mode=0o700)
+                os.chown(runtime_job, 1000, 1000, follow_symlinks=False)
                 flow_directory = self.execution_flows(account, context["QUOTA_SOURCE"], flows)
                 flow_path = "/flows/" + str(flow_directory.relative_to(root / "flows"))
                 control = root / "controls" / handle
@@ -1705,14 +1869,14 @@ class AccountRuntime:
                     QUOTA_SIGNAL_FILE=f"/controls/{handle}/pause.json",
                     QUOTA_STATE_FILE=f"/quota-accounts/{account['id']}/state.json",
                     QUOTA_OBSERVATIONS_FILE=f"{flow_path}/passive-quota.jsonl",
-                    QUOTA_CREDENTIALS_FILE="/home/node/.claude/.credentials.json",
+                    QUOTA_CREDENTIALS_FILE="/run/v3/access/.credentials.json",
                     NETWORK_INSPECTION_MODE="capture" if run.get("capture_full_http") else "passthrough")
                 if not run.get("capture_full_http"):
                     self._install_cli_quota(job, cwd, flow_directory, context.get("QUOTA_IDENTITY"))
                 if run.get("capture_full_http"):
                     context.update(CAPTURE_FULL_HTTP="1", SAVE_FULL_FLOWS="1",
                         CAPTURE_FILE=f"{flow_path}/http_capture.jsonl", CAPTURE_INDEX_FILE=f"{flow_path}/capture_index.json")
-                atomic_json(root / "runtime" / "context.json", context)
+                atomic_json(self._network_runtime(row) / "context.json", context)
                 self._configure_network_context(container, context)
                 job.update(run_id=run["id"], handle=handle, version=version, cwd=cwd,
                     network_inspection_mode=context["NETWORK_INSPECTION_MODE"])
@@ -1793,12 +1957,7 @@ class AccountRuntime:
                 blocker = self.reprofile_blocker(row)
                 if blocker:
                     raise ValueError(blocker)
-                try:
-                    container = self._container(row) if row.get("container_id") else None
-                except NotFound:
-                    container = None
-                if container:
-                    container.remove()
+                self._stop_environment(row, remove=True)
                 fingerprint = self.fingerprint(account.get("timezone"))
                 previous = json.loads(row["fingerprint_json"])
                 fingerprint["mem"] = previous.get("mem", os.environ.get("V3_ACCOUNT_MEMORY", "4g"))
@@ -1821,7 +1980,10 @@ class AccountRuntime:
                 raise ValueError("环境正在执行工作")
             if operation == "reconcile" and row["state"] == "cli_reconcile":
                 self.reconcile(environment_id)
-                if self._row(row["name"], row["account_id"])["state"] == "cli_reconcile":
+                row = self._row(row["name"], row["account_id"])
+                if row["state"] == "cli_reconcile" and row.get("isolation_version") == ISOLATION_VERSION:
+                    self._recover_cli(row)
+                if row["state"] == "cli_reconcile":
                     raise ValueError("CLI 对账未完成，独立 API 环境保持运行")
                 return
             if operation == "reconcile" and row["state"] == "profile_reauth_reconcile":
@@ -1836,16 +1998,11 @@ class AccountRuntime:
                 account_id = account.get("cc2api_account_id")
                 if account_id is not None:
                     snapshot = self.gateway._request("GET", f"/admin/runtime/accounts/{account_id}/lease")
-                    if snapshot["active"]:
+                    if snapshot["active"] or self._running_sender_active(row):
                         raise ValueError("API 仍有活动请求，拒绝对账")
-            try:
-                container = self._container(row) if row.get("container_id") else None
-            except NotFound:
-                container = None
-            if container:
-                container.stop(timeout=5)
-                if operation == "rebuild":
-                    container.remove()
+            if operation == "rebuild" and row.get("isolation_version") != ISOLATION_VERSION:
+                self._prepare_isolation_upgrade(row)
+            self._stop_environment(row, remove=operation == "rebuild")
             if job:
                 self._lease(job, "release")
                 with self.lock:
@@ -1855,7 +2012,55 @@ class AccountRuntime:
                 self.gateway._request("POST", f"/admin/runtime/accounts/{account['cc2api_account_id']}/lease",
                     {"operation": "release", "owner": lease["owner"], "generation": lease["generation"]})
             (self._root(row) / "runtime" / "execution.json").unlink(missing_ok=True)
-            self._update(row, state="stopped", **({"container_id": None} if operation == "rebuild" else {}))
+            self._update(row, state="stopped", **({"isolation_version": ISOLATION_VERSION} if operation == "rebuild" else {}))
+
+    def _prepare_isolation_upgrade(self, row: dict) -> None:
+        # 迁移只由已排空的显式 rebuild 进入；恢复资料私有保存，绝不自动回写旧 RT。
+        root = self._root(row)
+        snapshot = root / "runtime" / "isolation-upgrade"
+        if snapshot.is_symlink():
+            raise ValueError("隔离迁移备份目录不能是链接")
+        snapshot.mkdir(parents=True, exist_ok=True, mode=0o700)
+        marker = snapshot / "record.json"
+        if marker.exists():
+            previous = _read_json(marker)
+            if previous.get("environment_id") != row["environment_id"]:
+                raise ValueError("隔离迁移记录归属不匹配")
+            return
+        connection = self.database()
+        try:
+            with sqlite3.connect(snapshot / "before.sqlite") as destination:
+                connection.backup(destination)
+            (snapshot / "before.sqlite").chmod(0o600)
+        finally:
+            connection.close()
+        for source, name in ((root / "home/.claude.json", "identity.json"),
+                (root / "runtime/sender.json", "sender.json")):
+            if source.is_file():
+                shutil.copy2(source, snapshot / name)
+                (snapshot / name).chmod(0o600)
+        atomic_json(marker, {"schema": 1, "environment_id": row["environment_id"],
+            "previous": row, "target_isolation_version": ISOLATION_VERSION,
+            "created_at": time.time(), "credential_restore": "禁止恢复历史凭据，沿用最新合法所有者"})
+
+    def _recover_cli(self, row: dict) -> None:
+        if row["environment_id"] in self.jobs or (self._root(row) / "runtime/execution.json").exists():
+            raise ValueError("CLI 执行尚未确认收口")
+        roles = {role: role_container(self, row, role) for role in ROLE_COLUMNS}
+        for current in roles.values():
+            current.reload()
+        if any(roles[role].status != "running" for role in ("network", "sender")):
+            raise ValueError("公共网络或发送器异常，需要重建完整环境")
+        self._wait_network(row)
+        if roles["cli"].status != "running":
+            roles["cli"].start()
+        result = roles["cli"].exec_run(["python3", "-I", "/usr/local/bin/v3-cli-control", "stop"])
+        if result.exit_code:
+            raise ValueError("CLI 子进程仍未收口，独立 API 保持运行")
+        context = {"NETWORK_INSPECTION_MODE": "passthrough", "QUOTA_SOURCE": ""}
+        atomic_json(self._network_runtime(row) / "context.json", context)
+        self._configure_network_context(roles["cli"], context)
+        self._update(row, state="ready")
 
     def read_cli_identity(self, row: dict, version: str) -> dict:
         """只读核验官方 CLI 的本地身份及已有请求观察，不创建环境。
@@ -1868,9 +2073,9 @@ class AccountRuntime:
         identity_file = root / "runtime" / "identity.json"
         has_observation = identity_file.exists()
         try:
-            top = json.loads((root / "home" / ".claude.json").read_text())
-            profile = json.loads((self.data / "profiles" / row["name"] / ".claude.json").read_text())
-            observed = json.loads(identity_file.read_text()) if has_observation else None
+            top = _read_json(root / "home" / ".claude.json")
+            profile = _read_json(self.data / "profiles" / row["name"] / ".claude.json")
+            observed = _read_json(identity_file) if has_observation else None
         except (OSError, ValueError):
             raise ValueError("CLI 身份配置缺失或损坏，请检查固定环境的登录产物") from None
         if not isinstance(top, dict) or not isinstance(profile, dict):
@@ -1932,18 +2137,43 @@ class AccountRuntime:
         :param version: 当前 CLI 版本。
         :return: 可导入的进程指标；损坏或预算不符时拒绝。
         """
-        result = container.exec_run(["python3", "/usr/local/bin/v3-process-metrics", "read", version])
-        if result.exit_code:
-            raise ValueError("实际进程指标读取失败，请检查环境采样状态")
+        if row.get("isolation_version") == ISOLATION_VERSION:
+            observed = self._sample_cli_metrics(row, container)
+            sample = observed["versions"].get(version, {"sampled_at": None, "sample_count": 0,
+                "rss_bytes": None, "rss_min_bytes": None, "rss_max_bytes": None})
+            payload = {"constrained_memory": observed["constrained_memory"], "observation": {
+                "source": PROCESS_SOURCE, "environment_id": row["environment_id"], "cli_version": version,
+                "observed_at": observed["observed_at"], **sample}}
+        else:
+            result = container.exec_run(["python3", "/usr/local/bin/v3-process-metrics", "read", version])
+            if result.exit_code:
+                raise ValueError("实际进程指标读取失败，请检查环境采样状态")
+            payload = json.loads(result.output)
         try:
-            value = validate_process_metrics(json.loads(result.output), row["environment_id"], version)
+            value = validate_process_metrics(payload, row["environment_id"], version)
             fingerprint = json.loads(row["fingerprint_json"])
-            expected, _ = account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))
+            expected, _ = (isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))["cli"]
+                if row.get("isolation_version") == ISOLATION_VERSION else account_limits(fingerprint["mem"], fingerprint.get("swap", "0")))
             if value["constrained_memory"] != expected:
                 raise ValueError("实际容器内存限制与固化预算不一致")
             return value
         except (KeyError, TypeError, json.JSONDecodeError):
             raise ValueError("进程指标响应损坏") from None
+
+    def _sample_cli_metrics(self, row: dict, container) -> dict:
+        result = container.exec_run(["env", "-i", "PATH=/usr/local/bin:/usr/bin:/bin", "python3", "-I",
+            "/usr/local/bin/v3-cli-control", "sample"])
+        if result.exit_code:
+            raise ValueError("实际 CLI 内核采样失败")
+        try:
+            sample = json.loads(result.output)
+            fingerprint = json.loads(row["fingerprint_json"])
+            expected = isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))["cli"][0]
+            if sample["memory"] != expected:
+                raise ValueError("实际 CLI 内存限制与角色预算不符")
+            return merge_process_metrics(self._root(row) / "runtime", row["environment_id"], expected, sample["samples"])
+        except (KeyError, TypeError, json.JSONDecodeError):
+            raise ValueError("实际 CLI 内核采样响应无效") from None
 
     def process_identity_import(self, account: dict, version: str) -> dict:
         """导出原绑定的指标和非秘密身份，不读取或刷新 OAuth 凭据。
@@ -1955,7 +2185,7 @@ class AccountRuntime:
         row, container = self.ensure(account, preserve_proxy=True)
         with self.environment_lock(row["environment_id"]):
             identity = self.read_cli_identity(row, version)
-            top = json.loads((self._root(row) / "home/.claude.json").read_text())
+            top = _read_json(self._root(row) / "home/.claude.json")
             email = top.get("oauthAccount", {}).get("emailAddress")
             if not isinstance(email, str) or not email.strip():
                 raise ValueError("CLI 登录身份缺少邮箱，无法核对原关联账号")
@@ -1986,6 +2216,10 @@ class AccountRuntime:
                 container = self._container(row) if row["container_id"] else None
             except NotFound:
                 container = None
+            except (DockerException, ValueError):
+                # 新批次启动时旧角色仍需显式收口；单环境异常不能使整个管理服务启动失败。
+                self._update(row, state="cli_reconcile" if shared else "reconcile")
+                continue
             try:
                 if (self._root(row) / "runtime/credential-handoff.json").exists():
                     raise ValueError("解绑凭据交接未完成，需要再次显式解绑")
@@ -1994,7 +2228,7 @@ class AccountRuntime:
                     self._reconcile_login_import(row, container, commit_path)
                     continue
                 if record.exists():
-                    execution = json.loads(record.read_text())
+                    execution = _read_json(record)
                     shared = execution.get("exclusive") is False
                     if shared:
                         if execution.get("container_id") != row["container_id"] or execution.get("generation") != row["generation"]:
@@ -2027,8 +2261,7 @@ class AccountRuntime:
                                 self.release(job)
                                 self._update(row, state=settled_state or "stopped")
                         continue
-                    if container:
-                        container.stop(timeout=5)
+                    self._stop_environment(row)
                     if execution.get("lease"):
                         lease = execution["lease"]
                         path = f"/admin/runtime/accounts/{execution['account_id']}/lease"
@@ -2049,13 +2282,25 @@ class AccountRuntime:
                         if current["lease"]:
                             shared = current["lease"].get("exclusive") is False
                             raise ValueError("存在没有本地执行记录的门禁，需人工对账")
+                    isolated_state = None
+                    if row.get("isolation_version") == ISOLATION_VERSION and any(row.get(column) for column in ROLE_COLUMNS.values()):
+                        roles = {role: role_container(self, row, role) for role in ROLE_COLUMNS}
+                        for current in roles.values():
+                            current.reload()
+                        if any(current.status == "running" for current in roles.values()):
+                            if any(roles[role].status != "running" for role in ("network", "sender")):
+                                raise ValueError("账号公共角色状态不完整，需显式收口或重建")
+                            self._wait_network(row)
+                            self._sender_active(row)
+                            if roles["cli"].status != "running":
+                                shared, isolated_state = True, "cli_reconcile"
                     if container:
                         container.reload()
-                        if shared and container.status == "running" and (self._root(row) / "runtime" / "cli-unhealthy").exists():
+                        if shared and container.status == "running" and (self._network_runtime(row) / "cli-unhealthy").exists():
                             idle_context = {"NETWORK_INSPECTION_MODE": "passthrough", "QUOTA_SOURCE": ""}
-                            atomic_json(self._root(row) / "runtime" / "context.json", idle_context)
+                            atomic_json(self._network_runtime(row) / "context.json", idle_context)
                             self._configure_network_context(container, idle_context)
-                    self._update(row, state=settled_state or (
+                    self._update(row, state=isolated_state or settled_state or (
                         "ready" if container and container.status == "running" else "stopped"))
             except Exception:
                 state = "cli_reconcile" if shared else "reconcile"
@@ -2070,7 +2315,7 @@ class AccountRuntime:
         :return: None；不能确认时抛出异常并由调用方保留 reconcile
         """
         with self.environment_lock(row["environment_id"]):
-            record = json.loads(path.read_text())
+            record = _read_json(path)
             if record.get("environment_id") != row["environment_id"] or not re.fullmatch(r"[a-f0-9]{12}", record.get("sid", "")):
                 raise ValueError("重授权提交记录归属不合法")
             with self.lock:
@@ -2093,8 +2338,7 @@ class AccountRuntime:
             current = self.gateway._request("GET", lease_path)
             if current.get("active") or self._running_sender_active(row):
                 raise ValueError("重授权对账等待现有 API 收口")
-            if container:
-                container.stop(timeout=5)
+            self._stop_environment(row)
             snapshot = self.gateway.import_status(record["cc2api_account_id"], record["operation_id"])
             if snapshot is not None:
                 self.finish_bound_login(record, snapshot)

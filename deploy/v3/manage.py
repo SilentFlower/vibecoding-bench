@@ -26,7 +26,7 @@ REPO = Path(__file__).resolve().parents[2]
 COMPOSE = Path(__file__).with_name("compose.yml")
 # 独立部署脚本复用镜像内的纯预算模块，避免预检和容器解释不同单位。
 sys.path.insert(0, str(REPO / "orchestrator"))
-from resource_budget import account_limits
+from resource_budget import account_limits, isolated_account_limits
 
 
 def command(*arguments: str, capture: bool = False, environment=None) -> str:
@@ -72,6 +72,8 @@ def inspect_images(values: dict) -> dict:
     manifest = json.loads(Path(values["V3_RELEASE_MANIFEST"]).read_text())
     if manifest.get("schema") != 3:
         raise ValueError("版本清单格式不匹配")
+    if manifest.get("layout_version") not in (1, 2):
+        raise ValueError("版本清单隔离布局不受支持")
     if values.get("V3_RELEASE", manifest["release"]) != manifest["release"]:
         raise ValueError("配置批次与清单不一致")
     values["V3_RELEASE"] = manifest["release"]
@@ -88,6 +90,8 @@ def inspect_images(values: dict) -> dict:
             raise ValueError("镜像平台与清单不匹配")
         if labels.get("vibebench.product") != "v3" or labels.get("vibebench.role") != role:
             raise ValueError("镜像产品或角色不匹配")
+        if manifest["layout_version"] == 2 and labels.get("vibebench.isolation-version") != "2":
+            raise ValueError("联合镜像缺少三角色隔离能力")
         for label, key in (("release", "release"), ("parent-revision", "parent_revision"), ("gateway-revision", "gateway_revision")):
             if labels.get("vibebench." + label) != manifest[key]:
                 raise ValueError("镜像构建批次不匹配")
@@ -158,6 +162,7 @@ def preflight(values: dict) -> Path:
         if line.startswith(("MemAvailable:", "SwapFree:"))}
     active_limit = int(values.get("V3_MAX_ACTIVE_ACCOUNTS", "1"))
     account_memory, total_memory = account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"))
+    isolated_account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"))
     database = root / "bench/db.sqlite"
     if database.is_file():
         if not database.resolve().is_relative_to(root):
@@ -168,6 +173,7 @@ def preflight(values: dict) -> Path:
                 for saved, in connection.execute("SELECT fingerprint_json FROM account_environments"):
                     fingerprint = json.loads(saved)
                     ram, combined = account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))
+                    isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))
                     if ram > account_memory or combined - ram > total_memory - account_memory:
                         raise ValueError("已有账号固化预算超过当前配置，请提高部署预算后再启动")
     if active_limit < 1 or float(values.get("V3_ACCOUNT_CPUS", "2")) <= 0:
@@ -232,7 +238,7 @@ def build(release: str, manifest_path: Path) -> None:
                 "platform": info["Os"] + "/" + info["Architecture"]}
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     with manifest_path.open("x") as output:
-        json.dump({"schema": 3, "bridge_protocol": 1, "layout_version": 1, "default_cli_version": "2.1.280",
+        json.dump({"schema": 3, "bridge_protocol": 1, "layout_version": 2, "default_cli_version": "2.1.280",
             "release": release, "parent_revision": parent, "gateway_revision": gateway,
             "dirty_worktree": dirty, "source_content_sha256": source_hash, "images": images}, output, indent=2)
         output.write("\n")
@@ -535,7 +541,7 @@ def status(values: dict) -> dict:
         if labels.get("vibebench.product") != "v3" or labels.get("vibebench.deployment") != values["V3_DEPLOYMENT_ID"]:
             continue
         role = labels.get("vibebench.role", "unknown")
-        expected_role = "account" if role == "account" else "control"
+        expected_role = "account" if role in ("account", "account-sender", "account-network") else "control"
         expected = manifest["images"][expected_role]
         containers.append({"id": item["Id"], "name": item["Name"].lstrip("/"), "role": role,
             "environment_id": labels.get("vibebench.environment"), "status": item["State"]["Status"],
@@ -549,7 +555,9 @@ def status(values: dict) -> dict:
         with sqlite3.connect("file:" + quote(str(database), safe="/") + "?mode=ro", uri=True) as connection:
             connection.row_factory = sqlite3.Row
             if connection.execute("SELECT 1 FROM sqlite_master WHERE name='account_environments'").fetchone():
-                environments = [dict(row) for row in connection.execute("SELECT e.environment_id,e.name,e.account_id,e.generation,e.container_id,e.state,a.cc2api_account_id FROM account_environments e LEFT JOIN accounts a ON a.id=e.account_id ORDER BY e.name")]
+                columns = {row[1] for row in connection.execute("PRAGMA table_info(account_environments)")}
+                extra = "".join(",e." + name for name in ("isolation_version", "network_container_id", "sender_container_id") if name in columns)
+                environments = [dict(row) for row in connection.execute("SELECT e.environment_id,e.name,e.account_id,e.generation,e.container_id,e.state,a.cc2api_account_id" + extra + " FROM account_environments e LEFT JOIN accounts a ON a.id=e.account_id ORDER BY e.name")]
     host = values.get("V3_BIND_ADDRESS", "127.0.0.1")
     if host == "0.0.0.0":
         host = "127.0.0.1"
@@ -557,6 +565,9 @@ def status(values: dict) -> dict:
         container = next((item for item in containers if item["id"] == environment["container_id"]), None)
         environment["container_status"] = container["status"] if container else "missing"
         environment["image_digest"] = container["image_digest"] if container else None
+        environment["roles"] = {role: next(({"status": item["status"], "matches_release": item["matches_release"]}
+            for item in containers if item["id"] == environment.get(column)), {"status": "missing", "matches_release": False})
+            for role, column in (("cli", "container_id"), ("network", "network_container_id"), ("sender", "sender_container_id"))}
         environment["occupancy"] = {"active": None, "waiting": None, "lease": None, "available": False}
         account_id = environment.pop("cc2api_account_id")
         if account_id is not None:
@@ -796,7 +807,7 @@ def main() -> None:
             raise ValueError("部署标识不合法")
         # 调度器先收口 CLI 租约，此时网关仍可用；随后关闭发送器和网关。
         # 只认产品/部署/角色标签，不通过 Compose 项目名接管其它容器。
-        for role in ("orchestrator", "account", "gateway"):
+        for role in ("orchestrator", "account", "account-sender", "account-network", "gateway"):
             ids = command("docker", "ps", "-q", "--filter", "label=vibebench.product=v3",
                 "--filter", f"label=vibebench.deployment={deployment}",
                 "--filter", f"label=vibebench.role={role}", capture=True).split()

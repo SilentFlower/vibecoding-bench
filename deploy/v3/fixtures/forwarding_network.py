@@ -1,5 +1,6 @@
 """隔离转发上游：仅在本进程终止 TLS，不向任何公网地址建立连接。"""
 import hashlib
+import gzip
 import json
 import socket
 import socketserver
@@ -39,8 +40,26 @@ class Upstream(BaseHTTPRequestHandler):
         :return: None。
         """
         body = self.rfile.read(int(self.headers.get('Content-Length', '0')))
+        if self.headers.get('Content-Encoding') == 'gzip':
+            body = gzip.decompress(body)
         payload = json.loads(body)
+        if self.path.startswith('/v1/oauth/token'):
+            # 真实 Rust 刷新客户端仍经账号代理；这里只提供合成响应，不保存 AT/RT。
+            record('oauth-refresh', path=self.path, body_sha256=hashlib.sha256(body).hexdigest())
+            response = json.dumps({'access_token':'synthetic-refreshed-' + hashlib.sha256(body).hexdigest()[:12],
+                'refresh_token':payload['refresh_token'], 'expires_in':3600, 'token_type':'Bearer'}).encode()
+            self.send_response(200)
+            self.send_header('Content-Type','application/json')
+            self.send_header('Content-Length',str(len(response)))
+            self.end_headers()
+            self.wfile.write(response)
+            return
         marker = payload.get('marker') or payload.get('messages', [{}])[-1].get('content', '')
+        tool_fixture = self.path.startswith('/v1/messages') and (ROOT / 'cli-tools').exists()
+        tool_result = any(isinstance(item, dict) and item.get('type') == 'tool_result'
+            for message in payload.get('messages', []) for item in (message.get('content') if isinstance(message.get('content'), list) else []))
+        if tool_fixture:
+            marker = 'isolation-tool-complete' if tool_result else 'isolation-tool-start'
         record('upstream', marker=marker, path=self.path, body_sha256=hashlib.sha256(body).hexdigest(),
                billing_rewritten=any('x-anthropic-billing-header:' in str(item) and 'cc_version=0.0.1' not in str(item)
                    for item in payload.get('system', [])),
@@ -76,8 +95,18 @@ class Upstream(BaseHTTPRequestHandler):
             ('content_block_stop', {'type': 'content_block_stop', 'index': 0}),
             ('message_delta', {'type': 'message_delta', 'delta': {'stop_reason': 'end_turn', 'stop_sequence': None}, 'usage': {'output_tokens': 1}}),
             ('message_stop', {'type': 'message_stop'})]
+        if tool_fixture and not tool_result:
+            # 仅本地夹具下驱动真实官方 CLI 执行一次可核对的工具；没有真实模型参与。
+            sequence[1] = ('content_block_start', {'type': 'content_block_start', 'index': 0,
+                'content_block': {'type': 'tool_use', 'id': 'toolu_isolation', 'name': 'Bash', 'input': {}}})
+            sequence[2] = ('content_block_delta', {'type': 'content_block_delta', 'index': 0,
+                'delta': {'type': 'input_json_delta', 'partial_json': json.dumps({'command':
+                    "printf 'int main(void){return 0;}\\n' > isolation.c && cc isolation.c -o isolation-program && ./isolation-program && id -u > official-cli-tool.txt",
+                    'description': '执行本地隔离构建夹具'})}})
+            sequence[-2][1]['delta']['stop_reason'] = 'tool_use'
         slow = str(marker).startswith('slow-')
-        chunks = [*sequence[:2], *[sequence[2]] * 600, *sequence[3:]] if str(marker).startswith('slow-cancel') else sequence
+        repeats = 600 if str(marker).startswith('slow-cancel') else 120 if marker == 'slow-restart' else 1
+        chunks = [*sequence[:2], *[sequence[2]] * repeats, *sequence[3:]]
         digest = hashlib.sha256()
         completed = False
         try:

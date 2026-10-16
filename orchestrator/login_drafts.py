@@ -207,7 +207,7 @@ class LoginDraftStore:
         :param row: 已验证的未关联环境
         :return: 仅供恢复 CLI 的账号配置
         """
-        path = self.runtime._root(row) / "runtime" / "sender.json"
+        path = self.runtime._sender_config(row)
         if not path.exists():
             raise ValueError("登录准备未完成，请删除草稿后重新配置")
         configuration = json.loads(path.read_text())
@@ -265,12 +265,6 @@ class LoginDraftStore:
             profile = self.runtime.data / "profiles" / row["name"]
             self._safe_tree(root, self.runtime.data / "environments")
             self._safe_tree(profile, self.runtime.data / "profiles")
-            container = None
-            if row["container_id"]:
-                try:
-                    container = self.runtime._container(row)
-                except NotFound:
-                    pass
             with manager._lock:
                 sessions = [session for session in manager.sessions.values() if session.name == row["name"]]
             job = self.runtime.jobs.get(row["environment_id"])
@@ -285,9 +279,7 @@ class LoginDraftStore:
                 manager.cleanup(session.sid)
             if row["environment_id"] in self.runtime.jobs:
                 raise ValueError("登录执行尚未收口")
-            if container:
-                container.stop(timeout=5)
-                container.remove()
+            self.runtime._stop_environment(row, remove=True)
             for path in (root, profile):
                 if path.exists():
                     shutil.rmtree(path)

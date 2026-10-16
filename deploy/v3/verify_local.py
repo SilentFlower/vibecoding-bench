@@ -24,6 +24,65 @@ import docker
 import requests
 import main as orchestrator
 from account_runtime import AccountRuntime, atomic_json, derive_v3_fingerprint
+from account_isolation import role_container
+from verify_isolation import memory_peaks, verify_roles, verify_route_failure
+
+
+
+def write_sender(path: Path, value: dict) -> None:
+    """按正式权限原子发布合成 sender 配置。@param path 私有配置。@param value 配置。@return None。"""
+    atomic_json(path, value, 0o640)
+    os.chown(path, 0, 1001)
+
+
+def verify_legacy_transition(runtime, row: dict, account: dict, client) -> None:
+    """在合成资料上执行旧镜像→新布局→旧镜像，保持当前凭据和身份。
+
+    :param runtime: 隔离测试运行时。
+    :param row: 已停止、无任务的固定环境。
+    :param account: 未绑定的合成账号。
+    :param client: 当前 Docker 客户端。
+    :return: None；未指定旧镜像时不执行。
+    """
+    control, image = os.environ.get('VERIFY_LEGACY_CONTROL_IMAGE'), os.environ.get('VERIFY_LEGACY_ACCOUNT_IMAGE')
+    if not control or not image:
+        return
+    root = runtime._root(row)
+    files = [root / 'home/.claude.json', root / 'home/.claude/.credentials.json']
+    before = [path.read_bytes() for path in files]
+    fingerprint = row['fingerprint_json']
+    machine = json.loads(fingerprint)['machine_id']
+    (Path('/verify') / 'legacy-account.json').write_text(json.dumps(account))
+    old_release = client.images.get(image).attrs['Config']['Labels']['vibebench.release']
+
+    def old_layout() -> None:
+        """用旧镜像的实际运行时重建单容器，不使用新代码模拟旧行为。@return None。"""
+        runtime._stop_environment(row, remove=True)
+        # 对应停机离线回退 SOP：只改运行布局登记，绝不恢复旧 DB 或旧凭据。
+        runtime._update(row, isolation_version=0, state='stopped')
+        environment = {key: os.environ[key] for key in ('V3_DEPLOYMENT_ID','V3_NETWORK','V3_ACCOUNT_MEMORY','V3_ACCOUNT_SWAP','VERIFY_HOST_ROOT')}
+        environment.update(V3_ACCOUNT_IMAGE=image, V3_RELEASE=old_release, PYTHONPATH='/app', V3_MAX_ACTIVE_ACCOUNTS=str(runtime.limit))
+        output = client.containers.run(control, ['/fixtures/legacy_runtime.py'], entrypoint='python', remove=True,
+            network=runtime.network, labels={'vibebench.product':'v3','vibebench.deployment':runtime.deployment,'vibebench.role':'orchestrator'},
+            environment=environment, volumes={os.environ['VERIFY_HOST_ROOT']:{'bind':'/verify','mode':'rw'},
+                str(Path(os.environ['VERIFY_SOURCE_ROOT']) / 'deploy/v3/fixtures'):{'bind':'/fixtures','mode':'ro'},
+                '/var/run/docker.sock':{'bind':'/var/run/docker.sock','mode':'rw'}})
+        observed = json.loads(output.decode().strip().splitlines()[-1])
+        assert observed == {'environment_id':row['environment_id'],'machine_id':machine}
+        assert all(path.read_bytes() == value for path,value in zip(files,before))
+        row.update(runtime._row(account['name'], account['id']))
+
+    old_layout()
+    runtime.maintenance(row['environment_id'], 'rebuild')
+    upgraded, _ = runtime.ensure(account, '9.9.9')
+    row.update(upgraded)
+    assert row['isolation_version'] == 2 and row['fingerprint_json'] == fingerprint
+    assert all(row[name] for name in ('container_id','network_container_id','sender_container_id'))
+    assert all(path.read_bytes() == value for path,value in zip(files,before))
+    assert (root / 'runtime/isolation-upgrade/before.sqlite').is_file()
+    runtime.maintenance(row['environment_id'], 'stop')
+    old_layout()
+    print('通过：实际旧镜像单容器→三角色→停机离线回退旧镜像，身份/HOME/最新凭据均保留', flush=True)
 
 
 def wait_cli_started(runtime: AccountRuntime, client, token: str) -> str:
@@ -119,7 +178,7 @@ def verify_gateway_binding(configuration_path: Path, peer: str) -> None:
         assert response.status_code == 201, response.status_code
         account_id = response.json()["id"]
         configuration["binding"]["account_id"] = account_id
-        atomic_json(configuration_path, configuration)
+        write_sender(configuration_path, configuration)
         response = session.post(base + "/admin/tokens", headers=admin,
             json={"name": "synthetic-gateway-binding", "allowed_accounts": str(account_id)}, timeout=5)
         assert response.status_code == 201
@@ -166,7 +225,7 @@ def verify_gateway_binding(configuration_path: Path, peer: str) -> None:
         server.server_close()
         thread.join(timeout=5)
         session.close()
-        atomic_json(configuration_path, original)
+        write_sender(configuration_path, original)
 
 
 def verify() -> None:
@@ -213,6 +272,8 @@ def verify() -> None:
     container = None
     try:
         row, container = runtime.ensure(account, "9.9.9")
+        isolation = verify_roles(container, role_container(runtime, row, "sender"), runtime._network_container(row))
+        print("通过：真实 Docker 三角色权限/只读根/秘密隔离/内置 DNS 拒绝/本地构建/非 root 收口：" + json.dumps(isolation), flush=True)
         first_id, first_generation = container.id, row["generation"]
         check = container.exec_run(runtime.cli_command(["sh", "-c", "test ! -r /run/v3/sender.json && test ! -r /ca/mitmproxy-ca.pem && grep '^CapEff:' /proc/self/status"])); assert check.exit_code == 0 and b"0000000000000000" in check.output
         private_files = ["/sidecar", *("/usr/local/bin/v3-" + name for name in ("account-init", "network-context", "cli-version", "passthrough"))]
@@ -220,11 +281,11 @@ def verify() -> None:
             assert container.exec_run(runtime.cli_command(["test", "-r", path])).exit_code != 0, path
         assert container.exec_run(runtime.cli_command(["test", "-x", "/usr/local/bin/v3-cli-quota"])).exit_code == 0
         machine = container.exec_run(["cat", "/etc/machine-id"]).output
-        configuration_path = runtime._root(row) / "runtime" / "sender.json"
+        configuration_path = runtime._sender_config(row)
         configuration = json.loads(configuration_path.read_text())
         configuration["allowed_origin"] = "http://api.anthropic.com:8081"
         configuration["quota_identity"] = "synthetic-quota"
-        atomic_json(configuration_path, configuration)
+        write_sender(configuration_path, configuration)
         binding = configuration["binding"]
         prepared = {"account_id": 0, "environment_id": row["environment_id"], "generation": row["generation"], "request_id": str(uuid.uuid4()), "deadline_unix_ms": int(time.time() * 1000) + 30000,
             "method": "POST", "target_url": "http://api.anthropic.com:8081/v1/messages", "headers": [["Content-Type", "application/json"]], "preserve_header_casing": True}
@@ -234,14 +295,14 @@ def verify() -> None:
         evidence = json.loads((runtime._root(row) / "flows" / "api" / "observations.jsonl").read_text().splitlines()[-1])
         assert evidence["origin"] == "api" and evidence["identity"] == "synthetic-quota"
         configuration["allowed_origin"] = "https://api.anthropic.com"
-        atomic_json(configuration_path, configuration)
+        write_sender(configuration_path, configuration)
         prepared.update(request_id=str(uuid.uuid4()), target_url="https://api.anthropic.com/v1/messages")
         response = session.post(binding["endpoint"] + "/internal/send", headers={"Authorization": "Bearer " + binding["secret"], "x-v3-request": base64.b64encode(json.dumps(prepared).encode()).decode()}, data=b'{}', timeout=10)
         assert response.status_code == 502
         hello = json.loads(Path("/verify/tls.jsonl").read_text().splitlines()[-1])
         assert hello["record_type"] == 22
         container.reload()
-        assert hello["peer"] == container.attrs["NetworkSettings"]["Networks"][runtime.network]["IPAddress"]
+        assert hello["peer"] == runtime._network_container(row).attrs["NetworkSettings"]["Networks"][runtime.network]["IPAddress"]
         verify_gateway_binding(configuration_path, hello["peer"])
         row, container, profile, home = runtime.begin_login("abcdef123456", account, "9.9.9", False)
         time.sleep(0.5)
@@ -285,7 +346,7 @@ def verify() -> None:
             ".cc2api-oauth-refresh-request.json", ".cc2api-oauth-refresh-result.json", ".claude-home",
         ))
         assert not (workspace / ".claude" / "settings.local.json").exists()
-        acknowledgement = json.loads((runtime._root(row) / "runtime" / "context-ack.json").read_text())
+        acknowledgement = json.loads((runtime._network_runtime(row) / "context-ack.json").read_text())
         assert acknowledgement["NETWORK_INSPECTION_MODE"] == "passthrough" and acknowledgement["process"] == "passthrough"
         tls_after = [json.loads(line) for line in Path("/verify/tls.jsonl").read_text().splitlines()]
         assert len(tls_after) == tls_before + 1
@@ -295,7 +356,7 @@ def verify() -> None:
         settings_path = runtime._root(row) / "home/.claude/settings.json"
         installed = json.loads(settings_path.read_text())["statusLine"]
         assert "v3-cli-quota" in installed["command"], "driver 清除了本次临时采集配置"
-        writable = container.exec_run(["setpriv", "--reuid=1000", "--regid=1000", "--init-groups", "python3", "-c",
+        writable = container.exec_run(["python3", "-c",
             "import json,pathlib; settings=json.loads(pathlib.Path('/home/node/.claude/settings.json').read_text());"
             "import shlex; config=json.loads(pathlib.Path(shlex.split(settings['statusLine']['command'])[-1]).read_text());"
             "pathlib.Path(config['output']).write_text('')"])
@@ -307,7 +368,7 @@ def verify() -> None:
         # 只信任测试服务自己的证书；它与 account MITM CA 无关，不进入生产配置。
         (runtime._root(row) / "home" / "native-usage.crt").write_bytes(Path("/verify/native-usage.crt").read_bytes())
         Path("/verify/usage-tls.enabled").touch()
-        before_listener = (runtime._root(row) / "runtime" / "network.pid").read_text()
+        before_listener = (runtime._network_runtime(row) / "network.pid").read_text()
         probe = object.__new__(orchestrator.Runner)
         probe.client = client
         original_environment = orchestrator._claude_exec_env
@@ -327,7 +388,7 @@ def verify() -> None:
                 usage = probe.query_quota(account)
             assert usage["ok"] and usage["five_hour"]["utilization"] == 12
             assert usage["seven_day"]["utilization"] == 23
-            assert before_listener == (runtime._root(row) / "runtime" / "network.pid").read_text()
+            assert before_listener == (runtime._network_runtime(row) / "network.pid").read_text()
             assert not runtime.jobs
             observation = json.loads(Path("/verify/usage-calls.jsonl").read_text().splitlines()[-1])
             assert observation == {"path": "/api/oauth/usage", "tls": True}
@@ -369,8 +430,9 @@ def verify() -> None:
         assert all(path.read_bytes() == data for path, data in evidence.items())
         assert (resumed_flow / "capture.flow").exists()
         print("通过：同 run 第二代 CLI 在原 cwd/HOME 使用原 session 恢复，证据入口不变、旧统计/原生 flow 保留，新 flow 独立")
+        print("通过：透传/抓包/CLI 构建后的角色内存峰值：" + json.dumps(memory_peaks(container, role_container(runtime, row, "sender"), runtime._network_container(row))), flush=True)
         configuration["allowed_origin"] = "http://api.anthropic.com:8081"
-        atomic_json(configuration_path, configuration)
+        write_sender(configuration_path, configuration)
         with database() as connection:
             connection.executemany("INSERT INTO runs(id) VALUES(?)", [("synthetic-parallel",), ("synthetic-restart",)])
         prepared.update(request_id=str(uuid.uuid4()), target_url="http://api.anthropic.com:8081/v1/v3-stream",
@@ -386,7 +448,7 @@ def verify() -> None:
                 {"QUOTA_SOURCE": "run:synthetic-parallel", "QUOTA_IDENTITY": "synthetic-quota",
                     "QUOTA_WARMUP": "1", "QUOTA_SAMPLE_REQUIRED": "1"})
             execution = wait_cli_started(runtime, client, token)
-            quota_context = json.loads((runtime._root(row) / "runtime" / "context-ack.json").read_text())
+            quota_context = json.loads((runtime._network_runtime(row) / "context-ack.json").read_text())
             assert quota_context["NETWORK_INSPECTION_MODE"] == "passthrough" and quota_context["process"] == "passthrough"
             assert runtime._sender_active(row) == 1
             prepared_second = dict(prepared, request_id=str(uuid.uuid4()), target_url="http://api.anthropic.com:8081/v1/messages")
@@ -418,9 +480,9 @@ def verify() -> None:
             assert not client.api.exec_inspect(execution)["Running"]
             assert runtime._row(account["name"], account["id"])["state"] == "ready"
             assert runtime._sender_active(row) == 1
-            listener_pid = int((runtime._root(row) / "runtime" / "network.pid").read_text())
-            container.exec_run(["kill", "-TERM", str(listener_pid)])
-            unhealthy = runtime._root(row) / "runtime" / "cli-unhealthy"
+            listener_pid = int((runtime._network_runtime(row) / "network.pid").read_text())
+            runtime._network_container(row).exec_run(["kill", "-TERM", str(listener_pid)])
+            unhealthy = runtime._network_runtime(row) / "cli-unhealthy"
             deadline = time.monotonic() + 5
             while not unhealthy.exists() and time.monotonic() < deadline:
                 time.sleep(0.1)
@@ -455,8 +517,8 @@ def verify() -> None:
         assert container.exec_run(["cat", "/etc/machine-id"]).output == machine
         assert (runtime._root(row) / "home" / ".claude" / ".credentials.json").read_bytes() == original
         assert not container.attrs["HostConfig"]["PortBindings"]
-        assert container.attrs["HostConfig"]["Memory"] == 1536 * 1024**2
-        assert container.attrs["HostConfig"]["MemorySwap"] == 3584 * 1024**2
+        assert container.attrs["HostConfig"]["Memory"] == 1152 * 1024**2
+        assert container.attrs["HostConfig"]["MemorySwap"] == 3200 * 1024**2
         # 续聊仍使用同一账号 HOME、原项目目录和独立 source。
         source = "continue:abcdef111111:0"
         token, _ = runtime.begin_continue(account, {"id": "synthetic-run", "claude_code_version": "9.9.9", "capture_full_http": True},
@@ -464,14 +526,14 @@ def verify() -> None:
         continuation_job = runtime.job_for_container(token)
         handle = continuation_job["handle"]
         execution = client.api.exec_create(container.id, ["setsid", "--wait", "bash", "-c",
-            "echo $$ > /run/v3/job-" + handle + ".pid; exec setpriv --reuid=1000 --regid=1000 --init-groups --bounding-set=-all --no-new-privs sh -c 'sleep 120 & wait'"],
+            "echo $$ > /run/v3/jobs/" + handle + "/group.pid; exec sh -c 'sleep 120 & wait'"],
             workdir=continuation_job["cwd"])["Id"]
         runtime.register_exec(token, execution)
         client.api.exec_start(execution, detach=True)
         time.sleep(0.3)
         runtime.cleanup(token)
         assert not client.api.exec_inspect(execution)["Running"]
-        acknowledgement = json.loads((runtime._root(row) / "runtime" / "context-ack.json").read_text())
+        acknowledgement = json.loads((runtime._network_runtime(row) / "context-ack.json").read_text())
         assert acknowledgement["QUOTA_SOURCE"] == "" and acknowledgement["NETWORK_INSPECTION_MODE"] == "passthrough"
         with database() as connection:
             connection.execute("INSERT INTO accounts VALUES(2,'synthetic-two',NULL)")
@@ -500,7 +562,9 @@ def verify() -> None:
         assert tls_after[-1]["length"] == 8 and tls_after[-1]["payload_prefix"] == "1603030003010203"
         runtime.cleanup(http_token)
         print("通过：普通任务经 SOCKS5 与 HTTP CONNECT 上游均保持合成 TLS 字节不变")
-        second_configuration = json.loads((runtime._root(second_row) / "runtime" / "sender.json").read_text())
+        gateway = client.networks.get(runtime.network).attrs['IPAM']['Config'][0]['Gateway']
+        print("通过：默认路由回退桥网仍由账号过滤器丢弃直连包：" + json.dumps(verify_route_failure(second_container, runtime._network_container(second_row), gateway)), flush=True)
+        second_configuration = json.loads((runtime._sender_config(second_row)).read_text())
         second_binding = second_configuration["binding"]
         prepared.update(environment_id=second_row["environment_id"], generation=second_row["generation"], request_id=str(uuid.uuid4()),
             target_url="https://api.anthropic.com/v1/messages", deadline_unix_ms=int(time.time() * 1000) + 30000)
@@ -510,33 +574,43 @@ def verify() -> None:
         assert hellos[0]["peer"] != hellos[-1]["peer"]
         assert second_binding["secret"] != binding["secret"]
         # 网络服务故障必须关闭整个发送环境，不能保留一个失去网络约束的发送器。
-        second_container.exec_run(["pkill", "-TERM", "-x", "hev-socks5-tunn"])
+        runtime._network_container(second_row).exec_run(["pkill", "-TERM", "-x", "hev-socks5-tunn"])
         deadline = time.monotonic() + 12
         while time.monotonic() < deadline:
-            second_container.reload()
-            if second_container.status != "running":
+            network = runtime._network_container(second_row)
+            network.reload()
+            if network.status != "running":
                 break
             time.sleep(0.2)
-        assert second_container.status != "running"
+        assert network.status != "running"
+        try:
+            runtime.ensure(second)
+        except Exception:
+            pass
+        else:
+            raise AssertionError("公共网络退出后不能继续接单")
         runtime.maintenance(row["environment_id"], "rebuild")
         runtime.maintenance(row["environment_id"], "rebuild")
         rebuilt_row, rebuilt = runtime.ensure(account, "9.9.9")
         assert rebuilt.id != first_id and rebuilt_row["environment_id"] == row["environment_id"]
         assert rebuilt.exec_run(["cat", "/etc/machine-id"]).output == machine
         assert (runtime._root(rebuilt_row) / "home" / ".claude" / ".credentials.json").read_bytes() == original
+        runtime.maintenance(rebuilt_row['environment_id'], 'stop')
+        verify_legacy_transition(runtime, rebuilt_row, account, client)
         print("PASS: fixed HOME/container, native TLS ClientHello from account, raw body/429/API evidence, non-root isolation, tmux reattach, reauth cancellation, task capture cleanup, idempotent stop and wake")
         print("PASS: continue process-tree/capture cleanup, two accounts using the same mock proxy remain separate, network fault closes sender")
         print("通过：重复重建空实例后保留环境 ID、machine-id 和 HOME")
         print("真实 OAuth 和公网请求未执行；本地 usage 使用真实 TLS/JSON，CLI 生命周期使用测试替身。")
     except Exception:
-        for instance in client.containers.list(all=True, filters={"label": ["vibebench.product=v3", "vibebench.deployment=" + runtime.deployment, "vibebench.role=account"]}):
+        for instance in client.containers.list(all=True, filters={"label": ["vibebench.product=v3", "vibebench.deployment=" + runtime.deployment, "vibebench.role=account-network"]}):
             print(instance.logs(tail=35).decode(), flush=True)
             if instance.status == "running":
                 print(instance.exec_run(["tail", "-20", "/var/log/mitmdump.log"]).output.decode(), flush=True)
         raise
     finally:
-        for instance in client.containers.list(all=True, filters={"label": ["vibebench.product=v3", "vibebench.deployment=" + runtime.deployment, "vibebench.role=account"]}):
-            instance.remove(force=True)
+        for instance in client.containers.list(all=True, filters={"label": ["vibebench.product=v3", "vibebench.deployment=" + runtime.deployment]}):
+            if instance.labels.get('vibebench.role') in ('account', 'account-network', 'account-sender'):
+                instance.remove(force=True)
 
 
 if __name__ == "__main__":

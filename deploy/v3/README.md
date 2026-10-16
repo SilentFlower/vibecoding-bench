@@ -1,6 +1,6 @@
 # v3 独立部署
 
-本轮交付管理和账号两个镜像。管理镜像分别启动 gateway 和 orchestrator；每账号一个固定容器，账号容器没有宿主端口。原部署不会自动迁移或切流。
+本轮交付管理和账号两个镜像。管理镜像分别启动 gateway 和 orchestrator；每账号一个固定逻辑环境，包含 network、CLI、sender 三个角色容器（共 3N+2 个容器），账号角色没有宿主端口。原部署不会自动迁移或切流。
 
 ```bash
 python3 deploy/v3/manage.py build --release local-20261012 --manifest releases/v3-local-20261012.json
@@ -35,7 +35,7 @@ pull 按 `registry_digest` 固定下载，核对配置 ID后建立清单中的�
 
 ## RAM 与 swap 预算
 
-`V3_ACCOUNT_MEMORY` 是每账号 RAM 上限，`V3_ACCOUNT_SWAP` 是额外 swap 上限，默认 `0` 保持禁用。Docker 的内存加 swap 总上限由两者相加生成，账号首次保存预算；历史环境缺 swap 字段时保持关闭。以后修改全局配置不会自动改已有账号预算或身份。
+`V3_ACCOUNT_MEMORY` 是每账号 RAM 上限，`V3_ACCOUNT_SWAP` 是额外 swap 上限，默认 `0` 保持禁用。Docker 的内存加 swap 总上限由两者相加生成，账号首次保存预算；历史环境缺 swap 字段时保持关闭。以后修改全局配置不会自动改已有账号预算或身份。隔离布局 2 在原总额度内预留 network 256 MiB、sender 128 MiB，剩余分配 CLI；额外 swap 只分配 CLI。CLI 至少需要 512 MiB，总预算不足时拒绝启动。1536 MiB 账号的 CLI 实际 constrainedMemory 为 1152 MiB。
 
 美国服务器起步配置：`V3_ACCOUNT_MEMORY=1536m`、`V3_ACCOUNT_SWAP=2048m`、`V3_MAX_ACTIVE_ACCOUNTS=1`，RAM 1.5 GiB，额外 swap 2 GiB，总额度 3.5 GiB。部署预检分别要求可用 RAM 至少为账号预算加可配置余量 `V3_MEMORY_HEADROOM_BYTES`（默认 256 MiB）、空闲 swap 足够覆盖活跃账号额度且 Docker 支持 swap 限额；显式更高的 `V3_MIN_FREE_MEMORY_BYTES` 仍生效。默认 4 GiB、单账号配置要求至少 4.25 GiB 可用 RAM，swap 不能代替物理余量。起步上限不代表真实 CLI 的峰值已经验证。
 
@@ -45,7 +45,7 @@ pull 按 `registry_digest` 固定下载，核对配置 ID后建立清单中的�
 
 v3 回退先停止当前批次并保留最新停机备份。只在布局/桥协议兼容时，把 env 中两个镜像及清单一起切回已保存的兼容批次，再 check/up；通过“环境与任务”的重建操作替换已停止的旧批次容器，保留环境 ID 和持久 HOME。未完成重建的环境会拒绝发送，不静默混用镜像。数据库或布局不兼容时不能直接回退镜像，需先在独立离线目录核对快照与最新凭据所有者，再安排恢复；没有自动恢复数据库或切回旧版的入口。
 
-登录在真实 CLI/tmux 内完成。CLI 与 Rust API 客户端共用账号容器及代理，但仍是不同客户端；固定容器不保证完整指纹相同或避免封禁。身份没有明确来源时不应猜测。遥测专项继续留在后续任务。
+登录在真实 CLI/tmux 内完成。CLI 与 Rust API 发送器位于不同角色容器，共享本账号网络命名空间及代理，但仍是不同客户端。gateway 内的 OAuth 客户端使用账号显式代理；v3 缺少或只有空白代理时在请求前拒绝，不自动直连。固定环境不保证完整指纹相同或避免封禁。身份没有明确来源时不应猜测。遥测专项继续留在后续任务。
 
 账号支持 5h/7d 已用百分比阈值，两个窗口独立配置 1～100 的整数或关闭，默认关闭。达到任一阈值后，尚未启动的普通 CLI 与养号进入等待；当前 CLI 执行完整收尾，保留 HOME、工作目录和主会话。普通任务与养号在执行前后自动通过账号容器原生 TLS 查询 usage；未知、过期和失败由后台间隔重试，近期结果复用，查询不切换 MITM。运行中的 CLI 执行完整收尾，消费后的最新用量约束下一执行。未绑定但持有本地 OAuth 的账号也可以定时养号。抓包、继续对话与 cc2api API 保持原有门禁。此功能需要同批 control/account 镜像，回滚前先关闭阈值并收口等待工作，保留持久数据。
 
@@ -83,6 +83,15 @@ python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --brows
 scripts/v3-stack import-offline --env /absolute/path/v3.env --source /absolute/path/metadata.json
 scripts/v3-stack import-offline --env /absolute/path/v3.env --source /absolute/path/metadata.json --apply
 ```
+
+
+### 隔离布局 2 升级与回退
+
+CLI 为 UID1000、sender 为 UID1001，两者 capabilities 全部删除、no-new-privileges、根只读；PID/挂载独立，仅加入本账号网络命名空间。网络角色持有 NET_ADMIN/TUN，在账号命名空间默认拒绝出站；只允许回环、当前代理和 TUN，拒绝 Docker 内置 DNS、IPv6、其他私网目标。私有代理资料、CA 私钥、内部 sender 鉴权和全局额度目录不挂给 CLI。业务临时盘 noexec，工作区可安装本地依赖和运行编译产物。
+
+旧单容器不会在 GET/普通发送中自动转换。先排空并用本次 `stop` 停止全套角色，保存全新停机备份；再按新清单启动管理端，在环境页执行“重建容器”。迁移保留环境 ID、generation 连续性、画像、HOME 和最新凭据，并在环境私有 `runtime/isolation-upgrade/` 保存原登记、SQLite 和配置快照。此快照用于核对，不会自动覆盖凭据。角色缺失/创建失败保留 reconcile，显式 stop/rebuild 处理完整集合；CLI 单独异常可通过“故障对账”恢复，健康 API 保持运行。
+
+布局 2 不能直接切回只认识单容器的旧管理程序。回退必须先用布局 2 的 `stop` 和 `backup` 保存**最新**状态，再精确核对、移除待回退环境的三个已停止角色。在独立离线目录按迁移记录只恢复该环境的旧布局登记并清空三个容器 ID，保留当前 HOME/profile/gateway 的最新凭据与身份；禁止整体覆盖旧 SQLite 或恢复旧 RT。然后同时切回已保存的旧联合清单/两镜像，经 check 后启动，在副本验证完成前不对生产执行。没有自动数据降级入口。
 
 ## 完整账号转发与进程指标验收
 

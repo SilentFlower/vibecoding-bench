@@ -4517,7 +4517,7 @@ JS
             account_runtime.cli_command(["sh", "-c", script]) if account_runtime else ["sh", "-lc", script],
             stdout=True,
             stderr=True,
-            user="root" if account_runtime else WORKER_USER,
+            user="1000" if account_runtime else WORKER_USER,
             environment=_claude_exec_env(not account_runtime, {"V3_NATIVE_USAGE": "1" if account_runtime else "0",
                 **(account_runtime.execution_environment(account_runtime.job_for_container(worker_id)["row"]) if account_runtime else {})}),
             workdir=WORKER_HOME,
@@ -4557,7 +4557,7 @@ JS
                 try:
                     account_runtime.sync_credentials(row, account)
                     context = {"NETWORK_INSPECTION_MODE": "passthrough", "QUOTA_SOURCE": source}
-                    atomic_json(account_runtime._root(row) / "runtime" / "context.json", context)
+                    atomic_json(account_runtime._network_runtime(row) / "context.json", context)
                     account_runtime._configure_network_context(container, context)
                     raw = self._exec_oauth_refresh_probe(job["token"], use_mitm=False)
                     if raw.get("skipped"):
@@ -4839,7 +4839,7 @@ JS
             command,
             stdout=True,
             stderr=True,
-            user="root" if account_runtime else WORKER_USER,
+            user="1000" if account_runtime else WORKER_USER,
             environment=environment,
             workdir=workdir,
         )
@@ -9134,7 +9134,7 @@ async def login_ws(websocket: WebSocket, sid: str):
              if account_runtime else ["claude", "auth", "login"]),
             stdin=True,
             tty=True,
-            user="root" if account_runtime else WORKER_USER,
+            user="1000" if account_runtime else WORKER_USER,
             environment=_claude_exec_env(session.sidecar_id is not None, {
                 "TERM": "xterm-256color",
                 "COLUMNS": "120",
@@ -10587,11 +10587,11 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
                 cwd = job["cwd"]
                 actual_worker = job["row"]["container_id"]
                 command[2] = command[2].replace("/workspace", cwd)
-                command = ["setsid", "--wait", "sh", "-c", f"echo $$ > /run/v3/job-{job['handle']}.pid; exec " + shlex.join(account_runtime.cli_command(["sh", "-c", command[2]]))]
+                command = ["setsid", "--wait", "sh", "-c", f"echo $$ > /run/v3/jobs/{job['handle']}/group.pid; exec " + shlex.join(account_runtime.cli_command(["sh", "-c", command[2]]))]
             exec_id = api.exec_create(
                 actual_worker,
                 command,
-                stdin=True, tty=True, user="root" if account_runtime else WORKER_USER,
+                stdin=True, tty=True, user="1000" if account_runtime else WORKER_USER,
                 environment=_claude_exec_env(not account_runtime or job["network_inspection_mode"] != "passthrough", {
                     "TERM": "xterm-256color", "COLUMNS": "120", "LINES": "36",
                     **({"PATH": f"/cli/{job['version']}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin"} if account_runtime else {}),
@@ -10874,7 +10874,7 @@ def v3_quiesce(account_id: int, body: dict):
             raise HTTPException(409, "账号环境仍有工作或发送连接")
         if row["container_id"]:
             try:
-                account_runtime._container(row).stop(timeout=5)
+                account_runtime._stop_environment(row)
             except NotFound:
                 pass
         account_runtime._update(row, state="stopped")
@@ -10920,6 +10920,7 @@ def v3_environments() -> list[dict]:
     finally:
         connection.close()
     for row in rows:
+        row["role_status"] = account_runtime.role_status(row)
         blocker = account_runtime.reprofile_blocker(row)
         row["fingerprint"] = json.loads(row.pop("fingerprint_json"))
         with account_runtime.lock:

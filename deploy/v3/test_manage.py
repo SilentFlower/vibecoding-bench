@@ -92,7 +92,7 @@ class PreflightTests(unittest.TestCase):
     def test_image_digest_mismatch_rejects_even_if_tags_match(self) -> None:
         """不能以相同标签掩盖不同镜像内容。@return None。"""
         manifest = self.root.parent / "release.json"
-        manifest.write_text(json.dumps({"schema": 3, "release": "batch", "images": {
+        manifest.write_text(json.dumps({"schema": 3, "layout_version": 2, "release": "batch", "images": {
             "control": {"reference": "vibebench-v3-control:v3-batch", "digest": "sha256:expected"}}}))
         values = {"V3_RELEASE_MANIFEST": str(manifest), "V3_CONTROL_IMAGE": "vibebench-v3-control:v3-batch"}
         with patch.object(manage, "command", return_value='[{"Id":"sha256:other","Config":{"Labels":{}}}]'):
@@ -109,13 +109,13 @@ class PreflightTests(unittest.TestCase):
         """先收口调度，再停账号和网关；不依赖 Compose 变量或宽泛项目名。@return None。"""
         path = self.root.parent / "stop.env"
         path.write_text("V3_DEPLOYMENT_ID=test\n")
-        with patch.object(sys, "argv", ["manage.py", "stop", "--env", str(path)]), patch.object(manage, "command", side_effect=["scheduler", "", "account", "", "gateway", ""]) as invoke:
+        with patch.object(sys, "argv", ["manage.py", "stop", "--env", str(path)]), patch.object(manage, "command", side_effect=["scheduler", "", "account", "", "sender", "", "network", "", "gateway", ""]) as invoke:
             manage.main()
         calls = invoke.call_args_list
-        self.assertEqual([calls[index].args[-1] for index in (0, 2, 4)],
-            ["label=vibebench.role=orchestrator", "label=vibebench.role=account", "label=vibebench.role=gateway"])
-        self.assertEqual([calls[index].args for index in (1, 3, 5)],
-            [("docker", "stop", "scheduler"), ("docker", "stop", "account"), ("docker", "stop", "gateway")])
+        self.assertEqual([calls[index].args[-1] for index in (0, 2, 4, 6, 8)],
+            ["label=vibebench.role=" + role for role in ("orchestrator", "account", "account-sender", "account-network", "gateway")])
+        self.assertEqual([calls[index].args for index in (1, 3, 5, 7, 9)],
+            [("docker", "stop", name) for name in ("scheduler", "account", "sender", "network", "gateway")])
 
     def test_backup_refuses_running_deployment(self) -> None:
         """不能把正在变化的 HOME 与 SQLite 伪称一致回退点。@return None。"""

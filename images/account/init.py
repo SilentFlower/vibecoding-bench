@@ -28,7 +28,12 @@ def main() -> None:
     machine_id = os.environ["V3_MACHINE_ID"]
     if not re.fullmatch(r"[a-f0-9]{32}", machine_id):
         raise RuntimeError("环境 machine-id 不合法")
-    Path("/etc/machine-id").write_text(machine_id + "\n")
+    network_only = os.environ.get("V3_ACCOUNT_ROLE") == "network"
+    if network_only:
+        if Path("/etc/machine-id").read_text().strip() != machine_id:
+            raise RuntimeError("只读机器身份与固定环境不一致")
+    else:
+        Path("/etc/machine-id").write_text(machine_id + "\n")
     # passthrough 不信任 MITM CA；quota/capture 切换时才发布公钥并显式注入对应 CLI。
     Path("/etc/mitm").mkdir(exist_ok=True)
     children = []
@@ -50,20 +55,21 @@ def main() -> None:
             if stopping or network.poll() is not None or time.monotonic() > deadline:
                 raise RuntimeError("网络启动未完成")
             time.sleep(0.2)
-        sender_path = root / "sender.json"
-        configuration = json.loads(sender_path.read_text())
-        original_proxy = configuration.get("proxy_source", configuration["proxy_url"])
-        proxy = urlsplit(original_proxy)
-        address = (root / "proxy-ip").read_text().strip()
-        userinfo = proxy.netloc.rsplit("@", 1)[0] + "@" if "@" in proxy.netloc else ""
-        configuration["proxy_source"] = original_proxy
-        configuration["proxy_url"] = urlunsplit((proxy.scheme, f"{userinfo}{address}:{proxy.port}", proxy.path, proxy.query, ""))
-        temporary = root / "sender.tmp"
-        temporary.write_text(json.dumps(configuration))
-        temporary.chmod(0o600)
-        temporary.replace(sender_path)
-        sender = subprocess.Popen(["/usr/local/bin/account-sender"])
-        children.append(sender)
+        if not network_only:
+            sender_path = root / "sender.json"
+            configuration = json.loads(sender_path.read_text())
+            original_proxy = configuration.get("proxy_source", configuration["proxy_url"])
+            proxy = urlsplit(original_proxy)
+            address = (root / "proxy-ip").read_text().strip()
+            userinfo = proxy.netloc.rsplit("@", 1)[0] + "@" if "@" in proxy.netloc else ""
+            configuration["proxy_source"] = original_proxy
+            configuration["proxy_url"] = urlunsplit((proxy.scheme, f"{userinfo}{address}:{proxy.port}", proxy.path, proxy.query, ""))
+            temporary = root / "sender.tmp"
+            temporary.write_text(json.dumps(configuration))
+            temporary.chmod(0o600)
+            temporary.replace(sender_path)
+            sender = subprocess.Popen(["/usr/local/bin/account-sender"])
+            children.append(sender)
         (root / "ready").touch()
         next_metrics_at = 0.0
         while not stopping:
@@ -82,7 +88,7 @@ def main() -> None:
                         (root / "cli-unhealthy").touch()
                     else:
                         (root / "cli-unhealthy").unlink(missing_ok=True)
-            if time.monotonic() >= next_metrics_at:
+            if not network_only and time.monotonic() >= next_metrics_at:
                 try:
                     sample_process_metrics(root)
                     (root / "process-metrics-error").unlink(missing_ok=True)

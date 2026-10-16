@@ -13,6 +13,10 @@ import requests
 from websockets.asyncio.client import connect
 
 
+# 网络就绪上限为 120 秒，另留 CLI/管理桥启动时间；普通 DOM 等待仍为 15 秒。
+ACCOUNT_STARTUP_TIMEOUT = 150
+
+
 async def verify_visible_logout(base: str, password: str, exercise=None, insecure_http: bool = False) -> None:
     """从登录页操作到退出按钮，验证 Cookie 撤销和旧 Cookie 重放失败。
 
@@ -77,9 +81,14 @@ async def verify_visible_logout(base: str, password: str, exercise=None, insecur
                         raise RuntimeError("浏览器页面脚本执行失败")
                     return reply["result"].get("value")
 
-                async def wait_for(expression):
-                    """在有界时间内等待页面条件，不把未完成页面当作通过。"""
-                    async with asyncio.timeout(15):
+                async def wait_for(expression, timeout: float = 15):
+                    """在有界时间内等待页面条件，不把未完成页面当作通过。
+
+                    :param expression: 返回真值表示就绪的页面表达式。
+                    :param timeout: 最长等待秒数，账号冷启动由调用方明确指定。
+                    :return: None；超时或页面脚本错误立即抛出。
+                    """
+                    async with asyncio.timeout(timeout):
                         while not await evaluate(expression):
                             await asyncio.sleep(0.1)
 

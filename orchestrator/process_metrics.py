@@ -147,6 +147,24 @@ def sample_process_metrics(root: Path = Path("/run/v3"), proc: Path = Path("/pro
     environment_id = json.loads((root / "sender.json").read_text())["binding"]["environment_id"]
     if not isinstance(environment_id, str) or not re.fullmatch(r"[a-f0-9]{32}", environment_id):
         raise ValueError("进程观察的环境归属无效")
+    return merge_process_metrics(root, environment_id, memory_limit(cgroup), cli_processes(proc, cli))
+
+
+def merge_process_metrics(root: Path, environment_id: str, limit: int, samples: list) -> dict:
+    """将受控内核采样合并为管理端私有观察，保持原锁与持久格式。
+
+    :param root: 不向 CLI 开放的管理端 runtime。
+    :param environment_id: 管理端已核对的环境 ID。
+    :param limit: CLI 实际 cgroup RAM 上限。
+    :param samples: 只读采样器返回的版本和 RSS 二元组。
+    :return: 原子持久化后的观察记录。
+    """
+    if not re.fullmatch(r"[a-f0-9]{32}", environment_id) or type(limit) is not int or not 0 <= limit < 1 << 53:
+        raise ValueError("采样环境或内存限制无效")
+    if not isinstance(samples, list) or any(not isinstance(item, (tuple, list)) or len(item) != 2
+            or not isinstance(item[0], str) or not _VERSION.fullmatch(item[0])
+            or type(item[1]) is not int or not 0 < item[1] < 1 << 53 for item in samples):
+        raise ValueError("CLI 内核采样格式无效")
     path = root / "process-metrics.json"
     with (root / "process-metrics.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -159,13 +177,12 @@ def sample_process_metrics(root: Path = Path("/run/v3"), proc: Path = Path("/pro
                     or value.get("environment_id") != environment_id or not isinstance(value.get("versions"), dict)
                     or len(value["versions"]) > 32):
                 raise ValueError("进程观察文件损坏或归属冲突")
-        limit = memory_limit(cgroup)
         now = time.time()
         for version, sample in value["versions"].items():
             validate_process_metrics({"constrained_memory": limit, "observation": {
                 "source": PROCESS_SOURCE, "environment_id": environment_id, "cli_version": version,
                 "observed_at": now, **sample}}, environment_id, version)
-        for version, rss in cli_processes(proc, cli):
+        for version, rss in samples:
             previous = value["versions"].get(version, {})
             value["versions"][version] = {"sampled_at": now, "sample_count": previous.get("sample_count", 0) + 1,
                 "rss_bytes": rss, "rss_min_bytes": min(previous.get("rss_min_bytes", rss), rss),

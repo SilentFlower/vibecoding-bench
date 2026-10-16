@@ -8,6 +8,7 @@ import hashlib
 import io
 import ipaddress
 import json
+import os
 import shutil
 import socket
 import sqlite3
@@ -24,7 +25,8 @@ import requests
 
 import manage
 from manage import REPO
-from verify_browser import verify_visible_logout
+from verify_browser import ACCOUNT_STARTUP_TIMEOUT, verify_visible_logout
+from verify_isolation import verify_official_tools, verify_roles
 
 
 def wait_until(predicate, message, seconds=30):
@@ -96,7 +98,8 @@ def certificates(root):
         hostname = 'wrong.invalid' if mode == 'hostname' else 'api.anthropic.com'
         openssl('req', '-new', '-newkey', 'rsa:2048', '-nodes', '-subj', '/CN=' + hostname,
             '-keyout', mode + '.key', '-out', mode + '.csr')
-        (root / (mode + '.ext')).write_text('subjectAltName=DNS:' + hostname + '\n')
+        names = hostname + (',DNS:platform.claude.com' if mode != 'hostname' else '')
+        (root / (mode + '.ext')).write_text('subjectAltName=DNS:' + names + '\n')
         authority = 'other' if mode == 'untrusted' else 'ca'
         openssl('x509', '-req', '-in', mode + '.csr', '-CA', authority + '.crt', '-CAkey', authority + '.key',
             '-CAcreateserial', '-days', '1', '-extfile', mode + '.ext', '-out', mode + '.crt')
@@ -194,12 +197,14 @@ def verify(manifest_path, output, binary):
             code = "import os,urllib.request;r=urllib.request.Request('http://127.0.0.1:8000/internal/v3/transport/" + str(account['gid']) + "',headers={'Authorization':'Bearer '+os.environ['V3_INTERNAL_TOKEN']});print(urllib.request.urlopen(r,timeout=90).status)"
             result = orchestrator.exec_run(['python', '-c', code])
             assert result.exit_code == 0 and result.output.strip() == b'200', '实际调度器传输绑定未就绪'
-            container = client.containers.list(filters={'label': [*filters['label'], 'vibebench.environment=' + account['eid']]})[0]
+            roles = {item.labels['vibebench.role']: item for item in client.containers.list(filters={'label': [*filters['label'], 'vibebench.environment=' + account['eid']]})}
+            container = roles['account']
+            account['sender_container'], account['network_container'] = roles['account-sender'], roles['account-network']
             container.reload()
             version = container.exec_run(['/cli/2.1.293/node_modules/.bin/claude', '--version'], user='1000:1000')
             assert version.exit_code == 0 and version.output.decode().strip().startswith('2.1.293 '), '夹具官方 CLI 版本不符'
             account['container'] = container
-            account['peer'] = next(iter(container.attrs['NetworkSettings']['Networks'].values()))['IPAddress']
+            account['peer'] = next(iter(roles['account-network'].attrs['NetworkSettings']['Networks'].values()))['IPAddress']
             return container
 
         try:
@@ -215,6 +220,9 @@ def verify(manifest_path, output, binary):
             client.containers.run(values['V3_ACCOUNT_IMAGE'], ['-c', isolation], entrypoint='python3',
                 network_mode='container:' + gateway.id, cap_add=['NET_ADMIN'], remove=True,
                 labels={**labels, 'vibebench.role': 'verification'})
+            # 空代理回归即使失败，也只会尝试保留测试地址并被本次命名空间防火墙拦截。
+            assert gateway.exec_run(['python', '-c',
+                "open('/etc/hosts','a').write('\\n203.0.113.254 platform.claude.com\\n')"]).exit_code == 0
             gateway.exec_run(['mkdir', '-p', '/run/v3'])
             archive = io.BytesIO()
             with tarfile.open(fileobj=archive, mode='w') as bundle:
@@ -294,7 +302,7 @@ def verify(manifest_path, output, binary):
                 for account in accounts:
                     aid = account['aid']
                     await evaluate(f"{doc}.querySelector('[data-cc2-create=\"{aid}\"]').click()")
-                    await wait_for(f"Boolean({doc}.querySelector('[data-cc2-process=\"{aid}\"]'))")
+                    await wait_for(f"Boolean({doc}.querySelector('[data-cc2-process=\"{aid}\"]'))", timeout=ACCOUNT_STARTUP_TIMEOUT)
                     with sqlite3.connect(data / 'bench/db.sqlite') as database:
                         gid = database.execute('SELECT cc2api_account_id FROM accounts WHERE id=?', (aid,)).fetchone()[0]
                     account['gid'] = gid
@@ -302,8 +310,10 @@ def verify(manifest_path, output, binary):
                         row = database.execute('SELECT billing_mode,upstream_session_pool_enabled,upstream_session_pool_size,upstream_session_refresh_policy,concurrency,rpm_limit,upstream_session_ttl_minutes,canonical_process FROM accounts WHERE id=?', (gid,)).fetchone()
                     assert row[:7] == ('rewrite', 1, 4, 'owner_only', 4, 50, 60), row[:7]
                     metrics = json.loads(row[7])
-                    assert metrics['constrained_memory'] == 1610612736 and metrics['observation']['rss_bytes'] is None
+                    assert metrics['constrained_memory'] == 1207959552 and metrics['observation']['rss_bytes'] is None
                     wake(account)
+                passed('V1/V2/V5 实际三角色权限、秘密隔离与本地构建', facts=verify_roles(account['container'],account['sender_container'],account['network_container']))
+                passed('V5 官方 CLI 本地 SSE 工具构建', facts=verify_official_tools(account['container'], account['root'], account['network'], fixture / 'ca.crt'))
                 passed('S1 创建按钮/API/SQLite：六项配置、TTL 与无样本状态')
                 account = accounts[0]
                 custom = {'billing_mode': 'strip', 'upstream_session_pool_enabled': False, 'upstream_session_pool_size': 2,
@@ -324,7 +334,7 @@ def verify(manifest_path, output, binary):
                 await evaluate(f"{doc}.querySelector('[data-cc2-bind=\"{account['aid']}\"]').click()")
                 await wait_for(f"!{doc}.querySelector('#cc2api-binding-modal').classList.contains('hidden')")
                 await evaluate(f"{doc}.querySelector('#cc2api-binding-form').elements.cc2api_account_id.value='{account['gid']}';{doc}.querySelector('#cc2api-binding-form').requestSubmit()")
-                await wait_for(f"Boolean({doc}.querySelector('[data-cc2-process=\"{account['aid']}\"]'))")
+                await wait_for(f"Boolean({doc}.querySelector('[data-cc2-process=\"{account['aid']}\"]'))", timeout=ACCOUNT_STARTUP_TIMEOUT)
                 with sqlite3.connect(data / 'bench/db.sqlite') as database:
                     assert database.execute('SELECT warmup_enabled,warmup_next_run_at,warmup_last_status FROM accounts WHERE id=?', (account['aid'],)).fetchone() == warmup_before
                     assert database.execute('SELECT cc2api_account_id FROM accounts WHERE id=?', (account['aid'],)).fetchone() == (account['gid'],)
@@ -342,14 +352,14 @@ def verify(manifest_path, output, binary):
                     '/cli/2.1.293/node_modules/.bin/claude', '--dangerously-skip-permissions'], user='1000:1000')
                 assert launched.exit_code == 0, '官方 CLI 夹具启动失败'
                 metrics_path = account['root'] / 'runtime/process-metrics.json'
-                wait_until(lambda: json.loads(metrics_path.read_text())['versions'].get('2.1.293'), '未观察到官方 CLI RSS')
+                wait_until(lambda: b'2.1.293' in account['container'].exec_run(['python3','-I','/usr/local/bin/v3-cli-control','sample']).output, '未观察到官方 CLI RSS')
                 with sqlite3.connect(data / 'gateway/gateway.sqlite') as database:
                     database.row_factory = sqlite3.Row
                     before = dict(database.execute('SELECT * FROM accounts WHERE id=?', (account['gid'],)).fetchone())
                 before_files = [(path, hashlib.sha256(path.read_bytes()).hexdigest()) for path in (
                     account['profile'] / '.credentials.json', account['root'] / 'home/.claude/.credentials.json')]
                 await evaluate(f"{doc}.querySelector('[data-cc2-process=\"{account['aid']}\"]').click()")
-                await wait_for(f"{win}.eval('state.accountLoginMessage').includes('进程指标')")
+                await wait_for(f"{win}.eval('state.accountLoginMessage').includes('进程指标')", timeout=ACCOUNT_STARTUP_TIMEOUT)
                 with sqlite3.connect(data / 'gateway/gateway.sqlite') as database:
                     database.row_factory = sqlite3.Row
                     after = dict(database.execute('SELECT * FROM accounts WHERE id=?', (account['gid'],)).fetchone())
@@ -384,6 +394,16 @@ def verify(manifest_path, output, binary):
                     json={'name': 'synthetic-forwarding', 'allowed_accounts': str(account['gid'])})
                 assert response.status_code == 201
                 account['headers'] = {'Authorization': 'Bearer ' + response.json()['token'], 'User-Agent': 'python-httpx/0.28.1'}
+                refreshed = request('POST', f"/admin/accounts/{account['gid']}/oauth-credentials/resolve",
+                    headers=admin, json={'min_validity_seconds':60, 'force_refresh':True})
+                assert refreshed.status_code == 200, '服务端 OAuth 本地刷新失败'
+                assert refreshed.json()['access_token'].startswith('synthetic-refreshed-')
+                refreshed.close()
+                oauth = [item for item in evidence(account['network']) if item['kind'] == 'oauth-refresh']
+                assert len(oauth) == 1
+                assert any(item['kind'] == 'proxy' and item['target'] == 'platform.claude.com' and item['port'] == 443
+                    for item in evidence(account['network']))
+                passed('V3 服务端 OAuth 经本账号配置代理的实际 TLS 刷新：' + account['scheme'], count=len(oauth))
                 marker = 'json-' + account['scheme']
                 response = request('POST', '/api/v3-verification', headers=account['headers'], json={'marker': marker})
                 assert response.status_code == 200, (response.status_code, response.text[:160])
@@ -399,6 +419,24 @@ def verify(manifest_path, output, binary):
                 passed('S4/S5/S6 JSON 完整往返及账号隔离：' + account['scheme'], status=response.status_code,
                     response_sha256=hashlib.sha256(response.content).hexdigest(), account_id=account['gid'])
             account = accounts[0]
+            with sqlite3.connect(data / 'gateway/gateway.sqlite') as database:
+                original = database.execute('SELECT proxy_url,access_token,refresh_token,oauth_expires_at,status FROM accounts WHERE id=?',
+                    (account['gid'],)).fetchone()
+            try:
+                for empty_proxy in ('', ' \t'):
+                    assert request('PUT', f"/admin/accounts/{account['gid']}", headers=admin,
+                        json={'proxy_url': empty_proxy}).status_code == 200
+                    rejected = request('POST', f"/admin/accounts/{account['gid']}/oauth-credentials/resolve",
+                        headers=admin, json={'min_validity_seconds':60, 'force_refresh':True})
+                    assert rejected.status_code == 503, 'v3 缺少代理必须在请求前拒绝 OAuth 刷新'
+                    with sqlite3.connect(data / 'gateway/gateway.sqlite') as database:
+                        current = database.execute('SELECT access_token,refresh_token,oauth_expires_at,status FROM accounts WHERE id=?',
+                            (account['gid'],)).fetchone()
+                    assert current == original[1:], '代理配置错误不能修改合法凭据或停用账号'
+            finally:
+                assert request('PUT', f"/admin/accounts/{account['gid']}", headers=admin,
+                    json={'proxy_url': original[0]}).status_code == 200
+            passed('V3 OAuth 空白代理在请求前拒绝，凭据与账号状态保持，直连由最终内核计数核验')
             metrics_payload = {'device_id': account['top']['userID'], 'account_uuid': account['name'],
                 'email': account['top']['oauthAccount']['emailAddress'], 'environment_id': account['eid'], 'cli_version': '2.1.293',
                 'canonical_process': json.loads((account['root'] / 'runtime/process-metrics.json').read_text())}
@@ -484,27 +522,48 @@ def verify(manifest_path, output, binary):
                     assert database.execute('SELECT canonical_process FROM accounts WHERE id=?', (account['gid'],)).fetchone() == process_before
             wait_until(lambda: request('GET', lease_path, headers=admin).json()['active'] == 0, '取消后网关活动计数未归零')
             status_code = "import json,urllib.request;c=json.load(open('/run/v3/sender.json'));r=urllib.request.Request('http://127.0.0.1:8091/internal/status',headers={'Authorization':'Bearer '+c['binding']['secret']});print(json.load(urllib.request.urlopen(r))['active'])"
-            wait_until(lambda: account['container'].exec_run(['python3', '-c', status_code]).output.strip() == b'0', '取消后发送器活动计数未归零')
+            wait_until(lambda: account['sender_container'].exec_run(['python3', '-c', status_code]).output.strip() == b'0', '取消后发送器活动计数未归零')
             assert len([item for item in evidence(account['network']) if item['kind'] == 'upstream' and item['marker'] == 'slow-cancel']) == 1
             cancelled = wait_until(lambda: next((item for item in evidence(account['network']) if item['kind'] == 'stream-end' and item['marker'] == 'slow-cancel'), None), '取消未传播到隔离上游')
             assert not cancelled['completed'], '已取消的流被当成正常结束'
             passed('S7 慢流完整结束/取消：两端 active 归零，取消传播到上游，无重放')
+            cached_sender_started = account['sender_container'].attrs['State']['StartedAt']
+            with request('POST', '/api/v3-verification', headers=account['headers'], json={'marker':'slow-restart','stream':True}, stream=True) as response:
+                assert response.status_code == 200
+                chunks = response.iter_content(chunk_size=1)
+                received = next(chunks)
+                # 绑定维护可能早已停止/唤醒同一实例；以本次流已入场后的实际状态作比较基线。
+                account['sender_container'].reload()
+                sender_started = account['sender_container'].attrs['State']['StartedAt']
+                if cached_sender_started != sender_started:
+                    print('重启场景实时基线：' + json.dumps({'cached_started_at':cached_sender_started,
+                        'stream_started_at':sender_started}), flush=True)
+                orchestrator.restart(timeout=5)
+                wait_until(lambda: request('GET','/runtime/api/environments').status_code == 200, '实际调度器重启未恢复', seconds=60)
+                assert request('GET', lease_path, headers=admin).json()['active'] > 0, '重启结束前 API 长流已丢失'
+                received += b''.join(chunks)
+                assert b'event: message_stop\n' in received
+            account['sender_container'].reload()
+            assert account['sender_container'].attrs['State']['StartedAt'] == sender_started
+            completed = wait_until(lambda: next((item for item in evidence(account['network']) if item['kind']=='stream-end' and item['marker']=='slow-restart'),None), '重启场景长流未收口')
+            assert completed['completed'] and completed['response_sha256'] == hashlib.sha256(received).hexdigest()
+            passed('V6 实际重启 orchestrator，健康 sender 与 API 长流保留且字节哈希一致')
             before = len([item for item in evidence(account['network']) if item['kind'] == 'upstream'])
             rule = ['INPUT', '-p', 'tcp', '--dport', '8091', '-m', 'string', '--algo', 'bm',
                 '--string', 'POST /internal/send', '-j', 'REJECT', '--reject-with', 'tcp-reset']
-            assert account['container'].exec_run(['iptables', '-I', *rule]).exit_code == 0
+            assert account['network_container'].exec_run(['iptables', '-I', *rule]).exit_code == 0
             try:
                 response = request('POST', '/api/v3-verification', headers=account['headers'], json={'marker': 'reject-sender-unreachable'})
                 assert response.status_code == 502
                 assert len([item for item in evidence(account['network']) if item['kind'] == 'upstream']) == before
             finally:
-                assert account['container'].exec_run(['iptables', '-D', *rule]).exit_code == 0
+                assert account['network_container'].exec_run(['iptables', '-D', *rule]).exit_code == 0
             passed('S8 真实发送路径不可达：正式 API 明确失败，无管理端直连回退')
             # 每个故障先关闭连接池中的旧连接，确保新 TLS/代理连接确实命中故障夹具。
             for mode in ('untrusted', 'hostname', 'proxy', 'unreachable'):
                 before = len([item for item in evidence(account['network']) if item['kind'] == 'upstream'])
-                account['container'].restart(timeout=5)
-                wait_until(lambda: account['container'].exec_run(['python3', '-c', status_code]).output.strip() == b'0', '故障场景发送器未就绪')
+                account['sender_container'].restart(timeout=5)
+                wait_until(lambda: account['sender_container'].exec_run(['python3', '-c', status_code]).output.strip() == b'0', '故障场景发送器未就绪')
                 proxy_rule = ['INPUT', '-p', 'tcp', '--dport', '1081', '-j', 'REJECT', '--reject-with', 'tcp-reset']
                 if mode == 'unreachable':
                     code = 'import subprocess;subprocess.run(' + repr(['iptables', '-I', *proxy_rule]) + ',check=True)'
@@ -544,18 +603,19 @@ r=urllib.request.Request('http://127.0.0.1:8091/internal/send',data=b'{}',header
 try:urllib.request.urlopen(r);raise AssertionError('错误发送被接受')
 except urllib.error.HTTPError as error:print(json.dumps({'status':error.code,'phase':error.headers.get('x-v3-transport-error')}))
 """.replace('FAULT', repr(fault))
-                result = account['container'].exec_run(['python3', '-c', code])
+                result = account['sender_container'].exec_run(['python3', '-c', code])
                 assert result.exit_code == 0, '发送器拒绝场景执行失败'
                 rejected = json.loads(result.output)
                 assert rejected['phase'] == 'before-send' and rejected['status'] in (400, 401)
             assert len([item for item in evidence(account['network']) if item['kind'] == 'upstream']) == before
-            configuration_path = account['root'] / 'runtime/sender.json'
+            configuration_path = account['root'] / 'runtime/sender/sender.json'
             original = json.loads(configuration_path.read_text())
             changed = copy.deepcopy(original)
             changed['binding']['generation'] += 1
             manage_file = configuration_path.with_suffix('.verification')
             manage_file.write_text(json.dumps(changed))
-            manage_file.chmod(0o600)
+            manage_file.chmod(0o640)
+            os.chown(manage_file,0,1001)
             manage_file.replace(configuration_path)
             try:
                 response = request('POST', '/api/v3-verification', headers=account['headers'], json={'marker': 'reject-binding'})
@@ -563,7 +623,8 @@ except urllib.error.HTTPError as error:print(json.dumps({'status':error.code,'ph
                 assert len([item for item in evidence(account['network']) if item['kind'] == 'upstream']) == before
             finally:
                 manage_file.write_text(json.dumps(original))
-                manage_file.chmod(0o600)
+                manage_file.chmod(0o640)
+                os.chown(manage_file,0,1001)
                 manage_file.replace(configuration_path)
             passed('S8 错误身份/代次/目标/秘密在发送前拒绝；正式 API 绑定故障无直连回退')
             code = "import subprocess;v=subprocess.check_output(['iptables','-nvxL','V3VERIFY'],text=True);print(sum(int(line.split()[0]) for line in v.splitlines() if line.split() and line.split()[0].isdigit()))"

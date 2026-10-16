@@ -674,6 +674,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         runtime.ensure.return_value = (row, container)
         runtime.claim.return_value = {"token": "fixed-token", "source": "oauth-refresh:synthetic"}
         runtime._root.return_value = environment_root
+        runtime._network_runtime.return_value = environment_root / "runtime/network"
         runner = object.__new__(main.Runner)
         runner.client = Mock()
         runner._exec_oauth_refresh_probe = Mock(return_value={"refreshed": True})

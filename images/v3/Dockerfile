@@ -47,6 +47,7 @@ ARG V3_RELEASE
 ARG V3_PARENT_REV
 ARG V3_GATEWAY_REV
 LABEL vibebench.product="v3" vibebench.role="control" vibebench.release=$V3_RELEASE \
+    vibebench.isolation-version="2" \
     vibebench.parent-revision=$V3_PARENT_REV vibebench.gateway-revision=$V3_GATEWAY_REV \
     org.opencontainers.image.source="https://github.com/SilentFlower/vibecoding-bench" \
     org.opencontainers.image.revision=$V3_PARENT_REV
@@ -76,19 +77,23 @@ COPY images/account/init.py /usr/local/bin/v3-account-init
 COPY images/account/network-context.py /usr/local/bin/v3-network-context
 COPY images/account/cli-version.sh /usr/local/bin/v3-cli-version
 COPY images/account/passthrough.py /usr/local/bin/v3-passthrough
+COPY images/account/network-guard.py /usr/local/bin/v3-network-guard
+COPY images/account/cli-control.py /usr/local/bin/v3-cli-control
 COPY orchestrator/cli_quota.py /usr/local/bin/v3-cli-quota
 COPY orchestrator/process_metrics.py /usr/local/bin/process_metrics.py
 COPY orchestrator/process_metrics.py /usr/local/bin/v3-process-metrics
 COPY --from=backend /source/cc2api/target/release/account-sender /usr/local/bin/account-sender
 RUN chmod 700 /usr/local/bin/v3-account-init /usr/local/bin/v3-network-context \
     /usr/local/bin/v3-cli-version /usr/local/bin/v3-passthrough /usr/local/bin/process_metrics.py \
-    /usr/local/bin/v3-process-metrics /sidecar \
-    && chmod 755 /usr/local/bin/v3-cli-quota && mkdir -p /workspaces /run/v3
+    /usr/local/bin/v3-process-metrics /usr/local/bin/v3-network-guard /sidecar \
+    && chmod 755 /usr/local/bin/v3-cli-quota /usr/local/bin/v3-cli-control /usr/local/bin/process_metrics.py \
+    && mkdir -p /workspaces /run/v3 /etc/mitm /var/lib/dbus
 WORKDIR /home/node
 ARG V3_RELEASE
 ARG V3_PARENT_REV
 ARG V3_GATEWAY_REV
 LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELEASE \
+    vibebench.isolation-version="2" \
     vibebench.parent-revision=$V3_PARENT_REV vibebench.gateway-revision=$V3_GATEWAY_REV \
     org.opencontainers.image.source="https://github.com/SilentFlower/vibecoding-bench" \
     org.opencontainers.image.revision=$V3_PARENT_REV
