@@ -486,3 +486,49 @@ AccountStore::update_cli_process(account: &Account, process: &Value) -> Result<(
 - `verify_forwarding.py --build ...` 复用 canonical 冻结与联合清单；实际浏览器点击三入口、明暗与 1440/720px、官方 CLI RSS → API/SQLite/卡片。正式 `/v1/messages` JSON/SSE 响应哈希、Billing 与 5→4 session、两账号隔离、实际官方 CLI 与 API 并行、取消及全部故障场景均通过；网关专属网络命名空间的公网阻断计数为零，结束按本次精确标签清理。
 - 正式镜像继续跑 `verify_stack.py --browser --reauth`，核对原 ID、AT-only HOME、完整 profile、六项策略/TTL、错误登录/取消/草稿恢复及旧哨兵。页面驱动等首次列表事件处理器就绪，避免人为并发初始查询；失败保留脱敏证据。
 - `cargo fmt --check && cargo test`、Python 全量及前端构建保持。可用账号的真实 Anthropic 推理单独验收，不用测试替身/生产非模型 200 冒充。
+
+## Scenario: cc2api 删除后的悬空绑定收口
+
+### 1. Scope / Trigger
+
+- 修改 v3 解绑、正式账号删除或 `owner_transition` 时适用。远端账号已删除不应让本地绑定永久无法解除；明确不存在与服务不可达必须区分。
+
+### 2. Signatures
+
+```text
+DELETE /api/accounts/{aid}/cc2api-binding -> {ok: true}
+DELETE /api/accounts/{aid}
+AccountRuntime.owner_transition(account: dict, target_id: int | None)
+Cc2ApiClient.list_accounts(*, require_complete: bool = False) -> list[dict]
+GET /admin/accounts?page=<从1开始的页号>&page_size=100
+```
+
+### 3. Contracts
+
+- 只有 `target_id=None` 的解绑/本地删除，且失败 ID 为原绑定，才允许缺失收口。原 lease GET 或 prepare 的 ValueError 必须直接由 `urllib.error.HTTPError(code=404)` 引起；不能匹配错误文案，不能把网络、鉴权、5xx、坏 JSON 或其它冲突当作删除。
+- 404 后再次成功读取完整账号列表，确认原 ID 不存在，才跳过已删除账号的远端门禁；原账号仍存在或列表读取失败时拒绝。新目标、改绑和正常远端账号继续严格查询、prepare、检查占用，并在事务后 release。
+- 缺失证明调用 `list_accounts(require_complete=True)`：`page/page_size/total/total_pages` 为真实整数，页号匹配当前页、容量为 100、total 非负、页数为 ceil(total/100)，每页行数匹配应有数量；每行 ID 为正整数且全量去重后数量等于 total。空列表的 total/total_pages 均为 0。坏行不得静默过滤，不能只查第一页；普通列表调用默认保持原兼容行为。
+- owner 锁内重读绑定并沿用 active run（含 quota_wait）、续聊、登录保护；环境作业和实际发送器仍须空闲。发送器状态未知也拒绝。确认空闲后停止旧容器、写 stopped，再由现有 SQLite 事务清空绑定和关闭未来养号，不能直接改库绕过收口。
+- 解绑保留原账号、环境 ID、固化画像、HOME 和本地凭据，沿用既有本地发布规则，不调用远端 OAuth resolve/refresh、不创建远端账号。重复空闲解绑返回成功。调度器重启后因旧绑定缺失进入待对账，也可通过同一显式解绑路径安全收口。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 原 lease 404＋完整列表明确无原 ID＋本地空闲 | 解绑 200，绑定 null、养号 off、next null |
+| 404 但原账号出现在任一页，或列表不完整/损坏 | 拒绝，原绑定和实例保持 |
+| 鉴权、网络、服务错误或原门禁占用 | 拒绝，不能降级为已删除 |
+| 本地 run/续聊/登录/环境作业或发送器占用/未知 | 拒绝，不中断活动发送 |
+| 新目标缺失或改绑遇缺失原账号 | 继续严格拒绝，不使用解绑例外 |
+| 已解绑的空闲账号再次解绑 | 200，不创建远端账号 |
+
+### 5. Scenarios and Examples
+
+- 正常：先在 cc2api 删除账号，再从 bench 点击解绑；确认无原 ID、停止旧实例后清空本地关联，页面恢复“创建 cc2api 账号”和“关联已有账号”。
+- 基础：远端在 lease GET 与 prepare 之间删除；确认完整列表缺失后按相同本地空闲规则收口。重启调度器不改变该显式恢复入口。
+- 错误用法：捕获所有管理请求异常后直接 UPDATE 本地绑定。正确处理：限定原 ID 的真实 404，并核对完整列表与本地发送器，不把“查不到”一概当作删除证明。
+
+### 6. Tests Required
+
+- `test_deleted_binding.py`：真实管理客户端异常链与 SQLite，覆盖删除后/重复解绑、本地删除、GET/prepare 间删除、HTTP/网络拒绝、坏分页/后续页仍存在、本地/发送器占用及未知、正常门禁、HOME/profile/设备保留。既有 active run/续聊/登录和并发 owner 锁测试保持。
+- `verify_stack.py --manifest <同批正式清单> --browser --deleted-binding`：随机隔离部署，正式 cc2api DELETE → orchestrator 重启 → Chrome 点击解绑，核对 200、两库、恢复按钮、重复调用、原 HOME/凭据/画像和停止状态；不访问真实 OAuth/usage/模型，只清理本次标签资源，旧哨兵不变。

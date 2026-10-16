@@ -736,10 +736,11 @@ class Cc2ApiClient:
             raise ValueError("cc2api 响应必须是 JSON object")
         return data
 
-    def list_accounts(self) -> list[dict]:
+    def list_accounts(self, *, require_complete: bool = False) -> list[dict]:
         """
         分页读取全部 cc2api 账号。
 
+        :param require_complete: 缺失证明要求完整分页与有效 ID，不能把坏响应当作空列表
         :return: cc2api Account object 列表
         """
         page = 1
@@ -749,9 +750,21 @@ class Cc2ApiClient:
             rows = data.get("data")
             if not isinstance(rows, list):
                 raise ValueError("cc2api 账号列表响应无效")
+            if require_complete:
+                total = data.get("total")
+                metadata = (data.get("page"), data.get("page_size"), total, data.get("total_pages"))
+                # 解绑依赖“不存在”的结论，缺页、坏行或重复 ID 都不能成为删除证明。
+                if (any(type(value) is not int for value in metadata) or total < 0
+                        or metadata[0] != page or metadata[1] != 100 or metadata[3] != (total + 99) // 100
+                        or len(rows) != min(100, max(0, total - (page - 1) * 100))
+                        or any(not isinstance(row, dict) or type(row.get("id")) is not int
+                            or row["id"] <= 0 for row in rows)):
+                    raise ValueError("cc2api 账号列表不完整，无法确认原绑定已删除")
             accounts.extend(row for row in rows if isinstance(row, dict))
             total_pages = int(data.get("total_pages") or 1)
             if page >= total_pages:
+                if require_complete and (len(accounts) != total or len({row["id"] for row in accounts}) != total):
+                    raise ValueError("cc2api 账号列表不完整，无法确认原绑定已删除")
                 return accounts
             page += 1
 

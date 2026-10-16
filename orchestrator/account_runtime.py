@@ -19,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from socket import SHUT_WR
 from typing import Callable
+from urllib.error import HTTPError
 from urllib.parse import quote, unquote, urlsplit
 
 from docker.errors import NotFound
@@ -516,10 +517,20 @@ class AccountRuntime:
             try:
                 for account_id in sorted({int(value) for value in (account.get("cc2api_account_id"), target_id) if value is not None}):
                     path = f"/admin/runtime/accounts/{account_id}/lease"
-                    snapshot = self.gateway._request("GET", path)
-                    if snapshot["active"] or snapshot.get("waiting") or snapshot["lease"]:
-                        raise ValueError("绑定账号有活动或等待请求，不能切换绑定")
-                    snapshot = self.gateway._request("POST", path, {"operation": "prepare", "owner": f"binding:{uuid.uuid4().hex}"})
+                    try:
+                        snapshot = self.gateway._request("GET", path)
+                        if snapshot["active"] or snapshot.get("waiting") or snapshot["lease"]:
+                            raise ValueError("绑定账号有活动或等待请求，不能切换绑定")
+                        snapshot = self.gateway._request("POST", path, {"operation": "prepare", "owner": f"binding:{uuid.uuid4().hex}"})
+                    except ValueError as error:
+                        cause = error.__cause__
+                        if (target_id is not None or account_id != account.get("cc2api_account_id")
+                                or not isinstance(cause, HTTPError) or cause.code != 404):
+                            raise
+                        # 仅原绑定的明确删除允许本地收口；路由 404、坏分页和网络故障保持拒绝。
+                        if any(item["id"] == account_id for item in self.gateway.list_accounts(require_complete=True)):
+                            raise
+                        continue
                     leases.append((path, snapshot["lease"]))
                     if snapshot["active"] or self._running_sender_active(row):
                         raise ValueError("账号发送连接尚未收口，不能切换绑定")
