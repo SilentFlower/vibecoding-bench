@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md", "reason": "固定环境、独立 API/CLI、身份、凭据和发布共同契约"}
+{"file": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md", "reason": "所有权锁序、幂等 schema、额度与刷新任务保护"}
+{"file": ".trellis/tasks/10-16-v3-docker-isolation/research/isolation-evidence.md", "reason": "Docker 配置对照、消费者与前置实验边界"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "FBK-001：v3 OAuth 的 gateway 显式代理边界与原刷新所有权"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "OAuth 客户端修复须保留独立部署语义并执行完整 Rust 验证"}

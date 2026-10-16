@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md", "reason": "跨角色生命周期、身份/凭据、真实进程指标和发布保护回归"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "代码风格与真实运行验证要求"}
+{"file": ".trellis/tasks/10-16-v3-docker-isolation/research/isolation-evidence.md", "reason": "核对隔离事实、启动窗口和资源预算，防止用宣传替代验证"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "复核 v3 OAuth 请求前拒绝空代理，以及独立部署兼容边界"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "Rust 全量与标准 Docker 转发回归证据"}
