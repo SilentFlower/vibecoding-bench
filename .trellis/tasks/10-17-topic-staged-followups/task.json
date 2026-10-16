@@ -3,7 +3,7 @@
   "name": "topic-staged-followups",
   "title": "600 题递进需求与随机多轮自动执行",
   "description": "重构600个topic为初始需求和两条递进补充；每次运行固定抽取0至2次，自动投递并支持暂停恢复。",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "vibecoding-bench",
@@ -11,11 +11,20 @@
   "creator": "silentflower",
   "assignee": "silentflower",
   "createdAt": "2026-10-17",
-  "completedAt": null,
+  "completedAt": "2026-10-16",
   "closeout": {
-    "status": "pending",
+    "status": "blocked",
     "closedAt": null,
-    "blockers": []
+    "blockers": [
+      {
+        "code": "decision-review-required",
+        "owner": "decision_log.py",
+        "message": "当前 AI 决策摘要尚未获得 accepted review",
+        "detail": {
+          "decisionDigest": "c08dad547a9887c7b4156f49665f5139e7ecc3ae3e744efba3d02be55f1e7732"
+        }
+      }
+    ]
   },
   "branch": null,
   "base_branch": "main",
@@ -646,5 +655,14 @@
         "fingerprint": "5b06b3d91f636988b05643cd3d02363ef1ac3e34191db355cc77ba5f82d20906"
       }
     }
+  },
+  "progress": {
+    "updatedAt": "2026-10-16T19:45:12Z",
+    "completedSteps": [
+      "auto-loop: 本地提交完成 .:a39459e"
+    ],
+    "partialStep": null,
+    "nextStep": "auto-loop 已完成本地提交与确定性 Close；如有 blocker，按 close_result 处理",
+    "notes": "run_id=auto-20261016190659; task=.trellis/tasks/10-17-topic-staged-followups; commit=a39459e6c5c049f6babbe75c73ee89c242c6d62a; commits=.:a39459e6c5c049f6babbe75c73ee89c242c6d62a; status=completed"
   }
 }
