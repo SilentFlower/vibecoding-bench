@@ -11,6 +11,7 @@ from urllib.parse import urlsplit, urlunsplit
 from docker.types import Mount
 
 from resource_budget import isolated_account_limits
+from system_profile import SYSTEM_PROFILE_DIRECTORY, SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_VERSION
 
 
 ISOLATION_VERSION = 2
@@ -141,6 +142,8 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
             mem_limit=memory, memswap_limit=total, nano_cpus=cpu * (6 if role == 'cli' else 1) // 8,
             pids_limit=512 if role == 'cli' else 128, security_opt=['no-new-privileges:true'],
             log_config={'type': 'json-file', 'config': {'max-size': '10m', 'max-file': '3'}}, mounts=[machine_mount])
+        if role == 'cli':
+            options['labels'][SYSTEM_PROFILE_LABEL] = str(SYSTEM_PROFILE_VERSION)
         container = runtime.client.containers.run(runtime.image, **options)
         created.append(container)
         runtime._update(row, **{ROLE_COLUMNS[role]: container.id})
@@ -157,6 +160,9 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
         'UPSTREAM_SOCKS5_USER': account.get('upstream_socks5_user') or '',
         'UPSTREAM_SOCKS5_PASS': account.get('upstream_socks5_pass') or ''}
     try:
+        image_labels = runtime.client.images.get(runtime.image).attrs['Config'].get('Labels') or {}
+        if image_labels.get(SYSTEM_PROFILE_LABEL) != str(SYSTEM_PROFILE_VERSION):
+            raise ValueError('账号镜像缺少系统画像支持，请使用同批新镜像')
         network_mounts = mounts([*common_files, ('runtime/network', '/run/v3', 'rw'),
             ('public-ca', '/etc/mitm', 'rw'), ('ca', '/ca', 'rw'), ('cli', '/cli', 'rw'),
             ('flows', '/flows', 'rw'), ('runtime/empty', '/flows/api', 'ro'), ('controls', '/controls', 'rw')])
@@ -177,16 +183,22 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
             if network.status != 'running' or time.monotonic() > deadline:
                 raise ValueError('账号隔离网络未就绪，业务未启动')
             time.sleep(0.25)
+        runtime.prepare_system_profile(row, network)
         base = {'network_mode': 'container:' + network.id, 'cap_drop': ['ALL']}
-        launch('cli', **base, user='1000:1000', entrypoint=['python3', '-I', '/usr/local/bin/v3-cli-control'], command=['idle'],
+        cli = launch('cli', **base, user='1000:1000', entrypoint=['python3', '-I', '/usr/local/bin/v3-cli-control'], command=['idle'],
             environment={'HOME': '/home/node', 'TZ': fingerprint['tz'],
                 'LANG': fingerprint['lang'], 'LC_ALL': fingerprint['lang'], 'SHELL': '/bin/bash'},
-            volumes=mounts([*common_files, ('home', '/home/node', 'rw'), ('projects', '/home/node/projects', 'rw'),
+            volumes=mounts([*common_files,
+                ('runtime/system-profile', SYSTEM_PROFILE_DIRECTORY, 'ro'),
+                ('runtime/system-profile/cpuinfo', '/proc/cpuinfo', 'ro'),
+                ('runtime/system-profile/ld.so.preload', '/etc/ld.so.preload', 'ro'),
+                ('home', '/home/node', 'rw'), ('projects', '/home/node/projects', 'rw'),
                 ('cli', '/cli', 'ro'), ('public-ca', '/etc/mitm', 'ro'), ('runtime/cli', '/run/v3', 'rw'),
                 ('runtime/drivers', '/run/v3/drivers', 'ro'), ('runtime/runs', '/run/v3/runs', 'rw'),
                 ('runtime/jobs', '/run/v3/jobs', 'rw'), ('runtime/access', '/run/v3/access', 'ro'),
                 ('flows', '/flows', 'rw'), ('runtime/empty', '/flows/api', 'ro'), ('controls', '/controls', 'ro')]),
             tmpfs={'/tmp': 'rw,noexec,nosuid,nodev,size=128m,mode=1777'})
+        runtime.check_system_profile(row, cli)
         sender_mounts = mounts([*common_files, ('runtime/sender', '/run/v3', 'ro'), ('flows/api', '/flows/api', 'rw')])
         verification = root / 'runtime/verification-ca.der'
         if verification.is_file():

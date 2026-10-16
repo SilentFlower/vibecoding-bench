@@ -17,6 +17,7 @@ from docker import APIClient
 
 from account_runtime import AccountRuntime, atomic_json, derive_v3_fingerprint, locale_for_timezone
 from account_isolation import ROLE_COLUMNS, role_labels
+from system_profile import SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_PROBE, generate_system_profile
 import main
 
 
@@ -58,7 +59,7 @@ class AccountRuntimeTests(unittest.TestCase):
         self.runtime.release_id = "test"
         self.client.images.get.return_value.attrs = {"Config": {"Labels": {
             "vibebench.product": "v3", "vibebench.role": "account", "vibebench.release": "test",
-            "vibebench.isolation-version": "2"}}}
+            "vibebench.isolation-version": "2", SYSTEM_PROFILE_LABEL: "1"}}}
         self.client.networks.get.return_value.attrs = {"IPAM": {"Config": [{"Gateway": "192.0.2.1"}]}}
         self.client.api.create_endpoint_config.side_effect = APIClient(version="1.52").create_endpoint_config
         self.client.containers.list.return_value = []
@@ -69,14 +70,37 @@ class AccountRuntimeTests(unittest.TestCase):
             role = options["labels"]["vibebench.role"]
             container = network if role == "account-network" and network is not None else Mock()
             container.id, container.status, container.labels = role + "-new", "running", options["labels"]
-            if container is not network:
-                container.exec_run.return_value = SimpleNamespace(exit_code=0, output=b"")
+            previous = container.exec_run.side_effect if container is network else None
+
+            def execute(command, **kwargs):
+                """提供真实 CPU 入口和覆盖探针的合成响应，其余沿用原场景。"""
+                if command == ["cat", "/proc/cpuinfo"]:
+                    return SimpleNamespace(exit_code=0, output=self._cpuinfo().encode())
+                if command == ["python3", "-I", "-c", SYSTEM_PROFILE_PROBE]:
+                    with self.database() as connection:
+                        saved = connection.execute("SELECT fingerprint_json FROM account_environments WHERE environment_id=?",
+                            (options["labels"]["vibebench.environment"],)).fetchone()
+                    profile = json.loads(saved[0])["system_profile"]
+                    value = {"release": profile["kernel_release"], "version": profile["kernel_version"],
+                        "proc_version": profile["proc_version"], "sys_release": profile["kernel_release"] + "\n",
+                        "sys_version": profile["kernel_version"] + "\n", "readonly": True,
+                        "cpu_models": [profile["cpu_model_name"]]}
+                    return SimpleNamespace(exit_code=0, output=json.dumps(value).encode())
+                return previous(command, **kwargs) if previous else SimpleNamespace(exit_code=0, output=b"")
+
+            container.exec_run.side_effect = execute
             containers[container.id] = container
             return container
 
         self.client.containers.run.side_effect = create
         self.client.containers.get.side_effect = lambda identifier: containers[identifier]
         return containers
+
+    @staticmethod
+    def _cpuinfo() -> str:
+        """返回有真实字段形状的独立合成 CPU 样本。@return CPU 文本。"""
+        return ("processor\t: 0\nvendor_id\t: AuthenticAMD\ncpu family\t: 23\nmodel\t\t: 1\n"
+            "model name\t: AMD EPYC Processor\nstepping\t: 2\nflags\t\t: sse sse2 avx avx2\n\n")
 
     def test_rename_keeps_environment_and_frozen_fingerprint(self) -> None:
         """改名和重复读取不能重新派生身份。@return None。"""
@@ -325,6 +349,7 @@ class AccountRuntimeTests(unittest.TestCase):
         row = self.runtime._row("synthetic", 1)
         legacy = json.loads(row["fingerprint_json"])
         legacy.pop("profile_version")
+        legacy["system_profile"] = generate_system_profile(self._cpuinfo())
         self.runtime._update(row, fingerprint_json=json.dumps(legacy))
         replacement = {"profile_version": 2, "hostname": "b" * 12, "machine_id": "c" * 32,
             "mac": "02:10:20:30:40:50", "tz": "America/Los_Angeles", "lang": "en_US.UTF-8"}
@@ -337,6 +362,7 @@ class AccountRuntimeTests(unittest.TestCase):
         current = self.runtime._row("synthetic", 1)
         self.assertEqual("stopped", current["state"])
         self.assertEqual("b" * 12, json.loads(current["fingerprint_json"])["hostname"])
+        self.assertEqual(legacy["system_profile"], json.loads(current["fingerprint_json"])["system_profile"])
         self.assertEqual(before, credentials.read_bytes())
         with self.assertRaisesRegex(ValueError, "profile v2"):
             self.runtime.maintenance(row["environment_id"], "reprofile")
@@ -416,6 +442,7 @@ class AccountRuntimeTests(unittest.TestCase):
         self.runtime.jobs[row["environment_id"]] = job
         with patch.object(self.runtime, "ensure", return_value=(row, container)), \
                 patch.object(self.runtime, "claim", return_value=job), \
+                patch.object(self.runtime, "check_system_profile"), \
                 patch.object(self.runtime, "_ensure_version"):
             with self.runtime._cli_setup({"id": 1, "name": "synthetic"}, "run:test", "2.1.293"):
                 current = json.loads(settings.read_text())
@@ -542,7 +569,8 @@ class AccountRuntimeTests(unittest.TestCase):
         limits = [call.kwargs for call in self.client.containers.run.call_args_list]
         self.assertEqual(sum(item["mem_limit"] for item in limits), 1536 * 1024**2)
         self.assertEqual(sum(item["memswap_limit"] for item in limits), 3584 * 1024**2)
-        self.assertEqual(current["fingerprint_json"], row["fingerprint_json"])
+        self.assertEqual(json.loads(row["fingerprint_json"]),
+            {key: value for key, value in json.loads(current["fingerprint_json"]).items() if key != "system_profile"})
 
     def test_old_fingerprint_missing_swap_preserves_no_swap(self) -> None:
         """已有记录缺 swap 时不能随新全局配置开放额外额度。
@@ -713,7 +741,8 @@ class AccountRuntimeTests(unittest.TestCase):
         for container in old:
             container.remove.assert_called_once_with()
         self.assertEqual(current["generation"], 4)
-        self.assertEqual(current["fingerprint_json"], row["fingerprint_json"])
+        self.assertEqual(json.loads(row["fingerprint_json"]),
+            {key: value for key, value in json.loads(current["fingerprint_json"]).items() if key != "system_profile"})
         self.assertEqual((root / "home" / "marker").read_text(), "preserved")
         self.assertEqual(self.client.containers.run.call_args_list[0].kwargs["environment"]["UPSTREAM_SOCKS5_USER"], "u@name")
         with self.database() as connection:
@@ -964,6 +993,88 @@ class AccountRuntimeTests(unittest.TestCase):
         for path in directory.iterdir():
             self.assertEqual(b'{"legacy":true}\n', path.read_bytes())
             self.assertEqual((1001, 1001, 0o600), (path.stat().st_uid, path.stat().st_gid, path.stat().st_mode & 0o777))
+
+    def test_system_profile_is_added_once_and_survives_rebuild_and_rename(self) -> None:
+        """旧身份只增补一次系统画像，改名及空闲重建保留同一对象。@return None。"""
+        self._isolated_docker()
+        with self.database() as connection:
+            connection.execute("UPDATE accounts SET cc2api_account_id=NULL WHERE id=1")
+        account = {"id": 1, "name": "synthetic", "upstream_socks5_host": "192.0.2.2", "upstream_socks5_port": 1080}
+        initial = self.runtime._row(account["name"], 1)
+        original = json.loads(initial["fingerprint_json"])
+        with patch.object(self.runtime, "_make_room"), patch.object(self.runtime, "_sender_active", return_value=0), \
+                patch('account_runtime.generate_system_profile', wraps=generate_system_profile) as generate:
+            row, _ = self.runtime.ensure(account)
+            saved = json.loads(row["fingerprint_json"])
+            self.runtime.maintenance(row["environment_id"], "rebuild")
+            rebuilt, _ = self.runtime.ensure({**account, "name": "renamed"})
+        self.assertEqual(saved, json.loads(rebuilt["fingerprint_json"]))
+        self.assertEqual(original, {key: value for key, value in saved.items() if key != "system_profile"})
+        generate.assert_called_once()
+        path = self.runtime._root(row) / "runtime/system-profile"
+        self.assertEqual(0o755, path.stat().st_mode & 0o777)
+        self.assertTrue(all(value.stat().st_uid == 0 and value.stat().st_mode & 0o777 == 0o444 for value in path.iterdir()))
+        roles = {call.kwargs["labels"]["vibebench.role"]: call.kwargs for call in self.client.containers.run.call_args_list}
+        for role, options in roles.items():
+            destinations = {value['bind']: value['mode'] for value in options['volumes'].values()}
+            if role == 'account':
+                self.assertEqual('ro', destinations['/etc/ld.so.preload'])
+                self.assertEqual('ro', destinations['/proc/cpuinfo'])
+            else:
+                self.assertNotIn('/etc/ld.so.preload', destinations)
+
+    def test_system_profile_bad_record_and_active_run_never_regenerate(self) -> None:
+        """坏记录和活动作业保持拒绝，不能以重新抽签替代修复。@return None。"""
+        self._isolated_docker()
+        row = self.runtime._row('synthetic', 1)
+        fingerprint = json.loads(row['fingerprint_json'])
+        fingerprint['system_profile'] = None
+        self.runtime._update(row, fingerprint_json=json.dumps(fingerprint))
+        network = Mock()
+        network.exec_run.return_value = SimpleNamespace(exit_code=0, output=self._cpuinfo().encode())
+        with patch('account_runtime.generate_system_profile') as generate:
+            with self.assertRaisesRegex(ValueError, '禁止重新随机'):
+                self.runtime.prepare_system_profile(row, network)
+            self.runtime.jobs[row['environment_id']] = {'source': 'run:active'}
+            with self.assertRaisesRegex(ValueError, '活动执行'):
+                self.runtime.prepare_system_profile(row, network)
+            generate.assert_not_called()
+        self.assertEqual(fingerprint, json.loads(self.runtime._row('synthetic', 1)['fingerprint_json']))
+
+    def test_old_cli_requires_explicit_rebuild_while_api_remains_available(self) -> None:
+        """旧 CLI 不静默套用新画像，健康 API 不因该门禁中断。@return None。"""
+        self._isolated_docker()
+        with self.database() as connection:
+            for field in ('upstream_proxy_scheme', 'upstream_socks5_host', 'upstream_socks5_port',
+                    'upstream_socks5_user', 'upstream_socks5_pass'):
+                connection.execute(f'ALTER TABLE accounts ADD COLUMN {field} TEXT')
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+            'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active',
+            'proxy_url': 'socks5://192.0.2.2:1080'}
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sender_active', return_value=0):
+            row, container = self.runtime.ensure(account)
+            container.labels.pop(SYSTEM_PROFILE_LABEL)
+            for _ in range(2):
+                self.assertEqual(7, self.runtime.transport(account, '2.1.293')['account_id'])
+            with self.assertRaisesRegex(ValueError, '空闲重建'):
+                self.runtime.ensure(account, '2.1.293')
+            container.stop.assert_not_called()
+            self.assertEqual('cli_reconcile', self.runtime._row('synthetic', 1)['state'])
+
+            def gateway(method, path, payload=None):
+                """维护时提供已排空的远端租约，其余返回原配置。"""
+                if path.endswith('/lease'):
+                    lease = None if method == 'GET' or payload['operation'] == 'release' else {
+                        'owner': payload.get('owner', 'maintenance'), 'generation': 1}
+                    return {'active': 0, 'waiting': 0, 'lease': lease}
+                return {'auth_type': 'oauth', 'status': 'active', 'proxy_url': 'socks5://192.0.2.2:1080'}
+
+            self.gateway._request.side_effect = gateway
+            self.runtime.maintenance(row['environment_id'], 'rebuild')
+            recovered, _ = self.runtime.ensure(account, '2.1.293')
+            self.assertEqual(json.loads(row['fingerprint_json']), json.loads(recovered['fingerprint_json']))
+            self.assertEqual('ready', recovered['state'])
 
     def test_api_evidence_handoff_rejects_links_and_special_files(self) -> None:
         """旧证据交接不能越过链接或修改非普通文件。@return None。"""

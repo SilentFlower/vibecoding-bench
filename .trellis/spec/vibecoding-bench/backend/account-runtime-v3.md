@@ -615,3 +615,62 @@ verify_roles(cli, sender, network, fingerprint: dict) -> dict
 - `verify_forwarding.py` 标准入口覆盖真实权限/秘密、官方 CLI 本地工具、HTTP CONNECT/SOCKS5 的 OAuth/JSON/SSE、4 成员池、CLI/API 并行取消、管理端重启、错误证书/代理/绑定拒绝。空代理回归核对 AT/RT/oauth_expires_at/status 保持，最终 gateway 公网连接尝试内核计数必须为 0；SQL 字段以 AccountStore 的实际映射为准。
 - `verify_stack.py --browser --reauth` 覆盖草稿取消故障、恢复及完整删除；账号冷启动等待可用 150 秒，普通 DOM 仍为 15 秒。`--deleted-binding` 保留 RT 交接与再次创建回归。脚本不得依赖诊断 wrapper 才通过。
 - `run_local_verification.py` 使用同批正式清单与显式旧 control/account 镜像验收真实转换及离线回退、透传/Recorder、路由故障和总预算；分别记录本地夹具、正式非模型与真实模型证据，不以隔离承诺免封。
+
+## Scenario: v3 按账号固定的常规内核与 CPU 型号画像
+
+### 1. Scope / Trigger
+
+- 修改 `system_profile.py`、账号镜像的 `system-profile.c`、画像挂载、初始化或 CLI 就绪门禁时适用。只覆盖常规软件读取，不把它当作新的安全沙箱或已确认的封禁原因修复。
+
+### 2. Signatures
+
+```text
+fingerprint_json.system_profile = {
+  schema: 1, kernel_template_id: string, kernel_release: string,
+  kernel_version: string, proc_version: string,
+  cpu_template_id: string, cpu_signature: [vendor_id, family, model], cpu_model_name: string
+}
+generate_system_profile(cpuinfo: str) -> dict
+validate_system_profile(profile: dict, cpuinfo: str | None = None) -> dict
+render_system_profile(profile: dict, cpuinfo: str) -> dict[str, str]
+AccountRuntime.prepare_system_profile(row: dict, network) -> None
+AccountRuntime.check_system_profile(row: dict, container) -> None
+```
+
+### 3. Contracts
+
+- `system_profile` 独立于原 `profile_version=2`。首次受控创建时读取真实 Docker 网络角色的 `/proc/cpuinfo`，限定 4 MiB，核对所有逻辑 CPU 代际后从内置兼容模板选择一次；保存后跨 run、续聊、改名、停止唤醒、重建及回退复用。仅缺 key 可补齐，显式 null、未知 schema/模板或改写内容必须拒绝，不能重新随机。模板 ID 及内容只追加，不重解释旧记录。
+- 当前支持 `AuthenticAMD/23/1`（Naples）与 `AuthenticAMD/25/80`（Cezanne）。只替换 CPU 型号文本，保留创建时实际厂商、family/model/stepping、flags、数量/拓扑/频率等原文；真实硬件变化后空闲重建刷新非替换字段，跨代际迁移必须先核对，不能自动换画像。
+- 生成发生在环境锁内、CLI 创建前；有活动 job 或已有 CLI 实例时拒绝应用。旧容器须显式空闲重建，不能在 GET、普通 API 发送或正在运行的 CLI 中静默迁移。既有 hostname、MAC、machine-id、时区、设备、凭据和绑定保留；即使执行已获许可的 legacy reprofile，也保留已有合法 system_profile。
+- account 镜像携带 `vibebench.system-profile-version=1` 能力标签及镜像内编译的共享库；容器可能继承镜像标签，不能据此推断某角色已加载。只有 CLI 挂载 root 所有的只读 `/etc/v3-system-profile`、`/etc/ld.so.preload` 与 `/proc/cpuinfo`；network/sender 的 preload 为空，权限、网络和预算沿用三角色契约。
+- 覆盖库通过 libc uname 替换 release/version，保留 hostname/架构；常规 open/open64/openat/openat64、fopen/fopen64 及 fortified open 对三个内核文件精确重定向：`/proc/version`、`/proc/sys/kernel/osrelease`、`/proc/sys/kernel/version`。支持词法归一化、相对 cwd/目录 fd；写入仍走原接口，保留创建 mode、errno 和原 fortify 拒绝。配置初始化避免 hook 递归并使用 pthread_once，坏字段返回 EIO。
+- raw syscall、静态 uname、CPUID、显式库绕过、符号链接别名及未覆盖 sysfs 可能显示真值。CPU 文本与 CPUID 可不同；挂载/库本身可观察，不宣称全层一致、无指纹或免封。CPU/RAM 实际限额及 RSS 不参与替换。
+- 创建后及 CLI 入口执行实际读取/只读校验，标签不能代替证据。旧 CLI/坏画像只标记 `cli_reconcile`，不停止健康 API；其恢复允许 `exclusive + idle_only + maintenance:` 的显式维护认领，仍检查 API 排空，普通登录/任务不能借此绕过。新角色创建失败则停止本代已创建角色并保留 reconcile 证据。
+- `identity_import` 继续真实执行容器 Node 探针，同源填充 `canonical_env.linux_kernel` 和 `canonical_prompt.os_version`；真实进程指标维持原契约。既有 cc2api 保存环境不自动批量改写，不生成新设备或修改凭据/策略。
+- 回滚用旧镜像/配置在空闲窗口重建并去掉 CLI 画像挂载，保留新增 JSON 对象和最新 HOME/凭据；重新启用复用原对象。画像文本与 JSON 共用逐级 O_NOFOLLOW 目录 fd 的原子写入，不能沿账号链接覆盖外部文件。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 同账号新任务、续聊、唤醒、重建 | 固定替换字段保持，原项目目录规则不变 |
+| 画像缺 key / 显式 null 或内容损坏 | 受控创建时补齐一次 / 拒绝，不重新随机 |
+| 未支持、混合或迁移后的冲突 CPU 代际 | 明确报错，保留原记录 |
+| 活动 job 或已有 CLI 实例调用准备函数 | 拒绝改写，先完成空闲重建 |
+| 旧 CLI 或实际读取不符 | CLI 待对账；健康 API 保留，可显式排空后重建 |
+| preload 或覆盖库未实际加载、其它画像文件不符 | 实际探针失败，不假报 ready |
+| release/build 文件权限、类型或单行格式不合法 | 运行库的 uname 返回 EIO，实际探针失败 |
+| CPU 原始指令、静态或直接 syscall 探针 | 报告真实值，不伪称覆盖 |
+
+### 5. Scenarios and Examples
+
+- 正常：新账号选定一组模板，后续不同 run 及容器重建复用；只读 CPU 文件仅型号行改变。
+- 边界：旧账号没有新对象时保留原身份并等待空闲重建；旧 CLI 校验失败不影响既有 API 长流，也不能让后续普通任务跳过门禁。
+- 错误用法：仅替换外部 uname、修改管理页值、覆盖坏记录重新抽签，或靠增加 SYS_PTRACE/privileged 放宽 proc 挂载。正确处理：只读文件与动态接口配合，实际验证支持路径并明确绕过边界，损坏记录保留等待核对。
+
+### 6. Tests Required
+
+- 单元覆盖型号之外的 CPU 原文保持、未知/混合/迁移代际拒绝、画像损坏不重生成、首次增补一次、改名/重建/legacy reprofile 保持及 CLI 待对账仍可显式维护。
+- 实际 Docker 验证动态与静态 C、直接 uname syscall/CPUID、普通/fortified open、相对 openat、fopen、并发读取、Node/子进程、真实只读挂载及损坏字段 EIO；network/sender 不加载覆盖，实际资源/秘密边界保持。
+- 精确官方 CLI 2.1.293 在无账号断网环境验证版本、认证状态和登录帮助，结合动态绑定证明 uname 确实走覆盖。auth status 的未登录退出码 1 不算启动失败；不能据此声称真实登录或模型交互已验收。
+- 用 `run_local_verification.py` 的正式构建清单及显式旧 control/account 镜像验证 API/CLI 生命周期、重建和回退再启用，核对画像、身份及 HOME/凭据保留；记录本地启动性能及未执行的生产/真实模型边界。

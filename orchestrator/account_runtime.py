@@ -27,6 +27,8 @@ from docker.errors import DockerException, NotFound
 from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, ROLE_LABELS, create_environment, role_container
 from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_process_metrics
 from resource_budget import account_limits, isolated_account_limits
+from system_profile import (MAX_CPUINFO_BYTES, generate_system_profile, render_system_profile,
+    validate_system_profile, verify_system_profile)
 
 
 NETWORK_INSPECTION_MODES = {"passthrough", "quota", "capture"}
@@ -121,6 +123,17 @@ def atomic_json(path: Path, value: dict, mode: int = 0o600) -> None:
     :param mode: 文件权限
     :return: None
     """
+    atomic_text(path, json.dumps(value, ensure_ascii=False), mode)
+
+
+def atomic_text(path: Path, value: str, mode: int = 0o600) -> None:
+    """通过受控目录 fd 原子保存文本，供 JSON 和只读画像共同使用。
+
+    :param path: 目标文件。
+    :param value: 完整 UTF-8 文本。
+    :param mode: 文件权限。
+    :return: None。
+    """
     directory = _directory_fd(path.parent, create=True)
     temporary = path.name + "." + uuid.uuid4().hex
     try:
@@ -129,7 +142,7 @@ def atomic_json(path: Path, value: dict, mode: int = 0o600) -> None:
             mode, dir_fd=directory)
         with os.fdopen(descriptor, "w") as output:
             os.fchmod(output.fileno(), mode)
-            json.dump(value, output, ensure_ascii=False)
+            output.write(value)
             output.flush()
             os.fsync(output.fileno())
         os.replace(temporary, path.name, src_dir_fd=directory, dst_dir_fd=directory)
@@ -312,6 +325,58 @@ class AccountRuntime:
 
     def _root(self, row: dict) -> Path:
         return self.data / "environments" / row["environment_id"]
+
+    def prepare_system_profile(self, row: dict, network) -> None:
+        """在受控创建窗口保存一次画像，并发布 CLI 专属只读文件。
+
+        :param row: 已持有生命周期锁且尚未创建 CLI 的环境。
+        :param network: 同账号实际 Docker 网络角色，用于读取真实 CPU。
+        :return: None；坏画像保留，不重新随机。
+        """
+        if row["environment_id"] in self.jobs:
+            raise ValueError("活动执行中不能生成或应用系统画像")
+        if row.get("container_id"):
+            raise ValueError("已有 CLI 实例不能切换系统画像，请先空闲重建")
+        result = network.exec_run(["cat", "/proc/cpuinfo"])
+        if result.exit_code or not isinstance(result.output, bytes) or len(result.output) > MAX_CPUINFO_BYTES:
+            raise ValueError("无法读取实际 Docker CPU 信息，系统画像未启用")
+        try:
+            cpuinfo = result.output.decode("utf-8")
+            fingerprint = json.loads(row["fingerprint_json"])
+        except (UnicodeError, ValueError):
+            raise ValueError("系统画像来源或保存记录损坏") from None
+        if not isinstance(fingerprint, dict):
+            raise ValueError("系统画像保存记录格式无效")
+        if "system_profile" not in fingerprint:
+            fingerprint["system_profile"] = generate_system_profile(cpuinfo)
+            self._update(row, fingerprint_json=json.dumps(fingerprint))
+        profile = validate_system_profile(fingerprint["system_profile"], cpuinfo)
+        directory = self._root(row) / "runtime/system-profile"
+        descriptor = _directory_fd(directory, create=True)
+        try:
+            os.fchown(descriptor, 0, 0)
+            os.fchmod(descriptor, 0o755)
+        finally:
+            os.close(descriptor)
+        for name, content in render_system_profile(profile, cpuinfo).items():
+            atomic_text(directory / name, content, 0o444)
+
+    def check_system_profile(self, row: dict, container) -> None:
+        """只读确认 CLI 已应用固定画像，不迁移或改写运行配置。
+
+        :param row: 当前环境行。
+        :param container: 当前 CLI 角色。
+        :return: None；旧容器提示空闲重建，API 角色不受影响。
+        """
+        try:
+            fingerprint = json.loads(row["fingerprint_json"])
+            if not isinstance(fingerprint, dict) or "system_profile" not in fingerprint:
+                raise ValueError("CLI 尚无固定系统画像，请空闲重建账号环境")
+            verify_system_profile(container, fingerprint["system_profile"])
+        except ValueError:
+            # 只关闭 CLI 门禁，不能为本地画像问题中断健康的独立 API。
+            self._update(row, state="cli_reconcile")
+            raise
 
     def _labels(self, row: dict) -> dict:
         return {"vibebench.product": "v3", "vibebench.deployment": self.deployment,
@@ -551,6 +616,7 @@ class AccountRuntime:
                     self._update(row, state="ready")
         # 版本缓存准备不持有环境生命周期锁，API 不等待 CLI 安装。
         if version is not None:
+            self.check_system_profile(row, container)
             self._ensure_version(container, version)
         return row, container
 
@@ -831,7 +897,9 @@ class AccountRuntime:
         with self.environment_lock(row["environment_id"]):
             if not exclusive and (self._network_runtime(row) / "cli-unhealthy").exists():
                 self._update(row, state="cli_reconcile")
-            if row["state"] in ("reconcile", "cli_reconcile"):
+            maintenance = (row["state"] == "cli_reconcile" and exclusive and idle_only
+                and source.startswith("maintenance:"))
+            if row["state"] in ("reconcile", "cli_reconcile") and not maintenance:
                 raise ValueError("账号 CLI 需要先对账，拒绝开始下一作业")
             with self.lock:
                 pending = self._root(row) / "runtime" / "login-commit.json"
@@ -1010,6 +1078,7 @@ class AccountRuntime:
                    idle_only: bool = False, exclusive: bool = False, allow_inactive_login: bool = False):
         row, container = self.ensure(account, allow_inactive_login=allow_inactive_login,
             allow_login_recovery=source.startswith("login:"))
+        self.check_system_profile(row, container)
         job = self.claim(row, account, source, idle_only, exclusive)
         try:
             self._ensure_version(container, version)
@@ -1982,6 +2051,8 @@ class AccountRuntime:
                 self._stop_environment(row, remove=True)
                 fingerprint = self.fingerprint(account.get("timezone"))
                 previous = json.loads(row["fingerprint_json"])
+                if "system_profile" in previous:
+                    fingerprint["system_profile"] = validate_system_profile(previous["system_profile"])
                 fingerprint["mem"] = previous.get("mem", os.environ.get("V3_ACCOUNT_MEMORY", "4g"))
                 fingerprint["swap"] = previous.get("swap", "0")
                 account_limits(str(fingerprint["mem"]), str(fingerprint["swap"]))
@@ -2076,6 +2147,7 @@ class AccountRuntime:
         self._wait_network(row)
         if roles["cli"].status != "running":
             roles["cli"].start()
+        self.check_system_profile(row, roles["cli"])
         result = roles["cli"].exec_run(["python3", "-I", "/usr/local/bin/v3-cli-control", "stop"])
         if result.exit_code:
             raise ValueError("CLI 子进程仍未收口，独立 API 保持运行")

@@ -26,6 +26,7 @@ import main as orchestrator
 from account_runtime import AccountRuntime, atomic_json, derive_v3_fingerprint
 from account_isolation import role_container
 from verify_isolation import memory_peaks, verify_roles, verify_route_failure
+from verify_system_profile import verify_system_information
 
 
 
@@ -280,6 +281,10 @@ def verify() -> None:
         row, container = runtime.ensure(account, "9.9.9")
         isolation = verify_roles(container, role_container(runtime, row, "sender"), runtime._network_container(row),
             json.loads(row['fingerprint_json']))
+        system_profile = json.loads(row['fingerprint_json'])['system_profile']
+        system_facts = verify_system_information(container, runtime._network_container(row),
+            role_container(runtime, row, 'sender'), json.loads(row['fingerprint_json']))
+        print('通过：真实系统画像、文件 API、Node/子进程及直接 syscall/CPUID 边界：' + json.dumps(system_facts), flush=True)
         print("通过：真实 Docker 三角色权限/只读根/秘密隔离/内置 DNS 拒绝/本地构建/非 root 收口：" + json.dumps(isolation), flush=True)
         first_id, first_generation = container.id, row["generation"]
         check = container.exec_run(runtime.cli_command(["sh", "-c", "test ! -r /run/v3/sender.json && test ! -r /ca/mitmproxy-ca.pem && grep '^CapEff:' /proc/self/status"])); assert check.exit_code == 0 and b"0000000000000000" in check.output
@@ -603,6 +608,7 @@ def verify() -> None:
         runtime.maintenance(row["environment_id"], "rebuild")
         runtime.maintenance(row["environment_id"], "rebuild")
         rebuilt_row, rebuilt = runtime.ensure(account, "9.9.9")
+        assert json.loads(rebuilt_row['fingerprint_json'])['system_profile'] == system_profile
         assert rebuilt.id != first_id and rebuilt_row["environment_id"] == row["environment_id"]
         assert rebuilt.exec_run(["cat", "/etc/machine-id"]).output == machine
         assert (runtime._root(rebuilt_row) / "home" / ".claude" / ".credentials.json").read_bytes() == original

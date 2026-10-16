@@ -79,6 +79,11 @@ COPY images/account/cli-version.sh /usr/local/bin/v3-cli-version
 COPY images/account/passthrough.py /usr/local/bin/v3-passthrough
 COPY images/account/network-guard.py /usr/local/bin/v3-network-guard
 COPY images/account/cli-control.py /usr/local/bin/v3-cli-control
+COPY images/account/system-profile.c /opt/v3/system-profile.c
+RUN cc -shared -fPIC -O2 -Wall -Wextra -Werror -Wl,-z,relro,-z,now \
+    /opt/v3/system-profile.c -ldl -pthread -o /usr/local/lib/v3-system-profile.so \
+    && mkdir -p /etc/v3-system-profile && touch /etc/ld.so.preload \
+    && chmod 444 /etc/ld.so.preload && chmod 755 /usr/local/lib/v3-system-profile.so
 COPY orchestrator/cli_quota.py /usr/local/bin/v3-cli-quota
 COPY orchestrator/process_metrics.py /usr/local/bin/process_metrics.py
 COPY orchestrator/process_metrics.py /usr/local/bin/v3-process-metrics
@@ -94,6 +99,7 @@ ARG V3_PARENT_REV
 ARG V3_GATEWAY_REV
 LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELEASE \
     vibebench.isolation-version="2" \
+    vibebench.system-profile-version="1" \
     vibebench.parent-revision=$V3_PARENT_REV vibebench.gateway-revision=$V3_GATEWAY_REV \
     org.opencontainers.image.source="https://github.com/SilentFlower/vibecoding-bench" \
     org.opencontainers.image.revision=$V3_PARENT_REV
