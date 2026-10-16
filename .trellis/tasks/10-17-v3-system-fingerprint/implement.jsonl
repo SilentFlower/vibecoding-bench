@@ -1,0 +1,2 @@
+{"file":".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md","reason":"固定环境所有权、画像、真实指标、凭据与角色生命周期契约"}
+{"file":".trellis/tasks/10-17-v3-system-fingerprint/research/coverage-and-options.md","reason":"离线实验及已确认的常规覆盖范围，避免将命令探针或 CPUID 真值误报为完整画像"}

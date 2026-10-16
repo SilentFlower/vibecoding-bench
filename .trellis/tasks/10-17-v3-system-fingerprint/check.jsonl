@@ -1,0 +1,2 @@
+{"file":".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md","reason":"核对身份与真实采样不漂移、CLI 权限不扩大、任务和转发链路完整"}
+{"file":".trellis/tasks/10-17-v3-system-fingerprint/research/coverage-and-options.md","reason":"按真实实验区分动态接口、静态程序、系统调用、CPU 指令及正式协议验收"}
