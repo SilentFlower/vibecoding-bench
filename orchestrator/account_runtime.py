@@ -328,6 +328,28 @@ class AccountRuntime:
     def _network_runtime(self, row: dict) -> Path:
         return self._root(row) / "runtime" / "network" if row.get("isolation_version") == ISOLATION_VERSION else self._root(row) / "runtime"
 
+    def _adopt_sender_evidence(self, row: dict) -> None:
+        # 旧布局由 root 追加证据；转换后必须移交现有文件，不能只修改父目录属主。
+        directory = _directory_fd(self._root(row) / "flows/api", create=True)
+        try:
+            os.fchown(directory, 1001, 1001)
+            os.fchmod(directory, 0o700)
+            for name in ("observations.jsonl", "observations.jsonl.previous"):
+                try:
+                    descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+                except FileNotFoundError:
+                    continue
+                try:
+                    metadata = os.fstat(descriptor)
+                    if not S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                        raise ValueError("API 证据必须为无硬链接的普通文件")
+                    os.fchown(descriptor, 1001, 1001)
+                    os.fchmod(descriptor, 0o600)
+                finally:
+                    os.close(descriptor)
+        finally:
+            os.close(directory)
+
     def _cli_runtime(self, row: dict) -> Path:
         return self._root(row) / "runtime" / "cli" if row.get("isolation_version") == ISOLATION_VERSION else self._root(row) / "runtime"
 

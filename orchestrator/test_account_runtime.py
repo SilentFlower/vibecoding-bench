@@ -13,6 +13,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from docker import APIClient
+
 from account_runtime import AccountRuntime, atomic_json, derive_v3_fingerprint, locale_for_timezone
 from account_isolation import ROLE_COLUMNS, role_labels
 import main
@@ -58,6 +60,7 @@ class AccountRuntimeTests(unittest.TestCase):
             "vibebench.product": "v3", "vibebench.role": "account", "vibebench.release": "test",
             "vibebench.isolation-version": "2"}}}
         self.client.networks.get.return_value.attrs = {"IPAM": {"Config": [{"Gateway": "192.0.2.1"}]}}
+        self.client.api.create_endpoint_config.side_effect = APIClient(version="1.52").create_endpoint_config
         self.client.containers.list.return_value = []
         containers = {}
 
@@ -941,6 +944,61 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual(2_000_000_000, sum(value["nano_cpus"] for value in roles.values()))
         network = roles["account-network"]
         self.assertNotIn("/home/node", {value["bind"] for value in network["volumes"].values()})
+        self.assertNotIn("mac_address", network)
+        self.assertEqual(json.loads(row["fingerprint_json"])["mac"],
+            network["networking_config"][self.runtime.network]["MacAddress"])
+
+    def test_existing_api_evidence_keeps_content_and_moves_to_sender(self) -> None:
+        """旧 root 证据交接给普通发送器，历史和轮换文件均保留。@return None。"""
+        self._isolated_docker()
+        row = self.runtime._row("synthetic", 1)
+        directory = self.runtime._root(row) / "flows/api"
+        directory.mkdir(parents=True)
+        for name in ("observations.jsonl", "observations.jsonl.previous"):
+            path = directory / name
+            path.write_bytes(b'{"legacy":true}\n')
+            path.chmod(0o600)
+        account = {"id": 1, "name": "synthetic", "upstream_socks5_host": "192.0.2.2", "upstream_socks5_port": 1080}
+        with patch.object(self.runtime, "_make_room"), patch.object(self.runtime, "_sender_active", return_value=0):
+            self.runtime.ensure(account)
+        for path in directory.iterdir():
+            self.assertEqual(b'{"legacy":true}\n', path.read_bytes())
+            self.assertEqual((1001, 1001, 0o600), (path.stat().st_uid, path.stat().st_gid, path.stat().st_mode & 0o777))
+
+    def test_api_evidence_handoff_rejects_links_and_special_files(self) -> None:
+        """旧证据交接不能越过链接或修改非普通文件。@return None。"""
+        row = self.runtime._row("synthetic", 1)
+        directory = self.runtime._root(row) / "flows/api"
+        directory.mkdir(parents=True)
+        target = self.root / "external-evidence"
+        target.write_bytes(b"unchanged")
+        before = target.stat()
+        evidence = directory / "observations.jsonl"
+        for kind in ("symlink", "hardlink", "fifo"):
+            with self.subTest(kind=kind):
+                if kind == "symlink":
+                    evidence.symlink_to(target)
+                elif kind == "hardlink":
+                    os.link(target, evidence)
+                else:
+                    os.mkfifo(evidence)
+                try:
+                    with self.assertRaises((ValueError, OSError)):
+                        self.runtime._adopt_sender_evidence(row)
+                    self.assertEqual((before.st_uid, before.st_gid, before.st_mode),
+                        (target.stat().st_uid, target.stat().st_gid, target.stat().st_mode))
+                    self.assertEqual(b"unchanged", target.read_bytes())
+                finally:
+                    evidence.unlink()
+        directory.rmdir()
+        external = self.root / "external-directory"
+        external.mkdir()
+        before = external.stat()
+        directory.symlink_to(external, target_is_directory=True)
+        with self.assertRaises(OSError):
+            self.runtime._adopt_sender_evidence(row)
+        self.assertEqual((before.st_uid, before.st_gid, before.st_mode),
+            (external.stat().st_uid, external.stat().st_gid, external.stat().st_mode))
 
     def test_partial_creation_retains_evidence_and_stops_known_roles(self) -> None:
         """发送器创建失败不能留下可运行业务或假报 ready。@return None。"""

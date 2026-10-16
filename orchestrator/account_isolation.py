@@ -101,7 +101,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     for relative in ('runtime/drivers', 'runtime/runs', 'runtime/jobs'):
         _directory(root / relative, 0, 1000, 0o750)
     _directory(root / 'public-ca', 0, 0, 0o755)
-    _directory(root / 'flows/api', 1001, 1001)
+    runtime._adopt_sender_evidence(row)
     _directory(root / 'runtime/access', 0, 1000, 0o750)
     _directory(root / 'runtime/empty', 0, 0, 0o555)
     machine = root / 'runtime' / 'machine-id'
@@ -165,7 +165,9 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
             _directory(quota)
             network_mounts[str(runtime.host_data / quota.relative_to(runtime.data))] = {
                 'bind': '/quota-accounts/' + str(account['id']), 'mode': 'ro'}
-        network = launch('network', network=runtime.network, hostname=fingerprint['hostname'], mac_address=fingerprint['mac'],
+        # Docker 29 已忽略容器顶层 MAC，必须在实际网络端点上指定才能保持原画像。
+        network = launch('network', network=runtime.network, hostname=fingerprint['hostname'],
+            networking_config={runtime.network: runtime.client.api.create_endpoint_config(mac_address=fingerprint['mac'])},
             cap_add=['NET_ADMIN'], devices=['/dev/net/tun:/dev/net/tun'], environment=environment,
             volumes=network_mounts,
             tmpfs={'/tmp': 'rw,nosuid,nodev,size=64m', '/root': 'rw,nosuid,nodev,size=64m', '/var/log': 'rw,nosuid,nodev,size=32m'})

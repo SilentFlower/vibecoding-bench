@@ -312,7 +312,11 @@ def verify(manifest_path, output, binary):
                     metrics = json.loads(row[7])
                     assert metrics['constrained_memory'] == 1207959552 and metrics['observation']['rss_bytes'] is None
                     wake(account)
-                passed('V1/V2/V5 实际三角色权限、秘密隔离与本地构建', facts=verify_roles(account['container'],account['sender_container'],account['network_container']))
+                with sqlite3.connect(data / 'bench/db.sqlite') as database:
+                    fingerprint = json.loads(database.execute('SELECT fingerprint_json FROM account_environments WHERE environment_id=?',
+                        (account['eid'],)).fetchone()[0])
+                passed('V1/V2/V5 实际三角色权限、秘密隔离与本地构建', facts=verify_roles(
+                    account['container'], account['sender_container'], account['network_container'], fingerprint))
                 passed('V5 官方 CLI 本地 SSE 工具构建', facts=verify_official_tools(account['container'], account['root'], account['network'], fixture / 'ca.crt'))
                 passed('S1 创建按钮/API/SQLite：六项配置、TTL 与无样本状态')
                 account = accounts[0]

@@ -3,12 +3,13 @@ import json
 import re
 
 
-def verify_roles(cli, sender, network) -> dict:
+def verify_roles(cli, sender, network, fingerprint: dict) -> dict:
     """核验真实 Docker 配置和业务身份，任何边界失效立即失败。
 
     :param cli: 本次合成账号 CLI 容器。
     :param sender: 同环境发送器。
     :param network: 同环境网络角色。
+    :param fingerprint: 数据库保存的原环境画像。
     :return: 可公开的实际权限与资源摘要。
     """
     facts = {}
@@ -29,8 +30,16 @@ print(json.dumps({'uid':os.getuid(),'caps':{key:status[key].strip() for key in (
         assert all(value == '0000000000000000' for key, value in observed['caps'].items() if key != 'NoNewPrivs')
         assert container.exec_run(['touch', '/etc/isolation-must-fail']).exit_code != 0
         facts[role] = {**observed, 'memory': settings['Memory'], 'memory_swap': settings['MemorySwap']}
-    assert facts['cli']['hostname'] == facts['sender']['hostname']
-    assert facts['cli']['machine_id'] == facts['sender']['machine_id']
+    assert facts['cli']['hostname'] == facts['sender']['hostname'] == fingerprint['hostname']
+    assert facts['cli']['machine_id'] == facts['sender']['machine_id'] == fingerprint['machine_id']
+    network.reload()
+    endpoints = network.attrs['NetworkSettings']['Networks']
+    assert len(endpoints) == 1
+    assert next(iter(endpoints.values()))['MacAddress'] == fingerprint['mac']
+    for container in (cli, sender):
+        observed = container.exec_run(['cat', '/sys/class/net/eth0/address'])
+        assert observed.exit_code == 0 and observed.output.decode().strip() == fingerprint['mac']
+    facts['network'] = {'mac_matches': True}
     secrets = '''import os,pathlib
 for name in ('/run/v3/sender.json','/run/v3/network/context.json','/ca/mitmproxy-ca.pem'):
  assert not os.access(name,os.R_OK),name

@@ -269,10 +269,17 @@ def verify() -> None:
     shutil.copy2("/fixtures/mock_cli.py", binary)
     binary.chmod(0o755)
     (cached / ".ready").touch()
+    evidence_root = runtime._root(row) / 'flows/api'
+    evidence_root.mkdir(parents=True)
+    legacy_evidence = b'{"source":"synthetic-old-layout"}\n'
+    for name in ('observations.jsonl', 'observations.jsonl.previous'):
+        (evidence_root / name).write_bytes(legacy_evidence)
+        (evidence_root / name).chmod(0o600)
     container = None
     try:
         row, container = runtime.ensure(account, "9.9.9")
-        isolation = verify_roles(container, role_container(runtime, row, "sender"), runtime._network_container(row))
+        isolation = verify_roles(container, role_container(runtime, row, "sender"), runtime._network_container(row),
+            json.loads(row['fingerprint_json']))
         print("通过：真实 Docker 三角色权限/只读根/秘密隔离/内置 DNS 拒绝/本地构建/非 root 收口：" + json.dumps(isolation), flush=True)
         first_id, first_generation = container.id, row["generation"]
         check = container.exec_run(runtime.cli_command(["sh", "-c", "test ! -r /run/v3/sender.json && test ! -r /ca/mitmproxy-ca.pem && grep '^CapEff:' /proc/self/status"])); assert check.exit_code == 0 and b"0000000000000000" in check.output
@@ -292,6 +299,10 @@ def verify() -> None:
         session = requests.Session(); session.trust_env = False
         response = session.post(binding["endpoint"] + "/internal/send", headers={"Authorization": "Bearer " + binding["secret"], "x-v3-request": base64.b64encode(json.dumps(prepared).encode()).decode()}, data=b'{ "synthetic": true }', timeout=10)
         assert response.status_code == 429 and response.content == b'{ "synthetic": true }'
+        assert (evidence_root / 'observations.jsonl').read_bytes().startswith(legacy_evidence)
+        assert (evidence_root / 'observations.jsonl.previous').read_bytes() == legacy_evidence
+        assert all((evidence_root / name).stat().st_uid == 1001
+            for name in ('observations.jsonl', 'observations.jsonl.previous'))
         evidence = json.loads((runtime._root(row) / "flows" / "api" / "observations.jsonl").read_text().splitlines()[-1])
         assert evidence["origin"] == "api" and evidence["identity"] == "synthetic-quota"
         configuration["allowed_origin"] = "https://api.anthropic.com"
