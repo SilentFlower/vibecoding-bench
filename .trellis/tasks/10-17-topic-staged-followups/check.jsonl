@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/topic-prompt-contract.md", "reason": "题库英文、快照与解析同步契约；新排除范围以用户最新决定为准。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md", "reason": "任务/批次/运行事务及额度恢复身份。"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/image-build-push.md", "reason": "真实worker完成判定与控制消息边界。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md", "reason": "固定账号、私有runtime路径、角色隔离与交付。"}
+{"file": ".trellis/tasks/10-17-topic-staged-followups/research/current-behavior.md", "reason": "实际代码入口和实现边界。"}

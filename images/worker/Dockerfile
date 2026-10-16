@@ -37,6 +37,7 @@ RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
 WORKDIR /workspace
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY task_followups.py /usr/local/bin/v3-task-followups
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # tini 当 init，处理孤儿进程

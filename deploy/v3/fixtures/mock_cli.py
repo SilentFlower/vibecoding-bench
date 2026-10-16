@@ -7,10 +7,62 @@ import subprocess
 import sys
 import termios
 import time
+import tty
 from pathlib import Path
 from urllib.parse import urlencode
 
 home = Path(os.environ["HOME"])
+
+
+def run_followup_fixture() -> None:
+    """消费真实 tmux 粘贴，写入原生形状主会话证据，不进行推理。
+
+    :return: None；由外部 driver 结束本测试进程。
+    """
+    config = json.loads((home / '.synthetic-followups.json').read_text())
+    cwd = Path.cwd()
+    project = home / '.claude/projects' / str(cwd).replace('/', '-')
+    project.mkdir(parents=True, exist_ok=True)
+    session = project / (config['session'] + '.jsonl')
+    record = cwd / '.synthetic-turns.jsonl'
+    print('Synthetic task pane', flush=True)
+    # TUI 与真实 CLI 一样开启括号粘贴，跨行初始输入不能被 readline 拆成多个回合。
+    tty.setraw(sys.stdin.fileno())
+    os.write(sys.stdout.fileno(), b'\x1b[?2004h')
+    buffer = bytearray()
+    pasted = False
+    while True:
+        byte = os.read(sys.stdin.fileno(), 1)
+        if not byte:
+            return
+        buffer.extend(byte)
+        if buffer.endswith(b'\x1b[200~'):
+            del buffer[-6:]
+            pasted = True
+            continue
+        if buffer.endswith(b'\x1b[201~'):
+            del buffer[-6:]
+            pasted = False
+            continue
+        if byte not in (b'\r', b'\n') or pasted:
+            continue
+        text = bytes(buffer[:-1]).decode().replace('\r\n', '\n').replace('\r', '\n')
+        buffer.clear()
+        if not text.strip():
+            continue
+        with record.open('a') as stream:
+            stream.write(json.dumps({'text': text, 'cwd': str(cwd), 'session': config['session']}) + '\n')
+        with session.open('a') as stream:
+            stream.write(json.dumps({'type': 'user', 'message': {'role': 'user', 'content': text}}) + '\n')
+            if config.get('auth_failure'):
+                stream.write(json.dumps({'type':'assistant','isApiErrorMessage':True,'error':'account_on_hold','message':{
+                    'role':'assistant','model':'<synthetic>','content':[{'type':'text','text':'Your account is on hold.'}]}})+'\n')
+            else:
+                stream.write(json.dumps({'type':'assistant','message':{'role':'assistant','stop_reason':'end_turn',
+                    'content':[{'type':'text','text':'Completed the requested local fixture stage.'}]}})+'\n')
+        print('Fixture stage complete', flush=True)
+
+
 if "--version" in sys.argv:
     print("9.9.9 (Synthetic lifecycle fixture)")
 elif sys.argv[1:] == ["auth", "status"]:
@@ -54,6 +106,9 @@ elif sys.argv[1:] == ["auth", "login"]:
     while True:
         time.sleep(1)
 else:
+    if (home / '.synthetic-followups.json').exists():
+        run_followup_fixture()
+        sys.exit(0)
     if os.environ.get("SYNTHETIC_TLS_PROBE") == "1":
         with socket.create_connection(("api.anthropic.com", 443), timeout=5) as connection:
             connection.sendall(bytes.fromhex("1603030003010203"))

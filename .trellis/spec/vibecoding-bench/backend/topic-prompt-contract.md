@@ -40,7 +40,7 @@ def _load_recent_topic_prompt_fingerprints(
     ...
 
 parse_topics(path: Path) -> list[Topic]
-validate_topics(topics: list[Topic]) -> None
+validate_topics(topics: list[Topic], require_followups: bool = True) -> None
 backup_db(path: Path) -> Path
 ```
 
@@ -56,7 +56,7 @@ backup_db(path: Path) -> Path
 ### 3. Contracts
 
 - `topics.md` 固定包含 600 题、编号集合 1～600 和 21 个英文分类；分类、标题、描述不得含 CJK。明确风险目标和已知机器直译短语由 `validate_topics()` fail-closed，不能在同步时静默改写。
-- 题库主题按用户选择排除模型训练／微调、网络协议／代理／网络扫描与安全，以及生物／医疗；普通联网应用、现成 LLM 客户端、文件遍历、课程练习与引用关系图保留。`validate_topics()` 的 `_EXCLUDED_TOPIC_PATTERNS` 检查分类／标题／描述，匹配时非零退出并报告题号，不静默替换。该范围是题库偏好，不代表服务商的违规判定。
+- 题库主题按用户选择排除模型训练／微调、网络协议／代理／网络扫描与安全，以及生物／医疗；同时排除逆向/反编译和所有大模型客户端、API 集成、训练、微调、蒸馏；普通文件遍历、课程练习、经典算法与引用关系图保留。`validate_topics()` 的 `_EXCLUDED_TOPIC_PATTERNS` 检查分类／标题／初始描述及全部补充，匹配时非零退出并报告题号，不静默替换。该范围是题库偏好，不代表服务商的违规判定。
 - 原安全分类改为 `Organization and Recordkeeping Tools`，30 个原编号保持；分类中的 Recordkeeping 映射到 `product`，其余生成／同步契约保持。
 - `natural`：英文分类风格、开场、需求表达、可运行交付、结果说明和布局片段组合候选；每次随机抽取 12 个不同组合，且每个候选都必须保留英文标题、分类、描述、当前工作区可运行交付、启动、验证和主要取舍语义。
 - 分类风格只改变表达语气，不改变需求内容；现有分类归并为 `engineering`、`product`、`data_ai`、`creative`，未知分类使用 `generic` 回退。
@@ -95,7 +95,7 @@ backup_db(path: Path) -> Path
 | 题库不是 600 条、编号不完整或分类不是 21 个 | `validate_topics()` 非零退出，不访问数据库 |
 | 分类/标题/描述含 CJK、高风险目标或已知机器直译短语 | 校验失败并报告题号，不自动改写 |
 | 模型训练、DNS proxy、网络扫描、安全或生物医疗主题 | 校验失败并报告用户排除主题，不访问数据库 |
-| 天气 API、普通文件扫描、课程证书、LLM 客户端或引用关系图 | 通过主题范围校验，不按泛关键词误排除 |
+| 普通天气样例、普通文件扫描、课程证书或引用关系图 | 通过主题范围校验，不按泛关键词误排除 |
 | 英文分类标题 / 旧中文分类标题 | 两套解析器分别正常解析并保持相同结构 |
 | `--apply` 处理 WAL 数据库 | SQLite backup API 备份包含已提交 WAL；更新后 topic ID 与历史 prompt 不变 |
 
@@ -108,10 +108,10 @@ backup_db(path: Path) -> Path
 - Good：批次开始前加载一次 64 条历史窗口，每生成一个 item 就追加其指纹，后续 item 自动避开近期同构包装。
 - Base：旧 API 客户端不传字段，单任务和批次自动使用 `natural`，抓包自动使用 `canonical`。
 - Base：用户提交自定义 prompt，最终持久化文本与用户输入完全一致。
-- Base：已有 v3 数据库同步英文题库，只更新 600 个 topic 的 title/description/category；历史任务继续展示原 prompt。
+- Base：已有 v3 数据库同步英文题库，只更新 600 个 topic 的 title/description/category/followups_json；历史任务继续展示原 prompt。
 - Bad：自然片段增加指定框架、依赖、架构或超时策略，导致不同组合不再语义等价。
 - Bad：把 `topics.md` 直接复制进已 seed 的运行实例，或用 `shutil.copy2` 备份活动 WAL 数据库，导致题库没有更新或备份不一致。
-- Correct：先 `--validate-only` 和 dry-run，再由同步工具创建 SQLite 一致备份并 `--apply`；回滚恢复该备份。
+- Correct：先 `--validate-only` 和 dry-run，再由同步工具创建 SQLite 一致备份并 `--apply`；发布后回滚题库时仅定向恢复 topics，禁止整库覆盖新的运行或凭据。
 - Bad：批次为每个 item 重查全部历史，或把全部已生成指纹无限追加，导致创建耗时随历史量或批次长度无界增长。
 - Bad：持久化前生成一次、调度前再次生成一次，导致数据库记录与 worker 实际输入不一致。
 
@@ -128,7 +128,7 @@ backup_db(path: Path) -> Path
 - 覆盖优先级测试 mock `build_topic_prompt()`，断言非空自定义 prompt 不调用渲染器。
 - 养号回归测试断言 `tasks.prompt == scheduler.submit()` payload 中的 `prompt`。
 - 题库测试断言恰好 600 题、1～600、21 个英文分类、无 CJK/风险/机器直译短语，并核对 #39/#73/#76 的安全替换。
-- 主题校验测试替换一条合法样本，分别验证训练模型／微调 LLM、DNS proxy、端口扫描、TCP、安全、生物和医疗被拒绝；天气 API、文件扫描、课程证书、现成 LLM 及引用关系图保持通过。核对新 Recordkeeping 分类不落入 generic。
+- 主题校验测试替换一条合法样本，分别验证训练模型／微调 LLM、DNS proxy、端口扫描、TCP、安全、生物和医疗被拒绝；天气 API、文件扫描、课程证书及引用关系图保持通过；现成 LLM 客户端/API 集成也应被拒绝。核对新 Recordkeeping 分类不落入 generic。
 - 同步测试覆盖新旧分类标题、WAL 一致备份、按编号更新保留 topic ID 和历史 task prompt。
 - worker 脚本测试提取四类默认注入文本，断言无 CJK，并包含各自的续跑、最小交付、OAuth 重试和 API 卡顿恢复语义。
 - 静态契约检查核对三个 WebUI 表单的 `name="prompt_mode"`、选中默认值和 `app.js` 请求体字段。
@@ -155,3 +155,59 @@ task = {"prompt": prompt}
 ```
 
 近期历史只读一次，随机选择也只发生一次；同一个最终字符串同时用于存储和下发。
+
+
+## Scenario: 自包含题库与冻结的有限业务补充
+
+### 1. Scope / Trigger
+
+600 题均为英文初始需求及两条题目专属递进业务补充；编号 1～600、21 个分类块保持。`Writing and Document Workbenches` 与 `Rule-Based Workflow Workbenches` 替换原 AI 分类，映射 engineering。初始需求必须能在空目录开始，明确自建并标注合成记录、文件和图片/音频占位材料，无上传、外部账号、API Key、硬件或服务前提；高度依赖外部材料的题目改为本地工具或模拟器。关键词扫描只作门禁，不能代替逐题语义审查。
+
+### 2. Signatures
+
+- 共享模块 `orchestrator/topic_library.py` 提供 `Topic(no,title,description,category,followups=())`、`parse_topics`、`validate_topics`、`validate_followups`、`decode_followups`、`encode_followups`、`sample_followups`；seed 与同步脚本同源解析。
+- SQLite 幂等增加 `topics.followups_json`、`tasks.followup_candidates_json`、`task_batch_items.followup_candidates_json`、`runs.followup_plan_json`，均为 `TEXT NOT NULL DEFAULT '[]'`。
+- `POST /api/topics`、`PUT /api/topics/{id}` 的 `TopicIn.followups: Optional[list[StrictStr]]=None`；`GET /api/topics` 返回 `followups: list[str]`。
+- `GET /api/runs/{rid}` 增加初始 `prompt` 与 `followups={planned,completed,phase,messages[,stage]}`。
+- driver 调用 `python3 /usr/local/bin/v3-task-followups init|observe|advance --state <固定绝对路径> --project <主会话目录> [--resume] [--idle 10] [--no-next]`。
+
+### 3. Contracts
+
+Markdown 子行精确为 `  - Follow-up 1: <text>`、`  - Follow-up 2: <text>`，只进入独立字段，不能拼入初始 description。历史无子行解析为零补充，正式全量校验要求两条。消息最多两条、每条非空且最多 8000 字符，无 CJK、终端控制符或同题重复；编码后必须可往返解码，原文字面内容保持。
+
+自然模式普通任务、批次及养号在创建初始 prompt 时冻结候选正文。每个新 run 等概率选择 0/1/2 的候选前缀，在同一 run 创建事务中保存正文；独立重复运行各选一次。canonical、非空自定义输入、抓包及历史空计划保持单轮。批次后改题不影响既有候选；QuotaGuard 与 Scheduler 以原 run 的计划为准，不重新抽签。worker 环境 `TASK_FOLLOWUPS_JSON` 默认 `[]`，`TASK_INITIAL_PROMPT` 保留原初始输入，不被 resume 控制提示覆盖。
+
+helper 的状态 schema 1 保存 run_id、规范 JSON 计划摘要、初始摘要、completed_stages、phase、session、各主 JSONL 字节 cursor、input_entry 与 reply_entry。phase 为 awaiting/pending/complete；总阶段数为 1+补充数。只识别主目录 JSONL 的对应普通 user 输入及其后稳定、非空、非 tool_use、非 synthetic/API 错误的最新 assistant；忽略 isMeta/isSidechain 与子目录。投递前落 pending 和新游标，tmux 成功不等于消费确认；observe 看到原主会话输入后才 acknowledged。pending 未确认重启必须失败，不能重发。最后阶段完成才可结束成功；完成状态也需重核最后输入/回复的原生证据。
+
+各轮复用原账号/cwd/session 和执行 deadline。停止、认证失败、额度暂停、总超时沿用既有优先级；收尾窗口或 CLI 已退出时禁止开始下一条，未完成补充不能标成功。额度恢复仍沿用既有每次尝试时限策略。v3 阶段文件是 `runtime/runs/<rid>/followups.json`，旧 worker 为工作区 `.bench-followups.json`；原子 0600 写入，拒绝错 run/计划/非法阶段、链接、特殊文件、超过 64KiB 的状态及会话截断。阶段扫描有界，不以工具大输出占满内存。
+
+详情阶段缺失/损坏显示 unknown/invalid，不能冒充完成。页面只从冻结计划展示正文，使用 escapeHTML；topic 编辑缺省 followups 保留旧值，显式 [] 清空。状态摘要不扫描全部原生日志；成功判定由 worker 的证据核验负责。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 正式题库少子行、错序、重复或孤立子行 | 校验/解析非零退出，不能静默漏补充 |
+| Topic API 非字符串列表元素 / 文本越界等 | Pydantic 422 / 业务校验 400 |
+| 老数据库或历史任务 | 迁移默认 []；不回填旧 prompt/候选/计划 |
+| 快照 JSON 损坏、null 或非法消息 | 明确拒绝；不吞掉为零补充 |
+| pending 重启而无对应主输入 | 明确失败并保留现场，不重发 |
+| 元消息、子代理、旧回复、工具或 synthetic 回复 | 不完成当前业务阶段 |
+| 错 run/计划、非法状态、会话截断或链接文件 | helper 非零退出；详情标无效 |
+| 已进入收尾、CLI 已退出且尚有补充 | 不投新业务消息，不返回完整 success |
+| 认证失败 / 额度耗尽 | 原 42 / 43 优先，原计划保持 |
+
+### 5. Scenarios and Examples
+
+- Normal：#257 首轮生成合成线索并评分排名；仅被选中时追加双日期窗口比较，再追加离线 HTML 对比报告。
+- Base：选择零条的新 run 与历史 [] 都保持单轮；两条候选完整保存，但初始 prompt 不含后续正文。
+- Incorrect：tmux paste 后重启，没找到该 user 输入就再发一次。Correct：保留 pending 并失败，人工核对原会话，避免重复业务需求。
+- Incorrect：仅更新 topics.md 或在恢复时查询新题库。Correct：同步工具按 no 更新 topics 及 followups_json，历史 task/run 永远用自己的快照；同步代码须一起携带共享 topic_library.py。
+
+### 6. Tests Required
+
+- 600/21/1200、完整编号、所有英文及排除主题、自启动合成样例要求、补充不出现在初始正文；逐题语义审查包含改题依据。
+- 固定 0/1/2、同事务冻结、改题后普通/批次不漂移、养号候选、canonical/custom/旧记录零补充；quota payload 与实际下发原计划保持且不调用抽签。
+- 阶段输入确认、旧回复/元/子消息排除、pending 不确定与确认后恢复、坏摘要/索引/链接/截断、收尾禁止新补充。
+- `deploy/v3/run_local_verification.py --manifest <清单> [--followups-only]` 用正式 driver/tmux 与 CLI 替身断言 1/2/3 条输入、原 cwd/session、认证错误 42 且无补充。替身按原生 CLI 规范化 bracketed-paste 的 CR/LF，错误样例包含结构化 error 字段。
+- `deploy/v3/verify_stack.py --manifest <清单> --browser --topic-followups` 核对页面保存→API→SQLite、运行冻结正文、阶段摘要、XSS、1280/390px 明暗主题。替身和离线格式核对不能声称真实模型推理通过。

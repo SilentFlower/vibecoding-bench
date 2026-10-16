@@ -27,6 +27,7 @@ from account_runtime import AccountRuntime, atomic_json, derive_v3_fingerprint
 from account_isolation import role_container
 from verify_isolation import memory_peaks, verify_roles, verify_route_failure
 from verify_system_profile import verify_system_information
+from verify_followups import verify_followup_delivery
 
 
 
@@ -340,6 +341,9 @@ def verify() -> None:
         time.sleep(0.3)
         runtime.cleanup(runtime.execution_token(container.id, "login:abcdef654321"))
         assert (runtime._root(row) / "home" / ".claude" / ".credentials.json").read_bytes() == original
+        if os.environ.get("VERIFY_FOLLOWUPS_ONLY") == "1":
+            verify_followup_delivery(runtime, client, account, row, database)
+            return
         environment = {"CLAUDE_CODE_VERSION": "9.9.9", "TASK_PROMPT": "Synthetic only", "RUN_ID": "synthetic-run", "TIMEOUT_SEC": "120", "TIMEOUT_WRAPUP_SEC": "0",
             "SYNTHETIC_TLS_PROBE": "1", "TZ": "Asia/Tokyo", "LANG": "ja_JP.UTF-8", "LC_ALL": "ja_JP.UTF-8"}
         tls_before = len(Path("/verify/tls.jsonl").read_text().splitlines())
@@ -613,6 +617,7 @@ def verify() -> None:
         assert rebuilt.exec_run(["cat", "/etc/machine-id"]).output == machine
         assert (runtime._root(rebuilt_row) / "home" / ".claude" / ".credentials.json").read_bytes() == original
         runtime.maintenance(rebuilt_row['environment_id'], 'stop')
+        verify_followup_delivery(runtime, client, account, rebuilt_row, database)
         verify_legacy_transition(runtime, rebuilt_row, account, client)
         print("PASS: fixed HOME/container, native TLS ClientHello from account, raw body/429/API evidence, non-root isolation, tmux reattach, reauth cancellation, task capture cleanup, idempotent stop and wake")
         print("PASS: continue process-tree/capture cleanup, two accounts using the same mock proxy remain separate, network fault closes sender")

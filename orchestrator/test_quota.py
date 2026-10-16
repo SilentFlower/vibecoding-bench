@@ -283,13 +283,17 @@ class QuotaGuardTests(unittest.TestCase):
     def test_runtime_quota_wins_exit_zero_and_keeps_same_run(self) -> None:
         """额度状态优先于历史错误退出码 0，恢复原 run/会话及快照。"""
         task = self._run(batch=True)
+        plan = json.dumps(["Compare periods.", "Export comparison results."])
+        with main.get_db() as connection:
+            connection.execute("UPDATE runs SET followup_plan_json=? WHERE id='original'", (plan,))
         self.runner.read_worker_status.return_value = {"status": "quota_wait", "error": "被动识别额度耗尽:five_hour"}
         self.scheduler._execute("original", self.account, task)
         self.assertEqual("quota_wait", main.get_run("original")["status"])
         self.assertEqual(0, main.list_task_batches()[0]["done_count"])
         # 合成错误无 reset 时即使多次 tick 也不探测、不建新题。
         before = self.runner.start_run.call_count
-        self.guard.tick()
+        with patch.object(main, "sample_followups", side_effect=AssertionError("恢复不得重抽计划")):
+            self.guard.tick()
         self.guard.tick()
         self.assertEqual(before, self.runner.start_run.call_count)
         session = main.WORKSPACES_DIR / "original/.claude-home/projects/-workspace/same-session.jsonl"
@@ -297,13 +301,15 @@ class QuotaGuardTests(unittest.TestCase):
         session.write_text('{"message":{"role":"assistant"}}\n')
         self._expire()
         self.scheduler.submit = Mock()
-        self.guard.tick()
+        with patch.object(main, "sample_followups", side_effect=AssertionError("恢复不得重抽计划")):
+            self.guard.tick()
         rid, account, payload = self.scheduler.submit.call_args.args
         self.assertEqual("original", rid)
         self.assertEqual(task["id"], payload["id"])
         self.assertEqual("保持原 prompt", payload["prompt"])
         self.assertEqual("high", payload["claude_effort_level"])
         self.assertEqual(1, payload["quota_attempt"])
+        self.assertEqual(plan, payload["followup_plan_json"])
         self.runner.read_worker_status.return_value = {}
         # 真实成功响应解除恢复认领，其它等待才可运行。
         def successful_response(_worker):
@@ -311,6 +317,7 @@ class QuotaGuardTests(unittest.TestCase):
             return 0
         self.runner.wait_worker.side_effect = successful_response
         self.scheduler._execute(rid, account, payload)
+        self.assertEqual(plan, self.runner.start_run.call_args.args[2]["followup_plan_json"])
         self.assertEqual("same-session", self.runner.start_run.call_args.args[2]["resume_session_id"])
         self.assertEqual(main.get_run(rid)["execution_model"], self.runner.start_run.call_args.args[2]["model_override"])
         self.assertEqual("success", main.get_run(rid)["status"])

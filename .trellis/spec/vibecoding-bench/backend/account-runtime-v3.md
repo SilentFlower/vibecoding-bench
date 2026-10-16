@@ -68,7 +68,7 @@ scripts/v3-stack stop --env <独立配置>
 - `prepare` 创建排他维护门禁：重授权、代理修改、绑定切换、停止、重建检查或排空 API。配置 quiesce 验证排他 owner/generation、API 活动数和本环境 CLI/发送器状态。
 - CLI 安装在认领后执行，不持有环境生命周期锁；API 就绪不安装 CLI。原 weighted slot/FIFO/RPM/粘性请求和 SSE permit 规则保留，OAuth resolve 不等待 CLI 租约。
 - driver 和续聊 wrapper 使用 `setsid --wait`，Docker exec 生命周期必须跟随实际进程。tmux 登录 shell 显式保留选定 CLI 缓存 PATH。
-- v3 生成 driver 时去除内部时间戳 Stop hook；UID1000 无权写 root 私有 runtime 树，该信号也没有消费者。完成仍由真实主会话 JSONL 的最新稳定最终 assistant 文本判定，不需要放宽控制目录权限。原 hooks 在作业收口时按快照恢复。
+- v3 生成 driver 时去除内部时间戳 Stop hook；UID1000 无权写 root 私有 runtime 树，该信号也没有消费者。完成仍由真实主会话 JSONL 的最新稳定最终 assistant 文本判定；配置业务补充时还需 [阶段契约](./topic-prompt-contract.md#scenario-自包含题库与冻结的有限业务补充) 核验全部选定轮次，不需要放宽控制目录权限。原 hooks 在作业收口时按快照恢复。
 - `_cli_setup()` 在已认领的环境锁内合并固定 HOME 的 `settings.json.env.DISABLE_AUTOUPDATER="1"` 及画像的 TZ/LANG/LC_ALL，保留其他 env/model/hooks 并发布为 UID1000 文件。普通任务、抓包、登录和续聊的 CLI 准备共用此入口；CLI 版本继续由管理端精确缓存与全局运行配置选择。
 - 实际任务 driver 在合并 worker_env 后覆盖画像的 TZ/LANG/LC_ALL；登录 tmux 命令、短命令、OAuth 探测和续聊 PTY 使用同源值。账号列表 `effective_timezone` 优先只读既有画像，否则返回显式配置或新默认；GET 不创建环境，不再把旧账号名派生值当作 v3 有效设置。
 - 正式普通任务／养号／恢复及非抓包续聊临时安装 `/usr/local/bin/v3-cli-quota` 状态栏包装，只消费官方 rate_limits 与当前主会话的真实响应；不新增 usage 或模型请求。先落盘原 statusLine 及本代命令，收口／重启对账在停止进程后仅恢复仍由本代管理的字段，保留用户运行中改写；具体采集与周期认领见 [额度契约](./database-guidelines.md)。
@@ -89,7 +89,7 @@ bench/environments/<environment_id>/
   flows/group-<relative_path_hash>/
     executions/<source_hash>/        stats/HTTP/index/原生 flow/被动额度
   controls/<source_hash>/             独立只读暂停信号
-  runtime/runs/<run_id>/             status/transcript/baseline/刷新控制
+  runtime/runs/<run_id>/             status/transcript/baseline/followups/刷新控制
   runtime/                           作业脚本/PID/tmux、上下文/ACK、执行证明
 bench/flows/<account>/<task>/<run>/    固定兼容链接
 ```

@@ -1344,6 +1344,7 @@ async function renderTopics() {
   $('#add-topic').onclick = () => openTopicModal(null);
 }
 
+/** 打开题目及两条业务补充编辑。@param {number|null} topicId 题目 ID。@returns {void} */
 function openTopicModal(topicId) {
   const topic = topicId ? state.topics.find(t => t.id === topicId) : null;
   const form = $('#topic-form');
@@ -1352,6 +1353,8 @@ function openTopicModal(topicId) {
   form.no.value = topic ? topic.no : nextTopicNo();
   form.title.value = topic ? topic.title : '';
   form.description.value = topic ? topic.description : '';
+  form.followup_1.value = topic?.followups?.[0] || '';
+  form.followup_2.value = topic?.followups?.[1] || '';
   form.category.value = topic ? topic.category : '';
   $('#topic-modal-title').textContent = topic ? `#${topic.no}` : 'new';
   $('#topic-delete').classList.toggle('hidden', !topic);
@@ -1360,13 +1363,19 @@ function openTopicModal(topicId) {
   form.onsubmit = async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
+    const first = String(fd.get('followup_1') || '').trim();
+    const second = String(fd.get('followup_2') || '').trim();
+    if (second && !first) return alert('请先填写第一条补充需求');
     const body = {
       no: Number(fd.get('no')),
       title: fd.get('title'),
       description: fd.get('description') || '',
       category: fd.get('category') || '',
       enabled: true,
+      followups: [first, second].filter(Boolean),
     };
+    const submit = form.querySelector('button[type=submit]');
+    submit.disabled = true;
     try {
       if (topic) {
         await API(`/topics/${topic.id}`, { method: 'PUT', body: JSON.stringify(body) });
@@ -1378,6 +1387,8 @@ function openTopicModal(topicId) {
       await renderTopics();
     } catch (err) {
       alert('保存题目失败: ' + err.message);
+    } finally {
+      submit.disabled = false;
     }
   };
 
@@ -1568,6 +1579,25 @@ function renderBatchActions(batch) {
   `;
 }
 
+/**
+ * 展示本次冻结需求与可核对的自动补充进度。
+ * @param {Object} run 运行详情与补充状态。
+ * @returns {string} 已转义的需求 HTML。
+ */
+function renderRunFollowups(run) {
+  const plan = run.followups;
+  const messages = Array.isArray(plan?.messages) ? plan.messages : [];
+  const labels = { single: '单轮任务', not_started: '等待开始', awaiting: '当前轮执行中',
+    pending: '补充投递待确认', complete: '全部轮次完成',
+    unknown: '阶段状态待核对', invalid: '阶段证据无效，请查看运行错误' };
+  const label = labels[plan?.phase] || '阶段状态待核对';
+  const count = plan?.planned == null ? '未知' : `${plan.completed ?? '待确认'}/${plan.planned}`;
+  return `<p>${escapeHTML(label)} · 已完成补充 ${escapeHTML(count)}</p>
+    <details><summary>初始需求</summary><pre class="transcript-pre">${escapeHTML(run.prompt || '历史需求暂不可用')}</pre></details>
+    ${messages.map((text, index) => `<details><summary>补充 ${index + 1}</summary><pre class="transcript-pre">${escapeHTML(text)}</pre></details>`).join('')}`;
+}
+
+/** 创建运行详情容器。@param {string} rid 运行标识。@returns {void} */
 function renderRunDetailShell(rid) {
   $('#modal-content').innerHTML = `
     <h3>Run <code>${rid}</code> <span id="run-detail-status" class="pill pill-queued">queued</span></h3>
@@ -1584,6 +1614,11 @@ function renderRunDetailShell(rid) {
         <div class="stat-box"><div class="stat-label">模型覆盖</div><div class="stat-value-sm" data-stat-key="model_override">默认</div></div>
       </div>
       <div class="hint inline hidden" id="run-detail-stats-error"></div>
+    </div>
+
+    <div class="detail-section">
+      <h4>需求与自动补充</h4>
+      <div id="run-detail-followups">等待运行计划</div>
     </div>
 
     <div class="detail-section">
@@ -1668,10 +1703,22 @@ function renderCaptureDetail(capture) {
   `;
 }
 
+/**
+ * 按当前详情请求更新页面，保留既有异步生命周期。
+ * @param {string} rid 运行标识。
+ * @param {Object} run 运行详情。
+ * @param {Array} files 产物列表。
+ * @param {Object} stats 统计。
+ * @param {string} transcript 终端输出。
+ * @param {string} transcriptState 输出读取状态。
+ * @param {Object} capture 抓包摘要。
+ * @returns {void}
+ */
 function updateRunDetailContent(rid, run, files, stats, transcript, transcriptState, capture) {
   const detail = state.runDetail;
   if (!detail?.rendered) renderRunDetailShell(rid);
   const safeStatus = escapeHTML(run.status);
+  setRunDetailText('#run-detail-followups', renderRunFollowups(run));
 
   const statusEl = $('#run-detail-status');
   if (statusEl) {

@@ -1519,6 +1519,28 @@ inject_tmux_prompt() {
   tmux send-keys -t "$SESSION" Enter
 }
 
+advance_task_followups() {
+  local result action index text
+  local args=(advance --state /workspace/.bench-followups.json --project "$CLAUDE_DIR/projects/-workspace" --idle "$COMPLETION_IDLE_SEC")
+  if [ -f /tmp/claude-wrapup-sent ] || [ -f /tmp/claude-exited ]; then
+    args+=(--no-next)
+  fi
+  result="$(python3 /usr/local/bin/v3-task-followups "${args[@]}")" || return 4
+  action="$(printf '%s' "$result" | jq -r '.action')"
+  case "$action" in
+    complete) return 0 ;;
+    wait) return 1 ;;
+    send)
+      index="$(printf '%s' "$result" | jq -r '.index')"
+      text="$(printf '%s' "$result" | jq -r '.text')"
+      log "Injecting configured follow-up ${index}/${FOLLOWUP_COUNT}"
+      inject_tmux_prompt "followup-${index}" "$text" || return 4
+      return 2 ;;
+    incomplete) return 3 ;;
+    *) return 4 ;;
+  esac
+}
+
 interrupt_and_inject_tmux_prompt() {
   local kind="$1"
   local text="$2"
@@ -1729,6 +1751,29 @@ if not initial.exists():
     initial.write_text(json.dumps({path.name: path.stat().st_size for path in Path(sys.argv[1]).glob("*.jsonl")}))
 PY
 
+# 原始需求独立保存，quota resume 的控制提示不能改变业务阶段匹配正文。
+export TASK_INITIAL_PROMPT="$TASK_PROMPT"
+export TASK_FOLLOWUPS_JSON="${TASK_FOLLOWUPS_JSON-[]}"
+FOLLOWUP_COUNT="$(python3 - <<'FOLLOWUP_COUNT_PY'
+import json, os
+value = json.loads(os.environ['TASK_FOLLOWUPS_JSON'])
+if not isinstance(value, list) or len(value) > 2 or any(not isinstance(x, str) or not x.strip() for x in value):
+    raise ValueError('invalid follow-up plan')
+print(len(value))
+FOLLOWUP_COUNT_PY
+)"
+rm -f /tmp/claude-followup-error /tmp/claude-followup-incomplete
+if [ "$FOLLOWUP_COUNT" -gt 0 ]; then
+  followup_init=(init --state /workspace/.bench-followups.json --project "$CLAUDE_DIR/projects/-workspace")
+  if [ -n "${RESUME_SESSION_ID:-}" ]; then
+    followup_init+=(--resume)
+  fi
+  if ! python3 /usr/local/bin/v3-task-followups "${followup_init[@]}" >/tmp/claude-followup-init; then
+    write_bench_status "failed" "自动补充阶段证据无效或投递结果不确定，已保留原运行"
+    exit 1
+  fi
+fi
+
 start_profile_credentials_sync
 
 # ---------- 4) 启动 tmux + claude (node 用户 + run 权限模式快照) ----------
@@ -1899,12 +1944,40 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     fi
     write_api_stall_status "running" "检测到 Claude API 连接卡死，但自动恢复次数已用完"
   fi
+  if [ "$FOLLOWUP_COUNT" -gt 0 ]; then
+    if ! python3 /usr/local/bin/v3-task-followups observe --state /workspace/.bench-followups.json \
+        --project "$CLAUDE_DIR/projects/-workspace" >/dev/null; then
+      write_bench_status "failed" "自动补充阶段证据无效，已保留原运行"
+      touch /tmp/claude-followup-error
+      break
+    fi
+  fi
   completion_status=0
   classify_claude_completion "$COMPLETION_IDLE_SEC" >/tmp/claude-completion-state 2>/dev/null || completion_status=$?
   if handle_completion_failure "$completion_status"; then
     break
   fi
   if [ "$completion_status" -eq 0 ]; then
+    if [ "$FOLLOWUP_COUNT" -gt 0 ]; then
+      followup_status=0
+      advance_task_followups || followup_status=$?
+      case "$followup_status" in
+        0) completion_done=1; break ;;
+        1|2) sleep 2; continue ;;
+        3)
+          if [ -f /tmp/claude-wrapup-sent ]; then
+            write_bench_status "timeout" "已进入收尾窗口，配置的业务补充尚未全部完成"
+          else
+            write_bench_status "failed" "Claude 已退出，配置的业务补充尚未全部完成"
+          fi
+          touch /tmp/claude-followup-incomplete
+          break ;;
+        *)
+          write_bench_status "failed" "自动补充阶段证据无效或投递结果不确定，已保留原运行"
+          touch /tmp/claude-followup-error
+          break ;;
+      esac
+    fi
     completion_done=1
     break
   fi
@@ -1924,7 +1997,12 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
       break
     fi
     if [ "$completion_status" -eq 0 ]; then
-      completion_done=1
+      if [ "$FOLLOWUP_COUNT" -eq 0 ]; then
+        completion_done=1
+      elif python3 /usr/local/bin/v3-task-followups advance --state /workspace/.bench-followups.json \
+          --project "$CLAUDE_DIR/projects/-workspace" --idle 0 --no-next | jq -e '.action == "complete"' >/dev/null; then
+        completion_done=1
+      fi
     fi
     if [ "$completion_status" -eq 2 ]; then
       echo "auth_error" > /tmp/claude-fatal-error
@@ -1942,12 +2020,17 @@ done
 capture_transcript_snapshot
 persist_runtime_claude_state
 tmux kill-session -t "$SESSION" 2>/dev/null || true
-if [ "$completion_done" -ne 1 ] && [ ! -f /tmp/claude-fatal-error ] && [ ! -f /tmp/claude-quota-wait ] && [ ! -f /tmp/claude-api-fatal-error ]; then
+if [ "$completion_done" -ne 1 ] && [ ! -f /tmp/claude-fatal-error ] && [ ! -f /tmp/claude-quota-wait ] && [ ! -f /tmp/claude-api-fatal-error ] && [ ! -f /tmp/claude-followup-error ] && [ ! -f /tmp/claude-followup-incomplete ]; then
   completion_status=0
   classify_claude_completion 0 >/tmp/claude-completion-state 2>/dev/null || completion_status=$?
   handle_completion_failure "$completion_status" || true
   if [ "$completion_status" -eq 0 ]; then
-    completion_done=1
+    if [ "$FOLLOWUP_COUNT" -eq 0 ]; then
+      completion_done=1
+    elif python3 /usr/local/bin/v3-task-followups advance --state /workspace/.bench-followups.json \
+        --project "$CLAUDE_DIR/projects/-workspace" --idle 0 --no-next | jq -e '.action == "complete"' >/dev/null; then
+      completion_done=1
+    fi
   elif [ "$completion_status" -eq 2 ]; then
     echo "auth_error" > /tmp/claude-fatal-error
     write_bench_status "auth_failed" "OAuth 认证失败"
@@ -1959,6 +2042,12 @@ fi
 if [ -f /tmp/claude-quota-wait ]; then
   log "额度耗尽，保留原任务等待恢复"
   exit 43
+elif [ -f /tmp/claude-followup-error ]; then
+  log "Configured follow-up evidence is invalid or delivery is uncertain"
+  exit 1
+elif [ -f /tmp/claude-followup-incomplete ]; then
+  log "Configured follow-ups did not finish before wrap-up or CLI exit"
+  if [ -f /tmp/claude-wrapup-sent ]; then exit 124; else exit 1; fi
 elif [ "$completion_done" -eq 1 ]; then
   log "Claude finished with final assistant message"
   exit 0

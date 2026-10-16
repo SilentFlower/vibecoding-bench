@@ -60,6 +60,7 @@ def main() -> None:
     parser.add_argument("--warmup-quota", action="store_true")
     parser.add_argument("--reauth", action="store_true")
     parser.add_argument("--deleted-binding", action="store_true")
+    parser.add_argument("--topic-followups", action="store_true")
     args = parser.parse_args()
     if args.warmup_quota and not args.browser:
         parser.error("养号页面验证需要同时指定 --browser")
@@ -67,6 +68,8 @@ def main() -> None:
         parser.error("重授权验证需要 --browser，并单独执行以隔离合成账号")
     if args.deleted_binding and (not args.browser or args.warmup_quota or args.reauth):
         parser.error("删除后解绑验证需要 --browser，并单独执行以隔离合成账号")
+    if args.topic_followups and (not args.browser or args.warmup_quota or args.reauth or args.deleted_binding):
+        parser.error("递进需求页面验证需要 --browser，并单独执行")
     manifest = json.loads(args.manifest.read_text())
     client = docker.from_env()
     deployment = "stack-verify-" + uuid.uuid4().hex[:10]
@@ -186,6 +189,9 @@ def main() -> None:
                         if args.deleted_binding:
                             from verify_deleted_binding import deleted_binding_fixture
                             exercise = fixtures.enter_context(deleted_binding_fixture(client, deployment, data, manifest, browser, base, authorization))
+                        if args.topic_followups:
+                            from verify_followup_browser import followup_browser_fixture
+                            exercise = fixtures.enter_context(followup_browser_fixture(data))
                         asyncio.run(verify_visible_logout(base, values["V3_ADMIN_PASSWORD"], exercise=exercise, insecure_http=args.reauth))
                 finally:
                     if args.warmup_quota:

@@ -57,14 +57,16 @@ class EnglishTopicLibraryTests(unittest.TestCase):
             "Implement a DNS proxy.", "Scan network hosts and open ports.", "Capture TCP packets.",
             "Review security vulnerabilities.", "Build a gene and protein analysis tool.",
             "Manage medical prescriptions and vaccine records.",
+            "Configure an existing LLM client.", "Integrate a chatbot API.",
+            "Build a binary decompilation workbench.",
         ):
             with self.subTest(description=description):
                 modified = [replace(topics[0], description=description), *topics[1:]]
-                with self.assertRaisesRegex(SystemExit, "用户排除"):
+                with self.assertRaisesRegex(SystemExit, "用户排除|高风险目标"):
                     SYNC.validate_topics(modified)
         for description in (
             "Call a weather API and display a forecast.", "Scan local folders and summarize disk usage.",
-            "Track training courses, lesson attendance, and certificates.", "Configure an existing LLM client.",
+            "Track training courses, lesson attendance, and certificates.",
             "Visualize a paper citation network graph.",
         ):
             with self.subTest(description=description):

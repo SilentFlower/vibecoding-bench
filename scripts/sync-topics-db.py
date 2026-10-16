@@ -7,196 +7,13 @@
 from __future__ import annotations
 
 import argparse
-import re
+import sys
 import sqlite3
 import time
-from dataclasses import dataclass
 from pathlib import Path
 
-
-# 同时兼容旧中文标题与新英文标题，便于旧版材料回滚时继续解析。
-_CAT_RE = re.compile(
-    r"^##\s+(?:[一二三四五六七八九十百零\d]+、|\d+\.\s+)"
-    r"(.+?)(?:（\d+\s*题）|\(\d+\s+topics?\))\s*$",
-    re.IGNORECASE,
-)
-_ITEM_RE = re.compile(r"^-\s+\[[ x]\]\s+(\d+)\.\s+\*\*(.+?)\*\*[:：]?\s*(.*)$")
-_CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
-_HIGH_RISK_PHRASES = (
-    "reverse engineering",
-    "decompilation",
-    "credential harvesting",
-    "session hijacking",
-    "fingerprint spoofing",
-    "account farming",
-    "automated registration",
-    "model extraction",
-    "knowledge distillation",
-    "style imitation",
-    "style transfer",
-    "captcha bypass",
-    "auto-booking",
-    "auto-purchasing",
-    "ticket grabbing",
-    "class grabbing",
-    "number grabbing",
-    "sign-in scripts",
-)
-_UNNATURAL_PHRASES = (
-    "queryer",
-    "mutual conversion",
-    "desensitization",
-    "wrong question",
-    "keynote book",
-    "precipitate",
-    "grayscale release",
-    "online time",
-    "operation and maintenance",
-    "time consuming",
-    "card replenishment",
-    "variable occupancy",
-    "screen recording occupancy",
-    "automatic annotation",
-    "configure hot update",
-    "product promotion pipeline",
-    "number taking",
-    "enters the warehouse",
-    "speech quality inspection",
-    "big watermelon",
-    "word-marking translation",
-    "synonymously",
-)
-
-# 这是用户选择的题库范围，不把普通联网应用、文件遍历或课程练习当作排除主题。
-_EXCLUDED_TOPIC_PATTERNS = (
-    ("模型训练或微调", re.compile(
-        r"\b(?:train(?:ing|ed)?|retrain(?:ing)?|fine[- ]?tun(?:e|ing))\b[^.\n]{0,100}\b(?:models?|llms?|neural)\b"
-        r"|\b(?:models?|llms?|neural)\b[^.\n]{0,100}\b(?:train(?:ing|ed)?|retrain(?:ing)?|fine[- ]?tun(?:e|ing))\b", re.I)),
-    ("网络协议、代理或扫描", re.compile(
-        r"\b(?:dns|mdns|ssh|socks5?|tcp|udp|proxy|proxies|subnets?|packet capture|port forwarding)\b"
-        r"|\b(?:lan|network|device|port)\s+(?:scanner|scanning|discovery|protocols?)\b"
-        r"|\b(?:scan|scanning)\b[^.\n]{0,80}\b(?:network|ports?|hosts?|domains?)\b"
-        r"|\b(?:http load test|webhook|header overwriter|https? certificate|tls certificate|certificate expiration|certificate transparency|cors|traffic switching)\b", re.I)),
-    ("安全类", re.compile(
-        r"\b(?:security|cybersecurity|vulnerabilit(?:y|ies)|phishing|fingerprint|password|encryption|encrypted|zero[- ]trust)\b"
-        r"|\b(?:threat model|secrets? scanner|key leakage|key rotation|access token|two-factor|recovery code|cookie consent)\b", re.I)),
-    ("生物或医疗", re.compile(
-        r"\b(?:biolog\w*|genom\w*|dna|rna|proteins?|bacteria\w*|viruses?|molecul\w*|drugs?|medical|clinical|clinic|hospital|vaccine\w*|prescriptions?)\b"
-        r"|\b(?:health record|health data|heart rate|plant care|pet foster)\b", re.I)),
-)
-
-
-@dataclass(frozen=True)
-class Topic:
-    """
-    题库条目的结构化表示。
-
-    :param no: 题目编号
-    :param title: 题目标题
-    :param description: 题目描述
-    :param category: 题目分类
-    """
-
-    no: int
-    title: str
-    description: str
-    category: str
-
-
-def parse_topics(path: Path) -> list[Topic]:
-    """
-    从 Markdown 题库解析 topic 列表。
-
-    :param path: `topics.md` 文件路径
-    :return: 解析出的 topic 列表
-    """
-    topics: list[Topic] = []
-    current_category = ""
-    for line in path.read_text(encoding="utf-8").splitlines():
-        cm = _CAT_RE.match(line)
-        if cm:
-            current_category = cm.group(1).strip()
-            continue
-        im = _ITEM_RE.match(line)
-        if not im:
-            continue
-        no, title, desc = im.groups()
-        topics.append(Topic(
-            no=int(no),
-            title=title.strip(),
-            description=desc.strip(),
-            category=current_category,
-        ))
-    return topics
-
-
-def validate_topics(topics: list[Topic]) -> None:
-    """
-    校验完整英文题库的编号、分类、必填字段和安全短语。
-
-    :param topics: 待校验的 topic 列表
-    :return: None
-    """
-    if not topics:
-        raise SystemExit("题库为空，未解析到任何题目")
-    numbers = [topic.no for topic in topics]
-    duplicates = sorted({no for no in numbers if numbers.count(no) > 1})
-    if duplicates:
-        raise SystemExit(f"题目编号重复: {duplicates}")
-    # 文档按分类排列而不是按编号排列，集合仍必须精确覆盖固定的 600 个编号。
-    expected = set(range(1, 601))
-    actual = set(numbers)
-    if actual != expected:
-        missing = sorted(expected - actual)
-        extra = sorted(actual - expected)
-        raise SystemExit(
-            f"题目编号不完整: 期望 1..600 共 600 条，"
-            f"实际 {len(actual)} 条；缺失 {missing[:10]}{'...' if len(missing) > 10 else ''}；"
-            f"多余 {extra[:10]}{'...' if len(extra) > 10 else ''}"
-        )
-    missing_fields = [
-        topic.no for topic in topics
-        if not topic.title or not topic.description or not topic.category
-    ]
-    if missing_fields:
-        raise SystemExit(f"题目字段缺失: {missing_fields}")
-    categories = {topic.category for topic in topics}
-    if len(categories) != 21:
-        raise SystemExit(f"题目分类数量错误: 期望 21，实际 {len(categories)}")
-    cjk_fields = [
-        topic.no for topic in topics
-        if any(_CJK_RE.search(value) for value in (
-            topic.title,
-            topic.description,
-            topic.category,
-        ))
-    ]
-    if cjk_fields:
-        raise SystemExit(f"题目字段仍包含 CJK 字符: {cjk_fields[:20]}")
-    risky = []
-    for topic in topics:
-        content = f"{topic.title}\n{topic.description}".casefold()
-        matches = [phrase for phrase in _HIGH_RISK_PHRASES if phrase in content]
-        if matches:
-            risky.append((topic.no, matches))
-    if risky:
-        raise SystemExit(f"题目包含高风险目标短语: {risky[:20]}")
-    excluded = []
-    for topic in topics:
-        content = f"{topic.category}\n{topic.title}\n{topic.description}"
-        matches = [name for name, pattern in _EXCLUDED_TOPIC_PATTERNS if pattern.search(content)]
-        if matches:
-            excluded.append((topic.no, matches))
-    if excluded:
-        raise SystemExit(f"题目包含用户排除的主题: {excluded[:20]}")
-    unnatural = []
-    for topic in topics:
-        content = f"{topic.title}\n{topic.description}".casefold()
-        matches = [phrase for phrase in _UNNATURAL_PHRASES if phrase in content]
-        if matches:
-            unnatural.append((topic.no, matches))
-    if unnatural:
-        raise SystemExit(f"题目包含已知机器直译短语: {unnatural[:20]}")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "orchestrator"))
+from topic_library import Topic, encode_followups, parse_topics, validate_topics
 
 
 def connect_db(path: Path) -> sqlite3.Connection:
@@ -270,18 +87,21 @@ def apply_sync(conn: sqlite3.Connection, topics: list[Topic]) -> None:
     :return: None
     """
     with conn:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(topics)")}
+        if "followups_json" not in columns:
+            conn.execute("ALTER TABLE topics ADD COLUMN followups_json TEXT NOT NULL DEFAULT '[]'")
         for topic in topics:
             cur = conn.execute(
-                "UPDATE topics SET title=?, description=?, category=?, enabled=1, "
+                "UPDATE topics SET title=?, description=?, category=?, followups_json=?, enabled=1, "
                 "deleted_at=NULL, updated_at=julianday('now') WHERE no=?",
-                (topic.title, topic.description, topic.category, topic.no),
+                (topic.title, topic.description, topic.category, encode_followups(topic.followups), topic.no),
             )
             if cur.rowcount:
                 continue
             conn.execute(
-                "INSERT INTO topics(no, title, description, category, enabled) "
-                "VALUES(?,?,?,?,1)",
-                (topic.no, topic.title, topic.description, topic.category),
+                "INSERT INTO topics(no, title, description, category, followups_json, enabled) "
+                "VALUES(?,?,?,?,?,1)",
+                (topic.no, topic.title, topic.description, topic.category, encode_followups(topic.followups)),
             )
 
 

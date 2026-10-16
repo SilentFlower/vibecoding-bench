@@ -30,6 +30,7 @@ import uuid
 from collections import deque
 from contextlib import ExitStack, asynccontextmanager, contextmanager
 from pathlib import Path
+from stat import S_ISREG
 from typing import Literal, Optional, Sequence
 
 import docker
@@ -47,6 +48,7 @@ from account_runtime import AccountRuntime, RuntimeBusy, V3_DEFAULT_TIMEZONE, at
 from cli_quota import statusline_quota_observation
 from login_terminal import authorization_url
 from login_drafts import LoginDraftStore
+from topic_library import decode_followups, encode_followups, parse_topics, sample_followups
 
 
 # ============== 配置 ==============
@@ -1340,6 +1342,7 @@ CREATE TABLE IF NOT EXISTS topics (
   category TEXT NOT NULL DEFAULT '',
   enabled INTEGER DEFAULT 1,
   deleted_at REAL,
+  followups_json TEXT NOT NULL DEFAULT '[]',
   created_at REAL DEFAULT (julianday('now')),
   updated_at REAL DEFAULT (julianday('now'))
 );
@@ -1356,6 +1359,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   deleted_at REAL,
   timeout_sec INTEGER DEFAULT 1800,
   repeat_n INTEGER DEFAULT 1,
+  followup_candidates_json TEXT NOT NULL DEFAULT '[]',
   created_at REAL DEFAULT (julianday('now')),
   FOREIGN KEY(account_id) REFERENCES accounts(id)
 );
@@ -1384,6 +1388,7 @@ CREATE TABLE IF NOT EXISTS task_batch_items (
   run_id TEXT,
   prompt TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
+  followup_candidates_json TEXT NOT NULL DEFAULT '[]',
   created_at REAL DEFAULT (julianday('now')),
   updated_at REAL DEFAULT (julianday('now')),
   FOREIGN KEY(batch_id) REFERENCES task_batches(id),
@@ -1424,6 +1429,7 @@ CREATE TABLE IF NOT EXISTS runs (
   stop_requested_at REAL,
   deleted_at REAL,
   error TEXT,
+  followup_plan_json TEXT NOT NULL DEFAULT '[]',
   created_at REAL DEFAULT (julianday('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_runs_status  ON runs(status);
@@ -1525,6 +1531,10 @@ def init_db() -> None:
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_cc2api_account_id "
                 "ON accounts(cc2api_account_id) WHERE cc2api_account_id IS NOT NULL"
             )
+            _ensure_column(conn, "topics", "followups_json", "TEXT NOT NULL DEFAULT '[]'")
+            _ensure_column(conn, "tasks", "followup_candidates_json", "TEXT NOT NULL DEFAULT '[]'")
+            _ensure_column(conn, "task_batch_items", "followup_candidates_json", "TEXT NOT NULL DEFAULT '[]'")
+            _ensure_column(conn, "runs", "followup_plan_json", "TEXT NOT NULL DEFAULT '[]'")
             _seed_topics_if_empty(conn)
     finally:
         conn.close()
@@ -1547,39 +1557,21 @@ def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) 
 
 
 # ============== Topics（SQLite 为主，topics.md 首次 seed）==============
-_CAT_RE = re.compile(
-    r"^##\s+(?:[一二三四五六七八九十百零\d]+、|\d+\.\s+)"
-    r"(.+?)(?:（\d+\s*题）|\(\d+\s+topics?\))\s*$",
-    re.IGNORECASE,
-)
-_ITEM_RE = re.compile(r"^-\s+\[[ x]\]\s+(\d+)\.\s+\*\*(.+?)\*\*[:：]?\s*(.*)$")
-
-
 def load_seed_topics() -> list[dict]:
-    """
-    从题库 markdown 解析首次 seed 数据。
+    """通过共享解析器读取初始题面及独立补充，兼容无子行的历史材料。
 
-    :return: topic dict 列表，字段包含 no/category/title/description
+    :return: 可直接用于首次 seed 的题目字段。
     """
     if not TOPICS_FILE.exists():
         return []
-    topics: list[dict] = []
-    current_category: Optional[str] = None
-    for line in TOPICS_FILE.read_text(encoding="utf-8").splitlines():
-        cm = _CAT_RE.match(line)
-        if cm:
-            current_category = cm.group(1).strip()
-            continue
-        im = _ITEM_RE.match(line)
-        if im:
-            no, title, desc = im.groups()
-            topics.append({
-                "no": int(no),
-                "category": current_category or "",
-                "title": title.strip(),
-                "description": desc.strip(),
-            })
-    return topics
+    result = []
+    for topic in parse_topics(TOPICS_FILE):
+        item = {"no": topic.no, "category": topic.category, "title": topic.title,
+            "description": topic.description}
+        if topic.followups:
+            item["followups_json"] = encode_followups(topic.followups)
+        result.append(item)
+    return result
 
 
 def _seed_topics_if_empty(conn: sqlite3.Connection) -> None:
@@ -1594,13 +1586,14 @@ def _seed_topics_if_empty(conn: sqlite3.Connection) -> None:
         return
     for topic in load_seed_topics():
         conn.execute(
-            "INSERT OR IGNORE INTO topics(no, title, description, category) "
-            "VALUES(?,?,?,?)",
+            "INSERT OR IGNORE INTO topics(no, title, description, category, followups_json) "
+            "VALUES(?,?,?,?,?)",
             (
                 topic["no"],
                 topic["title"],
                 topic.get("description") or "",
                 topic.get("category") or "",
+                topic.get("followups_json", "[]"),
             ),
         )
 
@@ -1618,7 +1611,10 @@ def list_topic_rows(include_deleted: bool = False) -> list[dict]:
         rows = conn.execute(
             f"SELECT * FROM topics {where} ORDER BY no"
         ).fetchall()
-        return [dict(r) for r in rows]
+        items = [dict(r) for r in rows]
+        for item in items:
+            item["followups"] = decode_followups(item.pop("followups_json", None))
+        return items
     finally:
         conn.close()
 
@@ -2100,6 +2096,7 @@ _NATURAL_TOPIC_PROMPT_NGRAM_SIZE = 4
 
 _NATURAL_TOPIC_PROMPT_STYLE_KEYWORDS = (
     ("data_ai", ("AI Applications", "AI Agents", "Data Visualization", "Data Operations", "Dashboard")),
+    ("engineering", ("Writing and Document Workbenches", "Rule-Based Workflow Workbenches")),
     ("creative", ("Games", "Content Creation", "Education", "Creative", "Creativity")),
     (
         "product",
@@ -2126,7 +2123,7 @@ _NATURAL_TOPIC_PROMPT_STYLE_OPENERS = {
     ),
     "data_ai": (
         "Build {title} for data or intelligent processing in the {category} space.",
-        "The data or AI project for this task is {title}, in the {category} category.",
+        "The data project for this task is {title}, in the {category} category.",
         "Implement the core workflow for the {category} project {title}.",
         "Create a {category} project named {title}.",
     ),
@@ -2434,6 +2431,19 @@ def _resolve_topic_prompt(
     :return: 应持久化并下发给 worker 的最终 prompt
     """
     return prompt_override or build_topic_prompt(topic, mode, recent_fingerprints)
+
+
+def _topic_followup_candidates(topic: dict, prompt_override: Optional[str], mode: TopicPromptMode) -> str:
+    """与初始需求同时冻结自然模式补充，保留规范和自定义输入的单轮语义。
+
+    :param topic: 原题库数据库行。
+    :param prompt_override: 用户完整覆盖文本。
+    :param mode: 初始题面表达模式。
+    :return: 零至两条候选的规范 JSON。
+    """
+    if mode != "natural" or prompt_override:
+        return "[]"
+    return encode_followups(decode_followups(topic.get("followups_json")))
 
 
 def _should_load_topic_prompt_history(
@@ -3638,6 +3648,7 @@ class QuotaGuard:
             task = {"id": run["task_id"], "prompt": run["prompt"], "timeout_sec": run["timeout_sec"],
                     "claude_code_version": run["claude_code_version"], "claude_effort_level": run["claude_effort_level"],
                     "quota_attempt": attempt, "model_override": run["execution_model"],
+                    "followup_plan_json": run.get("followup_plan_json"),
                     "capture_full_http": run["run_kind"] == "capture", "capture_mode": run["capture_mode"],
                     "capture_permission_mode": run["capture_permission_mode"]}
             scheduler.submit(run["id"], account, task)
@@ -3839,6 +3850,7 @@ class Runner:
             })
         worker_env = {
             "TASK_PROMPT": task["prompt"],
+            "TASK_FOLLOWUPS_JSON": encode_followups(decode_followups(task.get("followup_plan_json"))),
             "RUN_ID": run_id,
             "TIMEOUT_SEC": str(task.get("timeout_sec", 1800)),
             "ACC_NAME": acc_name,
@@ -6283,6 +6295,8 @@ class Scheduler:
         """
         claude_code_version = effective_claude_code_version()
         claude_effort_level = effective_runtime_effort()
+        candidates = item.get("followup_candidates_json")
+        plan = encode_followups(sample_followups(decode_followups(candidates)))
         with _db_lock:
             conn = get_db()
             try:
@@ -6312,7 +6326,7 @@ class Scheduler:
                         return None
                     cur = conn.execute(
                         "INSERT INTO tasks(topic_no, title, prompt, account_id, batch_id, "
-                        "topic_id, timeout_sec, repeat_n) VALUES(?,?,?,?,?,?,?,?)",
+                        "topic_id, timeout_sec, repeat_n, followup_candidates_json) VALUES(?,?,?,?,?,?,?,?,?)",
                         (
                             item["topic_no"],
                             item["title"],
@@ -6322,12 +6336,13 @@ class Scheduler:
                             item["topic_id"],
                             batch["timeout_sec"],
                             1,
+                            candidates or "[]",
                         ),
                     )
                     task_id = int(cur.lastrowid)
                     conn.execute(
                         "INSERT INTO runs(id, task_id, account_id, batch_id, topic_id, status, "
-                        "claude_code_version, claude_effort_level) VALUES(?,?,?,?,?,?,?,?)",
+                        "claude_code_version, claude_effort_level, followup_plan_json) VALUES(?,?,?,?,?,?,?,?,?)",
                         (
                             run_id,
                             task_id,
@@ -6337,6 +6352,7 @@ class Scheduler:
                             "queued",
                             claude_code_version,
                             claude_effort_level,
+                            plan,
                         ),
                     )
                     conn.execute(
@@ -6495,6 +6511,7 @@ class Scheduler:
             flows_path = FLOWS_DIR / account["name"] / str(task["id"]) / run_id
             capture_full_http = bool(task.get("capture_full_http"))
             initial_state = self._get_run_state(run_id)
+            task = dict(task, followup_plan_json=(initial_state or {}).get("followup_plan_json"))
             if not initial_state or initial_state.get("deleted_at") is not None:
                 return
             if int(initial_state.get("quota_attempt") or 0) != attempt:
@@ -7254,6 +7271,8 @@ class WarmupScheduler:
         run_id = uuid.uuid4().hex[:12]
         claude_code_version = effective_claude_code_version()
         claude_effort_level = effective_runtime_effort()
+        candidates = _topic_followup_candidates(topic, None, "natural")
+        plan = encode_followups(sample_followups(decode_followups(candidates)))
         with _db_lock:
             conn = get_db()
             try:
@@ -7274,7 +7293,7 @@ class WarmupScheduler:
                         return None
                     cur = conn.execute(
                         "INSERT INTO tasks(topic_no, title, prompt, account_id, topic_id, "
-                        "timeout_sec, repeat_n) VALUES(?,?,?,?,?,?,?)",
+                        "timeout_sec, repeat_n, followup_candidates_json) VALUES(?,?,?,?,?,?,?,?)",
                         (
                             topic["no"],
                             f"[warmup] {topic['title']}",
@@ -7283,12 +7302,13 @@ class WarmupScheduler:
                             topic["id"],
                             1800,
                             1,
+                            candidates,
                         ),
                     )
                     task_id = int(cur.lastrowid)
                     conn.execute(
                         "INSERT INTO runs(id, task_id, account_id, topic_id, status, run_kind, "
-                        "claude_code_version, claude_effort_level) VALUES(?,?,?,?,?,?,?,?)",
+                        "claude_code_version, claude_effort_level, followup_plan_json) VALUES(?,?,?,?,?,?,?,?,?)",
                         (
                             run_id,
                             task_id,
@@ -7298,6 +7318,7 @@ class WarmupScheduler:
                             "warmup",
                             claude_code_version,
                             claude_effort_level,
+                            plan,
                         ),
                     )
                     conn.execute(
@@ -9499,13 +9520,22 @@ def login_cancel(sid: str):
 
 # ---------- topics ----------
 class TopicIn(BaseModel):
-    """创建或更新 topic 的请求体"""
+    """创建或更新题目，缺省补充字段保留旧客户端语义。
+
+    :param no: 稳定题号。
+    :param title: 题目标题。
+    :param description: 初始需求。
+    :param category: 分类。
+    :param enabled: 是否可用于新任务。
+    :param followups: 可选的零至两条英文业务补充，None 表示不修改。
+    """
 
     no: int
     title: str
     description: str = ""
     category: str = ""
     enabled: bool = True
+    followups: Optional[list[StrictStr]] = None
 
 
 @app.get("/api/topics")
@@ -9517,19 +9547,24 @@ def list_topics():
 @app.post("/api/topics")
 def create_topic(body: TopicIn):
     """新增一个 topic，持久化到 SQLite。"""
+    try:
+        followups_json = encode_followups(body.followups) if body.followups is not None else None
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
     with _db_lock:
         conn = get_db()
         try:
             with conn:
                 cur = conn.execute(
-                    "INSERT INTO topics(no, title, description, category, enabled) "
-                    "VALUES(?,?,?,?,?)",
+                    "INSERT INTO topics(no, title, description, category, enabled, followups_json) "
+                    "VALUES(?,?,?,?,?,?)",
                     (
                         body.no,
                         body.title.strip(),
                         body.description.strip(),
                         body.category.strip(),
                         int(body.enabled),
+                        followups_json or "[]",
                     ),
                 )
                 return {"id": cur.lastrowid}
@@ -9542,12 +9577,17 @@ def create_topic(body: TopicIn):
 @app.put("/api/topics/{topic_id}")
 def update_topic(topic_id: int, body: TopicIn):
     """更新 topic 基本信息。"""
+    try:
+        followups_json = encode_followups(body.followups) if body.followups is not None else None
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
     with _db_lock:
         conn = get_db()
         try:
             with conn:
                 cur = conn.execute(
                     "UPDATE topics SET no=?, title=?, description=?, category=?, enabled=?, "
+                    "followups_json=COALESCE(?,followups_json), "
                     "updated_at=julianday('now') WHERE id=? AND deleted_at IS NULL",
                     (
                         body.no,
@@ -9555,6 +9595,7 @@ def update_topic(topic_id: int, body: TopicIn):
                         body.description.strip(),
                         body.category.strip(),
                         int(body.enabled),
+                        followups_json,
                         topic_id,
                     ),
                 )
@@ -9685,6 +9726,7 @@ def create_task(body: TaskIn):
         body.prompt_mode,
         recent_fingerprints,
     )
+    candidates = _topic_followup_candidates(topic, body.prompt, body.prompt_mode)
     with _db_lock:
         conn = get_db()
         try:
@@ -9693,8 +9735,8 @@ def create_task(body: TaskIn):
                 if not account_row:
                     raise HTTPException(404, "account not found or disabled")
                 cur = conn.execute(
-                    "INSERT INTO tasks(topic_no, title, prompt, account_id, topic_id, timeout_sec, repeat_n) "
-                    "VALUES(?,?,?,?,?,?,?)",
+                    "INSERT INTO tasks(topic_no, title, prompt, account_id, topic_id, timeout_sec, repeat_n, followup_candidates_json) "
+                    "VALUES(?,?,?,?,?,?,?,?)",
                     (
                         body.topic_no,
                         topic["title"],
@@ -9703,6 +9745,7 @@ def create_task(body: TaskIn):
                         topic["id"],
                         body.timeout_sec,
                         body.repeat_n,
+                        candidates,
                     ),
                 )
                 return {"id": cur.lastrowid}
@@ -9780,7 +9823,7 @@ def create_task_batch(body: BatchIn):
         conn.close()
     # 相似度计算是纯 CPU 工作，提前在写锁外完成，避免阻塞其他任务落库。
     random.shuffle(topics)
-    prepared_items: list[tuple[dict, str]] = []
+    prepared_items: list[tuple[dict, str, str]] = []
     for topic in topics:
         prompt = _resolve_topic_prompt(
             topic,
@@ -9788,7 +9831,7 @@ def create_task_batch(body: BatchIn):
             body.prompt_mode,
             recent_fingerprints,
         )
-        prepared_items.append((topic, prompt))
+        prepared_items.append((topic, prompt, _topic_followup_candidates(topic, body.prompt, body.prompt_mode)))
         if recent_fingerprints is not None:
             recent_fingerprints.append(_topic_prompt_fingerprint(prompt, topic))
     name = f"batch acc#{body.account_id} · {len(topic_ids)} topics"
@@ -9813,10 +9856,10 @@ def create_task_batch(body: BatchIn):
                 )
                 batch_id = int(cur.lastrowid)
                 # prepared_items 的随机顺序由 item id 固化，便于运行追踪和恢复。
-                for topic, prompt in prepared_items:
+                for topic, prompt, candidates in prepared_items:
                     conn.execute(
-                        "INSERT INTO task_batch_items(batch_id, topic_id, prompt) VALUES(?,?,?)",
-                        (batch_id, topic["id"], prompt),
+                        "INSERT INTO task_batch_items(batch_id, topic_id, prompt, followup_candidates_json) VALUES(?,?,?,?)",
+                        (batch_id, topic["id"], prompt, candidates),
                     )
         finally:
             conn.close()
@@ -10124,6 +10167,7 @@ def run_task(tid: int):
     run_ids: list[str] = []
     for _ in range(int(task.get("repeat_n", 1))):
         rid = uuid.uuid4().hex[:12]
+        plan = encode_followups(sample_followups(decode_followups(task.get("followup_candidates_json"))))
         claude_code_version = effective_claude_code_version()
         claude_effort_level = effective_runtime_effort()
         with _db_lock:
@@ -10132,7 +10176,7 @@ def run_task(tid: int):
                 with conn:
                     conn.execute(
                         "INSERT INTO runs(id, task_id, account_id, batch_id, topic_id, status, "
-                        "claude_code_version, claude_effort_level) VALUES(?,?,?,?,?,?,?,?)",
+                        "claude_code_version, claude_effort_level, followup_plan_json) VALUES(?,?,?,?,?,?,?,?,?)",
                         (
                             rid,
                             tid,
@@ -10142,6 +10186,7 @@ def run_task(tid: int):
                             "queued",
                             claude_code_version,
                             claude_effort_level,
+                            plan,
                         ),
                     )
             finally:
@@ -10151,6 +10196,7 @@ def run_task(tid: int):
         run_task_payload = dict(task)
         run_task_payload["claude_code_version"] = claude_code_version
         run_task_payload["claude_effort_level"] = claude_effort_level
+        run_task_payload["followup_plan_json"] = plan
         scheduler.submit(rid, account, run_task_payload)
         run_ids.append(rid)
     return {"run_ids": run_ids}
@@ -10175,6 +10221,51 @@ def list_runs(limit: int = 200):
         conn.close()
 
 
+def _public_followup_progress(run: dict) -> dict:
+    """返回冻结消息与受限阶段摘要，不从文件读取任意正文或凭据。
+
+    :param run: 当前运行的数据库快照。
+    :return: 计划次数、正文、已完成数及可核对状态。
+    """
+    try:
+        messages = decode_followups(run.get("followup_plan_json"))
+    except ValueError:
+        return {"planned": None, "completed": None, "phase": "invalid", "messages": []}
+    result = {"planned": len(messages), "completed": 0 if not messages else None,
+        "phase": "single" if not messages else "not_started", "messages": messages}
+    if not messages:
+        return result
+    path = account_runtime.run_artifact_path(run["id"], "followups.json") if account_runtime else (
+        WORKSPACES_DIR / run["id"] / ".bench-followups.json")
+    descriptor = None
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        info = os.fstat(descriptor)
+        if not S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size > 65536 or info.st_mode & 0o077:
+            raise ValueError("阶段文件无效")
+        with os.fdopen(descriptor, "rb", closefd=False) as stream:
+            state = json.loads(stream.read(65537))
+        raw = json.dumps({"run_id": run["id"], "followups": messages}, ensure_ascii=False,
+            sort_keys=True, separators=(",", ":")).encode()
+        count = state.get("completed_stages") if isinstance(state, dict) else None
+        if not isinstance(state, dict) or type(state.get("schema")) is not int or state["schema"] != 1 \
+                or state.get("run_id") != run["id"] or state.get("plan_digest") != hashlib.sha256(raw).hexdigest() \
+                or type(count) is not int or not 0 <= count <= len(messages) + 1 \
+                or state.get("phase") not in ("awaiting", "pending", "complete") \
+                or (state["phase"] == "complete") != (count == len(messages) + 1):
+            raise ValueError("阶段归属或进度无效")
+        result.update(completed=max(0, count - 1), phase=state["phase"], stage=count)
+    except FileNotFoundError:
+        if run.get("status") not in ("queued",):
+            result["phase"] = "unknown"
+    except (OSError, ValueError, TypeError):
+        result["phase"] = "invalid"
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+    return result
+
+
 @app.get("/api/runs/{rid}")
 def get_run(rid: str):
     conn = get_db()
@@ -10186,6 +10277,9 @@ def get_run(rid: str):
         if not row:
             raise HTTPException(404)
         result = dict(row)
+        task = conn.execute("SELECT prompt FROM tasks WHERE id=?", (result["task_id"],)).fetchone()
+        result["prompt"] = task["prompt"] if task else None
+        result["followups"] = _public_followup_progress(result)
         account = conn.execute("SELECT * FROM accounts WHERE id=?", (result["account_id"],)).fetchone()
         result["passive_quota"] = _public_quota(dict(account)) if account else {}
         result["quota_policy"] = _public_quota_policy(dict(account), "warmup" if result["run_kind"] == "warmup" else "normal") if account else {}

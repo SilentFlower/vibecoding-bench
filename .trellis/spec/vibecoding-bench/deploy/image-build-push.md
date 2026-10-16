@@ -242,8 +242,9 @@ Stop hook 只允许记录“Claude 停过一轮”的观测信号,不能直接 `
 3. `stop_reason` 不是 `tool_use`。
 4. assistant 文本至少有一条非空文本行。
 5. 最新 session JSONL 文件的 mtime 已稳定至少 `COMPLETION_IDLE_SEC` 秒。
+6. 若配置了业务补充，还须由 `v3-task-followups` 核验全部选定阶段的主会话输入和正常回复；首轮满足前五项仅允许准备下一阶段。详见 [题库与阶段契约](../backend/topic-prompt-contract.md#scenario-自包含题库与冻结的有限业务补充)。
 
-成功状态只能保存在当前 worker 进程内的变量里,不能通过 `/tmp/claude-done` 这类文件判定。原因是旧 profile/settings 或 hook 残留可能在 Claude Stop hook 中写同名文件,把停在 `user tool_result` 的中间态误判成 success。
+最终成功变量只能保存在当前 worker 进程内；有限补充的持久阶段文件仅是待核验的运行状态，不能直接当完成信号。不能通过 `/tmp/claude-done` 这类文件判定。原因是旧 profile/settings 或 hook 残留可能在 Claude Stop hook 中写同名文件,把停在 `user tool_result` 的中间态误判成 success。
 
 账号 profile 的 `settings.json` 只允许保存长期用户偏好和默认权限配置,禁止持久化 `hooks` / `statusLine`:
 

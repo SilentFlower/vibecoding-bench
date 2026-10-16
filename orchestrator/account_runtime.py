@@ -1174,6 +1174,7 @@ class AccountRuntime:
                     "/workspace/.bench-status.json": f"/run/v3/runs/{run_id}/status.json",
                     "/workspace/.bench-transcript.log": f"/run/v3/runs/{run_id}/transcript.log",
                     "/workspace/.bench-session-baseline.json": f"/run/v3/runs/{run_id}/session-baseline.json",
+                    "/workspace/.bench-followups.json": f"/run/v3/runs/{run_id}/followups.json",
                     "/workspace/.cc2api-oauth-refresh-request.json": f"/run/v3/runs/{run_id}/oauth-refresh-request.json",
                     "/workspace/.cc2api-oauth-refresh-result.json": f"/run/v3/runs/{run_id}/oauth-refresh-result.json",
                 }
@@ -1598,10 +1599,10 @@ class AccountRuntime:
         解析 v3 run 的受限状态或 transcript 文件。
 
         :param run_id: runs.id
-        :param name: `status.json`、`transcript.log` 或 `session-baseline.json`
+        :param name: 状态、transcript、阶段或既有受限控制文件名。
         :return: 环境 runtime 下的文件路径
         """
-        if name not in {"status.json", "transcript.log", "session-baseline.json",
+        if name not in {"status.json", "transcript.log", "session-baseline.json", "followups.json",
                 "oauth-refresh-request.json", "oauth-refresh-result.json"}:
             raise ValueError("运行产物名称不合法")
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", run_id):

@@ -1,724 +1,1924 @@
 # Vibecoding Project Library: 600 Ideas
 
-> 600 small and medium-sized projects designed for building from scratch with AI-assisted programming.
+> 600 self-contained local software projects, each with an independent first version and two optional business extensions.
 > Each idea aims to be **demonstrable, scoped, useful, and easy to evaluate**.
 > Recommended pace: complete an MVP in 0.5 to 3 days. Build the main path first, then add error handling, clear feedback, and deployment notes.
 
 ## Usage
 
-1. Pick any idea and align on the PRD first: features, technology stack, acceptance criteria, and non-goals.
+1. Start from the initial requirement using reasonable defaults and bundled synthetic examples. No user-supplied input is needed to begin.
 2. During the MVP stage, complete the "input → processing → output" path before adding persistence, error states, and UX polish.
 3. When finished, mark the idea with `[x]` and add a short review under `done/`: one highlight, one lesson, and the launch command.
-4. Rotate between categories to reduce repetition and evaluate a broader range of engineering skills.
+4. Each run may select zero, one, or two ordered follow-ups. Implement only the messages actually supplied; continue in the same project and session. All sample records must be clearly labeled synthetic.
 
 ---
 
 ## 1. Command-Line Tools (20 topics)
 > Practice areas: parameter parsing, file IO, TTY interaction, cross-platform compatibility.
 
-- [ ] 1. **Markdown Renderer**: Accept Markdown files or directories from the CLI and produce HTML or PDF with themes, a table of contents, syntax highlighting, image-path validation, and a failure report.
-- [ ] 2. **Terminal Pomodoro**: Provide focus/rest cycle, keyboard control, reminder sound, daily statistics, CSV export and interruption recovery, suitable for long-term terminal use.
-- [ ] 3. **Clipboard Snippet Shelf**: Save clipboard text locally, organize snippets with tags, search recent entries, pin favorites, and export a reusable collection.
-- [ ] 4. **Batch Renaming Tool**: Rename files in batches with regular expressions, sequence templates, case conversion, conflict detection, a diff preview, and an undo log.
-- [ ] 5. **Command Alias Organizer**: Manage shell aliases, group commands by project, preview configuration changes, detect duplicate names, and export a local configuration file.
-- [ ] 6. **Git Changelog Generator**: Aggregate changes by version, date or Conventional Commit, generate Markdown/HTML, and automatically annotate breaking changes.
-- [ ] 7. **JSON, YAML, and TOML Converter**: Convert between JSON, YAML, and TOML from standard input or files, validate JSON Schema, locate errors, and process directories in batches.
-- [ ] 8. **Intelligent History Search**: Integrate shell history, working directory and command frequency, providing fzf interaction, contextual sorting and dangerous command confirmation.
-- [ ] 9. **Terminal Typing Trainer**: Provide built-in code snippets and English passages, then track WPM, error patterns, targeted practice, and local rankings.
-- [ ] 10. **Terminal LLM Client**: Support streaming output, session archiving, model configuration, `/` commands, file references, and local prompt template management.
+- [ ] 1. **Markdown Renderer**: Accept Markdown files or directories from the CLI and produce HTML or PDF with themes, a table of contents, syntax highlighting, image-path validation, and a failure report. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add cross-document links that survive HTML export.
+  - Follow-up 2: Build a collection index with tags and per-document reading progress.
+- [ ] 2. **Terminal Pomodoro**: Provide focus/rest cycle, keyboard control, reminder sound, daily statistics, CSV export and interruption recovery, suitable for long-term terminal use. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add named focus routines with different work and rest lengths.
+  - Follow-up 2: Compare completion rates by routine and identify frequent interruption periods.
+- [ ] 3. **Clipboard Snippet Shelf**: Save clipboard text locally, organize snippets with tags, search recent entries, pin favorites, and export a reusable collection. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add parameter placeholders to pinned snippets and preview filled text.
+  - Follow-up 2: Track snippet revisions and restore an earlier template without losing tags.
+- [ ] 4. **Batch Renaming Tool**: Rename files in batches with regular expressions, sequence templates, case conversion, conflict detection, a diff preview, and an undo log. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable naming presets with include and exclude filters.
+  - Follow-up 2: Support reversing one selected rename batch while reporting subsequent file changes.
+- [ ] 5. **Command Alias Organizer**: Manage shell aliases, group commands by project, preview configuration changes, detect duplicate names, and export a local configuration file. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add alias argument placeholders and an example invocation preview.
+  - Follow-up 2: Detect alias dependency cycles and export only a selected project group.
+- [ ] 6. **Git Changelog Generator**: Aggregate changes by version, date or Conventional Commit, generate Markdown/HTML, and automatically annotate breaking changes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add release-note sections for user-visible changes and internal maintenance.
+  - Follow-up 2: Compare two release drafts and preserve manually edited descriptions during regeneration.
+- [ ] 7. **JSON, YAML, and TOML Converter**: Convert between JSON, YAML, and TOML from standard input or files, validate JSON Schema, locate errors, and process directories in batches. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a field-mapping step for converting nested configuration layouts.
+  - Follow-up 2: Produce a batch conversion manifest with per-file errors and retry selection.
+- [ ] 8. **Project Command History Search**: Search a bundled command-history fixture by project, working directory, and frequency, with interactive filtering and saved searches. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add project-specific command collections with recency and frequency controls.
+  - Follow-up 2: Let users hide selected history entries and explain each search ranking factor.
+- [ ] 9. **Terminal Typing Trainer**: Provide built-in code snippets and English passages, then track WPM, error patterns, targeted practice, and local rankings. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add practice sets targeting the user's most common mistyped characters.
+  - Follow-up 2: Compare timed sessions and chart accuracy improvements for each practice set.
+- [ ] 10. **Terminal Command Recipe Notebook**: Keep named command recipes with descriptions, parameter fields, project tags, local search, and a non-executing command preview. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add named command recipes with editable arguments and execution previews.
+  - Follow-up 2: Record recipe runs and compare exit codes and durations across projects.
 
-- [ ] 301. **Environment Variable Comparator**: Compare local configuration files and exported shell values, highlight missing variables, support ignore rules, and export a Markdown report.
-- [ ] 302. **Log Time Slicing Tool**: Slice large logs by time window, level and keyword, support gzip, concurrent scan, context row count and result directory index.
-- [ ] 303. **Directory Volume Detective**: Scan disk usage hotspots, display tree top N, growth comparison, ignore rules and generate a cleanup suggestion list with one click.
-- [ ] 304. **Local Function Benchmark CLI**: Benchmark selected local functions using fixed sample inputs, configurable repetitions, duration histograms, and saved baseline comparisons.
-- [ ] 305. **Document Deadline Inspector**: Read document due dates from a CSV, group upcoming deadlines, apply reminder thresholds, and export a prioritized checklist.
-- [ ] 306. **Git Workspace Snapshot**: Package uncommitted changes, stash metadata, and branch information into a recoverable snapshot with notes, listing, and rollback preview commands.
-- [ ] 307. **CSV Pivot Command Line**: Group-by, aggregate, filter and sort CSV, output table or new CSV, support type inference and error row reporting.
-- [ ] 308. **Terminal Workspace Launcher**: Save named working directories and command presets, open a selected workspace, show recent choices, and export launcher configuration.
-- [ ] 309. **Dependency License Summary**: Scan npm/pip/go lockfile licenses, flag copyleft risks, missing licenses and generate compliance briefings.
-- [ ] 310. **Image Batch Compression CLI**: Compress PNG, JPEG, and WebP files in batches with quality presets, dimension limits, dry-run preview, and before-and-after size comparisons.
+- [ ] 301. **Environment Variable Comparator**: Compare local configuration files and exported shell values, highlight missing variables, support ignore rules, and export a Markdown report. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add named comparison profiles with required and optional variable groups.
+  - Follow-up 2: Compare saved reports and separate new differences from accepted exceptions.
+- [ ] 302. **Log Time Slicing Tool**: Slice large logs by time window, level and keyword, support gzip, concurrent scan, context row count and result directory index. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add named time-window presets and correlated request identifiers.
+  - Follow-up 2: Export a merged incident excerpt with original file and line references.
+- [ ] 303. **Directory Volume Detective**: Scan disk usage hotspots, display tree top N, growth comparison, ignore rules and generate a cleanup suggestion list with one click. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add age-based grouping and exclusion presets for generated files.
+  - Follow-up 2: Compare snapshots and identify which directories account for recent growth.
+- [ ] 304. **Local Function Benchmark CLI**: Benchmark selected local functions using fixed sample inputs, configurable repetitions, duration histograms, and saved baseline comparisons. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add warm-up iterations and separate setup time from execution time.
+  - Follow-up 2: Compare saved runs and flag functions whose median or tail duration regressed.
+- [ ] 305. **Document Deadline Inspector**: Read document due dates from a CSV, group upcoming deadlines, apply reminder thresholds, and export a prioritized checklist. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add dependency dates and lead-time estimates for document preparation.
+  - Follow-up 2: Generate a weekly preparation plan showing deadlines at risk.
+- [ ] 306. **Git Workspace Snapshot**: Package uncommitted changes, stash metadata, and branch information into a recoverable snapshot with notes, listing, and rollback preview commands. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add snapshot labels and a manifest of included working-tree changes.
+  - Follow-up 2: Compare snapshots and preview restoring selected paths into a separate local folder.
+- [ ] 307. **CSV Pivot Command Line**: Group-by, aggregate, filter and sort CSV, output table or new CSV, support type inference and error row reporting. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add calculated columns and reusable aggregation recipes.
+  - Follow-up 2: Explain invalid rows and export successful groups separately from rejected input.
+- [ ] 308. **Terminal Workspace Launcher**: Save named working directories and command presets, open a selected workspace, show recent choices, and export launcher configuration. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add project-specific environment notes and command arguments.
+  - Follow-up 2: Generate a workspace handoff card containing startup steps and recent launch outcomes.
+- [ ] 309. **Dependency License Summary**: Scan npm/pip/go lockfile licenses, flag copyleft risks, missing licenses and generate compliance briefings. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add license policy profiles and review notes for unknown packages.
+  - Follow-up 2: Compare two lockfile snapshots and report changed attribution obligations.
+- [ ] 310. **Image Batch Compression CLI**: Compress PNG, JPEG, and WebP files in batches with quality presets, dimension limits, dry-run preview, and before-and-after size comparisons. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add per-folder compression presets and an image-dimension budget.
+  - Follow-up 2: Generate a visual comparison gallery with size savings and chosen settings.
 
 ## 2. Personal Productivity Web Apps (30 topics)
 > Practice areas: front-end state management, local persistence, UI/UX polishing.
 
-- [ ] 11. **Minimalist Todo**: Manage tasks and subtasks with drag-and-drop ordering, complete keyboard controls, local persistence, completion trends, and a responsive mobile layout.
-- [ ] 12. **Pomodoro + Task Board**: Bind Pomodoro numbers to task cards, support drag-and-drop status, focus recording, daily/weekly statistics and abnormal interruption supplementary recording.
-- [ ] 13. **Daily Standup Notebook**: Record yesterday/today/blocked items, automatically generate weekly and monthly reports, support tags, search and Markdown export.
-- [ ] 14. **Habit Check-in + Heat Map**: Support multiple habits, consecutive days, re-signing rules, sign-off reminders, heat maps and data import and export.
-- [ ] 15. **Markdown Notebook**: Provide folder and tag views, backlinks, full-text search, edit and preview modes, and synchronization with local files.
-- [ ] 16. **Spaced Repeat Flashcards**: Implement the SM-2 review algorithm, support decks, rich text, Anki CSV import, review queues, and memory curves.
-- [ ] 17. **Personal Accounting**: Support income/expense entry, automatic classification of merchants and tags, budget alerts, monthly reports and CSV import.
-- [ ] 18. **Time Block Weekly Calendar**: Use drag and drop to arrange weekly plans, link with Todo, support conflict prompts, copy last week's plan and completion rate statistics.
-- [ ] 19. **Inspiration Collection Box**: Support quick saving of image and text links, tags, full-text search, later processing queue and automatic content identification from the clipboard.
-- [ ] 20. **Reading Tracker**: Manage books, articles, and papers, record progress, notes, excerpts, ratings, and generate annual reading statistics.
-- [ ] 21. **Bookmark Manager**: Read metadata from user-saved or public links, organize tags, build a local search index, detect duplicates, and create permitted offline snapshots.
-- [ ] 22. **Personal Collection Catalog**: Catalog household collections with photos, tags, storage locations, purchase notes, search, and CSV import and export.
-- [ ] 23. **Daily Activity Journal**: Record daily activities, memorable moments, mood notes, and photos, then browse a calendar and export selected entries.
-- [ ] 24. **Personal RSS Reader**: Subscribe to public or user-authorized RSS/Atom feeds, manage unread and starred items, index permitted article text, summarize entries, and filter by keyword.
-- [ ] 25. **Travel Map**: Import tracks and photo locations, display trail maps, trip timelines, city statistics and shareable travel pages.
+- [ ] 11. **Minimalist Todo**: Manage tasks and subtasks with drag-and-drop ordering, complete keyboard controls, local persistence, completion trends, and a responsive mobile layout. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add task dependencies and a view of currently unblocked work.
+  - Follow-up 2: Create recurring task templates whose next occurrence retains its checklist.
+- [ ] 12. **Pomodoro + Task Board**: Bind Pomodoro numbers to task cards, support drag-and-drop status, focus recording, daily/weekly statistics and abnormal interruption supplementary recording. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add daily focus-capacity limits and warn when planned sessions exceed them.
+  - Follow-up 2: Compare planned focus sessions with completed sessions by board column.
+- [ ] 13. **Daily Standup Notebook**: Record yesterday/today/blocked items, automatically generate weekly and monthly reports, support tags, search and Markdown export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Link recurring blockers across daily notes and track resolution dates.
+  - Follow-up 2: Generate a handoff digest grouped by unresolved blocker and responsible person.
+- [ ] 14. **Habit Check-in + Heat Map**: Support multiple habits, consecutive days, re-signing rules, sign-off reminders, heat maps and data import and export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add habit pause windows that do not break streak calculations.
+  - Follow-up 2: Compare habit completion before and after a chosen routine change date.
+- [ ] 15. **Markdown Notebook**: Provide folder and tag views, backlinks, full-text search, edit and preview modes, and synchronization with local files. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add unresolved-link detection and a panel for orphaned notes.
+  - Follow-up 2: Generate a portable notebook index preserving backlinks and relative attachments.
+- [ ] 16. **Spaced Repeat Flashcards**: Implement the SM-2 review algorithm, support decks, rich text, Anki CSV import, review queues, and memory curves. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add sibling-card spacing so related cards do not appear consecutively.
+  - Follow-up 2: Compare retention by deck and offer a preview of tomorrow's review load.
+- [ ] 17. **Personal Accounting**: Support income/expense entry, automatic classification of merchants and tags, budget alerts, monthly reports and CSV import. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add split transactions across multiple categories with exact rounding.
+  - Follow-up 2: Reconcile monthly category totals against an imported synthetic statement.
+- [ ] 18. **Time Block Weekly Calendar**: Use drag and drop to arrange weekly plans, link with Todo, support conflict prompts, copy last week's plan and completion rate statistics. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add travel buffers between scheduled blocks and flag impossible transitions.
+  - Follow-up 2: Compare planned blocks with actual completion and suggest movable catch-up slots.
+- [ ] 19. **Inspiration Collection Box**: Support quick saving of image and text links, tags, full-text search, later processing queue and automatic content identification from the clipboard. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add duplicate suggestions based on normalized titles and saved links.
+  - Follow-up 2: Turn a selected collection into an ordered research brief with source notes.
+- [ ] 20. **Reading Tracker**: Manage books, articles, and papers, record progress, notes, excerpts, ratings, and generate annual reading statistics. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reading goals by month and automatically allocate remaining pages.
+  - Follow-up 2: Compare planned and actual reading pace across unfinished books.
+- [ ] 21. **Bookmark Manager**: Organize a generated bookmark collection by tags, index local title and description fixtures, detect duplicates, and display local page snapshots. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add bookmark collections with ordered annotations and duplicate merge previews.
+  - Follow-up 2: Export a static collection page with searchable titles and locally saved descriptions.
+- [ ] 22. **Personal Collection Catalog**: Catalog household collections with photos, tags, storage locations, purchase notes, search, and CSV import and export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add lending records with borrower names and expected return dates.
+  - Follow-up 2: Produce a storage-location checklist including overdue loans and missing catalog entries.
+- [ ] 23. **Daily Activity Journal**: Record daily activities, memorable moments, mood notes, and photos, then browse a calendar and export selected entries. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable journal prompts and links between related days.
+  - Follow-up 2: Create a selected-month keepsake export with editable captions and photo placeholders.
+- [ ] 24. **Personal RSS Reader**: Read bundled RSS and Atom fixtures, manage unread and starred items, index article text, show opening-sentence excerpts, and filter by keyword. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add saved keyword rules that route articles into reading queues.
+  - Follow-up 2: Build a weekly digest from unread items with source and duplicate counts.
+- [ ] 25. **Travel Map**: Create a synthetic trip with generated coordinates and photo placeholders, show a schematic route, daily timeline, and city statistics without map services. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add editable trip segments and transport modes on a schematic map.
+  - Follow-up 2: Create a printable itinerary with distance totals and per-day highlights.
 
-- [ ] 311. **Meeting Action Item Tracking Board**: Extract action items from meeting notes, bind owners and deadlines, and support overdue reminders, completion rates, and weekly review views.
-- [ ] 312. **Personal Knowledge Weekly Review**: Summarize this week's notes, completed tasks and reading excerpts, automatically generate review templates, support tag filtering and export.
-- [ ] 313. **Focus Whitelist Timer**: Accumulate focus time only within the allowed website/application window, displaying the number of interruptions, time period distribution and daily goal completion.
-- [ ] 314. **Subscription Renewal Tracker**: Track software subscriptions, billing periods, renewal dates, costs, and cancellation links, with advance reminders and monthly totals.
-- [ ] 315. **Family Shared Purchasing List**: Multiple people can check purchasing items in real time, supporting classification, commonly used templates, out-of-stock notes and historical list reuse.
-- [ ] 316. **Personal Goal Milestone Wall**: Break down annual goals into milestones and checkpoints, display progress bars, risk markers and record of delays.
-- [ ] 317. **Email Unsubscribe Decision Box**: Import sample mailing lists, score by sending frequency and value, mark retention/unsubscription and export action list.
-- [ ] 318. **Commuting Route Memo**: Record multiple commuting plans, time consumption, costs and weather effects, and support the collection of optimal routes and notes on unusual days.
-- [ ] 319. **Digital Minimalist Separation List**: Inventory accounts, files and devices, set retention rules, track cleanup progress and release space records.
-- [ ] 320. **Personal Skills Matrix Board**: Maintain skills, proficiency and learning plans, associate practice tasks, and display growth trajectories and weaknesses.
-- [ ] 321. **Gift Exchange Journal**: Record gifts given and received, recipients, dates, occasions, and follow-up plans, with reminders and annual summaries.
-- [ ] 322. **Wardrobe Outfit Planner**: Manage clothing tags, seasons and occasions, generate a week's outfit draft, support cleaning status and missing item reminders.
-- [ ] 323. **Home Appliance Care Calendar**: Schedule appliance cleaning and maintenance, show upcoming tasks, record completion notes and photos, and flag overdue items.
-- [ ] 324. **Personal Creative Incubation Funnel**: Move ideas through collection, screening, prototyping, and shelving while recording rejection reasons and reactivation criteria.
-- [ ] 325. **Weekend Micro-Adventure Planner**: Collect nearby activities and points of interest, generate half-day or full-day itinerary drafts, and provide budget ranges and weather alternatives.
+- [ ] 311. **Meeting Action Item Tracking Board**: Extract action items from meeting notes, bind owners and deadlines, and support overdue reminders, completion rates, and weekly review views. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add action dependencies and meeting-to-meeting carryover links.
+  - Follow-up 2: Generate the next review agenda from blocked and overdue action groups.
+- [ ] 312. **Personal Knowledge Weekly Review**: Summarize this week's notes, completed tasks and reading excerpts, automatically generate review templates, support tag filtering and export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable review sections and links back to source notes.
+  - Follow-up 2: Compare weekly reviews and identify repeatedly deferred ideas.
+- [ ] 313. **Focus Activity Timeline Timer**: Use a generated local activity-event stream to count eligible focus intervals, interruptions, daily targets, and period distributions without monitoring real applications. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add local activity simulation with explicit focus and interruption events.
+  - Follow-up 2: Compare focus schedules and report which simulated interruptions consume the most time.
+- [ ] 314. **Subscription Renewal Tracker**: Track software subscriptions, billing periods, renewal dates, costs, and cancellation links, with advance reminders and monthly totals. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add annualized costs and shared subscription allocations.
+  - Follow-up 2: Compare renewal scenarios and list subscriptions exceeding a chosen monthly budget.
+- [ ] 315. **Family Shared Purchasing List**: Multiple people can check purchasing items in real time, supporting classification, commonly used templates, out-of-stock notes and historical list reuse. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add quantity units and store-specific shopping sections.
+  - Follow-up 2: Compare planned quantities with purchased quantities and reuse unfinished items.
+- [ ] 316. **Personal Goal Milestone Wall**: Break down annual goals into milestones and checkpoints, display progress bars, risk markers and record of delays. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add milestone dependencies and projected completion dates.
+  - Follow-up 2: Compare goal plans under different weekly effort assumptions.
+- [ ] 317. **Email Unsubscribe Decision Box**: Import sample mailing lists, score by sending frequency and value, mark retention/unsubscription and export action list. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable value scores and an explicit keep-or-remove explanation.
+  - Follow-up 2: Generate a monthly review showing retained categories and reduced message volume.
+- [ ] 318. **Commuting Route Memo**: Record multiple commuting plans, time consumption, costs and weather effects, and support the collection of optimal routes and notes on unusual days. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add departure-time bands and a reliability rating for each route.
+  - Follow-up 2: Compare route choices under different delay and weather scenarios.
+- [ ] 319. **Digital Minimalist Separation List**: Inventory accounts, files and devices, set retention rules, track cleanup progress and release space records. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add cleanup batches with keep reasons and estimated recoverable space.
+  - Follow-up 2: Compare planned and completed cleanup without deleting demo files automatically.
+- [ ] 320. **Personal Skills Matrix Board**: Maintain skills, proficiency and learning plans, associate practice tasks, and display growth trajectories and weaknesses. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add target proficiency requirements and evidence links per skill.
+  - Follow-up 2: Build a learning plan that prioritizes the largest target gaps.
+- [ ] 321. **Gift Exchange Journal**: Record gifts given and received, recipients, dates, occasions, and follow-up plans, with reminders and annual summaries. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add budget limits and recipient preference notes.
+  - Follow-up 2: Generate an upcoming-occasion plan grouped by recipient and remaining budget.
+- [ ] 322. **Wardrobe Outfit Planner**: Manage clothing tags, seasons and occasions, generate a week's outfit draft, support cleaning status and missing item reminders. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add outfit compatibility rules and laundry availability windows.
+  - Follow-up 2: Compare weekly outfit plans by repeated items and missing combinations.
+- [ ] 323. **Home Appliance Care Calendar**: Schedule appliance cleaning and maintenance, show upcoming tasks, record completion notes and photos, and flag overdue items. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add maintenance intervals based on usage and elapsed time.
+  - Follow-up 2: Forecast upcoming maintenance costs and group tasks by room.
+- [ ] 324. **Personal Creative Incubation Funnel**: Move ideas through collection, screening, prototyping, and shelving while recording rejection reasons and reactivation criteria. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add experiment hypotheses and clear prototype success criteria.
+  - Follow-up 2: Compare experiments and suggest which shelved ideas meet their reactivation conditions.
+- [ ] 325. **Weekend Micro-Adventure Planner**: Collect nearby activities and points of interest, generate half-day or full-day itinerary drafts, and provide budget ranges and weather alternatives. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add travel-time estimates and accessibility preferences to local fixtures.
+  - Follow-up 2: Compare itinerary alternatives by cost, duration, and indoor fallback coverage.
 
-## 3. AI Applications (30 topics)
+## 3. Writing and Document Workbenches (30 topics)
 > Practice areas: prompt engineering, RAG, streaming output, and API orchestration.
 
-- [ ] 26. **PDF Intelligent Q&A**: Upload PDFs, build a local vector index, answer with page citations, compare multiple documents, and jump directly to cited passages.
-- [ ] 27. **Long Article Summary + Mind Map**: Enter a long article or URL to generate hierarchical summary, key points, to-do extraction and Markmap/Mermaid map.
-- [ ] 28. **Meeting Minutes Tool**: The system completes recording upload, transcription, speaker separation, summary, resolution, to-do attribution and minutes export.
-- [ ] 29. **Resume and JD Matching Score**: Parse resume and job description, gives matching score, missing keywords, rewriting suggestions and version comparison.
-- [ ] 30. **Smart Email Reply Draft**: Connect to Gmail or a local sample mailbox, generate replies based on tone, retain contextual references and support manual modification.
-- [ ] 31. **AI Word Cards**: Enter words to automatically generate definitions, example sentences, IPA, root words, TTS reading and spaced review plans.
-- [ ] 32. **Image Description Generator**: Upload images to generate multi-language alt text, SEO descriptions and accessibility instructions, supporting batch processing and manual editing.
-- [ ] 33. **AI Speaking and Interview Coach**: Provide a practice library, live conversation, scoring criteria, pronunciation feedback, review reports, and a history of performance trends.
-- [ ] 34. **Code Review Bot**: Connect to a GitHub pull-request diff, apply configurable review rules, add inline comments, classify risks, and suggest actionable fixes.
-- [ ] 35. **Document Translation Preserves Typesetting**: Upload docx/pdf, retain titles, tables, and picture positions, and output bilingual previews and glossaries.
-- [ ] 36. **AI Meme Generator**: Generate meme images and captions from a theme, with templates, font and outline controls, batch export, and version history.
-- [ ] 37. **Article to Podcast**: Convert articles into two-person conversation scripts, generate segmented TTS audio, and support audition, regeneration, and mp3 export.
-- [ ] 38. **Natural Language Schedule Assistant**: Parse expressions such as "remind me to have a meeting next Wednesday at 2 pm", generate a schedule draft and support conflict checking.
-- [ ] 39. **Editorial Tone Consistency Checker**: Review a draft against an organization-owned tone guide, flag inconsistent passages, suggest neutral revisions, show a diff, and verify that factual claims remain unchanged.
-- [ ] 40. **Local Knowledge Base Chat**: Import Obsidian or Notion exports, build a local index, answer with an optional online LLM, cite sources, and refresh the index.
+- [ ] 26. **Document Passage Explorer**: Browse generated text documents by heading, search exact terms, highlight passages, save excerpts, and retain stable section references. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add saved searches across document headings and quoted passages.
+  - Follow-up 2: Export a reading packet containing selected passages with stable section references.
+- [ ] 27. **Article Outline Workbench**: Edit a generated article's heading tree, display paragraph opening lines as excerpts, and render the outline as a collapsible map. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add manual outline reordering with notes attached to source paragraphs.
+  - Follow-up 2: Compare two outline versions and export a change-marked article plan.
+- [ ] 28. **Meeting Minutes Organizer**: Edit a synthetic meeting agenda and structured notes, assign action owners, record decisions, and export minutes from templates. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add decision records linked to agenda items and action owners.
+  - Follow-up 2: Generate a follow-up agenda from overdue actions and unresolved decisions.
+- [ ] 29. **Resume Checklist Matcher**: Compare generated resumes with a structured job checklist using explicit keyword rules, explain matched and missing qualifications, and save review versions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable keyword weights and explain each score contribution.
+  - Follow-up 2: Compare multiple resume drafts against the same role checklist.
+- [ ] 30. **Mailbox Reply Template Desk**: Browse a synthetic local mailbox, choose rule-based reply templates, fill message fields, edit drafts, and retain references to original messages. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reply templates selected by message category and editable tone rules.
+  - Follow-up 2: Build a review queue showing draft changes and unresolved placeholders.
+- [ ] 31. **Vocabulary Card Workshop**: Use a bundled miniature dictionary to create editable word cards with definitions, local search, and a basic review queue. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add word families and user-edited example sentences to each card.
+  - Follow-up 2: Schedule mixed reviews that balance new words with previously missed words.
+- [ ] 32. **Image Caption Editorial Desk**: Create simple SVG asset fixtures, edit captions and descriptive text manually, manage publication variants, and export an asset text catalog. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add required-caption checklists for different image publication contexts.
+  - Follow-up 2: Export an asset manifest listing missing captions and approved text variants.
+- [ ] 33. **Speaking Practice Planner**: Provide built-in interview prompts, a local speaking-practice notebook, session notes, and an editable practice history without speech scoring services. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add timed practice rounds with a configurable speaking rubric.
+  - Follow-up 2: Compare self-ratings across rounds and build a targeted practice checklist.
+- [ ] 34. **Change Review Checklist Desk**: Create a small local repository fixture, display example diffs, apply explicit file-based checklist rules, and save reviewer findings without remote repository access. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add file-pattern-specific review checklists and suppression notes.
+  - Follow-up 2: Export a review packet grouping findings by changed file and unresolved item.
+- [ ] 35. **Parallel Text Layout Editor**: Create paired source and translated sample paragraphs, edit their alignment, retain headings and tables, and export a bilingual layout without automatic translation services. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add paired source and translated text sections with a glossary lookup.
+  - Follow-up 2: Detect missing translated sections and export a side-by-side document bundle.
+- [ ] 36. **Meme Caption Layout Studio**: Combine generated geometric image fixtures with user-edited captions, reusable layout templates, font controls, and local PNG export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable caption layouts with automatic text fitting.
+  - Follow-up 2: Generate a contact sheet comparing several caption variants per template.
+- [ ] 37. **Podcast Script Planner**: Organize a built-in article into manually editable host segments, chapter order, and a template-based podcast script without generated speech. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add speaker cue cards and estimated segment durations.
+  - Follow-up 2: Export a recording plan with chapter markers and pronunciation notes.
+- [ ] 38. **Schedule Phrase Parser**: Parse a documented finite grammar of English date and reminder phrases, show interpreted dates, create editable schedule drafts, and detect conflicts. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add recurring schedule expressions and show their next five occurrences.
+  - Follow-up 2: Explain ambiguous date phrases and let users save a preferred interpretation.
+- [ ] 39. **Editorial Tone Consistency Checker**: Check a generated draft against explicit word-list and sentence-length rules, explain flagged passages, offer dictionary-based replacements, and show an editable diff. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add per-section tone profiles with explicit rule explanations.
+  - Follow-up 2: Compare draft revisions and track which flagged passages were resolved.
+- [ ] 40. **Linked Notes Reading Desk**: Create a synthetic Markdown notebook, index headings and terms, browse source-linked excerpts, manage tags, and open related notes locally. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add glossary links between notes and a list of unresolved references.
+  - Follow-up 2: Export a topic reading trail with ordered excerpts and source filenames.
 
-- [ ] 326. **Code Comment Completion Workbench**: Upload code snippets to generate function-level comments and module descriptions, supporting language switching, style templates and diff preview.
-- [ ] 327. **Customer Conversation Quality Reviewer**: Import sample conversations, score politeness, completeness, and prohibited terms, then provide improvement suggestions and an example library.
-- [ ] 328. **Multilingual UI Copy Proofreading**: Scan interface copy CSV, check for tone consistency, length overflow and terminology uniformity, and generate a revision table.
-- [ ] 329. **Requirements Clarification Questionnaire Generator**: Enter a sentence of requirements and generate a list of clarification questions, priority suggestions and assumptions, which can be exported to stakeholders.
-- [ ] 330. **Test Case Draft Factory**: Generate draft boundary, error, and regression cases from a feature description, assign priorities, and export a reusable test suite.
-- [ ] 331. **Release Notes Polisher**: Turn commit messages into user-facing release notes, group new features, fixes, and breaking changes, and support several tones.
-- [ ] 332. **Design Draft Review Annotation Assistant**: Upload interface screenshots, automatically list usability and accessibility doubts, and support manual confirmation and export of issue lists.
-- [ ] 333. **Risk Summary of Contract Terms**: Upload the contract sample text, extract key obligations, deadlines and abnormal clause summaries, and mark items that require lawyer review (not a substitute for legal advice).
-- [ ] 334. **The Learning Path Orchestrator**: Generate stage paths, resource types and test checkpoints based on target skills, and support progress check-in and path adjustment.
-- [ ] 335. **Log Root Cause Hypothesis Generator**: The system pastes the error stack and recent changes to generate a possible root cause ranking, verification steps and related file guesses.
-- [ ] 336. **Product Naming Brainstorming Board**: Enter product positioning to generate candidate names, domain name availability reminders and trademark conflict reminder placeholders, and support voting and collection.
-- [ ] 337. **Meeting Role Simulator**: Set product/R&D/operation roles, generate different position summaries on the same issue, and help rehearse alignment meetings.
-- [ ] 338. **Data Field Definition Assistant**: Input table structure or sample rows to generate field business definitions, enumeration guesses, and drafts of lineage notes.
-- [ ] 339. **Accessible Copy Rewriter**: Rewrite complex descriptions into more readable versions, mark reading levels, retain key terms, and display a diff of changes.
-- [ ] 340. **Competitive Product Function Matrix Generation**: Import summaries of several product pages, extract a feature matrix and differentiators, rank follow-up priorities, and support manual revision.
+- [ ] 326. **Code Documentation Template Desk**: Create built-in source examples, fill language-specific documentation templates from parsed signatures, edit descriptions, and preview comment changes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add language-specific documentation templates and missing-parameter checks.
+  - Follow-up 2: Compare generated documentation drafts with manually edited revisions.
+- [ ] 327. **Conversation Rubric Reviewer**: Generate fictional service conversations, apply explicit politeness and completeness checklists, record reviewer scores, and maintain annotated examples. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable conversation scoring rubrics with per-rule evidence.
+  - Follow-up 2: Compare reviewer decisions and list examples with conflicting ratings.
+- [ ] 328. **Interface Copy Rule Checker**: Generate multilingual interface-copy fixtures, check configured terminology, sentence length, and per-screen limits, and export an editable correction table. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add product-area terminology dictionaries and locale-specific length budgets.
+  - Follow-up 2: Export a revision queue grouping inconsistent terms across interface screens.
+- [ ] 329. **Requirements Checklist Composer**: Map structured feature fields to predefined clarification-question templates, mark answered items, list explicit assumptions, and export a worksheet. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add requirement-type templates and mark questions answered by existing fields.
+  - Follow-up 2: Export a clarification worksheet showing remaining assumptions and their impact.
+- [ ] 330. **Boundary Test Case Composer**: Use structured sample requirements and deterministic boundary-value tables to assemble editable draft test cases, priorities, and expected outcomes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable boundary-value tables for numeric and date fields.
+  - Follow-up 2: Create a traceability matrix linking generated cases to requirement clauses.
+- [ ] 331. **Release Notes Template Editor**: Generate commit fixtures, classify Conventional Commit prefixes, populate editable user-facing release-note templates, and export grouped changes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add editable category rules and a glossary of customer-facing terms.
+  - Follow-up 2: Compare release-note drafts while preserving approved manual edits.
+- [ ] 332. **Interface Review Annotation Desk**: Generate simple interface screenshots, add manual annotations, apply a bundled usability checklist, and export an issue list without automated image interpretation. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add annotation categories and reusable interface-review checklists.
+  - Follow-up 2: Export a review packet with marked demo images and unresolved findings.
+- [ ] 333. **Agreement Obligation Review Desk**: Create fictional agreement sections, locate explicitly labeled obligations and dates, attach reviewer questions, and export a checklist without legal advice. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add milestone checklists and owner notes to agreement sections.
+  - Follow-up 2: Compare document versions and generate a list of changed obligations for review.
+- [ ] 334. **Learning Path Rule Planner**: Use a built-in skill and resource catalog with explicit prerequisites to schedule learning stages, checkpoints, and progress updates. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add prerequisite skills and alternative routes through the learning catalog.
+  - Follow-up 2: Replan the remaining path after a failed checkpoint or reduced weekly time.
+- [ ] 335. **Error Diagnosis Rule Notebook**: Generate error-stack and change-note fixtures, match documented diagnostic rules, display supporting lines, and record verification steps without inventing file locations. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add editable diagnostic rules with explicit supporting log fragments.
+  - Follow-up 2: Compare hypotheses and record the outcome of each suggested verification step.
+- [ ] 336. **Product Name Combination Board**: Combine a built-in vocabulary using explicit naming patterns, edit candidates, collect votes, and record manual availability-review notes without remote lookups. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable word-combination patterns and pronunciation notes.
+  - Follow-up 2: Compare name shortlists using user-defined criteria and recorded votes.
+- [ ] 337. **Meeting Role Card Rehearsal**: Provide predefined role cards and agenda prompts, let a local participant simulator select positions, record notes, and compare stakeholder priorities without generated dialogue. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add role-specific agenda prompts and manually selected position cards.
+  - Follow-up 2: Generate meeting notes that separate agreements, disagreements, and unanswered questions.
+- [ ] 338. **Data Field Definition Desk**: Generate table fixtures, infer primitive types with explicit rules, edit field meanings and enumerations, and maintain draft lineage notes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add field-definition templates and explicit confirmation of inferred types.
+  - Follow-up 2: Export a dictionary review queue for ambiguous values and missing descriptions.
+- [ ] 339. **Plain-Language Copy Workshop**: Use a controlled replacement glossary and sentence-length rules to flag complex text, edit alternatives, preserve required terms, and show a revision diff. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a controlled glossary and sentence-length recommendations.
+  - Follow-up 2: Compare revisions and highlight required terms that were removed or changed.
+- [ ] 340. **Product Feature Comparison Desk**: Generate fictional product fact sheets, manually map features into a comparison matrix, attach evidence notes, and rank products using explicit weights. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add weighted feature categories and manually entered evidence links.
+  - Follow-up 2: Compare product rankings under two buyer-priority profiles.
 
 ## 4. Mini Games (20 topics)
-> Practice areas: Game loop, collision detection, state machine, AI opponent.
+> Practice areas: explicit rules, editable templates, local fixtures, and reviewable workflows.
 
-- [ ] 41. **Snake**: Implement a Canvas or terminal version with keyboard controls, a local leaderboard, skins, pause and resume, and mobile touch input.
-- [ ] 42. **2048**: Support undo, animation, keyboard/touch operations, score statistics, highest score saving and different board sizes.
-- [ ] 43. **Minesweeper**: Provide custom difficulty, first point safety, flag marking, timing list, keyboard and mouse operation and failure replay.
-- [ ] 44. **Tetris**: Implement hold, next block preview, ghost blocks, combo scoring, pause and adjustable fall speed.
-- [ ] 45. **Gomoku with an AI Opponent**: Implement board interaction, win detection, an Alpha-Beta pruning opponent, difficulty levels, and replay history.
-- [ ] 46. **Sudoku**: Support problem generation, solver, candidate number, hints, error checking, step counting and multiple difficulties.
-- [ ] 47. **Chinese Idioms Wordle**: Publish one Chinese idiom puzzle each day with input validation, color feedback, hints, shareable results, and a local puzzle library.
-- [ ] 48. **Breakout**: Implement physical collisions, props, level editor, health, scores and level archives.
-- [ ] 49. **Canvas Arcade Shooter**: Build an arcade shooter with enemy waves, bosses, skill cooldowns, power-ups, collision detection, and a local leaderboard.
-- [ ] 50. **Multiplayer Online Tic-tac-toe**: Use WebSocket rooms for matchmaking and spectating, synchronize game state, and recover cleanly after a disconnect.
+- [ ] 41. **Snake**: Implement a Canvas or terminal version with keyboard controls, a local leaderboard, skins, pause and resume, and mobile touch input. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add obstacle layouts and collectible items with different score values.
+  - Follow-up 2: Create a challenge editor that saves replayable layouts and completion records.
+- [ ] 42. **2048**: Support undo, animation, keyboard/touch operations, score statistics, highest score saving and different board sizes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a replay timeline that can branch from an earlier move.
+  - Follow-up 2: Compare score distributions between saved board-size configurations.
+- [ ] 43. **Minesweeper**: Provide custom difficulty, first point safety, flag marking, timing list, keyboard and mouse operation and failure replay. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add an explanation mode showing why a candidate square is safe.
+  - Follow-up 2: Save partially solved boards and replay the sequence of flags and reveals.
+- [ ] 44. **Tetris**: Implement hold, next block preview, ghost blocks, combo scoring, pause and adjustable fall speed. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable scoring rules and a practice mode for difficult pieces.
+  - Follow-up 2: Show a replay analysis of cleared lines, placement gaps, and wasted space.
+- [ ] 45. **Gomoku with a Minimax Opponent**: Implement board interaction, win detection, an Alpha-Beta pruning opponent, configurable search depth, and replay history. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add board-position puzzles with a fixed target number of moves.
+  - Follow-up 2: Explain the opponent's chosen move using evaluated candidate scores.
+- [ ] 46. **Sudoku**: Support problem generation, solver, candidate number, hints, error checking, step counting and multiple difficulties. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add step-by-step explanations for singles and pair-based deductions.
+  - Follow-up 2: Generate printable puzzle sheets with separate answer and explanation pages.
+- [ ] 47. **English Word Puzzle**: Provide a built-in English word list, daily word puzzles, input validation, color feedback, hints, shareable results, and a local puzzle archive. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a local puzzle editor with an approved answer list.
+  - Follow-up 2: Track solve patterns by hint usage and show a weekly challenge archive.
+- [ ] 48. **Breakout**: Implement physical collisions, props, level editor, health, scores and level archives. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add moving obstacles and switches that open alternative ball routes.
+  - Follow-up 2: Export and import level packs with previews and per-level completion records.
+- [ ] 49. **Canvas Arcade Shooter**: Build an arcade shooter with enemy waves, bosses, skill cooldowns, power-ups, collision detection, and a local leaderboard. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add branching upgrade choices between enemy waves.
+  - Follow-up 2: Create a challenge summary comparing builds, survival time, and defeated waves.
+- [ ] 50. **Local Multiplayer Tic-tac-toe**: Run a local game room with two demo participants, matchmaking, spectating, synchronized moves, and saved match results. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add rematch voting while preserving the current room roster.
+  - Follow-up 2: Show a match history with move-by-move playback and cumulative scores.
 
-- [ ] 341. **Memory Matching Game**: Implement card flipping and matching with themed decks, combo scoring, a timed mode, and a local high score.
-- [ ] 342. **Pixel Parkour**: Build a side-scrolling runner with jumping, obstacle waves, power-ups, a difficulty curve, touch controls, and a local leaderboard.
-- [ ] 343. **Merge Puzzle Variant**: Build a merge puzzle with a customizable item progression, editable gravity and merge rules, skins, and one-step undo.
-- [ ] 344. **Text Adventure Engine**: Use JSON to configure plot nodes, options and state variables, and provide editor preview and archive reading.
-- [ ] 345. **Tower Defense Basic Level**: Implement paths, turret upgrades, waves and resources, and support level configuration files and failed restarts.
-- [ ] 346. **Rhythm Tapping Game**: Follow the beat and click to determine Perfect/Good/Miss. It supports custom music charts, calibration and performance ratings.
-- [ ] 347. **Maze Generation and Pathfinding Demonstration**: Random maze, player control and A* demonstration layer, supporting size adjustment and algorithm step visualization.
-- [ ] 348. **Two-Player Local Pong**: Implement paddle physics, scoring, optional power-ups, and pause controls for two players using split keyboard controls or touch buttons.
-- [ ] 349. **Deck-Building Roguelike Prototype**: Build a combat, card-selection, and upgrade loop with visible enemy intent, deck management, and reproducible random seeds.
-- [ ] 350. **City Construction Mini Sandbox**: Place buildings on a grid, manage resources and satisfaction, simulate a day-night cycle, and save the current city.
+- [ ] 341. **Memory Matching Game**: Implement card flipping and matching with themed decks, combo scoring, a timed mode, and a local high score. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add deck themes with different matching rules.
+  - Follow-up 2: Compare attempts by deck size and show the most frequently missed pairs.
+- [ ] 342. **Pixel Parkour**: Build a side-scrolling runner with jumping, obstacle waves, power-ups, a difficulty curve, touch controls, and a local leaderboard. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add checkpoint zones and reusable obstacle patterns.
+  - Follow-up 2: Replay a run and show where jumps and collisions occurred.
+- [ ] 343. **Merge Puzzle Variant**: Build a merge puzzle with a customizable item progression, editable gravity and merge rules, skins, and one-step undo. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add level objectives and limited-move challenges.
+  - Follow-up 2: Create a challenge pack with reproducible starting boards and completion records.
+- [ ] 344. **Text Adventure Engine**: Use JSON to configure plot nodes, options and state variables, and provide editor preview and archive reading. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add conditional choices and reusable inventory items.
+  - Follow-up 2: Validate story reachability and export a map of unreachable plot nodes.
+- [ ] 345. **Tower Defense Basic Level**: Implement paths, turret upgrades, waves and resources, and support level configuration files and failed restarts. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add enemy resistance types and branching turret upgrades.
+  - Follow-up 2: Compare defense builds using a reproducible wave configuration.
+- [ ] 346. **Rhythm Tapping Game**: Follow the beat and click to determine Perfect/Good/Miss. It supports custom music charts, calibration and performance ratings. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add chart sections with separate timing offsets.
+  - Follow-up 2: Show an accuracy timeline highlighting early hits, late hits, and missed sections.
+- [ ] 347. **Maze Generation and Pathfinding Demonstration**: Random maze, player control and A* demonstration layer, supporting size adjustment and algorithm step visualization. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add weighted terrain and several pathfinding heuristics.
+  - Follow-up 2: Compare explored cells and route costs across algorithms on the same maze.
+- [ ] 348. **Two-Player Local Pong**: Implement paddle physics, scoring, optional power-ups, and pause controls for two players using split keyboard controls or touch buttons. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable tournament rounds and local player names.
+  - Follow-up 2: Show match replays and aggregate rally-length statistics.
+- [ ] 349. **Deck-Building Roguelike Prototype**: Build a combat, card-selection, and upgrade loop with visible enemy intent, deck management, and reproducible random seeds. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add branching encounter choices and card-removal opportunities.
+  - Follow-up 2: Compare deck evolution across saved runs with the same initial seed.
+- [ ] 350. **City Construction Mini Sandbox**: Place buildings on a grid, manage resources and satisfaction, simulate a day-night cycle, and save the current city. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add building service ranges and road-connectivity requirements.
+  - Follow-up 2: Compare two city layouts by resource balance and unmet resident needs.
 
 ## 5. Browser Extensions (16 topics)
 > Practice areas: Manifest v3, Content Script, page interaction and local preferences.
 
-- [ ] 51. **Selection Translator with AI Explanations**: Show a translation popover for selected text with contextual explanations, examples, bookmarks, keyboard shortcuts, and compatibility with common page layouts.
-- [ ] 52. **Web Page to Markdown Archive**: Archive user-authorized or public pages as Markdown, localize permitted images, preserve metadata, estimate reading time, and export a downloadable package.
-- [ ] 53. **Tab Manager**: Display tab memory, grouping, one-command suspend, resume, search and session saving.
-- [ ] 54. **Bilibili/YouTube Subtitle Export + AI Summary**: Read subtitles, export SRT/Markdown, and generate chapter summaries and key timestamps.
-- [ ] 55. **Automatic Form Filling**: Manage multiple identity materials, support field mapping, domain name whitelist, preview confirmation and sensitive field protection.
-- [ ] 56. **Manual Element Blocker**: Click on page elements to generate hidden rules, supporting rule list, switch, import and export, and site-level effect.
-- [ ] 57. **Reading Mode**: Extract the main article into a distraction-free view with font, width, and theme controls, text-to-speech, a read-later list, and site-specific rules.
-- [ ] 58. **Web Page Change Monitor**: Monitor a selected region on a public or user-owned page, calculate diffs, send browser notifications, and retain historical snapshots.
+- [ ] 51. **Selection Glossary Extension**: Build a browser extension using bundled demo pages and a small local glossary, showing selected-term definitions, example sentences, bookmarks, and keyboard shortcuts. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add custom glossary entries and preferred definitions per website.
+  - Follow-up 2: Export a review deck of saved selections with their surrounding sentences.
+- [ ] 52. **Web Page to Markdown Archive**: Archive user-authorized or public pages as Markdown, localize permitted images, preserve metadata, estimate reading time, and export a downloadable package. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add collection-level tags and an editable archive index.
+  - Follow-up 2: Compare two saved versions of the same page and mark changed sections.
+- [ ] 53. **Tab Manager**: Display tab memory, grouping, one-command suspend, resume, search and session saving. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add project workspaces with pinned tab order and restore previews.
+  - Follow-up 2: Report duplicate tabs across saved workspaces and offer a merge preview.
+- [ ] 54. **Transcript Study Extension**: Build an extension for a bundled local transcript page, export timestamped text, organize manual chapter labels, and save study excerpts without external video services. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add chapter labels linked to transcript timestamps.
+  - Follow-up 2: Export a study sheet combining selected transcript passages and personal notes.
+- [ ] 55. **Demo Form Profile Filler**: Build an extension and a local event-registration form fixture, map reusable field groups, preview proposed field values, and fill the demo form on confirmation. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable field groups and show unresolved form mappings.
+  - Follow-up 2: Preview changes between two saved form profiles before applying either profile.
+- [ ] 56. **Manual Element Blocker**: Click on page elements to generate hidden rules, supporting rule list, switch, import and export, and site-level effect. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add temporary rules that expire after a chosen number of visits.
+  - Follow-up 2: Compare rule sets and restore selected rules from a previous export.
+- [ ] 57. **Reading Mode**: Extract the main article into a distraction-free view with font, width, and theme controls, text-to-speech, a read-later list, and site-specific rules. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add paragraph annotations and a reading-position indicator.
+  - Follow-up 2: Export selected articles with annotations and a generated reading-list index.
+- [ ] 58. **Local Page Change Monitor**: Compare generated local page snapshots, select watched regions, show textual differences, and retain a local change history. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add ignored regions and normalized whitespace handling for comparisons.
+  - Follow-up 2: Group related changes into a digest with links to saved snapshots.
 
-- [ ] 351. **Page Performance Snapshot Plug-in**: Collect LCP/CLS approximate indicators and resource waterfall summary with one click, export JSON report and annotate the big picture.
-- [ ] 352. **Automatically Temporarily Save Form Drafts**: Schedule local temporary storage of editable forms, restore them with one click after a crash, and support site whitelisting and sensitive field exclusion.
-- [ ] 353. **Page Heading Outline Inspector**: Extract page headings, highlight skipped levels and duplicate labels, preview the document outline, and export suggested corrections.
-- [ ] 354. **Dark Mode Enforcer**: The system injects adjustable filters/CSS for dark-free sites with support for domain rules, contrast adjustments, and exclude selectors.
-- [ ] 355. **Permitted Image Collection Exporter**: Select images from a user-owned or public page, filter and deduplicate permitted assets, and export them as a zip with configurable file names.
-- [ ] 356. **Reading Progress Synchronization Bar**: Synchronize long text reading position across devices (export code or local account simulation), display percentage and last reading time.
-- [ ] 357. **Browser Reading List Organizer**: Collect pages into a reading list, add priorities and tags, search saved entries, and import or export a local collection.
-- [ ] 358. **Page Typography Previewer**: Preview font families, line spacing, text width, and heading scales on the current page, save named presets, and reset changes.
+- [ ] 351. **Page Performance Snapshot Plug-in**: Collect LCP/CLS approximate indicators and resource waterfall summary with one click, export JSON report and annotate the big picture. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add saved performance budgets for page categories.
+  - Follow-up 2: Compare fixture page snapshots and attribute changes to resource groups.
+- [ ] 352. **Automatically Temporarily Save Form Drafts**: Schedule local temporary storage of editable forms, restore them with one click after a crash, and support site whitelisting and sensitive field exclusion. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add draft versions and field-level restore previews.
+  - Follow-up 2: Show conflicts between a stored draft and changed form fields.
+- [ ] 353. **Page Heading Outline Inspector**: Extract page headings, highlight skipped levels and duplicate labels, preview the document outline, and export suggested corrections. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add outline rules by page type and ignored heading regions.
+  - Follow-up 2: Compare page revisions and highlight newly introduced heading-structure problems.
+- [ ] 354. **Dark Mode Enforcer**: The system injects adjustable filters/CSS for dark-free sites with support for domain rules, contrast adjustments, and exclude selectors. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add named theme presets and per-element contrast overrides.
+  - Follow-up 2: Preview theme changes on bundled demo pages and report unreadable combinations.
+- [ ] 355. **Permitted Image Collection Exporter**: Select images from a user-owned or public page, filter and deduplicate permitted assets, and export them as a zip with configurable file names. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add collection captions and configurable naming sequences.
+  - Follow-up 2: Export a contact sheet with original page references and asset descriptions.
+- [ ] 356. **Portable Reading Progress Bar**: Track position on bundled long-text demo pages, export and import local reading profiles, and show progress percentage and last-read time without external accounts. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add multiple reading profiles and conflict resolution for imported positions.
+  - Follow-up 2: Compare reading sessions and show progress lost or gained after a merge.
+- [ ] 357. **Browser Reading List Organizer**: Collect pages into a reading list, add priorities and tags, search saved entries, and import or export a local collection. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reading goals and an estimated-time queue.
+  - Follow-up 2: Build a weekly reading plan constrained by available daily minutes.
+- [ ] 358. **Page Typography Previewer**: Preview font families, line spacing, text width, and heading scales on the current page, save named presets, and reset changes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add responsive typography presets for narrow and wide screens.
+  - Follow-up 2: Export a style guide showing heading scales and example paragraphs.
 
 ## 6. Data Visualization and Dashboard (20 topics)
 > Practice areas: chart library, time series data, real-time updates, information density design.
 
-- [ ] 59. **GitHub Contribution Analysis**: Pull public GitHub data to display languages, projects, stars, contribution heat maps and trend comparisons.
-- [ ] 60. **Cryptocurrency/stock Real-time Disk**: Implement watchlists, real-time prices, K-lines, rise and fall alerts and local investment notes.
-- [ ] 61. **Small-Screen Weather and Air Quality Dashboard**: Optimize a full-screen dashboard for an old phone or Raspberry Pi, showing weather, AQI, alerts, a clock, and automatic refresh.
-- [ ] 62. **Home Smart Device Dashboard**: Simulate the HomeAssistant style and manage device status, scene linkage, historical curves and offline prompts.
-- [ ] 63. **Local Build Duration Dashboard**: Import build logs and show duration trends, slow stages, result counts, and comparisons between saved runs.
-- [ ] 64. **Personal Consumption Sankey Chart + Waterfall Chart**: Import bill CSV, automatically classify, display fund flow, budget balance and abnormal consumption.
-- [ ] 65. **Team Efficiency Analysis**: Pull Jira/Linear sample data and analyze cycle time, congestion points, throughput and member load.
-- [ ] 66. **Reading Pace Dashboard**: Import reading sessions and page counts, display weekly progress, completion estimates, and comparisons by book or genre.
-- [ ] 67. **Paper Citation Network Graph**: Analyze paper citation data and use D3 to display force-directed graphs, key nodes, clustering and search positioning.
-- [ ] 68. **Company News Sentiment Dashboard**: Read public news feeds or local samples, classify sentiment, cluster topics, show a timeline, and highlight items for review.
+- [ ] 59. **Repository Activity Dashboard**: Generate public-project-shaped activity fixtures and display languages, projects, contribution heat maps, and trend comparisons without remote service access. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add saved comparison groups of projects and time windows.
+  - Follow-up 2: Explain contribution changes with drill-down tables by repository and activity type.
+- [ ] 60. **Synthetic Market Watchlist**: Display generated price series, watchlists, candlestick charts, threshold alerts, and paper investment notes with clearly labeled synthetic values. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a paper portfolio with synthetic trades and cost-basis tracking.
+  - Follow-up 2: Compare portfolio performance with a configurable synthetic benchmark.
+- [ ] 61. **Small-Screen Weather Dashboard**: Display generated weather and air-quality histories, threshold notices, a clock, and responsive layouts using local fixtures. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable dashboard layouts and per-city display rotation.
+  - Follow-up 2: Show daily threshold summaries using the bundled weather fixture history.
+- [ ] 62. **Home Device State Simulator**: Manage a synthetic catalog of household device states, local scene actions, history charts, and simulated unavailable-device notices. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a scene simulator that previews device state changes before applying them.
+  - Follow-up 2: Compare simulated scene outcomes and flag conflicting device actions.
+- [ ] 63. **Local Build Duration Dashboard**: Import build logs and show duration trends, slow stages, result counts, and comparisons between saved runs. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add build-stage budgets and highlight regressions against a chosen baseline.
+  - Follow-up 2: Compare two build histories and rank stages by contribution to total slowdown.
+- [ ] 64. **Personal Consumption Sankey Chart + Waterfall Chart**: Import bill CSV, automatically classify, display fund flow, budget balance and abnormal consumption. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add editable transaction classification rules with a preview of affected rows.
+  - Follow-up 2: Compare budget scenarios and show which categories drive the largest difference.
+- [ ] 65. **Team Flow Analysis**: Generate issue and task fixtures, calculate cycle time, queue bottlenecks, throughput, and member workload without connecting to issue services. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add aging buckets for unfinished work and configurable cycle-time boundaries.
+  - Follow-up 2: Compare team throughput before and after a selected process change.
+- [ ] 66. **Reading Pace Dashboard**: Import reading sessions and page counts, display weekly progress, completion estimates, and comparisons by book or genre. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reading-session goals and a forecast under different weekly schedules.
+  - Follow-up 2: Identify books whose estimated completion dates slip beyond chosen deadlines.
+- [ ] 67. **Paper Citation Network Graph**: Analyze paper citation data and use D3 to display force-directed graphs, key nodes, clustering and search positioning. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add manually curated reading paths through related papers.
+  - Follow-up 2: Compare two selected paper groups by shared references and missing connections.
+- [ ] 68. **News Topic Annotation Dashboard**: Browse synthetic news entries, classify them with explicit keyword rules, edit topic and tone labels, and display source and timeline views. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add editable keyword categories and an explanation for each assigned label.
+  - Follow-up 2: Compare topic coverage across sources and highlight conflicting manual annotations.
 
-- [ ] 359. **Open Source Project Activity Dashboard**: Import issue/PR sample CSV to display throughput, shutdown duration, contributor distribution and activity trends.
-- [ ] 360. **Team Duty Heat Map**: Show daily duty coverage, conflicts and vacancies, and support importing schedules and exporting adjustment suggestions.
-- [ ] 361. **Workshop Delivery Punctuality Wall**: Import delivery schedules and completion dates, calculate on-time rates, group delays by team, and export monthly comparisons.
-- [ ] 362. **Content Release Rhythm Calendar**: Visualize multi-channel release records as calendar heat, marking gap weeks and peak days.
-- [ ] 363. **Warehouse Space Utilization Map**: Display warehouse utilization, dwell time, and picking hot spots as a heat map, with filtering by SKU category.
-- [ ] 364. **Campus Schedule Conflict Map**: Import courses and classroom occupancy, highlight conflicts, idle classrooms and suggested class adjustment windows.
-- [ ] 365. **Customer Service Ticket Stacking Funnel**: Display the new/processing/waiting/closed funnel, as well as the average response and resolution time trends.
-- [ ] 366. **Equipment Inspection Completion Rate Dashboard**: Display the inspection plan completion rate, missed inspection points, and photo inspection entrances by route and owner.
-- [ ] 367. **Event Registration Conversion Funnel**: Visualize sample conversion data from impressions through clicks, form completion, and payment, with comparisons across channels.
-- [ ] 368. **Local Weather Comparison Dashboard**: Compare temperature and precipitation across saved cities, annotate thresholds, and export the resulting chart as an image.
+- [ ] 359. **Open Source Project Activity Dashboard**: Import issue/PR sample CSV to display throughput, shutdown duration, contributor distribution and activity trends. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable issue-resolution intervals and contributor cohorts.
+  - Follow-up 2: Compare periods and separate newly opened work from carried-over backlog.
+- [ ] 360. **Team Duty Heat Map**: Show daily duty coverage, conflicts and vacancies, and support importing schedules and exporting adjustment suggestions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add preferred substitutes and a fairness score for duty assignments.
+  - Follow-up 2: Compare proposed adjustments and explain which coverage gaps they resolve.
+- [ ] 361. **Workshop Delivery Punctuality Wall**: Import delivery schedules and completion dates, calculate on-time rates, group delays by team, and export monthly comparisons. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add promised-date revisions and reasons for each change.
+  - Follow-up 2: Compare original and revised punctuality to reveal schedule slippage.
+- [ ] 362. **Content Release Rhythm Calendar**: Visualize multi-channel release records as calendar heat, marking gap weeks and peak days. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add target publication frequencies and channel-specific quiet periods.
+  - Follow-up 2: Generate a gap-filling schedule using the available draft inventory.
+- [ ] 363. **Warehouse Space Utilization Map**: Display warehouse utilization, dwell time, and picking hot spots as a heat map, with filtering by SKU category. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add capacity limits and proposed item relocations.
+  - Follow-up 2: Compare picking-distance estimates before and after a relocation plan.
+- [ ] 364. **Campus Schedule Conflict Map**: Import courses and classroom occupancy, highlight conflicts, idle classrooms and suggested class adjustment windows. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add course equipment requirements and room-change penalties.
+  - Follow-up 2: Compare conflict-resolution plans by affected students and classroom usage.
+- [ ] 365. **Customer Service Ticket Stacking Funnel**: Display the new/processing/waiting/closed funnel, as well as the average response and resolution time trends. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add ticket aging buckets and priority-specific response targets.
+  - Follow-up 2: Compare queue snapshots and show where unresolved tickets accumulate.
+- [ ] 366. **Equipment Inspection Completion Rate Dashboard**: Display the inspection plan completion rate, missed inspection points, and photo inspection entrances by route and owner. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add mandatory inspection evidence and exception reasons.
+  - Follow-up 2: Generate a route completion report listing unverified checkpoints.
+- [ ] 367. **Event Registration Conversion Funnel**: Visualize sample conversion data from impressions through clicks, form completion, and payment, with comparisons across channels. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add conversion windows and cohort filters to event registrations.
+  - Follow-up 2: Compare channels using both conversion rates and synthetic acquisition costs.
+- [ ] 368. **Local Weather Comparison Dashboard**: Compare temperature and precipitation across saved cities, annotate thresholds, and export the resulting chart as an image. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add locally generated weather scenarios and event annotations.
+  - Follow-up 2: Compare cities by threshold exceedance days and seasonal totals.
 
 ## 7. Automation and Scripting (20 topics)
 > Practice areas: scheduled tasks, file processing, reminders, error recovery.
 
-- [ ] 69. **Daily News Digest**: Read public RSS feeds or approved web sources, deduplicate and classify entries, generate concise summaries, and deliver a scheduled email or chat digest.
-- [ ] 70. **Personal Media Library Organizer**: Parse user-provided feed metadata and local media files, rename and classify files, fetch permitted artwork, and report duplicates without downloading protected content.
-- [ ] 71. **WeChat / Telegram Robot**: Integrate reminders, weather, morning reports, queries and command help, and support multi-user permissions.
-- [ ] 72. **Screenshot + OCR Archiving**: Monitor clipboard screenshots, automatically OCR, tag, save original images and perform full-text search.
-- [ ] 73. **Recurring Routine Reminder**: Manage recurring personal routines, flexible schedules, missed-item reminders, completion notes, weekly summaries, and notification preferences without logging in to third-party accounts.
-- [ ] 74. **Folder Organizer**: Archive files by type, date, project rules, provide dry-run, undo and conflict handling.
-- [ ] 75. **Video Clipping by Keyword**: Read subtitles, locate clips by keyword, call ffmpeg to slice and generate a preview list.
-- [ ] 76. **Public Event Availability Digest**: Read public or sample event feeds, summarize schedule and availability changes, send a digest, and keep a change history without booking or reserving anything.
-- [ ] 77. **Event Planning Checklist**: Track event dates, public sales announcements, attendee reminders, accessibility notes, and a manual preparation checklist without automating login, purchase, or reservation flows.
-- [ ] 78. **Automatic Weekly Report Generation**: Summarize git commits, schedules, message records, and manual additions to generate an editable weekly report draft.
+- [ ] 69. **Local News Digest Builder**: Read generated RSS fixtures, deduplicate titles, categorize by keyword, select opening-sentence excerpts, and preview scheduled digest files locally. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add digest editions with configurable sections and source quotas.
+  - Follow-up 2: Preview a scheduled edition and record which items were carried into later editions.
+- [ ] 70. **Personal Media Library Organizer**: Create small generated media fixtures and local metadata, organize titles and collections, preview folder naming, and report duplicates without remote artwork services. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add collection naming presets and a preview of proposed folder moves.
+  - Follow-up 2: Generate a collection completeness report for missing artwork and duplicate editions.
+- [ ] 71. **Local Reminder Conversation Simulator**: Build a local chat-style command simulator for reminders, generated weather replies, daily brief templates, help commands, and multiple demo users. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add scheduled reminder commands to the local conversation simulator.
+  - Follow-up 2: Track command failures and let users replay selected simulated conversations.
+- [ ] 72. **Screenshot Text Archive Desk**: Generate simple page screenshot fixtures with companion text files, edit text annotations, apply tags, and search a local capture archive without OCR services. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add editable text corrections linked to each generated screenshot fixture.
+  - Follow-up 2: Create a searchable archive report grouping captures by project and capture date.
+- [ ] 73. **Recurring Routine Reminder**: Manage recurring personal routines, flexible schedules, missed-item reminders, completion notes, weekly summaries, and notification preferences without logging in to third-party accounts. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add routine dependencies and a skip reason for unavailable steps.
+  - Follow-up 2: Build a weekly review that distinguishes completed, skipped, and missed occurrences.
+- [ ] 74. **Folder Organizer**: Archive files by type, date, project rules, provide dry-run, undo and conflict handling. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add project-specific organization rules with priority ordering.
+  - Follow-up 2: Produce an undo preview that identifies files modified since the last organization batch.
+- [ ] 75. **Subtitle Clip Planning Desk**: Generate a short synthetic video and matching subtitles, locate keywords, preview time ranges, and produce a local clip plan with optional local media export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable lead-in and lead-out time around matched subtitle lines.
+  - Follow-up 2: Generate a chaptered clip plan with overlap merging and an export manifest.
+- [ ] 76. **Public Event Availability Digest**: Read generated public-event-shaped fixtures, summarize schedule and capacity changes using explicit rules, preview local digests, and keep change history without reservations. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add watched event groups and separate schedule changes from capacity changes.
+  - Follow-up 2: Create a weekly change summary with a local calendar export for selected events.
+- [ ] 77. **Event Planning Checklist**: Track event dates, public sales announcements, attendee reminders, accessibility notes, and a manual preparation checklist without automating login, purchase, or reservation flows. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add preparation dependencies and due dates relative to the event day.
+  - Follow-up 2: Generate role-specific run sheets with late-item warnings and completion signoffs.
+- [ ] 78. **Weekly Report Template Builder**: Create local commit, schedule, and work-note fixtures, select accomplishments, fill editable report templates, and export a weekly draft. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add report sections that link each accomplishment to its source fixture.
+  - Follow-up 2: Compare weekly drafts and carry unresolved action items into the next report.
 
-- [ ] 369. **Screenshot Regression Comparison Pipeline**: Capture approved pages on a schedule, compare screenshots against a baseline, and produce a visual diff report with threshold alerts.
-- [ ] 370. **Backup Integrity Inspection**: Check the backup directory size, timestamp and sample decompression, sends a notification in case of failure and retains the inspection log.
-- [ ] 371. **Email Attachment Archiving Robot**: Pull attachments and archives them into a directory structure according to rules, renames them and writes index JSON.
-- [ ] 372. **Folder Change Journal**: Record local file additions, edits, and removals on a schedule, show a change timeline, and export selected observations.
-- [ ] 373. **Dependency Update PR Pre-check**: Run installation and smoke scripts on the dependency upgrade branch, summarize the logs and mark merging suggestions.
-- [ ] 374. **Static Asset Size Reporter**: Inspect a local build folder, group assets by type and size, compare saved snapshots, and export a size-budget report.
-- [ ] 375. **Conference Room Preparation Checklist**: Track furniture, presentation materials, seating, and room setup before meetings, assign owners, and retain completion notes.
-- [ ] 376. **Multi-Environment Configuration Drift Scanner**: Compare configuration keys across environments, report missing, extra, and differing values, and generate a draft synchronization ticket.
-- [ ] 377. **Image Watermark Batch Processor**: Add watermarks, resize images, and convert formats in batches, with reusable templates and dry-run preview.
-- [ ] 378. **Slack/Feishu Daily Summary Script**: Pull tagged messages from Slack or Feishu, generate a structured daily digest, and deliver it to a selected conversation.
+- [ ] 369. **Local Screenshot Comparison Pipeline**: Generate local demo pages and their screenshots, compare against saved baselines, display visual differences, and retain review decisions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add ignored image regions and per-page difference thresholds.
+  - Follow-up 2: Generate a visual change review packet with accepted baseline updates.
+- [ ] 370. **Backup Integrity Inspection**: Check the backup directory size, timestamp and sample decompression, sends a notification in case of failure and retains the inspection log. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add expected backup schedules and minimum file-count checks.
+  - Follow-up 2: Compare inspection history and identify repeatedly incomplete backup sets.
+- [ ] 371. **Mailbox Attachment Organizer**: Create local mailbox and attachment fixtures, classify attachments using explicit rules, preview archive paths, and write a searchable manifest without email accounts. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add attachment classification rules using the bundled mailbox fixtures.
+  - Follow-up 2: Generate an archive manifest and a queue for unmatched attachment types.
+- [ ] 372. **Folder Change Journal**: Record local file additions, edits, and removals on a schedule, show a change timeline, and export selected observations. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add project filters and named checkpoints in the folder journal.
+  - Follow-up 2: Compare checkpoints and export a concise added-changed-removed file summary.
+- [ ] 373. **Dependency Upgrade Checklist Runner**: Create a tiny local project with two fixture dependency manifests, run configured local smoke checks, and collect compatibility notes without remote pull requests. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add upgrade groups and reusable local verification profiles.
+  - Follow-up 2: Compare upgrade attempts and record which compatibility checks remain unresolved.
+- [ ] 374. **Static Asset Size Reporter**: Inspect a local build folder, group assets by type and size, compare saved snapshots, and export a size-budget report. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add per-type size budgets and separate compressed from original sizes.
+  - Follow-up 2: Compare build snapshots and rank the assets driving budget overruns.
+- [ ] 375. **Conference Room Preparation Checklist**: Track furniture, presentation materials, seating, and room setup before meetings, assign owners, and retain completion notes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add room-layout templates and preparation lead times.
+  - Follow-up 2: Generate individual setup checklists and highlight unassigned equipment needs.
+- [ ] 376. **Multi-Environment Configuration Drift Scanner**: Compare configuration keys across environments, report missing, extra, and differing values, and generate a draft synchronization ticket. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add approved-difference annotations with review dates.
+  - Follow-up 2: Compare saved environment snapshots and identify expired exceptions.
+- [ ] 377. **Image Watermark Batch Processor**: Add watermarks, resize images, and convert formats in batches, with reusable templates and dry-run preview. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add watermark placement rules based on image orientation.
+  - Follow-up 2: Generate a preview contact sheet and export only approved image variants.
+- [ ] 378. **Team Message Digest Builder**: Generate fictional team-message exports, filter by tags and keywords, populate digest sections with quoted excerpts, and write a reviewable local report. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add digest sections and keyword-based routing for local message fixtures.
+  - Follow-up 2: Create a review edition showing omitted messages and duplicate groups.
 
 ## 8. Content Creation Tools (16 topics)
 > Practice areas: Canvas/SVG, real-time collaboration, exporting to multiple formats.
 
-- [ ] 79. **Online Whiteboard**: Provide drawing tools, shapes, text, selection, undo, export, and lightweight collaboration in an MVP inspired by Excalidraw.
-- [ ] 80. **Mini CodePen**: Offer side-by-side HTML, CSS, and JavaScript editors with a live preview, error capture, local saves, and shareable links.
-- [ ] 81. **Resume Builder**: The system offers multiple templates, structured forms, live preview, PDF export, ATS-friendly checking and version management.
-- [ ] 82. **Business Card/Poster Generator**: Edit text, images, colors, and dimensions in reusable templates, preview the result, and export PNG or PDF files.
-- [ ] 83. **Markdown Collaborative Editing**: Enable multi-person real-time editing, cursor display, version history, preview and conflict recovery.
-- [ ] 84. **SVG Icon Library + Online Editor**: Manage icon collections, support path transformation, color replacement, code copying and batch export.
-- [ ] 85. **PPT Automatically Generated**: Enter the outline to generate slide structure, layout, picture placeholders, lecture notes and downloadable files.
-- [ ] 86. **Video Subtitle Generation**: Upload audio and video, call transcription, generate bilingual subtitles, edit timeline, and burn and export.
+- [ ] 79. **Online Whiteboard**: Provide drawing tools, shapes, text, selection, undo, export, and lightweight collaboration in an MVP inspired by Excalidraw. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable shape groups with alignment guides and snapping.
+  - Follow-up 2: Export a selected board region as a diagram with a generated object legend.
+- [ ] 80. **Mini CodePen**: Offer side-by-side HTML, CSS, and JavaScript editors with a live preview, error capture, local saves, and shareable links. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add saved experiments with editable dependency-free starter templates.
+  - Follow-up 2: Compare two experiment versions using source diffs and side-by-side previews.
+- [ ] 81. **Resume Builder**: The system offers multiple templates, structured forms, live preview, PDF export, ATS-friendly checking and version management. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add role-specific resume versions sharing a common experience library.
+  - Follow-up 2: Show a comparison of included experience and page usage across versions.
+- [ ] 82. **Business Card/Poster Generator**: Edit text, images, colors, and dimensions in reusable templates, preview the result, and export PNG or PDF files. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add template variants for different print and screen dimensions.
+  - Follow-up 2: Export a batch contact sheet and identify text that exceeds each template's safe area.
+- [ ] 83. **Local Collaborative Markdown Editor**: Run a local document editor with two simulated participants, cursor labels, version history, preview, and conflict recovery. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add paragraph-level comments and a resolved discussion list.
+  - Follow-up 2: Compare named document snapshots and selectively restore changed sections.
+- [ ] 84. **SVG Icon Library + Online Editor**: Manage icon collections, support path transformation, color replacement, code copying and batch export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add icon families with shared color tokens and spacing rules.
+  - Follow-up 2: Export a sprite sheet and a catalog showing each icon's token usage.
+- [ ] 85. **Outline-to-Slides Template Builder**: Use a built-in presentation outline and deterministic layouts to create editable slides, image placeholders, speaker notes, and downloadable local files. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable slide layouts and a slide-duration estimate.
+  - Follow-up 2: Create a presenter handout with notes, slide thumbnails, and section timing.
+- [ ] 86. **Subtitle Authoring Workbench**: Generate a short tone-and-color video fixture and sample captions, edit caption timing and text, preview subtitles, and export SRT without transcription services. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add overlapping-caption detection and adjustable line-length rules.
+  - Follow-up 2: Export alternate subtitle styles plus a timing-quality report for the demo clip.
 
-- [ ] 379. **Storyboard Timeline**: Manage shots, duration, narration, and asset status, then export a production checklist and compare versions.
-- [ ] 380. **Subtitle Timeline Refiner**: Import SRT, support waveform alignment, batch offset, merge split sentences and style preview.
-- [ ] 381. **Cover Template Batch Rendering**: Use template + CSV to batch generate cover images, supporting font safe zone and export specification verification.
-- [ ] 382. **Podcast Chapter Marker**: Mark chapter points on the audio timeline, generate show notes drafts and platform chapter formats.
-- [ ] 383. **Material Copyright Source Ledger**: Register material sources, license types, expiration dates and used works, and prompt risks during retrieval.
-- [ ] 384. **Long Article Structure Outline Editor**: Edit chapters, arguments and evidence links in a tree view, export to Markdown and check for dangling references.
-- [ ] 385. **Brand Tone Checklist**: Scan the manuscript against the tone guidelines, mark violating sentences and provide replacement suggestions.
-- [ ] 386. **Multi-Platform Title Lab**: Generate title variations for the same content, record sample click feedback, and capture the patterns behind the strongest options.
+- [ ] 379. **Storyboard Timeline**: Manage shots, duration, narration, and asset status, then export a production checklist and compare versions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add shot dependencies and estimated setup time.
+  - Follow-up 2: Generate a shooting-day plan grouped by location and required props.
+- [ ] 380. **Subtitle Timeline Refiner**: Import SRT, support waveform alignment, batch offset, merge split sentences and style preview. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reading-speed limits and line-break suggestions.
+  - Follow-up 2: Compare subtitle versions and report timing changes that affect neighboring captions.
+- [ ] 381. **Cover Template Batch Rendering**: Use template + CSV to batch generate cover images, supporting font safe zone and export specification verification. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add per-platform crop presets and required text fields.
+  - Follow-up 2: Export a rendering manifest listing successful variants and overflow problems.
+- [ ] 382. **Podcast Chapter Marker**: Generate a short tone-based audio fixture, mark chapter timestamps, edit chapter notes, and export platform-style chapter text without external audio uploads. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add chapter title templates and minimum chapter duration checks.
+  - Follow-up 2: Create an episode handout with timestamped chapters and editable summary notes.
+- [ ] 383. **Material Copyright Source Ledger**: Register material sources, license types, expiration dates and used works, and prompt risks during retrieval. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add attribution templates and links between assets and published works.
+  - Follow-up 2: Generate a renewal checklist for expiring usage permissions.
+- [ ] 384. **Long Article Structure Outline Editor**: Edit chapters, arguments and evidence links in a tree view, export to Markdown and check for dangling references. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add claim-evidence links and a list of unsupported outline sections.
+  - Follow-up 2: Compare article plans and export the moved or removed evidence references.
+- [ ] 385. **Brand Tone Checklist**: Scan the manuscript against the tone guidelines, mark violating sentences and provide replacement suggestions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add section-specific tone rules and a controlled terminology list.
+  - Follow-up 2: Track resolved findings across draft revisions without losing reviewer notes.
+- [ ] 386. **Multi-Platform Title Lab**: Combine editorially supplied phrase fragments using explicit templates, edit title variants, enter synthetic trial feedback, and compare results by channel. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add headline constraints for each publishing channel.
+  - Follow-up 2: Compare manually entered trial results and separate sample size from click rate.
 
 ## 9. Education and Learning Tools (12 topics)
 > Practice areas: interactive animation, sandbox execution, visual teaching.
 
-- [ ] 87. **Coding Practice Platform**: Provide a project list, code editor, local evaluator, timer, mistake review notebook, and submission history.
-- [ ] 88. **Algorithm Visualization**: Demonstrate sorting, shortest-path, and dynamic-programming algorithms with step controls, adjustable speed, custom input, and explanatory text.
-- [ ] 89. **Live Formula Rendering Playground**: Provide a KaTeX and Mermaid practice area with live preview, precise error locations, and reusable templates.
-- [ ] 90. **Multilingual Read-Aloud Practice**: Display practice text, record and play back speech, score pronunciation, locate likely errors, and generate a repetition plan.
-- [ ] 91. **Code Translation Playground**: Translate examples between Python, JavaScript, and Go while showing diffs, runnable samples, and semantic caveats.
-- [ ] 92. **SQL Sandbox**: Provide sample databases and exercises from basic queries through window functions, with execution, result comparison, and hints.
+- [ ] 87. **Coding Practice Platform**: Provide a project list, code editor, local evaluator, timer, mistake review notebook, and submission history. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add prerequisite links and suggested practice sequences.
+  - Follow-up 2: Create a progress report comparing attempts by concept and recurring mistake type.
+- [ ] 88. **Algorithm Visualization**: Demonstrate sorting, shortest-path, and dynamic-programming algorithms with step controls, adjustable speed, custom input, and explanatory text. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add side-by-side algorithm runs on the same generated input.
+  - Follow-up 2: Export a step trace showing operation counts and the first divergence between runs.
+- [ ] 89. **Live Formula Rendering Playground**: Provide a KaTeX and Mermaid practice area with live preview, precise error locations, and reusable templates. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a library of reusable formula and diagram fragments.
+  - Follow-up 2: Create a printable workbook of selected examples with their editable source.
+- [ ] 90. **Read-Aloud Practice Notebook**: Provide built-in English phrases, syllable markings, timed practice, self-ratings, and repetition plans, with recording optional and a local playback fixture included. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add syllable-marking exercises and user-recorded self-ratings.
+  - Follow-up 2: Build a practice queue weighted toward phrases with low self-ratings.
+- [ ] 91. **Code Equivalence Workbook**: Browse built-in equivalent Python, JavaScript, and Go examples, display source differences, run available local examples, and explain manually documented semantic caveats. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add equivalence checks using generated input cases for the built-in examples.
+  - Follow-up 2: Show language-specific caveats beside each mismatched result.
+- [ ] 92. **SQL Sandbox**: Provide sample databases and exercises from basic queries through window functions, with execution, result comparison, and hints. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add progressive hints that reveal only the next useful query concept.
+  - Follow-up 2: Track exercise attempts and generate a review set from repeated query mistakes.
 
-- [ ] 387. **Mistake Review Organizer**: Record missed problems, concepts, and mastery levels, then build a review queue and a weak-area radar chart.
-- [ ] 388. **Classroom Random Student Picker**: Select students with configurable weights, avoid immediate repeats, retain history, support groups, and present clearly on a classroom display.
-- [ ] 389. **Experiment Report Template Assistant**: Generate report skeleton according to subject templates, check the completeness of required paragraphs and export to PDF/Markdown.
-- [ ] 390. **Vocabulary Self-test Web**: Graded vocabulary list sampling, record accuracy curve and recommended review list.
-- [ ] 391. **Programming Assignment Feedback Prototype**: Run fixed tests against student code and generate a pass matrix with safe, common-error feedback in a sandboxed demonstration.
-- [ ] 392. **Parent-Teacher Meeting Notes Planner**: Help teachers record student strengths, areas for improvement, action plans, meeting talking points, and follow-up dates.
+- [ ] 387. **Mistake Review Organizer**: Record missed problems, concepts, and mastery levels, then build a review queue and a weak-area radar chart. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add spaced review intervals and prerequisite concept links.
+  - Follow-up 2: Create a targeted review worksheet from repeated mistake categories.
+- [ ] 388. **Classroom Random Student Picker**: Select students with configurable weights, avoid immediate repeats, retain history, support groups, and present clearly on a classroom display. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add participation categories and adjustable recency penalties.
+  - Follow-up 2: Compare selection fairness across classes using a reproducible draw history.
+- [ ] 389. **Physics Report Template Assistant**: Create classroom mechanics fixtures, fill report sections, validate required observations, and export a printable report template. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add measurement tables and chart placeholders for classroom physics fixtures.
+  - Follow-up 2: Compare report drafts and identify missing observations or unsupported conclusions.
+- [ ] 390. **Vocabulary Self-test Web**: Graded vocabulary list sampling, record accuracy curve and recommended review list. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add topic-based word sets and configurable answer directions.
+  - Follow-up 2: Generate a review queue emphasizing repeatedly confused word pairs.
+- [ ] 391. **Programming Assignment Feedback Prototype**: Run fixed tests against student code and generate a pass matrix with safe, common-error feedback in a sandboxed demonstration. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add rubric categories and links from failed cases to lesson concepts.
+  - Follow-up 2: Compare assignment revisions and show which test failures were resolved.
+- [ ] 392. **Parent-Teacher Meeting Notes Planner**: Help teachers record student strengths, areas for improvement, action plans, meeting talking points, and follow-up dates. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add action-item owners and review dates to meeting notes.
+  - Follow-up 2: Generate an individual follow-up sheet showing agreed actions and later observations.
 
 ## 10. Creativity and Experimentation (16 topics)
-> Practice areas: graphics/audio processing, cross-device experience, AI gameplay innovation.
+> Practice areas: explicit rules, editable templates, local fixtures, and reviewable workflows.
 
-- [ ] 93. **Pixel Artboard + GIF Export**: Implement grid drawing, palette, layers, onion skinning, frame animation and GIF export.
-- [ ] 94. **Metronome + Rhythm Training**: Provide BPM, time signature, visual feedback, auditory feedback, rhythm practice and accuracy statistics.
-- [ ] 95. **Minimalist DAW**: Support multi-track recording, waveform display, editing, volume adjustment, beat grid and wav export.
-- [ ] 96. **ASCII Art Generator**: Upload images to character art, support density, character set, width, inverse color and text/image export.
-- [ ] 97. **AI Ancient Poetry Generator**: Generate ancient poems based on subject matter, meter, and rhyme, and display them for checking, rewriting, and collecting.
-- [ ] 98. **Tarot Divination Web Application**: Implement card drawing, card formation, AI interpretation, historical records, sharing pictures and disclaimers.
-- [ ] 99. **AR Business Card**: Generate a QR code, and WebXR displays the 3D business card, contact information and interactive effects after scanning the code.
-- [ ] 100. **Multi-person Collaboration Drawing Board**: Implement low-latency WebSocket synchronization, user cursor, undo stack, room management and disconnection recovery.
+- [ ] 93. **Pixel Artboard + GIF Export**: Implement grid drawing, palette, layers, onion skinning, frame animation and GIF export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable sprite stamps and palette replacement across frames.
+  - Follow-up 2: Export a sprite sheet with frame durations and an animation preview page.
+- [ ] 94. **Metronome + Rhythm Training**: Provide BPM, time signature, visual feedback, auditory feedback, rhythm practice and accuracy statistics. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add rhythm patterns with accents and silent beats.
+  - Follow-up 2: Compare tap timing against a pattern and chart early and late hits.
+- [ ] 95. **Mini Audio Arrangement Desk**: Generate short tone samples, arrange local audio clips on tracks, edit volume and timing, preview waveforms, and export WAV without a microphone. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add loop regions and a simple clip arrangement grid.
+  - Follow-up 2: Export a mixdown checklist with per-track clipping and silence indicators.
+- [ ] 96. **ASCII Art Generator**: Create geometric image fixtures, convert pixels to character art, adjust density, width, palette, and inverse colors, and export text or images. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add region-specific character palettes and a live density preview.
+  - Follow-up 2: Export a gallery comparing several rendering presets on the same generated image.
+- [ ] 97. **Verse Pattern Notebook**: Provide a built-in rhyme dictionary and syllable-count rules, edit short poems, highlight meter mismatches, and organize draft collections without generated prose. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add rhyme-family browsing and a syllable-count checklist.
+  - Follow-up 2: Compare poem drafts and highlight lines that violate the selected verse pattern.
+- [ ] 98. **Reflection Card Journal**: Provide a built-in deck of fictional reflection cards with fixed editable meanings, draw seeded spreads, record personal notes, and export journal pages. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add custom card spreads with position labels and editable meanings.
+  - Follow-up 2: Create a printable journal entry combining the chosen spread and reflection notes.
+- [ ] 99. **Interactive Business Card Preview**: Create a local 3D-style business-card scene with contact text, theme controls, a desktop preview, and a QR code pointing to its local contact page. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add multiple business-card themes and a desktop 3D preview.
+  - Follow-up 2: Export a static contact page with a QR image and an accessible text fallback.
+- [ ] 100. **Local Collaborative Drawing Board**: Run a local shared canvas with two simulated participants, object movement, undo history, room labels, and reconnect recovery demonstrations. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add shared layers and per-object ownership labels.
+  - Follow-up 2: Replay board changes over time and export a selected collaboration milestone.
 
-- [ ] 393. **Generate Artistic Parameter Sandbox**: Use sliders to control real-time preview of noise/color/symmetry parameters, support random seeds and export PNG.
-- [ ] 394. **Audio Visualization Playground**: Drive particles and waveforms from microphone input, offer several visual styles, and include a placeholder workflow for screen-recording export.
-- [ ] 395. **ASCII Animation Editor**: Edit frame-based ASCII animations with onion-skin preview, adjustable playback speed, and text or JSON export.
-- [ ] 396. **Pixel Painting Collaboration Canvas**: Grid pixel painting, color palette, undo and redo, optional sharing of read-only links.
-- [ ] 397. **Story Dice Inspirer**: Random character/scene/conflict combinations, save inspiration cards and expand short outlines.
-- [ ] 398. **Font Pairing Lab**: Preview heading and body font combinations, adjust weight and line height, and export reusable CSS snippets.
-- [ ] 399. **Mini Physics Sandbox**: Simulate 2D rigid bodies, gravity, and constraints, let users place shapes, and save parameter presets.
-- [ ] 400. **Color Accessibility Contrast Check**: Enter a pair of colors, calculate their contrast ratio, report WCAG AA and AAA results, and suggest accessible alternatives.
+- [ ] 393. **Generate Artistic Parameter Sandbox**: Use sliders to control real-time preview of noise/color/symmetry parameters, support random seeds and export PNG. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add preset families and a parameter-history timeline.
+  - Follow-up 2: Export a contact sheet comparing variations generated from the same seed.
+- [ ] 394. **Audio Visualization Playground**: Generate local tone sequences, drive waveform and particle previews from their amplitude, offer adjustable visual styles, and export reproducible animation frames without a microphone. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add generated audio tracks and configurable visualization response curves.
+  - Follow-up 2: Export an animation frame sequence with the settings needed to reproduce it.
+- [ ] 395. **ASCII Animation Editor**: Edit frame-based ASCII animations with onion-skin preview, adjustable playback speed, and text or JSON export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable character sprites and layer-based composition.
+  - Follow-up 2: Export a sprite library and an animation timing sheet.
+- [ ] 396. **Pixel Painting Collaboration Canvas**: Grid pixel painting, color palette, undo and redo, optional sharing of read-only links. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable pixel stamps and palette rules per layer.
+  - Follow-up 2: Compare saved canvas versions and selectively restore changed regions.
+- [ ] 397. **Story Dice Inspirer**: Random character/scene/conflict combinations, save inspiration cards and expand short outlines. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable story tables and constraints between character and setting.
+  - Follow-up 2: Build a story-outline board linking saved prompts to planned scenes.
+- [ ] 398. **Font Pairing Lab**: Preview heading and body font combinations, adjust weight and line height, and export reusable CSS snippets. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add font-role presets and text-length stress examples.
+  - Follow-up 2: Export a typography specimen page showing supported heading and body combinations.
+- [ ] 399. **Mini Physics Sandbox**: Simulate 2D rigid bodies, gravity, and constraints, let users place shapes, and save parameter presets. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable mechanical scenes and adjustable collision materials.
+  - Follow-up 2: Compare simulations using saved position traces and energy indicators.
+- [ ] 400. **Color Accessibility Contrast Check**: Enter a pair of colors, calculate their contrast ratio, report WCAG AA and AAA results, and suggest accessible alternatives. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add color palettes with text and background role assignments.
+  - Follow-up 2: Export a palette report showing failing pairs and chosen replacement colors.
 
 ## 11. Developer Tools and Engineering Platforms (40 topics)
 > Practice areas: code analysis, building experience, team collaboration, and engineering observability.
 
-- [ ] 101. **Local API Mock Studio**: Define REST endpoints visually, configure response templates, delays, and error rates, generate a mock server, and record request logs.
-- [ ] 102. **OpenAPI Document Comparator**: Compare two OpenAPI files, marking additions, deletions, compatibility risks, and migration recommendations.
-- [ ] 103. **Database Schema Diff Tool**: Read two SQLite/PostgreSQL schemas and output table field differences, index differences and migration SQL drafts.
-- [ ] 104. **Environment Template Comparator**: Compare project configuration templates, highlight missing and unused keys, group differences by file, and export a review checklist.
-- [ ] 105. **Dependency License Dashboard**: Parse package/requirements/go.mod, display licenses, version risks, upgrade recommendations and export reports.
-- [ ] 106. **Code Snippet Knowledge Base**: Collect reusable team snippets with tags, search, configurable placeholders, one-click copying, and usage statistics.
-- [ ] 107. **CLI Task Running Panel**: Register commonly used commands as tasks and provide parameter forms, real-time logs, exit codes and history records.
-- [ ] 108. **Local CI Prefinger**: Read project configuration, concatenates lint/test/build, and aggregate error summaries and fix suggestions on failure.
-- [ ] 109. **Log Pattern Miner**: Import log files, automatically cluster similar errors, and count frequency, time distribution and sample context.
-- [ ] 110. **Feature Flag Manager**: Manage local feature flags, environments, user targeting rules, and evaluation logs, and provide front-end SDK examples.
-- [ ] 111. **PR Review Checklist Generator**: Generate reviewer checklist based on diff and project rules, categorizes by risk and support Markdown export.
-- [ ] 112. **Code Complexity Radar**: Scan function length, cyclomatic complexity, duplicate code and dependencies, and output visual hot spots.
-- [ ] 113. **Repository File Convention Checker**: Check file names, folder structure, trailing whitespace, and required project documents against configurable conventions and export suggested edits.
-- [ ] 114. **Docker Compose Visualizer**: Parse compose files, displaying service dependencies, ports, volumes, environment variables, and health check gaps.
-- [ ] 115. **Error Code Dictionary Manager**: Maintain product error codes, user texts, troubleshooting steps and multi-language translations, and support search and export.
-- [ ] 116. **Database Query Favorites**: Save commonly used SQL, parameter templates, execution history, result previews and sensitive field masks.
-- [ ] 117. **Lightweight Release Checkbench**: Manage version numbers, change lists, rollback steps, release approvals, and post-release verification items.
-- [ ] 118. **Local Event Timeline Explorer**: Import JSON event samples, filter by type and time, inspect payload fields, compare related events, and export selected records.
-- [ ] 119. **Package Volume Analyzer**: Analyze front-end build products or static directories to display large files, duplicate resources, and compression gains.
-- [ ] 120. **Project Tool Version Checklist**: Compare local Git, Node, Python, and package-manager versions with project requirements and show a reproducible setup checklist.
+- [ ] 101. **Local API Mock Studio**: Define REST endpoints visually, configure response templates, delays, and error rates, generate a mock server, and record request logs. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable response scenarios selected by request fields.
+  - Follow-up 2: Generate a scenario coverage report from locally recorded example requests.
+- [ ] 102. **OpenAPI Document Comparator**: Compare two OpenAPI files, marking additions, deletions, compatibility risks, and migration recommendations. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable compatibility rules and explicit review exceptions.
+  - Follow-up 2: Export a migration worksheet grouping affected operations by consumer-facing change.
+- [ ] 103. **Database Schema Diff Tool**: Read two SQLite/PostgreSQL schemas and output table field differences, index differences and migration SQL drafts. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a migration preview that orders dependent table changes.
+  - Follow-up 2: Create a rollback draft and compare the resulting schema with the saved baseline.
+- [ ] 104. **Environment Template Comparator**: Compare project configuration templates, highlight missing and unused keys, group differences by file, and export a review checklist. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add environment-specific optional keys and allowed value sets.
+  - Follow-up 2: Export a setup checklist showing which template entries need user-provided values later.
+- [ ] 105. **Dependency License Dashboard**: Parse package/requirements/go.mod, display licenses, version risks, upgrade recommendations and export reports. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add approved-license policies and a review queue for unknown licenses.
+  - Follow-up 2: Compare dependency snapshots and show changes in license obligations.
+- [ ] 106. **Code Snippet Knowledge Base**: Collect reusable team snippets with tags, search, configurable placeholders, one-click copying, and usage statistics. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add snippet variants with named parameters and example outputs.
+  - Follow-up 2: Track copied variants and identify outdated snippets whose linked examples changed.
+- [ ] 107. **CLI Task Running Panel**: Register commonly used commands as tasks and provide parameter forms, real-time logs, exit codes and history records. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add task dependencies and a dry-run execution order view.
+  - Follow-up 2: Compare task histories and produce a summary of slow or frequently failing steps.
+- [ ] 108. **Local CI Checklist Runner**: Create a tiny example project, configure local lint, test, and build commands, collect exit results, and link failure summaries to captured output. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable pipeline profiles with optional and required steps.
+  - Follow-up 2: Export a local run report that links failed checks to their captured logs.
+- [ ] 109. **Log Pattern Miner**: Import log files, automatically cluster similar errors, and count frequency, time distribution and sample context. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add user-named error groups and rules for merging similar patterns.
+  - Follow-up 2: Compare two log batches and highlight newly appearing or disappearing error groups.
+- [ ] 110. **Feature Flag Manager**: Manage local feature flags, environments, user targeting rules, and evaluation logs, and provide front-end SDK examples. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add scheduled flag changes in a simulated timeline.
+  - Follow-up 2: Explain which targeting rule won for each bundled example user.
+- [ ] 111. **PR Review Checklist Generator**: Generate reviewer checklist based on diff and project rules, categorizes by risk and support Markdown export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add checklists selected by changed file types and change size.
+  - Follow-up 2: Track checklist completion and export unresolved review questions by file group.
+- [ ] 112. **Code Complexity Radar**: Scan function length, cyclomatic complexity, duplicate code and dependencies, and output visual hot spots. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable complexity budgets per folder.
+  - Follow-up 2: Compare snapshots and rank functions by growth in complexity.
+- [ ] 113. **Repository File Convention Checker**: Check file names, folder structure, trailing whitespace, and required project documents against configurable conventions and export suggested edits. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add convention profiles that can inherit shared rules.
+  - Follow-up 2: Generate an edit preview and show which inherited rule caused each finding.
+- [ ] 114. **Docker Compose Visualizer**: Parse compose files, displaying service dependencies, ports, volumes, environment variables, and health check gaps. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add dependency ordering and restart-impact exploration.
+  - Follow-up 2: Compare two service layouts and summarize changed storage and startup relationships.
+- [ ] 115. **Error Code Dictionary Manager**: Maintain product error codes, user texts, troubleshooting steps and multi-language translations, and support search and export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add product-area ownership and review dates for error entries.
+  - Follow-up 2: Export a completeness report for missing translations and stale troubleshooting steps.
+- [ ] 116. **Database Query Favorites**: Save commonly used SQL, parameter templates, execution history, result previews and sensitive field masks. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add typed query parameters and saved sample parameter sets.
+  - Follow-up 2: Compare query results from two local fixture databases by stable row keys.
+- [ ] 117. **Lightweight Release Checkbench**: Manage version numbers, change lists, rollback steps, release approvals, and post-release verification items. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add release dependencies and blocking checklist items.
+  - Follow-up 2: Generate a release readiness sheet showing missing evidence and rollback ownership.
+- [ ] 118. **Local Event Timeline Explorer**: Import JSON event samples, filter by type and time, inspect payload fields, compare related events, and export selected records. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add correlation groups across related event records.
+  - Follow-up 2: Export a narrated timeline with elapsed times between selected milestones.
+- [ ] 119. **Package Volume Analyzer**: Analyze front-end build products or static directories to display large files, duplicate resources, and compression gains. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add per-asset size budgets and separate generated assets from source assets.
+  - Follow-up 2: Compare snapshots and estimate gains from removing duplicate resources.
+- [ ] 120. **Project Tool Version Checklist**: Compare local Git, Node, Python, and package-manager versions with project requirements and show a reproducible setup checklist. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add project profiles with optional tool requirements and version ranges.
+  - Follow-up 2: Generate an offline setup worksheet explaining each incompatible version.
 
-- [ ] 401. **API Fault Injection Matrix**: Configure delay, 5xx, empty response and current limiting combinations by interface, generate reusable fault scenarios and export them to joint debugging parties.
-- [ ] 402. **Development Fixture Library**: Manage reusable local fixture files, attach descriptions and tags, preview contents, compare versions, and export selected bundles.
-- [ ] 403. **Change Impact Test Selector**: Map changed files to relevant test directories and output a recommended regression suite with identified coverage gaps.
-- [ ] 404. **Feature Switch Console**: Manage feature flags, audience percentages and audit logs, and provide local coverage mode.
-- [ ] 405. **Dependency Upgrade Planning Board**: Record desired dependency versions, compatibility notes, owners, target dates, and completed verification steps in an upgrade checklist.
-- [ ] 406. **Database Migration Previewer**: Parse the migration file and display the sequence, dangerous operation flags, and whether the rollback script exists.
-- [ ] 407. **Container Image Layer Analyzer**: Analyze the historical image layer size and file contribution, and mark the fat layer and optimization points.
-- [ ] 408. **Local Message Queue Observation Platform**: Visualize queue depth, consumption delay and dead letters, and support replaying sample messages.
-- [ ] 409. **Code Owner Coverage Check**: Check CODEOWNERS against the directory structure to identify unowned paths and conflicting rules.
-- [ ] 410. **Release Product Verification Bench**: Verify artifact checksums, signatures, and version metadata, then record the result in a release inventory.
-- [ ] 411. **One-click Initialization of the Development Environment**: Install dependencies according to the project template, copy env samples and run health checks, and output failure steps.
-- [ ] 412. **GraphQL Query Workbench**: Support schema browsing, query collections, variable templates, and history.
-- [ ] 413. **Contract Test Results Wall**: Aggregate consumer contract results, displaying breaking changes and owners by service.
-- [ ] 414. **Source Code Comment To-do Radar**: Scan TODO/FIXME and associates owners with deadlines to generate a cleanup sprint list.
-- [ ] 415. **Branch Lifecycle Monitor**: Track long-lived branches, commits behind the main branch, and recent activity, then remind owners to merge or archive stale work.
-- [ ] 416. **Error Code Dictionary Center**: Maintain error codes, meanings, user texts and troubleshooting links, and support search and versions.
-- [ ] 417. **Local Multi-Service Process Orchestrator**: Start local front-end and worker processes from configuration, colorize combined logs, and stop every managed process with one command.
-- [ ] 418. **SQL Slow Query Sample Library**: Include slow SQL, execution plans and optimization records, and support tags and comparison before and after.
-- [ ] 419. **Sample Event Rule Playground**: Apply configurable rules to imported JSON event samples, show matching decisions and transformations, and compare rule versions.
-- [ ] 420. **Scaffolding Template Market Local Version**: Browse local project templates, substitute variables, preview the generated file tree, and lock template versions.
+- [ ] 401. **API Fault Injection Matrix**: Configure delay, 5xx, empty response and current limiting combinations by interface, generate reusable fault scenarios and export them to joint debugging parties. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add deterministic local response scenarios and expected caller outcomes.
+  - Follow-up 2: Compare scenario runs and identify combinations without a recorded handling result.
+- [ ] 402. **Development Fixture Library**: Manage reusable local fixture files, attach descriptions and tags, preview contents, compare versions, and export selected bundles. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add fixture schemas and dependency links between fixture bundles.
+  - Follow-up 2: Export a reproducible fixture pack with version and generation notes.
+- [ ] 403. **Change Impact Test Selector**: Map changed files to relevant test directories and output a recommended regression suite with identified coverage gaps. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add test ownership and confidence levels to file-to-test mappings.
+  - Follow-up 2: Compare suggested suites and explain uncovered changed paths.
+- [ ] 404. **Feature Switch Console**: Manage feature flags, audience percentages and audit logs, and provide local coverage mode. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add flag prerequisites and simulated audience evaluation.
+  - Follow-up 2: Explain the final flag values for each bundled example profile.
+- [ ] 405. **Dependency Upgrade Planning Board**: Record desired dependency versions, compatibility notes, owners, target dates, and completed verification steps in an upgrade checklist. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add dependency constraints and staged upgrade groups.
+  - Follow-up 2: Generate an upgrade sequence showing blocked packages and required verification.
+- [ ] 406. **Database Migration Previewer**: Parse the migration file and display the sequence, dangerous operation flags, and whether the rollback script exists. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add statement-level dependency ordering and a dry-run SQLite fixture.
+  - Follow-up 2: Compare before-and-after schemas and list changes without a rollback draft.
+- [ ] 407. **Image Layer Inventory Analyzer**: Create synthetic image-layer inventory files, analyze file-size contributions and duplicate paths, and display optimization candidates without a container registry. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add saved layer inventories and configurable size budgets.
+  - Follow-up 2: Compare image fixture revisions and rank added files by size contribution.
+- [ ] 408. **Local Message Queue Observation Platform**: Visualize queue depth, consumption delay and dead letters, and support replaying sample messages. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable consumer speeds and retry delays to the queue simulator.
+  - Follow-up 2: Compare retry policies by backlog growth and dead-letter volume.
+- [ ] 409. **Code Owner Coverage Check**: Check CODEOWNERS against the directory structure to identify unowned paths and conflicting rules. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable ownership groups and rule-precedence explanations.
+  - Follow-up 2: Compare ownership revisions and list paths whose responsible team changes.
+- [ ] 410. **Release Artifact Inventory Bench**: Generate local artifact files and version manifests, verify checksums and expected metadata, and record completeness in a release inventory. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add required artifact types and release-specific completeness rules.
+  - Follow-up 2: Compare two release inventories and report missing or mismatched files.
+- [ ] 411. **Project Starter Setup Desk**: Bundle small dependency-free project templates, generate a selected local project, copy example configuration, run local readiness checks, and show actionable setup results. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add dependency-free project profiles and a startup preview.
+  - Follow-up 2: Generate a setup report showing completed steps and actionable failure details.
+- [ ] 412. **GraphQL Query Workbench**: Support schema browsing, query collections, variable templates, and history. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a bundled local schema and named query examples.
+  - Follow-up 2: Compare saved query results and flag fields absent from the selected schema.
+- [ ] 413. **Contract Test Results Wall**: Aggregate consumer contract results, displaying breaking changes and owners by service. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add contract-version compatibility rules and exception notes.
+  - Follow-up 2: Compare release snapshots and list consumers affected by changed expectations.
+- [ ] 414. **Source Code Comment To-do Radar**: Scan TODO/FIXME and associates owners with deadlines to generate a cleanup sprint list. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add cleanup categories and owner acknowledgment states.
+  - Follow-up 2: Generate a maintenance sprint plan constrained by estimated effort.
+- [ ] 415. **Branch Lifecycle Monitor**: Track long-lived branches, commits behind the main branch, and recent activity, then remind owners to merge or archive stale work. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add branch purpose labels and planned completion dates.
+  - Follow-up 2: Compare snapshots and list branches whose divergence or inactivity increased.
+- [ ] 416. **Error Code Dictionary Center**: Maintain error codes, meanings, user texts and troubleshooting links, and support search and versions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add error ownership and required troubleshooting sections.
+  - Follow-up 2: Export a review queue for duplicate codes and incomplete product messages.
+- [ ] 417. **Local Multi-Service Process Orchestrator**: Start local front-end and worker processes from configuration, colorize combined logs, and stop every managed process with one command. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add startup dependencies and process-specific readiness checks.
+  - Follow-up 2: Compare process runs and identify failures that prevented dependent services from starting.
+- [ ] 418. **SQL Slow Query Sample Library**: Include slow SQL, execution plans and optimization records, and support tags and comparison before and after. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add explain-plan annotations and measured fixture timings.
+  - Follow-up 2: Compare query alternatives while keeping input datasets and measurement settings fixed.
+- [ ] 419. **Sample Event Rule Playground**: Apply configurable rules to imported JSON event samples, show matching decisions and transformations, and compare rule versions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add rule groups with explicit transformation order.
+  - Follow-up 2: Compare rule versions and show the first step where each event result diverges.
+- [ ] 420. **Scaffolding Template Market Local Version**: Browse local project templates, substitute variables, preview the generated file tree, and lock template versions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add template inheritance and optional project modules.
+  - Follow-up 2: Preview an upgrade between template versions without overwriting manually edited files.
 
 ## 12. Collaboration and Real-Time Systems (30 topics)
 > Practice areas: shared editing, conflict handling, activity views, updates.
 
-- [ ] 121. **Team Decision-making Voting Room**: Create polls with anonymous or named voting, live results, deadlines, export, and role-based access controls.
-- [ ] 122. **Real-Time Queue and Calling System**: Issue queue numbers, call the next visitor, show service-window status, estimate waiting time, and drive a large display.
-- [ ] 123. **Multi-person Demand Priority Matrix**: The team drags the demand card to the value/cost matrix, synchronizes it in real time and generates ranking suggestions.
-- [ ] 124. **Online Planning Poker**: Complete closed loop of rooms, members, story point voting, reveals, statistics and history.
-- [ ] 125. **Shared Clipboard Workspace**: Share short text, links, and file snippets within a team space, with expiration, search, and access controls.
-- [ ] 126. **Collaborative JSON Editor**: Multiple people can edit JSON, supporting schema verification, formatting, conflict prompts and version rollback.
-- [ ] 127. **Real-time Status Wall**: Team members update status, blocked items, and items being processed, supporting filtering and automatic expiration.
-- [ ] 128. **Small Customer Service Workbench**: Simulate visitor messages, customer service assignments, quick replies, session status and satisfaction records.
-- [ ] 129. **Multiplayer White Noise Room**: Shared playlists, synchronized playback status, room chat and focus timing.
-- [ ] 130. **Event Registration and Sign-in System**: Event creation, registration form, QR code sign-in, list export and lateness statistics.
-- [ ] 131. **Team Knowledge Card Review**: Members submit knowledge cards, others comment, vote, mark as expired and generate a review queue.
-- [ ] 132. **Online Shift Scheduler**: Configure members, holidays, rules and fairness indicators to automatically generate an adjustable schedule.
-- [ ] 133. **Light Incident Command Room**: Record the incident timeline, owner, status, action items and review export.
-- [ ] 134. **Remote Pair Programming Timer**: Share Pomodoros, role rotations, notes and post-meeting action items, with room link support.
-- [ ] 135. **Live Interactive Barrage Wall**: Receive simulated barrage and support keyword filtering, lottery, voting and large screen mode.
+- [ ] 121. **Team Voting Room**: Create local polls with demo participants, anonymous or named voting, live results, deadlines, exports, and room-level roles without external accounts. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add ranked-choice voting alongside single-choice polls.
+  - Follow-up 2: Compare first-choice and final-round results with a transparent counting trace.
+- [ ] 122. **Real-Time Queue and Calling System**: Issue queue numbers, call the next visitor, show service-window status, estimate waiting time, and drive a large display. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add appointment slots and distinguish booked visitors from walk-ins.
+  - Follow-up 2: Compare service-window workloads and simulate adding an extra service desk.
+- [ ] 123. **Multi-person Demand Priority Matrix**: The team drags the demand card to the value/cost matrix, synchronizes it in real time and generates ranking suggestions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add confidence ratings and show uncertain high-value demands separately.
+  - Follow-up 2: Compare two prioritization snapshots and explain changed rankings.
+- [ ] 124. **Online Planning Poker**: Complete closed loop of rooms, members, story point voting, reveals, statistics and history. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a discussion round for unusually wide estimate spreads.
+  - Follow-up 2: Track estimate changes between rounds and export the final agreement notes.
+- [ ] 125. **Shared Clipboard Workspace**: Share short text, links, and file snippets within a team space, with expiration, search, and access controls. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add named collections and pinned shared snippets.
+  - Follow-up 2: Export an expiring-item report and restore selected archived snippets locally.
+- [ ] 126. **Collaborative JSON Editor**: Multiple people can edit JSON, supporting schema verification, formatting, conflict prompts and version rollback. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add field-level comments and proposed edits requiring review.
+  - Follow-up 2: Compare document versions and selectively accept nonconflicting field changes.
+- [ ] 127. **Real-time Status Wall**: Team members update status, blocked items, and items being processed, supporting filtering and automatic expiration. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add status dependencies and explicit handoff requests.
+  - Follow-up 2: Show unresolved handoffs and average time spent in each status.
+- [ ] 128. **Small Customer Service Workbench**: Simulate visitor messages, customer service assignments, quick replies, session status and satisfaction records. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add assignment rules based on issue category and workload.
+  - Follow-up 2: Compare simulated queue policies by waiting time and unresolved conversation count.
+- [ ] 129. **Shared Focus Sound Room**: Generate simple local sound loops, simulate two room participants, synchronize playback state, provide room notes, and track shared focus intervals. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a room agenda with alternating focus and break periods.
+  - Follow-up 2: Show shared focus history and compare participation across agenda segments.
+- [ ] 130. **Event Registration and Sign-in System**: Event creation, registration form, QR code sign-in, list export and lateness statistics. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add waiting lists and configurable capacity per session.
+  - Follow-up 2: Generate an attendance reconciliation report including duplicates and late arrivals.
+- [ ] 131. **Team Knowledge Card Review**: Members submit knowledge cards, others comment, vote, mark as expired and generate a review queue. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add review due dates and required reviewers by topic.
+  - Follow-up 2: Create a knowledge freshness report with unresolved review comments.
+- [ ] 132. **Online Shift Scheduler**: Configure members, holidays, rules and fairness indicators to automatically generate an adjustable schedule. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add availability preferences and explain unsatisfied scheduling constraints.
+  - Follow-up 2: Compare alternative rosters using fairness and uncovered-shift metrics.
+- [ ] 133. **Light Incident Command Room**: Record the incident timeline, owner, status, action items and review export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add milestone dependencies and owner acknowledgments.
+  - Follow-up 2: Generate a retrospective timeline separating decisions, actions, and unresolved follow-ups.
+- [ ] 134. **Remote Pair Programming Timer**: Share Pomodoros, role rotations, notes and post-meeting action items, with room link support. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable driver and navigator rotation rules.
+  - Follow-up 2: Produce a session handoff note with unfinished work and the next assigned roles.
+- [ ] 135. **Live Interactive Barrage Wall**: Receive simulated barrage and support keyword filtering, lottery, voting and large screen mode. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add moderated submission queues and reusable display scenes.
+  - Follow-up 2: Replay a saved event timeline and report participation by interaction type.
 
-- [ ] 421. **Multi-person Whiteboard Note Wall**: Let several participants move notes in real time, apply colors, vote, organize rooms, and export the board as an image.
-- [ ] 422. **Pair Programming Session Timing**: Alternate driving/navigation role timing, record issues and review notes.
-- [ ] 423. **Shared Cursor Presentation Mode**: The host shares the mouse track and highlight circle, and the audience follows the page scrolling (demo level).
-- [ ] 424. **Team Heartbeat Stand-up Board**: Real-time summary of each person's three-sentence status, supporting blocking marking and post-meeting archiving.
-- [ ] 425. **Online Voting and Point Estimator**: Plan poker-style point estimation, revealing the hidden votes before and after, discussion notes and final consensus.
-- [ ] 426. **Shared Release Countdown Wall**: Show a synchronized countdown, checklist completion, blockers, and a go/no-go decision to every participant.
-- [ ] 427. **Multi-person Outline Editing**: Real-time editing of tree outlines, locking nodes and comment bubbles, and supporting version snapshots.
-- [ ] 428. **Remote Design Walkthrough Room**: The system synchronously browse design draft hot spots, collect comment timelines and decision status.
-- [ ] 429. **Conference Room Occupancy Real-time Board**: Display room occupancy, reservations and next meeting, and support quick extension application.
-- [ ] 430. **Incident Bridge Minutes Board**: Record events, decisions and participants in real time during the accident, and automatically generate a timeline for export.
-- [ ] 431. **Shared Clipboard Team Edition**: Short-term sharing of text snippets to team rooms, automatic expiration and access auditing.
-- [ ] 432. **Online Q&A Queuing System**: Students raise their hands to line up, the instructor takes orders, and the conversation is timed to count the waiting time.
-- [ ] 433. **Multi-end Presentation Teleprompter Synchronization**: The speaker and teleprompter screen scroll simultaneously, supporting font size and segmentation marks.
-- [ ] 434. **Real-time Questionnaire Pulse**: Push single-question voting, real-time columnar results and anonymous mode during the meeting.
-- [ ] 435. **Collaborative Checklist Room**: Let multiple roles complete the same release-day checklist while showing progress, ownership, and blocking comments.
+- [ ] 421. **Multi-person Whiteboard Note Wall**: Let several participants move notes in real time, apply colors, vote, organize rooms, and export the board as an image. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add note clustering and labels for accepted decisions.
+  - Follow-up 2: Export a workshop report linking votes, decisions, and unresolved notes.
+- [ ] 422. **Pair Programming Session Timing**: Alternate driving/navigation role timing, record issues and review notes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add rotation schedules and interruption reasons.
+  - Follow-up 2: Compare sessions by role balance and unfinished handoff items.
+- [ ] 423. **Shared Cursor Presentation Demo**: Create a local presentation page with simulated presenter and audience views, show cursor trails, highlights, and following controls without external devices. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add presenter checkpoints and audience follow-position controls.
+  - Follow-up 2: Replay the presentation path and export annotated slide references.
+- [ ] 424. **Team Heartbeat Stand-up Board**: Real-time summary of each person's three-sentence status, supporting blocking marking and post-meeting archiving. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add blocker ownership and expected resolution dates.
+  - Follow-up 2: Generate a post-meeting handoff list grouped by responsible team.
+- [ ] 425. **Online Voting and Point Estimator**: Plan poker-style point estimation, revealing the hidden votes before and after, discussion notes and final consensus. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add estimate confidence and a second discussion round.
+  - Follow-up 2: Compare voting rounds and highlight items without a stable consensus.
+- [ ] 426. **Shared Release Countdown Wall**: Show a synchronized countdown, checklist completion, blockers, and a go/no-go decision to every participant. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add milestone dependencies and configurable decision deadlines.
+  - Follow-up 2: Generate a go-or-hold report listing unresolved blockers and missing acknowledgments.
+- [ ] 427. **Multi-person Outline Editing**: Real-time editing of tree outlines, locking nodes and comment bubbles, and supporting version snapshots. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add branch-level review status and required comments.
+  - Follow-up 2: Compare outline snapshots and selectively accept reordered sections.
+- [ ] 428. **Design Walkthrough Review Room**: Generate interface mockup images, simulate two local reviewers navigating marked regions, collect comments, and record review decisions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add review rounds and owner-assigned annotation categories.
+  - Follow-up 2: Export a decision log linking each accepted change to its marked design region.
+- [ ] 429. **Conference Room Occupancy Real-time Board**: Display room occupancy, reservations and next meeting, and support quick extension application. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add room turnaround buffers and quick reservation handoff.
+  - Follow-up 2: Compare planned and observed occupancy using locally generated room events.
+- [ ] 430. **Incident Bridge Minutes Board**: Record events, decisions and participants in real time during the accident, and automatically generate a timeline for export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add decision owners and linked recovery actions.
+  - Follow-up 2: Generate a retrospective separating confirmed facts from open investigation notes.
+- [ ] 431. **Shared Clipboard Team Edition**: Short-term sharing of text snippets to team rooms, automatic expiration and access auditing. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add shared snippet collections and per-item retention settings.
+  - Follow-up 2: Export an activity summary showing expired items and frequently reused snippets.
+- [ ] 432. **Online Q&A Queuing System**: Students raise their hands to line up, the instructor takes orders, and the conversation is timed to count the waiting time. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add question topics and priority rules for unanswered students.
+  - Follow-up 2: Compare waiting-time distributions across class sessions.
+- [ ] 433. **Multi-end Presentation Teleprompter Synchronization**: The speaker and teleprompter screen scroll simultaneously, supporting font size and segmentation marks. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add section bookmarks and rehearsal timing markers.
+  - Follow-up 2: Compare rehearsal pace with the planned segment durations.
+- [ ] 434. **Real-time Questionnaire Pulse**: Push single-question voting, real-time columnar results and anonymous mode during the meeting. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add conditional follow-up questions and a local participant simulator.
+  - Follow-up 2: Export a pulse report showing response counts and unanswered groups.
+- [ ] 435. **Collaborative Checklist Room**: Let multiple roles complete the same release-day checklist while showing progress, ownership, and blocking comments. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add prerequisite items and explicit blocker-resolution notes.
+  - Follow-up 2: Generate a role-specific completion report with remaining release-day responsibilities.
 
 ## 13. Business and Operational Tools (30 topics)
 > Practice areas: form process, data dashboard, permissions, import and export.
 
-- [ ] 136. **Small CRM**: Manage accounts, contacts, follow-ups, sales stages, reminders and funnel reports.
-- [ ] 137. **Inventory Warning System**: Maintain products, inventory changes, thresholds, suppliers and warning notifications, and support CSV import.
-- [ ] 138. **Quotation Generator**: Enter customers, projects, products and discounts, generate PDF quotations and retain version history.
-- [ ] 139. **Work Order Flow System**: Submit work orders, assign handlers, status flow, priority, comments and SLA statistics.
-- [ ] 140. **Subscription Revenue Dashboard**: Import subscription data, calculate MRR, churn rate, renewal reminders and customer stratification.
-- [ ] 141. **Content Scheduling Calendar**: Manage channels, topic selection, owner, status, release time and material links.
-- [ ] 142. **Activity Budget Tracker**: Record budget items, actual expenditures, approval status and overspending warnings, and output reports.
-- [ ] 143. **Customer Service FAQ Maintenance Desk**: Manage questions, answers, tags, versions, hit statistics and reminders to be updated.
-- [ ] 144. **Questionnaire Results Analyzer**: Create questionnaires or import CSV to display option distributions, cross-analysis and open question summaries.
-- [ ] 145. **Store Shift Scheduling and Attendance**: Configure employees, shifts, leave requests, punch-in records and anomaly reminders, and generate monthly statistics.
-- [ ] 146. **Invoice Header Manager**: Save company header, tax ID, address, invoicing history and one-command copy.
-- [ ] 147. **Supplier Rating Sheet**: Record delivery, price, quality and communication scores, generate radar charts and re-evaluation reminders.
-- [ ] 148. **Sales Lead Deduplication Tool**: Import leads from multiple sources, remove duplications by phone number, email address and company name, and output the merged results.
-- [ ] 149. **Project Cost Estimator**: Generate estimates by person-day, role, risk factor and outsourcing cost, and support scenario comparison.
-- [ ] 150. **Store Customer Flow Heat Map**: Import customer flow data in time periods to display heat maps, peak and valley analysis and shift scheduling suggestions.
+- [ ] 136. **Small CRM**: Manage accounts, contacts, follow-ups, sales stages, reminders and funnel reports. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add account-level opportunity forecasts with configurable stage probabilities.
+  - Follow-up 2: Compare forecast snapshots and show which opportunities changed the expected total.
+- [ ] 137. **Inventory Warning System**: Maintain products, inventory changes, thresholds, suppliers and warning notifications, and support CSV import. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add supplier lead times and reorder quantity suggestions.
+  - Follow-up 2: Simulate demand changes and report projected stockouts by product.
+- [ ] 138. **Quotation Generator**: Enter customers, projects, products and discounts, generate PDF quotations and retain version history. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add optional line items and alternative pricing scenarios.
+  - Follow-up 2: Compare quote versions and generate a customer-facing change summary.
+- [ ] 139. **Work Order Flow System**: Submit work orders, assign handlers, status flow, priority, comments and SLA statistics. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add workflow-specific required fields at each status transition.
+  - Follow-up 2: Report blocked transitions and time spent waiting for missing information.
+- [ ] 140. **Subscription Revenue Dashboard**: Import subscription data, calculate MRR, churn rate, renewal reminders and customer stratification. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add cohort retention tables and configurable revenue recognition dates.
+  - Follow-up 2: Compare revenue scenarios under different renewal and cancellation assumptions.
+- [ ] 141. **Content Scheduling Calendar**: Manage channels, topic selection, owner, status, release time and material links. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add channel-specific deadlines and reusable publication checklists.
+  - Follow-up 2: Create a workload view that identifies overloaded owners and unscheduled content.
+- [ ] 142. **Activity Budget Tracker**: Record budget items, actual expenditures, approval status and overspending warnings, and output reports. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add budget transfers between categories with approval notes.
+  - Follow-up 2: Compare approved and actual spending across event phases.
+- [ ] 143. **Customer Service FAQ Maintenance Desk**: Manage questions, answers, tags, versions, hit statistics and reminders to be updated. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add answer review owners and expiration dates.
+  - Follow-up 2: Produce a coverage report for unanswered searches and outdated articles.
+- [ ] 144. **Questionnaire Results Analyzer**: Create questionnaires or import CSV to display option distributions, cross-analysis and open question summaries. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add segment filters and side-by-side respondent group comparisons.
+  - Follow-up 2: Export a findings brief with sample sizes and explicitly labeled synthetic responses.
+- [ ] 145. **Store Shift Scheduling and Attendance**: Configure employees, shifts, leave requests, punch-in records and anomaly reminders, and generate monthly statistics. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add overtime rules and configurable attendance exception categories.
+  - Follow-up 2: Compare planned staffing with recorded attendance by shift and location.
+- [ ] 146. **Invoice Header Manager**: Save company header, tax ID, address, invoicing history and one-command copy. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add separate billing and shipping contact details with reusable templates.
+  - Follow-up 2: Generate a duplicate-company review list and preview merged header records.
+- [ ] 147. **Supplier Rating Sheet**: Record delivery, price, quality and communication scores, generate radar charts and re-evaluation reminders. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add category-specific weighting and minimum acceptable ratings.
+  - Follow-up 2: Compare supplier rankings under two weight profiles and explain rank changes.
+- [ ] 148. **Sales Lead Deduplication Tool**: Import leads from multiple sources, remove duplications by phone number, email address and company name, and output the merged results. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add field-level merge choices and a queue for ambiguous matches.
+  - Follow-up 2: Export a merge audit showing source rows and retained values.
+- [ ] 149. **Project Cost Estimator**: Generate estimates by person-day, role, risk factor and outsourcing cost, and support scenario comparison. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable role-rate catalogs with effective dates.
+  - Follow-up 2: Compare estimate revisions and attribute changes to rates, effort, and contingency.
+- [ ] 150. **Store Customer Flow Heat Map**: Import customer flow data in time periods to display heat maps, peak and valley analysis and shift scheduling suggestions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a staffing simulator with configurable service capacity.
+  - Follow-up 2: Compare queue buildup under two staffing plans using the bundled visitor counts.
 
-- [ ] 436. **Store Shift Conflict Detection**: Enter shifts and employee skills, detect overtime, consecutive shifts and gaps, and output adjustment suggestions.
-- [ ] 437. **Promotional Event Calendar Desk**: Manage event schedules, channels, and asset status to avoid conflicts in the same schedule and remind you of upcoming launches.
-- [ ] 438. **Member Points Rule Simulator**: Configure points acquisition/consumption rules, and use sample orders to preview points changes and abnormal boundaries.
-- [ ] 439. **Supplier Delivery Tracking Board**: Record PO, promised delivery, actual arrival and delay reasons, and display supplier on-time rate.
-- [ ] 440. **Price Tag Change Approval Flow**: Submit price changes, affect SKU and effective time, support approval, rejection and effective receipt.
-- [ ] 441. **Offline Activity Material List**: Manage material type, quantity, owner and packing status, and support receipt verification.
-- [ ] 442. **Customer Complaint Upgrade Routing Table**: Configure upgrade paths and SLAs according to problem types, simulate work order flow and count timeouts.
-- [ ] 443. **Channel Commission Settlement Form**: Enter orders and channel rules, and generate payable details and discrepancy verification views.
-- [ ] 444. **Store Inspection Scorecard**: Score inspection items on mobile, attach photos, create corrective tasks, and summarize store rankings.
-- [ ] 445. **Inventory Transfer Suggestion Tool**: Provide a list of transfer suggestions based on sales volume and inventory level, and support manual adjustment and export.
-- [ ] 446. **Contract Renewal Reminder Desk**: Manage customer contract expiration date, renewal owner and negotiation status, and provide advance reminders.
-- [ ] 447. **Quotation Version Comparison**: Maintain quotation versions, term differences and customer feedback, and generate a comparison table.
-- [ ] 448. **Group Purchase Progress Wall**: Display the target number of people, current progress, urging records and failed return.
-- [ ] 449. **After-sales Parts Application Desk**: Register faulty models, parts requirements, approval and delivery status, and collect statistics on high-frequency parts.
-- [ ] 450. **Store Energy Consumption Weekly Report**: Enter water and electricity usage, compare it with prior periods, flag unusual days, and generate a weekly report.
+- [ ] 436. **Store Shift Conflict Detection**: Enter shifts and employee skills, detect overtime, consecutive shifts and gaps, and output adjustment suggestions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add employee availability preferences and alternative shift swaps.
+  - Follow-up 2: Compare adjustment plans by coverage, overtime, and preference satisfaction.
+- [ ] 437. **Promotional Event Calendar Desk**: Manage event schedules, channels, and asset status to avoid conflicts in the same schedule and remind you of upcoming launches. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add channel lead times and required campaign materials.
+  - Follow-up 2: Generate a launch-readiness view listing missing assets and scheduling conflicts.
+- [ ] 438. **Member Points Rule Simulator**: Configure points acquisition/consumption rules, and use sample orders to preview points changes and abnormal boundaries. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add points expiration and reversal rules.
+  - Follow-up 2: Compare rule versions and explain changed balances for the same synthetic orders.
+- [ ] 439. **Supplier Delivery Tracking Board**: Record PO, promised delivery, actual arrival and delay reasons, and display supplier on-time rate. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add partial arrivals and revised supplier commitments.
+  - Follow-up 2: Compare promised versus actual delivery and identify repeatedly delayed items.
+- [ ] 440. **Price Tag Change Approval Flow**: Submit price changes, affect SKU and effective time, support approval, rejection and effective receipt. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add grouped price changes and effective-date conflict checks.
+  - Follow-up 2: Generate a receipt report showing which approved changes have not been acknowledged.
+- [ ] 441. **Offline Activity Material List**: Manage material type, quantity, owner and packing status, and support receipt verification. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add material reservations and return-condition notes.
+  - Follow-up 2: Reconcile issued, returned, and missing quantities after a simulated event.
+- [ ] 442. **Customer Complaint Upgrade Routing Table**: Configure upgrade paths and SLAs according to problem types, simulate work order flow and count timeouts. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add conditional escalation based on ticket age and customer segment.
+  - Follow-up 2: Compare routing policies using the same synthetic complaint timeline.
+- [ ] 443. **Channel Commission Settlement Form**: Enter orders and channel rules, and generate payable details and discrepancy verification views. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add tiered commission rates and refund adjustments.
+  - Follow-up 2: Reconcile settlement totals and explain each discrepancy at order level.
+- [ ] 444. **Store Inspection Scorecard**: Score inspection items on mobile, attach photos, create corrective tasks, and summarize store rankings. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add inspection templates by store type and issue severity.
+  - Follow-up 2: Compare store improvement across review rounds and list overdue corrective actions.
+- [ ] 445. **Inventory Transfer Suggestion Tool**: Provide a list of transfer suggestions based on sales volume and inventory level, and support manual adjustment and export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add transfer lead times and minimum transfer quantities.
+  - Follow-up 2: Compare transfer plans by projected shortages and transportation effort.
+- [ ] 446. **Contract Renewal Reminder Desk**: Manage customer contract expiration date, renewal owner and negotiation status, and provide advance reminders. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add renewal probability and expected contract-value changes.
+  - Follow-up 2: Compare renewal forecasts and identify accounts missing a next action.
+- [ ] 447. **Quotation Version Comparison**: Maintain quotation versions, term differences and customer feedback, and generate a comparison table. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add line-item matching when quote descriptions change.
+  - Follow-up 2: Generate a customer-facing summary separating quantity, price, and term changes.
+- [ ] 448. **Group Purchase Progress Wall**: Display the target number of people, current progress, urging records and failed return. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add local pledge stages and cancellation reasons.
+  - Follow-up 2: Compare progress scenarios and calculate shortfalls without initiating payments.
+- [ ] 449. **After-sales Parts Application Desk**: Register faulty models, parts requirements, approval and delivery status, and collect statistics on high-frequency parts. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add parts compatibility rules and stock availability.
+  - Follow-up 2: Generate a fulfillment plan identifying requests blocked by incompatible or missing parts.
+- [ ] 450. **Store Energy Consumption Weekly Report**: Enter water and electricity usage, compare it with prior periods, flag unusual days, and generate a weekly report. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add tariff profiles and opening-hour adjustments.
+  - Follow-up 2: Compare energy intensity across stores while showing raw usage separately.
 
-## 14. AI Agents and Automated Workflows (40 topics)
+## 14. Rule-Based Workflow Workbenches (40 topics)
 > Practice areas: tool invocation, state machine, queue, manual confirmation.
 
-- [ ] 151. **Research Data Collection Agent**: Search approved public sources or import local material for a topic, remove duplicates, summarize findings, cite sources, and produce a reading list.
-- [ ] 152. **Codebase Q&A Agent**: Index repository files and answer architecture or implementation questions with file citations and confidence levels.
-- [ ] 153. **PR Repair Suggestion Agent**: Read failed tests and diffs, generate repair plans, patch suggestions and risk descriptions, and does not automatically submit them.
-- [ ] 154. **Customer Service Diversion Agent**: The system classifies user messages, extracts entities, recommends FAQs, and forwards low-confidence requests to manual work.
-- [ ] 155. **Procurement Price Comparison Agent**: Import user-provided quotations or read approved supplier feeds, normalize specifications, and compare prices, delivery dates, and stated risks.
-- [ ] 156. **Personal Calendar Agent**: Read to-do, calendar and email summaries, proposes a draft schedule and waits for confirmation.
-- [ ] 157. **Web Page Data Monitoring Agent**: Monitor changes in specified web pages, determine whether they are important, generate summaries and push notifications.
-- [ ] 158. **Log Troubleshooting Agent**: Input logs and configurations, automatically extract abnormal patterns, search historical cases, and output troubleshooting steps.
-- [ ] 159. **Data Cleaning Agent**: Import dirty CSV, identifies missing, anomalies and duplications, and generate a reviewable cleaning plan.
-- [ ] 160. **Learning Path Planning Agent**: Generate courses, exercises, and review plans based on goals and time, and adjusts them according to progress.
-- [ ] 161. **Document Consistency Check Agent**: Compare README, API documentation and code interfaces to find out-of-date descriptions and missing examples.
-- [ ] 162. **Candidate Screening Agent**: Parse resumes, job requirements and interview feedback to generate structured scores and follow-up suggestions.
-- [ ] 163. **Multi-step Form Filling Agent**: The system maps natural language requirements to complex forms, confirms key fields step by step and generates submission previews.
-- [ ] 164. **Social Media Comment Processing Agent**: Cluster comments, identifies negative feedback, generate reply drafts, and upgrades processing lists.
-- [ ] 165. **Meeting Action Item Tracking Agent**: Extract action items from minutes, track the status, regularly reminds the owner and summarize the progress.
-- [ ] 166. **Contract Risk Scanning Agent**: Upload the contract text, mark payment, breach of contract, deadline and other risk terms and generate a list of issues.
-- [ ] 167. **Experiment Report Generation Agent**: Import experimental data, charts and notes, and generate conclusions, anomaly analysis and next step suggestions.
-- [ ] 168. **Multi-tool Travel Planning Agent**: Integrate budget, city, weather and route constraints to generate a modifiable itinerary draft.
-- [ ] 169. **Issue Triage Agent**: Read the issue title text, automatically labels, estimates priority, finds similar issues and recommends the owner.
-- [ ] 170. **Content Reuse Agent**: Split long articles into Weibo, public accounts, Xiaohongshu and email versions, retaining the core points and adapting the tone.
+- [ ] 151. **Research Source Review Workbench**: Create a synthetic article collection, search terms, deduplicate entries, record inclusion decisions, cite local sections, and build a reading list using explicit rules. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a source review queue with inclusion reasons and duplicate groups.
+  - Follow-up 2: Export a research packet with an evidence table and unresolved reading questions.
+- [ ] 152. **Repository Architecture Index**: Create a small example repository, index filenames and documented symbols, search responsibilities, and link results to source lines using local parsing. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add an editable architecture map linking modules to documented responsibilities.
+  - Follow-up 2: Report documentation gaps for modules missing from the architecture map.
+- [ ] 153. **Test Failure Repair Planner**: Create a tiny project with known failing tests, associate failures with an explicit troubleshooting checklist, edit repair steps, and display patch notes without generated fixes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add repair-plan steps linked to failing test names and changed files.
+  - Follow-up 2: Track plan revisions and produce a reviewer checklist for unresolved failures.
+- [ ] 154. **Customer Message Routing Workbench**: Classify synthetic customer messages with editable keyword rules, extract predefined fields, suggest matching FAQ entries, and queue ambiguous cases for review. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add editable routing priorities and a manual override reason.
+  - Follow-up 2: Compare routing policies using the bundled message cases and review queue sizes.
+- [ ] 155. **Supplier Quote Comparison Workbench**: Generate supplier quote fixtures, normalize product units, compare prices and delivery dates, and retain editable review notes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add quantity breaks and shipping costs to quote normalization.
+  - Follow-up 2: Compare supplier combinations under a delivery deadline and spending ceiling.
+- [ ] 156. **Calendar Constraint Planner**: Create local tasks and availability fixtures, schedule them by duration, priority, and explicit constraints, and preview an editable weekly plan. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add task duration estimates and protected calendar blocks.
+  - Follow-up 2: Explain unscheduled tasks and compare alternative weekly plans.
+- [ ] 157. **Page Snapshot Review Workbench**: Generate paired local page snapshots, extract configured fields, compare changes, label importance with explicit rules, and preview a local change brief. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add field-specific importance rules for saved page snapshots.
+  - Follow-up 2: Produce a daily change brief distinguishing new, removed, and edited entries.
+- [ ] 158. **Log Playbook Matcher**: Generate application log fixtures, match explicit error patterns to bundled troubleshooting steps, show evidence lines, and record investigation outcomes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add named troubleshooting playbooks matched by explicit log patterns.
+  - Follow-up 2: Report unmatched cases and show which playbook steps were completed.
+- [ ] 159. **CSV Cleaning Recipe Desk**: Generate intentionally inconsistent CSV fixtures, detect missing and duplicate values, propose explicit transformations, and preview a reviewable cleaning recipe. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a preview of cleaning operations with row-level before-and-after values.
+  - Follow-up 2: Export an operation history and reverse a selected cleaning step.
+- [ ] 160. **Learning Catalog Planner**: Use a built-in course catalog with prerequisites and durations, create a study schedule from selected goals, and update the remaining plan from recorded progress. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add prerequisites and optional practice tracks to the course catalog.
+  - Follow-up 2: Replan remaining study sessions after a missed week without deleting progress.
+- [ ] 161. **Documentation Consistency Checklist**: Create a small source-and-documentation fixture, compare declared interfaces and documented examples, and list outdated references using explicit checks. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add documentation checklists selected by interface type.
+  - Follow-up 2: Generate a correction queue ordered by affected examples and missing references.
+- [ ] 162. **Candidate Qualification Scorecard**: Generate fictional candidate profiles and role requirements, apply transparent checklist weights, record reviewer notes, and display comparable qualification summaries. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add role-specific qualification checklists with transparent point weights.
+  - Follow-up 2: Compare candidate review rounds and highlight changed reviewer judgments.
+- [ ] 163. **Conditional Form Workflow Builder**: Create a local multi-step application form with field definitions and conditional sections, validate values, and show a completed-form preview without external submission. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add conditional sections that appear when earlier fields meet configured rules.
+  - Follow-up 2: Export a completed-form summary explaining skipped sections and unresolved fields.
+- [ ] 164. **Comment Review Queue**: Generate fictional customer comments, categorize them by editable keyword rules, choose canned replies, and track review and resolution states locally. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add keyword-based issue categories and editable canned reply choices.
+  - Follow-up 2: Show recurring complaint themes and track follow-up resolution by category.
+- [ ] 165. **Meeting Action Tracker**: Create structured meeting-note fixtures, extract marked action lines with a documented grammar, assign owners and dates, and display progress and local reminder previews. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add dependencies between action items and relative due dates.
+  - Follow-up 2: Generate the next meeting agenda from blocked and overdue actions.
+- [ ] 166. **Agreement Milestone Checklist**: Create fictional project agreements, locate explicitly labeled deadlines and deliverables, and record human review questions without giving legal conclusions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a configurable checklist for dates, deliverables, and payment milestones.
+  - Follow-up 2: Compare agreement drafts and export questions requiring human review.
+- [ ] 167. **Measurement Report Builder**: Generate classroom physics measurements and observation notes, calculate basic statistics, create charts, and fill a report template with clearly labeled synthetic results. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add chart selection and explicitly labeled observations for synthetic measurements.
+  - Follow-up 2: Compare two experiment runs using the same measurement definitions.
+- [ ] 168. **Local Itinerary Constraint Planner**: Use fictional city, route, and weather fixtures to build editable itineraries within time and cost limits, with no map or travel-service accounts. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add alternative day plans for different local weather scenarios.
+  - Follow-up 2: Compare itineraries by travel time, planned activity time, and total budget.
+- [ ] 169. **Issue Rule Triage Desk**: Generate issue fixtures, label them using explicit keyword and priority rules, match similar titles, and route each item to a configured owner. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add owner routing rules with explicit fallback groups.
+  - Follow-up 2: Compare triage rounds and explain priority or owner changes.
+- [ ] 170. **Article Publishing Template Desk**: Create a sample article, divide it into marked sections, map sections into channel-specific templates, and edit publication drafts without generated prose. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable channel templates with character and section limits.
+  - Follow-up 2: Produce a publication package showing omitted sections and remaining placeholders.
 
-- [ ] 451. **Multi-source Information Morning Report Agent**: Aggregate approved RSS or public web summaries, deduplicate and cluster entries, and deliver a structured morning report.
-- [ ] 452. **Work Order Triage Agent**: Recommend a category, priority, and knowledge-base links from each work-order description, then send the item to a triage queue after manual confirmation.
-- [ ] 453. **Codebase Navigation Agent**: Answer where a requested function is implemented and return cited file paths with concise explanations.
-- [ ] 454. **Meeting Arrangement Coordination Agent**: Collect participants' availability and preferences, proposes time candidates and generate invitation drafts.
-- [ ] 455. **Change Risk Preflight Agent**: Read PR description and diff summary, list risk points, test suggestions and rollback concerns.
-- [ ] 456. **Document Expiration Scan Agent**: Compare the document update date and related code submissions, and mark possible expired chapters.
-- [ ] 457. **Product Update Digest Agent**: Read public release notes, summarize new features and wording changes, cite sources, and produce a weekly digest.
-- [ ] 458. **Inbound Data Cleaning Agent**: The system cleans CSV according to rules, reports correction items, discarded rows and manual samples for review.
-- [ ] 459. **Release Checklist Agent**: Generate or checks release check items based on service type and blocks unfinished items.
-- [ ] 460. **Customer Service Macro Reply Arrangement Agent**: The system recommends macro templates based on intent and fills in slots, and sends simulations after manual editing.
-- [ ] 461. **Research Evidence Card Agent**: Convert user-provided or public articles into claim-and-evidence cards with tags and citation links.
-- [ ] 462. **Demo Station Form Filling Agent**: The system automatically fills in the form at the controlled demo station and takes screenshots for verification, and locates the fields if it fails.
-- [ ] 463. **Log Noise Reduction Agent**: Cluster repeated log patterns, recommends sampling or ignoring rule drafts.
-- [ ] 464. **Dependency Upgrade Test Agent**: Try a small dependency upgrade on an isolated branch, run the selected tests, and summarize results and conflicting files.
-- [ ] 465. **Content Compliance Preliminary Review Agent**: Scan the copy for sensitive words and exaggerated expressions (configurable word list), and output modification suggestions.
-- [ ] 466. **Weekly Plan Dismantling Agent**: Split the goal into executable tasks, estimated time and dependencies, and write it into a Kanban draft.
-- [ ] 467. **API Sample Generation Agent**: Generate multi-language call samples and error handling snippets from OpenAPI.
-- [ ] 468. **Incident Review Draft Agent**: Input timeline materials to generate review structure, root cause candidates and improvement items list.
-- [ ] 469. **Multi-tool File Sorting Agent**: The system renames the archive download directory according to rules, requests confirmation and writes operation logs in case of conflicts.
-- [ ] 470. **Learning Coach Dialogue Agent**: Ask questions from a course outline, evaluate short answers, record mastery, and generate review points for the next session.
+- [ ] 451. **Multi-Source Morning Digest Workbench**: Generate local RSS and article fixtures, deduplicate by explicit title rules, categorize with keywords, and assemble a template-based morning report. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add source quotas and section-order templates for the local digest.
+  - Follow-up 2: Compare editions and show carried-over stories and duplicate source coverage.
+- [ ] 452. **Work Order Rule Router**: Generate fictional work orders, apply configured category and priority rules, link matching help articles, and present a reviewable local triage queue. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add explicit routing rules and reviewer override notes.
+  - Follow-up 2: Compare triage policies using identical synthetic work-order cases.
+- [ ] 453. **Repository Navigation Workbench**: Create a small source repository fixture, index documented symbols and filenames, search implementation locations, and show source-linked navigation results. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add symbol-to-module links and editable navigation bookmarks.
+  - Follow-up 2: Export a repository tour showing entry points and undocumented modules.
+- [ ] 454. **Meeting Availability Coordinator**: Create fictional participant calendars, collect explicit preferences, calculate candidate meeting times, and generate editable invitation templates. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add optional participants and meeting-duration preferences.
+  - Follow-up 2: Compare candidate times by required attendance and preference satisfaction.
+- [ ] 455. **Change Review Preflight Desk**: Generate change descriptions and diffs, select checklists by explicit change type, and track test, rollback, and reviewer questions locally. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add change-type checklists and evidence links for each risk item.
+  - Follow-up 2: Generate a review summary distinguishing verified concerns from unanswered questions.
+- [ ] 456. **Documentation Freshness Workbench**: Create related source and documentation fixtures, compare revision dates and interface references, and flag sections due for review using explicit rules. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add document ownership and configurable review intervals.
+  - Follow-up 2: Compare review snapshots and list chapters whose related interfaces changed.
+- [ ] 457. **Product Release Excerpt Digest**: Generate fictional release-note files, select labeled feature excerpts, group them by product area, and assemble a source-linked weekly template. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add product-area filters and source-linked release excerpts.
+  - Follow-up 2: Compare product editions and generate a digest of newly documented capabilities.
+- [ ] 458. **Inbound Data Cleaning Workbench**: Generate dirty CSV fixtures, apply an editable ordered cleaning recipe, report corrections and rejected rows, and retain review samples. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add row-level cleaning previews and accepted-exception notes.
+  - Follow-up 2: Export a reproducible cleaning recipe and separate rejected rows.
+- [ ] 459. **Release Checklist Evaluator**: Use bundled service profiles to select required checklist items, record evidence and owners, and display unfinished prerequisites. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add prerequisite checks and service-specific evidence requirements.
+  - Follow-up 2: Generate a readiness report with blocked steps and missing acknowledgments.
+- [ ] 460. **Customer Reply Macro Desk**: Generate local service conversations, match explicit keyword rules to reply templates, fill required fields, and preview editable replies without sending messages. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reply categories and required placeholder validation.
+  - Follow-up 2: Compare template versions and show conversations affected by changed wording.
+- [ ] 461. **Research Evidence Card Desk**: Create synthetic article fixtures, manually select claim and evidence passages, attach section references and tags, and export a reading packet. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add confidence labels and explicit links from claims to quoted passages.
+  - Follow-up 2: Export an evidence packet identifying unsupported or contradictory claims.
+- [ ] 462. **Demo Form Mapping Runner**: Build a local demonstration form and structured input fixtures, apply configured field mappings, validate results, and show failed-field diagnostics. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add conditional form sections and fixture-based input profiles.
+  - Follow-up 2: Generate a field-coverage report for missing mappings and failed demo cases.
+- [ ] 463. **Log Pattern Reduction Desk**: Generate repeated log fixtures, group entries using explicit normalization rules, preview sampling recipes, and retain representative examples. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable grouping rules and a preview of retained samples.
+  - Follow-up 2: Compare noise-reduction profiles and report which error groups lose visibility.
+- [ ] 464. **Dependency Verification Planner**: Create a tiny local example project, compare two dependency manifest fixtures, schedule configured tests, and collect compatibility results without remote upgrades. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add local upgrade plans with explicit prerequisite tests.
+  - Follow-up 2: Compare attempts and preserve the verification evidence for each dependency version.
+- [ ] 465. **Editorial Wording Rule Checker**: Generate sample product copy, check editable word lists and exaggerated-claim patterns, attach explanations, and record reviewer decisions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add product-specific wording rules and reviewer exceptions.
+  - Follow-up 2: Track findings across copy revisions and export unresolved wording issues.
+- [ ] 466. **Weekly Work Breakdown Planner**: Convert a structured goal checklist into tasks using duration and dependency fields, allocate available weekly time, and produce an editable board. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add capacity limits and prerequisite links to weekly work items.
+  - Follow-up 2: Replan after unfinished tasks carry over while preserving completed work.
+- [ ] 467. **API Example Template Builder**: Bundle a small OpenAPI example and deterministic language templates, fill sample parameters, generate example snippets, and document local fixture responses. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add parameter examples and fixture-based response expectations.
+  - Follow-up 2: Export a sample catalog showing operations without complete example coverage.
+- [ ] 468. **Incident Review Template Desk**: Generate a fictional event timeline, select confirmed facts and open questions, fill a retrospective template, and track agreed improvement items. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add confirmed-fact labels and links to supporting timeline entries.
+  - Follow-up 2: Generate a follow-up plan separating unresolved causes from agreed improvements.
+- [ ] 469. **File Sorting Recipe Runner**: Create a local fixture download folder, preview ordered naming and archiving rules, resolve collisions, and retain a reversible operation log. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable sorting recipes and collision-resolution choices.
+  - Follow-up 2: Export a reversible operation manifest with before-and-after paths.
+- [ ] 470. **Course Quiz Rule Trainer**: Provide a built-in course outline, question bank, and explicit answer keys, check short answers by documented rules, and schedule concept reviews. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add question types and explicit answer-key matching rules.
+  - Follow-up 2: Build a review queue from missed concepts and compare practice sessions.
 
 ## 15. Hardware, Edge, and Local-First Apps (30 topics)
 > Practice areas: local storage, offline experience, device adaptation, sensor data.
 
-- [ ] 171. **Offline Family Recipe Box**: Save recipes, ingredients, steps, and photos locally, with offline search, shopping lists, and serving-size conversion.
-- [ ] 172. **Raspberry Pi E-Ink Calendar**: Generate calendar images suitable for ink screens, including weather, schedule, to-do and low-power refresh strategies.
-- [ ] 173. **Local Photo Deduplicator**: Scan photo directories, finds duplicates by hash and similarity, and provide preview, retention rules and recycle bin.
-- [ ] 174. **Home Media Indexer**: Scan local video and music folders, read embedded metadata or approved public catalogs, and provide search, artwork, and playback history.
-- [ ] 175. **Local File Packaging Desk**: Select local files, preview folder structure and archive size, apply naming templates, create a zip, and keep package history.
-- [ ] 176. **Bluetooth Device Power Display Board**: Read or simulate Bluetooth device power, display status, low battery reminder and historical trends.
-- [ ] 177. **Sensor Data Logger**: Receive data such as temperature and humidity, implement local SQLite, display curves, threshold alarms and export.
-- [ ] 178. **Offline Map Annotator**: Load offline map tiles or static basemaps, add markers, paths, notes and export.
-- [ ] 179. **Local Music Practice Accompaniment**: Manage accompaniment, variable speed and key, loops, metronome and practice records.
-- [ ] 180. **Home Medication Reminder**: Manage medicines, dosages, reminders, inventory and medication records, and support multi-person files.
-- [ ] 181. **Old Mobile Phone Information Screen**: Make a full-screen web signage that displays time, weather, schedule, countdown and remote refresh.
-- [ ] 182. **Offline Translation Thesaurus Query**: Import thesaurus files to realize local word search, example sentences, favorites and recent queries.
-- [ ] 183. **Home Equipment Inventory**: Record equipment models, room locations, purchase dates, manuals, and maintenance notes with search and reminder views.
-- [ ] 184. **Personal Document Full-Text Indexer**: The system indexes local document content, providing search, highlighting, tagging, and privacy protection instructions.
-- [ ] 185. **Home Energy Consumption Recorder**: Input electricity meter/water meter/gas readings, display usage trends, cost estimates and abnormal reminders.
+- [ ] 171. **Offline Family Recipe Box**: Save recipes, ingredients, steps, and photos locally, with offline search, shopping lists, and serving-size conversion. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add ingredient substitutions and pantry availability tracking.
+  - Follow-up 2: Generate a shopping list for several recipes while combining shared ingredients.
+- [ ] 172. **E-Ink Calendar Previewer**: Render a calendar, generated weather, and local tasks into configurable monochrome screen images, with a browser preview and simulated refresh schedule. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add selectable screen dimensions and a monochrome preview.
+  - Follow-up 2: Simulate a week of refreshes and report which screen regions change most.
+- [ ] 173. **Local Photo Deduplicator**: Scan photo directories, finds duplicates by hash and similarity, and provide preview, retention rules and recycle bin. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add adjustable similarity thresholds and side-by-side retention choices.
+  - Follow-up 2: Export a reversible duplicate-removal plan with source and retained file paths.
+- [ ] 174. **Home Media Indexer**: Scan local video and music folders, read embedded metadata or approved public catalogs, and provide search, artwork, and playback history. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add series grouping and editable episode ordering.
+  - Follow-up 2: Generate a collection report showing missing episodes and duplicate editions.
+- [ ] 175. **Local File Packaging Desk**: Select local files, preview folder structure and archive size, apply naming templates, create a zip, and keep package history. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add package presets with include rules and an editable file manifest.
+  - Follow-up 2: Compare two packages and report added, removed, and changed files.
+- [ ] 176. **Portable Device Charge Simulator**: Create a fictional portable-device catalog, show generated charge levels and low-charge notices, and plot local battery histories without connecting to hardware. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable discharge profiles to the simulated device catalog.
+  - Follow-up 2: Compare predicted low-power times and propose a charging rotation.
+- [ ] 177. **Environmental Reading Logger**: Generate temperature and humidity samples, store them in SQLite, show time-series charts, and export threshold observations without physical sensors. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add gap detection and configurable sampling intervals.
+  - Follow-up 2: Compare sensor locations using the generated temperature and humidity history.
+- [ ] 178. **Schematic Map Annotator**: Generate a simple local vector basemap, add markers, paths, notes, and categories, and export the annotated map without map tiles or services. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add marker categories and distance measurement along saved paths.
+  - Follow-up 2: Export a printable map legend and a route-by-route annotation report.
+- [ ] 179. **Music Practice Loop Desk**: Generate short audio phrases, manage playback loops and tempo settings, provide a metronome, and record local practice notes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add practice loops with tempo progression targets.
+  - Follow-up 2: Compare practice attempts and record which passages reached the target tempo.
+- [ ] 180. **Household Chore Reminder**: Manage recurring household chores, reminder intervals, completion records, supply quantities, and multiple demo household members. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reminder intervals based on elapsed time or recorded usage.
+  - Follow-up 2: Generate a maintenance calendar and a list of supplies needed for upcoming chores.
+- [ ] 181. **Small-Screen Information Display**: Build responsive full-screen signage using generated weather, local schedules, countdowns, and configurable refresh intervals without dedicated hardware. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add rotating display scenes with per-scene durations.
+  - Follow-up 2: Preview a full day's scene schedule and highlight overlapping display events.
+- [ ] 182. **Offline Dictionary Browser**: Bundle a small editable English dictionary, support local word search, examples, favorites, and recent lookups without external dictionary files. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add editable word lists and cross-references between related entries.
+  - Follow-up 2: Create a printable vocabulary review packet from recent lookups.
+- [ ] 183. **Home Equipment Inventory**: Record equipment models, room locations, purchase dates, manuals, and maintenance notes with search and reminder views. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add maintenance intervals and a history of replaced parts.
+  - Follow-up 2: Generate a household maintenance forecast grouped by room and expected cost.
+- [ ] 184. **Personal Document Full-Text Indexer**: Generate a small local document collection, index content, highlight search terms, apply tags, and explain which files are included in the local index. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add saved queries and document collections with excerpt annotations.
+  - Follow-up 2: Export a reading bundle containing matching passages and their document locations.
+- [ ] 185. **Home Energy Consumption Recorder**: Input electricity meter/water meter/gas readings, display usage trends, cost estimates and abnormal reminders. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add tiered tariffs and estimated standing charges.
+  - Follow-up 2: Compare actual usage with a chosen baseline period and explain bill changes.
 
-- [ ] 471. **Raspberry Pi Home Dashboard**: The system locally displays weather, calendar and countdown to get off work, and supports offline caching and night mode.
-- [ ] 472. **USB Device Hot Plug Log**: Record insertion and removal events, device identification and driver prompts to facilitate troubleshooting.
-- [ ] 473. **Room Layout Inventory Map**: Place household equipment on a simple floor plan, attach item details, filter by room, and export an inventory sheet.
-- [ ] 474. **Offline Map Points of Interest Book**: Import GPX and points of interest, browse and annotate offline, suitable for outdoor use without network.
-- [ ] 475. **Sensor Simulator Kit**: Simulate temperature, humidity and door sensor readings and pushes them to local MQTT for automated debugging.
-- [ ] 476. **Edge Log Ring Buffer**: Rolling storage of critical logs on resource-constrained devices, supporting export and water level alarms.
-- [ ] 477. **Local Priority Note Conflict Demonstration**: Edit the same note offline at both ends, demonstrating conflict marking and merging strategies.
-- [ ] 478. **Camera Scheduled Snapshot Archiving**: Save local snapshots according to plan, retention days policy and thumbnail browsing.
-- [ ] 479. **Bluetooth Beacon Proximity Demo**: Simulate Bluetooth beacon proximity, trigger a check-in event, record a timeline, and display device battery usage.
-- [ ] 480. **Household Energy Consumption Socket Simulation Board**: Simulate multi-channel socket power curves, sets threshold alarms and daily usage summary.
-- [ ] 481. **Offline QR Code Scanning Gun Web**: The camera scans the QR code to enter the inventory, and the offline queue is synchronized after being connected to the Internet.
-- [ ] 482. **Embedded OTA Status Panel**: Display device firmware version, upgrade batch and failed retries (simulated device group).
-- [ ] 483. **Local Media Photo Album Machine**: Raspberry Pi photo frame mode rotates local photo albums, supports weather subtitles and remote delivery switch.
-- [ ] 484. **Text Format Debugging Workbench**: Compare line endings, encodings, delimiters, and indentation in local text files, preview conversions, and export corrected copies.
-- [ ] 485. **Edge Rule Engine Playground**: Edit if-this-then-that rules, trigger simulated events locally, and record an audit trail.
+- [ ] 471. **Local Home Information Dashboard**: Display generated weather, a local calendar, and countdowns with cached fixtures, night mode, and a standard browser preview without dedicated hardware. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable display scenes and generated weather histories.
+  - Follow-up 2: Preview a week of dashboard rotations and identify stale scene data.
+- [ ] 472. **Device Connection Event Simulator**: Generate fictional peripheral insertion and removal events, annotate device identities, display an event timeline, and flag repeated simulated disconnects without hardware access. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add simulated device connection sequences and editable event annotations.
+  - Follow-up 2: Compare event traces and show devices with repeated disconnect patterns.
+- [ ] 473. **Room Layout Inventory Map**: Place household equipment on a simple floor plan, attach item details, filter by room, and export an inventory sheet. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add room zones and item placement constraints.
+  - Follow-up 2: Generate a move checklist comparing two saved inventory layouts.
+- [ ] 474. **Offline Points of Interest Notebook**: Generate a schematic basemap and GPX fixture, browse local routes and points, attach notes, and export an offline trip packet. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add route categories and editable waypoint notes.
+  - Follow-up 2: Export a trip packet with schematic maps and distance totals.
+- [ ] 475. **Sensor Scenario Simulator**: Generate temperature, humidity, and door-state readings as local JSON events, browse their timeline, and inspect threshold outcomes without hardware or messaging protocols. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reproducible sensor scenarios with missing and delayed samples.
+  - Follow-up 2: Compare rule outcomes across scenarios and report unhandled reading gaps.
+- [ ] 476. **Edge Log Ring Buffer**: Rolling storage of critical logs on resource-constrained devices, supporting export and water level alarms. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add module-specific retention limits and important-event pinning.
+  - Follow-up 2: Compare retention profiles by storage use and discarded event counts.
+- [ ] 477. **Local Priority Note Conflict Demonstration**: Edit the same note offline at both ends, demonstrating conflict marking and merging strategies. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add field-level merge choices and a shared revision timeline.
+  - Follow-up 2: Replay two edit histories and explain each resolved or unresolved conflict.
+- [ ] 478. **Scheduled Snapshot Archive Simulator**: Generate timestamped geometric image snapshots, apply local archive schedules and retention rules, and browse thumbnails without a camera. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add generated snapshot schedules and retention exceptions.
+  - Follow-up 2: Produce a contact-sheet archive showing gaps and retained milestones.
+- [ ] 479. **Proximity Check-in Simulator**: Generate fictional movement coordinates, calculate entry into configured zones, record simulated check-ins, and show portable-device charge histories without radio hardware. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable proximity zones to the local movement simulator.
+  - Follow-up 2: Compare check-in rules and show duplicate or missed simulated visits.
+- [ ] 480. **Household Energy Consumption Socket Simulation Board**: Simulate multi-channel socket power curves, sets threshold alarms and daily usage summary. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add usage schedules and per-outlet tariff assumptions.
+  - Follow-up 2: Compare power scenarios and rank outlets by contribution to daily cost.
+- [ ] 481. **Offline Label Entry Desk**: Provide typed inventory-label entry, queue local records, reconcile counts, and show an offline browser demo without a camera. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add a generated label catalog and keyboard-driven scan simulation.
+  - Follow-up 2: Reconcile queued scans with inventory totals and flag duplicate item entries.
+- [ ] 482. **Device Version Rollout Simulator**: Create a fictional device catalog, simulate version batches and failed updates, and show local retry outcomes without real device updates. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add version prerequisites and staged simulated update groups.
+  - Follow-up 2: Compare batch outcomes and list devices blocked by failed prerequisites.
+- [ ] 483. **Local Album Slideshow Desk**: Generate colorful image fixtures, rotate albums with editable captions, provide theme and timing controls, and preview the slideshow in a standard browser. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add generated album themes and configurable slideshow transitions.
+  - Follow-up 2: Create a printable album index matching the slideshow order and captions.
+- [ ] 484. **Text Format Debugging Workbench**: Compare line endings, encodings, delimiters, and indentation in local text files, preview conversions, and export corrected copies. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable text-format profiles and mixed-format warnings.
+  - Follow-up 2: Export a conversion manifest showing changed files and unresolved byte sequences.
+- [ ] 485. **Edge Rule Engine Playground**: Edit if-this-then-that rules, trigger simulated events locally, and record an audit trail. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add rule priorities and a trace of matching conditions.
+  - Follow-up 2: Compare rule revisions using the same generated event timeline.
 
 ## 16. Organization and Recordkeeping Tools (30 topics)
 > Practice areas: structured records, search, printable layouts, reusable templates.
 
-- [ ] 186. **Household Storage Label Designer**: Design printable labels with room names, item lists, colors, and QR text, preview label sheets, and export PDF.
-- [ ] 187. **Recipe Variation Notebook**: Save recipe variations, ingredient substitutions, preparation notes, and photos, compare versions, and export a printable recipe card.
-- [ ] 188. **Travel Packing Checklist Builder**: Create packing lists by trip type, assign bags, mark packed items, reuse templates, and print a compact checklist.
-- [ ] 189. **Personal Keepsake Archive**: Catalog keepsakes with photos, dates, stories, tags, and storage locations, then browse a timeline and export an album.
-- [ ] 190. **Stationery Collection Planner**: Track stationery items, quantities, locations, favorite combinations, and restocking notes with search and a compact dashboard.
-- [ ] 191. **Printable Planner Page Designer**: Arrange weekly planner blocks, notes, and checklists on a page, choose typography, preview margins, and export PDF.
-- [ ] 192. **Purchase Receipt Organizer**: Import receipt photos and manually entered details, group purchases by shop and month, search notes, and export a CSV summary.
-- [ ] 193. **Neighborhood Event Scrapbook**: Record attended events, dates, photos, participants, and reflections, then create a searchable timeline and printable highlights.
-- [ ] 194. **Craft Material Inventory**: Track craft materials, colors, quantities, storage bins, and project assignments, with low-stock reminders and CSV export.
-- [ ] 195. **Project Reference Card Library**: Store concise reference cards with code snippets, diagrams, tags, and revision notes, then search and print selected cards.
-- [ ] 196. **Personal Decision Journal**: Record choices, alternatives, expected outcomes, and later reflections, compare outcomes, and export periodic reviews.
-- [ ] 197. **Room Decoration Mood Board**: Arrange images, color palettes, measurements, and furniture notes on a board, compare layouts, and export a presentation image.
-- [ ] 198. **Community Borrowing Ledger**: Record shared items, borrowers, pickup and return dates, condition notes, and reminders with a searchable lending view.
-- [ ] 199. **Personal Paperwork Checklist**: Track documents needed for routine errands, add deadlines and completion notes, reuse checklist templates, and print selected lists.
-- [ ] 200. **Creative Session Notes Organizer**: Record creative sessions, ideas, materials, and next actions, filter by project, and export a weekly progress notebook.
+- [ ] 186. **Household Storage Label Designer**: Design printable labels with room names, item lists, colors, and QR text, preview label sheets, and export PDF. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add label templates with repeated fields and sheet alignment guides.
+  - Follow-up 2: Generate a room inventory sheet matching the printed label codes.
+- [ ] 187. **Recipe Variation Notebook**: Save recipe variations, ingredient substitutions, preparation notes, and photos, compare versions, and export a printable recipe card. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add side-by-side ingredient ratios and tasting notes for each variation.
+  - Follow-up 2: Scale a selected variation and generate a printable comparison card.
+- [ ] 188. **Travel Packing Checklist Builder**: Create packing lists by trip type, assign bags, mark packed items, reuse templates, and print a compact checklist. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add luggage weight limits and item weight estimates.
+  - Follow-up 2: Compare packing alternatives and suggest items to move between bags.
+- [ ] 189. **Personal Keepsake Archive**: Catalog keepsakes with photos, dates, stories, tags, and storage locations, then browse a timeline and export an album. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add relationships between keepsakes and related people or events.
+  - Follow-up 2: Create a themed album with a timeline and storage-location appendix.
+- [ ] 190. **Stationery Collection Planner**: Track stationery items, quantities, locations, favorite combinations, and restocking notes with search and a compact dashboard. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add planned stationery combinations for different project types.
+  - Follow-up 2: Generate a restocking list from planned projects and available quantities.
+- [ ] 191. **Printable Planner Page Designer**: Arrange weekly planner blocks, notes, and checklists on a page, choose typography, preview margins, and export PDF. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable page sections and configurable writing-line spacing.
+  - Follow-up 2: Create a multi-page planner pack with page numbers and a contents sheet.
+- [ ] 192. **Purchase Receipt Organizer**: Import receipt photos and manually entered details, group purchases by shop and month, search notes, and export a CSV summary. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add line-item categorization and manual receipt-total reconciliation.
+  - Follow-up 2: Compare monthly spending by shop and flag receipts with unresolved totals.
+- [ ] 193. **Neighborhood Event Scrapbook**: Record attended events, dates, photos, participants, and reflections, then create a searchable timeline and printable highlights. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add event collections with shared captions and participant notes.
+  - Follow-up 2: Generate a yearly highlights booklet from selected event collections.
+- [ ] 194. **Craft Material Inventory**: Track craft materials, colors, quantities, storage bins, and project assignments, with low-stock reminders and CSV export. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add material reservations for planned craft projects.
+  - Follow-up 2: Estimate which projects can start now and list missing material quantities.
+- [ ] 195. **Project Reference Card Library**: Store concise reference cards with code snippets, diagrams, tags, and revision notes, then search and print selected cards. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add prerequisite links and difficulty labels between reference cards.
+  - Follow-up 2: Generate a study booklet with ordered cards and a topic index.
+- [ ] 196. **Personal Decision Journal**: Record choices, alternatives, expected outcomes, and later reflections, compare outcomes, and export periodic reviews. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add scheduled outcome reviews and confidence estimates at decision time.
+  - Follow-up 2: Compare expected and observed outcomes across decision categories.
+- [ ] 197. **Room Decoration Mood Board**: Arrange images, color palettes, measurements, and furniture notes on a board, compare layouts, and export a presentation image. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add budget estimates and alternative furniture arrangements.
+  - Follow-up 2: Compare mood-board options by cost, space usage, and retained items.
+- [ ] 198. **Community Borrowing Ledger**: Record shared items, borrowers, pickup and return dates, condition notes, and reminders with a searchable lending view. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reservation queues and pickup handoff notes.
+  - Follow-up 2: Show item availability over time and report frequent late returns.
+- [ ] 199. **Personal Paperwork Checklist**: Track documents needed for routine errands, add deadlines and completion notes, reuse checklist templates, and print selected lists. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add prerequisite documents and validity dates to checklist templates.
+  - Follow-up 2: Generate an errand plan grouping ready tasks and missing paperwork.
+- [ ] 200. **Creative Session Notes Organizer**: Record creative sessions, ideas, materials, and next actions, filter by project, and export a weekly progress notebook. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add session goals and links between ideas and produced artifacts.
+  - Follow-up 2: Create a project retrospective showing completed experiments and abandoned directions.
 
-- [ ] 486. **Local Folder Tag Notebook**: Attach descriptive tags and notes to local folder paths, group related folders, find recent entries, and export a catalog.
-- [ ] 487. **Collection Exhibit Planner**: Arrange selected collection items into exhibits, add captions and display positions, preview a layout, and print an exhibit guide.
-- [ ] 488. **Weekend Task Shuffle Board**: Organize household tasks by time and effort, shuffle a balanced weekend plan, mark completion, and reuse successful plans.
-- [ ] 489. **Presentation Rehearsal Log**: Record rehearsal duration, slide notes, speaking reminders, and feedback, compare sessions, and export a revision checklist.
-- [ ] 490. **Photo Print Order Planner**: Select local photos, assign print sizes and quantities, preview crop choices, estimate paper use, and export an order sheet.
-- [ ] 491. **Celebration Budget Worksheet**: Plan decorations, food, venue supplies, and shared costs, compare estimates with actual spending, and export a budget sheet.
-- [ ] 492. **Reading Discussion Card Builder**: Create discussion cards from book notes, group questions by chapter, mark reviewed cards, and export a printable meeting pack.
-- [ ] 493. **Workshop Supply Checklist**: Plan materials by activity and participant count, record packed quantities, mark shortages, and export preparation sheets.
-- [ ] 494. **Everyday Repair Notes Library**: Record household repair notes, parts, before-and-after photos, costs, and follow-up dates, with tags and search.
-- [ ] 495. **Local Text Template Catalog**: Organize reusable text templates with placeholders, preview filled examples, track revisions, and export selected template sets.
-- [ ] 496. **Personal Milestone Photo Wall**: Arrange photos and notes around dated milestones, filter by theme, adjust the layout, and export a poster.
-- [ ] 497. **Club Attendance Summary Desk**: Import club attendance sheets, group sessions by month, show participation totals, and prepare printable member summaries.
-- [ ] 498. **Hobby Project Materials Estimator**: Enter project dimensions and material presets, calculate quantities and cost estimates, save scenarios, and export a shopping sheet.
-- [ ] 499. **Board Game Score History**: Record players, games, rounds, and scores, display trends and personal bests, and export selected match histories.
-- [ ] 500. **Handmade Item Order Notebook**: Track handmade orders, colors, quantities, preparation steps, due dates, and pickup notes with a simple progress board.
+- [ ] 486. **Local Folder Tag Notebook**: Attach descriptive tags and notes to local folder paths, group related folders, find recent entries, and export a catalog. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add folder relationships and review dates for stale notes.
+  - Follow-up 2: Generate a project catalog identifying missing descriptions and disconnected folders.
+- [ ] 487. **Collection Exhibit Planner**: Arrange selected collection items into exhibits, add captions and display positions, preview a layout, and print an exhibit guide. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add display-capacity limits and visitor route ordering.
+  - Follow-up 2: Compare exhibit layouts and export a room-by-room installation checklist.
+- [ ] 488. **Weekend Task Shuffle Board**: Organize household tasks by time and effort, shuffle a balanced weekend plan, mark completion, and reuse successful plans. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add task dependencies and household-member availability.
+  - Follow-up 2: Compare weekend plans by effort balance and unfinished carryover work.
+- [ ] 489. **Presentation Rehearsal Log**: Record rehearsal duration, slide notes, speaking reminders, and feedback, compare sessions, and export a revision checklist. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add target timings per presentation section.
+  - Follow-up 2: Compare rehearsals and generate slide-specific pacing suggestions from recorded durations.
+- [ ] 490. **Photo Print Order Planner**: Select local photos, assign print sizes and quantities, preview crop choices, estimate paper use, and export an order sheet. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add paper-size presets and batch layout optimization.
+  - Follow-up 2: Compare print plans by paper usage, crop loss, and total cost.
+- [ ] 491. **Celebration Budget Worksheet**: Plan decorations, food, venue supplies, and shared costs, compare estimates with actual spending, and export a budget sheet. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add cost-sharing rules and contribution tracking.
+  - Follow-up 2: Reconcile actual spending against contributions and show outstanding balances.
+- [ ] 492. **Reading Discussion Card Builder**: Create discussion cards from book notes, group questions by chapter, mark reviewed cards, and export a printable meeting pack. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add discussion roles and estimated time per question.
+  - Follow-up 2: Generate a meeting agenda constrained by the group's available discussion time.
+- [ ] 493. **Workshop Supply Checklist**: Plan materials by activity and participant count, record packed quantities, mark shortages, and export preparation sheets. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable supply formulas by activity and participant count.
+  - Follow-up 2: Compare preparation plans and report shortages after participant numbers change.
+- [ ] 494. **Everyday Repair Notes Library**: Record household repair notes, parts, before-and-after photos, costs, and follow-up dates, with tags and search. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add recurring repair categories and replacement-part history.
+  - Follow-up 2: Generate a follow-up calendar and compare repair costs by household item.
+- [ ] 495. **Local Text Template Catalog**: Organize reusable text templates with placeholders, preview filled examples, track revisions, and export selected template sets. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add placeholder types and required-field validation.
+  - Follow-up 2: Compare template revisions and preview affected filled examples.
+- [ ] 496. **Personal Milestone Photo Wall**: Arrange photos and notes around dated milestones, filter by theme, adjust the layout, and export a poster. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add milestone grouping and caption-length constraints.
+  - Follow-up 2: Export alternate poster layouts with a shared event index.
+- [ ] 497. **Club Attendance Summary Desk**: Import club attendance sheets, group sessions by month, show participation totals, and prepare printable member summaries. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add attendance categories and excused-absence notes.
+  - Follow-up 2: Compare participation periods and produce individual member follow-up summaries.
+- [ ] 498. **Hobby Project Materials Estimator**: Enter project dimensions and material presets, calculate quantities and cost estimates, save scenarios, and export a shopping sheet. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add material waste factors and supplier pack sizes.
+  - Follow-up 2: Compare shopping scenarios and show leftover quantities for future projects.
+- [ ] 499. **Board Game Score History**: Record players, games, rounds, and scores, display trends and personal bests, and export selected match histories. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add game-specific scoring rules and tie-breaking methods.
+  - Follow-up 2: Compare player performance across games without mixing incompatible score scales.
+- [ ] 500. **Handmade Item Order Notebook**: Track handmade orders, colors, quantities, preparation steps, due dates, and pickup notes with a simple progress board. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add component inventory and preparation dependencies.
+  - Follow-up 2: Generate an order-readiness report showing missing materials and late production steps.
 
 ## 17. Industry Workbenches and Vertical Apps (40 topics)
 > Practice areas: business modeling, form flow, role view, operation closed loop.
 
-- [ ] 201. **Art Studio Booking Desk**: Manage studio rooms, instructors, workshop appointments, arrivals, rescheduling, cancellations, and a daily attendance queue.
-- [ ] 202. **Instrument Repair Case Book**: Record instruments, reported defects, repair steps, parts, estimates, and pickup dates, with a searchable service history.
-- [ ] 203. **Gym Membership Manager**: Manage membership plans, personal-training sessions, facility check-ins, renewal reminders, and class usage while showing each member's current status.
-- [ ] 204. **Small B&B Operation Desk**: Manage room status, reservations, check-in and check-out, cleaning tasks and income statistics, and support viewing available rooms within a date range.
-- [ ] 205. **Restaurant Waiting and Reservation Board**: Record table seats, reservations, waiting queues, check-in and seating status, and provide a quick operation view at the front desk.
-- [ ] 206. **Coffee Shop Recipe Costizer**: Maintain beverage recipes, ingredient prices, cup sizes and gross profit estimates to help shop owners compare pricing plans.
-- [ ] 207. **Maintenance Work Order Dispatching Platform**: Enter repair reports, assign technicians, track door-to-door time, accessories and settlement status, and display pending work orders according to priority.
-- [ ] 208. **Housekeeping Service Scheduler**: Manage customers, service items, schedules, order confirmations and service feedback to reduce scheduling conflicts.
-- [ ] 209. **Photography Appointment Process Table**: Maintain customer needs, schedules, contract nodes, film selection progress and delivery lists, and display the current stage of each order.
-- [ ] 210. **Course Cancellation System for Training Institutions**: Manage students, course packages, class records, leave requests for make-up classes and remaining class reminders, and support class view.
-- [ ] 211. **Community Property Repair Report Desk**: Receive repair reports from owners, categorizes them, dispatches work, processing progress and satisfaction, and provide announcements and entrance to frequently asked questions.
-- [ ] 212. **Lawyer Case Follow-up Board**: Record clients, case nodes, materials list, court date reminders and fee status, and display the next action by case.
-- [ ] 213. **Psychological Consultation Schedule Book**: Manage visitors, counselor schedules, appointment status, return visit reminders and anonymous statistics, and protect the display of sensitive information.
-- [ ] 214. **Dental Implant Process Tracking**: Record patient stages, imaging data, surgical schedules, follow-up visits and cost plans, allowing doctors to quickly check the progress.
-- [ ] 215. **Used Car Closing Evaluator**: Input vehicle information, inspection items, valuation, maintenance costs and sales status, and generate a summary of the car closing decision.
-- [ ] 216. **Wedding Execution List Desk**: Manage the needs of the couple, suppliers, timelines, payment nodes and tasks of the day, and support viewing to-dos by role.
-- [ ] 217. **Fresh Food Order Aggregator**: Collect store ordering requirements, inventory, supplier quotes and arrival status, and generate a purchase summary list.
-- [ ] 218. **School Bus Route Manager**: Maintain students, sites, routes, boarding and alighting records and anomaly reminders to facilitate scheduling and view daily operations.
-- [ ] 219. **Laboratory Sample Transfer Table**: Record sample number, source, processing steps, owner and storage location, and support status tracking and anomaly marking.
-- [ ] 220. **Community Activity Volunteer Desk**: Manage activities, positions, registrations, sign-ins and service hours, and generate volunteer participation records.
+- [ ] 201. **Art Studio Booking Desk**: Manage studio rooms, instructors, workshop appointments, arrivals, rescheduling, cancellations, and a daily attendance queue. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add equipment requirements and room turnaround buffers.
+  - Follow-up 2: Compare booking schedules and identify unused capacity by workshop type.
+- [ ] 202. **Instrument Repair Case Book**: Record instruments, reported defects, repair steps, parts, estimates, and pickup dates, with a searchable service history. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add repair-stage checklists and customer approval records for estimate changes.
+  - Follow-up 2: Generate a parts-demand report and identify jobs blocked by missing parts.
+- [ ] 203. **Sports Club Membership Desk**: Manage fictional membership plans, coaching sessions, facility check-ins, renewal reminders, and class usage with no body or wellness measurements. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add class capacity and waiting lists for the synthetic member roster.
+  - Follow-up 2: Compare plan usage with included allowances and show renewal options.
+- [ ] 204. **Small B&B Operation Desk**: Manage room status, reservations, check-in and check-out, cleaning tasks and income statistics, and support viewing available rooms within a date range. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add room turnaround buffers and cleaning assignments.
+  - Follow-up 2: Compare occupancy and revenue under alternative local pricing calendars.
+- [ ] 205. **Restaurant Waiting and Reservation Board**: Record table seats, reservations, waiting queues, check-in and seating status, and provide a quick operation view at the front desk. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add seating preferences and table-combination rules.
+  - Follow-up 2: Simulate the next hour's seating plan and compare visitor waiting times.
+- [ ] 206. **Coffee Shop Recipe Costizer**: Maintain beverage recipes, ingredient prices, cup sizes and gross profit estimates to help shop owners compare pricing plans. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add ingredient waste percentages and supplier pack sizes.
+  - Follow-up 2: Compare menu pricing scenarios and identify recipes below a chosen margin.
+- [ ] 207. **Maintenance Work Order Dispatching Platform**: Enter repair reports, assign technicians, track door-to-door time, accessories and settlement status, and display pending work orders according to priority. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add technician skills and configurable travel-time estimates.
+  - Follow-up 2: Compare dispatch plans by overdue jobs, travel time, and workload balance.
+- [ ] 208. **Housekeeping Service Scheduler**: Manage customers, service items, schedules, order confirmations and service feedback to reduce scheduling conflicts. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add recurring service plans and customer availability windows.
+  - Follow-up 2: Generate a weekly staffing plan with unresolved scheduling conflicts.
+- [ ] 209. **Photography Appointment Process Table**: Maintain customer needs, schedules, contract nodes, film selection progress and delivery lists, and display the current stage of each order. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add revision limits and approval checkpoints for photo selections.
+  - Follow-up 2: Show delivery readiness and create a customer-specific remaining-items checklist.
+- [ ] 210. **Course Cancellation System for Training Institutions**: Manage students, course packages, class records, leave requests for make-up classes and remaining class reminders, and support class view. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add course transfer records and shared family lesson balances.
+  - Follow-up 2: Reconcile lesson usage and report students with disputed deductions.
+- [ ] 211. **Community Property Repair Report Desk**: Receive repair reports from owners, categorizes them, dispatches work, processing progress and satisfaction, and provide announcements and entrance to frequently asked questions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add repeat-issue linking by building and equipment location.
+  - Follow-up 2: Compare resolution times and identify recurring repair categories.
+- [ ] 212. **Client Project Follow-up Board**: Record fictional clients, project milestones, material checklists, review dates, fees, and the next action for each project. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add milestone dependencies and a checklist of required project materials.
+  - Follow-up 2: Generate a handoff report showing missing materials and upcoming review dates.
+- [ ] 213. **Tutoring Appointment Notebook**: Manage fictional learners, tutor schedules, lesson appointments, follow-up notes, and attendance summaries. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add tutor availability and lesson-package balances.
+  - Follow-up 2: Compare lesson attendance across periods and forecast remaining sessions.
+- [ ] 214. **Custom Furniture Production Tracker**: Track fictional furniture orders, designs, workshop stages, delivery appointments, and cost plans. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add material approval steps and workshop production dependencies.
+  - Follow-up 2: Generate a delivery-readiness report listing blocked orders and missing components.
+- [ ] 215. **Used Car Closing Evaluator**: Input vehicle information, inspection items, valuation, maintenance costs and sales status, and generate a summary of the car closing decision. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable inspection weights and estimated refurbishment costs.
+  - Follow-up 2: Compare candidate vehicles under different resale-price assumptions.
+- [ ] 216. **Wedding Execution List Desk**: Manage the needs of the couple, suppliers, timelines, payment nodes and tasks of the day, and support viewing to-dos by role. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add vendor handoff dependencies and contingency assignments.
+  - Follow-up 2: Generate role-specific event-day run sheets with escalation contacts.
+- [ ] 217. **Fresh Food Order Aggregator**: Collect store ordering requirements, inventory, supplier quotes and arrival status, and generate a purchase summary list. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add supplier minimum quantities and delivery windows.
+  - Follow-up 2: Compare purchase allocations and show excess stock caused by minimum orders.
+- [ ] 218. **School Bus Route Manager**: Maintain students, sites, routes, boarding and alighting records and anomaly reminders to facilitate scheduling and view daily operations. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add vehicle capacity and alternative pickup assignments.
+  - Follow-up 2: Simulate route changes and report extra travel time and overloaded stops.
+- [ ] 219. **Craft Sample Transfer Ledger**: Record fictional craft sample IDs, materials, processing steps, owners, storage locations, transfer status, and handling exceptions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add material inspection checklists and transfer acknowledgments.
+  - Follow-up 2: Export a batch lineage report linking each craft sample to its processing steps.
+- [ ] 220. **Community Activity Volunteer Desk**: Manage activities, positions, registrations, sign-ins and service hours, and generate volunteer participation records. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add required skills and minimum staffing per volunteer position.
+  - Follow-up 2: Compare assignment fairness and generate individual volunteer run sheets.
 
-- [ ] 501. **Catering Kitchen Preparation List**: Generate preparation list according to reservation and menu, complete the check and waste records.
-- [ ] 502. **Parcel Sorting Station Dashboard**: Record incoming parcels, sorting-bin assignments, exceptions, processing time, and loss statistics.
-- [ ] 503. **Gym Personal Training Class Reservation**: Manage coaching schedules, membership reservations, cancellation rules and class consumption.
-- [ ] 504. **B&B Check-out Check List**: Check-out item scores, photos and compensation records are generated to generate the next sale status.
-- [ ] 505. **Driving School Subject Progress Board**: Student subject progress, instructor assignment and test appointment reminder.
-- [ ] 506. **Laundry Pickup and Delivery Work Order**: Register garments, condition notes, pickup codes, delivery status, and overdue reminders.
-- [ ] 507. **Community Book Exchange Cabinet**: Track cabinet capacity, borrowing and returns, overdue reminders, and tag-based lookup for a community book exchange.
-- [ ] 508. **Community Repair Report Dispatching Desk**: Classification of residents’ repair reports, dispatch of work, completion of sign-in and return visit of satisfaction.
-- [ ] 509. **Exhibition Booth Construction Progress**: Booth tasks, material arrival and acceptance nodes, showing the risk of delay.
-- [ ] 510. **Training Program Trial Conversion Board**: Track trial-session appointments, attendance, interest ratings, follow-up tasks, and conversion status.
-- [ ] 511. **Farm Picking Reservation Page**: Park time slot capacity, reservation cancellation and weather rescheduling notice.
-- [ ] 512. **Studio Schedule Board**: Studio occupancy, equipment borrowing and customer schedule conflict detection.
-- [ ] 513. **Car Beauty Construction Order**: Construction project, technician, quality inspection photos and vehicle delivery confirmation.
-- [ ] 514. **Shared Office Visitor Registration**: Visitor reservation, QR code sign-in and host confirmation, export daily report.
-- [ ] 515. **Board Game Lending Journal**: Track borrowed games, borrowers, return dates, missing pieces, and condition notes, with reminders and a searchable lending history.
-- [ ] 516. **Wedding Preparation Task Tree**: Suppliers, node deadlines and payment node reminders.
-- [ ] 517. **Scenic Area Volunteer Schedule**: Job requirements, volunteer skill matching and check-in time statistics.
-- [ ] 518. **Campus Lost and Found Desk**: Registration of lost and found items, matching suggestions and verification of claims.
-- [ ] 519. **Coffee Bean Roasting Batch Book**: Batch parameters, cupping notes and cup scoring trends (process management).
-- [ ] 520. **Warehouse Condition Log**: Record room temperature and humidity samples, annotate storage areas, display trends, and attach inspection notes and follow-up tasks.
+- [ ] 501. **Catering Kitchen Preparation List**: Generate preparation list according to reservation and menu, complete the check and waste records. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add ingredient yield factors and preparation lead times.
+  - Follow-up 2: Compare planned quantities with recorded use and report recurring waste sources.
+- [ ] 502. **Parcel Sorting Station Dashboard**: Record incoming parcels, sorting-bin assignments, exceptions, processing time, and loss statistics. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add sorting rules and exception-resolution owners.
+  - Follow-up 2: Compare processing shifts by throughput and unresolved parcel exceptions.
+- [ ] 503. **Sports Coaching Reservation Desk**: Manage fictional coach availability, club-member reservations, cancellation rules, and lesson balances without body or wellness measurements. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add instructor skills and member package balances.
+  - Follow-up 2: Compare reservation utilization and show cancellation-related unused capacity.
+- [ ] 504. **B&B Check-out Check List**: Check-out item scores, photos and compensation records are generated to generate the next sale status. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add room-specific inspection templates and repair follow-ups.
+  - Follow-up 2: Generate a room-readiness report showing incomplete cleaning and disputed charges.
+- [ ] 505. **Driving School Subject Progress Board**: Student subject progress, instructor assignment and test appointment reminder. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add practice prerequisites and instructor availability.
+  - Follow-up 2: Forecast readiness dates from completed lessons and remaining practice requirements.
+- [ ] 506. **Laundry Pickup and Delivery Work Order**: Register garments, condition notes, pickup codes, delivery status, and overdue reminders. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add garment-specific processing steps and delivery batches.
+  - Follow-up 2: Reconcile garments at each handoff and flag missing or delayed items.
+- [ ] 507. **Community Book Exchange Cabinet**: Track cabinet capacity, borrowing and returns, overdue reminders, and tag-based lookup for a community book exchange. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add book reservation queues and cabinet-location notes.
+  - Follow-up 2: Compare circulation across periods and identify titles with repeated overdue returns.
+- [ ] 508. **Community Repair Report Dispatching Desk**: Classification of residents’ repair reports, dispatch of work, completion of sign-in and return visit of satisfaction. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add location-based repeat-issue links and technician availability.
+  - Follow-up 2: Generate a follow-up report for recurring defects and unresolved resident feedback.
+- [ ] 509. **Exhibition Booth Construction Progress**: Booth tasks, material arrival and acceptance nodes, showing the risk of delay. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add task dependencies and material delivery windows.
+  - Follow-up 2: Compare construction plans and highlight the critical chain of delayed work.
+- [ ] 510. **Training Program Trial Conversion Board**: Track trial-session appointments, attendance, interest ratings, follow-up tasks, and conversion status. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add follow-up templates selected by trial feedback category.
+  - Follow-up 2: Compare conversion cohorts and show which follow-up tasks remain incomplete.
+- [ ] 511. **Orchard Visit Reservation Planner**: Create fictional visitor groups, capacity-limited time slots, cancellations, and synthetic weather rescheduling notices for an orchard visit without crop management. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add capacity rules and synthetic weather-rescheduling scenarios.
+  - Follow-up 2: Generate a revised visitor plan showing affected groups and available replacement slots.
+- [ ] 512. **Studio Schedule Board**: Studio occupancy, equipment borrowing and customer schedule conflict detection. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add setup buffers and equipment dependencies to studio bookings.
+  - Follow-up 2: Compare schedules and identify conflicts caused by equipment turnaround time.
+- [ ] 513. **Car Beauty Construction Order**: Construction project, technician, quality inspection photos and vehicle delivery confirmation. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add vehicle-service packages and required inspection checkpoints.
+  - Follow-up 2: Generate a delivery-readiness sheet listing unresolved quality issues.
+- [ ] 514. **Shared Office Visitor Registration**: Visitor reservation, QR code sign-in and host confirmation, export daily report. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add visitor groups and host acknowledgment states.
+  - Follow-up 2: Reconcile expected and checked-in visitors using the generated event history.
+- [ ] 515. **Board Game Lending Journal**: Track borrowed games, borrowers, return dates, missing pieces, and condition notes, with reminders and a searchable lending history. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add component checklists and reservation queues.
+  - Follow-up 2: Generate a return inspection report listing missing pieces and repair follow-ups.
+- [ ] 516. **Wedding Preparation Task Tree**: Suppliers, node deadlines and payment node reminders. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add task dependencies and alternative supplier options.
+  - Follow-up 2: Compare preparation plans by deadline risk and remaining payment commitments.
+- [ ] 517. **Scenic Area Volunteer Schedule**: Job requirements, volunteer skill matching and check-in time statistics. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add preferred shifts and minimum skill coverage.
+  - Follow-up 2: Compare rosters by fairness and unfilled specialist positions.
+- [ ] 518. **Campus Lost and Found Desk**: Registration of lost and found items, matching suggestions and verification of claims. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add item-description matching rules and reviewer confirmation notes.
+  - Follow-up 2: Report unresolved claims and show which description fields support each proposed match.
+- [ ] 519. **Coffee Bean Roasting Batch Book**: Batch parameters, cupping notes and cup scoring trends (process management). Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add target roast profiles and deviation notes.
+  - Follow-up 2: Compare batches by parameter differences and recorded tasting scores.
+- [ ] 520. **Warehouse Condition Log**: Record room temperature and humidity samples, annotate storage areas, display trends, and attach inspection notes and follow-up tasks. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add acceptable storage ranges and missing-sample detection.
+  - Follow-up 2: Compare warehouse zones and generate follow-up inspection tasks.
 
 ## 18. Team Knowledge and Internal Tools (40 topics)
 > Practice areas: knowledge management, process collaboration, permission awareness, retrievable information.
 
-- [ ] 221. **Internal SOP Manager**: Maintain process documents, applicable roles, versions, review status, and expiration reminders so the team can find the latest approved procedure.
-- [ ] 222. **Newcomer Onboarding Task Package**: Generate onboarding checklists, data links, mentor arrangements and completion progress by position, and support HR to check batch status.
-- [ ] 223. **Team Terminology Dictionary**: Include business terms, abbreviations, examples and owners, and support search, pending entries and change history.
-- [ ] 224. **Meeting Room Resource Booking**: Manage meeting rooms, equipment, booking conflicts, cancellations and usage statistics, providing a timeline view of the day.
-- [ ] 225. **Internal Q&A Knowledge Base**: Let team members submit questions and answers, apply tags, accept solutions, flag stale content, and rank frequently viewed entries.
-- [ ] 226. **Customer Handover Manual**: Organize customer background, contacts, risk points, current matters and historical communications to help the person taking over quickly understand the status.
-- [ ] 227. **Team Review Database**: Record project reviews, problems, improvement items, owners and follow-up status, and support review of experiences by topic.
-- [ ] 228. **Internal Training Registration Desk**: Publish courses, collect registrations, sign-ins, feedback and certificate status, and display training completion rates.
-- [ ] 229. **Shared Equipment Borrowing System**: Manage equipment inventory, loan returns, damage records and reservation queues to avoid loss of verbal borrowing.
-- [ ] 230. **Team OKR Progress Board**: Maintain goals, key results, owners, confidence values, and progress updates, and generate weekly summaries.
-- [ ] 231. **Job Responsibility Map**: Display positions, responsibilities, collaboration objects and common documents to help newcomers understand the organizational division of labor.
-- [ ] 232. **Internal Announcement Confirmation Desk**: Publish announcements, collect reading confirmations, track unread people and remind, suitable for important system notifications.
-- [ ] 233. **Team Duty Dashboard**: Configure duty roles, members, shifts, holidays and reminders to display the schedule for this week and next week.
-- [ ] 234. **Problem Escalation Path Assistant**: The system recommends the owner, response time limit, escalation conditions and processing records according to the problem type to reduce the cost of finding people.
-- [ ] 235. **Project Data Archiver**: Organize documents, links, deliverables, archive status and owner by project, supporting unified handover after delivery.
-- [ ] 236. **Internal Requirements Collection Box**: Employees submit tool requirements, pain points, impact areas, and votes, which the Product Owner can categorize and prioritize.
-- [ ] 237. **Cross-team Dependency Tracking Board**: Record dependencies, contacts, blocking reasons, commitment time and risk status, suitable for daily review by project managers.
-- [ ] 238. **System Change Comparator**: Upload two versions of the system text, mark changes in terms, affected positions, and issues to be confirmed, and output a summary of the changes.
-- [ ] 239. **Team Skills Matrix**: Maintain member skills, proficiency, project experience and learning plans to help with shift scheduling and training planning.
-- [ ] 240. **Internal Tool Directory**: Register tool entrance, owner, applicable scenarios, permission application and fault contact, support search by keywords.
+- [ ] 221. **Internal SOP Manager**: Maintain process documents, applicable roles, versions, review status, and expiration reminders so the team can find the latest approved procedure. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add procedure acknowledgments and role-specific required reading.
+  - Follow-up 2: Report teams using outdated procedures and show the required update actions.
+- [ ] 222. **Newcomer Onboarding Task Package**: Generate onboarding checklists, data links, mentor arrangements and completion progress by position, and support HR to check batch status. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add prerequisite tasks and role-specific onboarding variants.
+  - Follow-up 2: Compare onboarding cohorts and identify steps that repeatedly delay completion.
+- [ ] 223. **Team Terminology Dictionary**: Include business terms, abbreviations, examples and owners, and support search, pending entries and change history. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add related terms and deprecated names with replacement guidance.
+  - Follow-up 2: Export a terminology review packet for entries lacking examples or ownership.
+- [ ] 224. **Meeting Room Resource Booking**: Manage meeting rooms, equipment, booking conflicts, cancellations and usage statistics, providing a timeline view of the day. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add room setup requirements and turnaround time.
+  - Follow-up 2: Compare booking utilization with cancellations and unused reserved time.
+- [ ] 225. **Internal Q&A Knowledge Base**: Let team members submit questions and answers, apply tags, accept solutions, flag stale content, and rank frequently viewed entries. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add related questions and duplicate suggestions based on keyword overlap.
+  - Follow-up 2: Generate a freshness review queue for frequently viewed but outdated answers.
+- [ ] 226. **Customer Handover Manual**: Organize customer background, contacts, risk points, current matters and historical communications to help the person taking over quickly understand the status. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add handoff acknowledgments and unanswered questions.
+  - Follow-up 2: Produce a transition checklist grouped by customer priority and next deadline.
+- [ ] 227. **Team Review Database**: Record project reviews, problems, improvement items, owners and follow-up status, and support review of experiences by topic. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add recurring root-cause categories and linked improvement experiments.
+  - Follow-up 2: Compare review periods and show which improvement actions produced follow-up evidence.
+- [ ] 228. **Internal Training Registration Desk**: Publish courses, collect registrations, sign-ins, feedback and certificate status, and display training completion rates. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add course prerequisites and waiting-list promotion rules.
+  - Follow-up 2: Reconcile registrations, attendance, and completion records by cohort.
+- [ ] 229. **Shared Equipment Borrowing System**: Manage equipment inventory, loan returns, damage records and reservation queues to avoid loss of verbal borrowing. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add equipment inspection checklists before and after each loan.
+  - Follow-up 2: Forecast availability from reservations and scheduled maintenance windows.
+- [ ] 230. **Team OKR Progress Board**: Maintain goals, key results, owners, confidence values, and progress updates, and generate weekly summaries. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add key-result milestones and explicit confidence-change reasons.
+  - Follow-up 2: Compare weekly snapshots and highlight goals with stalled leading indicators.
+- [ ] 231. **Job Responsibility Map**: Display positions, responsibilities, collaboration objects and common documents to help newcomers understand the organizational division of labor. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add temporary deputies and handoff responsibilities.
+  - Follow-up 2: Generate a responsibility gap report for activities without a clear owner.
+- [ ] 232. **Internal Announcement Confirmation Desk**: Publish announcements, collect reading confirmations, track unread people and remind, suitable for important system notifications. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add audience groups and required follow-up questions.
+  - Follow-up 2: Compare acknowledgment progress and list teams with unresolved questions.
+- [ ] 233. **Team Duty Dashboard**: Configure duty roles, members, shifts, holidays and reminders to display the schedule for this week and next week. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add substitute assignments and handoff notes between shifts.
+  - Follow-up 2: Generate a coverage report for holidays and consecutive-duty limits.
+- [ ] 234. **Problem Escalation Path Assistant**: The system recommends the owner, response time limit, escalation conditions and processing records according to the problem type to reduce the cost of finding people. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add conditional escalation steps based on elapsed time.
+  - Follow-up 2: Replay synthetic cases and show the resulting owner and escalation timeline.
+- [ ] 235. **Project Data Archiver**: Organize documents, links, deliverables, archive status and owner by project, supporting unified handover after delivery. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add required-deliverable templates by project type.
+  - Follow-up 2: Generate a closure report listing missing artifacts and incomplete handoff approvals.
+- [ ] 236. **Internal Requirements Collection Box**: Employees submit tool requirements, pain points, impact areas, and votes, which the Product Owner can categorize and prioritize. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add duplicate request linking and impact-score explanations.
+  - Follow-up 2: Compare priority lists under different effort and impact weights.
+- [ ] 237. **Cross-team Dependency Tracking Board**: Record dependencies, contacts, blocking reasons, commitment time and risk status, suitable for daily review by project managers. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add dependency chains and the dates each team last reconfirmed them.
+  - Follow-up 2: Show downstream milestones affected by a delayed commitment.
+- [ ] 238. **Policy Document Change Comparator**: Create two fictional policy-document versions, match sections, highlight changed rules and affected job roles, and export human review questions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add custom section matching when headings change between document versions.
+  - Follow-up 2: Export a review checklist of changed rules and affected job roles.
+- [ ] 239. **Team Skills Matrix**: Maintain member skills, proficiency, project experience and learning plans to help with shift scheduling and training planning. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add target proficiency requirements per project role.
+  - Follow-up 2: Compare staffing options and list remaining skill gaps for a selected project.
+- [ ] 240. **Internal Tool Directory**: Register tool entrance, owner, applicable scenarios, permission application and fault contact, support search by keywords. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add tool categories, retirement dates, and replacement links.
+  - Follow-up 2: Generate an ownership review for stale entries and missing support contacts.
 
-- [ ] 521. **Decision Recording ADR Wall**: Authors architectural decisions, context and consequences, supporting state and associated services.
-- [ ] 522. **30-day Checklist for Newbies**: Onboarding tasks by role, mentor confirmation and progress meter.
-- [ ] 523. **Glossary Builder**: Team term definitions, aliases and banned words, change subscription notifications.
-- [ ] 524. **Meeting Cost Calculator**: Estimate meeting cost from participant roles and duration, show the assumptions, and suggest ways to shorten the meeting.
-- [ ] 525. **Internal System Navigation Directory**: Register internal system entrance, owner and permission description, support search.
-- [ ] 526. **RFC Comment Workflow**: Publish RFCs, section comments, upvotes, and merged resolutions.
-- [ ] 527. **Fault Drill Script Library**: Drill scenarios, steps, observation indicators and review templates.
-- [ ] 528. **Anonymous Team Pulse Survey**: Collect periodic anonymous ratings and topic tags, then show aggregate trends without exposing individuals.
-- [ ] 529. **Skills Internal Sharing Appointment**: Share topics, time and replay links, and count registrations and feedback.
-- [ ] 530. **Office Equipment Loan Desk**: Equipment inventory, loan and damage records, overdue reminders.
-- [ ] 531. **Conference Room Equipment Failure Report for Repair**: Repair report, handler and deactivation announcement, associated meeting conflict prompts.
-- [ ] 532. **Cross-Team Dependency Registry**: Document service dependencies, contacts, SLA expectations, and change-notification preferences.
-- [ ] 533. **Publish the Duty Week Manual**: Duty week responsibilities, contact information and checklist, handover confirmation.
-- [ ] 534. **Collaborative Interview Question Library**: Maintain interview questions, evaluation criteria, and usage history to reduce short-term repetition across interviewers.
-- [ ] 535. **Internal FAQ Voting Sorting**: FAQ submission, voting to the top and expiration cleanup.
-- [ ] 536. **Weekly Report Aggregation Reader**: Pull weekly report entries by team, tag filtering and highlight excerpts.
-- [ ] 537. **OKR Review Meeting Minutes Board**: Record goal progress, changes in confidence, blocking decisions and assumptions for the next cycle on a periodic basis, and export review minutes.
-- [ ] 538. **Permission Handover Checklist**: System permission recovery list and double confirmation when a person leaves office.
-- [ ] 539. **Internal Technology Radar**: Maintain Adopt, Experiment, Evaluate, and Hold entries with votes, comments, ownership, and review dates.
-- [ ] 540. **Silent Agenda Board in Conference Room**: Attach the agenda and reference links before a meeting, then track progress and decisions during the session.
+- [ ] 521. **Decision Recording ADR Wall**: Authors architectural decisions, context and consequences, supporting state and associated services. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add superseded-decision links and required reviewer acknowledgments.
+  - Follow-up 2: Export a decision history showing which earlier assumptions were replaced.
+- [ ] 522. **30-day Checklist for Newbies**: Onboarding tasks by role, mentor confirmation and progress meter. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add role-specific prerequisites and mentor handoff notes.
+  - Follow-up 2: Compare onboarding cohorts and identify steps with repeated completion delays.
+- [ ] 523. **Glossary Builder**: Team term definitions, aliases and banned words, change subscription notifications. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add related terms and effective dates for terminology changes.
+  - Follow-up 2: Generate a glossary update digest with affected examples and deprecated aliases.
+- [ ] 524. **Meeting Cost Calculator**: Estimate meeting cost from participant roles and duration, show the assumptions, and suggest ways to shorten the meeting. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add recurring-meeting frequency and alternative attendance groups.
+  - Follow-up 2: Compare meeting formats by total role-hours and required agenda coverage.
+- [ ] 525. **Internal System Navigation Directory**: Register internal system entrance, owner and permission description, support search. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add tool lifecycle status and replacement recommendations.
+  - Follow-up 2: Generate a directory review for stale links and missing owners.
+- [ ] 526. **RFC Comment Workflow**: Publish RFCs, section comments, upvotes, and merged resolutions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add required reviewer groups and section-level resolution states.
+  - Follow-up 2: Generate a decision packet with unresolved comments and accepted revisions.
+- [ ] 527. **Fault Drill Script Library**: Drill scenarios, steps, observation indicators and review templates. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add expected outcomes and evidence requirements to drill steps.
+  - Follow-up 2: Compare drill attempts and identify missing observations or exceeded time targets.
+- [ ] 528. **Anonymous Team Pulse Survey**: Collect periodic anonymous ratings and topic tags, then show aggregate trends without exposing individuals. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable minimum group sizes for aggregate display.
+  - Follow-up 2: Compare survey periods while suppressing groups below the chosen reporting threshold.
+- [ ] 529. **Skills Internal Sharing Appointment**: Share topics, time and replay links, and count registrations and feedback. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add topic prerequisites and presenter availability.
+  - Follow-up 2: Generate a sharing schedule balancing topics and expected participant interests.
+- [ ] 530. **Office Equipment Loan Desk**: Equipment inventory, loan and damage records, overdue reminders. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add item-condition checklists and reservation windows.
+  - Follow-up 2: Forecast availability and list items blocked by repairs or late returns.
+- [ ] 531. **Conference Room Equipment Failure Report for Repair**: Repair report, handler and deactivation announcement, associated meeting conflict prompts. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add temporary alternatives and affected-room notifications in a local preview.
+  - Follow-up 2: Generate a room-readiness report combining repairs and upcoming bookings.
+- [ ] 532. **Cross-Team Dependency Registry**: Document service dependencies, contacts, SLA expectations, and change-notification preferences. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add dependency criticality and change-notification lead times.
+  - Follow-up 2: Compare registry revisions and show teams requiring a new handoff agreement.
+- [ ] 533. **Publish the Duty Week Manual**: Duty week responsibilities, contact information and checklist, handover confirmation. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add handoff questions and unresolved follow-up actions.
+  - Follow-up 2: Generate next week's duty brief from the previous week's unfinished items.
+- [ ] 534. **Collaborative Interview Question Library**: Maintain interview questions, evaluation criteria, and usage history to reduce short-term repetition across interviewers. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add question prerequisites and interviewer-specific usage limits.
+  - Follow-up 2: Generate an interview set balancing concepts while avoiding recent repeats.
+- [ ] 535. **Internal FAQ Voting Sorting**: FAQ submission, voting to the top and expiration cleanup. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add FAQ review owners and last-verified dates.
+  - Follow-up 2: Compare popularity with freshness and prioritize high-use outdated answers.
+- [ ] 536. **Weekly Report Aggregation Reader**: Read generated weekly report entries by team, tag filtering and highlight excerpts. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable digest sections and linked source excerpts.
+  - Follow-up 2: Compare weekly editions and carry unresolved team blockers into the next digest.
+- [ ] 537. **OKR Review Meeting Minutes Board**: Record goal progress, changes in confidence, blocking decisions and assumptions for the next cycle on a periodic basis, and export review minutes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add key-result assumptions and explicit decision owners.
+  - Follow-up 2: Compare review cycles and show which confidence changes lack supporting updates.
+- [ ] 538. **Office Asset Handover Checklist**: Manage fictional departing-staff asset returns, document handoffs, recipient acknowledgments, and double-confirmed completion states. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add asset return conditions and recipient acknowledgment states.
+  - Follow-up 2: Generate a departure handoff report listing unreturned items and missing confirmations.
+- [ ] 539. **Internal Technology Radar**: Maintain Adopt, Experiment, Evaluate, and Hold entries with votes, comments, ownership, and review dates. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add trial outcomes and criteria for moving between radar stages.
+  - Follow-up 2: Compare radar snapshots and explain adopted, retired, and deferred entries.
+- [ ] 540. **Silent Agenda Board in Conference Room**: Attach the agenda and reference links before a meeting, then track progress and decisions during the session. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add time budgets and designated decision owners per agenda item.
+  - Follow-up 2: Compare actual agenda progress with planned timing and list deferred decisions.
 
 ## 19. Data Operations and Quality Governance (40 topics)
 > Practice areas: data import, cleaning, rule verification, interpretable reports.
 
-- [ ] 241. **CSV Field Mapping Wizard**: Import CSVs from different sources, manually match fields, preview results, save mapping templates, and export standard data.
-- [ ] 242. **Data Quality Inspection Platform**: Configure required, unique, range and format rules, and display error samples and repair progress after importing data.
-- [ ] 243. **Duplicate Customer Merger Assistant**: The system identifies suspected duplicate customers, displays difference fields, merge suggestions and manual confirmation results, and retains merge records.
-- [ ] 244. **Indicator Caliber Manager**: Maintain business indicator definitions, calculation calibers, owners and change history, and reduces team report caliber inconsistencies.
-- [ ] 245. **Funnel Conversion Analyzer**: Import event samples, configure funnel steps, and display conversion rates, churn nodes, and group comparisons.
-- [ ] 246. **A/B Experiment Results Dashboard**: Enter the experimental group, indicators, sample size and results to show whether the preset goals and conclusion records are achieved.
-- [ ] 247. **Data Import Error Inbox**: Receive import failure records, aggregate them by error type, assigns handlers, and mark retry status.
-- [ ] 248. **Operation Activity Attribution Table**: Record activities, channels, costs, leads and conversion results to help operations compare input and output.
-- [ ] 249. **Retention Cohort Dashboard**: Import user activity data, display retention curves and key date annotations by registration batch.
-- [ ] 250. **Abnormal Order Detection Platform**: Import order samples and mark abnormalities according to amount, frequency, address and refund behavior for manual review.
-- [ ] 251. **Tag Rule Debugger**: Configure user tag rules and display hit reasons and miss conditions after inputting sample users.
-- [ ] 252. **Buried Point Acceptance List**: Maintain pages, events, attributes, owners and acceptance status, and support viewing buried point coverage by version.
-- [ ] 253. **Report Subscription Center**: Manage reports, subscribers, sending frequency and recent sending status, and provide failed retry records.
-- [ ] 254. **Data Dictionary Browser**: Maintain field names, meanings, enumeration values, sources and examples, support search and recent updates.
-- [ ] 255. **Operation List Grouper**: Filter the user list according to conditions, estimate the number of people, save the groups and export the delivery list.
-- [ ] 256. **Inventory Turn Analyzer**: Import inventory and sales samples, calculate turnover days, slow-moving items and replenishment recommendations.
-- [ ] 257. **Channel Lead Quality Score**: Import leads from different channels, score them based on completeness, follow-up results and transaction status, and display channel rankings.
-- [ ] 258. **Refund Reason Analysis Desk**: Summarize refund records, reasons, products and customer service notes to display high-frequency issues and trend changes.
-- [ ] 259. **Data Masking Previewer**: Upload sample data, choose masking rules, and preview transformations for names, phone numbers, email addresses, and other sensitive fields.
-- [ ] 260. **Metric Incident Review Log**: Record anomalous metrics, impact, investigation steps, root causes, and follow-up actions in a searchable review log.
+- [ ] 241. **CSV Field Mapping Wizard**: Import CSVs from different sources, manually match fields, preview results, save mapping templates, and export standard data. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable transformation steps for dates, numbers, and combined fields.
+  - Follow-up 2: Export a mapping manifest and isolate rows that failed a transformation.
+- [ ] 242. **Data Quality Inspection Platform**: Configure required, unique, range and format rules, and display error samples and repair progress after importing data. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add rule severity levels and accepted-exception notes.
+  - Follow-up 2: Compare quality runs and report newly introduced versus resolved row errors.
+- [ ] 243. **Duplicate Customer Merger Assistant**: The system identifies suspected duplicate customers, displays difference fields, merge suggestions and manual confirmation results, and retains merge records. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add preferred-source rules for individual customer fields.
+  - Follow-up 2: Export a merge lineage report showing every original record and retained value.
+- [ ] 244. **Metric Definition Manager**: Maintain business metric definitions, formulas, owners, worked examples, and version history so reports can use consistent calculations. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add effective dates and sample calculations to indicator definitions.
+  - Follow-up 2: Compare two definition versions and explain affected dashboard values.
+- [ ] 245. **Funnel Conversion Analyzer**: Import event samples, configure funnel steps, and display conversion rates, churn nodes, and group comparisons. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable conversion windows and optional funnel steps.
+  - Follow-up 2: Compare cohorts and show where time-to-conversion differs most.
+- [ ] 246. **A/B Experiment Results Dashboard**: Enter the experimental group, indicators, sample size and results to show whether the preset goals and conclusion records are achieved. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable minimum sample requirements and inconclusive outcomes.
+  - Follow-up 2: Compare multiple experiment snapshots without mixing their sample populations.
+- [ ] 247. **Data Import Error Inbox**: Receive import failure records, aggregate them by error type, assigns handlers, and mark retry status. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add retry batches and assignment rules by error category.
+  - Follow-up 2: Show recurring failure causes and distinguish retried from newly failed rows.
+- [ ] 248. **Operation Activity Attribution Table**: Record activities, channels, costs, leads and conversion results to help operations compare input and output. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable attribution weights across multiple activity touches.
+  - Follow-up 2: Compare attribution methods and explain each channel's contribution change.
+- [ ] 249. **Retention Cohort Dashboard**: Import user activity data, display retention curves and key date annotations by registration batch. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add activity definitions and adjustable retention intervals.
+  - Follow-up 2: Compare cohort retention under two activity definitions.
+- [ ] 250. **Order Exception Review Desk**: Generate fictional orders, flag amount and fulfillment inconsistencies using explicit rules, and record manual review decisions without risk scoring people. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add editable anomaly rules and reviewer disposition notes.
+  - Follow-up 2: Compare rule precision using manually labeled synthetic orders.
+- [ ] 251. **Tag Rule Debugger**: Configure user tag rules and display hit reasons and miss conditions after inputting sample users. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add rule groups with explicit precedence and exclusion conditions.
+  - Follow-up 2: Compare two rule revisions and list users whose tags change.
+- [ ] 252. **Product Event Acceptance Checklist**: Maintain page events, required properties, owners, version references, and acceptance states, and display event coverage by release. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add required event properties and version-specific acceptance rules.
+  - Follow-up 2: Generate a release coverage report for missing or unverified events.
+- [ ] 253. **Report Subscription Center**: Manage reports, subscribers, sending frequency and recent sending status, and provide failed retry records. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add local delivery previews and per-subscriber report sections.
+  - Follow-up 2: Show missed delivery windows and export a retry plan for failed editions.
+- [ ] 254. **Data Dictionary Browser**: Maintain field names, meanings, enumeration values, sources and examples, support search and recent updates. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add field ownership, deprecated values, and replacement guidance.
+  - Follow-up 2: Export a data-contract change report for selected dictionary revisions.
+- [ ] 255. **Operation List Grouper**: Filter the user list according to conditions, estimate the number of people, save the groups and export the delivery list. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add saved segment comparisons with overlap and exclusion counts.
+  - Follow-up 2: Explain membership changes between two saved segment snapshots.
+- [ ] 256. **Inventory Turn Analyzer**: Import inventory and sales samples, calculate turnover days, slow-moving items and replenishment recommendations. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add seasonal demand assumptions and supplier lead times.
+  - Follow-up 2: Compare reorder plans by expected stockouts and tied-up inventory cost.
+- [ ] 257. **Channel Lead Quality Score**: Import leads from different channels, score them based on completeness, follow-up results and transaction status, and display channel rankings. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Compare channel lead quality across two selectable date windows using the same scoring rules.
+  - Follow-up 2: Export an offline HTML report with channel comparisons, score explanations, and synthetic-data labels.
+- [ ] 258. **Refund Reason Analysis Desk**: Summarize refund records, reasons, products and customer service notes to display high-frequency issues and trend changes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add hierarchical reason categories and split refunds across reasons.
+  - Follow-up 2: Compare product-period combinations and rank the causes driving refund changes.
+- [ ] 259. **Data Format Transformation Previewer**: Generate inconsistent contact-record fixtures, configure date, case, and whitespace transformations, preview changed fields, and export corrected rows. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add field transformation profiles and reversible preview examples.
+  - Follow-up 2: Export a transformation manifest showing changed fields and rejected rows.
+- [ ] 260. **Metric Incident Review Log**: Record anomalous metrics, impact, investigation steps, root causes, and follow-up actions in a searchable review log. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add metric-definition links and follow-up action dependencies.
+  - Follow-up 2: Compare recurring incidents and identify actions that remain unverified.
 
-- [ ] 541. **Simple Diagram of Indicator Lineage**: Maintain the lineage of indicators to table fields and search for downstream effects.
-- [ ] 542. **Data Quality Rule Sandbox**: Configure integrity and uniqueness rules, run the sample set and display the violating lines.
-- [ ] 543. **Dimension Degradation Detection**: Monitor the sudden increase or decrease in enumerated dimensions and triggers alarm samples.
-- [ ] 544. **Report Caliber Change Log**: Record indicator definition changes, effective versions and notification lists.
-- [ ] 545. **Buried Event Dictionary**: Event name, attributes, trigger page and owner, support for abandonment mark.
-- [ ] 546. **Data Request SLA Board**: Track intake, queue time, ownership, and delivery performance for internal data requests against an SLA.
-- [ ] 547. **Illustration Asset Version Ledger**: Maintain versions of illustration files, descriptions, tags, and change notes, compare revisions, and export a selected collection.
-- [ ] 548. **Null Value Rate Trend Monitoring**: Key fields Null value rate daily trend and threshold alarm.
-- [ ] 549. **Duplicate Primary Key Hunter**: Scan the imported table for duplicate keys and output samples and repair suggestions.
-- [ ] 550. **Data Dictionary Review Flow**: Field Definition Proposal, Comment and Approval Release.
-- [ ] 551. **Cross-system Reconciliation Difference Table**: Counting and summarizing differences on both sides, positioning and closing status.
-- [ ] 552. **Tag Coverage Dashboard**: List of user or content tag coverage and missing items.
-- [ ] 553. **Experimental Traffic Distribution Verification**: Check whether the distribution ratio deviates from the configuration and output an alarm.
-- [ ] 554. **Data Retention Policy Execution Table**: Table-level retention days, last cleanup, and next schedule.
-- [ ] 555. **CSV Schema Drift Detection**: Compare historical upload schemas and mark new or missing columns.
-- [ ] 556. **Audience List Deduplication and Merge**: Import an audience list, identify likely duplicates using configurable rules, preview proposed merges, and require manual confirmation.
-- [ ] 557. **Funnel Step Configurator**: The system visually configure event steps and windows, and preview conversions.
-- [ ] 558. **Data Alarm Acknowledgment Desk**: Alarm distribution, acknowledgment, processing notes and recurrence marks.
-- [ ] 559. **Metric Anomaly Explanation Notes**: Capture anomaly conclusions and chart snapshots as searchable notes with links to supporting evidence.
-- [ ] 560. **Permission Row-level Policy Directory**: Define row-level filtering rules for datasets, document the applicable roles, and provide a searchable policy directory.
+- [ ] 541. **Simple Diagram of Indicator Lineage**: Maintain the lineage of indicators to table fields and search for downstream effects. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add transformation notes and effective versions to lineage edges.
+  - Follow-up 2: Show downstream indicators affected by a selected field-definition change.
+- [ ] 542. **Data Quality Rule Sandbox**: Configure integrity and uniqueness rules, run the sample set and display the violating lines. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add severity levels and accepted-exception examples.
+  - Follow-up 2: Compare rule revisions and show newly accepted or rejected sample rows.
+- [ ] 543. **Dimension Degradation Detection**: Monitor the sudden increase or decrease in enumerated dimensions and triggers alarm samples. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add expected enumeration catalogs and configurable change thresholds.
+  - Follow-up 2: Compare periods and explain categories driving distribution changes.
+- [ ] 544. **Report Caliber Change Log**: Record indicator definition changes, effective versions and notification lists. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add sample calculations and affected-report links.
+  - Follow-up 2: Generate a migration checklist for reports using an older indicator definition.
+- [ ] 545. **Product Event Dictionary**: Maintain event names, required properties, triggering pages, owners, versions, and deprecation notes using generated product-event fixtures. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add required property sets and event-version history.
+  - Follow-up 2: Report pages with missing events or obsolete property definitions.
+- [ ] 546. **Data Request SLA Board**: Track intake, queue time, ownership, and delivery performance for internal data requests against an SLA. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add request dependencies and configurable priority rules.
+  - Follow-up 2: Compare service periods and identify where queue time exceeds processing time.
+- [ ] 547. **Illustration Asset Version Ledger**: Maintain versions of illustration files, descriptions, tags, and change notes, compare revisions, and export a selected collection. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add illustration usage records and required export formats.
+  - Follow-up 2: Generate a publication pack with current versions and missing-format warnings.
+- [ ] 548. **Null Value Rate Trend Monitoring**: Key fields Null value rate daily trend and threshold alarm. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add per-field acceptable ranges and missing-data reason labels.
+  - Follow-up 2: Compare periods and identify fields contributing most to quality degradation.
+- [ ] 549. **Duplicate Primary Key Hunter**: Scan the imported table for duplicate keys and output samples and repair suggestions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable composite keys and preferred-row selection rules.
+  - Follow-up 2: Export a reviewable deduplication plan with retained and rejected row references.
+- [ ] 550. **Data Dictionary Review Flow**: Field Definition Proposal, Comment and Approval Release. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add required reviewers by data domain and unresolved-comment states.
+  - Follow-up 2: Generate a publication-readiness report for incomplete field definitions.
+- [ ] 551. **Cross-system Reconciliation Difference Table**: Counting and summarizing differences on both sides, positioning and closing status. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable matching keys and tolerance rules.
+  - Follow-up 2: Group unresolved differences by cause and export a reconciliation worksheet.
+- [ ] 552. **Tag Coverage Dashboard**: List of user or content tag coverage and missing items. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add required tag sets for each content category.
+  - Follow-up 2: Compare snapshots and list items whose tag coverage improved or regressed.
+- [ ] 553. **Experimental Traffic Distribution Verification**: Check whether the distribution ratio deviates from the configuration and output an alarm. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add expected allocation ranges and minimum sample requirements.
+  - Follow-up 2: Compare synthetic experiment periods and explain deviations without combining cohorts.
+- [ ] 554. **Data Retention Policy Execution Table**: Table-level retention days, last cleanup, and next schedule. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add cleanup preview counts and exception retention dates.
+  - Follow-up 2: Generate a policy review showing overdue cleanup and expired exceptions.
+- [ ] 555. **CSV Schema Drift Detection**: Compare historical upload schemas and mark new or missing columns. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add type-change detection and accepted schema versions.
+  - Follow-up 2: Generate a migration worksheet for files incompatible with the selected schema.
+- [ ] 556. **Audience List Deduplication and Merge**: Import an audience list, identify likely duplicates using configurable rules, preview proposed merges, and require manual confirmation. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add field-level merge choices and source-priority rules.
+  - Follow-up 2: Export a merge audit identifying every source row and retained field value.
+- [ ] 557. **Funnel Step Configurator**: The system visually configure event steps and windows, and preview conversions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add optional steps and configurable conversion windows.
+  - Follow-up 2: Compare funnel definitions and show which sample journeys change classification.
+- [ ] 558. **Data Alarm Acknowledgment Desk**: Alarm distribution, acknowledgment, processing notes and recurrence marks. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add acknowledgment deadlines and recurring-alert links.
+  - Follow-up 2: Compare handling periods and list repeated alerts without completed follow-up actions.
+- [ ] 559. **Metric Anomaly Explanation Notes**: Capture anomaly conclusions and chart snapshots as searchable notes with links to supporting evidence. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add hypothesis labels and links to confirming observations.
+  - Follow-up 2: Generate a review packet distinguishing supported explanations from open questions.
+- [ ] 560. **Dataset Filter Preset Directory**: Generate small business datasets, define reusable row-filter conditions, document intended use, and explain which synthetic rows match each preset. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable dataset filter presets with explicit match explanations.
+  - Follow-up 2: Compare filter revisions and list synthetic rows entering or leaving each segment.
 
 ## 20. Creator Business and Community Operations (40 topics)
 > Practice areas: content planning, fan operation, commercialization process, feedback closed loop.
 
-- [ ] 261. **Creator Topic Pool**: Collect inspiration, platform, target audience, asset status and release time to support progress from idea to release.
-- [ ] 262. **Content Performance Review Platform**: Input multi-platform playback, interaction, conversion and notes to display popular content features and review conclusions.
-- [ ] 263. **Sponsorship Cooperation Manager**: Track brands, quotes, deliverables, contract nodes, payments and reviews to avoid missing out on cooperation.
-- [ ] 264. **Community Events Calendar**: Manage live broadcasts, check-ins, draws, sharing sessions and registration status, and display upcoming community events.
-- [ ] 265. **Fan Question Collection Box**: Collect questions from comments and private messages, cluster them by topic, track reply status, and turn recurring themes into an FAQ.
-- [ ] 266. **E-book Sales Backend**: Manage books, orders, discount codes, download permissions and refund status, and display sales trends.
-- [ ] 267. **Course Chapter Publisher**: Maintain course chapters, materials, publishing status, student feedback and update plans to help creators deliver at a pace.
-- [ ] 268. **Live Broadcast Process Prompt Board**: Prepare live broadcast links, words, product links, interactive reminders and review records, and support advancement by time.
-- [ ] 269. **Member Content Permission Table**: Manage membership levels, content packages, expiration times and access records to facilitate checking whether the rights and interests are correct.
-- [ ] 270. **Podcast Program Schedule Table**: Record guests, topics, recording time, editing status, release channels and promotional materials.
-- [ ] 271. **Short Video Script Workbench**: Split the opening, main body, transition and ending, manage materials, shooting status and version comparison.
-- [ ] 272. **Social Check-in Challenger**: Create challenges, member registration, daily check-ins, make-up rules and rankings, and output activity reviews.
-- [ ] 273. **Product Crowdfunding Progress Page**: Display the target amount, supporters, levels, production nodes and risk updates for public follow-up by the project party.
-- [ ] 274. **Knowledge Planet Content Index**: Organize posts, topics, essences, authors and update times to help members quickly find old content.
-- [ ] 275. **Creator Financial Summary**: Record platform income, sponsorship, costs, taxes and settlement status, and generate a monthly income view.
-- [ ] 276. **Brand Material Asset Library**: Manage logos, covers, fonts, templates and usage instructions, support downloads and version tags.
-- [ ] 277. **Comment Lottery Tool**: Import the comment list, set filtering rules, lottery quota and winning records, and generate a public results page.
-- [ ] 278. **Joint Project Collaboration Board**: Record partners, tasks, deliverables, review opinions and release time, and display the to-dos of both parties.
-- [ ] 279. **Content Redistribution Assistant**: Split a piece of content into multi-platform publishing tasks, recording the title, cover, publishing time and link.
-- [ ] 280. **Fan Growth Path Map**: Design the touch points, tasks and rights of new fans, active fans, and paying fans, and track conversions at each stage.
+- [ ] 261. **Creator Topic Pool**: Collect inspiration, platform, target audience, asset status and release time to support progress from idea to release. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add idea scoring by effort, audience fit, and available assets.
+  - Follow-up 2: Compare proposed publication queues under different weekly capacity limits.
+- [ ] 262. **Content Performance Review Platform**: Input multi-platform playback, interaction, conversion and notes to display popular content features and review conclusions. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add campaign grouping and normalized interaction-rate definitions.
+  - Follow-up 2: Compare content cohorts while keeping platform-specific metrics clearly separated.
+- [ ] 263. **Sponsorship Cooperation Manager**: Track brands, quotes, deliverables, contract nodes, payments and reviews to avoid missing out on cooperation. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add deliverable acceptance checklists and revision rounds.
+  - Follow-up 2: Generate a settlement-readiness report for completed and disputed deliverables.
+- [ ] 264. **Community Events Calendar**: Manage live broadcasts, check-ins, draws, sharing sessions and registration status, and display upcoming community events. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add event capacity and reminder schedules in a local preview queue.
+  - Follow-up 2: Compare participation across event types and identify repeated no-shows.
+- [ ] 265. **Fan Question Collection Box**: Collect questions from comments and private messages, cluster them by topic, track reply status, and turn recurring themes into an FAQ. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add question voting and links to published answers.
+  - Follow-up 2: Produce a recurring-question digest with unresolved themes and suggested FAQ placements.
+- [ ] 266. **E-book Sales Backend**: Manage books, orders, discount codes, download permissions and refund status, and display sales trends. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add edition bundles and synthetic discount-code usage limits.
+  - Follow-up 2: Reconcile local order fixtures with download entitlements and refunds.
+- [ ] 267. **Course Chapter Publisher**: Maintain course chapters, materials, publishing status, student feedback and update plans to help creators deliver at a pace. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add chapter dependencies and staged publication milestones.
+  - Follow-up 2: Generate a delivery-readiness view for missing materials and unresolved feedback.
+- [ ] 268. **Live Broadcast Process Prompt Board**: Prepare live broadcast links, words, product links, interactive reminders and review records, and support advancement by time. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add alternate run sheets for short and extended broadcasts.
+  - Follow-up 2: Compare planned and recorded segment timing and flag missed interaction cues.
+- [ ] 269. **Member Content Permission Table**: Manage membership levels, content packages, expiration times and access records to facilitate checking whether the rights and interests are correct. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add package inheritance and an entitlement explanation for sample members.
+  - Follow-up 2: Compare package revisions and preview whose content access would change.
+- [ ] 270. **Podcast Program Schedule Table**: Record guests, topics, recording time, editing status, release channels and promotional materials. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add guest preparation checklists and recording dependencies.
+  - Follow-up 2: Generate a production schedule highlighting episodes blocked by missing assets.
+- [ ] 271. **Short Video Script Workbench**: Split the opening, main body, transition and ending, manage materials, shooting status and version comparison. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add shot lists linked to script sections and estimated durations.
+  - Follow-up 2: Compare script revisions and regenerate the affected shooting checklist.
+- [ ] 272. **Social Check-in Challenger**: Create challenges, member registration, daily check-ins, make-up rules and rankings, and output activity reviews. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add team challenges and configurable tie-breaking rules.
+  - Follow-up 2: Compare participation cohorts and separate missed from excused check-ins.
+- [ ] 273. **Product Crowdfunding Progress Page**: Display the target amount, supporters, levels, production nodes and risk updates for public follow-up by the project party. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add milestone expense forecasts and fulfillment estimates.
+  - Follow-up 2: Show how funding scenarios affect production dates and supporter deliverables.
+- [ ] 274. **Knowledge Planet Content Index**: Organize posts, topics, essences, authors and update times to help members quickly find old content. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add curated reading paths and prerequisite topic links.
+  - Follow-up 2: Generate an update digest showing newly added and revised index entries.
+- [ ] 275. **Creator Financial Summary**: Record platform income, sponsorship, costs, taxes and settlement status, and generate a monthly income view. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add settlement-period reconciliation and split shared production costs.
+  - Follow-up 2: Compare monthly net income with outstanding platform settlements.
+- [ ] 276. **Brand Material Asset Library**: Manage logos, covers, fonts, templates and usage instructions, support downloads and version tags. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add asset approval states and allowed-use notes.
+  - Follow-up 2: Generate a publication asset pack with version and usage manifests.
+- [ ] 277. **Comment Lottery Tool**: Import the comment list, set filtering rules, lottery quota and winning records, and generate a public results page. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reproducible seeded draws and a preview of excluded entries.
+  - Follow-up 2: Export a draw audit with eligibility counts and alternate winners.
+- [ ] 278. **Joint Project Collaboration Board**: Record partners, tasks, deliverables, review opinions and release time, and display the to-dos of both parties. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add review dependencies and partner handoff acknowledgments.
+  - Follow-up 2: Generate a joint release checklist with unresolved cross-party commitments.
+- [ ] 279. **Content Redistribution Assistant**: Split a piece of content into multi-platform publishing tasks, recording the title, cover, publishing time and link. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add channel-specific content requirements and reusable publishing presets.
+  - Follow-up 2: Show redistribution coverage and identify channels missing required assets.
+- [ ] 280. **Fan Growth Path Map**: Design the touch points, tasks and rights of new fans, active fans, and paying fans, and track conversions at each stage. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable stage-entry rules and drop-off reasons.
+  - Follow-up 2: Compare fan cohorts and show which touch points precede progression.
 
-- [ ] 561. **Content Topic Selection Ballot Box**: Fans vote for topics, showing the trend of votes and the final schedule.
-- [ ] 562. **Member Renewal Redemption Sequence**: Configure reminder copywriting and channels before expiration, and track redemption results.
-- [ ] 563. **Peripheral Product Inventory Board**: SKU inventory, pre-sale and replenishment reminders, associated promotion nodes.
-- [ ] 564. **Community Welcome Flow Arrangement**: New member welcome steps, tasks and reward marks.
-- [ ] 565. **Co-branded Content Rights Table**: Record the number of exposures, materials and acceptance status of the partner.
-- [ ] 566. **Live Broadcast Gift Thank You List**: Import the reward list to generate thank you scripts and pinned lists.
-- [ ] 567. **Column Update Commitment Board**: Show readers the update frequency commitment and actual delivery.
-- [ ] 568. **Fan Submission Review Desk**: Submission queue, review comments and adoption status.
-- [ ] 569. **Offline Meeting Registration Verification**: Registration, sign-in code and material collection records.
-- [ ] 570. **Content Licensing Library**: External licensing scope, period and renewal reminder.
-- [ ] 571. **Classified Handling of Community Violations**: Rule levels, handling actions and appeal records.
-- [ ] 572. **Coursework Peer Evaluation Board**: Students’ mutual evaluation tasks, scoring rubrics and display of excellent assignments.
-- [ ] 573. **Acceptance of Brand Cooperation Materials**: List of deliverables, revision rounds and final confirmation.
-- [ ] 574. **Multi-platform Fan Growth Experiment**: Record experimental hypotheses, actions and growth results.
-- [ ] 575. **Knowledge Base Paid Chapter Access Control**: Chapter permissions, trial reading and unlocking records (demo).
-- [ ] 576. **Creator Tax Folder**: Collect invoices and income voucher lists (data management, non-tax calculation).
-- [ ] 577. **Activity Volunteer Recruitment Page**: Position, registration review and shift confirmation.
-- [ ] 578. **Content Calendar Conflict Detection**: Multiple accounts publish calendars to detect collisions and empty windows.
-- [ ] 579. **Fan Badge Achievement System**: Define badge conditions, issuance records and display wall.
-- [ ] 580. **Podcast Ad Insertion Schedule**: Bind advertising slots to customers and podcast episodes, track availability, and prevent overselling.
+- [ ] 561. **Content Topic Selection Ballot Box**: Fans vote for topics, showing the trend of votes and the final schedule. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add weighted topic categories and a fixed publication capacity.
+  - Follow-up 2: Compare the vote ranking with the final schedule and record override reasons.
+- [ ] 562. **Member Renewal Redemption Sequence**: Configure reminder copywriting and channels before expiration, and track redemption results. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add local reminder-preview stages and editable message templates.
+  - Follow-up 2: Compare synthetic renewal cohorts by reminder stage and recorded response.
+- [ ] 563. **Peripheral Product Inventory Board**: SKU inventory, pre-sale and replenishment reminders, associated promotion nodes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add preorder reservations and supplier lead-time assumptions.
+  - Follow-up 2: Compare restocking plans by shortage risk and leftover inventory.
+- [ ] 564. **Community Welcome Flow Arrangement**: New member welcome steps, tasks and reward marks. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add conditional welcome steps based on selected interests.
+  - Follow-up 2: Compare completion cohorts and identify steps where new members stop progressing.
+- [ ] 565. **Co-branded Content Rights Table**: Record the number of exposures, materials and acceptance status of the partner. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add partner-specific acceptance checklists and revision allowances.
+  - Follow-up 2: Generate a settlement-readiness report for outstanding collaboration deliverables.
+- [ ] 566. **Live Broadcast Gift Thank You List**: Import the reward list to generate thank you scripts and pinned lists. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add grouping rules and editable thank-you message templates.
+  - Follow-up 2: Export a review queue showing unresolved names and duplicate reward entries.
+- [ ] 567. **Column Update Commitment Board**: Show readers the update frequency commitment and actual delivery. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add planned exception weeks and replacement publication dates.
+  - Follow-up 2: Compare promised and actual delivery while keeping announced exceptions visible.
+- [ ] 568. **Fan Submission Review Desk**: Submission queue, review comments and adoption status. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reviewer assignment and rubric-based submission scores.
+  - Follow-up 2: Compare review rounds and report submissions awaiting a final decision.
+- [ ] 569. **Offline Meeting Registration Verification**: Registration, sign-in code and material collection records. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add attendance groups and per-person material entitlements.
+  - Follow-up 2: Reconcile registrations, arrivals, and collected materials after the simulated meeting.
+- [ ] 570. **Content Licensing Library**: External licensing scope, period and renewal reminder. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add usage records and territory or format restrictions.
+  - Follow-up 2: Generate a renewal review showing works with upcoming usage expirations.
+- [ ] 571. **Classified Handling of Community Violations**: Rule levels, handling actions and appeal records. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reviewer assignment and linked community rule references.
+  - Follow-up 2: Compare handling outcomes and list appeals awaiting a response.
+- [ ] 572. **Coursework Peer Evaluation Board**: Students’ mutual evaluation tasks, scoring rubrics and display of excellent assignments. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add anonymous peer assignment rules and minimum review counts.
+  - Follow-up 2: Compare rubric scores and identify assignments lacking enough independent reviews.
+- [ ] 573. **Acceptance of Brand Cooperation Materials**: List of deliverables, revision rounds and final confirmation. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add deliverable dependencies and revision-round budgets.
+  - Follow-up 2: Generate a final acceptance packet containing outstanding comments and approved versions.
+- [ ] 574. **Multi-platform Fan Growth Experiment**: Record experimental hypotheses, actions and growth results. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable success criteria and comparison periods.
+  - Follow-up 2: Compare experiments while showing sample sizes and platform-specific measurement definitions.
+- [ ] 575. **Course Chapter Editorial Progress**: Track fictional course chapters, sample reading sections, editorial reviews, required materials, and publication-readiness states without entitlement systems. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add chapter release milestones and required editorial assets.
+  - Follow-up 2: Generate a publication-readiness report for chapters with missing reviews or materials.
+- [ ] 576. **Creator Tax Folder**: Collect invoices and income voucher lists (data management, non-tax calculation). Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add document categories and monthly completeness checklists.
+  - Follow-up 2: Export an accountant handoff index listing missing or duplicate supporting documents.
+- [ ] 577. **Activity Volunteer Recruitment Page**: Position, registration review and shift confirmation. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add role requirements and volunteer availability windows.
+  - Follow-up 2: Compare shift assignments and generate individual confirmation sheets.
+- [ ] 578. **Content Calendar Conflict Detection**: Multiple accounts publish calendars to detect collisions and empty windows. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add channel lead times and owner availability.
+  - Follow-up 2: Compare adjustment plans by publication gaps and rescheduled content volume.
+- [ ] 579. **Fan Badge Achievement System**: Define badge conditions, issuance records and display wall. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add prerequisite achievements and repeat-award rules.
+  - Follow-up 2: Explain badge eligibility for each bundled member profile.
+- [ ] 580. **Podcast Ad Insertion Schedule**: Bind advertising slots to customers and podcast episodes, track availability, and prevent overselling. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add advertiser category exclusions and placement buffers.
+  - Follow-up 2: Compare insertion plans by remaining inventory and unfulfilled advertiser commitments.
 
 ## 21. Operations, Testing, and Delivery Assurance (40 topics)
 > Practice areas: operation observation, quality inspection, release process, fault recovery.
 
-- [ ] 281. **Scheduled Task Result Panel**: Import job execution records, show the latest result and duration, filter failures, and compare trends across recurring jobs.
-- [ ] 282. **Interface Smoke Test Bench**: Maintain interfaces, request samples, expected results and recent execution status, suitable for quick verification before release.
-- [ ] 283. **Release Window Calendar**: Record version, owner, freezing period, release time and rollback contact to avoid conflicting releases.
-- [ ] 284. **Rollback Drill Checklist**: Maintain the system, rollback steps, verification points, drill records and risk items to help the team drill regularly.
-- [ ] 285. **Configuration Change Approval Desk**: Submit configuration items, impact scope, approvers, release time and verification results, and keep change records.
-- [ ] 286. **Alert Noise Reduction Rule Builder**: Define alert triggers, silence windows, grouping rules, and routing behavior, then preview which alerts would be merged.
-- [ ] 287. **Fault Timeline Recorder**: Record time points, events, owners and decisions during fault handling, and export the review timeline afterwards.
-- [ ] 288. **Dependent Service Status Wall**: Display third-party services, recent status, scope of impact, and alternatives for customer service and R&D to view.
-- [ ] 289. **Test Case Review Desk**: Manage requirements, test points, use cases, review comments and execution status to help QA track coverage.
-- [ ] 290. **Defect Lifecycle Dashboard**: Record defects, severity, owner, fixed version and verification status, and display backlog trends.
-- [ ] 291. **Post-release Inspection Assistant**: Generate inspection items, owners, results and anomaly notes based on versions, and support unified confirmation after release.
-- [ ] 292. **Log Sample Annotator**: Import log fragments, annotate levels, modules, error types and handling suggestions, and accumulate troubleshooting data.
-- [ ] 293. **Capacity Estimator**: Enter user counts, request volume, data growth, and retention periods to estimate capacity trends and highlight risks.
-- [ ] 294. **Change Impact Diagram**: Maintain services, interfaces, queues and dependencies, and display the possible impact scope after entering changes.
-- [ ] 295. **Environment Consistency Checker**: Compare configuration items and versions of development, testing, and production, and mark differences and items to be confirmed.
-- [ ] 296. **Canary Release Monitoring Board**: Track canary cohorts, traffic percentages, metric thresholds, pause conditions, and the result of each rollout stage.
-- [ ] 297. **Data Backup Acceptance Form**: Manage backup tasks, latest success time, recovery drills and exception records, and remind backups that have not been verified for a long time.
-- [ ] 298. **Documentation Correction Tracker**: Register document issues, affected pages, owners, deadlines, and review results, and display overdue corrections.
-- [ ] 299. **Automated Job Runbook**: Record scheduled jobs, recent executions, duration, failure reasons, and a controlled manual rerun action for operators.
-- [ ] 300. **Release Risk Assessment Table**: Generate a release risk summary based on functional scope, data impact, dependencies, rollback difficulty, and verification plan scores.
+- [ ] 281. **Scheduled Task Result Panel**: Import job execution records, show the latest result and duration, filter failures, and compare trends across recurring jobs. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add expected job schedules and missing-run detection.
+  - Follow-up 2: Compare job reliability across two periods and rank duration regressions.
+- [ ] 282. **Interface Smoke Test Bench**: Maintain interfaces, request samples, expected results and recent execution status, suitable for quick verification before release. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add request groups and fixture-based response assertions.
+  - Follow-up 2: Export a run comparison showing changed responses and assertion failures.
+- [ ] 283. **Release Window Calendar**: Record version, owner, freezing period, release time and rollback contact to avoid conflicting releases. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add release dependency links and blackout dates.
+  - Follow-up 2: Generate a conflict report for overlapping owners and prerequisite releases.
+- [ ] 284. **Rollback Drill Checklist**: Maintain the system, rollback steps, verification points, drill records and risk items to help the team drill regularly. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add step timing and required evidence for drill completion.
+  - Follow-up 2: Compare drills and identify steps whose recovery times repeatedly exceed targets.
+- [ ] 285. **Configuration Change Approval Desk**: Submit configuration items, impact scope, approvers, release time and verification results, and keep change records. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configuration change dependencies and scheduled review windows.
+  - Follow-up 2: Export an approval history with unresolved verification items.
+- [ ] 286. **Alert Noise Reduction Rule Builder**: Define alert triggers, silence windows, grouping rules, and routing behavior, then preview which alerts would be merged. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add grouping precedence and an explanation for each suppressed alert.
+  - Follow-up 2: Compare rule versions using identical synthetic alert streams.
+- [ ] 287. **Fault Timeline Recorder**: Record time points, events, owners and decisions during fault handling, and export the review timeline afterwards. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add linked decisions and follow-up actions to timeline events.
+  - Follow-up 2: Generate a retrospective grouped by detection, diagnosis, recovery, and prevention.
+- [ ] 288. **Dependent Service Status Wall**: Display third-party services, recent status, scope of impact, and alternatives for customer service and R&D to view. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add local status scenarios and user-facing impact descriptions.
+  - Follow-up 2: Compare incident periods and show which fallback options were selected.
+- [ ] 289. **Test Case Review Desk**: Manage requirements, test points, use cases, review comments and execution status to help QA track coverage. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add requirement traceability and reusable test-step templates.
+  - Follow-up 2: Report requirements with missing cases or unresolved reviewer comments.
+- [ ] 290. **Defect Lifecycle Dashboard**: Record defects, severity, owner, fixed version and verification status, and display backlog trends. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reopening reasons and time-in-stage measurements.
+  - Follow-up 2: Compare release cohorts and identify recurring defect escape patterns.
+- [ ] 291. **Post-release Inspection Assistant**: Generate inspection items, owners, results and anomaly notes based on versions, and support unified confirmation after release. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add inspection templates by changed product area.
+  - Follow-up 2: Generate a readiness summary that distinguishes missing evidence from failed checks.
+- [ ] 292. **Log Sample Annotator**: Import log fragments, annotate levels, modules, error types and handling suggestions, and accumulate troubleshooting data. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reusable annotation labels and reviewer disagreements.
+  - Follow-up 2: Produce a sample-quality report identifying unlabeled and inconsistently labeled fragments.
+- [ ] 293. **Capacity Estimator**: Enter user counts, request volume, data growth, and retention periods to estimate capacity trends and highlight risks. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add growth scenarios and configurable storage overhead assumptions.
+  - Follow-up 2: Compare capacity forecasts and show which assumptions drive each threshold crossing.
+- [ ] 294. **Change Impact Diagram**: Maintain services, interfaces, queues and dependencies, and display the possible impact scope after entering changes. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add dependency criticality and optional fallback paths.
+  - Follow-up 2: Compare change plans and list milestones affected by a failed dependency.
+- [ ] 295. **Environment Consistency Checker**: Compare configuration items and versions of development, testing, and production, and mark differences and items to be confirmed. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add approved-difference rules and explicit expiration dates.
+  - Follow-up 2: Compare environment snapshots and report newly introduced configuration differences.
+- [ ] 296. **Staged Feature Rollout Checklist**: Track feature rollout stages, demo cohorts, evidence thresholds, pause decisions, and stage outcomes using local fixture records without traffic manipulation. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add staged feature checklists with entry and exit criteria.
+  - Follow-up 2: Simulate a rollout calendar and report which stage is blocked by missing evidence.
+- [ ] 297. **Data Backup Acceptance Form**: Manage backup tasks, latest success time, recovery drills and exception records, and remind backups that have not been verified for a long time. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add recovery-test evidence and expected retention periods.
+  - Follow-up 2: Generate a verification calendar for backups lacking recent recovery checks.
+- [ ] 298. **Documentation Correction Tracker**: Register document issues, affected pages, owners, deadlines, and review results, and display overdue corrections. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add issue dependencies and reusable correction templates.
+  - Follow-up 2: Compare review periods and show unresolved documentation hotspots.
+- [ ] 299. **Automated Job Runbook**: Record scheduled jobs, recent executions, duration, failure reasons, and a controlled manual rerun action for operators. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add prerequisite checks and a preview of local rerun parameters.
+  - Follow-up 2: Compare runbook revisions and identify jobs missing recovery instructions.
+- [ ] 300. **Release Risk Assessment Table**: Generate a release risk summary based on functional scope, data impact, dependencies, rollback difficulty, and verification plan scores. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable risk weights and reviewer override explanations.
+  - Follow-up 2: Compare release assessments and show which evidence changes the risk rating.
 
 ---
 
-- [ ] 581. **Canary Watch List**: Record canary indicators, observation windows and promotion or rollback decisions.
-- [ ] 582. **Synthetic Monitoring Script Library**: Manage critical path synthetic detection scripts, frequency and failure screenshots.
-- [ ] 583. **Release Notes Assembler**: Assemble draft release notes from PR labels, group changes by type, and attach concise risk warnings.
-- [ ] 584. **Disaster Recovery Switching Checklist**: Switching steps, verification points and communication templates, supporting drill mode.
-- [ ] 585. **Hot Configuration Update Audit**: Record each hot configuration update, operator, validation result, and rollback point.
-- [ ] 586. **Test Environment Reservation Calendar**: Reserve shared test environments, detect conflicts, show current ownership, and remind teams to release unused reservations.
-- [ ] 587. **Defect Clustering Dashboard**: Cluster defects by module and error signature to display hot spots.
-- [ ] 588. **Page Render Baseline Comparator**: Import local page-render timing samples, compare percentiles across versions, highlight slower pages, and export a performance report.
-- [ ] 589. **Dependency Service Drill Switch**: Simulate dependency fault switch and record the drill results.
-- [ ] 590. **Release Window Conflict Radar**: Visualize release windows across teams and highlight overlapping dependencies and schedule risks.
-- [ ] 591. **Log Sampling Policy Configuration**: Configure module sampling rate and retention period, and estimate storage usage.
-- [ ] 592. **Alarm Routing Simulator**: Enter alarm samples, preview notifications to people or groups, and upgrade chains.
-- [ ] 593. **Artifact Promotion Pipeline**: Show an artifact's promotion from development through staging to production, including status, evidence, and approval records.
-- [ ] 594. **One-Click Rollback Drill**: Run a rollback playbook in dry-run mode against a staging environment and report the duration and result of each step.
-- [ ] 595. **Test Data Reset Tool**: Reset environment seed data with one click, record version and executor.
-- [ ] 596. **Capacity Water Level Weekly Report**: Summarize CPU and storage water levels and growth forecasts (sample) to generate a weekly report.
-- [ ] 597. **Change Freeze Calendar**: Maintain change-freeze windows and exception approvals, and warn when a planned release conflicts with a freeze.
-- [ ] 598. **Smoke Use Case Priority Wall**: Smoke set ranking, recent failures and owners.
-- [ ] 599. **Release Stage Progress Panel**: Display deliverables moving through draft, review, staging, and completion, with owner notes, timestamps, and stage summaries.
-- [ ] 600. **Deliverable Acceptance Checker**: Validate evidence links against an acceptance checklist, flag missing proof, and generate a release decision report.
+- [ ] 581. **Feature Rollout Observation List**: Record local rollout stages, evidence indicators, observation windows, and promotion or hold decisions without controlling real traffic. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add stage-specific evidence requirements and observation deadlines.
+  - Follow-up 2: Generate a progression report explaining which rollout stages remain blocked.
+- [ ] 582. **Local User Journey Fixture Library**: Build bundled local demo pages, define critical-path browser journeys, capture checkpoint results, and organize failure screenshots without external services. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add bundled demo-page journeys and screenshot checkpoints.
+  - Follow-up 2: Compare journey attempts and show the first failed checkpoint.
+- [ ] 583. **Release Notes Assembler**: Assemble draft release notes from PR labels, group changes by type, and attach concise risk warnings. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add customer-facing wording rules and editable grouping templates.
+  - Follow-up 2: Compare release-note drafts and preserve approved manual descriptions.
+- [ ] 584. **Local Recovery Drill Checklist**: Use a dependency-free example app and local file fixtures to rehearse recovery steps, verification points, and communication templates in dry-run mode. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add drill prerequisites and communication acknowledgment states.
+  - Follow-up 2: Generate a recovery review showing incomplete steps and elapsed recovery time.
+- [ ] 585. **Hot Configuration Update Audit**: Record each hot configuration update, operator, validation result, and rollback point. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add related configuration groups and required verification evidence.
+  - Follow-up 2: Compare change records and identify updates without a verified rollback point.
+- [ ] 586. **Test Environment Reservation Calendar**: Reserve shared test environments, detect conflicts, show current ownership, and remind teams to release unused reservations. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add reservation priorities and setup buffers.
+  - Follow-up 2: Compare proposed bookings and identify avoidable unused reservation time.
+- [ ] 587. **Defect Clustering Dashboard**: Cluster defects by module and error signature to display hot spots. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable defect labels and manual cluster corrections.
+  - Follow-up 2: Compare releases and show new versus recurring defect groups.
+- [ ] 588. **Page Render Baseline Comparator**: Import local page-render timing samples, compare percentiles across versions, highlight slower pages, and export a performance report. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add per-page performance budgets and minimum sample counts.
+  - Follow-up 2: Compare versions and attribute overall slowdown to specific page groups.
+- [ ] 589. **Dependency Failure Scenario Desk**: Simulate dependency availability with local fixture functions, select failure and recovery scenarios, and record expected fallback outcomes without real service disruption. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add dependency-specific local failure scenarios and expected fallbacks.
+  - Follow-up 2: Compare drill runs and report fallback behaviors without a verified outcome.
+- [ ] 590. **Release Window Conflict Radar**: Visualize release windows across teams and highlight overlapping dependencies and schedule risks. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add prerequisite release links and shared-owner availability.
+  - Follow-up 2: Generate a revised release calendar minimizing dependency and ownership conflicts.
+- [ ] 591. **Log Sampling Policy Configuration**: Configure module sampling rate and retention period, and estimate storage usage. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add module-specific event sizes and burst assumptions.
+  - Follow-up 2: Compare sampling profiles by projected storage and retained diagnostic coverage.
+- [ ] 592. **Alarm Routing Simulator**: Enter alarm samples, preview notifications to people or groups, and upgrade chains. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add escalation delays and quiet-window rules.
+  - Follow-up 2: Replay a synthetic alert timeline and explain each simulated recipient decision.
+- [ ] 593. **Artifact Promotion Pipeline**: Show an artifact's promotion from development through staging to production, including status, evidence, and approval records. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add prerequisite evidence and approval ownership per promotion stage.
+  - Follow-up 2: Generate a readiness view listing artifacts blocked by missing evidence.
+- [ ] 594. **Local Rollback Dry-Run Desk**: Create local app-version and data fixtures, preview a rollback playbook, simulate each step, and record duration and expected outcome without touching a real environment. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add local drill prerequisites and expected step outcomes.
+  - Follow-up 2: Compare dry-run attempts and show rollback steps exceeding their time targets.
+- [ ] 595. **Test Data Reset Tool**: Reset environment seed data with one click, record version and executor. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add named seed versions and a preview of affected local tables.
+  - Follow-up 2: Compare reset results and report rows that differ from the selected seed manifest.
+- [ ] 596. **Capacity Water Level Weekly Report**: Summarize CPU and storage water levels and growth forecasts (sample) to generate a weekly report. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add configurable growth scenarios and capacity thresholds.
+  - Follow-up 2: Compare forecasts and identify the assumptions behind each projected threshold crossing.
+- [ ] 597. **Change Freeze Calendar**: Maintain change-freeze windows and exception approvals, and warn when a planned release conflicts with a freeze. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add exception expiration dates and linked release commitments.
+  - Follow-up 2: Generate a review of planned changes that still conflict with freeze periods.
+- [ ] 598. **Smoke Use Case Priority Wall**: Smoke set ranking, recent failures and owners. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add requirement coverage and configurable priority weights.
+  - Follow-up 2: Compare smoke suites and explain coverage lost when reducing the run budget.
+- [ ] 599. **Release Stage Progress Panel**: Display deliverables moving through draft, review, staging, and completion, with owner notes, timestamps, and stage summaries. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add stage prerequisites and deliverable acceptance owners.
+  - Follow-up 2: Compare milestone snapshots and show items whose progress stalled.
+- [ ] 600. **Deliverable Acceptance Checker**: Validate evidence links against an acceptance checklist, flag missing proof, and generate a release decision report. Start immediately in an empty workspace: create and label synthetic demo records, files, and visual or audio placeholders as needed; bundle everything for a local end-to-end demo without uploads, credentials, external services, or hardware. Choose reasonable defaults and document them.
+  - Follow-up 1: Add required evidence types and reviewer disposition notes.
+  - Follow-up 2: Generate a final decision packet distinguishing missing, rejected, and accepted proof.
 
 ## Progress
 

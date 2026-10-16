@@ -22,6 +22,7 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--legacy-control-image")
     parser.add_argument("--legacy-account-image")
+    parser.add_argument("--followups-only", action="store_true")
     args = parser.parse_args()
     if bool(args.legacy_control_image) != bool(args.legacy_account_image):
         parser.error("旧布局验证需要同时提供旧 control/account 镜像")
@@ -59,7 +60,7 @@ def main() -> None:
                     "V3_ACCOUNT_MEMORY": "1536m", "V3_ACCOUNT_SWAP": "2048m",
                     "VERIFY_LEGACY_CONTROL_IMAGE": args.legacy_control_image or "",
                     "VERIFY_LEGACY_ACCOUNT_IMAGE": args.legacy_account_image or "",
-                    "VERIFY_SOURCE_ROOT": str(repository)},
+                    "VERIFY_SOURCE_ROOT": str(repository), "VERIFY_FOLLOWUPS_ONLY": "1" if args.followups_only else "0"},
                 volumes={str(repository): {"bind": "/source", "mode": "ro"}, str(fixtures): {"bind": "/fixtures", "mode": "ro"},
                     str(root): {"bind": "/verify", "mode": "rw"}, "/var/run/docker.sock": {"bind": "/var/run/docker.sock", "mode": "rw"}})
             result = runner.wait(timeout=480)
