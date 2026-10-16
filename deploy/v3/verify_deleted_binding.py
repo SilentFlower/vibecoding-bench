@@ -81,6 +81,7 @@ def deleted_binding_fixture(client, deployment, data, manifest, browser, base, a
             :param session_id: 本次浏览器页面。
             :return: None；不满足验收时立即失败。
             """
+            nonlocal gid
             doc = "document.querySelector('iframe').contentDocument"
             win = "document.querySelector('iframe').contentWindow"
             await wait_for(f"Boolean({doc}?.querySelector('[data-cc2-unbind=\"{aid}\"]') && {doc}.querySelector('#accounts-body').onclick)")
@@ -115,9 +116,46 @@ def deleted_binding_fixture(client, deployment, data, manifest, browser, base, a
                 assert database.execute('SELECT environment_id,fingerprint_json FROM account_environments WHERE account_id=?', (aid,)).fetchone() == original_environment
                 assert database.execute('SELECT state FROM account_environments WHERE account_id=?', (aid,)).fetchone()[0] == 'stopped'
             assert browser.delete(base + f'/runtime/api/accounts/{aid}/cc2api-binding', timeout=30).status_code == 200
+            # 目录和设备保留，解绑后的 HOME 必须接管原管理侧完整凭据。
+            for path in protected:
+                expected = original_files[str(profile / '.credentials.json')] if path == home / '.claude/.credentials.json' else original_files[str(path)]
+                assert json.loads(path.read_text()) == expected
+            # 驱动真实 scheduler/runner/容器收尾，仅替换 OAuth 探测返回失败，不发真实上游请求。
+            script = '''import main,docker,json
+from unittest.mock import patch
+from account_runtime import AccountRuntime
+runtime=AccountRuntime(docker.from_env(),main.BENCH_DATA,main.HOST_BENCH_DATA,main.get_db,main.derive_v3_fingerprint,main.cc2api_client)
+main.account_runtime=runtime
+runner=main.Runner()
+try:
+ with patch.object(main,'_read_account_oauth_status',return_value={'oauth_token_state':'expired'}), patch.object(runner,'_exec_oauth_refresh_probe',return_value={'error':'synthetic refresh failure'}) as probe:
+  main.OAuthRefreshScheduler(runner)._tick()
+  assert probe.call_count==1,'后台刷新没有实际执行'
+ assert not runtime.jobs,'刷新失败后作业未收口'
+finally:
+ runtime.heartbeat_pool.shutdown()
+ runtime.client.close()
+ runner.client.close()
+'''
+            failed_refresh = orchestrator.exec_run(['python', '-c', script])
+            assert failed_refresh.exit_code == 0, '合成刷新失败收尾未通过'
+            assert json.loads((profile / '.credentials.json').read_text())['claudeAiOauth']['refreshToken'] == credentials['claudeAiOauth']['refreshToken']
+            with sqlite3.connect(data / 'bench/db.sqlite') as database:
+                assert database.execute('SELECT oauth_refresh_last_status FROM accounts WHERE id=?', (aid,)).fetchone()[0] == 'failed'
+            assert not (env_root / 'runtime/execution.json').exists()
+            # 再次点击真实创建按钮，确认后续使用边界也能读取 RT，而非只验即时快照。
+            await evaluate(f"{doc}.querySelector('[data-cc2-create=\"{aid}\"]').click()")
+            await wait_for(f"Boolean({doc}.querySelector('[data-cc2-unbind=\"{aid}\"]'))")
+            assert not await evaluate(f"{win}.__unbindAlerts")
+            with sqlite3.connect(data / 'bench/db.sqlite') as database:
+                gid = database.execute('SELECT cc2api_account_id FROM accounts WHERE id=?', (aid,)).fetchone()[0]
+                assert gid is not None
+                assert database.execute('SELECT environment_id,fingerprint_json FROM account_environments WHERE account_id=?', (aid,)).fetchone() == original_environment
+            with sqlite3.connect(data / 'gateway/gateway.sqlite') as database:
+                assert database.execute('SELECT count(*) FROM accounts WHERE id=?', (gid,)).fetchone()[0] == 1
             assert all(json.loads(path.read_text()) == original_files[str(path)] for path in protected)
             assert not (network_data / 'usage-calls.jsonl').exists(), '解绑不应查询上游额度'
-            print('通过：正式远端删除→调度器重启→真实页面解绑 HTTP 200→SQLite 清空绑定/关闭养号→创建/关联按钮恢复；重复解绑及 HOME/凭据/设备保留')
+            print('通过：创建/绑定→远端删除→调度器重启→页面解绑→完整 RT 交接→真实后台刷新失败收尾→再次页面创建成功；绑定后 HOME 恢复 AT-only，原身份与两库一致')
 
         yield exercise
     finally:

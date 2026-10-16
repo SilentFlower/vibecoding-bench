@@ -10,7 +10,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from unittest.mock import Mock, patch
 
-from account_runtime import AccountRuntime
+from account_runtime import AccountRuntime, atomic_json
 import main
 
 
@@ -96,23 +96,209 @@ class DeletedBindingTests(unittest.TestCase):
         self.assertEqual(1, sum('/admin/accounts?' in path for method, path in self.paths))
         self.assertFalse(any(method == 'POST' for method, path in self.paths))
 
-    def test_unbind_preserves_home_profile_and_device_identity(self) -> None:
-        """悬空解绑保留原 HOME、设备及本地凭据内容，不重建账号。@return None。"""
+    def _credential_files(self) -> dict:
+        """准备与生产一致的管理完整凭据及同账号 AT-only HOME。"""
         profile = self.root / 'profiles/synthetic'
         home = self.runtime._root(self.row) / 'home'
-        values = {profile / '.credentials.json': {'claudeAiOauth': {'accessToken': 'profile-at', 'refreshToken': 'profile-rt'}},
-            home / '.claude/.credentials.json': {'claudeAiOauth': {'accessToken': 'home-at'}},
-            profile / '.claude.json': {'userID': 'd' * 64}, home / '.claude.json': {'userID': 'd' * 64}}
+        full = {'claudeAiOauth': {'accessToken': 'profile-at', 'refreshToken': 'profile-rt', 'expiresAt': 1}}
+        top = {'userID': 'd' * 64, 'oauthAccount': {'accountUuid': 'synthetic-account'}}
+        values = {profile / '.credentials.json': full,
+            home / '.claude/.credentials.json': {'claudeAiOauth': {'accessToken': 'home-at', 'expiresAt': 1}},
+            profile / '.claude.json': top, home / '.claude.json': top}
         for path, value in values.items():
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(value))
+        return values
+
+    def test_unbind_preserves_home_profile_and_device_identity(self) -> None:
+        """悬空解绑保留身份，并把管理侧完整凭据交接给原 AT-only HOME。@return None。"""
+        values = self._credential_files()
+        home = self.runtime._root(self.row) / 'home'
         original = self.runtime._row('synthetic', 1)
         main.delete_account_cc2api_binding(1)
         after = self.runtime._row('synthetic', 1)
         self.assertEqual(original['environment_id'], after['environment_id'])
         self.assertEqual(original['fingerprint_json'], after['fingerprint_json'])
+        values[home / '.claude/.credentials.json'] = values[self.root / 'profiles/synthetic/.credentials.json']
         for path, value in values.items():
             self.assertEqual(value, json.loads(path.read_text()))
+
+    def test_unbind_then_failed_local_job_cleanup_keeps_refresh_token(self) -> None:
+        """真实解绑后模拟失败作业收尾，完整凭据不能再次降级。@return None。"""
+        self._credential_files()
+        main.delete_account_cc2api_binding(1)
+        with closing(main.get_db()) as database:
+            account = dict(database.execute('SELECT * FROM accounts WHERE id=1').fetchone())
+        row = self.runtime._row('synthetic', 1)
+        job = self.runtime.claim(row, account, 'oauth-refresh:synthetic-failure', exclusive=True)
+        try:
+            self.runtime.sync_credentials(row, account)
+            raise RuntimeError('synthetic refresh failed')
+        except RuntimeError:
+            pass
+        finally:
+            self.runtime.release(job)
+        profile = self.root / 'profiles/synthetic/.credentials.json'
+        self.assertEqual('profile-rt', json.loads(profile.read_text())['claudeAiOauth']['refreshToken'])
+
+    def test_local_rotation_survives_sync_cleanup_and_repeated_unbind(self) -> None:
+        """本地已经轮换后的 HOME 不得被旧 profile 或重复解绑回滚。@return None。"""
+        self._credential_files()
+        main.delete_account_cc2api_binding(1)
+        home = self.runtime._root(self.row) / 'home/.claude/.credentials.json'
+        rotated = {'claudeAiOauth': {'accessToken': 'rotated-at', 'refreshToken': 'rotated-rt', 'expiresAt': 2}, 'preserved': True}
+        home.write_text(json.dumps(rotated))
+        with closing(main.get_db()) as database:
+            account = dict(database.execute('SELECT * FROM accounts WHERE id=1').fetchone())
+        self.runtime.sync_credentials(self.row, account)
+        job = self.runtime.claim(self.row, account, 'synthetic-rotation')
+        self.runtime.release(job)
+        main.delete_account_cc2api_binding(1)
+        self.assertEqual(rotated, json.loads(home.read_text()))
+        self.assertEqual(rotated, json.loads((self.root / 'profiles/synthetic/.credentials.json').read_text()))
+
+    def test_legacy_unbound_at_only_home_requires_matching_token_and_identity(self) -> None:
+        """旧空绑定可补同一 AT 的 RT，未知来源与损坏文件不能猜测合并。@return None。"""
+        files = self._credential_files()
+        profile = self.root / 'profiles/synthetic/.credentials.json'
+        home = self.runtime._root(self.row) / 'home/.claude/.credentials.json'
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': None}
+        with self.assertRaisesRegex(ValueError, '来源不能确认'):
+            self.runtime.sync_credentials(self.row, account)
+        self.assertEqual(files[profile], json.loads(profile.read_text()))
+        home.write_text(json.dumps({'claudeAiOauth': {'accessToken': 'profile-at', 'expiresAt': 1}, 'home_setting': True}))
+        self.runtime.sync_credentials(self.row, account)
+        self.assertEqual('profile-rt', json.loads(home.read_text())['claudeAiOauth']['refreshToken'])
+        self.assertTrue(json.loads(home.read_text())['home_setting'])
+        for broken in ('{', '[]', '{"claudeAiOauth":null}'):
+            with self.subTest(broken=broken):
+                home.write_text(broken)
+                with self.assertRaises(ValueError):
+                    self.runtime.sync_credentials(self.row, account)
+                self.assertEqual(files[profile], json.loads(profile.read_text()))
+                self.assertEqual(broken, home.read_text())
+
+    def test_incomplete_home_cleanup_preserves_full_profile_and_execution_proof(self) -> None:
+        """异常 HOME 不可降级覆盖完整 profile，失败保留对账证明。@return None。"""
+        files = self._credential_files()
+        profile = self.root / 'profiles/synthetic/.credentials.json'
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': None}
+        job = self.runtime.claim(self.row, account, 'synthetic-bad-home', exclusive=True)
+        with self.assertRaisesRegex(ValueError, '本地 OAuth 凭据不完整'):
+            self.runtime.release(job)
+        self.assertEqual(files[profile], json.loads(profile.read_text()))
+        self.assertEqual('reconcile', self.runtime._row('synthetic', 1)['state'])
+        self.assertTrue((self.runtime._root(self.row) / 'runtime/execution.json').exists())
+
+    def test_bound_sync_and_cleanup_keep_refresh_token_private(self) -> None:
+        """绑定期间重复发布及作业收尾仍只向运行 HOME 提供 AT。@return None。"""
+        files = self._credential_files()
+        profile = self.root / 'profiles/synthetic/.credentials.json'
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7}
+        self.remote_status = 200
+        self.runtime.sync_credentials(self.row, account)
+        job = self.runtime.claim(self.row, account, 'synthetic-bound')
+        self.runtime.release(job)
+        for path in [self.runtime._root(self.row) / 'home/.claude/.credentials.json', self.runtime._root(self.row) / 'runtime/access/.credentials.json']:
+            self.assertNotIn('refreshToken', json.loads(path.read_text())['claudeAiOauth'])
+        self.assertEqual(files[profile], json.loads(profile.read_text()))
+
+    def test_partial_handoff_is_not_success_and_repeated_unbind_recovers(self) -> None:
+        """DB 已提交后文件故障必须隔离，重试继续原交接而不丢 RT。@return None。"""
+        self._credential_files()
+        access = self.runtime._root(self.row) / 'runtime/access/.credentials.json'
+
+        def write(path, value, *args, **kwargs):
+            """仅模拟发布运行副本失败，其余原子写入保持真实。"""
+            if path == access:
+                raise OSError('synthetic disk failure')
+            return atomic_json(path, value, *args, **kwargs)
+
+        with patch('account_runtime.atomic_json', side_effect=write):
+            with self.assertRaises(OSError):
+                main.delete_account_cc2api_binding(1)
+        self.assertIsNone(self._binding()[0])
+        self.assertEqual('reconcile', self.runtime._row('synthetic', 1)['state'])
+        self.assertEqual({'ok': True}, main.delete_account_cc2api_binding(1))
+        self.assertEqual('profile-rt', json.loads(access.read_text())['claudeAiOauth']['refreshToken'])
+        self.assertEqual('stopped', self.runtime._row('synthetic', 1)['state'])
+
+    def test_home_write_failure_survives_restart_until_explicit_retry(self) -> None:
+        """HOME 尚未写入时的中断保留来源证明，启动对账不得静默清除。@return None。"""
+        self._credential_files()
+        home = self.runtime._root(self.row) / 'home/.claude/.credentials.json'
+        marker = self.runtime._root(self.row) / 'runtime/credential-handoff.json'
+
+        def write(path, value, *args, **kwargs):
+            """模拟 HOME 原子写入失败，意图记录仍正常落盘。"""
+            if path == home:
+                raise OSError('synthetic HOME disk failure')
+            return atomic_json(path, value, *args, **kwargs)
+
+        with patch('account_runtime.atomic_json', side_effect=write):
+            with self.assertRaises(OSError):
+                main.delete_account_cc2api_binding(1)
+        self.assertTrue(marker.exists())
+        self.assertEqual(0o600, marker.stat().st_mode & 0o777)
+        self.assertNotIn('profile-rt', marker.read_text())
+        self.runtime.reconcile()
+        self.assertEqual('reconcile', self.runtime._row('synthetic', 1)['state'])
+        self.assertEqual({'ok': True}, main.delete_account_cc2api_binding(1))
+        self.assertFalse(marker.exists())
+        self.assertEqual('profile-rt', json.loads(home.read_text())['claudeAiOauth']['refreshToken'])
+
+    def test_pending_handoff_refuses_changed_profile_and_new_binding(self) -> None:
+        """意图提交后来源变化或改绑目标不能沿用旧交接证明。@return None。"""
+        self._credential_files()
+        with closing(main.get_db()) as database:
+            account = dict(database.execute('SELECT * FROM accounts WHERE id=1').fetchone())
+        with self.assertRaisesRegex(RuntimeError, 'synthetic DB failure'):
+            with self.runtime.owner_transition(account, None):
+                raise RuntimeError('synthetic DB failure')
+        marker = self.runtime._root(self.row) / 'runtime/credential-handoff.json'
+        self.assertTrue(marker.exists())
+        with self.assertRaisesRegex(ValueError, '交接记录或来源已变化'):
+            with self.runtime.owner_transition(account, 8):
+                self.fail('未完成交接不能改绑')
+        profile = self.root / 'profiles/synthetic/.credentials.json'
+        changed = {'claudeAiOauth': {'accessToken': 'newer-at', 'refreshToken': 'newer-rt', 'expiresAt': 2}}
+        profile.write_text(json.dumps(changed))
+        with self.assertRaises(main.HTTPException):
+            main.delete_account_cc2api_binding(1)
+        self.assertEqual(7, self._binding()[0])
+        self.assertEqual(changed, json.loads(profile.read_text()))
+        self.assertTrue(marker.exists())
+
+    def test_existing_remote_unbind_uses_same_complete_handoff(self) -> None:
+        """正常远端解绑也交接 RT，保留原 prepare/release 门禁。@return None。"""
+        self._credential_files()
+        self.remote_status = 200
+        self.assertEqual({'ok': True}, main.delete_account_cc2api_binding(1))
+        home = self.runtime._root(self.row) / 'home/.claude/.credentials.json'
+        self.assertEqual('profile-rt', json.loads(home.read_text())['claudeAiOauth']['refreshToken'])
+        self.assertEqual(2, sum(method == 'POST' for method, path in self.paths))
+
+    def test_unbind_identity_conflict_preserves_binding_and_credentials(self) -> None:
+        """交接前身份不符应拒绝，不能先清空绑定。@return None。"""
+        profile = self.root / 'profiles/synthetic'
+        home = self.runtime._root(self.row) / 'home'
+        files = {profile / '.credentials.json': {'claudeAiOauth': {'accessToken': 'synthetic-at', 'refreshToken': 'synthetic-rt', 'expiresAt': 1}},
+            home / '.claude/.credentials.json': {'claudeAiOauth': {'accessToken': 'synthetic-at', 'expiresAt': 1}},
+            profile / '.claude.json': {'userID': 'd' * 64, 'oauthAccount': {'accountUuid': 'first'}},
+            home / '.claude.json': {'userID': 'd' * 64, 'oauthAccount': {'accountUuid': 'second'}}}
+        for path, value in files.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(value))
+        for full_home in (False, True):
+            with self.subTest(full_home=full_home):
+                if full_home:
+                    files[home / '.claude/.credentials.json'] = files[profile / '.credentials.json']
+                    (home / '.claude/.credentials.json').write_text(json.dumps(files[profile / '.credentials.json']))
+                with self.assertRaises(main.HTTPException):
+                    main.delete_account_cc2api_binding(1)
+                self.assertEqual(7, self._binding()[0])
+                for path, value in files.items():
+                    self.assertEqual(value, json.loads(path.read_text()))
 
     def test_delete_local_account_with_deleted_remote_binding(self) -> None:
         """本地删除复用相同收口规则，不依赖已经删除的远端。@return None。"""
@@ -120,6 +306,14 @@ class DeletedBindingTests(unittest.TestCase):
         self.assertTrue(result['ok'])
         with closing(main.get_db()) as database:
             self.assertIsNone(database.execute('SELECT id FROM accounts WHERE id=1').fetchone())
+
+    def test_delete_local_account_does_not_require_usable_credentials(self) -> None:
+        """显式删除不应要求先修复缺 RT 的损坏凭据，仍停止旧实例。@return None。"""
+        profile = self.root / 'profiles/synthetic/.credentials.json'
+        profile.parent.mkdir(parents=True)
+        profile.write_text('{"claudeAiOauth":{"accessToken":"synthetic-expired"}}')
+        self.assertTrue(main.delete_account(1)['ok'])
+        self.container.stop.assert_called_once_with(timeout=5)
 
     def test_remote_deletion_between_status_and_prepare_still_unbinds(self) -> None:
         """GET 后删除导致 prepare 404 时仍须确认列表缺失并完成本地收口。@return None。"""

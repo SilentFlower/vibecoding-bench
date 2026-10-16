@@ -487,20 +487,23 @@ AccountStore::update_cli_process(account: &Account, process: &Value) -> Result<(
 - 正式镜像继续跑 `verify_stack.py --browser --reauth`，核对原 ID、AT-only HOME、完整 profile、六项策略/TTL、错误登录/取消/草稿恢复及旧哨兵。页面驱动等首次列表事件处理器就绪，避免人为并发初始查询；失败保留脱敏证据。
 - `cargo fmt --check && cargo test`、Python 全量及前端构建保持。可用账号的真实 Anthropic 推理单独验收，不用测试替身/生产非模型 200 冒充。
 
-## Scenario: cc2api 删除后的悬空绑定收口
+## Scenario: cc2api 删除后的悬空绑定收口与凭据交接
 
 ### 1. Scope / Trigger
 
-- 修改 v3 解绑、正式账号删除或 `owner_transition` 时适用。远端账号已删除不应让本地绑定永久无法解除；明确不存在与服务不可达必须区分。
+- 修改 v3 解绑、正式账号删除、`owner_transition`、运行凭据发布或作业收尾时适用。远端删除的收口与本地刷新权交接必须同时完成。
 
 ### 2. Signatures
 
 ```text
 DELETE /api/accounts/{aid}/cc2api-binding -> {ok: true}
 DELETE /api/accounts/{aid}
-AccountRuntime.owner_transition(account: dict, target_id: int | None)
+AccountRuntime.owner_transition(account: dict, target_id: int | None, *, handoff_credentials: bool = True)
+AccountRuntime.sync_credentials(row: dict, account: dict, *, take_ownership: bool = False) -> None
 Cc2ApiClient.list_accounts(*, require_complete: bool = False) -> list[dict]
 GET /admin/accounts?page=<从1开始的页号>&page_size=100
+runtime/credential-handoff.json -> {schema: 1, account_id, environment_id,
+                                   previous_binding, profile_sha256}
 ```
 
 ### 3. Contracts
@@ -509,7 +512,10 @@ GET /admin/accounts?page=<从1开始的页号>&page_size=100
 - 404 后再次成功读取完整账号列表，确认原 ID 不存在，才跳过已删除账号的远端门禁；原账号仍存在或列表读取失败时拒绝。新目标、改绑和正常远端账号继续严格查询、prepare、检查占用，并在事务后 release。
 - 缺失证明调用 `list_accounts(require_complete=True)`：`page/page_size/total/total_pages` 为真实整数，页号匹配当前页、容量为 100、total 非负、页数为 ceil(total/100)，每页行数匹配应有数量；每行 ID 为正整数且全量去重后数量等于 total。空列表的 total/total_pages 均为 0。坏行不得静默过滤，不能只查第一页；普通列表调用默认保持原兼容行为。
 - owner 锁内重读绑定并沿用 active run（含 quota_wait）、续聊、登录保护；环境作业和实际发送器仍须空闲。发送器状态未知也拒绝。确认空闲后停止旧容器、写 stopped，再由现有 SQLite 事务清空绑定和关闭未来养号，不能直接改库绕过收口。
-- 解绑保留原账号、环境 ID、固化画像、HOME 和本地凭据，沿用既有本地发布规则，不调用远端 OAuth resolve/refresh、不创建远端账号。重复空闲解绑返回成功。调度器重启后因旧绑定缺失进入待对账，也可通过同一显式解绑路径安全收口。
+- 解绑保留原账号、环境 ID、固化画像、HOME 和本地凭据。绑定期间管理 profile 持有完整镜像，HOME/access 只发布 AT；解除绑定后显式 `take_ownership=True` 把完整 AT/RT/expiry 交接给同账号 HOME，不调用远端 OAuth resolve/refresh 或自动创建账号。主入口持有 owner → profile → environment 锁序。重复空闲解绑返回成功，旧绑定缺失造成的待对账也可用同一显式入口收口。
+- 本地完整凭据要求 AT/RT 均为非空字符串，expiry 为排除 bool 的有限正数且小于 2^53，允许已过期但结构完整。已有独立 HOME 的完整 RT 是轮换权威，不被旧 profile 回滚。给 AT-only HOME 补 RT 前核对两侧非空字符串 userID/accountUuid 相同；普通补齐还须 AT/expiry 完全相同，显式解绑才可交接原管理侧的更新快照。文件/身份损坏或来源冲突保留现有秘密并拒绝猜测合并。
+- 交接资料先校验，停止旧实例后、DB 提交前原子写 0600 的无令牌意图记录；DB 和 HOME/access 全部发布完成才删除。记录校验账号/环境/原绑定与原管理文件 SHA256；来源变化或改绑目标拒绝。中断保持 reconcile，启动 reconcile/ensure 不能绕过记录；重复显式解绑验证原证明后续办，不能假报成功。
+- 正式未绑定账号的 `release` 仅把完整 HOME 凭据原子镜像回 profile；AT-only、缺字段或坏 JSON 拒绝回写并保留执行证明/隔离，不能抹除已有 RT。未提交草稿没有正式 account_id，不回写正式 profile。显式本地账号删除用 `handoff_credentials=False`，保留原占用与停止门禁，不要求先修复失效 RT；旧 warmup 的 null 继续表示保留绑定。
 
 ### 4. Validation & Error Matrix
 
@@ -521,14 +527,22 @@ GET /admin/accounts?page=<从1开始的页号>&page_size=100
 | 本地 run/续聊/登录/环境作业或发送器占用/未知 | 拒绝，不中断活动发送 |
 | 新目标缺失或改绑遇缺失原账号 | 继续严格拒绝，不使用解绑例外 |
 | 已解绑的空闲账号再次解绑 | 200，不创建远端账号 |
+| profile 完整、HOME AT-only、身份一致 | 解绑后 HOME 接管 RT，绑定空、养号 off |
+| 未绑定 HOME 已有新完整 AT/RT | 保留轮换结果，收尾镜像回 profile |
+| HOME 不完整/损坏、来源或身份不符 | 不降级覆盖管理凭据；交接前拒绝或收尾隔离 |
+| DB 已解绑但 HOME/access 写入失败 | 保留交接记录与 reconcile，重复解绑可续办 |
+| 交接记录来源变化、启动/普通唤醒/再次改绑 | 保留记录并拒绝自动放行 |
+| 显式删除本地账号但凭据失效 | 无需交接 RT，仍按原空闲/停止/删除规则执行 |
 
 ### 5. Scenarios and Examples
 
 - 正常：先在 cc2api 删除账号，再从 bench 点击解绑；确认无原 ID、停止旧实例后清空本地关联，页面恢复“创建 cc2api 账号”和“关联已有账号”。
 - 基础：远端在 lease GET 与 prepare 之间删除；确认完整列表缺失后按相同本地空闲规则收口。重启调度器不改变该显式恢复入口。
 - 错误用法：捕获所有管理请求异常后直接 UPDATE 本地绑定。正确处理：限定原 ID 的真实 404，并核对完整列表与本地发送器，不把“查不到”一概当作删除证明。
+- 错误用法：解绑后继续优先已有 AT-only HOME，再在后台刷新失败的 finally 中覆盖 profile。正确处理：解绑时交接完整凭据，收尾前验证完整性，验收到下一次真实使用边界。
 
 ### 6. Tests Required
 
-- `test_deleted_binding.py`：真实管理客户端异常链与 SQLite，覆盖删除后/重复解绑、本地删除、GET/prepare 间删除、HTTP/网络拒绝、坏分页/后续页仍存在、本地/发送器占用及未知、正常门禁、HOME/profile/设备保留。既有 active run/续聊/登录和并发 owner 锁测试保持。
-- `verify_stack.py --manifest <同批正式清单> --browser --deleted-binding`：随机隔离部署，正式 cc2api DELETE → orchestrator 重启 → Chrome 点击解绑，核对 200、两库、恢复按钮、重复调用、原 HOME/凭据/画像和停止状态；不访问真实 OAuth/usage/模型，只清理本次标签资源，旧哨兵不变。
+- `test_deleted_binding.py`：真实异常链/SQLite/运行时，保持原门禁回归，增加正常/悬空解绑 RT 交接、失败作业收尾、独立轮换、旧 AT-only 同源补齐、坏文件/身份冲突、HOME/access 写入故障、重启保留意图及重复恢复、来源变化/改绑拒绝，以及本地删除不依赖 RT。
+- `test_login_drafts.py`：合成成功凭据具备真实 CLI 的 expiry；未提交 AT-only 草稿仍可取消，不污染正式 profile，保存失败和重试门禁保持。
+- `verify_stack.py --manifest <同批正式清单> --browser --deleted-binding`：随机部署经正式创建/绑定、远端删除、重启与页面解绑，核对两库和 RT 交接；真实 scheduler/runner/容器执行仅替换 OAuth 探测为失败，收尾后再次页面创建成功，HOME 回到 AT-only。保留原身份、统一会话/退出与旧哨兵验证，不访问真实 OAuth/usage/模型，只清理本次标签资源。

@@ -308,6 +308,8 @@ class AccountRuntime:
             if draft_path.exists() and json.loads(draft_path.read_text()).get("phase") == "submitting" and not allow_login_recovery:
                 raise ValueError("原登录保存尚未完成，请先继续登录提交")
             root = self._root(row)
+            if (root / "runtime/credential-handoff.json").exists():
+                raise ValueError("解绑凭据交接尚未完成，请再次解绑完成交接")
             root.mkdir(parents=True, exist_ok=True, mode=0o700)
             for name in ("home", "projects", "workspaces", "flows", "controls", "ca", "cli", "runtime"):
                 (root / name).mkdir(exist_ok=True, mode=0o700)
@@ -430,23 +432,84 @@ class AccountRuntime:
             host = f"[{host}]"
         return f"{scheme}://{credentials}{host}:{int(account.get('upstream_socks5_port') or 1080)}"
 
-    def sync_credentials(self, row: dict, account: dict) -> None:
-        """发布 AT-only 运行凭据，完整 RT 副本留在管理目录。
+    @staticmethod
+    def _local_oauth(credentials: dict) -> dict:
+        """校验本地刷新所有者的完整凭据，错误不包含秘密。"""
+        oauth = credentials.get("claudeAiOauth") if isinstance(credentials, dict) else None
+        if (not isinstance(oauth, dict)
+                or any(not isinstance(oauth.get(key), str) or not oauth[key].strip()
+                    for key in ("accessToken", "refreshToken"))
+                or type(oauth.get("expiresAt")) not in (int, float)
+                or not 0 < oauth["expiresAt"] < 2 ** 53):
+            raise ValueError("本地 OAuth 凭据不完整，请恢复同账号完整凭据或重新授权")
+        return oauth
+
+    def _local_credentials(self, row: dict, account: dict, take_ownership: bool = False) -> dict | None:
+        """选择本地权威凭据，仅在已证明来源一致时补齐 AT-only HOME。"""
+        profile = self.data / "profiles" / account["name"]
+        path = profile / ".credentials.json"
+        if not path.exists():
+            return None
+        home = self._root(row) / "home"
+        destination = home / ".claude/.credentials.json"
+        try:
+            credentials = json.loads(path.read_text())
+            if not destination.exists():
+                self._local_oauth(credentials)
+                return credentials
+            current = json.loads(destination.read_text())
+            oauth = current.get("claudeAiOauth") if isinstance(current, dict) else None
+            if not isinstance(oauth, dict):
+                raise ValueError("本地 HOME 凭据损坏，请恢复同账号完整凭据或重新授权")
+            if oauth.get("refreshToken"):
+                self._local_oauth(current)
+                # 独立运行后的 HOME 持有轮换结果，旧管理副本不能回滚它。
+                if not take_ownership:
+                    return current
+            source = self._local_oauth(credentials)
+            identities = [json.loads((folder / ".claude.json").read_text()) for folder in (profile, home)]
+            expected = identities[0]
+            if (not isinstance(expected, dict) or not isinstance(identities[1], dict)
+                    or not isinstance(expected.get("userID"), str) or not expected["userID"]
+                    or not isinstance(expected.get("oauthAccount"), dict)
+                    or not isinstance(expected["oauthAccount"].get("accountUuid"), str)
+                    or not expected["oauthAccount"]["accountUuid"]
+                    or identities[1].get("userID") != expected["userID"]
+                    or not isinstance(identities[1].get("oauthAccount"), dict)
+                    or identities[1]["oauthAccount"].get("accountUuid") != expected["oauthAccount"]["accountUuid"]):
+                raise ValueError("本地 HOME 与管理凭据账号身份不一致，请先核对或重新授权")
+            if oauth.get("refreshToken"):
+                if (any(not secrets.compare_digest(oauth[key], source[key])
+                        for key in ("accessToken", "refreshToken")) or oauth["expiresAt"] != source["expiresAt"]):
+                    raise ValueError("解绑前 HOME 存在独立凭据，请先核对凭据所有权")
+                return current
+            if not take_ownership and (not isinstance(oauth.get("accessToken"), str)
+                    or not secrets.compare_digest(oauth["accessToken"], source["accessToken"])
+                    or oauth.get("expiresAt") != source["expiresAt"]):
+                raise ValueError("本地 HOME 凭据来源不能确认，请恢复同账号完整凭据或重新授权")
+            # 显式解绑可交接原管理所有者的最新快照；普通修复只补同一 AT 的 RT。
+            return {**current, **credentials, "claudeAiOauth": {**oauth, **source}}
+        except (OSError, ValueError) as error:
+            if isinstance(error, ValueError) and not isinstance(error, json.JSONDecodeError):
+                raise
+            raise ValueError("本地凭据或账号身份文件无法读取，请检查后重新授权") from None
+
+    def sync_credentials(self, row: dict, account: dict, *, take_ownership: bool = False) -> None:
+        """绑定时发布 AT-only；未绑定时保留完整的本地刷新所有者。
 
         :param row: 固定环境
         :param account: bench 账号
+        :param take_ownership: 显式从原 cc2api 绑定接管本地刷新权
         :return: None
         """
         profile = self.data / "profiles" / account["name"]
         path = profile / ".credentials.json"
         if not path.exists():
             return
-        credentials = json.loads(path.read_text())
+        credentials = (self._local_credentials(row, account, take_ownership)
+            if account.get("cc2api_account_id") is None else json.loads(path.read_text()))
         home = self._root(row) / "home"
         destination = home / ".claude" / ".credentials.json"
-        if account.get("cc2api_account_id") is None and destination.exists():
-            # 未绑定时固定 HOME 是唯一运行所有者，不能用旧 profile 覆盖轮换后的 RT。
-            credentials = json.loads(destination.read_text())
         if account.get("cc2api_account_id") is not None:
             credentials.get("claudeAiOauth", {}).pop("refreshToken", None)
         atomic_json(destination, credentials)
@@ -502,17 +565,34 @@ class AccountRuntime:
         return self._sender_active(row) if container.status == "running" else 0
 
     @contextmanager
-    def owner_transition(self, account: dict, target_id: int | None):
+    def owner_transition(self, account: dict, target_id: int | None, *, handoff_credentials: bool = True):
         """在绑定切换整个事务期间关闭两端门禁并撤销旧发送实例。
 
         :param account: 切换前的 bench 账号
         :param target_id: 新 cc2api 绑定，None 表示解绑或删除
+        :param handoff_credentials: 本地账号删除无需交接凭据，其余切换保留发布
         :return: 持有环境锁与远端门禁的上下文
         """
         with self._account_lock(account):
             row = self._row(account["name"], account["id"])
             if row["environment_id"] in self.jobs:
                 raise ValueError("账号环境正在执行工作，不能切换绑定")
+            handoff = self._root(row) / "runtime/credential-handoff.json"
+            profile = self.data / "profiles" / account["name"] / ".credentials.json"
+            take_ownership = handoff_credentials and account.get("cc2api_account_id") is not None and target_id is None
+            if handoff_credentials and handoff.exists():
+                try:
+                    pending = json.loads(handoff.read_text())
+                    valid = (isinstance(pending, dict) and pending.get("schema") == 1
+                        and pending.get("account_id") == account["id"]
+                        and pending.get("environment_id") == row["environment_id"]
+                        and account.get("cc2api_account_id") in (None, pending.get("previous_binding"))
+                        and pending.get("profile_sha256") == hashlib.sha256(profile.read_bytes()).hexdigest())
+                except (OSError, ValueError):
+                    valid = False
+                if target_id is not None or not valid:
+                    raise ValueError("解绑凭据交接记录或来源已变化，请先核对同账号凭据")
+                take_ownership = True
             leases = []
             try:
                 for account_id in sorted({int(value) for value in (account.get("cc2api_account_id"), target_id) if value is not None}):
@@ -536,6 +616,10 @@ class AccountRuntime:
                         raise ValueError("账号发送连接尚未收口，不能切换绑定")
                 if self._running_sender_active(row):
                     raise ValueError("账号发送连接尚未收口，不能切换绑定")
+                local_credentials = None
+                if take_ownership:
+                    # 交接所需资料先校验，身份/完整性冲突不能先清空本地绑定。
+                    local_credentials = self._local_credentials(row, account, True)
                 if row.get("container_id"):
                     try:
                         self._container(row).stop(timeout=5)
@@ -543,14 +627,29 @@ class AccountRuntime:
                         pass
                 # 已解析的旧 API 请求只能遇到停止的实例；下一唤醒轮换秘密和代次。
                 self._update(row, state="stopped")
+                if local_credentials is not None and not handoff.exists():
+                    # 先持久化无令牌意图，再提交 DB；跨文件失败可由重复解绑接着完成。
+                    atomic_json(handoff, {"schema": 1, "account_id": account["id"],
+                        "environment_id": row["environment_id"], "previous_binding": account["cc2api_account_id"],
+                        "profile_sha256": hashlib.sha256(profile.read_bytes()).hexdigest()})
                 yield
                 connection = self.database()
                 try:
                     current = connection.execute("SELECT * FROM accounts WHERE id=?", (account["id"],)).fetchone()
                 finally:
                     connection.close()
-                if current:
-                    self.sync_credentials(row, dict(current))
+                if current and handoff_credentials:
+                    try:
+                        self.sync_credentials(row, dict(current), take_ownership=take_ownership)
+                    except Exception:
+                        # DB 已提交而文件未收口时保留隔离，重复解绑可重新完成发布。
+                        self._update(row, state="reconcile")
+                        raise
+                handoff.unlink(missing_ok=True)
+            except Exception:
+                if handoff.exists():
+                    self._update(row, state="reconcile")
+                raise
             finally:
                 for path, lease in reversed(leases):
                     try:
@@ -677,10 +776,12 @@ class AccountRuntime:
                 if job.get("exclusive", True) and self._running_sender_active(row):
                     raise ValueError("账号发送连接尚未收口")
                 self._restore_cli_quota(job)
-                if job["account"].get("cc2api_account_id") is None:
+                if row.get("account_id") is not None and job["account"].get("cc2api_account_id") is None:
                     credentials = self._root(row) / "home" / ".claude" / ".credentials.json"
                     if credentials.exists():
-                        atomic_json(self.data / "profiles" / row["name"] / ".credentials.json", json.loads(credentials.read_text()))
+                        current = json.loads(credentials.read_text())
+                        self._local_oauth(current)
+                        atomic_json(self.data / "profiles" / row["name"] / ".credentials.json", current)
                 self._lease(job, "release")
                 (self._root(row) / "runtime" / "execution.json").unlink(missing_ok=True)
                 if row["state"] == "cli_reconcile":
@@ -1886,6 +1987,8 @@ class AccountRuntime:
             except NotFound:
                 container = None
             try:
+                if (self._root(row) / "runtime/credential-handoff.json").exists():
+                    raise ValueError("解绑凭据交接未完成，需要再次显式解绑")
                 commit_path = self._root(row) / "runtime" / "login-commit.json"
                 if commit_path.exists():
                     self._reconcile_login_import(row, container, commit_path)

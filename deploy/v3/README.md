@@ -67,7 +67,7 @@ python3 deploy/v3/verify_warmup_quota.py --manifest /absolute/path/release.json
 python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --warmup-quota
 # 关联重授权的页面/WS/tmux/凭据落盘演练，使用专用合成账号和本地代理
 python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --reauth
-# 原 cc2api 账号删除后，从真实页面解绑并交叉核对 SQLite、身份和重复调用。
+# 原 cc2api 删除后页面解绑、RT 交接、后台刷新失败收尾及再次创建，交叉核对两库和原身份。
 python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --deleted-binding
 ```
 

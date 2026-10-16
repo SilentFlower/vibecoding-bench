@@ -7835,20 +7835,23 @@ def _require_oauth_owner_transition_idle(account: dict) -> None:
 
 
 @contextmanager
-def _runtime_owner_transition(account: dict, target_id: Optional[int], needed: bool = True):
+def _runtime_owner_transition(account: dict, target_id: Optional[int], needed: bool = True,
+    *, handoff_credentials: bool = True):
     """在所有权事务期间协调固定环境和两端 API 门禁。
 
     :param account: 修改前账号
     :param target_id: 修改后绑定，None 表示解绑或删除
     :param needed: 是否实际修改所有权
+    :param handoff_credentials: 显式删除本地账号时不发布运行凭据
     :return: 持有相应门禁的上下文
     """
     if not account_runtime or not needed:
         yield
         return
     try:
-        with account_runtime.owner_transition(account, target_id):
-            yield
+        with _profile_lock(account["name"]):
+            with account_runtime.owner_transition(account, target_id, handoff_credentials=handoff_credentials):
+                yield
     except (ValueError, ConnectionError) as exc:
         raise HTTPException(409, _redact_cc2api_error(exc))
 
@@ -8512,7 +8515,7 @@ def delete_account(aid: int):
             conn.close()
         if account.get("cc2api_account_id") is not None:
             _require_oauth_owner_transition_idle(account)
-        with _runtime_owner_transition(account, None):
+        with _runtime_owner_transition(account, None, handoff_credentials=False):
             with _db_lock:
                 conn = get_db()
                 try:

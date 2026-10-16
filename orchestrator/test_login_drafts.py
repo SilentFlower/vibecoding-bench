@@ -116,7 +116,7 @@ class LoginDraftTests(unittest.TestCase):
         resumed = main.resume_login_draft(self.row["environment_id"], main.LoginDraftActionIn(generation=draft["generation"]))
         self.assertEqual(resumed["session_id"], first["session_id"])
         self.assertNotEqual(resumed["draft_generation"], draft["generation"])
-        atomic_json(session.profile_dir / ".credentials.json", {"claudeAiOauth": {"accessToken": "synthetic", "refreshToken": "synthetic-rt"}})
+        atomic_json(session.profile_dir / ".credentials.json", {"claudeAiOauth": {"accessToken": "synthetic", "refreshToken": "synthetic-rt", "expiresAt": int(time.time() * 1000) + 3600000}})
         self.manager.auth_status.return_value = {"loggedIn": True}
         self.manager.persist_top_config = Mock()
         self.assertIn("id", main.login_commit(session.sid, main.LoginStartIn(name=session.name)))
@@ -162,7 +162,7 @@ class LoginDraftTests(unittest.TestCase):
         first = self._start()
         sid = first["session_id"]
         session = self.manager.get(sid)
-        atomic_json(session.profile_dir / ".credentials.json", {"claudeAiOauth": {"accessToken": "synthetic", "refreshToken": "synthetic-rt"}})
+        atomic_json(session.profile_dir / ".credentials.json", {"claudeAiOauth": {"accessToken": "synthetic", "refreshToken": "synthetic-rt", "expiresAt": int(time.time() * 1000) + 3600000}})
         self.manager.auth_status.return_value = {"loggedIn": True}
         self.manager.persist_top_config = Mock()
         with patch.object(self.manager, "persist_profile_files", side_effect=OSError("synthetic IO")):
@@ -187,7 +187,7 @@ class LoginDraftTests(unittest.TestCase):
         """实际请求线程竞争 owner 锁，提交先完成时删除拒绝正式环境。@return None。"""
         first = self._start()
         session = self.manager.get(first["session_id"])
-        atomic_json(session.profile_dir / ".credentials.json", {"claudeAiOauth": {"accessToken": "synthetic", "refreshToken": "synthetic-rt"}})
+        atomic_json(session.profile_dir / ".credentials.json", {"claudeAiOauth": {"accessToken": "synthetic", "refreshToken": "synthetic-rt", "expiresAt": int(time.time() * 1000) + 3600000}})
         self.manager.auth_status.return_value = {"loggedIn": True}
         self.manager.persist_top_config = Mock()
         draft = main.list_login_drafts()[0]
@@ -232,7 +232,7 @@ class LoginDraftTests(unittest.TestCase):
         """DB 已保存但 HOME 未完成时，新登录不得绕过原提交门禁。@return None。"""
         first = self._start()
         session = self.manager.get(first["session_id"])
-        atomic_json(session.profile_dir / ".credentials.json", {"claudeAiOauth": {"accessToken": "synthetic", "refreshToken": "synthetic-rt"}})
+        atomic_json(session.profile_dir / ".credentials.json", {"claudeAiOauth": {"accessToken": "synthetic", "refreshToken": "synthetic-rt", "expiresAt": int(time.time() * 1000) + 3600000}})
         self.manager.auth_status.return_value = {"loggedIn": True}
         self.manager.persist_top_config = Mock()
         with patch.object(self.runtime, "commit_login", side_effect=OSError("synthetic HOME failure")):
