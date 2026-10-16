@@ -1,0 +1,661 @@
+{
+  "id": "v3-unbind-credential-handoff",
+  "name": "v3-unbind-credential-handoff",
+  "title": "修复解绑后的 refresh token 所有权交接与凭据降级覆盖",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-16",
+  "completedAt": "2026-10-16",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-16T01:47:59Z",
+    "blockers": []
+  },
+  "branch": "v3",
+  "base_branch": "v3",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-16T01:14:49Z",
+      "contextKey": "codex_01a13f46-c561-7bb0-8a7d-7b49ea6f998e",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "c70dc4a377fb17def783481193df1b672ba0f592",
+        "status": [
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-auto-loop/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-brainstorm/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-check-all/references/reporting-and-disposition.md"
+          },
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-meta/references/customize-local/change-workflow.md"
+          },
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-route/SKILL.md"
+          },
+          {
+            "status": "??",
+            "path": ".agents/skills/trellis-route/references/interaction.md"
+          },
+          {
+            "status": "??",
+            "path": ".agents/skills/trellis-route/references/recovery-and-errors.md"
+          },
+          {
+            "status": "??",
+            "path": ".agents/skills/trellis-route/references/subagent-dispatch.md"
+          },
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-task-brief/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-update-spec/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-auto-loop/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-brainstorm/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-check-all/references/reporting-and-disposition.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-meta/references/customize-local/change-workflow.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-route/SKILL.md"
+          },
+          {
+            "status": "??",
+            "path": ".claude/skills/trellis-route/references/interaction.md"
+          },
+          {
+            "status": "??",
+            "path": ".claude/skills/trellis-route/references/recovery-and-errors.md"
+          },
+          {
+            "status": "??",
+            "path": ".claude/skills/trellis-route/references/subagent-dispatch.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-task-brief/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-update-spec/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".codex/config.toml"
+          },
+          {
+            "status": " M",
+            "path": ".flower/plugin-lock.json"
+          },
+          {
+            "status": " M",
+            "path": ".flower/plugins.json"
+          },
+          {
+            "status": " M",
+            "path": ".trellis/scripts/flower_session_start.py"
+          },
+          {
+            "status": " M",
+            "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/account-hold-comparison.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/recovery-contracts.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/telemetry-evidence.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/worker-contracts.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/research/current-evidence.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/task.json"
+          },
+          {
+            "status": " M",
+            "path": ".trellis/workflow.md"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "c70dc4a377fb17def783481193df1b672ba0f592",
+            "status": [
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-auto-loop/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-brainstorm/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-check-all/references/reporting-and-disposition.md"
+              },
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-meta/references/customize-local/change-workflow.md"
+              },
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-route/SKILL.md"
+              },
+              {
+                "status": "??",
+                "path": ".agents/skills/trellis-route/references/interaction.md"
+              },
+              {
+                "status": "??",
+                "path": ".agents/skills/trellis-route/references/recovery-and-errors.md"
+              },
+              {
+                "status": "??",
+                "path": ".agents/skills/trellis-route/references/subagent-dispatch.md"
+              },
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-task-brief/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-update-spec/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-auto-loop/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-brainstorm/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-check-all/references/reporting-and-disposition.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-meta/references/customize-local/change-workflow.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-route/SKILL.md"
+              },
+              {
+                "status": "??",
+                "path": ".claude/skills/trellis-route/references/interaction.md"
+              },
+              {
+                "status": "??",
+                "path": ".claude/skills/trellis-route/references/recovery-and-errors.md"
+              },
+              {
+                "status": "??",
+                "path": ".claude/skills/trellis-route/references/subagent-dispatch.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-task-brief/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-update-spec/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".codex/config.toml"
+              },
+              {
+                "status": " M",
+                "path": ".flower/plugin-lock.json"
+              },
+              {
+                "status": " M",
+                "path": ".flower/plugins.json"
+              },
+              {
+                "status": " M",
+                "path": ".trellis/scripts/flower_session_start.py"
+              },
+              {
+                "status": " M",
+                "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/account-hold-comparison.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/recovery-contracts.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/telemetry-evidence.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/worker-contracts.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/research/current-evidence.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/task.json"
+              },
+              {
+                "status": " M",
+                "path": ".trellis/workflow.md"
+              }
+            ],
+            "worktreeDiffSha256": "093ac22e34f69c23b9144cfae73220c2b66421dc1faff75d0da301fdfdf434af",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [
+              {
+                "path": ".agents/skills/trellis-route/references/interaction.md",
+                "sha256": "b33bf8fe6ab7112b6b8b25a13b337e63e802d8be1a485eb7f533b5276c6a1aba"
+              },
+              {
+                "path": ".agents/skills/trellis-route/references/recovery-and-errors.md",
+                "sha256": "0ee8b43aaa3fa25252ae5b28d65db8296d4dbddb487469be09282b3118b8aa72"
+              },
+              {
+                "path": ".agents/skills/trellis-route/references/subagent-dispatch.md",
+                "sha256": "2c9b2f98c586fe9550f974f9ee9ffaecf5a65bd0f899d3b6308d3dd6b4029907"
+              },
+              {
+                "path": ".claude/skills/trellis-route/references/interaction.md",
+                "sha256": "b33bf8fe6ab7112b6b8b25a13b337e63e802d8be1a485eb7f533b5276c6a1aba"
+              },
+              {
+                "path": ".claude/skills/trellis-route/references/recovery-and-errors.md",
+                "sha256": "0ee8b43aaa3fa25252ae5b28d65db8296d4dbddb487469be09282b3118b8aa72"
+              },
+              {
+                "path": ".claude/skills/trellis-route/references/subagent-dispatch.md",
+                "sha256": "2c9b2f98c586fe9550f974f9ee9ffaecf5a65bd0f899d3b6308d3dd6b4029907"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md",
+                "sha256": "8ba4e9f26af89b42e2ce20fe88bee62e3e03bbf35a9718e02c96b7c4c27b5745"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl",
+                "sha256": "91534c2dd15014470e9266e207fea31ca117537fb0f5c74e7880d9954b2c8399"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md",
+                "sha256": "0af15a1ee3eef2ad7d75bbfeee48ce78a7a5c47a977ab65e650f68ea3e85a50d"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl",
+                "sha256": "3f8050ff392e2bb0ed37ce8865bfe3b7c4e341c8fe89c01bd643386fc186c2e1"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md",
+                "sha256": "bd30f98dafc1b6726301d7d44183be17d2f1782d63cba44ec47bffd2c875c43f"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md",
+                "sha256": "34b4876aefc2ba9cb2c345839e614f18611050f2f429e4cbf69d52dc9fb79715"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md",
+                "sha256": "1e907d1a7f469f49b46a4a9644156c8af2379164e5064b88ef069acc74b5fbc0"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md",
+                "sha256": "3b96b5901fa58216e783fafaf84f7c5e370c70aba8c2de82b5ed42bf5b6513df"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md",
+                "sha256": "95db129ed16d1a85e3ef21361ec506332a4cec902f20ec91cafa76c49a681819"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json",
+                "sha256": "53a52a996c4db18c5b422746b488099f45c1dedc4d18b245d500e92a02edcdef"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/brief.md",
+                "sha256": "b96632b24c8289b8912f782b091022a148037914057f48a591925e82dd982143"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/check.jsonl",
+                "sha256": "6a334cbc38658f19938380b89767461ca59ab44677025b5654085f075cebbcd5"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/design.md",
+                "sha256": "a50397b8ef738d04bd160907a594f00969ce2aecdbbd59a0087d567d4b395580"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.jsonl",
+                "sha256": "d289c33e827e2e5a17529626199f34a5a5bbb411451a5491e4150776cecf7428"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.md",
+                "sha256": "905c420bd2ff3d396634bd5cc2972b0504a0e0d9c28e12b1ceb53bddabef8691"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/prd.md",
+                "sha256": "17ef0f84dc4dbd14d6393b2bef47064184a7f6e2516129cce05e8a3fcc476347"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/account-hold-comparison.md",
+                "sha256": "76ba3752b38a4dc32ce8a4d2a9a6dc8f10f4bcbf5bfb6e642bb058bd16ce762c"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/recovery-contracts.md",
+                "sha256": "5b305441324f8f6c72568be289a1a7a07751f2eef77113916ac5063f6dbb002a"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/telemetry-evidence.md",
+                "sha256": "8cf11213eee1518660d1903b475964fca7710fb210865ec3fa7ab79decadf841"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/worker-contracts.md",
+                "sha256": "f89688bd7de8ff0a9eadfb4d97294660f0681ef6b97697627fe5b5eae419c649"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/task.json",
+                "sha256": "cf64ee2d3af29224a9c79d6abbf27541482ca0e090ec218b51f660b0a7fa54f5"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/brief.md",
+                "sha256": "59fe498b7e300b0f8f39e3589eb696f62f5955d3be8a352020b784d91d460f08"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/check.jsonl",
+                "sha256": "1706622e8a35e707d89458d1461251dd98e688398bc25a4945cd0d50505b3f5f"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/design.md",
+                "sha256": "f4940a74480c7c2dcdea8f5b5ffbb517cdf00c01ddd9e5f1240f1569357d7129"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.jsonl",
+                "sha256": "1706622e8a35e707d89458d1461251dd98e688398bc25a4945cd0d50505b3f5f"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.md",
+                "sha256": "07fcc5dce5dfd24802e161edbf3333aab4ab7f68a87b48dc72571560a34b7b57"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/prd.md",
+                "sha256": "2f44e4092380c3b2d0a417e5b93c6480749464ef8ac6e0cdb27a09e79ff72edf"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/research/current-evidence.md",
+                "sha256": "fe7eae8555792ab821aa320773548af89312dcfd45112bcdbc3f09f2c14b56b5"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/task.json",
+                "sha256": "877d2412d6e23987cebe2eac73b928ad4dd47dce313f2cc4d4419e3477e12469"
+              }
+            ],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "7b1c106e821c14b4ba5a7e323ae244c19dbf715d2d635d2e2c0f52d4fd57641f"
+          },
+          {
+            "root": "cc2api",
+            "head": "ec108e79440c4cca8204ad25cdd6477d2c81dca8",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "96657f9b7d474f615102af8c1f72e084218add917251571febe5184d5d32748a"
+          }
+        ],
+        "fingerprint": "42f8601a047076ac6d2e4021131b342f441451e28cf07d96acd8670d5fd3409b"
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-10-16T01:47:59.137934+00:00",
+    "completedSteps": [
+      "修复解绑凭据交接、后台降级覆盖与中断恢复",
+      "288 项 Python 回归及真实容器/页面/两库验收通过",
+      "完成缺陷复盘、规范更新与代码提交推送"
+    ],
+    "partialStep": null,
+    "nextStep": "部署 v3 并受控恢复本次丢失的同账号 RT",
+    "notes": "部署与恢复已授权；恢复前重新核对同账号、设备、原 AT/expiry 和空闲状态，不覆盖新授权或把文件恢复当作上游授权成功。"
+  }
+}
