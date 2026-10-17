@@ -25,8 +25,9 @@ def verify_followup_delivery(runtime, client, account: dict, row: dict, database
     try:
         scenarios = ((0,False,False,False),(1,False,False,False),(2,False,False,False),
             (2,True,False,False),(2,False,True,False),(2,False,True,True))
-        scenarios = [(count,auth,wrapup,unmatched,False) for count,auth,wrapup,unmatched in scenarios]
-        scenarios.extend(((1,False,False,False,True),(2,False,False,False,True),(2,True,False,False,True)))
+        scenarios = [(count,auth,wrapup,unmatched,0) for count,auth,wrapup,unmatched in scenarios]
+        scenarios.extend(((1,False,False,False,1),(2,False,False,False,1),(2,True,False,False,1),
+            (0,False,False,False,2),(1,False,False,False,2),(2,False,False,False,2),(2,True,False,False,2)))
         if os.environ.get('VERIFY_TIMED_FOLLOWUPS_ONLY') == '1':
             scenarios = [scenario for scenario in scenarios if scenario[-1]]
         for index, (count, auth, wrapup, unmatched, timed) in enumerate(scenarios):
@@ -41,8 +42,9 @@ def verify_followup_delivery(runtime, client, account: dict, row: dict, database
                 'TIMEOUT_WRAPUP_SEC':'58' if wrapup else '0','TIMEOUT_WRAPUP_PROMPT':wrapup_prompt,
                 'COMPLETION_IDLE_SEC':'1'}
             if timed:
+                offsets = [3,12] if timed == 2 else [6,12]
                 environment.update(TIMEOUT_SEC='60',TIMEOUT_WRAPUP_SEC='20',
-                    TASK_FOLLOWUP_TIMING_JSON=json.dumps({'schema':1,'offsets_sec':[6,12][:count],
+                    TASK_FOLLOWUP_TIMING_JSON=json.dumps({'schema':timed,'offsets_sec':offsets[:count],
                         'timeout_sec':60,'wrapup_sec':20}))
             token, _ = runtime.start_run(account, {'id':1,'capture_full_http':False}, rid, environment, {})
             job = runtime.job_for_container(token)
@@ -75,7 +77,7 @@ def verify_followup_delivery(runtime, client, account: dict, row: dict, database
                 assert {turn['cwd'] for turn in turns}=={job['cwd']}
                 assert {turn['session'] for turn in turns}=={rid}
                 if timed and not auth:
-                    for offset, turn in zip([6,12],turns[1:]):
+                    for offset, turn in zip(offsets,turns[1:]):
                         assert offset <= turn['at']-turns[0]['at'] < offset+6,turns
                         assert turn['busy'] == (count == 2),turns
                 assert not (workspace/'.bench-followups.json').exists()

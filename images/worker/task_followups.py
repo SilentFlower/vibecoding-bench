@@ -407,11 +407,15 @@ def _process_timed(action: str, state_path: Path, project: Path, run_id: str,
         raise ValueError('补充时间快照须为对象')
     offsets = timing.get('offsets_sec')
     timeout, wrapup = timing.get('timeout_sec'), timing.get('wrapup_sec')
-    if type(timing.get('schema')) is not int or timing['schema'] != 1 \
+    if type(timing.get('schema')) is not int or timing['schema'] not in (1, 2) \
             or type(timeout) is not int or timeout < 1 or type(wrapup) is not int or wrapup < 0 \
-            or not isinstance(offsets, list) or len(offsets) != len(followups) \
-            or any(type(x) is not int or not (timeout + 9) // 10 <= x <= timeout * 6 // 10
-                or x >= timeout - wrapup for x in offsets) or offsets != sorted(set(offsets)):
+            or not isinstance(offsets, list) or len(offsets) != len(followups):
+        raise ValueError('补充时间快照无效')
+    # 账号镜像须和管理端按相同版本校验，历史计划及其摘要不随新策略改变。
+    lower, upper = ((timeout + 9) // 10, timeout * 6 // 10) if timing['schema'] == 1 else (
+        (timeout + 19) // 20, timeout * 3 // 10)
+    if any(type(x) is not int or not lower <= x <= upper
+            or x >= timeout - wrapup for x in offsets) or offsets != sorted(set(offsets)):
         raise ValueError('补充时间快照无效')
     timing_digest = hashlib.sha256(json.dumps(timing, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     digest = plan_digest(run_id, followups)

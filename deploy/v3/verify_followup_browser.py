@@ -58,7 +58,7 @@ def followup_browser_fixture(data: Path):
         assert await evaluate(f'{doc}.querySelector("#run-detail-followups").textContent.includes({json.dumps(messages[0])})')
         assert not await evaluate(f'Boolean({doc}.defaultView.__followupXss)')
         assert await evaluate(f'{doc}.querySelectorAll("#run-detail-followups img").length')==0
-        timing = {'schema':1,'offsets_sec':[180,600],'timeout_sec':1800,'wrapup_sec':600}
+        timing = {'schema':2,'offsets_sec':[90,540],'timeout_sec':1800,'wrapup_sec':600}
         with sqlite3.connect(database) as connection:
             connection.execute('UPDATE runs SET followup_timing_json=?,status=\'running\' WHERE id=?',(json.dumps(timing),rid))
         state = {'schema':2,'run_id':rid,'plan_digest':digest,'completed_stages':0,'phase':'awaiting',
@@ -69,7 +69,7 @@ def followup_browser_fixture(data: Path):
         await evaluate(f'{doc}.defaultView.openRunDetail("{rid}")')
         await wait_for(f'{doc}.querySelector("#run-detail-followups")?.textContent.includes("已入队，等待消费")')
         content = await evaluate(f'{doc}.querySelector("#run-detail-followups").textContent')
-        assert all(text in content for text in ('已投递 2/2','已消费 1/2','已完成补充 0/2','启动后 3分0秒','启动后 10分0秒')),content
+        assert all(text in content for text in ('已投递 2/2','已消费 1/2','已完成补充 0/2','启动后 1分30秒','启动后 9分0秒')),content
         state.update(phase='complete',completed_stages=3)
         for index,item in enumerate(state['items']):
             item.update(status='completed',input_entry=f'session.jsonl:{index+3}',reply_entry='session.jsonl:5')

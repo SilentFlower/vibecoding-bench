@@ -282,9 +282,17 @@ class QuotaGuardTests(unittest.TestCase):
 
     def test_runtime_quota_wins_exit_zero_and_keeps_same_run(self) -> None:
         """额度状态优先于历史错误退出码 0，恢复原 run/会话及快照。"""
+        self._assert_runtime_quota_snapshot(1)
+
+    def test_runtime_quota_keeps_new_timing_and_never_resamples(self) -> None:
+        """新版时间策略恢复仍沿用原次数与时间，不触发新分布。@return None。"""
+        self._assert_runtime_quota_snapshot(2)
+
+    def _assert_runtime_quota_snapshot(self, timing_schema: int) -> None:
+        """复用完整额度恢复场景。@param timing_schema 时间版本；@return None。"""
         task = self._run(batch=True)
         plan = json.dumps(["Compare periods.", "Export comparison results."])
-        timing = json.dumps({'schema':1,'offsets_sec':[180,360],'timeout_sec':1800,'wrapup_sec':600})
+        timing = json.dumps({'schema':timing_schema,'offsets_sec':[180,360],'timeout_sec':1800,'wrapup_sec':600})
         with main.get_db() as connection:
             connection.execute("UPDATE runs SET followup_plan_json=?,followup_timing_json=? WHERE id='original'", (plan,timing))
         self.runner.read_worker_status.return_value = {"status": "quota_wait", "error": "被动识别额度耗尽:five_hour"}
@@ -293,7 +301,8 @@ class QuotaGuardTests(unittest.TestCase):
         self.assertEqual(0, main.list_task_batches()[0]["done_count"])
         # 合成错误无 reset 时即使多次 tick 也不探测、不建新题。
         before = self.runner.start_run.call_count
-        with patch.object(main, "sample_followups", side_effect=AssertionError("恢复不得重抽计划")):
+        with patch.object(main, "sample_followups", side_effect=AssertionError("恢复不得重抽计划")), \
+                patch.object(main, "sample_followup_timing", side_effect=AssertionError("恢复不得重抽时间")):
             self.guard.tick()
         self.guard.tick()
         self.assertEqual(before, self.runner.start_run.call_count)
@@ -302,7 +311,8 @@ class QuotaGuardTests(unittest.TestCase):
         session.write_text('{"message":{"role":"assistant"}}\n')
         self._expire()
         self.scheduler.submit = Mock()
-        with patch.object(main, "sample_followups", side_effect=AssertionError("恢复不得重抽计划")):
+        with patch.object(main, "sample_followups", side_effect=AssertionError("恢复不得重抽计划")), \
+                patch.object(main, "sample_followup_timing", side_effect=AssertionError("恢复不得重抽时间")):
             self.guard.tick()
         rid, account, payload = self.scheduler.submit.call_args.args
         self.assertEqual("original", rid)

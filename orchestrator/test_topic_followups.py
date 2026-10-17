@@ -58,10 +58,22 @@ class TopicFollowupTests(unittest.TestCase):
         self.assertEqual(escaped, library.decode_followups(library.encode_followups(escaped)))
         with self.assertRaises(ValueError):
             library.validate_followups(['Invalid\x7finput'])
-        for count in (0, 1, 2):
-            with patch.object(library.random, 'randint', return_value=count) as random:
-                self.assertEqual(candidates[:count], library.sample_followups(candidates))
-                random.assert_called_once_with(0, 2)
+
+    def test_weighted_prefix_distribution_and_missing_candidates(self):
+        """枚举全部随机整数，精确验证次数概率及候选不足的合并。@return None。"""
+        candidates = ['Add comparisons.', 'Export the comparison report.']
+        for available, expected in ((2, [10,45,45]), (1, [10,90,0])):
+            counts = [0,0,0]
+            for draw in range(100):
+                with patch.object(library.random, 'randrange', return_value=draw) as random:
+                    selected = library.sample_followups(candidates[:available])
+                    random.assert_called_once_with(100)
+                self.assertEqual(candidates[:len(selected)], selected)
+                counts[len(selected)] += 1
+            self.assertEqual(expected, counts)
+        with patch.object(library.random, 'randrange') as random:
+            self.assertEqual([], library.sample_followups([]))
+            random.assert_not_called()
 
 
 class StageEvidenceTests(unittest.TestCase):
@@ -329,7 +341,7 @@ class FollowupPersistenceTests(unittest.TestCase):
         task_id = main.create_task(main.TaskIn(topic_no=1, account_id=1, repeat_n=3))['id']
         with main.get_db() as conn:
             conn.execute("UPDATE topics SET followups_json='[]'")
-        with patch.object(library.random, 'randint', side_effect=[0,1,2]) as random:
+        with patch.object(library.random, 'randrange', side_effect=[0,10,55]) as random:
             result = main.run_task(task_id)
         self.assertEqual(3, random.call_count)
         rows = [main.get_run(rid) for rid in result['run_ids']]
@@ -337,7 +349,8 @@ class FollowupPersistenceTests(unittest.TestCase):
             [json.loads(row['followup_plan_json']) for row in rows])
         for row in rows:
             timing = library.decode_followup_timing(row['followup_timing_json'], len(row['followups']['messages']))
-            self.assertTrue(all(180 <= x <= 1080 for x in timing['offsets_sec']))
+            self.assertEqual(2, timing['schema'])
+            self.assertTrue(all(90 <= x <= 540 for x in timing['offsets_sec']))
         self.assertEqual(rows[-1]['followup_timing_json'], main.scheduler.submit.call_args.args[2]['followup_timing_json'])
         for custom, mode in ((None,'canonical'),('Use exactly this prompt.','natural'),('   ','natural')):
             tid = main.create_task(main.TaskIn(topic_no=1,account_id=1,prompt=custom,prompt_mode=mode))['id']
@@ -354,20 +367,24 @@ class FollowupPersistenceTests(unittest.TestCase):
             topic = dict(conn.execute('SELECT * FROM topics WHERE id=1').fetchone())
             conn.execute("UPDATE topics SET followups_json='[]'")
         item.update(topic_no=topic['no'],title=topic['title'])
-        with patch.object(library.random,'randint',return_value=2):
+        with patch.object(library.random,'randrange',return_value=55):
             main.Scheduler(Mock())._create_batch_task_and_run(batch,account,item,'aade1180bd9d')
             warmup = main.WarmupScheduler(Mock())._create_task_and_run(account,topic,'Build a local table.')
         self.assertIsNotNone(warmup)
         for rid in ('aade1180bd9d',warmup[0]):
             run = main.get_run(rid)
             self.assertEqual(['Compare groups.','Export comparisons.'],json.loads(run['followup_plan_json']))
-            self.assertEqual(2, len(library.decode_followup_timing(run['followup_timing_json'], 2)['offsets_sec']))
+            timing = library.decode_followup_timing(run['followup_timing_json'], 2)
+            self.assertEqual(2, timing['schema'])
+            self.assertEqual(2, len(timing['offsets_sec']))
+            self.assertTrue(all(90 <= x <= 540 for x in timing['offsets_sec']))
 
     def test_timing_window_short_budget_and_legacy_null(self):
         """短预算不与收尾重叠，旧运行 NULL 保持原模式。@return None。"""
         for timeout in (60, 300, 1800, 10800):
-            with patch.object(library.random,'sample',return_value=[timeout*6//10-1,timeout*6//10]):
+            with patch.object(library.random,'sample',return_value=[timeout*3//10-1,timeout*3//10]):
                 timing = library.decode_followup_timing(library.sample_followup_timing(['First.', 'Second.'], timeout, 600), 2)
+            self.assertEqual(2, timing['schema'])
             self.assertLessEqual(timing['offsets_sec'][-1]+5, timeout - timing['wrapup_sec'])
         self.assertIsNone(library.decode_followup_timing(None, 2))
         with main.get_db() as conn:
@@ -471,13 +488,14 @@ class TimedEvidenceTests(unittest.TestCase):
     setUp = StageEvidenceTests.setUp
     _append = StageEvidenceTests._append
     _classify = StageEvidenceTests._classify
+    timing_schema = 1
 
     def _process(self, action='tick', now=1000, **kwargs):
         if self.session.exists():
             os.utime(self.session,(now-1,now-1))
         with patch.object(STAGES.time, 'time', return_value=now):
             return STAGES.process(action,self.state,self.project,'aade1180bd9d',self.initial,
-                self.followups,idle_seconds=0,timing={'schema':1,'offsets_sec':[10,20],
+                self.followups,idle_seconds=0,timing={'schema':self.timing_schema,'offsets_sec':[10,20],
                     'timeout_sec':100,'wrapup_sec':30},**kwargs)
 
     def _queue(self, text, **extra):
@@ -615,6 +633,74 @@ class TimedEvidenceTests(unittest.TestCase):
                     'TIMEOUT_SEC':'1800','TIMEOUT_WRAPUP_SEC':'600'},timeout=10)
             self.assertEqual(1,result.returncode,result.stdout)
             self.assertFalse(self.state.exists())
+
+
+class EarlierTimedEvidenceTests(TimedEvidenceTests):
+    """对新版时间策略复用全部投递、消费、恢复及损坏证据场景。"""
+
+    timing_schema = 2
+
+
+class TimingCompatibilityTests(unittest.TestCase):
+    """核对管理端与独立worker对新旧时间策略的校验一致。"""
+
+    def test_versioned_boundaries_and_invalid_snapshots_match_worker(self):
+        """新旧范围不能串用，未知版本和非法类型均在创建状态前拒绝。@return None。"""
+        base = {'schema':2,'offsets_sec':[90,540],'timeout_sec':1800,'wrapup_sec':600}
+        cases = [(base,True),(dict(base,schema=1,offsets_sec=[180,1080]),True),
+            (dict(base,schema=1,offsets_sec=[860]),True),(dict(base,offsets_sec=[]),True)]
+        for change in ({'schema':0},{'schema':3},{'schema':True},{'schema':2.0},{'schema':'2'},
+                {'offsets_sec':[89,540]},{'offsets_sec':[90,541]},{'offsets_sec':[540,90]},
+                {'offsets_sec':[90,90]},{'offsets_sec':[True,90]},{'offsets_sec':[90,90.0]},
+                {'schema':1,'offsets_sec':[90,180]},{'schema':2,'offsets_sec':[860]},
+                {'timeout_sec':True},{'timeout_sec':'1800'},{'wrapup_sec':float('nan')},
+                {'wrapup_sec':1260}):
+            cases.append((dict(base,**change),False))
+        for index, (timing, accepted) in enumerate(cases):
+            messages = ['Compare periods.','Export comparisons.'][:len(timing['offsets_sec'])]
+            with self.subTest(timing=timing), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                project = root/'project'
+                project.mkdir()
+                state = root/'state.json'
+                if accepted:
+                    self.assertEqual(timing,library.decode_followup_timing(json.dumps(timing),len(messages)))
+                    STAGES.process('init',state,project,f'f0110b{index:06x}',
+                        'Build a local table.',messages,timing=timing)
+                    self.assertEqual(2,json.loads(state.read_text())['schema'])
+                else:
+                    with self.assertRaises(ValueError):
+                        library.decode_followup_timing(json.dumps(timing),len(messages))
+                    with self.assertRaises(ValueError):
+                        STAGES.process('init',state,project,f'f0110b{index:06x}',
+                            'Build a local table.',messages,timing=timing)
+                    self.assertFalse(state.exists())
+
+    def test_legacy_860_second_plan_resumes_without_changing_clock_or_digest(self):
+        """复现线上旧860秒快照，升级恢复仍在原时刻投递。@return None。"""
+        timing = {'schema':1,'offsets_sec':[860],'timeout_sec':1800,'wrapup_sec':600}
+        initial = 'Build a local timeline.'
+        messages = ['Add linked decisions and follow-up actions to timeline events.']
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = root/'project'
+            project.mkdir()
+            state = root/'state.json'
+            session = project/'session.jsonl'
+            with patch.object(STAGES.time,'time',return_value=1000):
+                STAGES.process('init',state,project,'490232362377',initial,messages,timing=timing)
+                session.write_text(json.dumps({'type':'user','uuid':'u0',
+                    'message':{'role':'user','content':initial}})+'\n')
+                STAGES.process('start',state,project,'490232362377',initial,messages,timing=timing)
+            original = state.read_bytes()
+            with patch.object(STAGES.time,'time',return_value=1859):
+                result = STAGES.process('init',state,project,'490232362377',initial,messages,resume=True,timing=timing)
+                self.assertEqual('wait',result['action'])
+                self.assertEqual('wait',STAGES.process('tick',state,project,'490232362377',initial,messages,timing=timing)['action'])
+            self.assertEqual(original,state.read_bytes())
+            with patch.object(STAGES.time,'time',return_value=1860):
+                self.assertEqual('send',STAGES.process('tick',state,project,'490232362377',initial,messages,timing=timing)['action'])
+            self.assertEqual(1000,json.loads(state.read_text())['started_at'])
 
 
 if __name__ == '__main__':

@@ -151,13 +151,18 @@ def encode_followups(messages: object) -> str:
 
 
 def sample_followups(candidates: object) -> list[str]:
-    """在新 run 创建时等概率选定候选前缀。
+    """在新 run 创建时按10%/45%/45%选定零至两条候选前缀。
 
     :param candidates: 已冻结的消息候选。
     :return: 本次运行的消息正文；恢复路径禁止调用本函数。
     """
     messages = validate_followups(candidates)
-    return messages[:random.randint(0, len(messages))] if messages else []
+    if not messages:
+        return []
+    draw = random.randrange(100)
+    count = 0 if draw < 10 else 1 if draw < 55 else 2
+    # 只有一条候选时合并两条的权重，保留零条10%的概率且不生成额外正文。
+    return messages[:count]
 
 
 def sample_followup_timing(messages: list[str], timeout_sec: int, wrapup_sec: int) -> str:
@@ -168,11 +173,11 @@ def sample_followup_timing(messages: list[str], timeout_sec: int, wrapup_sec: in
     :param wrapup_sec: 当前收尾设置，短预算时限制到投递窗口之后。
     :return: 可持久化的规范时间计划 JSON。
     """
-    lower, upper = (timeout_sec + 9) // 10, timeout_sec * 6 // 10
+    lower, upper = (timeout_sec + 19) // 20, timeout_sec * 3 // 10
     offsets = sorted(random.sample(range(lower, upper + 1), len(messages)))
     # 预留两秒轮询、末尾提交与秒级时钟取整的余量，短任务不能刚到点就被收尾抢先。
     wrapup = min(max(0, wrapup_sec), max(0, timeout_sec - upper - 5)) if messages else max(0, wrapup_sec)
-    return json.dumps({'schema': 1, 'offsets_sec': offsets, 'timeout_sec': timeout_sec,
+    return json.dumps({'schema': 2, 'offsets_sec': offsets, 'timeout_sec': timeout_sec,
         'wrapup_sec': wrapup}, separators=(',', ':'))
 
 
@@ -188,12 +193,16 @@ def decode_followup_timing(raw: str | None, count: int) -> dict | None:
     if not isinstance(raw, str) or len(raw) > 1024:
         raise ValueError('补充时间快照无效')
     value = json.loads(raw)
-    if not isinstance(value, dict) or type(value.get('schema')) is not int or value['schema'] != 1:
+    if not isinstance(value, dict) or type(value.get('schema')) is not int or value['schema'] not in (1, 2):
         raise ValueError('补充时间快照版本无效')
     offsets, timeout, wrapup = value.get('offsets_sec'), value.get('timeout_sec'), value.get('wrapup_sec')
     if type(timeout) is not int or timeout < 1 or type(wrapup) is not int or wrapup < 0 \
-            or not isinstance(offsets, list) or len(offsets) != count \
-            or any(type(x) is not int or not (timeout + 9) // 10 <= x <= timeout * 6 // 10
+            or not isinstance(offsets, list) or len(offsets) != count:
+        raise ValueError('补充时间快照预算或顺序无效')
+    # 版本限定原冻结区间，旧运行不能因默认策略前移而失效或被重新解释。
+    lower, upper = ((timeout + 9) // 10, timeout * 6 // 10) if value['schema'] == 1 else (
+        (timeout + 19) // 20, timeout * 3 // 10)
+    if any(type(x) is not int or not lower <= x <= upper
                 or x >= timeout - wrapup for x in offsets) \
             or offsets != sorted(set(offsets)):
         raise ValueError('补充时间快照预算或顺序无效')

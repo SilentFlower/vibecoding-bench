@@ -176,7 +176,7 @@ task = {"prompt": prompt}
 
 Markdown 子行精确为 `  - Follow-up 1: <text>`、`  - Follow-up 2: <text>`，只进入独立字段，不能拼入初始 description。历史无子行解析为零补充，正式全量校验要求两条。消息最多两条、每条非空且最多 8000 字符，无 CJK、终端控制符或同题重复；编码后必须可往返解码，原文字面内容保持。
 
-自然模式普通任务、批次及养号在创建初始 prompt 时冻结候选正文。每个新 run 等概率选择 0/1/2 的候选前缀，在同一 run 创建事务中保存正文；独立重复运行各选一次。canonical、非空自定义输入、抓包及历史空计划保持单轮。批次后改题不影响既有候选；QuotaGuard 与 Scheduler 以原 run 的计划为准，不重新抽签。worker 环境 `TASK_FOLLOWUPS_JSON` 默认 `[]`，`TASK_INITIAL_PROMPT` 保留原初始输入，不被 resume 控制提示覆盖。
+自然模式普通任务、批次及养号在创建初始 prompt 时冻结候选正文。新 run 按0次10%、1次45%、2次45%选择候选前缀：`sample_followups` 仅抽一次均匀整数0～99，0～9/10～54/55～99分别对应0/1/2次；只有一条候选时将2次合并为1次，形成10%/90%，无候选不抽样并返回[]。在同一 run 创建事务中保存正文，独立重复运行各选一次。canonical、非空自定义输入、抓包及历史空计划保持单轮。批次后改题不影响既有候选；QuotaGuard 与 Scheduler 以原 run 的计划为准，不重新抽签，历史等概率抽取的次数也不修改。worker 环境 `TASK_FOLLOWUPS_JSON` 默认 `[]`，`TASK_INITIAL_PROMPT` 保留原初始输入，不被 resume 控制提示覆盖。
 
 时间快照为 NULL 的旧运行保留以下 schema 1 规则；新的定时模式见下节，不能向历史运行回填时间。
 
@@ -222,7 +222,7 @@ driver 已确认收尾回复或 CLI 退出后，`advance --no-next` 缺少匹配
 ### 6. Tests Required
 
 - 600/21/1200、完整编号、所有英文及排除主题、自启动合成样例要求、补充不出现在初始正文；逐题语义审查包含改题依据。
-- 固定 0/1/2、同事务冻结、改题后普通/批次不漂移、养号候选、canonical/custom/旧记录零补充；quota payload 与实际下发原计划保持且不调用抽签。
+- 枚举100个离散随机值，断言两条候选次数恰为10/45/45、一条候选为10/90、无候选不调用随机数；同事务冻结、改题后普通/批次不漂移、养号候选、canonical/custom/旧记录零补充；quota payload 与实际下发原计划保持且不调用次数或时间抽签。
 - 阶段输入确认、旧回复/元/子消息排除、pending 不确定与确认后恢复、坏摘要/索引/链接/截断、收尾禁止新补充。
 - 两个消费者对同一混合正文和原生乱序记录同时断言；覆盖 0/1/2 阶段、附件父链、倒序时钟、旧执行字节基线、无 UUID/时间、异根、坏链及完成后恢复复核；输入包装接受/拒绝矩阵、no-next 缺证据不空等。
 - 实际按键多行保留空行、尾换行和字面字符，仅提交一次，Tab/CR 兼容输入不改变正文；原生 CLI 使用独立 HOME 与本地合成 SSE 核对真实格式，不能加载生产账号。
@@ -247,15 +247,16 @@ v3-task-followups init|start|tick|observe|advance --state <绝对路径> --proje
                  [--resume] [--idle <秒>] [--no-next]
 ```
 
-- 时间 JSON：`{schema:1,offsets_sec:[整数秒],timeout_sec:整数,wrapup_sec:整数}`。
+- 时间 JSON：`{schema:1|2,offsets_sec:[整数秒],timeout_sec:整数,wrapup_sec:整数}`；新生成使用2，旧1原样保留，不增加字段或转换版本。
 - 环境 `TASK_FOLLOWUP_TIMING_JSON` 为空走旧模式；非空必须为有效对象，与正文数、`TIMEOUT_SEC`、`TIMEOUT_WRAPUP_SEC` 一致。
 - 新状态 schema 2 保存原 run/正文摘要、`timing_digest`、`started_at`、`session/cursor`、`completed_stages/phase` 与 `items=[{status,cursor,queue_entry,input_entry,reply_entry}]`。
 - 详情 `followups` 保留 planned/completed/phase/messages；定时模式增加 `mode="timed"`、`offsets_sec`、`started_at`、`delivered/consumed`、`items: list[str]`。公开 items 仅含状态，不返回证据键。
 
 ### 3. Contracts
 
-- 次数仍等概率选择候选前缀 0/1/2。三个创建入口在原 run 事务中保存正文与时间：在 `[ceil(timeout*0.1),floor(timeout*0.6)]` 内无放回抽整数秒并排序，正文顺序不变。30 分钟为第 3～18 分钟，重复运行各抽一次。Scheduler、Runner、QuotaGuard 只读原快照。
-- 有补充时冻结 `wrapup_sec=min(max(0,原设置),max(0,timeout-floor(timeout*0.6)-5))`，为轮询、提交和时钟取整留余量；零补充保持原收尾设置。
+- 次数按前节10%/45%/45%选择候选前缀。三个创建入口在原 run 事务中保存正文与时间：新时间schema 2在 `[ceil(timeout*0.05),floor(timeout*0.3)]` 内无放回抽整数秒并排序，正文顺序不变；30分钟为启动后1分30秒～9分钟。时间schema 1继续校验原 `[ceil(timeout*0.1),floor(timeout*0.6)]`，即30分钟为3～18分钟。重复运行各抽一次，Scheduler、Runner、QuotaGuard只读原快照；不能将旧schema 1拓宽为新区间，也不能因默认策略前移而让旧快照失效。
+- 有补充时冻结 `wrapup_sec=min(max(0,原设置),max(0,timeout-窗口上界-5))`，新schema 2上界为floor(timeout*0.3)，为轮询、提交和时钟取整留余量；零补充保持原收尾设置。旧schema 1使用其已冻结预算，不重新计算。
+- 管理端解码和独立worker必须按相同时间版本校验，schema须为整数1/2，bool、未知值和非法类型均拒绝。阶段文件schema继续为2，与时间策略版本分开；timing_digest计算原时间对象的规范JSON，不能补默认字段、转换版本或重置时钟。
 - init 捕获旧字节基线，初始需求实际投递后 start 一次固定 Unix 时钟。每轮先处理原停止/认证/额度/收尾/超时门禁，再 tick；初始主输入已确认且到点才保存 pending 并发送，不等待最终回复。首轮提前结束但仍有未来计划时继续等待。
 - item 为 scheduled → pending → queued/consumed → completed。`type=queue-operation,operation=enqueue,sessionId=<主文件去后缀>` 的精确正文仅确认入队，须 include_queue=True 才读取；通用完成分类始终排除队列事件。普通主 user 才确认消费，正常最终 assistant 才确认完成；两条输入可共享同一最终回复，不要求逐条回复。
 - 严格正文/整体包装、字节边界、父链、非工具/非 synthetic 和稳定窗口沿用前节。仅跟踪最多三条业务输入的祖先标记，避免平方内存增长。成功须通用分类及全部计划证据共同通过，计数和 phase 不能单独作为成功凭证。
@@ -263,12 +264,15 @@ v3-task-followups init|start|tick|observe|advance --state <绝对路径> --proje
 - 已绑定主会话却找不到原初始输入时，init/observe/tick 立即拒绝并保留阶段文件原字节，不能将已消费/完成状态回退为等待。首次尚未绑定、输入未落盘时允许等待。
 - 详情不扫描原生日志。已投递/消费/完成阶段的必需证据字段须为非空、非空白字符串；非 scheduled 条目须有有限正数时钟。运行后缺阶段文件为 unknown，损坏为 invalid；两者的 delivered/consumed/completed 均为 null，items 为 unknown。queued 尚未生成阶段文件可保持 not_started、投递/消费零及 scheduled。
 - 前端显式展示 unknown/invalid 提示及待确认计数，不能显示成等待到点或确定完成；保留来自 DB 的目标时间及正文，继续 escapeHTML。不发送中断、不模拟人工输入节奏、不承诺降低账号限制风险。
+- 同批交付管理和账号镜像，数据库无新增列或回填；旧镜像不支持时间schema 2，回退前须收口/隔离新版本运行和等待记录并保留证据，不能改写成schema 1或交旧worker盲目恢复。
 
 ### 4. Validation & Error Matrix
 
 | 条件 | 预期行为 |
 | --- | --- |
 | 历史时间字段 NULL | 保留 schema 1，不回填、不重抽 |
+| 旧时间schema 1的860秒 / 新时间schema 2的90/540秒（1800秒预算） | 各按原版本接受；不改时间对象、摘要或时钟 |
+| 时间schema 1的90秒 / schema 2的860秒、未知或非整数schema | 管理端和worker均拒绝，不借版本转换放行 |
 | null/数组、时间数量/顺序/范围或执行预算不符 | 明确拒绝，不降级旧模式 |
 | 到点仍忙 / 首轮提前结束 | 原队列投递 / 等待未来时刻，不中断、不提前成功 |
 | 两条排队输入共同消费并得到一条正常最终回复 | 两条均可完成 |
@@ -281,15 +285,16 @@ v3-task-followups init|start|tick|observe|advance --state <绝对路径> --proje
 
 ### 5. Scenarios and Examples
 
-- 正常：1800 秒任务冻结 `[300,780]`，第 5/13 分钟投递，原 cwd/session 保持；两条可以共享正常最终回复。
+- 正常：1800秒的新时间schema 2冻结 `[300,480]`，第5/8分钟投递，原cwd/session保持；两条可以共享正常最终回复。
 - 边界：零条保持单轮；短预算给最后计划点保留轮询余量；旧 NULL 运行仍按原回复边界执行。
+- 兼容：原运行490232362377的时间schema 1 / `[860]`仍在原第14分20秒投递，恢复不前移、不重抽。错误：直接把所有解码范围改为5%～30%。正确：新生成schema 2，两个消费者继续分版本校验旧1及新2。
 - 错误：enqueue 就算已完成，或缺文件显示默认零值和等待到点。正确：分开传输、消费、完成证据，缺失显示未知。
 - 错误：恢复时原输入已消失仍覆盖 phase=awaiting。正确：拒绝并保留原状态，不盲目重发。
 
 ### 6. Tests Required
 
-- SQLite 核对三个创建入口、0/1/2、历史 NULL、窗口上界和短预算余量；恢复 payload 与原时间 JSON 一致，不调用抽签。
+- SQLite核对三个创建入口、0/1/2、历史NULL、新schema 2窗口及短预算余量；管理端和worker对新旧边界、未知版本、非法类型、重复/乱序/收尾冲突均作一致断言，拒绝时不创建阶段状态。复现旧860秒快照，断言恢复不改阶段字节/摘要/时钟且仍在原时刻投递；双版本quota恢复payload与原时间JSON一致，不调用抽签。
 - helper 覆盖忙碌入队、提前空闲、共同回复、乱序/异根、初始落盘延迟、pending/queued 重启；对已消费/完成注入日志删除/截断/替换，断言 init/observe/tick 报错且原阶段字节保持。
 - API 覆盖 queued/running/quota_wait/success 缺文件，空输入/回复/入队证据和缺时钟；正常分离计数、未知/无效空计数。真实浏览器覆盖文案、明暗/窄屏和 XSS。
-- 正式 driver/tmux 覆盖提前空闲、忙碌两条及认证先停；可用 `--timed-followups-only` 定向执行。原生 CLI 在独立 HOME、断网和 localhost 合成 SSE 下只证明输入/队列，不冒称真实模型推理。
+- 正式driver/tmux保留旧时间版本单条/两条/认证先停，并覆盖新时间版本0/1/2条及认证先停；可用 `--timed-followups-only` 定向执行，验证较早目标、忙时入队和共同回复。浏览器使用新90/540秒计划核对实际目标及分离进度。原生CLI在独立HOME、断网和localhost合成SSE下只证明输入/队列，不冒称真实模型推理。
 - 通过后端 unittest、Python 编译、shell/JS 语法；正式镜像的 helper/链接/driver 与源码一致。生产迁移和历史保留在发布后验收，不主动发起真实账号模型探测。
