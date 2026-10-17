@@ -180,9 +180,11 @@ Markdown 子行精确为 `  - Follow-up 1: <text>`、`  - Follow-up 2: <text>`�
 
 时间快照为 NULL 的旧运行保留以下 schema 1 规则；新的定时模式见下节，不能向历史运行回填时间。
 
-helper 的状态 schema 1 保存 run_id、规范 JSON 计划摘要、初始摘要、completed_stages、phase、session、各主 JSONL 字节 cursor、input_entry 与 reply_entry。phase 为 awaiting/pending/complete；总阶段数为 1+补充数。只识别主目录 JSONL 的对应普通 user 输入及其后稳定、非空、非 tool_use、非 synthetic/API 错误的最新 assistant；忽略 isMeta/isSidechain 与子目录。投递前落 pending 和新游标，tmux 成功不等于消费确认；observe 看到原主会话输入后才 acknowledged。pending 未确认重启必须失败，不能重发。最后阶段完成才可结束成功；完成状态也需重核最后输入/回复的原生证据。
+helper 的状态 schema 1 保存 run_id、规范 JSON 计划摘要、初始摘要、completed_stages、phase、session、各主 JSONL 字节 cursor、input_entry 与 reply_entry。phase 为 awaiting/pending/complete；总阶段数为 1+补充数。只识别主目录 JSONL 的对应业务输入（普通 user 或下述合格原生附件）及其后稳定、非空、非 tool_use、非 synthetic/API 错误的最新 assistant；忽略 isMeta/isSidechain 与子目录。投递前落 pending 和新游标，tmux 成功不等于消费确认；observe 看到原主会话输入后才 acknowledged。pending 未确认重启必须失败，不能重发。最后阶段完成才可结束成功；完成状态也需重核最后输入/回复的原生证据。
 
 user 正文只接受完整文本匹配，或去除外围空白后完整符合单层 `<pasted_content id="同一ID">\n正文\n</pasted_content id="同一ID">` 的消息；ID 为 1～128 位字母、数字、下划线或连字符，标签换行允许 CRLF。正文沿用两端 strip 后的精确比较，额外文字、错 ID、截断或并列包装不匹配。user 文本块列表仍须全部为有效 text；assistant 可混合 thinking/text，只提取有效 text，工具及 synthetic 判断独立，不能因含正文而放行。
+
+忙碌时的补充可能以 `type="attachment", attachment.type="queued_command"` 进入原回合，不产生独立 user 行。公共解析器仅在 `sessionId` 等于当前主文件去后缀、非元/旁支、存在非空字符串 uuid/parentUuid、`attachment.prompt` 为字符串、`commandMode="prompt"`、`origin.kind="human"` 且 `humanTurn is True` 时，将该附件归一化为 user 输入；仍受正文精确匹配、工具/错误过滤及父链约束。不从 rendered、工具正文或回复复述提取输入，队列 remove 不能确认消费。`input_entry` 指向原附件字节 key，保留原 uuid/parentUuid 和时刻，不伪造 user 行；通用完成检测同样使用该解析结果，附件后没有正常回复时不能成功。状态 schema 1/2 和原时间计划无需迁移。
 
 JSONL 落盘顺序不代表对话顺序。`read_dialogue` 仅扫描保存字节游标之后的完整行，保留原字节 key/end；通过 uuid/parentUuid 及附件/元节点父链恢复依赖顺序。父链优先于时钟；全部对话均有有效带时区时间时，以时间排列无依赖节点，否则旧格式按文件顺序排列。重复对话 UUID、父链冲突或循环明确拒绝，不回退游标、不跨主会话读取旧工作。有 UUID 的阶段回复须能追溯至匹配输入；无 UUID 的旧格式保持兼容。逐次限长读取并跳过跨块长行，每次文件扫描限 64 MiB，超限须对账。
 
@@ -206,6 +208,8 @@ driver 已确认收尾回复或 CLI 退出后，`advance --no-next` 缺少匹配
 | 元消息、子代理、旧回复、工具或 synthetic 回复 | 不完成当前业务阶段 |
 | 同 ID 的整体输入包装 / 额外文字或错误包装 | 前者精确确认，后者等待；advance --no-next 时明确 incomplete |
 | thinking/text 混合回复 / 回复先于输入落盘 | 提取正文并按父链及时间恢复顺序，不漏判或重复推进 |
+| 合格 queued_command / 仅队列移除或渲染引用 | 前者确认消费、关联正常最终回复才完成；后者不能确认消费 |
+| 附件来源/会话/正文错误、元/旁支或缺 uuid/parentUuid | 不作为业务输入，不允许借无关回复完成 |
 | 异根回复 / 父链循环、冲突或重复对话 UUID | 异根不完成；坏链明确拒绝，不能猜测顺序 |
 | 错 run/计划、非法状态、会话截断或链接文件 | helper 非零退出；详情标无效 |
 | 已进入收尾、CLI 已退出且尚有补充 | 不投新业务消息，不返回完整 success |
@@ -218,6 +222,11 @@ driver 已确认收尾回复或 CLI 退出后，`advance --no-next` 缺少匹配
 - Incorrect：tmux paste 后重启，没找到该 user 输入就再发一次。Correct：保留 pending 并失败，人工核对原会话，避免重复业务需求。
 - Incorrect：仅更新 topics.md 或在恢复时查询新题库。Correct：同步工具按 no 更新 topics 及 followups_json，历史 task/run 永远用自己的快照；同步代码须一起携带共享 topic_library.py。
 - Incorrect：物理最后一条是 user 就一直等，或 thinking/text 混合就拒绝整个回复。Correct：两个消费者共用解析，按父链确认 user→assistant 的逻辑顺序，再校验正文、工具、错误和稳定窗口。
+- Incorrect：enqueue 后只有 remove 和 queued_command，就始终认为没有消费。Correct：识别严格合格附件，输入键保留原字节；正常最终回复须能沿父链追溯至附件。`session.jsonl` 的合格形状示例：
+
+```json
+{"type":"attachment","uuid":"q1","parentUuid":"u0","sessionId":"session","attachment":{"type":"queued_command","prompt":"Add comparisons.","commandMode":"prompt","origin":{"kind":"human"},"humanTurn":true}}
+```
 
 ### 6. Tests Required
 
@@ -225,6 +234,7 @@ driver 已确认收尾回复或 CLI 退出后，`advance --no-next` 缺少匹配
 - 枚举100个离散随机值，断言两条候选次数恰为10/45/45、一条候选为10/90、无候选不调用随机数；同事务冻结、改题后普通/批次不漂移、养号候选、canonical/custom/旧记录零补充；quota payload 与实际下发原计划保持且不调用次数或时间抽签。
 - 阶段输入确认、旧回复/元/子消息排除、pending 不确定与确认后恢复、坏摘要/索引/链接/截断、收尾禁止新补充。
 - 两个消费者对同一混合正文和原生乱序记录同时断言；覆盖 0/1/2 阶段、附件父链、倒序时钟、旧执行字节基线、无 UUID/时间、异根、坏链及完成后恢复复核；输入包装接受/拒绝矩阵、no-next 缺证据不空等。
+- 原生附件覆盖消费先于最终回复、1/2条及与普通user混合、共享回复、原queued恢复、旧阶段兼容、乱序/倒序时钟和原字节键；错误来源/会话/正文、渲染/工具引用、重复/丢失及旧字节基线不得误认。用helper实际生成状态，经真实SQLite运行详情验证消费/完成计数。
 - 实际按键多行保留空行、尾换行和字面字符，仅提交一次，Tab/CR 兼容输入不改变正文；原生 CLI 使用独立 HOME 与本地合成 SSE 核对真实格式，不能加载生产账号。
 - `deploy/v3/run_local_verification.py --manifest <清单> [--followups-only]` 用正式 driver/tmux 与 CLI 替身断言 1/2/3 条输入、原 cwd/session、认证错误 42 且无补充、两种收尾及时以 124 退出且保留未完成。替身允许整体包装、thinking/text 混合及回复先落盘，区分 Ctrl+J 换行与 Enter 提交，并记录 keys/paste；错误样例包含结构化 error 字段。正式镜像还须核对模块/命令链接及 control driver 与被测源码一致。
 - `deploy/v3/verify_stack.py --manifest <清单> --browser --topic-followups` 核对页面保存→API→SQLite、运行冻结正文、阶段摘要、XSS、1280/390px 明暗主题。替身和离线格式核对不能声称真实模型推理通过。
@@ -258,9 +268,9 @@ v3-task-followups init|start|tick|observe|advance --state <绝对路径> --proje
 - 有补充时冻结 `wrapup_sec=min(max(0,原设置),max(0,timeout-窗口上界-5))`，新schema 2上界为floor(timeout*0.3)，为轮询、提交和时钟取整留余量；零补充保持原收尾设置。旧schema 1使用其已冻结预算，不重新计算。
 - 管理端解码和独立worker必须按相同时间版本校验，schema须为整数1/2，bool、未知值和非法类型均拒绝。阶段文件schema继续为2，与时间策略版本分开；timing_digest计算原时间对象的规范JSON，不能补默认字段、转换版本或重置时钟。
 - init 捕获旧字节基线，初始需求实际投递后 start 一次固定 Unix 时钟。每轮先处理原停止/认证/额度/收尾/超时门禁，再 tick；初始主输入已确认且到点才保存 pending 并发送，不等待最终回复。首轮提前结束但仍有未来计划时继续等待。
-- item 为 scheduled → pending → queued/consumed → completed。`type=queue-operation,operation=enqueue,sessionId=<主文件去后缀>` 的精确正文仅确认入队，须 include_queue=True 才读取；通用完成分类始终排除队列事件。普通主 user 才确认消费，正常最终 assistant 才确认完成；两条输入可共享同一最终回复，不要求逐条回复。
+- item 为 scheduled → pending → queued/consumed → completed。`type=queue-operation,operation=enqueue,sessionId=<主文件去后缀>` 的精确正文仅确认入队，须 include_queue=True 才读取；通用完成分类始终排除队列事件。普通主 user 或符合前节严格约束的 queued_command 附件确认消费，关联的正常最终 assistant 才确认完成；两条输入可共享同一最终回复，不要求逐条回复。
 - 严格正文/整体包装、字节边界、父链、非工具/非 synthetic 和稳定窗口沿用前节。仅跟踪最多三条业务输入的祖先标记，避免平方内存增长。成功须通用分类及全部计划证据共同通过，计数和 phase 不能单独作为成功凭证。
-- 恢复不重抽时间或时钟；暂停中到期的未发消息在新尝试门禁允许时依次投递，时限沿用既有尝试策略。原 CLI 内存队列无法跨进程保证保留，恢复时 pending/queued 无普通 user 必须失败、不重发。
+- 恢复不重抽时间或时钟；暂停中到期的未发消息在新尝试门禁允许时依次投递，时限沿用既有尝试策略。原 CLI 内存队列无法跨进程保证保留，恢复时 pending/queued 无有效业务输入必须失败、不重发；原日志已有合格附件时先确认消费，不因缺少独立 user 而拒绝，也不重新投递。
 - 已绑定主会话却找不到原初始输入时，init/observe/tick 立即拒绝并保留阶段文件原字节，不能将已消费/完成状态回退为等待。首次尚未绑定、输入未落盘时允许等待。
 - 详情不扫描原生日志。已投递/消费/完成阶段的必需证据字段须为非空、非空白字符串；非 scheduled 条目须有有限正数时钟。运行后缺阶段文件为 unknown，损坏为 invalid；两者的 delivered/consumed/completed 均为 null，items 为 unknown。queued 尚未生成阶段文件可保持 not_started、投递/消费零及 scheduled。
 - 前端显式展示 unknown/invalid 提示及待确认计数，不能显示成等待到点或确定完成；保留来自 DB 的目标时间及正文，继续 escapeHTML。不发送中断、不模拟人工输入节奏、不承诺降低账号限制风险。
@@ -276,7 +286,8 @@ v3-task-followups init|start|tick|observe|advance --state <绝对路径> --proje
 | null/数组、时间数量/顺序/范围或执行预算不符 | 明确拒绝，不降级旧模式 |
 | 到点仍忙 / 首轮提前结束 | 原队列投递 / 等待未来时刻，不中断、不提前成功 |
 | 两条排队输入共同消费并得到一条正常最终回复 | 两条均可完成 |
-| 重启只有 enqueue、无普通 user | 失败并保留现场，不重发 |
+| 原生附件已消费 / 只有 enqueue 或 remove | 前者关联最终回复后完成；后者仍不确认消费 |
+| 重启只有 enqueue/remove、无普通 user 或合格原生附件 | 失败并保留现场，不重发 |
 | 已绑定会话删除/截断/替换，原输入不可见 | 立即报错，原阶段字节不变 |
 | 首次输入尚未落盘 | 正常等待 |
 | queued 缺阶段文件 / 运行后缺文件 | not_started、零投递/消费 / unknown、全部计数 null |
@@ -297,4 +308,5 @@ v3-task-followups init|start|tick|observe|advance --state <绝对路径> --proje
 - helper 覆盖忙碌入队、提前空闲、共同回复、乱序/异根、初始落盘延迟、pending/queued 重启；对已消费/完成注入日志删除/截断/替换，断言 init/observe/tick 报错且原阶段字节保持。
 - API 覆盖 queued/running/quota_wait/success 缺文件，空输入/回复/入队证据和缺时钟；正常分离计数、未知/无效空计数。真实浏览器覆盖文案、明暗/窄屏和 XSS。
 - 正式driver/tmux保留旧时间版本单条/两条/认证先停，并覆盖新时间版本0/1/2条及认证先停；可用 `--timed-followups-only` 定向执行，验证较早目标、忙时入队和共同回复。浏览器使用新90/540秒计划核对实际目标及分离进度。原生CLI在独立HOME、断网和localhost合成SSE下只证明输入/队列，不冒称真实模型推理。
+- driver替身同时保留普通user与原生附件消费模式，时间1/2各覆盖原生单条/双条：必须观察最终回复前的consumed，确认input_entry实际指向queued_command字节、双条共享回复且退出0。不能仅用普通user夹具证明忙碌原生队列消费；扩展矩阵时同步核对外层等待预算，不能缩短产品deadline掩盖等待不足。
 - 通过后端 unittest、Python 编译、shell/JS 语法；正式镜像的 helper/链接/driver 与源码一致。生产迁移和历史保留在发布后验收，不主动发起真实账号模型探测。

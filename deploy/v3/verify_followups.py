@@ -28,13 +28,15 @@ def verify_followup_delivery(runtime, client, account: dict, row: dict, database
         scenarios = [(count,auth,wrapup,unmatched,0) for count,auth,wrapup,unmatched in scenarios]
         scenarios.extend(((1,False,False,False,1),(2,False,False,False,1),(2,True,False,False,1),
             (0,False,False,False,2),(1,False,False,False,2),(2,False,False,False,2),(2,True,False,False,2)))
+        scenarios = [(*scenario,False) for scenario in scenarios]
+        scenarios.extend((count,False,False,False,timed,True) for timed in (1,2) for count in (1,2))
         if os.environ.get('VERIFY_TIMED_FOLLOWUPS_ONLY') == '1':
-            scenarios = [scenario for scenario in scenarios if scenario[-1]]
-        for index, (count, auth, wrapup, unmatched, timed) in enumerate(scenarios):
+            scenarios = [scenario for scenario in scenarios if scenario[4]]
+        for index, (count, auth, wrapup, unmatched, timed, native) in enumerate(scenarios):
             rid = f'f0110a{index:06x}'
             atomic_json(config,{'session':rid,'auth_failure':auth,'wrap_inputs':True,
                 'wait_for_wrapup':wrapup,'unmatched_input':unmatched,'out_of_order':True,
-                'busy_seconds':20 if timed and count == 2 else 0},0o644)
+                'busy_seconds':20 if timed and (count == 2 or native) else 0,'queued_command':native},0o644)
             with database() as connection:
                 connection.execute('INSERT INTO runs(id) VALUES(?)',(rid,))
             environment = {'CLAUDE_CODE_VERSION':'9.9.9','TASK_PROMPT':initial,'RUN_ID':rid,
@@ -51,7 +53,13 @@ def verify_followup_delivery(runtime, client, account: dict, row: dict, database
             try:
                 started = time.monotonic()
                 deadline = started+100
+                consumed_seen = False
                 while time.monotonic()<deadline:
+                    if native:
+                        path = runtime.run_artifact_path(rid,'followups.json')
+                        if path.is_file():
+                            observed = json.loads(path.read_text())
+                            consumed_seen = consumed_seen or any(item['status']=='consumed' for item in observed['items'])
                     state = client.api.exec_inspect(job['exec'])
                     if not state['Running']:
                         break
@@ -79,7 +87,7 @@ def verify_followup_delivery(runtime, client, account: dict, row: dict, database
                 if timed and not auth:
                     for offset, turn in zip(offsets,turns[1:]):
                         assert offset <= turn['at']-turns[0]['at'] < offset+6,turns
-                        assert turn['busy'] == (count == 2),turns
+                        assert turn['busy'] == (count == 2 or native),turns
                 assert not (workspace/'.bench-followups.json').exists()
                 if count:
                     phase = json.loads(runtime.run_artifact_path(rid,'followups.json').read_text())
@@ -89,10 +97,20 @@ def verify_followup_delivery(runtime, client, account: dict, row: dict, database
                     assert phase['schema']==(2 if timed else 1),phase
                     if timed and not auth:
                         assert all(item['status']=='completed' for item in phase['items']),phase
+                        if native:
+                            assert consumed_seen,'原生附件消费后、最终回复前应可观察到consumed'
+                            session = root/'home/.claude/projects'/str(job['cwd']).replace('/','-')/(rid+'.jsonl')
+                            for item in phase['items']:
+                                name,offset = item['input_entry'].rsplit(':',1)
+                                assert name==session.name
+                                with session.open('rb') as stream:
+                                    stream.seek(int(offset))
+                                    entry = json.loads(stream.readline())
+                                assert entry['type']=='attachment' and entry['attachment']['type']=='queued_command'
                         if count == 2:
                             assert len({item['reply_entry'] for item in phase['items']})==1,phase
                 elapsed = f'，收尾后 {wrapup_seconds:.1f}s 退出' if wrapup else ''
-                print(f'通过：真实 driver/tmux + CLI 替身，定时={timed}，补充 {count} 条，认证={auth}，收尾={wrapup}，未知包装={unmatched}{elapsed}，按键/正文/目录/主会话核对',flush=True)
+                print(f'通过：真实 driver/tmux + CLI 替身，定时={timed}，原生附件={native}，补充 {count} 条，认证={auth}，收尾={wrapup}，未知包装={unmatched}{elapsed}，按键/正文/目录/主会话核对',flush=True)
             finally:
                 runtime.cleanup(token)
     finally:

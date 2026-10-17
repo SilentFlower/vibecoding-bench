@@ -217,6 +217,19 @@ def read_dialogue(path: Path, offset: int = 0, include_queue: bool = False) -> l
             if not isinstance(message, dict):
                 message = entry
             role = message.get('role')
+            attachment = entry.get('attachment')
+            native_input = entry.get('type') == 'attachment'
+            if native_input:
+                origin = attachment.get('origin') if isinstance(attachment, dict) else None
+                if not isinstance(attachment, dict) or attachment.get('type') != 'queued_command' \
+                        or entry.get('sessionId') != path.stem or not identity or not parent \
+                        or attachment.get('commandMode') != 'prompt' or attachment.get('humanTurn') is not True \
+                        or not isinstance(origin, dict) or origin.get('kind') != 'human' \
+                        or not isinstance(attachment.get('prompt'), str):
+                    continue
+                # 忙碌时的用户补充以原生附件进入当前回合，rendered包装和队列移除均不能证明消费。
+                # 复用原附件字节键与父链，让阶段机和通用完成检测同时看见这条真实输入。
+                role = 'user'
             queued = include_queue and entry.get('type') == 'queue-operation' \
                 and entry.get('operation') == 'enqueue' and entry.get('sessionId') == path.stem
             if queued:
@@ -224,7 +237,7 @@ def read_dialogue(path: Path, offset: int = 0, include_queue: bool = False) -> l
             if role not in ('user', 'assistant') and not queued:
                 continue
             content = message.get('content')
-            text = _text(content, role)
+            text = _text(attachment['prompt'] if native_input else content, role)
             synthetic = entry.get('isApiErrorMessage') is True or message.get('model') == '<synthetic>'
             tool = message.get('stop_reason') == 'tool_use' or (
                 isinstance(content, list) and any(isinstance(item, dict) and item.get('type') in ('tool_use', 'tool_result') for item in content))

@@ -66,7 +66,8 @@ def main() -> None:
                     "VERIFY_TIMED_FOLLOWUPS_ONLY": "1" if args.timed_followups_only else "0"},
                 volumes={str(repository): {"bind": "/source", "mode": "ro"}, str(fixtures): {"bind": "/fixtures", "mode": "ro"},
                     str(root): {"bind": "/verify", "mode": "rw"}, "/var/run/docker.sock": {"bind": "/var/run/docker.sock", "mode": "rw"}})
-            result = runner.wait(timeout=480)
+            # 完整补充矩阵包含逐次CLI启动和原生忙碌消费，外层等待不能先于场景自身截止时间结束。
+            result = runner.wait(timeout=1200)
             print(runner.logs().decode())
             if result["StatusCode"] != 0:
                 for instance in client.containers.list(all=True, filters={"label": ["vibebench.deployment=" + deployment, "vibebench.role=account-network"]}):

@@ -38,11 +38,35 @@ def run_followup_fixture() -> None:
     previous = None
     busy_until = 0
     queued_users = []
+    queued_at = {}
+    native_queue = config.get('queued_command', False)
     while True:
+        if busy_until and native_queue:
+            for queued in list(queued_users):
+                if time.monotonic()-queued_at[queued['uuid']] < 2:
+                    continue
+                # 原生 CLI 在原回合中以附件消费消息，时间可沿用入队时刻，不能伪造独立user回合。
+                prompt = queued['message']['content']
+                if isinstance(prompt, list):
+                    prompt = '\n'.join(item['text'] for item in prompt)
+                attachment = {'type':'attachment','uuid':queued['uuid']+'-attachment',
+                    'parentUuid':previous,'sessionId':config['session'],'isSidechain':False,
+                    'timestamp':queued['timestamp'],'attachment':{'type':'queued_command','prompt':prompt,
+                        'source_uuid':queued['uuid'],'delivery_id':queued['uuid']+'-delivery',
+                        'commandMode':'prompt','origin':{'kind':'human'},'humanTurn':True}}
+                with session.open('a') as stream:
+                    stream.write(json.dumps({'type':'queue-operation','operation':'remove',
+                        'sessionId':config['session'],'content':prompt,
+                        'timestamp':datetime.now(timezone.utc).isoformat()})+'\n')
+                    stream.write(json.dumps(attachment)+'\n')
+                previous = attachment['uuid']
+                queued_users.remove(queued)
+                queued_at.pop(queued['uuid'])
         if busy_until and time.monotonic() >= busy_until:
             initial_reply = {'type':'assistant','uuid':config['session']+'-initial-done','parentUuid':previous,
                 'timestamp':datetime.now(timezone.utc).isoformat(),'message':{'role':'assistant',
-                    'stop_reason':'end_turn','content':[{'type':'text','text':'Initial work complete.'}]}}
+                    'stop_reason':'end_turn','content':[{'type':'text','text':
+                        'All queued extensions complete.' if native_queue else 'Initial work complete.'}]}}
             previous = initial_reply['uuid']
             events = [initial_reply]
             for queued in queued_users:
@@ -59,6 +83,7 @@ def run_followup_fixture() -> None:
                 for entry in events:
                     stream.write(json.dumps(entry)+'\n')
             queued_users.clear()
+            queued_at.clear()
             busy_until = 0
             print('Fixture busy queue consumed',flush=True)
         if busy_until and not select.select([sys.stdin],[],[],0.1)[0]:
@@ -112,6 +137,7 @@ def run_followup_fixture() -> None:
                         'sessionId':config['session'],'content':recorded,
                         'timestamp':datetime.now(timezone.utc).isoformat()})+'\n')
                 queued_users.append(user)
+                queued_at[user['uuid']] = time.monotonic()
                 continue
         if config.get('wait_for_wrapup') and input_count == 1:
             with session.open('a') as stream:

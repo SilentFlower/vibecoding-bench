@@ -416,6 +416,45 @@ class FollowupPersistenceTests(unittest.TestCase):
         run['followup_timing_json'] = json.dumps(dict(timing,offsets_sec=[181,360]))
         self.assertEqual('invalid', main._public_followup_progress(run)['phase'])
 
+    def test_run_api_reads_native_consumption_and_completion_from_real_helper(self):
+        """真实SQLite运行经helper生成附件阶段后，详情接口返回对应消费和完成。@return None。"""
+        tid = main.create_task(main.TaskIn(topic_no=1,account_id=1))['id']
+        with patch.object(library.random,'randrange',return_value=10), \
+                patch.object(library.random,'sample',return_value=[90]):
+            rid = main.run_task(tid)['run_ids'][0]
+        run = main.get_run(rid)
+        with main.get_db() as conn:
+            conn.execute("UPDATE runs SET status='running' WHERE id=?",(rid,))
+        messages = json.loads(run['followup_plan_json'])
+        timing = json.loads(run['followup_timing_json'])
+        workspace = main.WORKSPACES_DIR/rid
+        workspace.mkdir(parents=True)
+        project = self.root/'sessions'
+        project.mkdir()
+        state = workspace/'.bench-followups.json'
+        session = project/'session.jsonl'
+        def step(action,now):
+            if session.exists():
+                os.utime(session,(now-1,now-1))
+            with patch.object(STAGES.time,'time',return_value=now):
+                return STAGES.process(action,state,project,rid,run['prompt'],messages,idle_seconds=0,timing=timing)
+        step('init',1000)
+        session.write_text(json.dumps({'type':'user','uuid':'u0',
+            'message':{'role':'user','content':run['prompt']}})+'\n')
+        step('start',1000)
+        self.assertEqual('send',step('tick',1090)['action'])
+        with session.open('a') as stream:
+            stream.write(json.dumps({'type':'attachment','uuid':'q1','parentUuid':'u0','sessionId':'session',
+                'attachment':{'type':'queued_command','prompt':messages[0],'commandMode':'prompt',
+                    'origin':{'kind':'human'},'humanTurn':True}})+'\n')
+        step('observe',1091)
+        self.assertEqual((1,0),(main.get_run(rid)['followups']['consumed'],main.get_run(rid)['followups']['completed']))
+        with session.open('a') as stream:
+            stream.write(json.dumps({'type':'assistant','uuid':'a1','parentUuid':'q1',
+                'message':{'role':'assistant','stop_reason':'end_turn','content':'The extension is complete.'}})+'\n')
+        self.assertEqual('complete',step('advance',1092)['action'])
+        self.assertEqual((1,1),(main.get_run(rid)['followups']['consumed'],main.get_run(rid)['followups']['completed']))
+
     def test_topic_edit_missing_preserves_and_explicit_empty_clears(self):
         """旧编辑请求不会抹去补充，显式清空仍可用。@return None。"""
         main.update_topic(1,main.TopicIn(no=1,title='Renamed',description='Local example.',category='Examples'))
@@ -639,6 +678,223 @@ class EarlierTimedEvidenceTests(TimedEvidenceTests):
     """对新版时间策略复用全部投递、消费、恢复及损坏证据场景。"""
 
     timing_schema = 2
+
+
+class NativeQueueEvidenceTests(unittest.TestCase):
+    """用已观察的原生附件格式校验消费、完成、恢复和错误归属。"""
+
+    setUp = StageEvidenceTests.setUp
+    _append = StageEvidenceTests._append
+    _classify = StageEvidenceTests._classify
+    _queue = TimedEvidenceTests._queue
+
+    def _timing(self):
+        return {'schema':self.timing_schema,'offsets_sec':[10,20][:len(self.followups)],
+            'timeout_sec':100,'wrapup_sec':30}
+
+    def _process(self, action='tick', now=1000, **kwargs):
+        if self.session.exists():
+            os.utime(self.session,(now-1,now-1))
+        with patch.object(STAGES.time,'time',return_value=now):
+            return STAGES.process(action,self.state,self.project,'aade1180bd9d',self.initial,
+                self.followups,idle_seconds=kwargs.pop('idle_seconds',0),timing=self._timing(),**kwargs)
+
+    def _start(self, schema=2, count=1):
+        self.state.unlink(missing_ok=True)
+        self.session.unlink(missing_ok=True)
+        self.timing_schema = schema
+        self.followups = ['Compare two date windows.','Export the comparison report.'][:count]
+        self._process('init')
+        self._append('user',self.initial,uuid='u0',timestamp='1970-01-01T00:16:40+00:00')
+        self._process('start')
+
+    def _native(self, text, identity='q1', parent='u0', **fields):
+        entry = {'type':'attachment','uuid':identity,'parentUuid':parent,
+            'sessionId':self.session.stem,'isSidechain':False,
+            'attachment':{'type':'queued_command','prompt':text,'source_uuid':identity+'-source',
+                'delivery_id':identity+'-delivery','commandMode':'prompt','origin':{'kind':'human'},
+                'humanTurn':True},**fields}
+        key = self.session.name+':'+str(self.session.stat().st_size)
+        with self.session.open('a') as stream:
+            stream.write(json.dumps(entry)+'\n')
+        return key
+
+    def _progress(self):
+        with patch.object(main,'account_runtime',Mock(run_artifact_path=Mock(return_value=self.state))):
+            return main._public_followup_progress({'id':'aade1180bd9d','status':'running',
+                'followup_plan_json':json.dumps(self.followups),'followup_timing_json':json.dumps(self._timing())})
+
+    def test_native_attachment_confirms_consumption_then_final_reply(self):
+        """入队和移除不算消费；原附件及关联最终回复分别推进状态和API计数。@return None。"""
+        for schema in (1,2):
+            with self.subTest(schema=schema):
+                self._start(schema)
+                self.assertEqual('send',self._process(now=1010)['action'])
+                self._queue(self.followups[0])
+                self._queue(self.followups[0],operation='remove')
+                self._process('observe',now=1011)
+                self.assertEqual('queued',self._progress()['items'][0])
+                self.assertEqual(0,self._progress()['consumed'])
+                key = self._native(self.followups[0])
+                self._process('observe',now=1012)
+                self.assertEqual(('consumed',1,0),(self._progress()['items'][0],
+                    self._progress()['consumed'],self._progress()['completed']))
+                self.assertEqual(key,json.loads(self.state.read_text())['items'][0]['input_entry'])
+                self.assertEqual(1,self._classify()[0])
+                self._append('assistant','The extension is implemented.',uuid='a1',parentUuid='q1')
+                self.assertEqual('complete',self._process('advance',now=1013,allow_next=False)['action'])
+                progress = self._progress()
+                self.assertEqual((1,1,1),(progress['delivered'],progress['consumed'],progress['completed']))
+                self.assertEqual(0,self._classify()[0])
+
+    def test_two_native_or_mixed_inputs_share_one_final_reply(self):
+        """两条原生附件或与普通输入混合时均按原父链共用最终回复。@return None。"""
+        for schema in (1,2):
+            for kinds in (('native','native'),('native','user'),('user','native')):
+                with self.subTest(schema=schema,kinds=kinds):
+                    self._start(schema,2)
+                    parent = 'u0'
+                    for index,kind in enumerate(kinds):
+                        now = 1010+10*index
+                        self.assertEqual('send',self._process(now=now)['action'])
+                        self._queue(self.followups[index])
+                        identity = 'q'+str(index+1)
+                        if kind == 'native':
+                            self._native(self.followups[index],identity,parent)
+                        else:
+                            self._append('user',self.followups[index],uuid=identity,parentUuid=parent)
+                        parent = identity
+                        self._process('observe',now=now+1)
+                    self.assertEqual(['consumed','consumed'],self._progress()['items'])
+                    self._append('assistant','Both extensions are complete.',uuid='a2',parentUuid=parent)
+                    self.assertEqual('complete',self._process('advance',now=1022)['action'])
+                    items = json.loads(self.state.read_text())['items']
+                    self.assertEqual(1,len({x['reply_entry'] for x in items}))
+
+    def test_saved_queue_resumes_from_native_evidence_without_resending(self):
+        """原queued记录先确认附件消费再恢复，冻结计划和原时钟不变。@return None。"""
+        self._start()
+        self._process(now=1010)
+        self._queue(self.followups[0])
+        self._queue(self.followups[0],operation='remove')
+        self._process('observe',now=1011)
+        original = json.loads(self.state.read_text())
+        with self.assertRaisesRegex(ValueError,'原队列未消费'):
+            self._process('init',now=1012,resume=True)
+        self._native(self.followups[0])
+        self._process('init',now=1013,resume=True)
+        self.assertEqual(['consumed'],self._progress()['items'])
+        self._append('assistant','The extension is implemented.',uuid='a1',parentUuid='q1')
+        self.assertEqual('complete',self._process('init',now=1014,resume=True)['action'])
+        current = json.loads(self.state.read_text())
+        for key in ('schema','run_id','plan_digest','timing_digest','started_at','cursor'):
+            self.assertEqual(original[key],current[key],key)
+        self.assertEqual('complete',self._process(now=1040)['action'])
+
+    def test_invalid_native_shapes_and_quoted_content_never_acknowledge(self):
+        """错误来源或会话、旁支、元事件及工具/渲染引用不能伪装业务输入。@return None。"""
+        valid = {'type':'queued_command','prompt':'Compare two date windows.','commandMode':'prompt',
+            'origin':{'kind':'human'},'humanTurn':True}
+        cases = [{'sessionId':'other'},{'isMeta':True},{'isSidechain':True},{'uuid':None},
+            {'parentUuid':'unrelated-root'},
+            {'parentUuid':None},{'attachment':[]},{'isApiErrorMessage':True},
+            {'message':{'model':'<synthetic>'}}]
+        cases.extend({'attachment':dict(valid,**change)} for change in (
+            {'type':'other'},{'commandMode':'command'},{'origin':{'kind':'agent'}},
+            {'humanTurn':1},{'humanTurn':False},{'prompt':[]},{'prompt':'Unrelated requirement.'}))
+        cases.append({'attachment':{'type':'other'},'rendered':[{'content':valid['prompt']}],
+            'message':{'role':'user','content':valid['prompt']}})
+        for fields in cases:
+            with self.subTest(fields=fields):
+                self._start()
+                self._process(now=1010)
+                self._queue(self.followups[0])
+                self._native(self.followups[0],**fields)
+                self._append('user',self.followups[0],uuid='tool',parentUuid='u0',
+                    message={'role':'user','content':[{'type':'tool_result','content':self.followups[0]}]})
+                self._append('assistant','A summary.',uuid='a1',parentUuid='tool')
+                self.assertEqual('incomplete',self._process('advance',now=1012,allow_next=False)['action'])
+                self.assertEqual(['queued'],self._progress()['items'])
+
+    def test_native_reply_must_be_normal_stable_and_on_current_parent_chain(self):
+        """附件消费不跳过父链、工具/错误过滤与稳定窗口。@return None。"""
+        self._start()
+        self._process(now=1010)
+        self._native(self.followups[0])
+        for parent,message,extra in (
+                ('u0',{'role':'assistant','content':'Unrelated reply.'},{}),
+                ('q1',{'role':'assistant','stop_reason':'tool_use','content':'Still working.'},{}),
+                ('q1',{'role':'assistant','model':'<synthetic>','content':'API error.'},{'isApiErrorMessage':True})):
+            self._append('assistant','',uuid='a'+str(self.session.stat().st_size),parentUuid=parent,
+                message=message,**extra)
+            self.assertEqual('wait',self._process(now=1012)['action'])
+            self.assertEqual(['consumed'],self._progress()['items'])
+        self._append('assistant','The extension is implemented.',uuid='final',parentUuid='q1')
+        self.assertEqual('wait',self._process(now=1013,idle_seconds=2)['action'])
+        self.assertEqual('complete',self._process(now=1014)['action'])
+
+    def test_duplicate_or_lost_native_evidence_preserves_state(self):
+        """附件重复或消费后丢失不能重新初始化阶段或再次发送。@return None。"""
+        self._start()
+        self._process(now=1010)
+        self._native(self.followups[0])
+        self._process('observe',now=1011)
+        original = self.state.read_bytes()
+        session = self.session.read_bytes()
+        self._native(self.followups[0],identity='q2')
+        with self.assertRaisesRegex(ValueError,'重复'):
+            self._process(now=1012)
+        self.assertEqual(original,self.state.read_bytes())
+        first = session.splitlines(keepends=True)[0]
+        self.session.write_bytes(first)
+        with self.assertRaises(ValueError):
+            self._process('init',now=1013,resume=True)
+        self.assertEqual(original,self.state.read_bytes())
+
+    def test_out_of_order_native_attachment_and_reply_keep_original_byte_keys(self):
+        """回复可先落盘，附件沿用入队旧时刻，仍以父链和原字节核验。@return None。"""
+        self._start()
+        self._process(now=1010)
+        self._queue(self.followups[0],timestamp='1970-01-01T00:16:50+00:00')
+        self._append('assistant','The extension is implemented.',uuid='a1',parentUuid='q1',
+            timestamp='1970-01-01T00:16:55+00:00')
+        self._append('user','',uuid='tool',parentUuid='u0',timestamp='1970-01-01T00:16:54+00:00',
+            message={'role':'user','content':[{'type':'tool_result','content':'Working.'}]})
+        key = self._native(self.followups[0],parent='tool',timestamp='1970-01-01T00:16:50+00:00')
+        self.assertEqual('complete',self._process(now=1016)['action'])
+        self.assertEqual(key,json.loads(self.state.read_text())['items'][0]['input_entry'])
+
+    def test_native_input_before_initial_byte_baseline_cannot_confirm_new_delivery(self):
+        """旧主文件中的同正文附件不能越过原执行字节基线确认新投递。@return None。"""
+        self.timing_schema = 2
+        self.followups = self.followups[:1]
+        self.session.touch()
+        self._native(self.followups[0],identity='old-q',parent='old-user')
+        self._process('init')
+        self._append('user',self.initial,uuid='u0')
+        self._process('start')
+        self.assertEqual('send',self._process(now=1010)['action'])
+        self._queue(self.followups[0])
+        self._process('observe',now=1011)
+        self.assertEqual(['queued'],self._progress()['items'])
+        self._native(self.followups[0])
+        self._append('assistant','The new extension is implemented.',uuid='a1',parentUuid='q1')
+        self.assertEqual('complete',self._process(now=1012)['action'])
+
+    def test_legacy_stage_accepts_native_attachment_and_rechecks_completion(self):
+        """无时间快照的旧阶段同样识别原生输入，完成后仍复核原证据。@return None。"""
+        self.followups = self.followups[:1]
+        def step(action='advance',**kwargs):
+            return STAGES.process(action,self.state,self.project,'aade1180bd9d',self.initial,
+                self.followups,idle_seconds=0,**kwargs)
+        step('init')
+        self._append('user',self.initial,uuid='u0')
+        self._append('assistant','Initial complete.',uuid='a0',parentUuid='u0')
+        self.assertEqual('send',step()['action'])
+        self._native(self.followups[0],parent='a0')
+        self._append('assistant','The extension is implemented.',uuid='a1',parentUuid='q1')
+        self.assertEqual('complete',step()['action'])
+        self.assertEqual('complete',step('init',resume=True)['action'])
 
 
 class TimingCompatibilityTests(unittest.TestCase):
