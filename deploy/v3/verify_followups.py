@@ -1,5 +1,6 @@
 """通过正式 account driver 与 tmux 校验有限多轮业务消息。"""
 import json
+import os
 import time
 from pathlib import Path
 
@@ -24,16 +25,25 @@ def verify_followup_delivery(runtime, client, account: dict, row: dict, database
     try:
         scenarios = ((0,False,False,False),(1,False,False,False),(2,False,False,False),
             (2,True,False,False),(2,False,True,False),(2,False,True,True))
-        for index, (count, auth, wrapup, unmatched) in enumerate(scenarios):
+        scenarios = [(count,auth,wrapup,unmatched,False) for count,auth,wrapup,unmatched in scenarios]
+        scenarios.extend(((1,False,False,False,True),(2,False,False,False,True),(2,True,False,False,True)))
+        if os.environ.get('VERIFY_TIMED_FOLLOWUPS_ONLY') == '1':
+            scenarios = [scenario for scenario in scenarios if scenario[-1]]
+        for index, (count, auth, wrapup, unmatched, timed) in enumerate(scenarios):
             rid = f'f0110a{index:06x}'
             atomic_json(config,{'session':rid,'auth_failure':auth,'wrap_inputs':True,
-                'wait_for_wrapup':wrapup,'unmatched_input':unmatched,'out_of_order':True},0o644)
+                'wait_for_wrapup':wrapup,'unmatched_input':unmatched,'out_of_order':True,
+                'busy_seconds':20 if timed and count == 2 else 0},0o644)
             with database() as connection:
                 connection.execute('INSERT INTO runs(id) VALUES(?)',(rid,))
             environment = {'CLAUDE_CODE_VERSION':'9.9.9','TASK_PROMPT':initial,'RUN_ID':rid,
                 'TASK_FOLLOWUPS_JSON':json.dumps(candidates[:count]),'TIMEOUT_SEC':'60' if wrapup else '90',
                 'TIMEOUT_WRAPUP_SEC':'58' if wrapup else '0','TIMEOUT_WRAPUP_PROMPT':wrapup_prompt,
                 'COMPLETION_IDLE_SEC':'1'}
+            if timed:
+                environment.update(TIMEOUT_SEC='60',TIMEOUT_WRAPUP_SEC='20',
+                    TASK_FOLLOWUP_TIMING_JSON=json.dumps({'schema':1,'offsets_sec':[6,12][:count],
+                        'timeout_sec':60,'wrapup_sec':20}))
             token, _ = runtime.start_run(account, {'id':1,'capture_full_http':False}, rid, environment, {})
             job = runtime.job_for_container(token)
             try:
@@ -64,14 +74,23 @@ def verify_followup_delivery(runtime, client, account: dict, row: dict, database
                 assert {turn['transport'] for turn in turns}=={'keys'},turns
                 assert {turn['cwd'] for turn in turns}=={job['cwd']}
                 assert {turn['session'] for turn in turns}=={rid}
+                if timed and not auth:
+                    for offset, turn in zip([6,12],turns[1:]):
+                        assert offset <= turn['at']-turns[0]['at'] < offset+6,turns
+                        assert turn['busy'] == (count == 2),turns
                 assert not (workspace/'.bench-followups.json').exists()
                 if count:
                     phase = json.loads(runtime.run_artifact_path(rid,'followups.json').read_text())
                     assert phase['run_id']==rid
                     assert phase['completed_stages']==(0 if auth or wrapup else count+1),phase
                     assert phase['phase']==('awaiting' if auth or wrapup else 'complete'),phase
+                    assert phase['schema']==(2 if timed else 1),phase
+                    if timed and not auth:
+                        assert all(item['status']=='completed' for item in phase['items']),phase
+                        if count == 2:
+                            assert len({item['reply_entry'] for item in phase['items']})==1,phase
                 elapsed = f'，收尾后 {wrapup_seconds:.1f}s 退出' if wrapup else ''
-                print(f'通过：真实 driver/tmux + CLI 替身，补充 {count} 条，认证={auth}，收尾={wrapup}，未知包装={unmatched}{elapsed}，按键/正文/目录/主会话核对',flush=True)
+                print(f'通过：真实 driver/tmux + CLI 替身，定时={timed}，补充 {count} 条，认证={auth}，收尾={wrapup}，未知包装={unmatched}{elapsed}，按键/正文/目录/主会话核对',flush=True)
             finally:
                 runtime.cleanup(token)
     finally:

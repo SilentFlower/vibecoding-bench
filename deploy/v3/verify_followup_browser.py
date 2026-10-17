@@ -58,6 +58,51 @@ def followup_browser_fixture(data: Path):
         assert await evaluate(f'{doc}.querySelector("#run-detail-followups").textContent.includes({json.dumps(messages[0])})')
         assert not await evaluate(f'Boolean({doc}.defaultView.__followupXss)')
         assert await evaluate(f'{doc}.querySelectorAll("#run-detail-followups img").length')==0
+        timing = {'schema':1,'offsets_sec':[180,600],'timeout_sec':1800,'wrapup_sec':600}
+        with sqlite3.connect(database) as connection:
+            connection.execute('UPDATE runs SET followup_timing_json=?,status=\'running\' WHERE id=?',(json.dumps(timing),rid))
+        state = {'schema':2,'run_id':rid,'plan_digest':digest,'completed_stages':0,'phase':'awaiting',
+            'timing_digest':hashlib.sha256(json.dumps(timing,sort_keys=True,separators=(',',':')).encode()).hexdigest(),
+            'started_at':1792210000,'items':[{'status':'queued','queue_entry':'session.jsonl:1'},
+                {'status':'consumed','input_entry':'session.jsonl:2'}]}
+        phase.write_text(json.dumps(state))
+        await evaluate(f'{doc}.defaultView.openRunDetail("{rid}")')
+        await wait_for(f'{doc}.querySelector("#run-detail-followups")?.textContent.includes("已入队，等待消费")')
+        content = await evaluate(f'{doc}.querySelector("#run-detail-followups").textContent')
+        assert all(text in content for text in ('已投递 2/2','已消费 1/2','已完成补充 0/2','启动后 3分0秒','启动后 10分0秒')),content
+        state.update(phase='complete',completed_stages=3)
+        for index,item in enumerate(state['items']):
+            item.update(status='completed',input_entry=f'session.jsonl:{index+3}',reply_entry='session.jsonl:5')
+        phase.write_text(json.dumps(state))
+        await evaluate(f'{doc}.defaultView.openRunDetail("{rid}")')
+        await wait_for(f'{doc}.querySelector("#run-detail-followups")?.textContent.includes("已完成补充 2/2")')
+        valid_state = json.dumps(state)
+        phase.unlink()
+        await evaluate(f'{doc}.defaultView.openRunDetail("{rid}")')
+        await wait_for(f'{doc}.querySelector("#run-detail-followups")?.textContent.includes("阶段状态待核对")')
+        content = await evaluate(f'{doc}.querySelector("#run-detail-followups").textContent')
+        assert '已投递 待确认/2' in content and '等待到点' not in content,content
+        for item in state['items']:
+            item.update(input_entry='',reply_entry='')
+        phase.write_text(json.dumps(state))
+        phase.chmod(0o600)
+        await evaluate(f'{doc}.defaultView.openRunDetail("{rid}")')
+        await wait_for(f'{doc}.querySelector("#run-detail-followups")?.textContent.includes("阶段证据无效")')
+        content = await evaluate(f'{doc}.querySelector("#run-detail-followups").textContent')
+        assert '已完成补充 2/2' not in content and '已消费 待确认/2' in content,content
+        phase.unlink()
+        with sqlite3.connect(database) as connection:
+            connection.execute("UPDATE runs SET status='queued' WHERE id=?",(rid,))
+        await evaluate(f'{doc}.defaultView.openRunDetail("{rid}")')
+        await wait_for(f'{doc}.querySelector("#run-detail-followups")?.textContent.includes("等待到点")')
+        content = await evaluate(f'{doc}.querySelector("#run-detail-followups").textContent')
+        assert '已投递 0/2' in content and '阶段状态待核对' not in content,content
+        with sqlite3.connect(database) as connection:
+            connection.execute("UPDATE runs SET status='running' WHERE id=?",(rid,))
+        phase.write_text(valid_state)
+        phase.chmod(0o600)
+        await evaluate(f'{doc}.defaultView.openRunDetail("{rid}")')
+        await wait_for(f'{doc}.querySelector("#run-detail-followups")?.textContent.includes("已完成补充 2/2")')
         for width in (1280,390):
             await rpc('Emulation.setDeviceMetricsOverride',{'width':width,'height':900,'deviceScaleFactor':1,'mobile':False},session_id)
             for theme in ('dark','light'):
@@ -67,7 +112,7 @@ def followup_browser_fixture(data: Path):
                 assert bounds['left']>=-1 and bounds['right']<=bounds['width']+1,bounds
                 screenshot=await rpc('Page.captureScreenshot',{'format':'png'},session_id)
                 Path(f'/tmp/topic-followups-{width}-{theme}.png').write_bytes(base64.b64decode(screenshot['data']))
-        print('通过：真实浏览器题目补充编辑/API/SQLite，冻结运行正文与2/2阶段，XSS转义，1280/390px明暗主题',flush=True)
+        print('通过：真实浏览器编辑/API/SQLite，旧阶段与定时进度，缺失/空证据提示及正常未启动，XSS转义，1280/390px明暗主题',flush=True)
     try:
         yield exercise
     finally:

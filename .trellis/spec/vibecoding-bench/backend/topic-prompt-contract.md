@@ -73,7 +73,7 @@ backup_db(path: Path) -> Path
 - 新 Markdown 分类标题使用 `## 1. Category (20 topics)`；首次 seed 与同步解析器仍兼容旧 `## 一、分类（20 题）`，条目兼容半角/全角冒号。两个解析器必须对同一文件得到相同 category/title/description。
 - 同步工具默认 dry-run，`--apply` 前使用 SQLite backup API 生成包含已提交 WAL 数据的一致备份，再按 `topic.no` 原位更新。既有 `topics.id`、task/run 数量和已持久化 prompt 不得变化。
 - 不新增 `variant_id`、随机种子或 `prompt_mode` 数据库列。历史 task/run prompt 不翻译、不回填；`prompt_override` 和未来显式环境覆盖原样保留。
-- Topic prompt 不承载超时、工具权限、认证恢复或网络策略。worker 的 resume、timeout wrap-up、OAuth retry 和 Claude API stall 默认注入文本必须为英文，触发时机、重试次数、优先级和退出码保持不变。
+- Topic prompt 不承载超时、工具权限、认证恢复或网络策略。worker 的 resume、timeout wrap-up、OAuth retry 和 Claude API stall 默认注入文本必须为英文，重试次数、优先级和退出码保持不变；定时补充模式的短预算收尾时刻按下文时间契约冻结，其它路径的触发时机保持。
 
 ### 4. Validation & Error Matrix
 
@@ -170,13 +170,15 @@ task = {"prompt": prompt}
 - `POST /api/topics`、`PUT /api/topics/{id}` 的 `TopicIn.followups: Optional[list[StrictStr]]=None`；`GET /api/topics` 返回 `followups: list[str]`。
 - `GET /api/runs/{rid}` 增加初始 `prompt` 与 `followups={planned,completed,phase,messages[,stage]}`。
 - driver 调用 `python3 /usr/local/bin/v3-task-followups init|observe|advance --state <固定绝对路径> --project <主会话目录> [--resume] [--idle 10] [--no-next]`。
-- `images/worker/task_followups.py` 提供 `read_dialogue(path: Path, offset: int = 0) -> list[dict]` 与 `latest_dialogue(project: Path, idle_seconds: float, baseline_path: Path) -> dict | None`；完成分类与阶段机共用。两种 worker 镜像均复制为 `/usr/local/bin/task_followups.py`，原命令 `/usr/local/bin/v3-task-followups` 为同文件链接；嵌入式分类器显式从该目录导入。
+- `images/worker/task_followups.py` 提供 `read_dialogue(path: Path, offset: int = 0, include_queue: bool = False) -> list[dict]` 与 `latest_dialogue(project: Path, idle_seconds: float, baseline_path: Path) -> dict | None`；完成分类与阶段机共用。两种 worker 镜像均复制为 `/usr/local/bin/task_followups.py`，原命令 `/usr/local/bin/v3-task-followups` 为同文件链接；嵌入式分类器显式从该目录导入。
 
 ### 3. Contracts
 
 Markdown 子行精确为 `  - Follow-up 1: <text>`、`  - Follow-up 2: <text>`，只进入独立字段，不能拼入初始 description。历史无子行解析为零补充，正式全量校验要求两条。消息最多两条、每条非空且最多 8000 字符，无 CJK、终端控制符或同题重复；编码后必须可往返解码，原文字面内容保持。
 
 自然模式普通任务、批次及养号在创建初始 prompt 时冻结候选正文。每个新 run 等概率选择 0/1/2 的候选前缀，在同一 run 创建事务中保存正文；独立重复运行各选一次。canonical、非空自定义输入、抓包及历史空计划保持单轮。批次后改题不影响既有候选；QuotaGuard 与 Scheduler 以原 run 的计划为准，不重新抽签。worker 环境 `TASK_FOLLOWUPS_JSON` 默认 `[]`，`TASK_INITIAL_PROMPT` 保留原初始输入，不被 resume 控制提示覆盖。
+
+时间快照为 NULL 的旧运行保留以下 schema 1 规则；新的定时模式见下节，不能向历史运行回填时间。
 
 helper 的状态 schema 1 保存 run_id、规范 JSON 计划摘要、初始摘要、completed_stages、phase、session、各主 JSONL 字节 cursor、input_entry 与 reply_entry。phase 为 awaiting/pending/complete；总阶段数为 1+补充数。只识别主目录 JSONL 的对应普通 user 输入及其后稳定、非空、非 tool_use、非 synthetic/API 错误的最新 assistant；忽略 isMeta/isSidechain 与子目录。投递前落 pending 和新游标，tmux 成功不等于消费确认；observe 看到原主会话输入后才 acknowledged。pending 未确认重启必须失败，不能重发。最后阶段完成才可结束成功；完成状态也需重核最后输入/回复的原生证据。
 
@@ -226,3 +228,68 @@ driver 已确认收尾回复或 CLI 退出后，`advance --no-next` 缺少匹配
 - 实际按键多行保留空行、尾换行和字面字符，仅提交一次，Tab/CR 兼容输入不改变正文；原生 CLI 使用独立 HOME 与本地合成 SSE 核对真实格式，不能加载生产账号。
 - `deploy/v3/run_local_verification.py --manifest <清单> [--followups-only]` 用正式 driver/tmux 与 CLI 替身断言 1/2/3 条输入、原 cwd/session、认证错误 42 且无补充、两种收尾及时以 124 退出且保留未完成。替身允许整体包装、thinking/text 混合及回复先落盘，区分 Ctrl+J 换行与 Enter 提交，并记录 keys/paste；错误样例包含结构化 error 字段。正式镜像还须核对模块/命令链接及 control driver 与被测源码一致。
 - `deploy/v3/verify_stack.py --manifest <清单> --browser --topic-followups` 核对页面保存→API→SQLite、运行冻结正文、阶段摘要、XSS、1280/390px 明暗主题。替身和离线格式核对不能声称真实模型推理通过。
+
+## Scenario: 随机时间投递与阶段证据
+
+### 1. Scope / Trigger
+
+自然模式普通、批量和养号创建新 run 时冻结随机投递时间；修改 worker 调度、额度恢复、JSONL 证据或详情 API/UI 时须同步核对本节。旧 run 的 NULL 时间快照继续使用旧阶段规则，不回填。
+
+### 2. Signatures
+
+```text
+runs.followup_timing_json TEXT NULL
+sample_followup_timing(messages: list[str], timeout_sec: int, wrapup_sec: int) -> str
+decode_followup_timing(raw: str | None, count: int) -> dict | None
+process(action, state_path, project, run_id, initial, followups,
+        resume=False, idle_seconds=10, allow_next=True, timing=None) -> dict
+v3-task-followups init|start|tick|observe|advance --state <绝对路径> --project <主目录>
+                 [--resume] [--idle <秒>] [--no-next]
+```
+
+- 时间 JSON：`{schema:1,offsets_sec:[整数秒],timeout_sec:整数,wrapup_sec:整数}`。
+- 环境 `TASK_FOLLOWUP_TIMING_JSON` 为空走旧模式；非空必须为有效对象，与正文数、`TIMEOUT_SEC`、`TIMEOUT_WRAPUP_SEC` 一致。
+- 新状态 schema 2 保存原 run/正文摘要、`timing_digest`、`started_at`、`session/cursor`、`completed_stages/phase` 与 `items=[{status,cursor,queue_entry,input_entry,reply_entry}]`。
+- 详情 `followups` 保留 planned/completed/phase/messages；定时模式增加 `mode="timed"`、`offsets_sec`、`started_at`、`delivered/consumed`、`items: list[str]`。公开 items 仅含状态，不返回证据键。
+
+### 3. Contracts
+
+- 次数仍等概率选择候选前缀 0/1/2。三个创建入口在原 run 事务中保存正文与时间：在 `[ceil(timeout*0.1),floor(timeout*0.6)]` 内无放回抽整数秒并排序，正文顺序不变。30 分钟为第 3～18 分钟，重复运行各抽一次。Scheduler、Runner、QuotaGuard 只读原快照。
+- 有补充时冻结 `wrapup_sec=min(max(0,原设置),max(0,timeout-floor(timeout*0.6)-5))`，为轮询、提交和时钟取整留余量；零补充保持原收尾设置。
+- init 捕获旧字节基线，初始需求实际投递后 start 一次固定 Unix 时钟。每轮先处理原停止/认证/额度/收尾/超时门禁，再 tick；初始主输入已确认且到点才保存 pending 并发送，不等待最终回复。首轮提前结束但仍有未来计划时继续等待。
+- item 为 scheduled → pending → queued/consumed → completed。`type=queue-operation,operation=enqueue,sessionId=<主文件去后缀>` 的精确正文仅确认入队，须 include_queue=True 才读取；通用完成分类始终排除队列事件。普通主 user 才确认消费，正常最终 assistant 才确认完成；两条输入可共享同一最终回复，不要求逐条回复。
+- 严格正文/整体包装、字节边界、父链、非工具/非 synthetic 和稳定窗口沿用前节。仅跟踪最多三条业务输入的祖先标记，避免平方内存增长。成功须通用分类及全部计划证据共同通过，计数和 phase 不能单独作为成功凭证。
+- 恢复不重抽时间或时钟；暂停中到期的未发消息在新尝试门禁允许时依次投递，时限沿用既有尝试策略。原 CLI 内存队列无法跨进程保证保留，恢复时 pending/queued 无普通 user 必须失败、不重发。
+- 已绑定主会话却找不到原初始输入时，init/observe/tick 立即拒绝并保留阶段文件原字节，不能将已消费/完成状态回退为等待。首次尚未绑定、输入未落盘时允许等待。
+- 详情不扫描原生日志。已投递/消费/完成阶段的必需证据字段须为非空、非空白字符串；非 scheduled 条目须有有限正数时钟。运行后缺阶段文件为 unknown，损坏为 invalid；两者的 delivered/consumed/completed 均为 null，items 为 unknown。queued 尚未生成阶段文件可保持 not_started、投递/消费零及 scheduled。
+- 前端显式展示 unknown/invalid 提示及待确认计数，不能显示成等待到点或确定完成；保留来自 DB 的目标时间及正文，继续 escapeHTML。不发送中断、不模拟人工输入节奏、不承诺降低账号限制风险。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 预期行为 |
+| --- | --- |
+| 历史时间字段 NULL | 保留 schema 1，不回填、不重抽 |
+| null/数组、时间数量/顺序/范围或执行预算不符 | 明确拒绝，不降级旧模式 |
+| 到点仍忙 / 首轮提前结束 | 原队列投递 / 等待未来时刻，不中断、不提前成功 |
+| 两条排队输入共同消费并得到一条正常最终回复 | 两条均可完成 |
+| 重启只有 enqueue、无普通 user | 失败并保留现场，不重发 |
+| 已绑定会话删除/截断/替换，原输入不可见 | 立即报错，原阶段字节不变 |
+| 首次输入尚未落盘 | 正常等待 |
+| queued 缺阶段文件 / 运行后缺文件 | not_started、零投递/消费 / unknown、全部计数 null |
+| 空或空白证据、已执行阶段缺时钟 | invalid，不能冒充完成 |
+| 停止、认证、额度、收尾、退出及硬超时 | 原门禁优先，禁止继续新增业务需求 |
+
+### 5. Scenarios and Examples
+
+- 正常：1800 秒任务冻结 `[300,780]`，第 5/13 分钟投递，原 cwd/session 保持；两条可以共享正常最终回复。
+- 边界：零条保持单轮；短预算给最后计划点保留轮询余量；旧 NULL 运行仍按原回复边界执行。
+- 错误：enqueue 就算已完成，或缺文件显示默认零值和等待到点。正确：分开传输、消费、完成证据，缺失显示未知。
+- 错误：恢复时原输入已消失仍覆盖 phase=awaiting。正确：拒绝并保留原状态，不盲目重发。
+
+### 6. Tests Required
+
+- SQLite 核对三个创建入口、0/1/2、历史 NULL、窗口上界和短预算余量；恢复 payload 与原时间 JSON 一致，不调用抽签。
+- helper 覆盖忙碌入队、提前空闲、共同回复、乱序/异根、初始落盘延迟、pending/queued 重启；对已消费/完成注入日志删除/截断/替换，断言 init/observe/tick 报错且原阶段字节保持。
+- API 覆盖 queued/running/quota_wait/success 缺文件，空输入/回复/入队证据和缺时钟；正常分离计数、未知/无效空计数。真实浏览器覆盖文案、明暗/窄屏和 XSS。
+- 正式 driver/tmux 覆盖提前空闲、忙碌两条及认证先停；可用 `--timed-followups-only` 定向执行。原生 CLI 在独立 HOME、断网和 localhost 合成 SSE 下只证明输入/队列，不冒称真实模型推理。
+- 通过后端 unittest、Python 编译、shell/JS 语法；正式镜像的 helper/链接/driver 与源码一致。生产迁移和历史保留在发布后验收，不主动发起真实账号模型探测。

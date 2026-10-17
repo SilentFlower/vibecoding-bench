@@ -1592,9 +1592,19 @@ function renderRunFollowups(run) {
     unknown: '阶段状态待核对', invalid: '阶段证据无效，请查看运行错误' };
   const label = labels[plan?.phase] || '阶段状态待核对';
   const count = plan?.planned == null ? '未知' : `${plan.completed ?? '待确认'}/${plan.planned}`;
-  return `<p>${escapeHTML(label)} · 已完成补充 ${escapeHTML(count)}</p>
+  const timed = plan?.mode === 'timed';
+  const itemLabels = { scheduled: '等待到点', pending: '投递待确认', queued: '已入队，等待消费',
+    consumed: '已消费，执行中', completed: '已完成', unknown: '状态待核对' };
+  const warning = ['unknown', 'invalid'].includes(plan?.phase) ? `${label} · ` : '';
+  const summary = timed ? `${warning}按时间投递 · 已投递 ${plan.delivered ?? '待确认'}/${plan.planned} · 已消费 ${plan.consumed ?? '待确认'}/${plan.planned}` : label;
+  return `<p>${escapeHTML(summary)} · 已完成补充 ${escapeHTML(count)}</p>
     <details><summary>初始需求</summary><pre class="transcript-pre">${escapeHTML(run.prompt || '历史需求暂不可用')}</pre></details>
-    ${messages.map((text, index) => `<details><summary>补充 ${index + 1}</summary><pre class="transcript-pre">${escapeHTML(text)}</pre></details>`).join('')}`;
+    ${messages.map((text, index) => {
+      const offset = plan?.offsets_sec?.[index];
+      const when = timed && Number.isInteger(offset) ? ` · 启动后 ${Math.floor(offset / 60)}分${offset % 60}秒` : '';
+      const progress = timed ? ` · ${itemLabels[plan.items?.[index]] || '状态待核对'}` : '';
+      return `<details><summary>补充 ${index + 1}${escapeHTML(when + progress)}</summary><pre class="transcript-pre">${escapeHTML(text)}</pre></details>`;
+    }).join('')}`;
 }
 
 /** 创建运行详情容器。@param {string} rid 运行标识。@returns {void} */

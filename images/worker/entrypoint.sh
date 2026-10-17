@@ -1440,7 +1440,7 @@ inject_tmux_prompt() {
 
 advance_task_followups() {
   local result action index text
-  local args=(advance --state /workspace/.bench-followups.json --project "$CLAUDE_DIR/projects/-workspace" --idle "$COMPLETION_IDLE_SEC")
+  local args=("${1:-advance}" --state /workspace/.bench-followups.json --project "$CLAUDE_DIR/projects/-workspace" --idle "$COMPLETION_IDLE_SEC")
   if [ -f /tmp/claude-wrapup-sent ] || [ -f /tmp/claude-exited ]; then
     args+=(--no-next)
   fi
@@ -1754,6 +1754,13 @@ CLAUDE_API_STALL_RECOVERY_PROMPT="${CLAUDE_API_STALL_RECOVERY_PROMPT:-A Claude A
 log "Waiting for final assistant message or timeout (${TIMEOUT_SEC}s)"
 run_started_at=$(date +%s)
 deadline=$(( $(date +%s) + TIMEOUT_SEC ))
+if [ "$FOLLOWUP_COUNT" -gt 0 ] && [ -n "${TASK_FOLLOWUP_TIMING_JSON:-}" ]; then
+  if ! python3 /usr/local/bin/v3-task-followups start --state /workspace/.bench-followups.json \
+      --project "$CLAUDE_DIR/projects/-workspace" >/dev/null; then
+    write_bench_status "failed" "自动补充投递时钟无效，已保留原运行"
+    exit 1
+  fi
+fi
 completion_done=0
 capture_transcript_snapshot
 while [ "$(date +%s)" -lt "$deadline" ]; do
@@ -1864,7 +1871,19 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     write_api_stall_status "running" "检测到 Claude API 连接卡死，但自动恢复次数已用完"
   fi
   if [ "$FOLLOWUP_COUNT" -gt 0 ]; then
-    if ! python3 /usr/local/bin/v3-task-followups observe --state /workspace/.bench-followups.json \
+    if [ -n "${TASK_FOLLOWUP_TIMING_JSON:-}" ]; then
+      # 到点投递独立于最终回复；忙碌的原生 CLI 会先入队，不能等待首轮结束。
+      followup_status=0
+      advance_task_followups tick || followup_status=$?
+      if [ "$followup_status" -eq 2 ]; then
+        sleep 0.2
+        continue
+      elif [ "$followup_status" -gt 2 ]; then
+        write_bench_status "failed" "自动补充定时证据无效或投递结果不确定，已保留原运行"
+        touch /tmp/claude-followup-error
+        break
+      fi
+    elif ! python3 /usr/local/bin/v3-task-followups observe --state /workspace/.bench-followups.json \
         --project "$CLAUDE_DIR/projects/-workspace" >/dev/null; then
       write_bench_status "failed" "自动补充阶段证据无效，已保留原运行"
       touch /tmp/claude-followup-error

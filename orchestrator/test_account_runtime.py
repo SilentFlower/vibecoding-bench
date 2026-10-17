@@ -393,12 +393,17 @@ class AccountRuntimeTests(unittest.TestCase):
             setup.return_value.__enter__.return_value = (row, container, job)
             with patch.object(main, "derive_fingerprint", return_value={"tz": "Asia/Tokyo", "lang": "ja_JP.UTF-8"}):
                 runner.start_run("driver-test", {"id": 1, "name": "synthetic"},
-                    {"id": 1, "prompt": "Synthetic only", "claude_code_version": "2.1.293", "model_override": ""})
+                    {"id": 1, "prompt": "Synthetic only", "claude_code_version": "2.1.293", "model_override": "",
+                        "followup_plan_json": '["Add a comparison."]',
+                        "followup_timing_json": '{"schema":1,"offsets_sec":[6],"timeout_sec":60,"wrapup_sec":20}',
+                        "timeout_sec": 60})
         self.assertFalse((root / "workspaces/driver-test/.claude-home").exists())
         executed = self.client.api.exec_create.call_args.kwargs["environment"]
         self.assertEqual("UTC", executed["TZ"])
         self.assertEqual("en_US.UTF-8", executed["LANG"])
         self.assertEqual("en_US.UTF-8", executed["LC_ALL"])
+        self.assertEqual([6], json.loads(executed['TASK_FOLLOWUP_TIMING_JSON'])['offsets_sec'])
+        self.assertEqual('20',executed['TIMEOUT_WRAPUP_SEC'])
         script = (root / "runtime/drivers" / f"job-{job['handle']}.sh").read_text()
         defaults = re.search(r"^write_default_settings\(\) \{.*?^\}$", script, re.M | re.S)
         self.assertIsNotNone(defaults)

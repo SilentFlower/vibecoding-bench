@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import secrets
@@ -164,11 +165,12 @@ def _ordered(items: list[dict], parents: dict[str, str | None]) -> list[dict]:
     return result
 
 
-def read_dialogue(path: Path, offset: int = 0) -> list[dict]:
+def read_dialogue(path: Path, offset: int = 0, include_queue: bool = False) -> list[dict]:
     """有界读取主消息，保留字节证据并恢复实际对话顺序。
 
     :param path: 已由调用方核对的主 JSONL 文件。
     :param offset: 本次执行或阶段已保存的字节游标。
+    :param include_queue: 定时模式额外读取原生入队证据，通用完成检测始终排除。
     :return: 按父链及时间排序的消息摘要，不保留工具大正文。
     """
     if path.stat().st_size < offset:
@@ -215,7 +217,11 @@ def read_dialogue(path: Path, offset: int = 0) -> list[dict]:
             if not isinstance(message, dict):
                 message = entry
             role = message.get('role')
-            if role not in ('user', 'assistant'):
+            queued = include_queue and entry.get('type') == 'queue-operation' \
+                and entry.get('operation') == 'enqueue' and entry.get('sessionId') == path.stem
+            if queued:
+                role = 'queue'
+            if role not in ('user', 'assistant') and not queued:
                 continue
             content = message.get('content')
             text = _text(content, role)
@@ -229,7 +235,7 @@ def read_dialogue(path: Path, offset: int = 0) -> list[dict]:
                     epoch = timestamp.timestamp()
             except (KeyError, ValueError, TypeError, AttributeError, OverflowError, OSError):
                 pass
-            items.append({'role': role, 'text': text, 'normal': not synthetic and not tool,
+            items.append({'role': role, 'text': text, 'normal': not synthetic and not tool and not queued,
                 'synthetic': synthetic, 'tool': tool, 'error': str(entry.get('error') or ''),
                 'id': identity, 'parent': parent, 'epoch': epoch,
                 'key': path.name + ':' + str(start), 'end': stream.tell()})
@@ -309,10 +315,10 @@ def _validate(state: dict, run_id: str, digest: str, total: int, initial: str) -
 
 def process(action: str, state_path: Path, project: Path, run_id: str,
             initial: str, followups: list[str], resume: bool = False,
-            idle_seconds: float = 10, allow_next: bool = True) -> dict:
+            idle_seconds: float = 10, allow_next: bool = True, timing: dict | None = None) -> dict:
     """依据输入与回复证据推进一个阶段，pending 状态禁止再次发送。
 
-    :param action: init、observe 或 advance。
+    :param action: init/observe/advance，定时模式另提供 start/tick。
     :param state_path: 本运行持久阶段文件。
     :param project: 固定主会话目录。
     :param run_id: 固定运行标识。
@@ -321,9 +327,10 @@ def process(action: str, state_path: Path, project: Path, run_id: str,
     :param resume: 是否从原运行恢复。
     :param idle_seconds: 最终回复所需稳定窗口。
     :param allow_next: 收尾窗口禁止启动下一业务补充。
+    :param timing: 新运行冻结时间快照；None 保留旧阶段规则。
     :return: wait、send、complete 或 incomplete 动作及阶段摘要。
     """
-    if action not in ('init', 'observe', 'advance') or not re.fullmatch(r'[a-f0-9]{12}', run_id):
+    if action not in ('init', 'observe', 'advance', 'start', 'tick') or not re.fullmatch(r'[a-f0-9]{12}', run_id):
         raise ValueError('阶段动作或运行标识无效')
     if not isinstance(initial, str) or not initial.strip() or not isinstance(followups, list) or len(followups) > 2 \
             or any(not isinstance(x, str) or not x.strip() or len(x) > 8000
@@ -333,6 +340,11 @@ def process(action: str, state_path: Path, project: Path, run_id: str,
     total = 1 + len(followups)
     directory = _parent(state_path)
     os.close(directory)
+    if timing is not None:
+        return _process_timed(action, state_path, project, run_id, initial, followups,
+            resume, idle_seconds, allow_next, timing)
+    if action in ('start', 'tick'):
+        raise ValueError('旧阶段模式不能使用定时动作')
     if state_path.exists() or state_path.is_symlink():
         state = _read(state_path, MAX_STATE_BYTES)
     elif action == 'init' and not resume:
@@ -388,13 +400,160 @@ def process(action: str, state_path: Path, project: Path, run_id: str,
         'completed_stages': state['completed_stages'], 'phase': 'pending'}
 
 
+def _process_timed(action: str, state_path: Path, project: Path, run_id: str,
+        initial: str, followups: list[str], resume: bool, idle_seconds: float,
+        allow_next: bool, timing: dict) -> dict:
+    if not isinstance(timing, dict):
+        raise ValueError('补充时间快照须为对象')
+    offsets = timing.get('offsets_sec')
+    timeout, wrapup = timing.get('timeout_sec'), timing.get('wrapup_sec')
+    if type(timing.get('schema')) is not int or timing['schema'] != 1 \
+            or type(timeout) is not int or timeout < 1 or type(wrapup) is not int or wrapup < 0 \
+            or not isinstance(offsets, list) or len(offsets) != len(followups) \
+            or any(type(x) is not int or not (timeout + 9) // 10 <= x <= timeout * 6 // 10
+                or x >= timeout - wrapup for x in offsets) or offsets != sorted(set(offsets)):
+        raise ValueError('补充时间快照无效')
+    timing_digest = hashlib.sha256(json.dumps(timing, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    digest = plan_digest(run_id, followups)
+    if state_path.exists() or state_path.is_symlink():
+        state = _read(state_path, MAX_STATE_BYTES)
+    elif action == 'init' and not resume:
+        state = {'schema': 2, 'run_id': run_id, 'plan_digest': digest, 'timing_digest': timing_digest,
+            'initial_digest': hashlib.sha256(initial.encode()).hexdigest(),
+            'completed_stages': 0, 'phase': 'awaiting', 'session': '', 'started_at': None,
+            'cursor': {p.name: p.stat().st_size for p in _files(project)},
+            'items': [{'status': 'scheduled', 'cursor': {}, 'queue_entry': None,
+                'input_entry': None, 'reply_entry': None} for _ in followups]}
+        _write(state_path, state)
+    else:
+        raise ValueError('缺少原定时状态，恢复不能重抽或初始化')
+    original = json.dumps(state, sort_keys=True)
+    # 复用旧模式的运行身份、游标及会话校验，计数另按消息证据验证。
+    _validate(dict(state, schema=1, completed_stages=0, phase='awaiting'), run_id, digest,
+        1 + len(followups), initial)
+    items = state.get('items')
+    started = state.get('started_at')
+    if type(state.get('schema')) is not int or state['schema'] != 2 \
+            or state.get('timing_digest') != timing_digest \
+            or not isinstance(items, list) or len(items) != len(followups) \
+            or state.get('phase') not in ('awaiting', 'pending', 'complete') \
+            or type(state.get('completed_stages')) is not int or not 0 <= state['completed_stages'] <= 1 + len(followups) \
+            or (started is not None and (type(started) not in (int, float) or not math.isfinite(started) or started <= 0)):
+        raise ValueError('定时状态与原计划不匹配')
+    seen_scheduled = False
+    for item in items:
+        if not isinstance(item, dict) or item.get('status') not in ('scheduled', 'pending', 'queued', 'consumed', 'completed'):
+            raise ValueError('定时消息状态无效')
+        _validate(dict(state, schema=1, completed_stages=0, phase='awaiting', cursor=item.get('cursor')),
+            run_id, digest, 1 + len(followups), initial)
+        if seen_scheduled and item['status'] != 'scheduled':
+            raise ValueError('定时消息不能跳过前序投递')
+        seen_scheduled = seen_scheduled or item['status'] in ('scheduled', 'pending')
+        for key, required in (('queue_entry', item['status'] == 'queued'),
+                ('input_entry', item['status'] in ('consumed', 'completed')),
+                ('reply_entry', item['status'] == 'completed')):
+            if (item.get(key) is not None and not isinstance(item[key], str)) or (required and not item.get(key)):
+                raise ValueError('定时消息证据键无效')
+    if state['phase'] == 'complete' and (state['completed_stages'] != 1 + len(followups)
+            or any(item['status'] != 'completed' for item in items)):
+        raise ValueError('定时完成状态不一致')
+    accepted, _, path = _evidence(state, project, initial)
+    if state['session'] and accepted is None:
+        # 已确认过的初始输入不应再次消失；拒绝覆盖原进度，避免损坏日志被当作尚未开始。
+        raise ValueError('原主会话输入证据缺失，已保留原阶段状态')
+    latest = None
+    records, ancestry = [], {}
+    if accepted:
+        state['session'] = path.name
+        records = read_dialogue(path, state['cursor'].get(path.name, 0), include_queue=True)
+        tracked = {accepted['key']}
+        for text in followups:
+            inputs = [r for r in records if r['role'] == 'user' and r['normal']
+                and r['text'] is not None and _matches_input(r['text'], text)]
+            if len(inputs) > 1:
+                raise ValueError('定时业务输入重复，归属不确定')
+            tracked.update(r['key'] for r in inputs)
+        # 入队记录无 UUID，只确认传输；真正消费和完成仍依赖普通消息父链。
+        # 仅跟踪最多三条业务输入的祖先标记，避免长任务保存整条祖先链造成平方内存增长。
+        for record in records:
+            if record['role'] == 'queue':
+                continue
+            ancestors = ancestry.get(record['parent_key'], set())
+            ancestry[record['key']] = ancestors | ({record['key']} if record['key'] in tracked else set())
+        dialogue = [r for r in records if r['role'] != 'queue']
+        latest = dialogue[-1] if dialogue else None
+        for index, item in enumerate(items):
+            boundary = item['cursor'].get(path.name, 0)
+            matches = [r for r in records if r['text'] is not None and _matches_input(r['text'], followups[index])
+                and int(r['key'].rsplit(':', 1)[1]) >= boundary
+                and (r['role'] == 'queue' or r['role'] == 'user' and r['normal']
+                    and (accepted['id'] is None or r['id'] is None or accepted['key'] in ancestry[r['key']]))]
+            users = [r for r in matches if r['role'] == 'user']
+            queues = [r for r in matches if r['role'] == 'queue']
+            if len(users) > 1 or len(queues) > 1 or matches and item['status'] == 'scheduled':
+                raise ValueError('定时输入重复或未经投递，归属不确定')
+            if item.get('input_entry') and not any(r['key'] == item['input_entry'] for r in users) \
+                    or item.get('queue_entry') and not any(r['key'] == item['queue_entry'] for r in queues):
+                raise ValueError('原定时投递证据缺失')
+            if queues:
+                item['queue_entry'] = queues[0]['key']
+                if item['status'] == 'pending':
+                    item['status'] = 'queued'
+            if users:
+                item['input_entry'] = users[0]['key']
+                if item['status'] != 'completed':
+                    item['status'] = 'consumed'
+            if item.get('reply_entry'):
+                replies = [r for r in dialogue if r['key'] == item['reply_entry'] and r['role'] == 'assistant'
+                    and r['normal'] and r['text'] and (users[0]['id'] is None or r['id'] is None
+                        or item['input_entry'] in ancestry[r['key']])]
+                if not replies:
+                    raise ValueError('原定时完成证据缺失')
+    if resume and any(item['status'] in ('pending', 'queued') for item in items):
+        # 原生队列只在旧 CLI 内存中，重启后不能把历史 enqueue 当作消息仍会执行。
+        raise ValueError('补充消息投递结果不确定，原队列未消费，禁止盲目重发')
+    if action == 'start' and started is None:
+        state['started_at'] = time.time()
+    elif resume and started is None:
+        raise ValueError('原运行缺少投递时钟，不能猜测恢复时间')
+    stable_reply = latest is not None and latest['role'] == 'assistant' and latest['normal'] \
+        and latest['text'] and latest['text'].strip() and time.time() - path.stat().st_mtime >= idle_seconds
+    if stable_reply:
+        for item in items:
+            if item['status'] in ('consumed', 'completed') and (latest['id'] is None
+                    or item['input_entry'] in ancestry[latest['key']]
+                    or any(r['key'] == item['input_entry'] and r['id'] is None for r in records)):
+                item.update(status='completed', reply_entry=latest['key'])
+    initial_done = bool(stable_reply and (accepted['id'] is None or latest['id'] is None
+        or accepted['key'] in ancestry[latest['key']]))
+    state['completed_stages'] = int(initial_done) + sum(x['status'] == 'completed' for x in items)
+    complete = initial_done and all(x['status'] == 'completed' for x in items)
+    state['phase'] = 'complete' if complete else 'pending' if any(x['status'] == 'pending' for x in items) else 'awaiting'
+    result = {'action': 'complete' if complete else 'wait', 'phase': state['phase']}
+    if not complete and action == 'advance' and not allow_next:
+        result['action'] = 'incomplete'
+    elif action == 'tick' and allow_next and accepted and state['started_at'] is not None:
+        for index, item in enumerate(items):
+            if item['status'] == 'pending':
+                break
+            if item['status'] == 'scheduled':
+                if time.time() >= state['started_at'] + offsets[index]:
+                    item.update(status='pending', cursor={p.name: p.stat().st_size for p in _files(project)})
+                    state['phase'] = 'pending'
+                    result = {'action': 'send', 'index': index + 1, 'text': followups[index], 'phase': 'pending'}
+                break
+    if json.dumps(state, sort_keys=True) != original:
+        _write(state_path, state)
+    return result
+
+
 def main() -> None:
     """提供 driver 使用的无网络命令行入口。
 
     :return: None；错误仅输出固定诊断，不输出题面和会话正文。
     """
     parser = argparse.ArgumentParser(description='有限业务补充阶段控制')
-    parser.add_argument('action', choices=('init', 'observe', 'advance'))
+    parser.add_argument('action', choices=('init', 'observe', 'advance', 'start', 'tick'))
     parser.add_argument('--state', type=Path, required=True)
     parser.add_argument('--project', type=Path, required=True)
     parser.add_argument('--resume', action='store_true')
@@ -403,8 +562,15 @@ def main() -> None:
     args = parser.parse_args()
     try:
         followups = json.loads(os.environ.get('TASK_FOLLOWUPS_JSON', '[]'))
+        timing_raw = os.environ.get('TASK_FOLLOWUP_TIMING_JSON')
+        timing = json.loads(timing_raw) if timing_raw else None
+        if timing_raw and (not isinstance(timing, dict)
+                or 'TIMEOUT_SEC' in os.environ and timing.get('timeout_sec') != int(os.environ['TIMEOUT_SEC'])
+                or 'TIMEOUT_WRAPUP_SEC' in os.environ and timing.get('wrapup_sec') != int(os.environ['TIMEOUT_WRAPUP_SEC'])):
+            raise ValueError('投递时间快照与执行预算不一致')
         value = process(args.action, args.state, args.project, os.environ.get('RUN_ID', ''),
-            os.environ.get('TASK_INITIAL_PROMPT', ''), followups, args.resume, args.idle, not args.no_next)
+            os.environ.get('TASK_INITIAL_PROMPT', ''), followups, args.resume, args.idle, not args.no_next,
+            timing)
     except (OSError, ValueError, TypeError, KeyError):
         print(json.dumps({'action': 'error', 'message': '自动补充阶段证据无效或投递结果不确定，需核对原运行'}))
         sys.exit(1)

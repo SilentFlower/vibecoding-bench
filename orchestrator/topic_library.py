@@ -160,6 +160,46 @@ def sample_followups(candidates: object) -> list[str]:
     return messages[:random.randint(0, len(messages))] if messages else []
 
 
+def sample_followup_timing(messages: list[str], timeout_sec: int, wrapup_sec: int) -> str:
+    """为新运行一次性冻结投递时刻和兼容收尾预算。
+
+    :param messages: 已抽取的补充正文。
+    :param timeout_sec: 本次运行总预算秒数。
+    :param wrapup_sec: 当前收尾设置，短预算时限制到投递窗口之后。
+    :return: 可持久化的规范时间计划 JSON。
+    """
+    lower, upper = (timeout_sec + 9) // 10, timeout_sec * 6 // 10
+    offsets = sorted(random.sample(range(lower, upper + 1), len(messages)))
+    # 预留两秒轮询、末尾提交与秒级时钟取整的余量，短任务不能刚到点就被收尾抢先。
+    wrapup = min(max(0, wrapup_sec), max(0, timeout_sec - upper - 5)) if messages else max(0, wrapup_sec)
+    return json.dumps({'schema': 1, 'offsets_sec': offsets, 'timeout_sec': timeout_sec,
+        'wrapup_sec': wrapup}, separators=(',', ':'))
+
+
+def decode_followup_timing(raw: str | None, count: int) -> dict | None:
+    """校验新时间快照，以 NULL 明确区分旧运行。
+
+    :param raw: 原运行时间 JSON，历史记录为 None。
+    :param count: 原冻结正文数。
+    :return: 时间计划对象或旧模式的 None。
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or len(raw) > 1024:
+        raise ValueError('补充时间快照无效')
+    value = json.loads(raw)
+    if not isinstance(value, dict) or type(value.get('schema')) is not int or value['schema'] != 1:
+        raise ValueError('补充时间快照版本无效')
+    offsets, timeout, wrapup = value.get('offsets_sec'), value.get('timeout_sec'), value.get('wrapup_sec')
+    if type(timeout) is not int or timeout < 1 or type(wrapup) is not int or wrapup < 0 \
+            or not isinstance(offsets, list) or len(offsets) != count \
+            or any(type(x) is not int or not (timeout + 9) // 10 <= x <= timeout * 6 // 10
+                or x >= timeout - wrapup for x in offsets) \
+            or offsets != sorted(set(offsets)):
+        raise ValueError('补充时间快照预算或顺序无效')
+    return value
+
+
 def parse_topics(path: Path) -> list[Topic]:
     """解析新题库与无补充的历史 Markdown，拒绝孤立或错序子行。
 

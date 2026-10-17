@@ -284,8 +284,9 @@ class QuotaGuardTests(unittest.TestCase):
         """额度状态优先于历史错误退出码 0，恢复原 run/会话及快照。"""
         task = self._run(batch=True)
         plan = json.dumps(["Compare periods.", "Export comparison results."])
+        timing = json.dumps({'schema':1,'offsets_sec':[180,360],'timeout_sec':1800,'wrapup_sec':600})
         with main.get_db() as connection:
-            connection.execute("UPDATE runs SET followup_plan_json=? WHERE id='original'", (plan,))
+            connection.execute("UPDATE runs SET followup_plan_json=?,followup_timing_json=? WHERE id='original'", (plan,timing))
         self.runner.read_worker_status.return_value = {"status": "quota_wait", "error": "被动识别额度耗尽:five_hour"}
         self.scheduler._execute("original", self.account, task)
         self.assertEqual("quota_wait", main.get_run("original")["status"])
@@ -310,6 +311,7 @@ class QuotaGuardTests(unittest.TestCase):
         self.assertEqual("high", payload["claude_effort_level"])
         self.assertEqual(1, payload["quota_attempt"])
         self.assertEqual(plan, payload["followup_plan_json"])
+        self.assertEqual(timing, payload["followup_timing_json"])
         self.runner.read_worker_status.return_value = {}
         # 真实成功响应解除恢复认领，其它等待才可运行。
         def successful_response(_worker):
@@ -318,6 +320,7 @@ class QuotaGuardTests(unittest.TestCase):
         self.runner.wait_worker.side_effect = successful_response
         self.scheduler._execute(rid, account, payload)
         self.assertEqual(plan, self.runner.start_run.call_args.args[2]["followup_plan_json"])
+        self.assertEqual(timing, self.runner.start_run.call_args.args[2]["followup_timing_json"])
         self.assertEqual("same-session", self.runner.start_run.call_args.args[2]["resume_session_id"])
         self.assertEqual(main.get_run(rid)["execution_model"], self.runner.start_run.call_args.args[2]["model_override"])
         self.assertEqual("success", main.get_run(rid)["status"])

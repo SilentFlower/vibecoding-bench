@@ -48,7 +48,8 @@ from account_runtime import AccountRuntime, RuntimeBusy, V3_DEFAULT_TIMEZONE, at
 from cli_quota import statusline_quota_observation
 from login_terminal import authorization_url
 from login_drafts import LoginDraftStore
-from topic_library import decode_followups, encode_followups, parse_topics, sample_followups
+from topic_library import (decode_followup_timing, decode_followups, encode_followups, parse_topics,
+    sample_followup_timing, sample_followups)
 
 
 # ============== 配置 ==============
@@ -1430,6 +1431,7 @@ CREATE TABLE IF NOT EXISTS runs (
   deleted_at REAL,
   error TEXT,
   followup_plan_json TEXT NOT NULL DEFAULT '[]',
+  followup_timing_json TEXT,
   created_at REAL DEFAULT (julianday('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_runs_status  ON runs(status);
@@ -1535,6 +1537,7 @@ def init_db() -> None:
             _ensure_column(conn, "tasks", "followup_candidates_json", "TEXT NOT NULL DEFAULT '[]'")
             _ensure_column(conn, "task_batch_items", "followup_candidates_json", "TEXT NOT NULL DEFAULT '[]'")
             _ensure_column(conn, "runs", "followup_plan_json", "TEXT NOT NULL DEFAULT '[]'")
+            _ensure_column(conn, "runs", "followup_timing_json", "TEXT")
             _seed_topics_if_empty(conn)
     finally:
         conn.close()
@@ -3649,6 +3652,7 @@ class QuotaGuard:
                     "claude_code_version": run["claude_code_version"], "claude_effort_level": run["claude_effort_level"],
                     "quota_attempt": attempt, "model_override": run["execution_model"],
                     "followup_plan_json": run.get("followup_plan_json"),
+                    "followup_timing_json": run.get("followup_timing_json"),
                     "capture_full_http": run["run_kind"] == "capture", "capture_mode": run["capture_mode"],
                     "capture_permission_mode": run["capture_permission_mode"]}
             scheduler.submit(run["id"], account, task)
@@ -3848,8 +3852,11 @@ class Runner:
                 "CAPTURE_TARGETS": "anthropic.com,claude.com",
                 "CAPTURE_MAX_BODY_BYTES": "0",
             })
+        timing = decode_followup_timing(task.get("followup_timing_json"),
+            len(decode_followups(task.get("followup_plan_json"))))
         worker_env = {
             "TASK_PROMPT": task["prompt"],
+            "TASK_FOLLOWUP_TIMING_JSON": json.dumps(timing, separators=(",", ":")) if timing else "",
             "TASK_FOLLOWUPS_JSON": encode_followups(decode_followups(task.get("followup_plan_json"))),
             "RUN_ID": run_id,
             "TIMEOUT_SEC": str(task.get("timeout_sec", 1800)),
@@ -3859,7 +3866,7 @@ class Runner:
             "CLAUDE_PERMISSION_MODE": permission_mode,
             "PROFILE_CLAUDE_CODE_EFFORT_LEVEL": CLAUDE_CODE_EFFORT_LEVEL,
             "CLEAN_WORKSPACE_DEPS": CLEAN_WORKSPACE_DEPS,
-            "TIMEOUT_WRAPUP_SEC": str(TIMEOUT_WRAPUP_SEC),
+            "TIMEOUT_WRAPUP_SEC": str(timing["wrapup_sec"] if timing else TIMEOUT_WRAPUP_SEC),
             "OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC": str(OAUTH_CREDENTIAL_SYNC_INTERVAL_SEC),
             "OAUTH_401_PROFILE_WAIT_SEC": str(OAUTH_401_PROFILE_WAIT_SEC),
             "CLAUDE_API_STALL_WATCHDOG_SEC": str(CLAUDE_API_STALL_WATCHDOG_SEC),
@@ -6297,6 +6304,7 @@ class Scheduler:
         claude_effort_level = effective_runtime_effort()
         candidates = item.get("followup_candidates_json")
         plan = encode_followups(sample_followups(decode_followups(candidates)))
+        timing = sample_followup_timing(decode_followups(plan), batch["timeout_sec"], TIMEOUT_WRAPUP_SEC)
         with _db_lock:
             conn = get_db()
             try:
@@ -6342,7 +6350,7 @@ class Scheduler:
                     task_id = int(cur.lastrowid)
                     conn.execute(
                         "INSERT INTO runs(id, task_id, account_id, batch_id, topic_id, status, "
-                        "claude_code_version, claude_effort_level, followup_plan_json) VALUES(?,?,?,?,?,?,?,?,?)",
+                        "claude_code_version, claude_effort_level, followup_plan_json, followup_timing_json) VALUES(?,?,?,?,?,?,?,?,?,?)",
                         (
                             run_id,
                             task_id,
@@ -6353,6 +6361,7 @@ class Scheduler:
                             claude_code_version,
                             claude_effort_level,
                             plan,
+                            timing,
                         ),
                     )
                     conn.execute(
@@ -6511,7 +6520,8 @@ class Scheduler:
             flows_path = FLOWS_DIR / account["name"] / str(task["id"]) / run_id
             capture_full_http = bool(task.get("capture_full_http"))
             initial_state = self._get_run_state(run_id)
-            task = dict(task, followup_plan_json=(initial_state or {}).get("followup_plan_json"))
+            task = dict(task, followup_plan_json=(initial_state or {}).get("followup_plan_json"),
+                followup_timing_json=(initial_state or {}).get("followup_timing_json"))
             if not initial_state or initial_state.get("deleted_at") is not None:
                 return
             if int(initial_state.get("quota_attempt") or 0) != attempt:
@@ -7273,6 +7283,7 @@ class WarmupScheduler:
         claude_effort_level = effective_runtime_effort()
         candidates = _topic_followup_candidates(topic, None, "natural")
         plan = encode_followups(sample_followups(decode_followups(candidates)))
+        timing = sample_followup_timing(decode_followups(plan), 1800, TIMEOUT_WRAPUP_SEC)
         with _db_lock:
             conn = get_db()
             try:
@@ -7308,7 +7319,7 @@ class WarmupScheduler:
                     task_id = int(cur.lastrowid)
                     conn.execute(
                         "INSERT INTO runs(id, task_id, account_id, topic_id, status, run_kind, "
-                        "claude_code_version, claude_effort_level, followup_plan_json) VALUES(?,?,?,?,?,?,?,?,?)",
+                        "claude_code_version, claude_effort_level, followup_plan_json, followup_timing_json) VALUES(?,?,?,?,?,?,?,?,?,?)",
                         (
                             run_id,
                             task_id,
@@ -7319,6 +7330,7 @@ class WarmupScheduler:
                             claude_code_version,
                             claude_effort_level,
                             plan,
+                            timing,
                         ),
                     )
                     conn.execute(
@@ -10168,6 +10180,7 @@ def run_task(tid: int):
     for _ in range(int(task.get("repeat_n", 1))):
         rid = uuid.uuid4().hex[:12]
         plan = encode_followups(sample_followups(decode_followups(task.get("followup_candidates_json"))))
+        timing = sample_followup_timing(decode_followups(plan), task["timeout_sec"], TIMEOUT_WRAPUP_SEC)
         claude_code_version = effective_claude_code_version()
         claude_effort_level = effective_runtime_effort()
         with _db_lock:
@@ -10176,7 +10189,7 @@ def run_task(tid: int):
                 with conn:
                     conn.execute(
                         "INSERT INTO runs(id, task_id, account_id, batch_id, topic_id, status, "
-                        "claude_code_version, claude_effort_level, followup_plan_json) VALUES(?,?,?,?,?,?,?,?,?)",
+                        "claude_code_version, claude_effort_level, followup_plan_json, followup_timing_json) VALUES(?,?,?,?,?,?,?,?,?,?)",
                         (
                             rid,
                             tid,
@@ -10187,6 +10200,7 @@ def run_task(tid: int):
                             claude_code_version,
                             claude_effort_level,
                             plan,
+                            timing,
                         ),
                     )
             finally:
@@ -10197,6 +10211,7 @@ def run_task(tid: int):
         run_task_payload["claude_code_version"] = claude_code_version
         run_task_payload["claude_effort_level"] = claude_effort_level
         run_task_payload["followup_plan_json"] = plan
+        run_task_payload["followup_timing_json"] = timing
         scheduler.submit(rid, account, run_task_payload)
         run_ids.append(rid)
     return {"run_ids": run_ids}
@@ -10229,10 +10244,14 @@ def _public_followup_progress(run: dict) -> dict:
     """
     try:
         messages = decode_followups(run.get("followup_plan_json"))
+        timing = decode_followup_timing(run.get("followup_timing_json"), len(messages))
     except ValueError:
         return {"planned": None, "completed": None, "phase": "invalid", "messages": []}
     result = {"planned": len(messages), "completed": 0 if not messages else None,
         "phase": "single" if not messages else "not_started", "messages": messages}
+    if timing is not None:
+        result.update(mode="timed", offsets_sec=timing["offsets_sec"], started_at=None,
+            delivered=0, consumed=0, items=["scheduled"] * len(messages))
     if not messages:
         return result
     path = account_runtime.run_artifact_path(run["id"], "followups.json") if account_runtime else (
@@ -10247,6 +10266,38 @@ def _public_followup_progress(run: dict) -> dict:
             state = json.loads(stream.read(65537))
         raw = json.dumps({"run_id": run["id"], "followups": messages}, ensure_ascii=False,
             sort_keys=True, separators=(",", ":")).encode()
+        if timing is not None:
+            timing_raw = json.dumps(timing, sort_keys=True, separators=(",", ":")).encode()
+            items = state.get("items") if isinstance(state, dict) else None
+            if not isinstance(state, dict) or type(state.get("schema")) is not int or state["schema"] != 2 \
+                    or state.get("run_id") != run["id"] or state.get("plan_digest") != hashlib.sha256(raw).hexdigest() \
+                    or state.get("timing_digest") != hashlib.sha256(timing_raw).hexdigest() \
+                    or state.get("phase") not in ("awaiting", "pending", "complete") \
+                    or type(state.get("completed_stages")) is not int \
+                    or not 0 <= state["completed_stages"] <= len(messages) + 1 \
+                    or not isinstance(items, list) or len(items) != len(messages):
+                raise ValueError("定时阶段归属无效")
+            statuses = []
+            for item in items:
+                status = item.get("status") if isinstance(item, dict) else None
+                if status not in ("scheduled", "pending", "queued", "consumed", "completed") \
+                        or any(not isinstance(item.get(key), str) or not item[key].strip()
+                            for key, required in (("queue_entry", status == "queued"),
+                                ("input_entry", status in ("consumed", "completed")),
+                                ("reply_entry", status == "completed")) if required):
+                    raise ValueError("定时阶段计数无效")
+                statuses.append(status)
+            started = state.get("started_at")
+            if started is not None and (type(started) not in (int, float) or not 0 < started < float("inf")) \
+                    or started is None and any(x != "scheduled" for x in statuses) \
+                    or state["phase"] == "complete" and (any(x != "completed" for x in statuses)
+                        or state["completed_stages"] != len(messages) + 1):
+                raise ValueError("定时时钟或完成状态无效")
+            result.update(completed=statuses.count("completed"),
+                delivered=sum(x in ("queued", "consumed", "completed") for x in statuses),
+                consumed=sum(x in ("consumed", "completed") for x in statuses),
+                items=statuses, started_at=started, phase=state["phase"])
+            return result
         count = state.get("completed_stages") if isinstance(state, dict) else None
         if not isinstance(state, dict) or type(state.get("schema")) is not int or state["schema"] != 1 \
                 or state.get("run_id") != run["id"] or state.get("plan_digest") != hashlib.sha256(raw).hexdigest() \
@@ -10263,6 +10314,9 @@ def _public_followup_progress(run: dict) -> dict:
     finally:
         if descriptor is not None:
             os.close(descriptor)
+    if timing is not None and result["phase"] in ("unknown", "invalid"):
+        # 缺失和损坏都没有可用的执行证据，不能把默认零值伪装成确定的进度。
+        result.update(completed=None, delivered=None, consumed=None, items=["unknown"] * len(messages))
     return result
 
 

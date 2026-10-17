@@ -242,7 +242,7 @@ Stop hook 只允许记录“Claude 停过一轮”的观测信号,不能直接 `
 3. `stop_reason` 不是 `tool_use`。
 4. assistant 文本至少有一条非空文本行。
 5. 最新 session JSONL 文件的 mtime 已稳定至少 `COMPLETION_IDLE_SEC` 秒。
-6. 若配置了业务补充，还须由 `v3-task-followups` 核验全部选定阶段的主会话输入和正常回复；首轮满足前五项仅允许准备下一阶段。详见 [题库与阶段契约](../backend/topic-prompt-contract.md#scenario-自包含题库与冻结的有限业务补充)。
+6. 若配置了业务补充，还须由 `v3-task-followups` 核验全部选定需求的主会话输入和正常回复。旧运行在回复后准备下一阶段；有时间快照的新运行由独立 tick 到点投递，首轮完成不能提前结束，enqueue 也不能冒充消费或完成。详见 [题库与阶段契约](../backend/topic-prompt-contract.md#scenario-自包含题库与冻结的有限业务补充) 和 [定时投递契约](../backend/topic-prompt-contract.md#scenario-随机时间投递与阶段证据)。
 
 worker 与 v3 account 镜像都必须分发 `/usr/local/bin/task_followups.py`，原 `v3-task-followups` 命令链接到同一文件；通用分类器和阶段机共用其解析、父链排序和字节边界。输入的整体包装、默认按键/Ctrl+J 传输、无 UUID 兼容及 no-next 未完成收口，以同一题库阶段契约为准，禁止维护两份不同的完成解析规则。
 

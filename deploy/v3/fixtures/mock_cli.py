@@ -2,6 +2,7 @@
 """仅用于隔离生命周期测试的 CLI 替身，不打入产品镜像。"""
 import json
 import os
+import select
 import socket
 import subprocess
 import sys
@@ -35,7 +36,33 @@ def run_followup_fixture() -> None:
     used_paste = False
     input_count = 0
     previous = None
+    busy_until = 0
+    queued_users = []
     while True:
+        if busy_until and time.monotonic() >= busy_until:
+            initial_reply = {'type':'assistant','uuid':config['session']+'-initial-done','parentUuid':previous,
+                'timestamp':datetime.now(timezone.utc).isoformat(),'message':{'role':'assistant',
+                    'stop_reason':'end_turn','content':[{'type':'text','text':'Initial work complete.'}]}}
+            previous = initial_reply['uuid']
+            events = [initial_reply]
+            for queued in queued_users:
+                queued.update(parentUuid=previous,timestamp=datetime.now(timezone.utc).isoformat())
+                previous = queued['uuid']
+                events.append(queued)
+            if queued_users:
+                events.append({'type':'assistant','uuid':config['session']+'-combined-done','parentUuid':previous,
+                    'timestamp':datetime.now(timezone.utc).isoformat(),'message':{'role':'assistant',
+                        'stop_reason':'end_turn','content':[{'type':'thinking','thinking':'Local fixture reasoning.'},
+                            {'type':'text','text':'All queued extensions complete.'}]}})
+                previous = events[-1]['uuid']
+            with session.open('a') as stream:
+                for entry in events:
+                    stream.write(json.dumps(entry)+'\n')
+            queued_users.clear()
+            busy_until = 0
+            print('Fixture busy queue consumed',flush=True)
+        if busy_until and not select.select([sys.stdin],[],[],0.1)[0]:
+            continue
         byte = os.read(sys.stdin.fileno(), 1)
         if not byte:
             return
@@ -59,6 +86,7 @@ def run_followup_fixture() -> None:
         input_count += 1
         with record.open('a') as stream:
             stream.write(json.dumps({'text': text, 'cwd': str(cwd), 'session': config['session'],
+                'at':time.time(),'busy':bool(busy_until),
                 'transport': 'paste' if used_paste else 'keys'}) + '\n')
         used_paste = False
         recorded = text
@@ -70,6 +98,21 @@ def run_followup_fixture() -> None:
         user = {'type': 'user', 'uuid': identity+'-user', 'parentUuid': previous,
             'timestamp': datetime.now(timezone.utc).isoformat(), 'message': {'role': 'user',
             'content': recorded if input_count == 1 else [{'type': 'text', 'text': recorded}]}}
+        if config.get('busy_seconds') and not config.get('auth_failure'):
+            if input_count == 1:
+                with session.open('a') as stream:
+                    stream.write(json.dumps(user)+'\n')
+                previous = user['uuid']
+                busy_until = time.monotonic() + config['busy_seconds']
+                print('Fixture initial work busy',flush=True)
+                continue
+            if busy_until:
+                with session.open('a') as stream:
+                    stream.write(json.dumps({'type':'queue-operation','operation':'enqueue',
+                        'sessionId':config['session'],'content':recorded,
+                        'timestamp':datetime.now(timezone.utc).isoformat()})+'\n')
+                queued_users.append(user)
+                continue
         if config.get('wait_for_wrapup') and input_count == 1:
             with session.open('a') as stream:
                 stream.write(json.dumps(user)+'\n')

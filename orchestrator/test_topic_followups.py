@@ -335,6 +335,10 @@ class FollowupPersistenceTests(unittest.TestCase):
         rows = [main.get_run(rid) for rid in result['run_ids']]
         self.assertEqual([[],['Compare groups.'],['Compare groups.','Export comparisons.']],
             [json.loads(row['followup_plan_json']) for row in rows])
+        for row in rows:
+            timing = library.decode_followup_timing(row['followup_timing_json'], len(row['followups']['messages']))
+            self.assertTrue(all(180 <= x <= 1080 for x in timing['offsets_sec']))
+        self.assertEqual(rows[-1]['followup_timing_json'], main.scheduler.submit.call_args.args[2]['followup_timing_json'])
         for custom, mode in ((None,'canonical'),('Use exactly this prompt.','natural'),('   ','natural')):
             tid = main.create_task(main.TaskIn(topic_no=1,account_id=1,prompt=custom,prompt_mode=mode))['id']
             with main.get_db() as conn:
@@ -355,7 +359,45 @@ class FollowupPersistenceTests(unittest.TestCase):
             warmup = main.WarmupScheduler(Mock())._create_task_and_run(account,topic,'Build a local table.')
         self.assertIsNotNone(warmup)
         for rid in ('aade1180bd9d',warmup[0]):
-            self.assertEqual(['Compare groups.','Export comparisons.'],json.loads(main.get_run(rid)['followup_plan_json']))
+            run = main.get_run(rid)
+            self.assertEqual(['Compare groups.','Export comparisons.'],json.loads(run['followup_plan_json']))
+            self.assertEqual(2, len(library.decode_followup_timing(run['followup_timing_json'], 2)['offsets_sec']))
+
+    def test_timing_window_short_budget_and_legacy_null(self):
+        """短预算不与收尾重叠，旧运行 NULL 保持原模式。@return None。"""
+        for timeout in (60, 300, 1800, 10800):
+            with patch.object(library.random,'sample',return_value=[timeout*6//10-1,timeout*6//10]):
+                timing = library.decode_followup_timing(library.sample_followup_timing(['First.', 'Second.'], timeout, 600), 2)
+            self.assertLessEqual(timing['offsets_sec'][-1]+5, timeout - timing['wrapup_sec'])
+        self.assertIsNone(library.decode_followup_timing(None, 2))
+        with main.get_db() as conn:
+            conn.execute("INSERT INTO tasks(id,topic_no,title,prompt,account_id) VALUES(99,1,'Legacy','Legacy.',1)")
+            conn.execute("INSERT INTO runs(id,task_id,account_id,followup_plan_json) VALUES('legacy',99,1,'[\"Add a view.\"]')")
+        main.init_db()
+        self.assertIsNone(main.get_run('legacy')['followup_timing_json'])
+        self.assertNotIn('mode', main.get_run('legacy')['followups'])
+
+    def test_timed_public_progress_distinguishes_delivery_consumption_and_completion(self):
+        """详情只从匹配的快照返回分离计数，不能用入队数冒充完成。@return None。"""
+        workspace = main.WORKSPACES_DIR/'aade1180bd9d'
+        workspace.mkdir(parents=True)
+        project = self.root/'sessions'
+        project.mkdir()
+        state = workspace/'.bench-followups.json'
+        timing = {'schema':1,'offsets_sec':[180,360],'timeout_sec':1800,'wrapup_sec':600}
+        messages = ['Compare groups.', 'Export comparisons.']
+        STAGES.process('init',state,project,'aade1180bd9d','Build a table.',messages,timing=timing)
+        value = json.loads(state.read_text())
+        value['started_at'] = 1000
+        value['items'][0].update(status='queued',queue_entry='session.jsonl:2')
+        value['items'][1].update(status='consumed',input_entry='session.jsonl:4')
+        state.write_text(json.dumps(value))
+        run = {'id':'aade1180bd9d','status':'running','followup_plan_json':library.encode_followups(messages),
+            'followup_timing_json':json.dumps(timing)}
+        result = main._public_followup_progress(run)
+        self.assertEqual((2,1,0), (result['delivered'],result['consumed'],result['completed']))
+        run['followup_timing_json'] = json.dumps(dict(timing,offsets_sec=[181,360]))
+        self.assertEqual('invalid', main._public_followup_progress(run)['phase'])
 
     def test_topic_edit_missing_preserves_and_explicit_empty_clears(self):
         """旧编辑请求不会抹去补充，显式清空仍可用。@return None。"""
@@ -363,6 +405,53 @@ class FollowupPersistenceTests(unittest.TestCase):
         self.assertEqual(2,len(main.list_topic_rows()[0]['followups']))
         main.update_topic(1,main.TopicIn(no=1,title='Renamed',description='Local example.',category='Examples',followups=[]))
         self.assertEqual([],main.list_topic_rows()[0]['followups'])
+
+    def test_timed_missing_state_has_unknown_progress_except_queued(self):
+        """未启动可以显示零投递，运行后的缺证据只能显示未知。@return None。"""
+        timing = {'schema':1,'offsets_sec':[180,360],'timeout_sec':1800,'wrapup_sec':600}
+        run = {'id':'aade1180bd9d','followup_plan_json':'["Compare groups.","Export comparisons."]',
+            'followup_timing_json':json.dumps(timing)}
+        queued = main._public_followup_progress(dict(run,status='queued'))
+        self.assertEqual(('not_started',0,0,['scheduled','scheduled']),
+            (queued['phase'],queued['delivered'],queued['consumed'],queued['items']))
+        for status in ('running','quota_wait','success'):
+            with self.subTest(status=status):
+                result = main._public_followup_progress(dict(run,status=status))
+                self.assertEqual('unknown',result['phase'])
+                self.assertEqual([None,None,None],[result[key] for key in ('delivered','consumed','completed')])
+                self.assertEqual(['unknown','unknown'],result['items'])
+
+    def test_timed_public_progress_rejects_empty_evidence_or_missing_clock(self):
+        """合法 JSON 的空证据和丢失时钟也不能冒充已投递或已完成。@return None。"""
+        workspace = main.WORKSPACES_DIR/'aade1180bd9d'
+        workspace.mkdir(parents=True)
+        project = self.root/'sessions'
+        project.mkdir()
+        path = workspace/'.bench-followups.json'
+        timing = {'schema':1,'offsets_sec':[180,360],'timeout_sec':1800,'wrapup_sec':600}
+        messages = ['Compare groups.','Export comparisons.']
+        STAGES.process('init',path,project,'aade1180bd9d','Build a table.',messages,timing=timing)
+        base = json.loads(path.read_text())
+        base.update(started_at=1000,phase='complete',completed_stages=3)
+        for index,item in enumerate(base['items']):
+            item.update(status='completed',input_entry=f'session.jsonl:{index}',reply_entry='session.jsonl:9')
+        run = {'id':'aade1180bd9d','status':'running','followup_plan_json':library.encode_followups(messages),
+            'followup_timing_json':json.dumps(timing)}
+        for key in ('queue_entry','input_entry','reply_entry','started_at'):
+            for value in ('','   ',None):
+                with self.subTest(key=key,value=value):
+                    state = json.loads(json.dumps(base))
+                    if key == 'started_at':
+                        state[key] = value
+                    else:
+                        state['items'][0][key] = value
+                        if key == 'queue_entry':
+                            state.update(phase='awaiting',completed_stages=1)
+                            state['items'][0]['status'] = 'queued'
+                    path.write_text(json.dumps(state))
+                    result = main._public_followup_progress(run)
+                    self.assertEqual('invalid',result['phase'])
+                    self.assertEqual([None,None,None],[result[field] for field in ('delivered','consumed','completed')])
 
     def test_public_progress_never_trusts_wrong_run_state(self):
         """阶段文件归属错误应显示无效，不能冒充完成。@return None。"""
@@ -374,6 +463,158 @@ class FollowupPersistenceTests(unittest.TestCase):
         result = main._public_followup_progress({'id':'aade1180bd9d','status':'running','followup_plan_json':'["Add a view."]'})
         self.assertEqual('invalid',result['phase'])
         self.assertIsNone(result['completed'])
+
+
+class TimedEvidenceTests(unittest.TestCase):
+    """验证到点入队、合并消费、提前空闲及恢复不重发。"""
+
+    setUp = StageEvidenceTests.setUp
+    _append = StageEvidenceTests._append
+    _classify = StageEvidenceTests._classify
+
+    def _process(self, action='tick', now=1000, **kwargs):
+        if self.session.exists():
+            os.utime(self.session,(now-1,now-1))
+        with patch.object(STAGES.time, 'time', return_value=now):
+            return STAGES.process(action,self.state,self.project,'aade1180bd9d',self.initial,
+                self.followups,idle_seconds=0,timing={'schema':1,'offsets_sec':[10,20],
+                    'timeout_sec':100,'wrapup_sec':30},**kwargs)
+
+    def _queue(self, text, **extra):
+        with self.session.open('a') as stream:
+            stream.write(json.dumps({'type':'queue-operation','operation':'enqueue',
+                'sessionId':self.session.stem,'content':text,**extra})+'\n')
+
+    def _start(self):
+        self._process('init')
+        self._append('user',self.initial,uuid='u0')
+        self._process('start')
+
+    def test_busy_delivery_does_not_wait_for_reply_and_one_reply_completes_both(self):
+        """首轮没有结束也按时投递，两条消费后同一回复可完成全部。@return None。"""
+        self._start()
+        self._append('assistant','Working.',uuid='a0',parentUuid='u0',
+            message={'role':'assistant','stop_reason':'tool_use','content':[{'type':'text','text':'Working.'}]})
+        self.assertEqual('wait',self._process(now=1009)['action'])
+        self.assertEqual('send',self._process(now=1010)['action'])
+        self._queue(self.followups[0])
+        self.assertEqual('wait',self._process(now=1011)['action'])
+        self.assertEqual('queued',json.loads(self.state.read_text())['items'][0]['status'])
+        self.assertEqual(1,self._classify()[0])
+        self.assertEqual('send',self._process(now=1020)['action'])
+        self._queue(self.followups[1])
+        self._process('observe',now=1021)
+        with self.assertRaisesRegex(ValueError,'原队列未消费'):
+            self._process('init',now=1022,resume=True)
+        self._append('assistant','Initial done.',uuid='a1',parentUuid='a0')
+        self.assertEqual('wait',self._process(now=1023)['action'])
+        self._append('user',self.followups[0],uuid='u1',parentUuid='a1')
+        self._append('user',self.followups[1],uuid='u2',parentUuid='u1')
+        self._process(now=1024)
+        self.assertEqual(['consumed','consumed'],[x['status'] for x in json.loads(self.state.read_text())['items']])
+        self._append('assistant','Both extensions done.',uuid='a2',parentUuid='u2')
+        self.assertEqual('complete',self._process(now=1025)['action'])
+        self.assertEqual('complete',self._process('init',now=1026,resume=True)['action'])
+
+    def test_early_idle_waits_for_frozen_times_and_does_not_reset_clock(self):
+        """提前结束首轮不能提前成功或提前投递，时钟与恢复一致。@return None。"""
+        self._start()
+        self._append('assistant','Initial complete.',uuid='a0',parentUuid='u0')
+        self.assertEqual('wait',self._process('advance',now=1002)['action'])
+        self._process('start',now=1008)
+        self.assertEqual(1000,json.loads(self.state.read_text())['started_at'])
+        self.assertEqual('send',self._process(now=1010)['action'])
+        self.assertEqual('wait',self._process(now=1030)['action'])
+        with self.assertRaisesRegex(ValueError,'投递结果不确定'):
+            self._process('init',now=1030,resume=True)
+        self._append('user',self.followups[0],uuid='u1',parentUuid='a0')
+        self._process('init',now=1040,resume=True)
+        self.assertEqual('send',self._process(now=1040)['action'])
+
+    def test_no_next_never_sends_and_foreign_queue_does_not_acknowledge(self):
+        """收尾与退出禁止新消息，异会话及元事件不能确认投递。@return None。"""
+        self._start()
+        self.assertEqual('wait',self._process(now=1020,allow_next=False)['action'])
+        self.assertEqual('send',self._process(now=1020)['action'])
+        self._queue(self.followups[0],sessionId='other')
+        self._queue(self.followups[0],isMeta=True)
+        self._queue(self.followups[0],sessionId='other',message={'role':'queue','content':self.followups[0]})
+        self._process(now=1021)
+        self.assertEqual('pending',json.loads(self.state.read_text())['items'][0]['status'])
+        self.assertEqual('incomplete',self._process('advance',now=1022,allow_next=False)['action'])
+
+    def test_timing_state_corruption_and_changed_plan_fail_closed(self):
+        """时间快照和消息状态损坏不能重置或重抽。@return None。"""
+        self._start()
+        value = json.loads(self.state.read_text())
+        for change in ({'schema':1},{'started_at':float('nan')},{'timing_digest':'changed'},
+                {'items':[{'status':'completed'},{}]}):
+            self.state.write_text(json.dumps(dict(value,**change)))
+            with self.assertRaises(ValueError):
+                self._process()
+
+    def test_known_session_loss_never_changes_original_progress(self):
+        """已消费或已完成后的主会话损坏必须拒绝，原阶段字节保持。@return None。"""
+        self._start()
+        self._process(now=1010)
+        self._append('user',self.followups[0],uuid='u1',parentUuid='u0')
+        self._process('observe',now=1011)
+        consumed = (self.state.read_bytes(),self.session.read_bytes())
+        self._process(now=1020)
+        self._append('user',self.followups[1],uuid='u2',parentUuid='u1')
+        self._append('assistant','All complete.',uuid='a2',parentUuid='u2')
+        self.assertEqual('complete',self._process(now=1021)['action'])
+        completed = (self.state.read_bytes(),self.session.read_bytes())
+        for snapshot in (consumed,completed):
+            for damage in ('deleted','truncated','replaced'):
+                for action in ('init','observe','tick'):
+                    with self.subTest(damage=damage,action=action):
+                        self.state.write_bytes(snapshot[0])
+                        self.session.write_bytes(snapshot[1])
+                        if damage == 'deleted':
+                            self.session.unlink()
+                        else:
+                            self.session.write_text('' if damage == 'truncated' else
+                                json.dumps({'message':{'role':'user','content':'Another request.'}})+'\n')
+                        with self.assertRaisesRegex(ValueError,'原主会话输入证据缺失'):
+                            self._process(action,now=1030,resume=action=='init')
+                        self.assertEqual(snapshot[0],self.state.read_bytes())
+
+    def test_first_input_can_be_delayed_before_session_binding(self):
+        """首次输入尚未落盘允许等待，不把正常启动判为证据丢失。@return None。"""
+        self._process('init')
+        self._process('start')
+        self.assertEqual('wait',self._process(now=1010)['action'])
+        self._append('user',self.initial,uuid='u0')
+        self.assertEqual('send',self._process(now=1011)['action'])
+
+
+    def test_out_of_order_reply_requires_current_business_parent_chain(self):
+        """定时模式仍按父链确认乱序落盘，异根总结不能完成补充。@return None。"""
+        self._start()
+        self.assertEqual('send',self._process(now=1010)['action'])
+        self._append('assistant','Comparison complete.',uuid='a1',parentUuid='u1')
+        self._append('user',self.followups[0],uuid='u1',parentUuid='u0')
+        self._process(now=1011)
+        self.assertEqual('completed',json.loads(self.state.read_text())['items'][0]['status'])
+        self.assertEqual('send',self._process(now=1020)['action'])
+        self._append('user',self.followups[1],uuid='u2',parentUuid='a1')
+        self._append('user','Unrelated request.',uuid='other')
+        self._append('assistant','Unrelated summary.',uuid='other-a',parentUuid='other')
+        self.assertEqual('wait',self._process(now=1021)['action'])
+        self._append('assistant','Current delivery complete.',uuid='a2',parentUuid='u2')
+        self.assertEqual('complete',self._process(now=1022)['action'])
+
+    def test_cli_rejects_null_and_mismatched_execution_budget(self):
+        """无效快照不得降级成旧模式，也不能用其它超时执行。@return None。"""
+        for raw in ('null','[]','{"schema":1,"offsets_sec":[10,20],"timeout_sec":100,"wrapup_sec":30}'):
+            result = subprocess.run([sys.executable,str(ROOT/'images/worker/task_followups.py'),'init',
+                '--state',str(self.state),'--project',str(self.project)],capture_output=True,text=True,
+                env={**os.environ,'RUN_ID':'aade1180bd9d','TASK_INITIAL_PROMPT':self.initial,
+                    'TASK_FOLLOWUPS_JSON':json.dumps(self.followups),'TASK_FOLLOWUP_TIMING_JSON':raw,
+                    'TIMEOUT_SEC':'1800','TIMEOUT_WRAPUP_SEC':'600'},timeout=10)
+            self.assertEqual(1,result.returncode,result.stdout)
+            self.assertFalse(self.state.exists())
 
 
 if __name__ == '__main__':
