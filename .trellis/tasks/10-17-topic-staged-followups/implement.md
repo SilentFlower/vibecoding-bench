@@ -50,3 +50,36 @@ runner 的终点为本地代码提交与任务 Close；随后根据本次用户�
 - 已只读核对原生 CLI 2.1.293 的版本及线上历史主会话 JSONL 字段形状；未进行真实模型推理或新的登录/付费调用。600 题结构与语义审查不冒称全部模型实跑。
 - `sync-topics-db.py --validate-only`、Python 编译、shell/JS 语法、`git diff --check` 均通过。原 55 条 protected-retained 在提交前再次按 runner 摘要核对。
 - [上线后验证] 推送与 Actions 同批清单、空闲停机备份、schema/题库同步、原 topic ID/历史 prompt/持久 HOME 核对及健康验收，按 release.md 继续；本地通过不代表已经上线。
+
+## 2026-10-17 返工计划
+
+1. [x] 修复真实 pasted_content 包装匹配，保留严格正文/主会话校验与旧阶段兼容。
+2. [x] 修复 no-next 下缺少阶段证据的等待，收尾回复完成后立即退出并报告补充未完成。
+3. [x] 默认改为 literal 按键输入及 Ctrl+J 换行，覆盖多行、特殊字面文本、单次提交及 Tab/CR 兼容。
+4. [x] 增强替身对按键/粘贴及真实包装的建模，通过阶段机与实际 driver/tmux 回归。
+5. [x] 按 follow-up-edit 的 Pre-Check hold 完成针对性验证后交还用户；下一步按 owner 进入 Check-All、规范与发布链。
+
+## 返工针对性验证结果
+
+- 阶段/冻结 16 项、worker 启动/按键 6 项、额度 38 项分别通过，共 60 项，未累计上一轮覆盖。
+- 原生 CLI 2.1.293 在断网、独立 HOME 与合成 localhost SSE 下通过真实产品按键函数完成初始及一条补充；两条输入正文/换行、原会话、阶段完成核对通过，均无粘贴包装。结果 `/tmp/topic-followups-native-evidence/native-input.json`，未使用生产账号或真实模型。
+- 同源正式本地联合镜像 `/tmp/topic-followups-fix-local.json` 完成构建；`--followups-only` 重跑退出 0，0/1/2 条补充及认证失败场景通过。已识别输入和未知包装两种收尾均在真实收尾信号后约 4.5 秒以 124 退出，状态明确业务补充未完成；原计划及输入证据保留。
+- 首次演练的收尾时限断言包含约 25 秒 TUI 启动等待而失败；未改产品预算，改为从真实收尾 marker 计时并核对明确状态后，全部六场景通过。初次日志 `/tmp/topic-followups-fix-docker.log`，成功日志 `/tmp/topic-followups-fix-docker-rerun.log`。
+- 实际 Docker 三角色权限/只读根/秘密隔离、系统信息边界、真实网关本地 TLS 与错误绑定无重放的既有前置断言通过。所有临时演练容器与网络已由 runner 清理。
+- shell 语法、Python 编译和 diff 空白检查通过，原 55 个非本任务文件内容摘要保持，cc2api 子仓干净。本次返工未提交、未部署；保持 Pre-Check hold，等待用户下一步进入完整检查。
+
+## Check-All 修复批次
+
+- 发现并报告 CHK-001（混合 thinking/text 回复被漏判）和 CHK-002（原生 CLI 异步落盘顺序被当作对话顺序），用户已要求修复全部。
+- [x] 统一主会话解析与完成检测，分开 user 严格输入确认和 assistant 混合正文提取。
+- [x] 在原 byte cursor 范围内按父链及时间恢复顺序，排除异根与坏链；旧无时间记录兼容。
+- [x] 同步两个镜像的模块入口与实际消费者测试，回归两个失败场景及原生 CLI 快速响应。
+- [x] 完成定向验证后直接返回当前 Check-All 重检，不重新进入 Pre-Check hold；通过后继续规范与提交 owner。
+
+## 本批修复重检证据
+
+- 当前代码后端全量 324 项、部署工具 32 项通过，日志为 `/tmp/topic-followups-fix3-backend.log`、`/tmp/topic-followups-fix3-deploy.log`；阶段用例包含混合正文、0/1/2 乱序阶段、附件父链、倒序时钟、旧执行基线、异根和坏链。
+- 原生 CLI 2.1.293 在断网容器、UID1000、独立 HOME、合成 localhost SSE 下完成两轮真实按键输入。多行及行尾反斜杠保持，两次通用完成分类均为 complete，阶段依次 send/complete，恢复复核通过。结果 `/tmp/topic-followups-native-evidence4/result.json`；该次实际落盘为 user/assistant 顺序，另将原生全部字段及附件按回复先写重放，两个消费者也通过，日志 `/tmp/topic-followups-native-replay.log`。
+- 正式 Dockerfile 联合构建 `followups-fix-20261017-d` 成功，清单 `/tmp/topic-followups-fix4-local.json`。account 模块/命令链接及 control driver 与当前源码逐字节一致。早先 c 批次在 HEV 下载时网络失败；d 批次使用已关闭的临时构建代理完成，不修改产品网络配置。
+- `run_local_verification.py --manifest /tmp/topic-followups-fix4-local.json --followups-only` 退出 0：六场景均使用混合正文、回复先落盘及真实包装；0/1/2 追加、认证失败、两种收尾全部通过。已知和未知输入的收尾均在信号后 4.5 秒以 124 退出，保留未完成阶段。配套三角色隔离和本地 TLS 转发断言通过，演练容器与网络清理完成。
+- Python 编译、shell/JS 语法、600 题校验、diff 空白检查通过；55 个非本任务文件摘要未变，cc2api 子仓干净。CHK-001/CHK-002 均修复，当前仅本地验证，尚未提交或部署。
