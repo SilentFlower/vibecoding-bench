@@ -17,12 +17,9 @@
     "closedAt": null,
     "blockers": [
       {
-        "code": "decision-review-required",
-        "owner": "decision_log.py",
-        "message": "当前 AI 决策摘要尚未获得 accepted review",
-        "detail": {
-          "decisionDigest": "c08dad547a9887c7b4156f49665f5139e7ecc3ae3e744efba3d02be55f1e7732"
-        }
+        "code": "delivery-recovery-required",
+        "owner": "trellis-push",
+        "message": "任务目录存在未闭合的交付差异，请先由 trellis-push 恢复"
       }
     ]
   },
