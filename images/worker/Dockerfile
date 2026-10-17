@@ -4,7 +4,7 @@
 # - 基础：node 22（Claude Code 是 Node CLI）
 # - 工具链：python / git / build-essential，覆盖大部分题目所需运行时
 # - MITM CA：由 entrypoint 在容器启动时注入到系统证书库 + 各语言运行时
-# - 驱动：tmux session 内启动 `claude`，通过粘贴缓冲注入题目 prompt
+# - 驱动：tmux session 内启动 `claude`，默认按键输入完整多行 prompt
 # - 完成判定：Stop hook 只记录回合结束，最终以稳定的 JSONL assistant 文本为准
 # =======================================================================
 FROM node:22-bookworm-slim
@@ -37,8 +37,9 @@ RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
 WORKDIR /workspace
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY task_followups.py /usr/local/bin/v3-task-followups
-RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY task_followups.py /usr/local/bin/task_followups.py
+RUN ln -s task_followups.py /usr/local/bin/v3-task-followups \
+    && chmod +x /usr/local/bin/entrypoint.sh
 
 # tini 当 init，处理孤儿进程
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]

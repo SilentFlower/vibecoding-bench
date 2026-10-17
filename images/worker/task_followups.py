@@ -9,6 +9,8 @@ import secrets
 import stat
 import sys
 import time
+from datetime import datetime
+from heapq import heapify, heappop, heappush
 from pathlib import Path
 
 MAX_STATE_BYTES = 65536
@@ -93,9 +95,14 @@ def _files(project: Path) -> list[Path]:
     return sorted(result)
 
 
-def _text(content: object) -> str | None:
+def _text(content: object, role: str) -> str | None:
     if isinstance(content, str):
         return content
+    if role == 'assistant' and isinstance(content, list):
+        # 思考块不属于交付正文；工具和 synthetic 判断仍由消息类型独立保护。
+        parts = [item['text'] for item in content if isinstance(item, dict)
+            and item.get('type') == 'text' and isinstance(item.get('text'), str)]
+        return '\n'.join(parts) if parts else None
     if isinstance(content, list) and content and all(
             isinstance(item, dict) and item.get('type') == 'text' and isinstance(item.get('text'), str)
             for item in content):
@@ -103,9 +110,70 @@ def _text(content: object) -> str | None:
     return None
 
 
-def _dialogue(path: Path, offset: int):
+def _matches_input(actual: str, expected: str) -> bool:
+    # 原生 CLI 会把粘贴正文整体包成同 ID 标签；只接受完整包装，避免任意引用被当作投递确认。
+    actual = actual.strip()
+    if actual == expected.strip():
+        return True
+    pasted = re.fullmatch(
+        r'<pasted_content id="(?P<id>[A-Za-z0-9_-]{1,128})">\r?\n'
+        r'(?P<text>[\s\S]*?)\r?\n</pasted_content id="(?P=id)">', actual)
+    return pasted is not None and pasted['text'].strip() == expected.strip()
+
+
+def _ordered(items: list[dict], parents: dict[str, str | None]) -> list[dict]:
+    indices = {}
+    for index, item in enumerate(items):
+        if item['id']:
+            if item['id'] in indices:
+                raise ValueError('主会话消息标识重复，无法确认归属')
+            indices[item['id']] = index
+    children = [[] for _ in items]
+    indegrees = [0] * len(items)
+    cache = {}
+    for index, item in enumerate(items):
+        parent, trace, seen = item['parent'], [], set()
+        while parent and parent not in indices and parent not in cache:
+            if parent in seen:
+                raise ValueError('主会话父链存在循环')
+            seen.add(parent)
+            trace.append(parent)
+            parent = parents.get(parent)
+        ancestor = indices.get(parent, cache.get(parent))
+        for identity in trace:
+            cache[identity] = ancestor
+        item['parent_key'] = items[ancestor]['key'] if ancestor is not None else None
+        if ancestor is not None:
+            children[ancestor].append(index)
+            indegrees[index] += 1
+    # 父子关系优先于落盘和时钟顺序；旧无时间记录继续使用稳定的原文件顺序。
+    timed = all(item['epoch'] is not None for item in items)
+    priority = [item['epoch'] if timed else index for index, item in enumerate(items)]
+    ready = [(priority[index], index) for index, count in enumerate(indegrees) if count == 0]
+    heapify(ready)
+    result = []
+    while ready:
+        _, index = heappop(ready)
+        result.append(items[index])
+        for child in children[index]:
+            indegrees[child] -= 1
+            if indegrees[child] == 0:
+                heappush(ready, (priority[child], child))
+    if len(result) != len(items):
+        raise ValueError('主会话父链存在循环')
+    return result
+
+
+def read_dialogue(path: Path, offset: int = 0) -> list[dict]:
+    """有界读取主消息，保留字节证据并恢复实际对话顺序。
+
+    :param path: 已由调用方核对的主 JSONL 文件。
+    :param offset: 本次执行或阶段已保存的字节游标。
+    :return: 按父链及时间排序的消息摘要，不保留工具大正文。
+    """
     if path.stat().st_size < offset:
         raise ValueError('主会话已截断，阶段游标不能自动回退')
+    items, parents = [], {}
     with path.open('rb') as stream:
         stream.seek(offset)
         scanned = 0
@@ -131,7 +199,17 @@ def _dialogue(path: Path, offset: int):
                 entry = json.loads(raw)
             except (ValueError, UnicodeDecodeError):
                 continue
-            if not isinstance(entry, dict) or entry.get('isSidechain') or entry.get('isMeta'):
+            if not isinstance(entry, dict) or entry.get('isSidechain'):
+                continue
+            identity = entry.get('uuid')
+            identity = identity if isinstance(identity, str) and identity else None
+            parent = entry.get('parentUuid')
+            parent = parent if isinstance(parent, str) and parent else None
+            if identity:
+                if identity in parents and parents[identity] != parent:
+                    raise ValueError('主会话消息父链冲突')
+                parents[identity] = parent
+            if entry.get('isMeta'):
                 continue
             message = entry.get('message')
             if not isinstance(message, dict):
@@ -140,12 +218,48 @@ def _dialogue(path: Path, offset: int):
             if role not in ('user', 'assistant'):
                 continue
             content = message.get('content')
-            text = _text(content)
+            text = _text(content, role)
             synthetic = entry.get('isApiErrorMessage') is True or message.get('model') == '<synthetic>'
             tool = message.get('stop_reason') == 'tool_use' or (
                 isinstance(content, list) and any(isinstance(item, dict) and item.get('type') in ('tool_use', 'tool_result') for item in content))
-            yield {'role': role, 'text': text, 'normal': not synthetic and not tool,
-                'key': path.name + ':' + str(start), 'end': stream.tell()}
+            epoch = None
+            try:
+                timestamp = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00'))
+                if timestamp.tzinfo is not None:
+                    epoch = timestamp.timestamp()
+            except (KeyError, ValueError, TypeError, AttributeError, OverflowError, OSError):
+                pass
+            items.append({'role': role, 'text': text, 'normal': not synthetic and not tool,
+                'synthetic': synthetic, 'tool': tool, 'error': str(entry.get('error') or ''),
+                'id': identity, 'parent': parent, 'epoch': epoch,
+                'key': path.name + ':' + str(start), 'end': stream.tell()})
+    return _ordered(items, parents)
+
+
+def latest_dialogue(project: Path, idle_seconds: float, baseline_path: Path) -> dict | None:
+    """为通用完成检测返回本次执行的最新主消息，与阶段机共用解析。
+
+    :param project: 主会话目录。
+    :param idle_seconds: 文件须满足的稳定窗口。
+    :param baseline_path: 本次尝试开始时保存的文件字节基线。
+    :return: 最新主消息摘要；未稳定或尚无新消息时返回 None。
+    """
+    files = _files(project)
+    if not files:
+        return None
+    path = max(files, key=lambda item: item.stat().st_mtime)
+    if time.time() - path.stat().st_mtime < idle_seconds:
+        return None
+    offset = 0
+    try:
+        baseline = json.loads(baseline_path.read_text())
+        value = baseline.get(str(path), 0)
+        if type(value) is int and value >= 0:
+            offset = value
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    items = read_dialogue(path, offset)
+    return items[-1] if items else None
 
 
 def _evidence(state: dict, project: Path, expected: str) -> tuple[dict | None, dict | None, Path | None]:
@@ -155,13 +269,18 @@ def _evidence(state: dict, project: Path, expected: str) -> tuple[dict | None, d
             continue
         offset = state['cursor'].get(path.name, 0)
         local_input = local_latest = None
-        for item in _dialogue(path, offset):
+        descendants = set()
+        for item in read_dialogue(path, offset):
             if local_input is None:
                 if item['role'] == 'user' and item['normal'] and item['text'] is not None \
-                        and item['text'].strip() == expected.strip():
+                        and _matches_input(item['text'], expected):
                     local_input = item
+                    descendants.add(item['key'])
             else:
-                local_latest = item
+                linked = local_input['id'] is None or item['id'] is None or item['parent_key'] in descendants
+                if linked:
+                    descendants.add(item['key'])
+                local_latest = dict(item, linked=linked)
         if local_input:
             if accepted:
                 raise ValueError('多个主会话出现相同阶段输入，归属不确定')
@@ -229,7 +348,7 @@ def process(action: str, state_path: Path, project: Path, run_id: str,
     result = {'action': 'wait', 'completed_stages': state['completed_stages'], 'phase': state['phase']}
     if state['phase'] == 'complete':
         accepted, latest, path = _evidence(state, project, ([initial] + followups)[-1])
-        if accepted is None or latest is None or latest['role'] != 'assistant' or not latest['normal'] \
+        if accepted is None or latest is None or latest['role'] != 'assistant' or not latest['normal'] or not latest['linked'] \
                 or accepted['key'] != state['input_entry'] or latest['key'] != state['reply_entry']:
             raise ValueError('已完成阶段缺少匹配的主会话证据')
         return dict(result, action='complete')
@@ -242,10 +361,14 @@ def process(action: str, state_path: Path, project: Path, run_id: str,
             _write(state_path, state)
     elif resume and state['phase'] == 'pending':
         raise ValueError('补充消息投递结果不确定，已保留现场，禁止盲目重发')
-    if action in ('init', 'observe') or accepted is None or latest is None:
+    if action in ('init', 'observe'):
         return dict(result, phase=state['phase'])
-    if latest['role'] != 'assistant' or not latest['normal'] or not latest['text'] or not latest['text'].strip() \
-            or time.time() - path.stat().st_mtime < idle_seconds:
+    if accepted is None or latest is None:
+        # driver 已确认收尾回复/退出且禁止追加时，缺证据必须显式未完成，不能继续空等到硬超时。
+        return dict(result, action='wait' if allow_next else 'incomplete', phase=state['phase'])
+    if latest['role'] != 'assistant' or not latest['normal'] or not latest['linked'] or not latest['text'] or not latest['text'].strip():
+        return dict(result, action='wait' if allow_next else 'incomplete', phase=state['phase'])
+    if time.time() - path.stat().st_mtime < idle_seconds:
         return dict(result, phase=state['phase'])
     state.update(completed_stages=state['completed_stages'] + 1, reply_entry=latest['key'])
     if state['completed_stages'] == total:

@@ -760,6 +760,7 @@ class WorkerCompletionTests(unittest.TestCase):
             path = project / "session.jsonl"
             path.write_text(json.dumps(entry) + "\n")
             env = dict(os.environ)
+            env['PYTHONPATH'] = str(root / 'images/worker')
             if baseline:
                 offset = project / "baseline.json"
                 offset.write_text(json.dumps({str(path): path.stat().st_size}))

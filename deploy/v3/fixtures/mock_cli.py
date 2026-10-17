@@ -8,6 +8,7 @@ import sys
 import termios
 import time
 import tty
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -15,7 +16,7 @@ home = Path(os.environ["HOME"])
 
 
 def run_followup_fixture() -> None:
-    """消费真实 tmux 粘贴，写入原生形状主会话证据，不进行推理。
+    """消费真实 tmux 按键或粘贴，写入原生形状主会话证据，不进行推理。
 
     :return: None；由外部 driver 结束本测试进程。
     """
@@ -31,6 +32,9 @@ def run_followup_fixture() -> None:
     os.write(sys.stdout.fileno(), b'\x1b[?2004h')
     buffer = bytearray()
     pasted = False
+    used_paste = False
+    input_count = 0
+    previous = None
     while True:
         byte = os.read(sys.stdin.fileno(), 1)
         if not byte:
@@ -39,27 +43,54 @@ def run_followup_fixture() -> None:
         if buffer.endswith(b'\x1b[200~'):
             del buffer[-6:]
             pasted = True
+            used_paste = True
             continue
         if buffer.endswith(b'\x1b[201~'):
             del buffer[-6:]
             pasted = False
             continue
-        if byte not in (b'\r', b'\n') or pasted:
+        # Ctrl+J 是正文换行，只有 Enter/CR 才提交；不能让替身掩盖多行被提前提交的问题。
+        if byte != b'\r' or pasted:
             continue
         text = bytes(buffer[:-1]).decode().replace('\r\n', '\n').replace('\r', '\n')
         buffer.clear()
         if not text.strip():
             continue
+        input_count += 1
         with record.open('a') as stream:
-            stream.write(json.dumps({'text': text, 'cwd': str(cwd), 'session': config['session']}) + '\n')
+            stream.write(json.dumps({'text': text, 'cwd': str(cwd), 'session': config['session'],
+                'transport': 'paste' if used_paste else 'keys'}) + '\n')
+        used_paste = False
+        recorded = text
+        if config.get('wrap_inputs'):
+            recorded = f'\n\n<pasted_content id="316b-{input_count}">\n{text}\n</pasted_content id="316b-{input_count}">\n'
+        if config.get('unmatched_input') and input_count == 1:
+            recorded = 'Unrecognized transport: ' + recorded
+        identity = f"{config['session']}-{input_count}"
+        user = {'type': 'user', 'uuid': identity+'-user', 'parentUuid': previous,
+            'timestamp': datetime.now(timezone.utc).isoformat(), 'message': {'role': 'user',
+            'content': recorded if input_count == 1 else [{'type': 'text', 'text': recorded}]}}
+        if config.get('wait_for_wrapup') and input_count == 1:
+            with session.open('a') as stream:
+                stream.write(json.dumps(user)+'\n')
+            previous = user['uuid']
+            print('Fixture initial work pending', flush=True)
+            continue
+        attachment = {'type': 'attachment', 'uuid': identity+'-context', 'parentUuid': user['uuid']}
+        assistant = {'type': 'assistant', 'uuid': identity+'-reply', 'parentUuid': attachment['uuid'],
+            'timestamp': datetime.now(timezone.utc).isoformat(), 'message': {'role': 'assistant',
+            'stop_reason': 'end_turn', 'content': [{'type': 'thinking', 'thinking': 'Local fixture reasoning.'},
+                {'type': 'text', 'text': 'Completed the requested local fixture stage.'}]}}
+        if config.get('auth_failure'):
+            assistant.update(isApiErrorMessage=True, error='account_on_hold')
+            assistant['message'].update(model='<synthetic>', content=[{'type': 'thinking', 'thinking': 'Not a delivery.'},
+                {'type': 'text', 'text': 'Your account is on hold.'}])
+        # 复现原生 CLI 的异步落盘：回复可先于输入和附件写入，同一回合仍由父链相连。
+        events = [assistant, user, attachment] if config.get('out_of_order') else [user, attachment, assistant]
         with session.open('a') as stream:
-            stream.write(json.dumps({'type': 'user', 'message': {'role': 'user', 'content': text}}) + '\n')
-            if config.get('auth_failure'):
-                stream.write(json.dumps({'type':'assistant','isApiErrorMessage':True,'error':'account_on_hold','message':{
-                    'role':'assistant','model':'<synthetic>','content':[{'type':'text','text':'Your account is on hold.'}]}})+'\n')
-            else:
-                stream.write(json.dumps({'type':'assistant','message':{'role':'assistant','stop_reason':'end_turn',
-                    'content':[{'type':'text','text':'Completed the requested local fixture stage.'}]}})+'\n')
+            for entry in events:
+                stream.write(json.dumps(entry)+'\n')
+        previous = assistant['uuid']
         print('Fixture stage complete', flush=True)
 
 

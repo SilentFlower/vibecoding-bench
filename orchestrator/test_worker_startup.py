@@ -41,12 +41,14 @@ class WorkerStartupTests(unittest.TestCase):
             definitions.append(match.group(0))
         return "\n".join(definitions).replace("/tmp/", f"{self.base}/")
 
-    def _submit_after_auto_offer(self, mode: str, stuck: bool = False) -> subprocess.CompletedProcess:
+    def _submit_after_auto_offer(self, mode: str, stuck: bool = False,
+            prompt: str = "题目：保持原始内容\n不要替换题目。") -> subprocess.CompletedProcess:
         """
         模拟 Auto 推荐菜单：回车接受 Auto，取消保留模式，菜单期间丢弃粘贴。
 
         :param mode: 当前任务指定的权限模式
         :param stuck: 是否模拟菜单收到取消后仍未消失
+        :param prompt: 需逐字保留的初始需求
         :return: 实际入口函数的执行结果
         """
         (self.base / "mode").write_text(mode, encoding="utf-8")
@@ -70,9 +72,14 @@ tmux() {
     paste-buffer)
       if [ -f "$TEST_STATE/declined" ]; then
         cp "$TEST_STATE/buffer" "$TEST_STATE/draft"
+        touch "$TEST_STATE/pasted"
       fi
       ;;
     send-keys)
+      if [ "${4:-}" = -l ] && [ "${5:-}" = -- ]; then
+        printf '%s' "${@: -1}" >> "$TEST_STATE/draft"
+        return 0
+      fi
       printf '%s\n' "${@: -1}" >> "$TEST_STATE/keys"
       if [ "${@: -1}" = Escape ]; then
         [ "$TEST_STUCK" = 1 ] || touch "$TEST_STATE/declined"
@@ -83,6 +90,8 @@ tmux() {
         else
           cp "$TEST_STATE/draft" "$TEST_STATE/submitted"
         fi
+      elif [ "${@: -1}" = C-j ]; then
+        printf '\n' >> "$TEST_STATE/draft"
       fi
       ;;
   esac
@@ -96,7 +105,7 @@ tmux() {
                 **os.environ,
                 "TEST_STATE": str(self.base),
                 "TEST_STUCK": "1" if stuck else "0",
-                "TEST_PROMPT": "题目：保持原始内容\n不要替换题目。",
+                "TEST_PROMPT": prompt,
             },
             capture_output=True,
             text=True,
@@ -121,6 +130,24 @@ tmux() {
                     "题目：保持原始内容\n不要替换题目。",
                     (self.base / "submitted").read_text(),
                 )
+                self.assertFalse((self.base / "pasted").exists())
+
+    def test_keyboard_input_preserves_blank_lines_literals_and_single_submission(self) -> None:
+        """按键输入保留空行、末尾换行和特殊字面文本，全文只提交一次。@return None。"""
+        prompt = '\nFirst line.\n\n-l Enter $() `literal` "quoted" \\ path 中文\n'
+        result = self._submit_after_auto_offer('bypassPermissions', prompt=prompt)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(prompt, (self.base / 'submitted').read_text())
+        self.assertEqual(1, (self.base / 'keys').read_text().splitlines().count('Enter'))
+        self.assertFalse((self.base / 'pasted').exists())
+
+    def test_tab_input_keeps_compatible_paste_transport(self) -> None:
+        """自定义正文中的 Tab 不能作为补全按键改变需求。@return None。"""
+        prompt = 'Name\tValue\nExample\t42'
+        result = self._submit_after_auto_offer('bypassPermissions', prompt=prompt)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(prompt, (self.base / 'submitted').read_text())
+        self.assertTrue((self.base / 'pasted').exists())
 
     def test_uncleared_auto_offer_prevents_prompt_submission(self) -> None:
         """

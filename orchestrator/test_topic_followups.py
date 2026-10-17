@@ -2,6 +2,9 @@
 import importlib.util
 import json
 import os
+import re
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -69,8 +72,8 @@ class StageEvidenceTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        self.project = self.root / 'project'
-        self.project.mkdir()
+        self.project = self.root / 'projects' / '-workspace'
+        self.project.mkdir(parents=True)
         self.state = self.root / 'followups.json'
         self.session = self.project / 'session.jsonl'
         self.initial = 'Build a local lead score table.\nUse generated sample rows.'
@@ -84,6 +87,92 @@ class StageEvidenceTests(unittest.TestCase):
         entry = {'type': role, 'message': {'role': role, 'content': [{'type': 'text', 'text': text}]}, **fields}
         with self.session.open('a') as stream:
             stream.write(json.dumps(entry) + '\n')
+
+    def _classify(self, baseline=None):
+        source = (ROOT / 'images/worker/entrypoint.sh').read_text()
+        classifier = re.search(r'^classify_claude_completion\(\) \{.*?^\}$', source, re.M | re.S).group(0)
+        result = subprocess.run(['bash', '-c', classifier + '\nclassify_claude_completion 0'],
+            env={**os.environ, 'CLAUDE_DIR': str(self.root), 'PYTHONPATH': str(ROOT / 'images/worker'),
+                'COMPLETION_BASELINE': str(baseline or self.root / 'missing-baseline.json')},
+            capture_output=True, text=True, timeout=10)
+        return result.returncode, result.stdout.strip()
+
+    def test_mixed_thinking_and_text_advance_without_accepting_tools_or_errors(self):
+        """两种完成检测允许混合正文，工具和合成错误仍优先排除。@return None。"""
+        # 两种检测使用同一主目录，避免测试各自造一套解析规则。
+        self._process('init')
+        self._append('user', self.initial)
+        self._append('assistant', '', isApiErrorMessage=True, error='unknown',
+            message={'role': 'assistant', 'content': [{'type': 'thinking', 'thinking': 'Not a delivery.'},
+                {'type': 'text', 'text': 'API Error: 500'}]})
+        self.assertEqual(5, self._classify()[0])
+        self.assertEqual('wait', self._process()['action'])
+        for extra, expected_code in (({'type': 'tool_use', 'id': 'local', 'name': 'Read', 'input': {}}, 1),
+                ({'type': 'thinking', 'thinking': 'Local reasoning.'}, 0)):
+            self._append('assistant', '', message={'role': 'assistant', 'stop_reason': 'end_turn',
+                'content': [extra, {'type': 'text', 'text': 'Local delivery complete.'}]})
+            self.assertEqual(expected_code, self._classify()[0])
+            self.assertEqual('send' if expected_code == 0 else 'wait', self._process()['action'])
+
+    def test_out_of_order_native_turns_keep_stage_cursors_and_shared_completion(self):
+        """回复先落盘且经过附件父链时，0/1/2 阶段仍只推进一次。@return None。"""
+        candidates = list(self.followups)
+        for count in (0, 1, 2):
+            self.state.unlink(missing_ok=True)
+            self.session.unlink(missing_ok=True)
+            self.followups = candidates[:count]
+            self._process('init')
+            for index, message in enumerate([self.initial] + self.followups):
+                self._append('assistant', 'Done.', uuid=f'a{index}', parentUuid=f'm{index}',
+                    timestamp=f'2026-10-17T02:02:0{index}.285Z')
+                self._append('user', message, uuid=f'u{index}', parentUuid=f'a{index-1}' if index else None,
+                    timestamp=f'2026-10-17T02:02:0{index}.201Z')
+                self._append('attachment', 'Context.', uuid=f'm{index}', parentUuid=f'u{index}',
+                    timestamp=f'2026-10-17T02:02:0{index}.231Z')
+                self.assertEqual((0, 'complete'), self._classify())
+                self.assertEqual('complete' if index == count else 'send', self._process()['action'])
+                if index < count:
+                    self.assertEqual('wait', self._process()['action'])
+            self.assertEqual('complete', self._process('init', resume=True)['action'])
+
+    def test_parent_chain_precedes_clock_and_old_attempt_baseline(self):
+        """父链可纠正时钟倒序，既有游标仍排除旧回复。@return None。"""
+        self._append('assistant', 'Old reply.', uuid='old', timestamp='2030-01-01T00:00:00Z')
+        baseline = self.root / 'baseline.json'
+        baseline.write_text(json.dumps({str(self.session): self.session.stat().st_size}))
+        self._process('init')
+        self.assertEqual(1, self._classify(baseline)[0])
+        self._append('assistant', 'Current done.', uuid='a', parentUuid='u', timestamp='2026-10-17T02:00:00Z')
+        self._append('user', self.initial, uuid='u', timestamp='2026-10-17T02:00:01Z')
+        self.assertEqual((0, 'complete'), self._classify(baseline))
+        self.assertEqual('send', self._process()['action'])
+
+    def test_unrelated_root_reply_does_not_complete_current_stage(self):
+        """其它根对话的正常回复不能被借来确认本阶段。@return None。"""
+        self._process('init')
+        self._append('user', self.initial, uuid='u')
+        self._append('user', 'Another request.', uuid='other')
+        self._append('assistant', 'Other reply.', uuid='a', parentUuid='other')
+        self.assertEqual('wait', self._process()['action'])
+        self.assertEqual('incomplete', self._process(allow_next=False)['action'])
+        self.assertEqual(0, json.loads(self.state.read_text())['completed_stages'])
+
+    def test_invalid_parent_cycles_and_duplicate_ids_are_rejected(self):
+        """循环或重复标识不能被猜测为合法主会话顺序。@return None。"""
+        for parent in ('a', 'u'):
+            with self.subTest(parent=parent):
+                self.state.unlink(missing_ok=True)
+                self.session.unlink(missing_ok=True)
+                self._process('init')
+                self._append('user', self.initial, uuid='u', parentUuid=parent)
+                self._append('assistant', 'Invalid reply.', uuid='a', parentUuid='u')
+                with self.assertRaisesRegex(ValueError, '循环'):
+                    self._process()
+        self.session.write_text('')
+        self._append('user', self.initial, uuid='u')
+        self._append('assistant', 'Conflicting id.', uuid='u')
+        with self.assertRaisesRegex(ValueError, '标识重复'):
+            self._process()
 
     def test_zero_one_two_plans_require_all_native_turns(self):
         """只在最后一个已选阶段结束后成功，旧回复不得连发补充。@return None。"""
@@ -119,6 +208,56 @@ class StageEvidenceTests(unittest.TestCase):
         self.assertEqual('wait', self._process('init', resume=True)['action'])
         self._append('assistant', 'Comparison complete.')
         self.assertEqual('send', self._process()['action'])
+
+    def test_native_paste_wrappers_confirm_initial_and_followup_inputs(self):
+        """真实 CLI 的整体包装可确认输入，恢复及最终复核仍沿用原正文。@return None。"""
+        self._process('init')
+        for index, message in enumerate([self.initial] + self.followups):
+            wrapped = f'\n\n<pasted_content id="316b-{index}">\n{message}\n</pasted_content id="316b-{index}">\n'
+            fields = {'message': {'role': 'user', 'content': wrapped}} if index == 0 else {}
+            self._append('user', wrapped, **fields)
+            self.assertEqual('wait', self._process('init', resume=True)['action'])
+            self._append('assistant', f'Completed wrapped stage {index}.')
+            self.assertEqual('complete' if index == 2 else 'send', self._process()['action'])
+        self.assertEqual('complete', self._process('init', resume=True)['action'])
+
+    def test_wrapper_matching_rejects_extra_text_wrong_ids_and_partial_quotes(self):
+        """只有完整同 ID 包装可匹配，任意引用和其它输入都不能推进阶段。@return None。"""
+        wrapped = f'<pasted_content id="316b">\n{self.initial}\n</pasted_content id="316b">'
+        for text in (wrapped + '\nAnother request.', 'Quoted requirement:\n' + wrapped,
+                wrapped.replace('</pasted_content id="316b">', '</pasted_content id="other">'),
+                wrapped.removesuffix('</pasted_content id="316b">'), wrapped + '\n' + wrapped,
+                wrapped.replace('Build a local', 'Build a different local')):
+            with self.subTest(text=text):
+                self.state.unlink(missing_ok=True)
+                self.session.unlink(missing_ok=True)
+                self._process('init')
+                self._append('user', text)
+                self._append('assistant', 'Unrelated final reply.')
+                self.assertEqual('wait', self._process()['action'])
+                self.assertEqual(0, json.loads(self.state.read_text())['completed_stages'])
+
+    def test_no_next_finishes_unknown_input_without_rewriting_progress(self):
+        """收尾回复已经结束但输入未识别时返回未完成，不空等或伪造确认。@return None。"""
+        self._process('init')
+        self._append('user', 'Unrecognized transport: ' + self.initial)
+        self._append('assistant', 'Wrap-up complete.')
+        original = self.state.read_bytes()
+        self.assertEqual('wait', self._process('observe', allow_next=False)['action'])
+        self.assertEqual('incomplete', self._process(allow_next=False)['action'])
+        self.assertEqual(original, self.state.read_bytes())
+
+    def test_no_next_pending_delivery_keeps_uncertainty_and_never_resends(self):
+        """禁止追加时缺少 pending 消费证据明确未完成，恢复仍按不确定投递拒绝。@return None。"""
+        self._process('init')
+        self._append('user', self.initial)
+        self._append('assistant', 'Initial done.')
+        self.assertEqual('send', self._process()['action'])
+        original = self.state.read_bytes()
+        self.assertEqual('incomplete', self._process(allow_next=False)['action'])
+        self.assertEqual(original, self.state.read_bytes())
+        with self.assertRaisesRegex(ValueError, '投递结果不确定'):
+            self._process('init', resume=True)
 
     def test_existing_history_meta_sidechains_and_synthetic_replies_cannot_finish(self):
         """旧历史、元消息、子会话与错误回复均不能完成阶段。@return None。"""

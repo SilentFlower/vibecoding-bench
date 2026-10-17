@@ -170,6 +170,7 @@ task = {"prompt": prompt}
 - `POST /api/topics`、`PUT /api/topics/{id}` 的 `TopicIn.followups: Optional[list[StrictStr]]=None`；`GET /api/topics` 返回 `followups: list[str]`。
 - `GET /api/runs/{rid}` 增加初始 `prompt` 与 `followups={planned,completed,phase,messages[,stage]}`。
 - driver 调用 `python3 /usr/local/bin/v3-task-followups init|observe|advance --state <固定绝对路径> --project <主会话目录> [--resume] [--idle 10] [--no-next]`。
+- `images/worker/task_followups.py` 提供 `read_dialogue(path: Path, offset: int = 0) -> list[dict]` 与 `latest_dialogue(project: Path, idle_seconds: float, baseline_path: Path) -> dict | None`；完成分类与阶段机共用。两种 worker 镜像均复制为 `/usr/local/bin/task_followups.py`，原命令 `/usr/local/bin/v3-task-followups` 为同文件链接；嵌入式分类器显式从该目录导入。
 
 ### 3. Contracts
 
@@ -179,7 +180,15 @@ Markdown 子行精确为 `  - Follow-up 1: <text>`、`  - Follow-up 2: <text>`�
 
 helper 的状态 schema 1 保存 run_id、规范 JSON 计划摘要、初始摘要、completed_stages、phase、session、各主 JSONL 字节 cursor、input_entry 与 reply_entry。phase 为 awaiting/pending/complete；总阶段数为 1+补充数。只识别主目录 JSONL 的对应普通 user 输入及其后稳定、非空、非 tool_use、非 synthetic/API 错误的最新 assistant；忽略 isMeta/isSidechain 与子目录。投递前落 pending 和新游标，tmux 成功不等于消费确认；observe 看到原主会话输入后才 acknowledged。pending 未确认重启必须失败，不能重发。最后阶段完成才可结束成功；完成状态也需重核最后输入/回复的原生证据。
 
+user 正文只接受完整文本匹配，或去除外围空白后完整符合单层 `<pasted_content id="同一ID">\n正文\n</pasted_content id="同一ID">` 的消息；ID 为 1～128 位字母、数字、下划线或连字符，标签换行允许 CRLF。正文沿用两端 strip 后的精确比较，额外文字、错 ID、截断或并列包装不匹配。user 文本块列表仍须全部为有效 text；assistant 可混合 thinking/text，只提取有效 text，工具及 synthetic 判断独立，不能因含正文而放行。
+
+JSONL 落盘顺序不代表对话顺序。`read_dialogue` 仅扫描保存字节游标之后的完整行，保留原字节 key/end；通过 uuid/parentUuid 及附件/元节点父链恢复依赖顺序。父链优先于时钟；全部对话均有有效带时区时间时，以时间排列无依赖节点，否则旧格式按文件顺序排列。重复对话 UUID、父链冲突或循环明确拒绝，不回退游标、不跨主会话读取旧工作。有 UUID 的阶段回复须能追溯至匹配输入；无 UUID 的旧格式保持兼容。逐次限长读取并跳过跨块长行，每次文件扫描限 64 MiB，超限须对账。
+
+`latest_dialogue` 使用最新主文件、稳定窗口及 `COMPLETION_BASELINE` 对应的本次执行字节基线，返回逻辑最新消息。默认投递通过 `tmux send-keys -l --` 逐行输入，Ctrl+J 插入换行，末尾一次 Enter；含 Tab/CR 的正文保留括号粘贴，避免补全或提前提交。快速按键也可能被 CLI 包装，识别不能依赖传输方式；不加入随机人工节奏。
+
 各轮复用原账号/cwd/session 和执行 deadline。停止、认证失败、额度暂停、总超时沿用既有优先级；收尾窗口或 CLI 已退出时禁止开始下一条，未完成补充不能标成功。额度恢复仍沿用既有每次尝试时限策略。v3 阶段文件是 `runtime/runs/<rid>/followups.json`，旧 worker 为工作区 `.bench-followups.json`；原子 0600 写入，拒绝错 run/计划/非法阶段、链接、特殊文件、超过 64KiB 的状态及会话截断。阶段扫描有界，不以工具大输出占满内存。
+
+driver 已确认收尾回复或 CLI 退出后，`advance --no-next` 缺少匹配输入、正常回复或同阶段父链时返回 incomplete，保留未完成阶段，不继续等硬超时。`init/observe` 仍只观察；pending 恢复无消费证据仍明确失败，不能据此重发。
 
 详情阶段缺失/损坏显示 unknown/invalid，不能冒充完成。页面只从冻结计划展示正文，使用 escapeHTML；topic 编辑缺省 followups 保留旧值，显式 [] 清空。状态摘要不扫描全部原生日志；成功判定由 worker 的证据核验负责。
 
@@ -193,6 +202,9 @@ helper 的状态 schema 1 保存 run_id、规范 JSON 计划摘要、初始摘�
 | 快照 JSON 损坏、null 或非法消息 | 明确拒绝；不吞掉为零补充 |
 | pending 重启而无对应主输入 | 明确失败并保留现场，不重发 |
 | 元消息、子代理、旧回复、工具或 synthetic 回复 | 不完成当前业务阶段 |
+| 同 ID 的整体输入包装 / 额外文字或错误包装 | 前者精确确认，后者等待；advance --no-next 时明确 incomplete |
+| thinking/text 混合回复 / 回复先于输入落盘 | 提取正文并按父链及时间恢复顺序，不漏判或重复推进 |
+| 异根回复 / 父链循环、冲突或重复对话 UUID | 异根不完成；坏链明确拒绝，不能猜测顺序 |
 | 错 run/计划、非法状态、会话截断或链接文件 | helper 非零退出；详情标无效 |
 | 已进入收尾、CLI 已退出且尚有补充 | 不投新业务消息，不返回完整 success |
 | 认证失败 / 额度耗尽 | 原 42 / 43 优先，原计划保持 |
@@ -203,11 +215,14 @@ helper 的状态 schema 1 保存 run_id、规范 JSON 计划摘要、初始摘�
 - Base：选择零条的新 run 与历史 [] 都保持单轮；两条候选完整保存，但初始 prompt 不含后续正文。
 - Incorrect：tmux paste 后重启，没找到该 user 输入就再发一次。Correct：保留 pending 并失败，人工核对原会话，避免重复业务需求。
 - Incorrect：仅更新 topics.md 或在恢复时查询新题库。Correct：同步工具按 no 更新 topics 及 followups_json，历史 task/run 永远用自己的快照；同步代码须一起携带共享 topic_library.py。
+- Incorrect：物理最后一条是 user 就一直等，或 thinking/text 混合就拒绝整个回复。Correct：两个消费者共用解析，按父链确认 user→assistant 的逻辑顺序，再校验正文、工具、错误和稳定窗口。
 
 ### 6. Tests Required
 
 - 600/21/1200、完整编号、所有英文及排除主题、自启动合成样例要求、补充不出现在初始正文；逐题语义审查包含改题依据。
 - 固定 0/1/2、同事务冻结、改题后普通/批次不漂移、养号候选、canonical/custom/旧记录零补充；quota payload 与实际下发原计划保持且不调用抽签。
 - 阶段输入确认、旧回复/元/子消息排除、pending 不确定与确认后恢复、坏摘要/索引/链接/截断、收尾禁止新补充。
-- `deploy/v3/run_local_verification.py --manifest <清单> [--followups-only]` 用正式 driver/tmux 与 CLI 替身断言 1/2/3 条输入、原 cwd/session、认证错误 42 且无补充。替身按原生 CLI 规范化 bracketed-paste 的 CR/LF，错误样例包含结构化 error 字段。
+- 两个消费者对同一混合正文和原生乱序记录同时断言；覆盖 0/1/2 阶段、附件父链、倒序时钟、旧执行字节基线、无 UUID/时间、异根、坏链及完成后恢复复核；输入包装接受/拒绝矩阵、no-next 缺证据不空等。
+- 实际按键多行保留空行、尾换行和字面字符，仅提交一次，Tab/CR 兼容输入不改变正文；原生 CLI 使用独立 HOME 与本地合成 SSE 核对真实格式，不能加载生产账号。
+- `deploy/v3/run_local_verification.py --manifest <清单> [--followups-only]` 用正式 driver/tmux 与 CLI 替身断言 1/2/3 条输入、原 cwd/session、认证错误 42 且无补充、两种收尾及时以 124 退出且保留未完成。替身允许整体包装、thinking/text 混合及回复先落盘，区分 Ctrl+J 换行与 Enter 提交，并记录 keys/paste；错误样例包含结构化 error 字段。正式镜像还须核对模块/命令链接及 control driver 与被测源码一致。
 - `deploy/v3/verify_stack.py --manifest <清单> --browser --topic-followups` 核对页面保存→API→SQLite、运行冻结正文、阶段摘要、XSS、1280/390px 明暗主题。替身和离线格式核对不能声称真实模型推理通过。

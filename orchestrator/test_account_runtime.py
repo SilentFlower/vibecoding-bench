@@ -425,7 +425,7 @@ class AccountRuntimeTests(unittest.TestCase):
         classifier = re.search(r"^classify_claude_completion\(\) \{.*?^\}", script, re.M | re.S)
         self.assertIsNotNone(classifier)
         result = subprocess.run(["bash", "-c", classifier.group(0) + "\nclassify_claude_completion 0\n"],
-            env={**os.environ, "CLAUDE_DIR": str(root / "home/.claude")},
+            env={**os.environ, "CLAUDE_DIR": str(root / "home/.claude"), "PYTHONPATH": str(source.parent)},
             capture_output=True, text=True, timeout=10)
         self.assertEqual(0, result.returncode, result.stderr)
 

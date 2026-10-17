@@ -942,154 +942,56 @@ capture_transcript_snapshot() {
 }
 
 classify_claude_completion() {
-  # Stop hook 只能说明 Claude 结束了一次回合；真正成功必须看 session JSONL
-  # 最后一条对话消息是否为稳定的纯文本 assistant 回复，不能停在 tool_use/tool_result。
+  # 与补充阶段共用正文和对话顺序解析；Stop hook 或物理最后一行都不能直接代表完成。
   local idle_sec="$1"
   python3 - "$CLAUDE_DIR/projects/-workspace" "$idle_sec" <<'PY'
-import json
 import os
 import sys
-import time
 from pathlib import Path
 
-project_dir = Path(sys.argv[1])
-idle_sec = float(sys.argv[2])
+sys.path.insert(0, '/usr/local/bin')
+from task_followups import latest_dialogue
 
-
-def message_role(entry):
-    message = entry.get("message")
-    if isinstance(message, dict):
-        return message.get("role")
-    return entry.get("role")
-
-
-def message_stop_reason(entry):
-    message = entry.get("message")
-    if isinstance(message, dict):
-        return message.get("stop_reason")
-    return entry.get("stop_reason")
-
-
-def message_content(entry):
-    message = entry.get("message")
-    if isinstance(message, dict):
-        return message.get("content")
-    return entry.get("content")
-
-
-def content_text(content):
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts = []
-        for item in content:
-            if isinstance(item, dict) and item.get("type") == "text":
-                parts.append(str(item.get("text") or ""))
-        return "\n".join(parts)
-    return ""
-
-
-def content_has_tool_use(content):
-    if not isinstance(content, list):
-        return False
-    return any(isinstance(item, dict) and item.get("type") == "tool_use" for item in content)
-
-
-def is_synthetic_api_timeout(entry, text):
-    # Claude Code 2.x 在请求重试耗尽后会写入 synthetic assistant 消息。
-    # 这不是模型完成结果，不能按普通最终 assistant 文本判 success。
-    is_api_error = entry.get("isApiErrorMessage") is True
-    message = entry.get("message")
-    if isinstance(message, dict) and message.get("model") == "<synthetic>":
-        is_api_error = True
-    return is_api_error and "request timed out" in text.lower()
-
-
-jsonl_files = sorted(project_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
-if not jsonl_files:
+try:
+    latest = latest_dialogue(Path(sys.argv[1]), float(sys.argv[2]),
+        Path(os.environ.get('COMPLETION_BASELINE', '/tmp/claude-completion-baseline.json')))
+except (OSError, ValueError):
     sys.exit(1)
-
-latest_entry = None
-latest_path = jsonl_files[0]
-latest_stat = latest_path.stat()
-if time.time() - latest_stat.st_mtime < idle_sec:
+if not latest or latest['role'] != 'assistant':
     sys.exit(1)
-
-with latest_path.open("r", encoding="utf-8", errors="replace") as handle:
-    # 自动恢复沿用同一会话，只判本次启动后新增的消息。
-    try:
-        baseline = json.loads(Path(os.environ.get("COMPLETION_BASELINE", "/tmp/claude-completion-baseline.json")).read_text())
-        handle.seek(int(baseline.get(str(latest_path), 0)))
-    except (OSError, ValueError, TypeError):
-        pass
-    for line in handle:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            entry = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if message_role(entry) in {"assistant", "user"}:
-            latest_entry = entry
-
-if not latest_entry:
-    sys.exit(1)
-
-role = message_role(latest_entry)
-content = message_content(latest_entry)
-text = content_text(content)
-stop_reason = message_stop_reason(latest_entry)
-
-if role != "assistant":
-    sys.exit(1)
-if is_synthetic_api_timeout(latest_entry, text):
-    print("fatal_api_timeout")
-    sys.exit(3)
-synthetic = latest_entry.get("isApiErrorMessage") is True or (
-    isinstance(latest_entry.get("message"), dict)
-    and latest_entry["message"].get("model") == "<synthetic>"
-)
-if synthetic:
-    error = str(latest_entry.get("error") or "").lower()
+text = latest['text'] or ''
+if latest['synthetic']:
+    error = latest['error'].lower()
     lowered = text.lower()
-    if error == "account_on_hold" or "account is on hold" in lowered or "account has been suspended" in lowered:
-        print("fatal_account_on_hold")
+    if 'request timed out' in lowered:
+        print('fatal_api_timeout')
+        sys.exit(3)
+    if error == 'account_on_hold' or 'account is on hold' in lowered or 'account has been suspended' in lowered:
+        print('fatal_account_on_hold')
         sys.exit(2)
-    if error == "invalid_grant":
-        print("fatal_invalid_grant")
+    if error == 'invalid_grant':
+        print('fatal_invalid_grant')
         sys.exit(2)
-    if any(marker in lowered for marker in ("api error: 401", "please run /login", "invalid authentication", "oauth token has expired")):
-        print("fatal_auth_error")
+    if any(marker in lowered for marker in ('api error: 401', 'please run /login', 'invalid authentication', 'oauth token has expired')):
+        print('fatal_auth_error')
         sys.exit(2)
-    if error == "rate_limit" and any(marker in lowered for marker in (
-        "session limit", "weekly limit", "usage limit", "5-hour", "5 hour", "7-day", "额度耗尽",
-        "you've hit your limit", "you have hit your limit",
+    if error == 'rate_limit' and any(marker in lowered for marker in (
+        'session limit', 'weekly limit', 'usage limit', '5-hour', '5 hour', '7-day', '额度耗尽',
+        "you've hit your limit", 'you have hit your limit',
     )):
-        print("seven_day" if "weekly" in lowered or "7-day" in lowered else "five_hour"
-              if "session limit" in lowered or "5-hour" in lowered or "5 hour" in lowered else "unknown")
+        print('seven_day' if 'weekly' in lowered or '7-day' in lowered else 'five_hour'
+              if 'session limit' in lowered or '5-hour' in lowered or '5 hour' in lowered else 'unknown')
         sys.exit(4)
-    print("fatal_api_error")
+    print('fatal_api_error')
     sys.exit(5)
-if content_has_tool_use(content):
+if latest['tool'] or not text.strip():
     sys.exit(1)
-if stop_reason == "tool_use":
-    sys.exit(1)
-lines = [line.strip() for line in text.splitlines() if line.strip()]
-if not lines:
-    sys.exit(1)
-
-auth_error_markers = [
-    "Please run /login",
-    "API Error: 401",
-    "Invalid authentication credentials",
-    "OAuth token has expired",
-]
-if any(marker in text for marker in auth_error_markers):
-    print("fatal_auth_error")
+if any(marker in text for marker in (
+    'Please run /login', 'API Error: 401', 'Invalid authentication credentials', 'OAuth token has expired',
+)):
+    print('fatal_auth_error')
     sys.exit(2)
-
-print("complete")
+print('complete')
 PY
 }
 
@@ -1511,10 +1413,27 @@ is_claude_tui_busy() {
 inject_tmux_prompt() {
   local buffer="$1"
   local text="$2"
+  local line
   tmux has-session -t "$SESSION" 2>/dev/null || return 1
-  printf '%s' "$text" > "/tmp/${buffer}.txt"
-  tmux load-buffer -b "$buffer" "/tmp/${buffer}.txt"
-  tmux paste-buffer -t "$SESSION" -b "$buffer" -d -p
+  if [[ "$text" == *$'\t'* || "$text" == *$'\r'* ]]; then
+    # Tab/CR 作为按键可能补全或提前提交，兼容既有自定义正文时仍按完整粘贴传输。
+    printf '%s' "$text" > "/tmp/${buffer}.txt"
+    tmux load-buffer -b "$buffer" "/tmp/${buffer}.txt" || return 1
+    tmux paste-buffer -t "$SESSION" -b "$buffer" -d -p || return 1
+  else
+    # Ctrl+J 只插入换行；普通 Enter 仅在全文输入后发送，不能把多行需求拆成多个任务。
+    while [[ "$text" == *$'\n'* ]]; do
+      line="${text%%$'\n'*}"
+      if [ -n "$line" ]; then
+        tmux send-keys -t "$SESSION" -l -- "$line" || return 1
+      fi
+      tmux send-keys -t "$SESSION" C-j || return 1
+      text="${text#*$'\n'}"
+    done
+    if [ -n "$text" ]; then
+      tmux send-keys -t "$SESSION" -l -- "$text" || return 1
+    fi
+  fi
   sleep 1
   tmux send-keys -t "$SESSION" Enter
 }
@@ -1813,7 +1732,7 @@ fi
 startup_ready=1
 handle_claude_startup_gates || startup_ready=0
 
-# ---------- 5) 注入 prompt(用 bracketed paste,避免逐字符触发 TUI 行为) ----------
+# ---------- 5) 输入完整 prompt（默认按键，保留多行且只提交一次） ----------
 if [ ! -f /tmp/claude-exited ] && [ "$startup_ready" = "1" ]; then
   log "Injecting prompt (${#TASK_PROMPT} chars)"
   inject_tmux_prompt prompt "$TASK_PROMPT"

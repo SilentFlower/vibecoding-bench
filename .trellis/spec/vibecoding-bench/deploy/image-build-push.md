@@ -237,12 +237,14 @@ worker 注入 prompt 时必须保持 `TASK_PROMPT` 原样,不要把 bench 自己
 
 Stop hook 只允许记录“Claude 停过一轮”的观测信号,不能直接 `exit 0` 或直接 touch 成功文件。成功必须解析 `.claude/projects/**/*.jsonl`,并满足:
 
-1. 最新对话消息是 assistant。
-2. assistant 内容不包含 `tool_use`。
+1. 通过共用 `task_followups.latest_dialogue` 在本次执行字节基线之后取得逻辑最新主对话消息，结果是 assistant；JSONL 的物理最后一行不能代表对话顺序。
+2. assistant 可混合 thinking/text，须提取有效正文；内容不包含 `tool_use` / `tool_result`。
 3. `stop_reason` 不是 `tool_use`。
 4. assistant 文本至少有一条非空文本行。
 5. 最新 session JSONL 文件的 mtime 已稳定至少 `COMPLETION_IDLE_SEC` 秒。
 6. 若配置了业务补充，还须由 `v3-task-followups` 核验全部选定阶段的主会话输入和正常回复；首轮满足前五项仅允许准备下一阶段。详见 [题库与阶段契约](../backend/topic-prompt-contract.md#scenario-自包含题库与冻结的有限业务补充)。
+
+worker 与 v3 account 镜像都必须分发 `/usr/local/bin/task_followups.py`，原 `v3-task-followups` 命令链接到同一文件；通用分类器和阶段机共用其解析、父链排序和字节边界。输入的整体包装、默认按键/Ctrl+J 传输、无 UUID 兼容及 no-next 未完成收口，以同一题库阶段契约为准，禁止维护两份不同的完成解析规则。
 
 最终成功变量只能保存在当前 worker 进程内；有限补充的持久阶段文件仅是待核验的运行状态，不能直接当完成信号。不能通过 `/tmp/claude-done` 这类文件判定。原因是旧 profile/settings 或 hook 残留可能在 Claude Stop hook 中写同名文件,把停在 `user tool_result` 的中间态误判成 success。
 
