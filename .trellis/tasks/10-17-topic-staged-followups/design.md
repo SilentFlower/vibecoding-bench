@@ -21,7 +21,7 @@
 4. Runner 只从已保存的 run 计划下发正文，调度 payload、额度恢复、任务详情使用同一事实来源。旧调用缺值为 `[]`；损坏或超长计划明确拒绝，不静默当零补充。
 5. v3 把计划和跨尝试阶段文件放在 `runtime/runs/<run_id>`，在原有目录映射中增加明确路径；旧 worker 使用工作区的受控运行文件。计划不拼进 TASK_PROMPT，也不泄露到别的账号/项目。
 
-## 多轮执行与确认
+## 上一版多轮执行与确认（已部署行为）
 
 - 拟新增小型标准库 Python 阶段模块，供 shell driver 调用；shell 继续复用实际 `inject_tmux_prompt()` 及既有会话 JSONL 完成判定。helper 通过正式镜像 COPY 分发，v3 driver 在 UID1000、原 cwd、原 tmux/CLI 下运行。
 - 每个被选阶段均需要原主会话 JSONL 中的对应 user 输入和其后的稳定正常 assistant 回复；记录 run、计划摘要、阶段、session、输入/回复 UUID 或游标。只使用主会话，排除子代理、旧历史、tool_result、synthetic/API 错误及元消息。
@@ -67,3 +67,17 @@ auto-loop 完成实现、完整 Check-All、Spec Update 与精确本地 commit�
 - 对完整 JSONL 行做有界扫描，保留原字节位置及结束游标。基于 uuid/parentUuid（含附件节点）恢复先后关系；无依赖节点用有效时间排序，没有完整时间的旧格式保留文件顺序。亲缘冲突/循环拒绝，不跨主会话或已保存 cursor 回读旧工作。
 - 补充输入后的正常回复还须属于本阶段后代链；无 UUID 的旧格式沿用既有匹配。收尾时证据不足明确 incomplete，不能靠等待硬超时掩盖完成判定分歧。
 - 新验证覆盖混合回复、乱序输入/回复/附件、父链优先于时间、旧无时间记录、阶段 cursor、其它根会话、损坏父链及真实原生 CLI 快速响应。沿用既有 0/1/2、认证、额度及收尾验证。
+
+## 随机时间投递：已实施的新契约
+
+- 原生 2.1.293 离线证据：`/tmp/topic-followups-busy-evidence2/result.json` 与 queued/final JSONL。在首轮合成响应未返回期间，真实按键函数成功投递两条，主会话立即记录 `type=queue-operation, operation=enqueue, content=<完整正文>`；当时尚无这两条普通 user。首轮回复后，分别记录两条 user，下一上游请求将两条拼为一个 user，最后一个正常 assistant 同时回应两条。不能把“一条消息一条独立回复”作为新模式前提。
+- 定时发送与业务完成必须解耦。新模式每次循环检查固定的到点计划；发送前保存 pending，入队或普通 user 的精确正文证据确认传输，普通主 user 才确认消费。两条均已消费且最后一条之后出现正常最终回复时核验整体完成，保留旧字节边界/父链/错误保护。
+- 时间从初始需求实际投递后的运行计时点计算，不从排队创建任务的数据库时间计算。随机次数、正文及时间计划只生成一次并持久保存；恢复按原计划和既有尝试时限策略对账，不重新抽签、不将未知 pending 当作未发送。
+- 新旧模式须有显式快照边界。旧行/活动 run 不回填新时间；schema 1 阶段仍按已部署规则恢复。新增字段、driver 环境与页面 DTO 已按下述已确认窗口实现。
+- 默认发送仍为现有按键函数，不发送中断，不添加人工打字节奏。到点可能只是进入原生队列，不能承诺模型当场打断工作或完成业务要求。
+- 页面计划列表显示每条目标时间及传输/消费/完成状态；汇总“已完成”不能借用“已入队”数。首轮提前结束但仍有将来计划时，须保留本任务等待后续时间点，不能提前 success。
+- 用户已选择预算的 10%～60% 窗口。新 run 在创建事务中冻结 `runs.followup_timing_json`（nullable TEXT，历史 NULL）：`{schema:1,offsets_sec:[递增整数],timeout_sec,wrapup_sec}`。独立随机抽取整数秒后排序，正文顺序不变；收尾秒数取原设置与 `timeout-floor(timeout*0.6)-5` 的较小值，预留轮询、提交及秒级时钟取整余量，确保短预算也不在收尾后投递。无补充保持原收尾设置。
+- Runner、Scheduler 与 QuotaGuard 只传原 timing 快照，环境为 `TASK_FOLLOWUP_TIMING_JSON`；NULL/空环境走原 schema 1。新状态 schema 2 保存 timing 摘要、初始投递时钟 `started_at`、原 cursor/session 与每条消息的 pending/queued/consumed/completed 证据。`start` 在初始输入投递后原子固定时钟，恢复不改时间；暂停期间到期的未发消息在新尝试门禁允许时顺序投递。
+- `tick` 独立于最终回复分类，每次循环检查时间；pending 先持久化再 send。queue-operation 仅作精确传输确认，不进入通用完成分类；普通 user 才是消费证据，最终正文须位于该输入后代链。两条输入可由同一最终回复共同确认。恢复时 pending/queued 尚无普通 user 代表原 CLI 内存队列无法保证保留，明确失败且不重发。
+- 运行详情补充 `mode/offsets_sec/started_at/delivered/consumed/items`，item 只从 DB 正文与已核对的状态计数派生。旧 schema 1 展示保持。schema 2 中首轮提前结束仍等待未来时间点，全部计划消费并完成才允许 success。
+- 本次用户已明确禁止新增大体积服务器备份；部署继续使用现有回退资料、精确代码切换和持久文件核对，不自动创建新数据副本。
