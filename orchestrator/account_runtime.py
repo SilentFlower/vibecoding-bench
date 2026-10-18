@@ -1342,10 +1342,11 @@ class AccountRuntime:
                 or payload.get("process") != ("passthrough" if mode == "passthrough" else "recorder")):
             raise ValueError("网络上下文确认不匹配")
 
-    def wait_worker(self, container_id: str) -> int:
+    def wait_worker(self, container_id: str, on_running: Callable[[], None] | None = None) -> int:
         """等待本次 exec，而非等待固定容器退出。
 
-        :param container_id: 固定账号容器 ID
+        :param container_id: 含本代执行来源的完整 token。
+        :param on_running: 仅当前 exec 仍存活时检查本地额度，不发起上游请求。
         :return: 本次 driver 的退出码
         """
         job = self.job_for_container(container_id)
@@ -1353,6 +1354,11 @@ class AccountRuntime:
             state = self.client.api.exec_inspect(job["exec"])
             if not state.get("Running"):
                 return int(state.get("ExitCode") if state.get("ExitCode") is not None else -1)
+            if on_running is not None:
+                with self.lock:
+                    current = self.jobs.get(job["row"]["environment_id"])
+                if current is job:
+                    on_running()
             time.sleep(0.5)
 
     def register_exec(self, token: str, exec_id: str) -> None:

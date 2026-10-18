@@ -590,7 +590,7 @@ if "model_override" not in task:
 
 ### 1. Scope / Trigger
 
-修改 v3 账号阈值、普通任务／批次／养号启动及恢复、CLI 状态栏、usage 手动查询或页面摘要时适用。v3 不在执行边界或 tick 查询 usage；抓包、续聊和网关 API 不受账号百分比阈值限制，共同耗尽及认证门禁仍生效。旧 runner 保持原兼容行为。
+修改 v3 账号阈值、普通任务／批次／养号启动、运行中强制停止及恢复、CLI 状态栏、usage 手动查询或页面摘要时适用。v3 不在执行边界或 tick 查询 usage；抓包、续聊和网关 API 不受账号百分比阈值限制，共同耗尽及认证门禁仍生效。旧 runner 保持原兼容行为。
 
 ### 2. Signatures
 
@@ -606,6 +606,10 @@ QuotaGuard.policy_snapshot(account, workload, source=None, *, quota_state=None) 
 _public_quota_policy(account, workload="normal") -> dict
 statusline_quota_observation(rate_limits: object, observed_at: float) -> dict
 collect_statusline(payload: object, configuration: dict, now: float) -> bool
+AccountRuntime.wait_worker(container_id: str, on_running: Callable[[], None] | None = None) -> int
+Runner.wait_worker(worker_id: str, on_running: Optional[Callable[[], None]] = None) -> int
+Scheduler._enforce_running_quota(run_id: str, account: dict, attempt: int, worker_id: str) -> None
+runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止意图与终态字段
 ```
 
 历史字段和 warmup_quota_admissions 表保留；没有新 schema。v3 移除 refresh_usage／invalidate_usage 与进程内自动刷新失败元数据；认领正常恢复机会复用持久 admissions，服务重启不能再制造一次机会。
@@ -614,9 +618,12 @@ collect_statusline(payload: object, configuration: dict, now: float) -> bool
 
 - 阈值是 1～100 的已用整数百分比，两个窗口独立，默认 NULL；省略保留，null 关闭，StrictInt 拒绝 bool／字符串／小数。保存不隐式改绑。
 - 未绑定账号有完整本地 OAuth 时可以启用定时养号；绑定账号核实身份与 active OAuth，只由 cc2api 刷新。未绑定配置缺凭据返回 409，不调用 cc2api；NULL 绑定的调度写入用 IS ?。
-- 首次额度未知不写成 0%，也不因无样本、进程重启或 300 秒缓存年龄而等待主动查询；没有真实拒绝或有效命中时可启动已有正常任务，由正式响应更新。有效窗口等于或高于任一阈值阻止下一执行；已开始 CLI 完整收尾。
+- 首次额度未知不写成 0%，也不因无样本、进程重启或 300 秒缓存年龄而等待主动查询；没有真实拒绝或有效命中时可启动已有正常任务，由正式响应更新。任一有效窗口已用等于或高于启用阈值时，阻止下一执行，并强制结束正在运行的普通任务／养号本轮，不等待业务完整收尾，也不注入收尾或补充消息。单次响应可能跨阈值，只承诺可信观测后的停止，不能保证实际计费用量不越界或避免封禁。
+- 运行中检查复用当前 Docker exec 的 0.5 秒等待循环：已退出 exec 不再回调，替代 job 不接受旧回调。认领前核对账号身份、run／attempt、完整 token、source、环境及 generation；同一快照消费观察、判定 hit，再用数据库 CAS 核对 running、未停止／删除及仍启用的账号与当前两个阈值。提高／关闭配置使旧判定失效，下轮按新配置判断；缺失、非法或过期窗口不构成命中。
+- 停止先持久化 stopping、stop_requested_at 和包含命中窗口／实际百分比／阈值／UTC 观察时间的 error，再于数据库锁外复用本代 cleanup。TERM → 有界 KILL 与 UID1000 子进程收口确认后写 stopped／ended_at，等待器只补实际 exit_code，不覆盖原因或时间；HOME、项目、session、补充计划和已发证据保留。清理失败记 failed 并暂停批次，运行时保留 cli_reconcile 门禁，不能假报停止或放行下一 CLI；其它账号与独立 API 不随之停止。
+- 已有用户停止、删除和自然终态不被重新分类；清理过程中落盘的认证失败仍优先，明确 account_on_hold／invalid_grant 保留永久门禁。重启看见停止意图只完成旧轮收口，不把它改为 quota_wait 或再次提交。
 - 旧命中窗口 reset 到期只给一个已有执行正常恢复机会。共同耗尽到期同样参与认领，即使百分比阈值关闭；普通任务／养号／续聊／抓包共用 `policy_key="v3-passive-recovery"`，周期键包含阈值与 reset，以及已耗尽通用窗口的 reset。同周期并发、失败和重启不能再发探测；真实允许的新周期事实才能继续推进。
-- 原 run／批次、prompt、workspace/session 与版本／effort／模型快照保持；零 run 活动批次依本地事实和恢复机会创建首个正常工作，后台不补查。停止、删除、身份变化和永久认证错误优先。
+- 真正额度耗尽的 quota_wait 仍保留原 run／批次、prompt、workspace/session 与版本／effort／模型快照并按旧恢复流程续跑。阈值强制中断则永久结束本轮 run／item 为 stopped：批次可进入 quota_wait，额度恢复及原 next_launch_at 允许后只投放下一 pending／paused item，不清空原间隔，不重试 stopped item；定时养号按既有间隔安排新一轮，停止不增加认证失败计数。零 run 活动批次依本地事实和恢复机会创建首个正常工作，后台不补查。
 - API 继续消费发送器白名单响应头；CLI 在普通任务、养号、原任务恢复和非抓包续聊临时包装 statusLine，stdin 的 `rate_limits.five_hour/seven_day.used_percentage` 为 0～100，`resets_at` 为 UTC 秒。bool、非有限值、越界值、非未来 reset、超过观察时间 6 小时／8 天的 reset 或缺失窗口不写入；缺失不补零，不删除其它窗口。
 - collector 校验 cwd、主会话目录／文件名、非链接 transcript，最多读取尾部 512 KiB；仅使用本代开始后且不超过当前时间 5 秒的正常主 assistant 响应，排除子会话、synthetic/API 错误和会话冲突。ts 使用响应时间；flock 去重 session／response ID／窗口内容，重复缓存不伪造新观察时间。
 - 观察只保存 source=`cli:<执行来源>`、identity、ts、origin=cli、session_id、response_id 和 rate_limits 白名单；不保存完整 stdin、prompt、工具内容或凭据。QuotaGuard 校验游标来源、身份与 origin，CLI 事件不能提供 account_error。现有用户状态栏获得原 stdin 并保持输出；collector 无网络调用，不增加定时刷新、usage 或模型请求。
@@ -631,8 +638,13 @@ collect_statusline(payload: object, configuration: dict, now: float) -> bool
 | 条件 | 结果 |
 | --- | --- |
 | 首次未知且无真实拒绝 | 正常启动，页面显示未知，不请求 usage |
-| 有效窗口达到阈值 | 阻止下一执行，当前 CLI 完整收尾 |
-| 命中或共同耗尽 reset 到期 | 持久认领一次已有执行，沿原题／session 恢复 |
+| 运行中任一有效窗口等于／跨过启用阈值 | 认领停止并清理当前代，原 run／item 永久 stopped，文件及 session 保留 |
+| 阈值中断后窗口恢复 | 持久单次更新机会仍生效；批次等原投放时间后做下一未执行题目，不续原轮 |
+| 真正共同耗尽的 quota_wait 在 reset 到期 | 持久认领一次已有执行，沿原题／session 恢复 |
+| 提高／关闭阈值在停止 CAS 前提交 | 旧判定取消，后续观察使用新配置 |
+| 执行代次替换／已自然结束／用户停止 | 旧回调不清理新代，不覆盖已有终态或用户停止 |
+| 强制停止清理失败 | failed，批次 paused；保留 cli_reconcile，禁止下一 CLI |
+| 终止时明确认证失败 | auth_failed 优先；永久认证门禁不被阈值原因掩盖 |
 | 恢复机会已使用、并发 tick 或服务重启 | 等待被动更新，不再新增探测 |
 | CLI 窗口缺失／非法／旧响应／重复缓存 | 不追加观察，不覆盖已有有效窗口 |
 | 手动 0%＋过去或空 reset | 沿已有空闲窗口规则记录真实事实，不伪造 reset |
@@ -645,12 +657,14 @@ collect_statusline(payload: object, configuration: dict, now: float) -> bool
 
 ### 5. Scenarios and Examples
 
-- 正常：5h 阈值 70%，首次未知的正常任务启动；其正式响应报告 75%，后续工作等待。reset 到期沿原 run 恢复一次，新观察低位才继续批次，不调用 usage。
+- 正常：5h 阈值 60%，普通任务从 55% 启动；正式响应报告 60% 或 68% 时即强制结束本轮，记录原因及实际退出码。reset 到期后下一 pending item 在原间隔允许时取得一次正常更新机会，新观察低位才继续批次，不调用 usage。
+- 边界：只启用 7d=80% 时，养号观察到 5h=55%／7d=80% 也结束本轮；关闭两个阈值则高位不触发百分比停止，共同耗尽和认证保护保持。
 - 基础：600 题批次尚无 run，未知状态可创建第一条正常工作；已有持久投放时间仍须等待，不能补发历史 item。
 - 基础：未绑定账号持本地 OAuth 独立养号；明确绑定后才移交刷新权，不必为养号创建网关账号。
 - 错误用法：前置／后置／失败 tick 自动请求 usage，或用同一缓存状态栏不断刷新 observed_at。正确做法：仅消费正式响应／本地新响应观察，usage 留给手动按钮。
 - 错误用法：取消阈值后让多个 CLI 同时试探耗尽窗口，或重启清掉恢复机会。正确做法：共同耗尽加入同一持久周期认领，真实新观察确认恢复。
 - 错误用法：owner 锁内再次调用 _sync_bound_account_credentials。正确做法：调用 locked 入口，并用真实不可重入锁回归。
+- 错误用法：阈值命中后写 quota_wait 并在 reset 后续原题，或先改终态再调用只接受活动状态的 CAS。正确做法：先原子认领 stopping，清理成功后 stopped，等待器仅补实际退出码；批次恢复只选择尚未执行的 item。
 
 ### 6. Tests Required
 
@@ -660,6 +674,9 @@ collect_statusline(payload: object, configuration: dict, now: float) -> bool
 - 隔离官方 CLI＋本地 SSE 验证：采集命中 5h／7d，启用前后模型请求相同、usage 为零；安装在镜像中的 collector 被实际执行，测试替身和无真实账号边界明确。
 - 重启批次回归：只注册 active 且账号启用未删除；未来 next_launch_at 必须等待，取消时不创建 run 或清空时间；终态 item 保持。
 - test_warmup_quota.py/test_quota.py 保留旧 runner、Recorder 单次许可、停止／删除／永久异常、字段校验与历史合并回归。
+- test_quota_hard_stop.py：等值／跨阈值、5h／7d、普通／养号、未知／过期／关闭、动态降低与提高配置竞争、重复回调、旧代、自然完成、用户停止、认证竞争、清理失败、重启不续原轮及批次原间隔；真实 Scheduler 等待路径保留命中原因与实际退出码。
+- run_local_verification.py --manifest <本轮联合清单> --quota-hard-stop-only：真实 driver／tmux 用正式 statusLine 产生合成读数，验证 5h=60／68、7d=80 停止、关闭阈值成功；命中后两秒内认领停止、无额外补充／收尾输入、已有项目与会话保留，全部使用离线资料。
+- verify_stack.py --manifest <本轮联合清单> --browser --quota-hard-stop：真实页面配置保存重读、stopped API／SQLite 原因及退出码、XSS 和 1280／390px 明暗主题；不以合成页面终态代替真实 driver 终止验证。
 - 固定 Docker 验证：真实 TLS 手动 usage JSON、监听 PID 不变、无 MITM CA，普通任务／养号透传与显式抓包、独立 API 长流及重建保持；页面 1280/390 明暗主题、未知／被动／手动／历史来源，只有按钮产生一次查询。
 
 ---

@@ -47,7 +47,7 @@ v3 回退先停止当前批次并保留最新停机备份。只在布局/桥协�
 
 登录在真实 CLI/tmux 内完成。CLI 与 Rust API 发送器位于不同角色容器，共享本账号网络命名空间及代理，但仍是不同客户端。gateway 内的 OAuth 客户端使用账号显式代理；v3 缺少或只有空白代理时在请求前拒绝，不自动直连。固定环境不保证完整指纹相同或避免封禁。身份没有明确来源时不应猜测。遥测专项继续留在后续任务。
 
-账号支持 5h/7d 已用百分比阈值，两个窗口独立配置 1～100 的整数或关闭，默认关闭。达到任一阈值后，尚未启动的普通 CLI 与养号进入等待；当前 CLI 执行完整收尾，保留 HOME、工作目录和主会话。普通任务与养号在执行前后自动通过账号容器原生 TLS 查询 usage；未知、过期和失败由后台间隔重试，近期结果复用，查询不切换 MITM。运行中的 CLI 执行完整收尾，消费后的最新用量约束下一执行。未绑定但持有本地 OAuth 的账号也可以定时养号。抓包、继续对话与 cc2api API 保持原有门禁。此功能需要同批 control/account 镜像，回滚前先关闭阈值并收口等待工作，保留持久数据。
+账号支持 5h/7d 已用百分比阈值，两个窗口独立配置 1～100 的整数或关闭，默认关闭。额度从正式响应被动更新，不在自动调度中查询 usage。首次观测到任一有效窗口达到阈值时，强制结束正在运行的普通 CLI 或养号轮次，保留 HOME、工作目录和主会话，并将本轮记为 stopped；不等待业务完整收尾、不自动续跑原轮次。后续批次任务等待额度恢复及原投放间隔，再执行下一未执行题目；定时养号按原间隔安排新一轮。窗口到期不伪造用量归零，仍复用持久单次正常更新机会。单次响应可能跨过阈值，强制停止不保证实际计费值绝不越界。未绑定但持有本地 OAuth 的账号也可以定时养号。抓包、继续对话与 cc2api API 保持原有门禁。此功能需要同批 control/account 镜像，回滚前先关闭阈值并收口等待工作，保留持久数据。
 
 API 与同账号普通 CLI、养号、抓包独立调度，可以同时运行；CLI 之间串行，养号让位于正式 CLI 工作。API 准备发送器不安装 CLI。普通 CLI 的取消、心跳失联、调度器重启只清理本次进程和 CLI 观察上下文，保留账号容器与 API 长流；清理无法确认时标为 `cli_reconcile`，只禁止下一 CLI。旧无模式记录默认排他。重授权、代理修改、绑定切换、停止及重建仍关闭 API 入场并检查或排空已有请求。两条链路共享账号额度及容器资源，容器或公共网络故障仍可能影响两者。
 
@@ -58,9 +58,13 @@ run 与续聊的证据入口保持固定，各次执行在 `executions/<source_h
 ```bash
 # 需在已安装 orchestrator requirements 的 Python 环境运行。
 python3 deploy/v3/run_local_verification.py --manifest /absolute/path/release.json
+# 真实忙碌 driver、正式状态栏采集和调度器的强制中断，含 5h、7d、跨阈值和关闭阈值。
+python3 deploy/v3/run_local_verification.py --manifest /absolute/path/release.json --quota-hard-stop-only
 python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json
 # 已安装 Chrome/Chromium 时，验证真实页面的统一退出和旧 Cookie 重放拒绝。
 python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser
+# 强制结束阈值说明、真实 API／SQLite 停止原因与页面转义。
+python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --quota-hard-stop
 # 验证实际 Recorder 的本地 HTTPS/SSE、未知一次机会及重启不重复。
 python3 deploy/v3/verify_warmup_quota.py --manifest /absolute/path/release.json
 # 在统一后台验证合成账号阈值配置、保存重读、明暗主题和 390px。

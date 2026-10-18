@@ -3,6 +3,7 @@
 import json
 import os
 import select
+import shlex
 import socket
 import subprocess
 import sys
@@ -40,7 +41,32 @@ def run_followup_fixture() -> None:
     queued_users = []
     queued_at = {}
     native_queue = config.get('queued_command', False)
+    quota_started = None
+    quota_sent = set()
     while True:
+        for index, sample in enumerate(config.get('quota_schedule', [])):
+            if quota_started is None or index in quota_sent or time.monotonic()-quota_started < sample['after']:
+                continue
+            # 使用正式 statusLine 入口和正常工具响应，验证真实采集链路而非直接改额度状态。
+            observed = time.time()
+            identity = f"{config['session']}-quota-{index}"
+            response = {'type':'assistant','uuid':identity,'parentUuid':previous,
+                'sessionId':config['session'],'timestamp':datetime.now(timezone.utc).isoformat(),
+                'message':{'id':identity,'role':'assistant','model':'offline-fixture','stop_reason':'tool_use',
+                    'content':[{'type':'tool_use','id':identity+'-tool','name':'Bash','input':{'command':'synthetic'}}]}}
+            with session.open('a') as stream:
+                stream.write(json.dumps(response)+'\n')
+            previous = identity
+            settings = json.loads((home/'.claude/settings.json').read_text())
+            payload = {'cwd':str(cwd),'session_id':config['session'],'transcript_path':str(session),
+                'rate_limits':{key:{'used_percentage':sample[key],'resets_at':observed+delay}
+                    for key,delay in (('five_hour',600),('seven_day',3600))}}
+            with (cwd/'.synthetic-quota.jsonl').open('a') as stream:
+                stream.write(json.dumps({'at':observed,'five_hour':sample['five_hour'],
+                    'seven_day':sample['seven_day']})+'\n')
+            subprocess.run(shlex.split(settings['statusLine']['command']), input=json.dumps(payload),
+                text=True,capture_output=True,check=True)
+            quota_sent.add(index)
         if busy_until and native_queue:
             for queued in list(queued_users):
                 if time.monotonic()-queued_at[queued['uuid']] < 2:
@@ -128,6 +154,9 @@ def run_followup_fixture() -> None:
                 with session.open('a') as stream:
                     stream.write(json.dumps(user)+'\n')
                 previous = user['uuid']
+                if config.get('quota_schedule'):
+                    quota_started = time.monotonic()
+                    (cwd/'partial-artifact.txt').write_text('保留强制中断前的合成产物')
                 busy_until = time.monotonic() + config['busy_seconds']
                 print('Fixture initial work busy',flush=True)
                 continue

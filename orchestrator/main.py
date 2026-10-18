@@ -29,9 +29,10 @@ import urllib.request
 import uuid
 from collections import deque
 from contextlib import ExitStack, asynccontextmanager, contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from stat import S_ISREG
-from typing import Literal, Optional, Sequence
+from typing import Callable, Literal, Optional, Sequence
 
 import docker
 from docker.errors import NotFound
@@ -275,6 +276,7 @@ _DEFAULT_CLAUDE_TOP_CONFIG: dict[str, object] = {
 _PROFILE_SYNC_FILES = (".credentials.json", "settings.json", ".claude.json")
 _PROFILE_CONFIG_SYNC_FILES = ("settings.json", ".claude.json")
 _TERMINAL_RUN_STATUSES = {"success", "failed", "timeout", "stopped", "auth_failed"}
+_THRESHOLD_STOP_PREFIX = "额度阈值强制中断："
 OAUTH_REFRESH_INTERVAL_SEC = 60
 OAUTH_REFRESH_BUFFER_SEC = 10 * 60
 _profile_locks: dict[str, threading.Lock] = {}
@@ -3673,7 +3675,9 @@ class QuotaGuard:
                     if state["retry_ready"]:
                         batches = batches[:1]
                     for batch in batches:
-                        conn.execute("UPDATE task_batches SET status='active',next_launch_at=NULL WHERE id=? AND status='quota_wait'", (batch["id"],))
+                        conn.execute("UPDATE task_batches SET status='active'" +
+                                     ("" if account_runtime else ",next_launch_at=NULL") +
+                                     " WHERE id=? AND status='quota_wait'", (batch["id"],))
                     conn.execute("UPDATE accounts SET warmup_next_run_at=?,warmup_last_status='scheduled',warmup_last_error=NULL "
                                  "WHERE id=? AND warmup_enabled=1 AND warmup_last_status='quota_wait' "
                                  "AND ?=0 "
@@ -4018,9 +4022,15 @@ class Runner:
             # 容器可能已经退出或被删除；停止路径不应被配置兜底阻断。
             pass
 
-    def wait_worker(self, worker_id: str) -> int:
+    def wait_worker(self, worker_id: str, on_running: Optional[Callable[[], None]] = None) -> int:
+        """等待当前执行，在 v3 活跃期间执行本地保护检查。
+
+        :param worker_id: 本代完整执行标识。
+        :param on_running: 活跃执行的可选本地检查回调。
+        :return: 实际进程退出码。
+        """
         if account_runtime:
-            return account_runtime.wait_worker(worker_id)
+            return account_runtime.wait_worker(worker_id, on_running=on_running)
         worker = self.client.containers.get(worker_id)
         result = worker.wait()
         return int(result.get("StatusCode", -1))
@@ -6502,6 +6512,120 @@ class Scheduler:
         finally:
             conn.close()
 
+    def _enforce_running_quota(self, run_id: str, account: dict, attempt: int, worker_id: str) -> None:
+        """有效窗口命中后结束本轮，只清理仍归属该 run 的 v3 执行。
+
+        :param run_id: 当前运行标识。
+        :param account: 启动时账号快照，用于核对不可变归属。
+        :param attempt: 当前运行代次。
+        :param worker_id: 含执行来源的完整 token。
+        :return: None；清理失败保留门禁并向等待器报告错误。
+        """
+        if not account_runtime or not quota_guard:
+            return
+        run = self._get_run_state(run_id)
+        if (not run or run["status"] != "running" or run.get("deleted_at") is not None
+                or run.get("stop_requested_at") is not None or run["run_kind"] not in ("normal", "warmup")
+                or run["quota_attempt"] != attempt or run["account_id"] != account["id"]
+                or run.get("worker_container") != worker_id):
+            return
+        connection = get_db()
+        try:
+            row = _get_available_account(connection, account["id"])
+            current_account = dict(row) if row else None
+        finally:
+            connection.close()
+        if (not current_account or not any(current_account.get(key) is not None for key in
+                ("warmup_quota_5h_limit_percent", "warmup_quota_7d_limit_percent"))
+                or run.get("quota_identity") != _quota_identity(current_account)):
+            return
+        try:
+            job = account_runtime.job_for_container(worker_id)
+        except ValueError:
+            return
+        if (job["token"] != worker_id or job.get("run_id") != run_id
+                or job.get("source") != _quota_source(run_id, attempt)
+                or job["row"]["account_id"] != account["id"]
+                or job["row"]["environment_id"] != run.get("environment_id")
+                or job["row"]["generation"] != run.get("environment_generation")):
+            return
+        quota_guard.consume(current_account)
+        state = quota_guard.snapshot(current_account)
+        policy = quota_guard.policy_snapshot(current_account, run["run_kind"], quota_state=state)
+        if state.get("account_error") or not policy["hit"]:
+            return
+        if self.runner.read_worker_status(run_id).get("status") in _TERMINAL_RUN_STATUSES:
+            return
+        facts = []
+        for key in policy["hit"]:
+            window = state["windows"][key]
+            observed = datetime.fromtimestamp(window["observed_at"], timezone.utc).isoformat()
+            label = "5h" if key == "five_hour" else "7d"
+            facts.append(f"{label} 已用 {window['utilization']:g}% ≥ {policy['limits'][key]}%（观测 {observed}）")
+        reason = _THRESHOLD_STOP_PREFIX + "；".join(facts)
+        stopped_at = time.time()
+        with _db_lock:
+            connection = get_db()
+            try:
+                with connection:
+                    changed = connection.execute("UPDATE runs SET status='stopping',stop_requested_at=?,error=? "
+                        "WHERE id=? AND quota_attempt=? AND status='running' AND deleted_at IS NULL "
+                        "AND stop_requested_at IS NULL AND worker_container=? AND quota_identity=? "
+                        "AND EXISTS(SELECT 1 FROM accounts a WHERE a.id=runs.account_id AND a.enabled=1 "
+                        "AND a.deleted_at IS NULL AND a.warmup_quota_5h_limit_percent IS ? "
+                        "AND a.warmup_quota_7d_limit_percent IS ?)",
+                        (stopped_at, reason, run_id, attempt, worker_id, state["identity"],
+                         policy["limits"]["five_hour"], policy["limits"]["seven_day"])).rowcount
+                    if changed and run.get("batch_id"):
+                        # 本轮尚在清理时就阻止投放；投放时间保留原间隔，不与额度 reset 混写。
+                        connection.execute("UPDATE task_batches SET status='quota_wait' "
+                                           "WHERE id=? AND status='active'", (run["batch_id"],))
+            finally:
+                connection.close()
+        if not changed:
+            return
+        try:
+            self.runner.persist_worker_profile(worker_id)
+            self.runner.cleanup(None, worker_id)
+        except Exception as error:
+            with _db_lock:
+                connection = get_db()
+                try:
+                    with connection:
+                        connection.execute("UPDATE runs SET status='failed',error=?,ended_at=? "
+                            "WHERE id=? AND quota_attempt=? AND status='stopping' AND stop_requested_at=?",
+                            (reason + "；强制中断清理失败：" + str(error), time.time(), run_id, attempt, stopped_at))
+                        if run.get("batch_id"):
+                            connection.execute("UPDATE task_batches SET status='paused',next_launch_at=NULL "
+                                               "WHERE id=? AND status='quota_wait'", (run["batch_id"],))
+                finally:
+                    connection.close()
+            self._update_batch_item_for_run(run_id, "failed")
+            raise
+        worker_status = self.runner.read_worker_status(run_id)
+        account_error = quota_guard.snapshot(current_account).get("account_error")
+        if worker_status.get("status") == "auth_failed" or account_error:
+            # 终止过程中刚落盘的认证错误仍须保持永久门禁，不能被百分比原因掩盖。
+            error = account_error or worker_status.get("error") or "OAuth 认证失败"
+            with _db_lock:
+                connection = get_db()
+                try:
+                    with connection:
+                        changed = connection.execute("UPDATE runs SET status='auth_failed',error=?,ended_at=? "
+                            "WHERE id=? AND quota_attempt=? AND status='stopping' AND stop_requested_at=?",
+                            (error, time.time(), run_id, attempt, stopped_at)).rowcount
+                finally:
+                    connection.close()
+            if changed:
+                self._update_batch_item_for_run(run_id, "auth_failed")
+                for code in ("account_on_hold", "invalid_grant"):
+                    if code in error:
+                        quota_guard.record_auth_failure(current_account, code)
+                        break
+            return
+        if self._update_attempt(run_id, attempt, status="stopped", ended_at=time.time()):
+            self._update_batch_item_for_run(run_id, "stopped")
+
     def _execute(self, run_id: str, account: dict, task: dict) -> None:
         attempt = int(task.get("quota_attempt") or 0)
         with self._execution_lock:
@@ -6666,11 +6790,28 @@ class Scheduler:
                     self._update_attempt(run_id, attempt, status="stopped", ended_at=time.time())
                     self._update_batch_item_for_run(run_id, "stopped")
                     return
-                exit_code = self.runner.wait_worker(wid)
+                if account_runtime and current["run_kind"] in ("normal", "warmup"):
+                    exit_code = self.runner.wait_worker(wid, on_running=lambda:
+                        self._enforce_running_quota(run_id, account, attempt, wid))
+                else:
+                    exit_code = self.runner.wait_worker(wid)
                 if quota_guard:
                     # 先消费最后的本地观察，再发布终态，让批次看到本次执行产生的额度。
                     quota_guard.consume(account)
                 run_state = self._get_run_state(run_id)
+                if (run_state and run_state["status"] in _TERMINAL_RUN_STATUSES
+                        and run_state.get("stop_requested_at") is not None):
+                    # 强制停止已在清理成功后固化终态，此处只补实际退出码，保留原原因和结束时刻。
+                    with _db_lock:
+                        connection = get_db()
+                        try:
+                            with connection:
+                                connection.execute("UPDATE runs SET exit_code=? WHERE id=? AND quota_attempt=? "
+                                    "AND status=? AND stop_requested_at IS NOT NULL",
+                                    (exit_code, run_id, attempt, run_state["status"]))
+                        finally:
+                            connection.close()
+                    return
                 if run_state and run_state["status"] in ("stopping", "stopped"):
                     status = "stopped"
                 elif exit_code == 0:
@@ -6755,8 +6896,12 @@ class Scheduler:
             conn = get_db()
             try:
                 with conn:
-                    conn.execute("UPDATE task_batches SET status='quota_wait',next_launch_at=? "
-                                 "WHERE id=? AND status='active'", (state["resume_at"], batch_id))
+                    if account_runtime:
+                        conn.execute("UPDATE task_batches SET status='quota_wait' "
+                                     "WHERE id=? AND status='active'", (batch_id,))
+                    else:
+                        conn.execute("UPDATE task_batches SET status='quota_wait',next_launch_at=? "
+                                     "WHERE id=? AND status='active'", (state["resume_at"], batch_id))
             finally:
                 conn.close()
 

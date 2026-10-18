@@ -510,7 +510,7 @@ function updateWarmupQuotaInputs(form) {
     const value = Number(input.value);
     $(`#warmup-quota-${window}-hint`).textContent = !enabled ? '已关闭，沿用额度用满保护'
       : input.value && Number.isInteger(value) && value >= 1 && value <= 100
-        ? `已用达到 ${value}%（剩余 ${100 - value}%）时暂停后续普通任务与养号`
+        ? `观测已用达到 ${value}%（剩余 ${100 - value}%）时强制结束当前普通任务与养号轮次，后续执行等待`
         : '请输入 1～100 的已用百分比整数';
   }
 }

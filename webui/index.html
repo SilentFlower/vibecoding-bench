@@ -423,7 +423,7 @@
             <p class="hint" id="warmup-quota-7d-hint"></p>
           </div>
         </div>
-        <p class="hint">普通任务与养号在执行前后自动查询额度。任一阈值命中时，正在运行的 CLI 执行完整收尾，后续执行等待；未知、过期或查询失败会自动更新和重试。cc2api API 转发不受此阈值控制。</p>
+        <p class="hint">额度从正常响应中被动更新。观测到任一阈值命中时，强制结束当前普通任务或养号轮次，保留文件和会话，不自动续跑本轮；窗口恢复后批次执行下一题，并遵守原投放间隔。单次响应仍可能跨过阈值。cc2api API 转发不受此阈值控制。</p>
         <div class="row-end">
           <button type="button" class="btn" data-close="#warmup-modal">cancel</button>
           <button type="submit" class="btn btn-primary">save</button>
@@ -695,6 +695,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20261016-process-sync-actions"></script>
+  <script src="app.js?v=20261018-quota-hard-stop"></script>
 </body>
 </html>

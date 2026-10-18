@@ -56,8 +56,8 @@ class AutoUsageTests(unittest.TestCase):
     def test_unknown_task_runs_without_usage_and_passive_high_value_stops_next(self) -> None:
         """首次未知可运行，正式响应达到阈值后下一条等待；无 usage 请求。@return None。"""
         task = self._run()
-        def completed(worker):
-            """模拟当前任务真实响应产生额度，返回退出码。"""
+        def completed(worker, *, on_running=None):
+            """模拟进程已退出后取得最后额度，不再调用活跃回调；返回退出码。"""
             self._passive(75)
             return 0
         self.runner.wait_worker.side_effect = completed
