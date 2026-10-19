@@ -11,7 +11,8 @@ from urllib.parse import urlsplit, urlunsplit
 from docker.types import Mount
 
 from resource_budget import isolated_account_limits
-from system_profile import SYSTEM_PROFILE_DIRECTORY, SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_VERSION
+from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_VERSION, SYSTEM_PROFILE_DIRECTORY,
+    SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_VERSION)
 
 
 ISOLATION_VERSION = 2
@@ -144,6 +145,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
             log_config={'type': 'json-file', 'config': {'max-size': '10m', 'max-file': '3'}}, mounts=[machine_mount])
         if role == 'cli':
             options['labels'][SYSTEM_PROFILE_LABEL] = str(SYSTEM_PROFILE_VERSION)
+            options['labels'][COMPUTER_PROFILE_LABEL] = str(COMPUTER_PROFILE_VERSION)
         container = runtime.client.containers.run(runtime.image, **options)
         created.append(container)
         runtime._update(row, **{ROLE_COLUMNS[role]: container.id})
@@ -163,6 +165,8 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
         image_labels = runtime.client.images.get(runtime.image).attrs['Config'].get('Labels') or {}
         if image_labels.get(SYSTEM_PROFILE_LABEL) != str(SYSTEM_PROFILE_VERSION):
             raise ValueError('账号镜像缺少系统画像支持，请使用同批新镜像')
+        if image_labels.get(COMPUTER_PROFILE_LABEL) != str(COMPUTER_PROFILE_VERSION):
+            raise ValueError('账号镜像缺少计算机画像支持，请使用同批新镜像')
         network_mounts = mounts([*common_files, ('runtime/network', '/run/v3', 'rw'),
             ('public-ca', '/etc/mitm', 'rw'), ('ca', '/ca', 'rw'), ('cli', '/cli', 'rw'),
             ('flows', '/flows', 'rw'), ('runtime/empty', '/flows/api', 'ro'), ('controls', '/controls', 'rw')])

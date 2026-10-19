@@ -284,6 +284,7 @@ def verify() -> None:
         isolation = verify_roles(container, role_container(runtime, row, "sender"), runtime._network_container(row),
             json.loads(row['fingerprint_json']))
         system_profile = json.loads(row['fingerprint_json'])['system_profile']
+        computer_profile = json.loads(row['fingerprint_json'])['computer_profile']
         system_facts = verify_system_information(container, runtime._network_container(row),
             role_container(runtime, row, 'sender'), json.loads(row['fingerprint_json']))
         print('通过：真实系统画像、文件 API、Node/子进程及直接 syscall/CPUID 边界：' + json.dumps(system_facts), flush=True)
@@ -617,6 +618,7 @@ def verify() -> None:
         runtime.maintenance(row["environment_id"], "rebuild")
         rebuilt_row, rebuilt = runtime.ensure(account, "9.9.9")
         assert json.loads(rebuilt_row['fingerprint_json'])['system_profile'] == system_profile
+        assert json.loads(rebuilt_row['fingerprint_json'])['computer_profile'] == computer_profile
         assert rebuilt.id != first_id and rebuilt_row["environment_id"] == row["environment_id"]
         assert rebuilt.exec_run(["cat", "/etc/machine-id"]).output == machine
         assert (runtime._root(rebuilt_row) / "home" / ".claude" / ".credentials.json").read_bytes() == original

@@ -1,7 +1,8 @@
-"""固定账号的常规系统信息画像；不处理设备身份或真实资源指标。"""
+"""固定账号系统画像与合成计算机身份；不处理凭据或真实资源指标。"""
 import json
 import re
 import secrets
+from uuid import UUID, uuid4
 
 
 SYSTEM_PROFILE_VERSION = 1
@@ -9,6 +10,11 @@ SYSTEM_PROFILE_LABEL = 'vibebench.system-profile-version'
 SYSTEM_PROFILE_DIRECTORY = '/etc/v3-system-profile'
 SYSTEM_PROFILE_LIBRARY = '/usr/local/lib/v3-system-profile.so'
 MAX_CPUINFO_BYTES = 4 * 1024 ** 2
+COMPUTER_PROFILE_VERSION = 1
+COMPUTER_PROFILE_LABEL = 'vibebench.computer-profile-version'
+DMI_DIRECTORIES = ('/sys/class/dmi/id', '/sys/devices/virtual/dmi/id')
+DMI_FIELDS = {'manufacturer': 'sys_vendor', 'product': 'product_name', 'version': 'product_version',
+    'family': 'product_family', 'serial': 'product_serial', 'uuid': 'product_uuid'}
 
 # 模板只能追加，已有 ID 不得重新解释；完整来源见本任务 research/templates.md。
 KERNEL_TEMPLATES = {
@@ -23,6 +29,17 @@ CPU_TEMPLATES = {
     'amd-cezanne-5800h': (('AuthenticAMD', '25', '80'), 'AMD Ryzen 7 5800H with Radeon Graphics'),
     'amd-cezanne-5900hx': (('AuthenticAMD', '25', '80'), 'AMD Ryzen 9 5900HX with Radeon Graphics'),
 }
+# 显示配置由本项目定义，原厂资料只核对 CPU 与机型兼容；模板 ID 和内容不可重解释。
+COMPUTER_TEMPLATES = {
+    'naples-poweredge-r7425-v1': (('AuthenticAMD', '23', '1'),
+        {'manufacturer': 'Dell Inc.', 'product': 'PowerEdge R7425', 'version': '1.0', 'family': 'PowerEdge'}),
+    'naples-proliant-dl385-v1': (('AuthenticAMD', '23', '1'),
+        {'manufacturer': 'HPE', 'product': 'ProLiant DL385 Gen10', 'version': '1.0', 'family': 'ProLiant'}),
+    'cezanne-legion-7-v1': (('AuthenticAMD', '25', '80'),
+        {'manufacturer': 'LENOVO', 'product': 'Legion 7 16ACHg6', 'version': '1.0', 'family': 'Legion'}),
+    'cezanne-rog-g513-v1': (('AuthenticAMD', '25', '80'),
+        {'manufacturer': 'ASUSTeK COMPUTER INC.', 'product': 'ROG Strix G513', 'version': '1.0', 'family': 'ROG Strix'}),
+}
 SYSTEM_PROFILE_PROBE = '''import json,os,pathlib
 u=os.uname()
 p=pathlib.Path('/etc/v3-system-profile')
@@ -33,6 +50,17 @@ print(json.dumps({'release':u.release,'version':u.version,
  'sys_version':pathlib.Path('/proc/sys/kernel/version').read_text(),
  'cpu_models':[line.split(':',1)[1].strip() for line in cpu.splitlines() if line.split(':',1)[0].strip()=='model name'],
  'readonly':not os.access(p,os.W_OK) and not os.access('/etc/ld.so.preload',os.W_OK)}))
+'''
+COMPUTER_PROFILE_PROBE = '''import json,os,pathlib
+fields = ''' + repr(DMI_FIELDS) + '''
+paths = {}
+for directory in ''' + repr(DMI_DIRECTORIES) + ''':
+    paths[directory] = {}
+    for key, name in fields.items():
+        path = pathlib.Path(directory) / name
+        paths[directory][key] = {'value':path.read_text().rstrip('\\n'),
+            'exists':path.exists(), 'readable':os.access(path,os.R_OK), 'writable':os.access(path,os.W_OK)}
+print(json.dumps({'paths':paths, 'readonly':not os.access('/etc/v3-system-profile/dmi',os.W_OK)}))
 '''
 
 
@@ -103,6 +131,63 @@ def validate_system_profile(profile: dict, cpuinfo: str | None = None) -> dict:
     return profile
 
 
+def generate_computer_profile(system_profile: dict) -> dict:
+    """依据已固定 CPU 选择一次兼容机型，并独立生成序列号和 UUID。
+
+    :param system_profile: 已校验的 CPU／内核画像。
+    :return: 尚待调用方持久保存的计算机画像。
+    """
+    profile = validate_system_profile(system_profile)
+    candidates = [key for key, (signature, _) in COMPUTER_TEMPLATES.items()
+        if list(signature) == profile['cpu_signature']]
+    if not candidates:
+        raise ValueError('计算机画像尚无兼容模板，请保留已有身份')
+    template_id = secrets.choice(candidates)
+    return {'schema': COMPUTER_PROFILE_VERSION, 'template_id': template_id,
+        'dmi': {**COMPUTER_TEMPLATES[template_id][1], 'serial': secrets.token_hex(8).upper(), 'uuid': str(uuid4())}}
+
+
+def validate_computer_profile(profile: dict, system_profile: dict) -> dict:
+    """验证已保存计算机画像，拒绝损坏及跨代模板而不重新随机。
+
+    :param profile: 已保存的计算机画像。
+    :param system_profile: 与该对象共用的 CPU／内核画像。
+    :return: 原对象；校验失败抛出 ValueError。
+    """
+    system = validate_system_profile(system_profile)
+    if not isinstance(profile, dict) or set(profile) != {'schema', 'template_id', 'dmi'} \
+            or type(profile.get('schema')) is not int or profile['schema'] != COMPUTER_PROFILE_VERSION:
+        raise ValueError('计算机画像格式或版本无效，禁止重新随机')
+    template_id, dmi = profile['template_id'], profile['dmi']
+    if not isinstance(template_id, str) or template_id not in COMPUTER_TEMPLATES \
+            or not isinstance(dmi, dict) or set(dmi) != set(DMI_FIELDS):
+        raise ValueError('计算机画像模板或字段损坏，禁止重新随机')
+    signature, expected = COMPUTER_TEMPLATES[template_id]
+    if list(signature) != system['cpu_signature'] or any(dmi[key] != value for key, value in expected.items()) \
+            or not isinstance(dmi['serial'], str) or not re.fullmatch(r'[0-9A-F]{16}', dmi['serial']) \
+            or not isinstance(dmi['uuid'], str):
+        raise ValueError('计算机画像内容或 CPU 兼容性无效，禁止重新随机')
+    try:
+        identifier = UUID(dmi['uuid'])
+    except ValueError:
+        raise ValueError('计算机画像 UUID 无效，禁止重新随机') from None
+    if identifier.version != 4 or str(identifier) != dmi['uuid']:
+        raise ValueError('计算机画像 UUID 无效，禁止重新随机')
+    return profile
+
+
+def render_computer_profile(profile: dict, system_profile: dict) -> dict[str, str]:
+    """将已保存 DMI 渲染为固定白名单文件，标记最后发布。
+
+    :param profile: 计算机画像。
+    :param system_profile: 已保存的 CPU／内核画像。
+    :return: 画像目录内的相对文件路径与完整文本。
+    """
+    validate_computer_profile(profile, system_profile)
+    return {**{'dmi/' + name: profile['dmi'][key] + '\n' for key, name in DMI_FIELDS.items()},
+        'computer-profile-version': str(COMPUTER_PROFILE_VERSION) + '\n'}
+
+
 def render_system_profile(profile: dict, cpuinfo: str) -> dict[str, str]:
     """渲染只读文件，CPU 原文只替换型号行。
 
@@ -140,3 +225,25 @@ def verify_system_profile(container, profile: dict) -> None:
             or not isinstance(value.get('cpu_models'), list) or not value['cpu_models'] \
             or any(item != profile['cpu_model_name'] for item in value['cpu_models']):
         raise ValueError('CLI 系统画像实际读取或只读校验失败，需要检查环境')
+
+
+def verify_computer_profile(container, profile: dict, system_profile: dict) -> None:
+    """核验容器内两类 DMI 读取及权限检查，不以保存值代替实际结果。
+
+    :param container: 已启动的 CLI 角色。
+    :param profile: 已保存的计算机画像。
+    :param system_profile: 已保存的 CPU／内核画像。
+    :return: None；任何入口不一致时抛出 ValueError。
+    """
+    validate_computer_profile(profile, system_profile)
+    if container.labels.get(COMPUTER_PROFILE_LABEL) != str(COMPUTER_PROFILE_VERSION):
+        raise ValueError('CLI 尚未启用计算机画像，请空闲重建账号环境')
+    result = container.exec_run(['python3', '-I', '-c', COMPUTER_PROFILE_PROBE])
+    try:
+        value = json.loads(result.output) if result.exit_code == 0 else None
+    except (ValueError, TypeError):
+        value = None
+    expected = {directory: {key: {'value': text, 'exists': True, 'readable': True, 'writable': False}
+        for key, text in profile['dmi'].items()} for directory in DMI_DIRECTORIES}
+    if not isinstance(value, dict) or value.get('paths') != expected or value.get('readonly') is not True:
+        raise ValueError('CLI 计算机画像实际读取或只读校验失败，需要检查环境')

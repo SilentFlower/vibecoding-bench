@@ -1,8 +1,10 @@
 """验证固定画像的兼容选择、损坏拒绝和真实 CPU 字段保留。"""
 import copy
 import unittest
+from uuid import UUID
 
-from system_profile import generate_system_profile, render_system_profile, validate_system_profile
+from system_profile import (DMI_FIELDS, generate_computer_profile, generate_system_profile, render_computer_profile,
+    render_system_profile, validate_computer_profile, validate_system_profile)
 
 
 class SystemProfileTests(unittest.TestCase):
@@ -45,3 +47,32 @@ class SystemProfileTests(unittest.TestCase):
                 generate_system_profile(cpu)
         with self.assertRaisesRegex(ValueError, '代际冲突'):
             validate_system_profile(profile, self.cpuinfo.replace('cpu family\t: 23', 'cpu family\t: 25'))
+
+    def test_computer_identity_is_independent_and_matches_cpu_family(self) -> None:
+        """两个 CPU 家族只选兼容机型，每次新身份的 UUID 和序列号各自独立。@return None。"""
+        for cpu in (self.cpuinfo, self.cpuinfo.replace('family\t: 23', 'family\t: 25').replace('model\t\t: 1', 'model\t\t: 80')):
+            system = generate_system_profile(cpu)
+            first, second = generate_computer_profile(system), generate_computer_profile(system)
+            self.assertEqual(first, validate_computer_profile(copy.deepcopy(first), system))
+            self.assertEqual(set(DMI_FIELDS), set(first['dmi']))
+            self.assertNotEqual(first['dmi']['uuid'], second['dmi']['uuid'])
+            self.assertNotEqual(first['dmi']['serial'], second['dmi']['serial'])
+            self.assertEqual(4, UUID(first['dmi']['uuid']).version)
+            files = render_computer_profile(first, system)
+            self.assertEqual('1\n', files['computer-profile-version'])
+            self.assertEqual(first['dmi']['uuid'] + '\n', files['dmi/product_uuid'])
+
+    def test_computer_corruption_and_cross_family_never_become_new_identity(self) -> None:
+        """非法模板、字段及 UUID 必须拒绝，不能修复成另一套随机身份。@return None。"""
+        system = generate_system_profile(self.cpuinfo)
+        first = generate_computer_profile(system)
+        invalid = [None, {}, {**first, 'schema': True}, {**first, 'template_id': []}, {**first, 'extra': 1}]
+        for key, value in [('manufacturer', 'other'), ('serial', 'bad\nserial'), ('uuid', '0' * 32), ('uuid', None)]:
+            invalid.append({**first, 'dmi': {**first['dmi'], key: value}})
+        invalid.append({**first, 'dmi': {**first['dmi'], 'extra': 'unexpected'}})
+        for value in invalid:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                validate_computer_profile(value, system)
+        changed = generate_system_profile(self.cpuinfo.replace('family\t: 23', 'family\t: 25').replace('model\t\t: 1', 'model\t\t: 80'))
+        with self.assertRaises(ValueError):
+            validate_computer_profile(first, changed)

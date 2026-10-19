@@ -9,6 +9,7 @@ import threading
 import time
 import unittest
 from contextlib import closing
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -17,7 +18,8 @@ from docker import APIClient
 
 from account_runtime import AccountRuntime, atomic_json, derive_v3_fingerprint, locale_for_timezone
 from account_isolation import ROLE_COLUMNS, role_labels
-from system_profile import SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_PROBE, generate_system_profile
+from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_PROBE, DMI_DIRECTORIES,
+    SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_PROBE, generate_computer_profile, generate_system_profile)
 import main
 
 
@@ -59,7 +61,7 @@ class AccountRuntimeTests(unittest.TestCase):
         self.runtime.release_id = "test"
         self.client.images.get.return_value.attrs = {"Config": {"Labels": {
             "vibebench.product": "v3", "vibebench.role": "account", "vibebench.release": "test",
-            "vibebench.isolation-version": "2", SYSTEM_PROFILE_LABEL: "1"}}}
+            "vibebench.isolation-version": "2", SYSTEM_PROFILE_LABEL: "1", COMPUTER_PROFILE_LABEL: "1"}}}
         self.client.networks.get.return_value.attrs = {"IPAM": {"Config": [{"Gateway": "192.0.2.1"}]}}
         self.client.api.create_endpoint_config.side_effect = APIClient(version="1.52").create_endpoint_config
         self.client.containers.list.return_value = []
@@ -85,6 +87,14 @@ class AccountRuntimeTests(unittest.TestCase):
                         "proc_version": profile["proc_version"], "sys_release": profile["kernel_release"] + "\n",
                         "sys_version": profile["kernel_version"] + "\n", "readonly": True,
                         "cpu_models": [profile["cpu_model_name"]]}
+                    return SimpleNamespace(exit_code=0, output=json.dumps(value).encode())
+                if command == ["python3", "-I", "-c", COMPUTER_PROFILE_PROBE]:
+                    with self.database() as connection:
+                        saved = connection.execute("SELECT fingerprint_json FROM account_environments WHERE environment_id=?",
+                            (options["labels"]["vibebench.environment"],)).fetchone()
+                    dmi = json.loads(saved[0])["computer_profile"]["dmi"]
+                    value = {"paths": {directory: {key: {"value": text, "exists": True, "readable": True,
+                        "writable": False} for key, text in dmi.items()} for directory in DMI_DIRECTORIES}, "readonly": True}
                     return SimpleNamespace(exit_code=0, output=json.dumps(value).encode())
                 return previous(command, **kwargs) if previous else SimpleNamespace(exit_code=0, output=b"")
 
@@ -350,6 +360,7 @@ class AccountRuntimeTests(unittest.TestCase):
         legacy = json.loads(row["fingerprint_json"])
         legacy.pop("profile_version")
         legacy["system_profile"] = generate_system_profile(self._cpuinfo())
+        legacy["computer_profile"] = generate_computer_profile(legacy["system_profile"])
         self.runtime._update(row, fingerprint_json=json.dumps(legacy))
         replacement = {"profile_version": 2, "hostname": "b" * 12, "machine_id": "c" * 32,
             "mac": "02:10:20:30:40:50", "tz": "America/Los_Angeles", "lang": "en_US.UTF-8"}
@@ -363,6 +374,7 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual("stopped", current["state"])
         self.assertEqual("b" * 12, json.loads(current["fingerprint_json"])["hostname"])
         self.assertEqual(legacy["system_profile"], json.loads(current["fingerprint_json"])["system_profile"])
+        self.assertEqual(legacy["computer_profile"], json.loads(current["fingerprint_json"])["computer_profile"])
         self.assertEqual(before, credentials.read_bytes())
         with self.assertRaisesRegex(ValueError, "profile v2"):
             self.runtime.maintenance(row["environment_id"], "reprofile")
@@ -576,7 +588,8 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual(sum(item["mem_limit"] for item in limits), 1536 * 1024**2)
         self.assertEqual(sum(item["memswap_limit"] for item in limits), 3584 * 1024**2)
         self.assertEqual(json.loads(row["fingerprint_json"]),
-            {key: value for key, value in json.loads(current["fingerprint_json"]).items() if key != "system_profile"})
+            {key: value for key, value in json.loads(current["fingerprint_json"]).items()
+                if key not in ("system_profile", "computer_profile")})
 
     def test_old_fingerprint_missing_swap_preserves_no_swap(self) -> None:
         """已有记录缺 swap 时不能随新全局配置开放额外额度。
@@ -748,7 +761,8 @@ class AccountRuntimeTests(unittest.TestCase):
             container.remove.assert_called_once_with()
         self.assertEqual(current["generation"], 4)
         self.assertEqual(json.loads(row["fingerprint_json"]),
-            {key: value for key, value in json.loads(current["fingerprint_json"]).items() if key != "system_profile"})
+            {key: value for key, value in json.loads(current["fingerprint_json"]).items()
+                if key not in ("system_profile", "computer_profile")})
         self.assertEqual((root / "home" / "marker").read_text(), "preserved")
         self.assertEqual(self.client.containers.run.call_args_list[0].kwargs["environment"]["UPSTREAM_SOCKS5_USER"], "u@name")
         with self.database() as connection:
@@ -1015,11 +1029,14 @@ class AccountRuntimeTests(unittest.TestCase):
             self.runtime.maintenance(row["environment_id"], "rebuild")
             rebuilt, _ = self.runtime.ensure({**account, "name": "renamed"})
         self.assertEqual(saved, json.loads(rebuilt["fingerprint_json"]))
-        self.assertEqual(original, {key: value for key, value in saved.items() if key != "system_profile"})
+        self.assertEqual(original, {key: value for key, value in saved.items()
+            if key not in ("system_profile", "computer_profile")})
         generate.assert_called_once()
         path = self.runtime._root(row) / "runtime/system-profile"
         self.assertEqual(0o755, path.stat().st_mode & 0o777)
-        self.assertTrue(all(value.stat().st_uid == 0 and value.stat().st_mode & 0o777 == 0o444 for value in path.iterdir()))
+        self.assertTrue(all(value.stat().st_uid == 0 and value.stat().st_mode & 0o777 == 0o444
+            for value in path.rglob('*') if value.is_file()))
+        self.assertEqual(0o755, (path / 'dmi').stat().st_mode & 0o777)
         roles = {call.kwargs["labels"]["vibebench.role"]: call.kwargs for call in self.client.containers.run.call_args_list}
         for role, options in roles.items():
             destinations = {value['bind']: value['mode'] for value in options['volumes'].values()}
@@ -1046,6 +1063,78 @@ class AccountRuntimeTests(unittest.TestCase):
                 self.runtime.prepare_system_profile(row, network)
             generate.assert_not_called()
         self.assertEqual(fingerprint, json.loads(self.runtime._row('synthetic', 1)['fingerprint_json']))
+
+    def test_computer_identity_is_published_once_across_two_runtime_instances(self) -> None:
+        """两个独立运行时并发初始化同一 SQLite 环境，也只发布一套身份。@return None。"""
+        initial = self.runtime._row('synthetic', 1)
+        other = AccountRuntime(self.client, self.root, self.root, self.database, self.fingerprint, self.gateway)
+        self.addCleanup(other.heartbeat_pool.shutdown)
+        self.addCleanup(other.stopping.set)
+        barrier = threading.Barrier(2)
+        network = Mock()
+        network.exec_run.return_value = SimpleNamespace(exit_code=0, output=self._cpuinfo().encode())
+
+        def prepare(runtime):
+            """让两个调用同时持有首次读取的旧行，验证事务内重读。"""
+            row = dict(initial)
+            barrier.wait(timeout=5)
+            with runtime.environment_lock(row['environment_id']):
+                runtime.prepare_system_profile(row, network)
+            return json.loads(row['fingerprint_json'])
+
+        with patch('account_runtime.generate_computer_profile', wraps=generate_computer_profile) as generate:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                saved = list(pool.map(prepare, (self.runtime, other)))
+        self.assertEqual(saved[0], saved[1])
+        self.assertEqual(saved[0], json.loads(self.runtime._row('synthetic', 1)['fingerprint_json']))
+        generate.assert_called_once()
+
+    def test_profile_render_failure_keeps_committed_identity_for_stale_retry(self) -> None:
+        """数据库已提交而文件发布失败时，旧行重试必须复用已保存身份。@return None。"""
+        row = self.runtime._row('synthetic', 1)
+        stale = dict(row)
+        network = Mock()
+        network.exec_run.return_value = SimpleNamespace(exit_code=0, output=self._cpuinfo().encode())
+        with patch('account_runtime.generate_computer_profile', wraps=generate_computer_profile) as generate:
+            with patch('account_runtime.atomic_text', side_effect=OSError('synthetic write failure')):
+                with self.assertRaises(OSError):
+                    self.runtime.prepare_system_profile(row, network)
+            committed = json.loads(self.runtime._row('synthetic', 1)['fingerprint_json'])
+            self.runtime.prepare_system_profile(stale, network)
+            generate.assert_called_once()
+        self.assertEqual(committed, json.loads(stale['fingerprint_json']))
+        actual = self.runtime._root(row) / 'runtime/system-profile/dmi/product_uuid'
+        self.assertEqual(committed['computer_profile']['dmi']['uuid'] + '\n', actual.read_text())
+
+    def test_saved_bad_computer_profile_never_rotates_or_rewrites_identity(self) -> None:
+        """显式空计算机画像是坏记录，不能当作未初始化再次抽取。@return None。"""
+        row = self.runtime._row('synthetic', 1)
+        saved = json.loads(row['fingerprint_json'])
+        saved.update(system_profile=generate_system_profile(self._cpuinfo()), computer_profile=None)
+        self.runtime._update(row, fingerprint_json=json.dumps(saved))
+        network = Mock()
+        network.exec_run.return_value = SimpleNamespace(exit_code=0, output=self._cpuinfo().encode())
+        with patch('account_runtime.generate_computer_profile') as generate:
+            with self.assertRaisesRegex(ValueError, '禁止重新随机'):
+                self.runtime.prepare_system_profile(row, network)
+            generate.assert_not_called()
+        self.assertEqual(saved, json.loads(self.runtime._row('synthetic', 1)['fingerprint_json']))
+
+    def test_new_uuid_collision_retries_only_the_unpublished_profile(self) -> None:
+        """首次随机 UUID 碰撞只重试未发布值，另一账号的保存身份保持不变。@return None。"""
+        row = self.runtime._row('synthetic', 1)
+        other = self.runtime._row('other', 2)
+        system = generate_system_profile(self._cpuinfo())
+        occupied, fresh = generate_computer_profile(system), generate_computer_profile(system)
+        original = {**json.loads(other['fingerprint_json']), 'system_profile': system, 'computer_profile': occupied}
+        self.runtime._update(other, fingerprint_json=json.dumps(original))
+        network = Mock()
+        network.exec_run.return_value = SimpleNamespace(exit_code=0, output=self._cpuinfo().encode())
+        with patch('account_runtime.generate_computer_profile', side_effect=[occupied, fresh]) as generate:
+            self.runtime.prepare_system_profile(row, network)
+        self.assertEqual(2, generate.call_count)
+        self.assertEqual(fresh, json.loads(row['fingerprint_json'])['computer_profile'])
+        self.assertEqual(original, json.loads(self.runtime._row('other', 2)['fingerprint_json']))
 
     def test_old_cli_requires_explicit_rebuild_while_api_remains_available(self) -> None:
         """旧 CLI 不静默套用新画像，健康 API 不因该门禁中断。@return None。"""

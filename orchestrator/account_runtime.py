@@ -27,8 +27,9 @@ from docker.errors import DockerException, NotFound
 from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, ROLE_LABELS, create_environment, role_container
 from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_process_metrics
 from resource_budget import account_limits, isolated_account_limits
-from system_profile import (MAX_CPUINFO_BYTES, generate_system_profile, render_system_profile,
-    validate_system_profile, verify_system_profile)
+from system_profile import (MAX_CPUINFO_BYTES, generate_computer_profile, generate_system_profile,
+    render_computer_profile, render_system_profile, validate_computer_profile, validate_system_profile,
+    verify_computer_profile, verify_system_profile)
 
 
 NETWORK_INSPECTION_MODES = {"passthrough", "quota", "capture"}
@@ -342,23 +343,62 @@ class AccountRuntime:
             raise ValueError("无法读取实际 Docker CPU 信息，系统画像未启用")
         try:
             cpuinfo = result.output.decode("utf-8")
-            fingerprint = json.loads(row["fingerprint_json"])
-        except (UnicodeError, ValueError):
-            raise ValueError("系统画像来源或保存记录损坏") from None
-        if not isinstance(fingerprint, dict):
-            raise ValueError("系统画像保存记录格式无效")
-        if "system_profile" not in fingerprint:
-            fingerprint["system_profile"] = generate_system_profile(cpuinfo)
-            self._update(row, fingerprint_json=json.dumps(fingerprint))
-        profile = validate_system_profile(fingerprint["system_profile"], cpuinfo)
-        directory = self._root(row) / "runtime/system-profile"
-        descriptor = _directory_fd(directory, create=True)
+        except UnicodeError:
+            raise ValueError("系统画像来源损坏") from None
+        connection = self.database()
         try:
-            os.fchown(descriptor, 0, 0)
-            os.fchmod(descriptor, 0o755)
+            # 写事务内重读，防止并发初始化或旧 row 副本覆盖已经发布的随机身份。
+            with connection:
+                connection.execute("BEGIN IMMEDIATE")
+                saved = connection.execute("SELECT fingerprint_json,generation,container_id FROM account_environments"
+                    " WHERE environment_id=?", (row["environment_id"],)).fetchone()
+                if not saved or saved["container_id"] or saved["generation"] != row["generation"] \
+                        or row["environment_id"] in self.jobs:
+                    raise ValueError("环境代次或执行状态已改变，禁止切换系统画像")
+                fingerprint = json.loads(saved["fingerprint_json"])
+                if not isinstance(fingerprint, dict):
+                    raise ValueError("系统画像保存记录格式无效")
+                if "system_profile" not in fingerprint:
+                    fingerprint["system_profile"] = generate_system_profile(cpuinfo)
+                profile = validate_system_profile(fingerprint["system_profile"], cpuinfo)
+                occupied = set()
+                for other in connection.execute("SELECT fingerprint_json FROM account_environments WHERE environment_id<>?",
+                        (row["environment_id"],)):
+                    try:
+                        other_fingerprint = json.loads(other["fingerprint_json"])
+                    except ValueError:
+                        continue
+                    computer = other_fingerprint.get("computer_profile") if isinstance(other_fingerprint, dict) else None
+                    dmi = computer.get("dmi") if isinstance(computer, dict) else None
+                    if isinstance(dmi, dict) and isinstance(dmi.get("uuid"), str):
+                        occupied.add(dmi["uuid"])
+                if "computer_profile" not in fingerprint:
+                    for _ in range(8):
+                        computer = generate_computer_profile(profile)
+                        if computer["dmi"]["uuid"] not in occupied:
+                            fingerprint["computer_profile"] = computer
+                            break
+                    else:
+                        raise ValueError("计算机画像 UUID 冲突，尚未发布身份")
+                computer = validate_computer_profile(fingerprint["computer_profile"], profile)
+                if computer["dmi"]["uuid"] in occupied:
+                    raise ValueError("已保存计算机画像 UUID 重复，禁止重新随机")
+                encoded = json.dumps(fingerprint)
+                connection.execute("UPDATE account_environments SET fingerprint_json=? WHERE environment_id=?",
+                    (encoded, row["environment_id"]))
+            row["fingerprint_json"] = encoded
         finally:
-            os.close(descriptor)
-        for name, content in render_system_profile(profile, cpuinfo).items():
+            connection.close()
+        directory = self._root(row) / "runtime/system-profile"
+        for folder in (directory, directory / "dmi"):
+            descriptor = _directory_fd(folder, create=True)
+            try:
+                os.fchown(descriptor, 0, 0)
+                os.fchmod(descriptor, 0o755)
+            finally:
+                os.close(descriptor)
+        files = {**render_system_profile(profile, cpuinfo), **render_computer_profile(computer, profile)}
+        for name, content in files.items():
             atomic_text(directory / name, content, 0o444)
 
     def check_system_profile(self, row: dict, container) -> None:
@@ -370,9 +410,11 @@ class AccountRuntime:
         """
         try:
             fingerprint = json.loads(row["fingerprint_json"])
-            if not isinstance(fingerprint, dict) or "system_profile" not in fingerprint:
+            if not isinstance(fingerprint, dict) or "system_profile" not in fingerprint \
+                    or "computer_profile" not in fingerprint:
                 raise ValueError("CLI 尚无固定系统画像，请空闲重建账号环境")
             verify_system_profile(container, fingerprint["system_profile"])
+            verify_computer_profile(container, fingerprint["computer_profile"], fingerprint["system_profile"])
         except ValueError:
             # 只关闭 CLI 门禁，不能为本地画像问题中断健康的独立 API。
             self._update(row, state="cli_reconcile")
@@ -2060,6 +2102,9 @@ class AccountRuntime:
                 previous = json.loads(row["fingerprint_json"])
                 if "system_profile" in previous:
                     fingerprint["system_profile"] = validate_system_profile(previous["system_profile"])
+                if "computer_profile" in previous:
+                    fingerprint["computer_profile"] = validate_computer_profile(previous["computer_profile"],
+                        fingerprint.get("system_profile"))
                 fingerprint["mem"] = previous.get("mem", os.environ.get("V3_ACCOUNT_MEMORY", "4g"))
                 fingerprint["swap"] = previous.get("swap", "0")
                 account_limits(str(fingerprint["mem"]), str(fingerprint["swap"]))

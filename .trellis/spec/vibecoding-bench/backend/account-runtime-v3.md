@@ -674,3 +674,70 @@ AccountRuntime.check_system_profile(row: dict, container) -> None
 - 实际 Docker 验证动态与静态 C、直接 uname syscall/CPUID、普通/fortified open、相对 openat、fopen、并发读取、Node/子进程、真实只读挂载及损坏字段 EIO；network/sender 不加载覆盖，实际资源/秘密边界保持。
 - 精确官方 CLI 2.1.293 在无账号断网环境验证版本、认证状态和登录帮助，结合动态绑定证明 uname 确实走覆盖。auth status 的未登录退出码 1 不算启动失败；不能据此声称真实登录或模型交互已验收。
 - 用 `run_local_verification.py` 的正式构建清单及显式旧 control/account 镜像验证 API/CLI 生命周期、重建和回退再启用，核对画像、身份及 HOME/凭据保留；记录本地启动性能及未执行的生产/真实模型边界。
+
+## Scenario: v3 持久计算机身份与 DMI 常规读取
+
+### 1. Scope / Trigger
+
+- 修改计算机身份生成、`fingerprint_json.computer_profile`、DMI 读取库或跨重建持久性时适用。沿用前一场景的 CPU／内核、三角色权限和 CLI 待对账契约，不接入闭源生成器、不新增生产迁移入口。
+
+### 2. Signatures
+
+```text
+fingerprint_json.computer_profile = {
+  schema: 1, template_id: string,
+  dmi: {manufacturer: string, product: string, version: string,
+        family: string, serial: string, uuid: string}
+}
+generate_computer_profile(system_profile: dict) -> dict
+validate_computer_profile(profile: dict, system_profile: dict) -> dict
+render_computer_profile(profile: dict, system_profile: dict) -> dict[str, str]
+verify_computer_profile(container, profile: dict, system_profile: dict) -> None
+account 镜像能力标签：vibebench.computer-profile-version="1"
+只读标记：/etc/v3-system-profile/computer-profile-version，内容为 1 加换行
+```
+
+### 3. Contracts
+
+- 旧 `system_profile` schema=1 保持不变。计算机对象和 dmi 对象必须精确匹配声明的键；schema 必须为整数 1，不能用 bool。厂商／产品／版本／系列作为兼容 CPU 代际的一套合成模板选择，模板 ID 和显示内容只追加、不重解释，也不声称是原厂 DMI 快照。
+- serial 为独立随机生成的 16 位大写十六进制，uuid 为独立标准小写 UUIDv4；不从 MAC、machine-id、账号或官方设备身份派生。已有合法 hostname、MAC、machine-id、时区／语言、CPU／内核、HOME、凭据及绑定继续保留；CPU 能力、实际限额和 RSS 不随机替换。
+- `prepare_system_profile` 在环境锁内、CLI 创建前读取实际 CPU；Docker 读取位于 SQLite 写事务外。`BEGIN IMMEDIATE` 后重读本行指纹、generation 和 container_id，仅缺 key 才生成；不持全局 jobs 锁等待 SQLite。UUID 占用查询与首次提交位于同一事务，未发布碰撞最多尝试 8 次；已保存重复值报错，不能旋转身份。
+- 先提交完整权威 JSON，再用逐级 O_NOFOLLOW 的原子写入渲染只读文件。画像和 dmi 目录 root 所有且 0755，文件 0444，计算机标记最后发布；提交后渲染失败、旧 row 重试或并发初始化都从 DB 复用同一对象。新任务、恢复、进程重启、唤醒、重建和镜像更新不重抽；legacy reprofile 也保留合法计算机对象。
+- 仅 CLI 加载共享库与只读画像，不新增 capability。将 `/sys/class/dmi/id` 和 `/sys/devices/virtual/dmi/id` 下的 sys_vendor、product_name、product_version、product_family、product_serial、product_uuid 映射到同一 dmi 子目录；精确目录打开、相对目录 fd 与受支持 chdir 后读取也适用，不依赖宿主存在 DMI 目录。
+- 内容和元数据共用路径映射：普通／fortified open、fopen，以及 stat/lstat/stat64/lstat64、fstatat/fstatat64、statx、access/faccessat、旧 glibc stat ABI。x86_64 的动态 libc `syscall(SYS_statx, ...)` 同样映射，以覆盖 Node/libuv；其它 syscall 保留原始参数和 errno。不得用 va_arg 读取未传入参数，零参数和六参数透传均须实测。
+- `O_TMPFILE` 包含 `O_DIRECTORY` 位，必须按完整 mask 判断，不能把 `O_RDONLY | O_DIRECTORY` 当作写入。写入仍走原接口；白名单外保持原行为，不扩大为整棵 sysfs 仿真。静态程序、直接内联系统调用、CPUID、符号链接别名、完整 SMBIOS／dmidecode 和未列路径仍在覆盖边界外。
+- 能力标签不代替实际证据：创建和 CLI 入口校验两目录六字段的内容、存在、可读和不可写。旧实例只能显式空闲重建；坏对象／旧 CLI 只隔离 CLI，健康独立 API 保留。库初始化区分旧画像缺标记和已发布标记损坏，后者拒绝 DMI 读取，不回退宿主值。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| key 缺失且处于受控创建窗口 | 生成并提交一次；旧基础身份和未知顶层字段保留 |
+| 显式 null、未知键／版本／模板、格式坏或跨 CPU 代际 | ValueError，原记录保留，不重新随机 |
+| 已提交 JSON，但文件发布或后续创建失败 | 停止本代已创建角色，重试复用已提交身份 |
+| 新值 UUID 碰撞／已有 UUID 重复 | 首次发布前有界重试／已有身份报错不旋转 |
+| 活动 job、CLI 已存在或 generation 改变 | 拒绝应用，等待合法空闲维护 |
+| account 镜像缺少计算机能力 | 创建前拒绝，要求同批支持镜像 |
+| 两目录内容或权限探针不符 | CLI 待对账，不能仅据标签报告已加载 |
+| 已发布标记无效，或 DMI 文件不可读、类型／权限／有界单行格式损坏 | 常规 DMI 读取返回 EIO，不回退预置宿主内容 |
+
+### 5. Scenarios and Examples
+
+- 正常：保存兼容的 CPU 与计算机对象，独立控制端进程恢复、停止唤醒和另一批镜像显式重建后，规范化静态身份 SHA256 相同，实际 DMI 与 DB 一致。
+- 基础：旧记录有合法 CPU／内核但缺计算机对象，在空闲重建时只增补后者；旧 CPU、时区和设备配置保持。
+- 错误用法：`if not saved.get('computer_profile'): ...` 把损坏的 null 重新随机。正确处理：仅检查 key 是否存在，存在则严格校验：
+
+```python
+if 'computer_profile' not in saved:
+    saved['computer_profile'] = generate_computer_profile(saved['system_profile'])
+validate_computer_profile(saved['computer_profile'], saved['system_profile'])
+```
+
+- 错误用法：cat 输出合成文本就报告完成，或 stat 失败后显示缓存页面值。正确处理：分别用 Python、Node 和原生 C 校验内容、exists/stat、access 和相对目录接口，并在预置宿主 DMI 与缺 DMI 两种环境下验证。
+
+### 6. Tests Required
+
+- `test_system_profile.py` 覆盖 Naples／Cezanne 兼容候选、独立 serial／UUID、严格键和格式校验、跨代拒绝；保留型号之外真实 CPU 原文的断言。
+- `test_account_runtime.py` 覆盖两个独立运行时共享 SQLite 的首次并发、提交后写文件失败及 stale row 重试、损坏记录拒绝、未发布 UUID 碰撞、旧身份／legacy reprofile 保留和健康 API 不受 CLI 门禁影响。
+- `verify_system_profile.py --manifest` 与原生探针覆盖两目录六字段、Node/libuv statx、元数据／权限／只读、相对 fd／cwd、零／六参数 syscall 和 errno、静态／CPUID 边界，以及已有宿主值和坏标记不回退。
+- `run_local_verification.py` 核对跨任务／恢复／重建、三角色权限、HOME／凭据和 CLI／API 隔离；任务研究中的 `identity_lifecycle_probe.py` 使用独立控制端进程、持久合成 SQLite 和两批真实镜像证明静态摘要、HOME／设备配置保持。真实账号、OAuth、模型和公网遥测不用于本地验收。
