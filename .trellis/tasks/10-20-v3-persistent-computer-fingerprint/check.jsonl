@@ -1,0 +1,5 @@
+{"file": ".trellis/tasks/10-20-v3-persistent-computer-fingerprint/research/project-contracts.md", "reason": "适用权威规范的精确摘录；保留源文件SHA256和行号，避免整份文件注入截断"}
+{"file": "doc/v3-system-profile.md", "reason": "当前CPU／内核覆盖与绕过边界，保证DMI扩展保留原身份和资源真实性"}
+{"file": ".trellis/tasks/10-20-v3-persistent-computer-fingerprint/design.md", "reason": "本轮自有生成器、原子持久化、旧身份兼容及DMI常规读取设计"}
+{"file": ".trellis/tasks/10-20-v3-persistent-computer-fingerprint/research/dmi-read-feasibility.md", "reason": "直接挂载限制和内容／元数据差异的实际断网实验"}
+{"file": ".trellis/tasks/10-20-v3-persistent-computer-fingerprint/research/hardware-template-sources.md", "reason": "模板适配当前CPU代际的原厂来源与合成显示值边界"}

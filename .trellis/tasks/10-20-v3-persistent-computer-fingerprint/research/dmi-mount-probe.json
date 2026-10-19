@@ -1,0 +1,30 @@
+{
+  "image": "vibebench-v3-account:v3-quota-hard-stop-20261018-b",
+  "root": "/tmp/v3-fingerprint-dmi-planning-e8f7trti",
+  "cases": [
+    {
+      "case": "baseline",
+      "exit_code": 0,
+      "stdout": "{\"/sys/class/dmi/id\": {\"exists\": false, \"resolved\": \"/sys/class/dmi/id\", \"values\": {\"sys_vendor\": {\"error\": \"FileNotFoundError\"}, \"product_name\": {\"error\": \"FileNotFoundError\"}, \"product_serial\": {\"error\": \"FileNotFoundError\"}, \"product_uuid\": {\"error\": \"FileNotFoundError\"}}}, \"/sys/devices/virtual/dmi/id\": {\"exists\": false, \"resolved\": \"/sys/devices/virtual/dmi/id\", \"values\": {\"sys_vendor\": {\"error\": \"FileNotFoundError\"}, \"product_name\": {\"error\": \"FileNotFoundError\"}, \"product_serial\": {\"error\": \"FileNotFoundError\"}, \"product_uuid\": {\"error\": \"FileNotFoundError\"}}}}",
+      "stderr": ""
+    },
+    {
+      "case": "class-directory",
+      "exit_code": 125,
+      "stdout": "",
+      "stderr": "docker: Error response from daemon: failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: error mounting \"/tmp/v3-fingerprint-dmi-planning-e8f7trti/dmi\" to rootfs at \"/sys/class/dmi/id\": create mountpoint for /sys/class/dmi/id mount: make mountpoint \"/sys/class/dmi/id\": mkdirat /var/lib/docker/rootfs/overlayfs/d21d986743e929dfb7fc1a26232d4a5d1018e8a6c92fc4ba793e2eed0bd21368/sys/class/dmi: read-only file system\n\nRun 'docker run --help' for more information"
+    },
+    {
+      "case": "canonical-directory",
+      "exit_code": 125,
+      "stdout": "",
+      "stderr": "docker: Error response from daemon: failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: error mounting \"/tmp/v3-fingerprint-dmi-planning-e8f7trti/dmi\" to rootfs at \"/sys/devices/virtual/dmi/id\": create mountpoint for /sys/devices/virtual/dmi/id mount: make mountpoint \"/sys/devices/virtual/dmi/id\": mkdirat /var/lib/docker/rootfs/overlayfs/bc676cbf5c29b45c40c9f2a0ac7179b2f4020b7eaadc5b85923d9c3e5dd13dd3/sys/devices/virtual/dmi: read-only file system\n\nRun 'docker run --help' for more information"
+    },
+    {
+      "case": "both-directories",
+      "exit_code": 125,
+      "stdout": "",
+      "stderr": "docker: Error response from daemon: failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: error mounting \"/tmp/v3-fingerprint-dmi-planning-e8f7trti/dmi\" to rootfs at \"/sys/class/dmi/id\": create mountpoint for /sys/class/dmi/id mount: make mountpoint \"/sys/class/dmi/id\": mkdirat /var/lib/docker/rootfs/overlayfs/de20cb470ac5a26ae0f3673088a6f351c86c2d9f8d634c474cb8c809f461df15/sys/class/dmi: read-only file system\n\nRun 'docker run --help' for more information"
+    }
+  ]
+}

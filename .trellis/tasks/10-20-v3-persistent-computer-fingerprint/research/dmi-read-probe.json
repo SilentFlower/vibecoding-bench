@@ -1,0 +1,27 @@
+{
+  "image": "vibebench-v3-account:v3-quota-hard-stop-20261018-b",
+  "root": "/tmp/v3-fingerprint-dmi-routing-pg568uc_",
+  "repo_source_sha256": "bce76b83e2c7d477d70629ba3c825a8dc7ea91f871aa98483b29b77ab6a1fbbd",
+  "exit_code": 0,
+  "stderr": "",
+  "observed": {
+    "/sys/class/dmi/id": {
+      "python_read": "Synthetic Research Product",
+      "exists": false,
+      "access_read": false,
+      "cat_read": "Synthetic Research Product",
+      "shell_readable_status": 1
+    },
+    "/sys/devices/virtual/dmi/id": {
+      "python_read": "Synthetic Research Product",
+      "exists": false,
+      "access_read": false,
+      "cat_read": "Synthetic Research Product",
+      "shell_readable_status": 1
+    },
+    "node": {
+      "read": "Synthetic Research Product",
+      "exists": false
+    }
+  }
+}
