@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "commit",
+    "metric": "lines",
+    "group": "repository",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "commit_average": "average",
+    "commit_median": "median",
+    "commit_rank": "rank",
+    "commit_sort": "sort",
+    "commit_group": "group",
+    "commit_totals": "totals",
+    "commit_histogram": "histogram",
+    "commit_timeline": "timeline",
+    "commit_window": "window",
+    "commit_cumulative": "cumulative",
+    "commit_moving": "moving",
+    "commit_forecast": "forecast",
+    "commit_percentages": "percentages",
+    "commit_ratio": "ratio",
+    "commit_outliers": "outliers",
+    "commit_matrix": "matrix",
+    "commit_filter": "filter",
+    "commit_csv": "csv",
+    "commit_compare": "compare",
+    "commit_digest": "digest"
+  }
+}

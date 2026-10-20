@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "template",
+    "metric": "replies",
+    "group": "mailbox",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "template_word_count": "word_count",
+    "template_headings": "headings",
+    "template_links": "links",
+    "template_terms": "terms",
+    "template_search": "search",
+    "template_replace": "replace",
+    "template_template": "template",
+    "template_slug": "slug",
+    "template_normalize": "normalize",
+    "template_deduplicate": "deduplicate",
+    "template_group": "group",
+    "template_tags": "tags",
+    "template_tag_filter": "tag_filter",
+    "template_required": "required",
+    "template_sort": "sort",
+    "template_diff": "diff",
+    "template_html": "html",
+    "template_markdown": "markdown",
+    "template_roundtrip": "roundtrip",
+    "template_digest": "digest"
+  }
+}

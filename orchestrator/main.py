@@ -53,6 +53,9 @@ from login_terminal import authorization_url
 from login_drafts import LoginDraftStore
 from physical_features import physical_features_summary
 from run_windows import normalize_run_window, run_window_snapshot
+from project_library import ProjectLibrary
+from project_iteration import PROJECT_RUN_KIND, PROJECT_SCHEMA, ProjectIterationManager
+from project_verifier import ProjectVerifier
 from topic_library import (decode_followup_timing, decode_followups, encode_followups, parse_topics,
     sample_followup_timing, sample_followups)
 
@@ -67,6 +70,8 @@ WORKSPACES_DIR = BENCH_DATA / "workspaces"
 CA_DIR = BENCH_DATA / "ca"
 TOPICS_FILE = Path(os.environ.get("TOPICS_FILE", "/repo/topics.md"))
 WEBUI_DIR = Path(os.environ.get("WEBUI_DIR", "/webui"))
+PROJECT_LIBRARY_DIR = Path(os.environ.get("PROJECT_LIBRARY_DIR",
+    str(Path(__file__).resolve().parents[1] / "project_library") if (Path(__file__).resolve().parents[1] / "project_library").is_dir() else "/repo/project_library"))
 
 # 宿主机路径（用于让 docker daemon 给 sibling 容器挂载 volume；与容器内路径可能不同）
 HOST_BENCH_DATA = Path(os.environ.get("HOST_BENCH_DATA", str(BENCH_DATA)))
@@ -1488,6 +1493,7 @@ def init_db() -> None:
     try:
         with conn:
             conn.executescript(_SCHEMA)
+            conn.executescript(PROJECT_SCHEMA)
             _ensure_column(conn, "accounts", "upstream_proxy_scheme", "TEXT DEFAULT 'socks5'")
             _ensure_column(conn, "accounts", "timezone", "TEXT")
             _ensure_column(conn, "accounts", "run_window_json", "TEXT")
@@ -1648,6 +1654,9 @@ def _account_reference_counts(conn: sqlite3.Connection, account_id: int) -> dict
             (account_id,),
         ).fetchone()
         counts[table] = int(row["n"] if row else 0)
+    projects = conn.execute("SELECT COUNT(*) AS n FROM project_iteration_batches WHERE account_id=?", (account_id,)).fetchone()["n"]
+    if projects:
+        counts["project_iteration_batches"] = projects
     return counts
 
 
@@ -3542,7 +3551,7 @@ class QuotaGuard:
             threshold_guarded = False
             if account and run["run_kind"] == "warmup":
                 threshold_guarded = bool(self.warmup_snapshot(account)["enabled"])
-            elif account and run["run_kind"] == "normal":
+            elif account and run["run_kind"] in ("normal", PROJECT_RUN_KIND):
                 threshold_guarded = bool(self.policy_snapshot(account, "normal")["blocked"])
             if (run["status"] != "quota_wait" and not state.get("exhausted")
                     and not run["quota_attempt"] and run["id"] not in observed_runs and not control_status and not threshold_guarded):
@@ -3652,6 +3661,8 @@ class QuotaGuard:
         finally:
             conn.close()
         for run in rows:
+            if run["run_kind"] == PROJECT_RUN_KIND and (not project_iterations or not project_iterations.execution_allowed(run["id"])):
+                continue
             if self._cancel_changed_identity(run, account):
                 continue
             if scheduler.is_executing(run["id"], int(run["quota_attempt"])):
@@ -3678,9 +3689,7 @@ class QuotaGuard:
                 if not _account_run_window(account)["allowed"]:
                     continue
                 workload = (
-                    "warmup" if run["run_kind"] == "warmup"
-                    else "normal" if run["run_kind"] == "normal"
-                    else None
+                    _execution_workload(run["run_kind"])
                 )
                 if workload == "warmup" and (
                         not account.get("warmup_enabled") or self.policy_snapshot(account, workload, source)["blocked"]):
@@ -3786,6 +3795,15 @@ class QuotaGuard:
 
 
 # ============== Docker 运行器 ==============
+def _execution_workload(run_kind: Optional[str]) -> Optional[Literal["normal", "warmup"]]:
+    """将项目迭代接入普通任务策略，不改变旧模式的含义。
+
+    :param run_kind: 已持久化的运行类型。
+    :return: 普通／养号策略，抓包等原独立类型返回 None。
+    """
+    return "warmup" if run_kind == "warmup" else "normal" if run_kind in ("normal", PROJECT_RUN_KIND) else None
+
+
 def _public_quota(account: dict) -> dict:
     """读取页面可用的被动额度，参数为账号，返回不含身份或凭据哈希的摘要。"""
     snapshot = quota_guard.snapshot(account) if quota_guard else {}
@@ -3873,7 +3891,8 @@ class Runner:
         tz = _effective_account_timezone(account)
 
         # 容器内创建运行目录（docker 会按宿主路径挂载到子容器）
-        (BENCH_DATA / "workspaces" / run_id).mkdir(parents=True, exist_ok=True)
+        if not (project_iterations and project_iterations.run_context(run_id)):
+            (BENCH_DATA / "workspaces" / run_id).mkdir(parents=True, exist_ok=True)
         if not account_runtime:
             (BENCH_DATA / "workspaces" / run_id / ".claude-home").mkdir(parents=True, exist_ok=True)
         (BENCH_DATA / "flows" / acc_name / str(task["id"]) / run_id).mkdir(parents=True, exist_ok=True)
@@ -6035,6 +6054,8 @@ def _find_latest_claude_session_id(run_id: str) -> Optional[str]:
     base = account_runtime.run_session_path(run_id) if account_runtime else (
         WORKSPACES_DIR / run_id / ".claude-home" / "projects"
     )
+    if project_iterations and project_iterations.run_context(run_id):
+        return project_iterations.latest_native_session(run_id, base)
     if not base.exists():
         return None
     files = [p for p in (base.glob("*.jsonl") if account_runtime else base.glob("*/*.jsonl")) if p.is_file()]
@@ -6063,6 +6084,8 @@ def _aggregate_claude_session_usage(run_id: str) -> dict[str, int | bool]:
     base = account_runtime.run_session_path(run_id) if account_runtime else (
         WORKSPACES_DIR / run_id / ".claude-home" / "projects"
     )
+    if project_iterations and project_iterations.run_context(run_id):
+        return project_iterations.native_usage(run_id, base, _usage_input_tokens)
     if not base.exists():
         return {
             "tokens_in": 0,
@@ -6251,6 +6274,14 @@ class Scheduler:
                     (run["batch_id"],)).fetchone() if run["batch_id"] else None
             finally:
                 connection.close()
+            if run["run_kind"] == PROJECT_RUN_KIND:
+                context = project_iterations.run_context(run_id) if project_iterations else None
+                if not context or context["batch_status"] in ("stopping", "stopped", "blocked") or context["attempt_generation"] != context["batch_generation"]:
+                    self._update_attempt(run_id, attempt, status="stopped", ended_at=time.time())
+                    return None
+                if not project_iterations.execution_allowed(run_id):
+                    self._window_stop.wait(0.5)
+                    continue
             if current is None:
                 self._update_attempt(run_id, attempt, status="failed", error="账号不存在或已停用", ended_at=time.time())
                 self._update_batch_item_for_run(run_id, "failed")
@@ -6743,9 +6774,9 @@ class Scheduler:
             if ready_account is None:
                 return
             account = ready_account
-            if quota_guard and initial_state.get("run_kind") in ("normal", "warmup"):
+            if quota_guard and _execution_workload(initial_state.get("run_kind")) is not None:
                 quota_guard.consume(account)
-                if quota_guard.policy_snapshot(account, initial_state["run_kind"], source)["blocked"]:
+                if quota_guard.policy_snapshot(account, _execution_workload(initial_state["run_kind"]), source)["blocked"]:
                     if not initial_state.get("quota_identity"):
                         self._update_attempt(
                             run_id,
@@ -6797,8 +6828,9 @@ class Scheduler:
                         self._update_batch_item_for_run(run_id, "stopped")
                     return
                 policy = _account_run_window(account)
-                if not policy["allowed"]:
-                    self._update_attempt(run_id, attempt, window_wait_until=policy.get("next_open_at") or 0)
+                if not policy["allowed"] or (current["run_kind"] == PROJECT_RUN_KIND and
+                        (not project_iterations or not project_iterations.execution_allowed(run_id))):
+                    self._update_attempt(run_id, attempt, window_wait_until=(policy.get("next_open_at") or 0) if not policy["allowed"] else None)
                     deferred_for_window = True
                     return
                 # 首次进入启动流程即固化模型；自动恢复读取原 run 的快照。
@@ -6809,9 +6841,7 @@ class Scheduler:
                 task["model_override"] = model
                 task["warmup"] = current.get("run_kind") == "warmup"
                 workload = (
-                    "warmup" if current["run_kind"] == "warmup"
-                    else "normal" if current["run_kind"] == "normal"
-                    else None
+                    _execution_workload(current["run_kind"])
                 )
                 if quota_guard and not quota_guard.admit(
                     account,
@@ -6847,8 +6877,9 @@ class Scheduler:
                         return
                 # 同步凭据可能跨过边界，此时尚未发起执行，仍应回到原队列等待。
                 policy = _account_run_window(account)
-                if not policy["allowed"]:
-                    self._update_attempt(run_id, attempt, window_wait_until=policy.get("next_open_at") or 0)
+                if not policy["allowed"] or (current["run_kind"] == PROJECT_RUN_KIND and
+                        (not project_iterations or not project_iterations.execution_allowed(run_id))):
+                    self._update_attempt(run_id, attempt, window_wait_until=(policy.get("next_open_at") or 0) if not policy["allowed"] else None)
                     deferred_for_window = True
                     return
                 if not self._update_attempt(
@@ -6867,6 +6898,17 @@ class Scheduler:
                 try:
                     sid, wid = self.runner.start_run(run_id, account, task)
                 except Exception as exc:
+                    if current["run_kind"] == PROJECT_RUN_KIND and isinstance(exc, RuntimeBusy):
+                        state = quota_guard.snapshot(account) if quota_guard else {}
+                        policy = quota_guard.policy_snapshot(account, "normal", source) if quota_guard else {}
+                        if state.get("blocked") or policy.get("blocked"):
+                            quota_guard.release(account, source, unstarted=True)
+                            self._mark_quota_wait(run_id, account, attempt)
+                        else:
+                            self._update_attempt(run_id, attempt, status="queued", started_at=None, ended_at=None,
+                                worker_container=None, sidecar_container=None, error=str(exc))
+                            deferred_for_window = True
+                        return
                     deferred = bool(task.get("warmup") and isinstance(exc, RuntimeBusy))
                     self._update_attempt(
                         run_id, attempt,
@@ -6980,6 +7022,17 @@ class Scheduler:
                     sem.release()
                 with self._execution_lock:
                     self._executing.discard((run_id, attempt))
+                current_project_run = self._get_run_state(run_id)
+                if (project_iterations and current_project_run and current_project_run["run_kind"] == PROJECT_RUN_KIND
+                        and current_project_run["status"] in _TERMINAL_RUN_STATUSES | {"quota_wait"}):
+                    cleanup_error = None
+                    try:
+                        self.runner.cleanup_quota_run(run_id)
+                        if account_runtime and project_iterations.run_context(run_id).get("workspace_relative"):
+                            project_iterations.record_native_end(run_id, account_runtime.run_session_path(run_id))
+                    except Exception as error:
+                        cleanup_error = "原执行未能严格收口：" + type(error).__name__
+                    project_iterations.execution_released(run_id, attempt, cleanup_error)
                 if deferred_for_window and not self._window_stop.is_set():
                     # 先释放账号资源和本代去重标记，再由同一执行进入时间等待。
                     self.submit(run_id, account, task)
@@ -7031,7 +7084,7 @@ class Scheduler:
         resume_at = state.get("resume_at")
         current = self._get_run_state(run_id) or {}
         if quota_guard and not state.get("blocked"):
-            workload = current.get("run_kind")
+            workload = _execution_workload(current.get("run_kind"))
             if workload in ("normal", "warmup"):
                 policy = quota_guard.policy_snapshot(account, workload)
                 if policy["enabled"] and (
@@ -7675,6 +7728,38 @@ class WarmupScheduler:
 
 
 # ============== FastAPI ==============
+def _project_admission(account: dict, run_id: str) -> bool:
+    """在环境准备后只读复核共同门禁。
+
+    :param account: 当前可用账号。
+    :param run_id: 本次运行。
+    :return: 是否仍可开始正式执行。
+    """
+    if not _account_run_window(account)["allowed"]:
+        return False
+    if not quota_guard:
+        return True
+    connection = get_db()
+    try:
+        run = connection.execute("SELECT quota_attempt FROM runs WHERE id=?", (run_id,)).fetchone()
+    finally:
+        connection.close()
+    if run is None:
+        return False
+    state = quota_guard.snapshot(account)
+    policy = quota_guard.policy_snapshot(account, "normal", _quota_source(run_id, run["quota_attempt"]), quota_state=state)
+    return not state.get("blocked") and not state.get("account_error") and not policy.get("blocked")
+
+
+def _project_execution_settings() -> dict:
+    """冻结新项目尝试的 CLI、思考等级和模型。
+
+    :return: 与既有调度器载荷一致的设置。
+    """
+    return {"claude_code_version": effective_claude_code_version(),
+        "claude_effort_level": effective_runtime_effort(), "execution_model": effective_runtime_model()}
+
+
 runner: Optional[Runner] = None
 scheduler: Optional[Scheduler] = None
 login_manager: Optional[LoginManager] = None
@@ -7683,11 +7768,13 @@ oauth_refresh_scheduler: Optional[OAuthRefreshScheduler] = None
 warmup_scheduler: Optional[WarmupScheduler] = None
 quota_guard: Optional[QuotaGuard] = None
 account_runtime: Optional[AccountRuntime] = None
+project_iterations: Optional[ProjectIterationManager] = None
+project_iteration_error: Optional[str] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard, account_runtime
+    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard, account_runtime, project_iterations, project_iteration_error
     init_db()
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     FLOWS_DIR.mkdir(parents=True, exist_ok=True)
@@ -7704,7 +7791,21 @@ async def lifespan(app: FastAPI):
     oauth_refresh_scheduler = OAuthRefreshScheduler(runner)
     warmup_scheduler = WarmupScheduler(scheduler)
     quota_guard = QuotaGuard(runner)
+    project_iterations = None
+    project_iteration_error = None
+    if account_runtime:
+        try:
+            project_iterations = ProjectIterationManager(BENCH_DATA, ProjectLibrary(PROJECT_LIBRARY_DIR), get_db, _db_lock,
+                scheduler.submit, _project_execution_settings, _quota_identity, stop_run,
+                ProjectVerifier(runner.client, BENCH_DATA, HOST_BENCH_DATA, account_runtime.image), scheduler.is_executing,
+                admission=_project_admission)
+            account_runtime.set_project_iterations(project_iterations)
+        except (ValueError, OSError) as error:
+            # 新内容损坏只隔离新入口，原题库执行仍可使用。
+            project_iteration_error = "项目内容库不可用：" + str(error)[:300]
     quota_guard.recover()
+    if project_iterations:
+        project_iterations.recover(runner.cleanup_quota_run)
     # 清掉上次进程残留的 login 容器，避免重启后僵尸容器堆积
     login_manager.cleanup_stale()
     continue_manager.cleanup_stale()
@@ -7715,9 +7816,13 @@ async def lifespan(app: FastAPI):
     if V3_ENABLED:
         scheduler.recover_window_waits()
         scheduler.recover_active_batches()
+    if project_iterations:
+        project_iterations.start()
     try:
         yield
     finally:
+        if project_iterations:
+            project_iterations.stop()
         scheduler.stop_window_waits()
         quota_guard.stop()
         warmup_scheduler.stop()
@@ -9976,6 +10081,178 @@ def delete_topic(topic_id: int):
 
 
 # ---------- tasks ----------
+# ---------- 项目迭代 ----------
+class ProjectIterationBatchIn(BaseModel):
+    """创建独立项目批次的输入。
+
+    :param account_id: 运行账号。
+    :param name: 批次名称。
+    :param project_keys: 所选项目，省略时选择全部。
+    """
+    account_id: StrictInt
+    name: StrictStr = "项目迭代批次"
+    project_keys: Optional[list[StrictStr]] = None
+
+
+def _project_manager() -> ProjectIterationManager:
+    """取得可用的 v3 项目迭代能力。
+
+    :return: 项目管理器；不可用时返回明确的 HTTP 错误。
+    """
+    if not project_iterations:
+        raise HTTPException(503, project_iteration_error or "项目迭代需要 v3 固定账号运行环境")
+    return project_iterations
+
+
+@app.get("/api/project-catalog")
+def project_catalog() -> dict:
+    """浏览预置项目和固定基线版本。@return 公开项目摘要。"""
+    return _project_manager().catalog()
+
+
+@app.get("/api/project-catalog/{key}")
+def project_catalog_entry(key: str) -> dict:
+    """读取一条项目路线。@param key 项目标识。@return 不含参考实现的路线。"""
+    project = _project_manager().library.projects.get(key)
+    if project is None:
+        raise HTTPException(404, "项目不存在")
+    return project.summary(include_steps=True)
+
+
+@app.post("/api/project-iteration-batches")
+def create_project_iteration_batch(body: ProjectIterationBatchIn) -> dict:
+    """创建尚未投放的独立批次。@param body 账号与项目选择。@return 批次详情。"""
+    try:
+        return _project_manager().create_batch(body.account_id, body.name, body.project_keys)
+    except ValueError as error:
+        raise HTTPException(400, str(error))
+
+
+@app.get("/api/project-iteration-batches")
+def list_project_iteration_batches() -> list[dict]:
+    """读取自动批次列表。@return 不包含账号身份材料的列表。"""
+    return _project_manager().batches()
+
+
+@app.get("/api/project-iteration-batches/{bid}")
+def get_project_iteration_batch(bid: int) -> dict:
+    """读取批次进度。@param bid 批次 ID。@return 项目与调度状态。"""
+    try:
+        return _project_manager().batch(bid)
+    except ValueError as error:
+        raise HTTPException(404, str(error))
+
+
+def _transition_project_batch(bid: int, action: str) -> dict:
+    try:
+        return _project_manager().transition(bid, action)
+    except ValueError as error:
+        raise HTTPException(409, str(error))
+
+
+@app.post("/api/project-iteration-batches/{bid}/start")
+def start_project_iteration_batch(bid: int) -> dict:
+    """启用批次自动推进。@param bid 批次 ID。@return 最新状态。"""
+    return _transition_project_batch(bid, "start")
+
+
+@app.post("/api/project-iteration-batches/{bid}/pause")
+def pause_project_iteration_batch(bid: int) -> dict:
+    """暂停后续投放并收尾当前步骤。@param bid 批次 ID。@return 最新状态。"""
+    return _transition_project_batch(bid, "pause")
+
+
+@app.post("/api/project-iteration-batches/{bid}/stop")
+def stop_project_iteration_batch(bid: int) -> dict:
+    """立即停止批次并保留全部已开始项目。@param bid 批次 ID。@return 最新状态。"""
+    return _transition_project_batch(bid, "stop")
+
+
+@app.get("/api/project-instances/{iid}")
+def get_project_instance(iid: int) -> dict:
+    """读取持久实例和路线。@param iid 实例 ID。@return 步骤及尝试详情。"""
+    try:
+        return _project_manager().instance(iid)
+    except ValueError as error:
+        raise HTTPException(404, str(error))
+
+
+@app.get("/api/project-instances/{iid}/usage")
+def get_project_instance_usage(iid: int) -> dict:
+    """按步骤汇总已有统计，缺少证据不冒充零消耗。
+
+    :param iid: 项目实例 ID。
+    :return: 每步骤的请求、输出和数据完整性。
+    """
+    instance = get_project_instance(iid)
+    steps = {}
+    for attempt in instance["attempts"]:
+        item = steps.setdefault(attempt["step_id"], {"step_id": attempt["step_id"], "tokens_in": 0,
+            "tokens_out": 0, "requests": 0, "attempts": 0, "known_attempts": 0})
+        item["attempts"] += 1
+        try:
+            usage = get_stats(attempt["run_id"])
+        except (HTTPException, OSError, ValueError):
+            usage = {}
+        if usage.get("usage_available"):
+            item["known_attempts"] += 1
+            for key in ("tokens_in", "tokens_out", "requests"):
+                item[key] += usage.get(key, 0)
+    for item in steps.values():
+        item["complete"] = item["known_attempts"] == item["attempts"]
+        if not item["known_attempts"]:
+            item.update(tokens_in=None, tokens_out=None, requests=None)
+    return {"instance_id": iid, "steps": list(steps.values())}
+
+
+@app.get("/api/project-step-attempts/{aid}/artifacts")
+def get_project_attempt_artifacts(aid: int) -> dict:
+    """读取历史成果。@param aid 步骤尝试 ID。@return 验收和文件清单。"""
+    try:
+        return _project_manager().artifacts(aid)
+    except ValueError as error:
+        raise HTTPException(404, str(error))
+
+
+@app.get("/api/project-iterations-stream")
+async def project_iterations_stream(request: Request, batch_id: int = 0, instance_id: int = 0):
+    """推送页面所需状态。
+
+    :param request: HTTP 请求。
+    :param batch_id: 当前批次，零表示仅订阅批次列表。
+    :param instance_id: 当前实例，非零时必须属于所选批次。
+    :return: 状态事件流。
+    """
+    manager = _project_manager()
+    if batch_id:
+        get_project_iteration_batch(batch_id)
+    if instance_id:
+        instance = get_project_instance(instance_id)
+        if not batch_id or instance["batch_id"] != batch_id:
+            raise HTTPException(400, "项目实例不属于当前批次")
+
+    async def events():
+        while not await request.is_disconnected():
+            payload = {"batches": manager.batches()}
+            if batch_id:
+                payload["batch"] = manager.batch(batch_id)
+            if instance_id:
+                payload["instance"] = manager.instance(instance_id)
+            yield {"event": "project-state", "data": json.dumps(payload, ensure_ascii=False)}
+            await asyncio.sleep(2)
+
+    return EventSourceResponse(events())
+
+
+@app.get("/api/project-step-attempts/{aid}/file")
+def get_project_attempt_file(aid: int, path: str) -> dict:
+    """预览固定历史文件。@param aid 尝试 ID。@param path 相对路径。@return 有界文本。"""
+    try:
+        return _project_manager().artifact_file(aid, path)
+    except ValueError as error:
+        raise HTTPException(404, str(error))
+
+
 class TaskIn(BaseModel):
     """
     创建单个 topic 任务的请求体。
@@ -10508,6 +10785,8 @@ def run_task(tid: int):
         if not task_row:
             raise HTTPException(404, "task not found")
         task = dict(task_row)
+        if conn.execute("SELECT a.id FROM project_step_attempts a JOIN runs r ON r.id=a.run_id WHERE r.task_id=?", (tid,)).fetchone():
+            raise HTTPException(409, "项目迭代任务请通过项目批次推进，不能单独再次运行")
         account_row = _get_available_account(conn, int(task["account_id"]))
         if not account_row:
             raise HTTPException(404, "account not found or disabled")
@@ -10709,6 +10988,17 @@ def list_workspace(rid: str):
     :return: 文件/目录条目列表
     """
     _require_visible_run(rid)
+    connection = get_db()
+    try:
+        visible_run = dict(connection.execute("SELECT run_kind FROM runs WHERE id=?", (rid,)).fetchone())
+    finally:
+        connection.close()
+    if visible_run["run_kind"] == PROJECT_RUN_KIND:
+        if not project_iterations:
+            raise HTTPException(503, "项目历史成果读取器未就绪")
+        context = project_iterations.run_context(rid)
+        artifact = project_iterations.artifacts(context["attempt_id"]) if context else {"files": []}
+        return [{"path": item["path"], "size": item["size"], "type": "file"} for item in artifact["files"]]
     base = WORKSPACES_DIR / rid
     if not base.exists():
         raise HTTPException(404)
@@ -10977,6 +11267,8 @@ def continue_run_start(rid: str):
         if not run_row:
             raise HTTPException(404, "运行记录不存在")
         run = dict(run_row)
+        if run["run_kind"] == PROJECT_RUN_KIND:
+            raise HTTPException(409, "项目迭代通过项目批次自动推进，首版不提供人工续聊")
         if run["status"] not in _TERMINAL_RUN_STATUSES:
             raise HTTPException(400, f"运行 {rid} 尚未结束")
         account_row = conn.execute(

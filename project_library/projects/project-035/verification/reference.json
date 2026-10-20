@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "build",
+    "metric": "seconds",
+    "group": "pipeline",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "build_average": "average",
+    "build_median": "median",
+    "build_rank": "rank",
+    "build_sort": "sort",
+    "build_group": "group",
+    "build_totals": "totals",
+    "build_histogram": "histogram",
+    "build_timeline": "timeline",
+    "build_window": "window",
+    "build_cumulative": "cumulative",
+    "build_moving": "moving",
+    "build_forecast": "forecast",
+    "build_percentages": "percentages",
+    "build_ratio": "ratio",
+    "build_outliers": "outliers",
+    "build_matrix": "matrix",
+    "build_filter": "filter",
+    "build_csv": "csv",
+    "build_compare": "compare",
+    "build_digest": "digest"
+  }
+}

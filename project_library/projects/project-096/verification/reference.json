@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "ebook",
+    "metric": "copies",
+    "group": "edition",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "ebook_search": "search",
+    "ebook_filter": "filter",
+    "ebook_sort": "sort",
+    "ebook_rank": "rank",
+    "ebook_tags": "tags",
+    "ebook_tag_filter": "tag_filter",
+    "ebook_group": "group",
+    "ebook_totals": "totals",
+    "ebook_budget": "budget",
+    "ebook_ratio": "ratio",
+    "ebook_percentages": "percentages",
+    "ebook_timeline": "timeline",
+    "ebook_window": "window",
+    "ebook_capacity": "capacity",
+    "ebook_eligibility": "eligibility",
+    "ebook_transitions": "transitions",
+    "ebook_csv": "csv",
+    "ebook_compare": "compare",
+    "ebook_roundtrip": "roundtrip",
+    "ebook_digest": "digest"
+  }
+}

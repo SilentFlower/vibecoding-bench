@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "container",
+    "metric": "capacity",
+    "group": "room",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "container_search": "search",
+    "container_filter": "filter",
+    "container_tags": "tags",
+    "container_tag_filter": "tag_filter",
+    "container_sort": "sort",
+    "container_group": "group",
+    "container_totals": "totals",
+    "container_page": "page",
+    "container_required": "required",
+    "container_duplicates": "duplicates",
+    "container_merge": "merge",
+    "container_template": "template",
+    "container_html": "html",
+    "container_markdown": "markdown",
+    "container_timeline": "timeline",
+    "container_window": "window",
+    "container_csv": "csv",
+    "container_compare": "compare",
+    "container_roundtrip": "roundtrip",
+    "container_digest": "digest"
+  }
+}

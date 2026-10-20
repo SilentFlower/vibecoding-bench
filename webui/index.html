@@ -36,6 +36,7 @@
       <a href="#topics"   data-tab="topics"><span class="tab-en">topics</span><span class="tab-cn">题库</span></a>
       <a href="#tasks"    data-tab="tasks"><span class="tab-en">tasks</span><span class="tab-cn">任务</span></a>
       <a href="#runs"     data-tab="runs"><span class="tab-en">runs</span><span class="tab-cn">运行</span></a>
+      <a href="#projects" data-tab="projects"><span class="tab-en">projects</span><span class="tab-cn">项目迭代</span></a>
       <a href="#environments" data-tab="environments"><span class="tab-en">environments</span><span class="tab-cn">环境</span></a>
     </nav>
     <div class="statline">
@@ -65,6 +66,32 @@
   </footer>
 
   <!-- ====== 各视图模板 ====== -->
+  <template id="tpl-projects">
+    <section class="view project-view">
+      <header class="view-head">
+        <div><h1>项目迭代</h1><p class="muted">在已有项目上持续改进，按阶段轮换，验收通过后自动推进。</p></div>
+        <span id="project-library-count" class="pill">加载项目库</span>
+      </header>
+      <p id="project-feedback" class="hint" role="status"></p>
+      <details class="project-create" open>
+        <summary>创建自动迭代批次</summary>
+        <form id="project-batch-form" class="form">
+          <label>运行账号<select name="account_id" required></select></label>
+          <label>批次名称<input name="name" value="项目迭代批次" maxlength="120" required></label>
+          <label>项目选择<select name="project_keys" multiple size="6" aria-label="选择迭代项目"></select></label>
+          <div class="op-actions"><button class="btn btn-sm" type="button" id="project-select-all">全选项目</button><button class="btn btn-sm btn-primary" type="submit">创建暂停批次</button></div>
+          <p class="muted">创建后可启动自动推进。项目首次实际启动时才建立工作目录，此后保留代码、数据和进度。</p>
+        </form>
+      </details>
+      <div class="project-layout">
+        <section class="project-panel"><h2>迭代批次</h2><div id="project-batches"></div></section>
+        <section class="project-panel"><div id="project-batch-detail"><p class="muted">选择一个批次查看进度。</p></div></section>
+      </div>
+      <section class="project-panel" id="project-instance-detail"><p class="muted">选择项目查看路线、执行和验收。</p></section>
+      <details class="project-panel"><summary>浏览项目库与路线</summary><div id="project-catalog-list" class="project-catalog"></div></details>
+    </section>
+  </template>
+
   <template id="tpl-accounts">
     <section class="view">
       <header class="view-head">

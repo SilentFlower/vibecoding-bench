@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "check",
+    "metric": "failures",
+    "group": "dataset",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "check_required": "required",
+    "check_errors": "errors",
+    "check_uniqueness": "uniqueness",
+    "check_normalize": "normalize",
+    "check_mapping": "mapping",
+    "check_duplicates": "duplicates",
+    "check_merge": "merge",
+    "check_deduplicate": "deduplicate",
+    "check_filter": "filter",
+    "check_range": "range",
+    "check_sort": "sort",
+    "check_group": "group",
+    "check_totals": "totals",
+    "check_average": "average",
+    "check_histogram": "histogram",
+    "check_outliers": "outliers",
+    "check_matrix": "matrix",
+    "check_csv": "csv",
+    "check_compare": "compare",
+    "check_digest": "digest"
+  }
+}

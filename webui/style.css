@@ -1573,3 +1573,31 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .run-window-days { display: flex; flex-wrap: wrap; gap: .75rem; }
 .run-window-days label { display: inline-flex; align-items: center; gap: .3rem; }
 .run-window-interval { align-items: end; }
+
+/* 项目模式按批次展开；未开始项目不会生成工作目录入口。 */
+.project-create, .project-panel { border: 1px solid var(--border); padding: 16px; margin-block: 16px; background: var(--surface); }
+.project-create summary, .project-panel summary { cursor: pointer; color: var(--amber); }
+#project-batch-form { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(180px, 1fr); gap: 14px; margin-top: 16px; }
+#project-batch-form label { display: flex; flex-direction: column; gap: 6px; }
+#project-batch-form label:nth-child(3), #project-batch-form > p { grid-column: 1 / -1; }
+#project-batch-form select { width: 100%; }
+#project-batch-form select[multiple] { background-image: none; padding-right: 12px; }
+.project-layout { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.project-layout > .project-panel { min-width: 0; margin-block: 0 16px; }
+.project-batch-item, .project-catalog-item { display: flex; flex-direction: column; gap: 6px; text-align: left; width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); padding: 12px; cursor: pointer; font: inherit; overflow-wrap: anywhere; }
+.project-batch-item { margin-bottom: 10px; }
+.project-batch-item.selected, .project-batch-item:hover, .project-catalog-item:hover { border-color: var(--amber); }
+.project-table-scroll { overflow: auto; max-height: min(60vh, 560px); margin-top: 16px; }
+.project-table-scroll table { min-width: 580px; width: 100%; }
+.project-path { overflow-wrap: anywhere; }
+.project-report { max-height: 480px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); color: var(--text); padding: 12px; }
+.project-catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-top: 16px; }
+.project-file { display: block; margin-block: 6px; max-width: 100%; overflow-wrap: anywhere; text-align: left; }
+.project-view h2 { font-size: 16px; margin-top: 0; }
+.project-view ol { padding-left: 24px; }
+.project-view li { margin-block: 8px; }
+@media (max-width: 720px) {
+  .project-layout, #project-batch-form { grid-template-columns: minmax(0, 1fr); }
+  .project-create, .project-panel { padding: 10px; }
+  .project-catalog { grid-template-columns: minmax(0, 1fr); }
+}

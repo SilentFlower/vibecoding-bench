@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "ingredient",
+    "metric": "grams",
+    "group": "recipe",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "ingredient_search": "search",
+    "ingredient_filter": "filter",
+    "ingredient_tags": "tags",
+    "ingredient_tag_filter": "tag_filter",
+    "ingredient_sort": "sort",
+    "ingredient_group": "group",
+    "ingredient_totals": "totals",
+    "ingredient_page": "page",
+    "ingredient_required": "required",
+    "ingredient_duplicates": "duplicates",
+    "ingredient_merge": "merge",
+    "ingredient_template": "template",
+    "ingredient_html": "html",
+    "ingredient_markdown": "markdown",
+    "ingredient_timeline": "timeline",
+    "ingredient_window": "window",
+    "ingredient_csv": "csv",
+    "ingredient_compare": "compare",
+    "ingredient_roundtrip": "roundtrip",
+    "ingredient_digest": "digest"
+  }
+}

@@ -12,6 +12,7 @@
 | [Settings & Database](./settings-database.md) | settings 默认值、热刷新、SQLx Any、账号创建提交可见性、SQLite/Postgres 双栈迁移规则 | Filled |
 | [Testing & Quality](./testing-quality.md) | Rust 格式、单测策略、网关回归、敏感数据边界和 review 清单 | Filled |
 | [v3 账号运行环境](../../vibecoding-bench/backend/account-runtime-v3.md) | 共享 CLI/排他维护、管理桥与账号内 HTTPS 的跨项目共同契约 | Filled |
+| [项目迭代管理桥](../../vibecoding-bench/backend/project-iterations.md) | 项目管理资源白名单、原会话鉴权与内部路径拒绝的共同契约 | Filled |
 
 ---
 

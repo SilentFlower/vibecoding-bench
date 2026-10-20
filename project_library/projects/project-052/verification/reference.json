@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "module",
+    "metric": "files",
+    "group": "layer",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "module_required": "required",
+    "module_errors": "errors",
+    "module_uniqueness": "uniqueness",
+    "module_deduplicate": "deduplicate",
+    "module_duplicates": "duplicates",
+    "module_merge": "merge",
+    "module_mapping": "mapping",
+    "module_normalize": "normalize",
+    "module_filter": "filter",
+    "module_search": "search",
+    "module_sort": "sort",
+    "module_transitions": "transitions",
+    "module_dependencies": "dependencies",
+    "module_eligibility": "eligibility",
+    "module_coverage": "coverage",
+    "module_conflicts": "conflicts",
+    "module_matrix": "matrix",
+    "module_csv": "csv",
+    "module_compare": "compare",
+    "module_digest": "digest"
+  }
+}

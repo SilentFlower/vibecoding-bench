@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "retrospective",
+    "metric": "score",
+    "group": "team",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "retrospective_search": "search",
+    "retrospective_filter": "filter",
+    "retrospective_required": "required",
+    "retrospective_group": "group",
+    "retrospective_tags": "tags",
+    "retrospective_tag_filter": "tag_filter",
+    "retrospective_sort": "sort",
+    "retrospective_coverage": "coverage",
+    "retrospective_dependencies": "dependencies",
+    "retrospective_transitions": "transitions",
+    "retrospective_capacity": "capacity",
+    "retrospective_conflicts": "conflicts",
+    "retrospective_eligibility": "eligibility",
+    "retrospective_timeline": "timeline",
+    "retrospective_window": "window",
+    "retrospective_matrix": "matrix",
+    "retrospective_csv": "csv",
+    "retrospective_compare": "compare",
+    "retrospective_roundtrip": "roundtrip",
+    "retrospective_digest": "digest"
+  }
+}

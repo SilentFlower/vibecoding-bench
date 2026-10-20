@@ -1,0 +1,11 @@
+# 项目迭代内容库
+
+首版包含 100 个可运行的本地业务核心，每项 20 步。它们是来源题目领域的小型初始程序，使用 Python 标准库和固定合成数据；模型在同一个实例目录内逐步增加能力。
+
+`catalog.json` 列出项目键。每项的 `project.json` 固定初始源码摘要、阶段、依赖和行为断言，`seed/` 是唯一复制到账号工作目录的内容。`verification/` 与 `reference_runtime.py` 只用于控制端核验，不进入账号副本。
+
+运行 `python3 scripts/validate-project-library.py --all` 核验全部初始程序、待开发步骤和参考行为。参考器通过仅证明内容的通过条件可达到，不表示真实模型已完成这些步骤。
+
+内容来源由 `build_catalog.py` 维护，重建命令为 `python3 project_library/build_catalog.py`。修改业务核心或路线后重新生成并运行校验，再随新的 control 镜像交付。控制端按内容摘要注册不可变版本；已建立批次继续使用原版本，更新不会覆盖其工作目录。
+
+执行程序的协议是 `python3 app.py`，每行输入一个 JSON 请求、每行输出一个 JSON 结果。初始 `overview` 操作使用该项目的业务核心；后续步骤有独立动作、参数和样例。验收累计检查基线和前面所有已接受能力。

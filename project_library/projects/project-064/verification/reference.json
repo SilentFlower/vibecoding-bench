@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "keepsake",
+    "metric": "year",
+    "group": "album",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "keepsake_search": "search",
+    "keepsake_filter": "filter",
+    "keepsake_tags": "tags",
+    "keepsake_tag_filter": "tag_filter",
+    "keepsake_sort": "sort",
+    "keepsake_group": "group",
+    "keepsake_totals": "totals",
+    "keepsake_page": "page",
+    "keepsake_required": "required",
+    "keepsake_duplicates": "duplicates",
+    "keepsake_merge": "merge",
+    "keepsake_template": "template",
+    "keepsake_html": "html",
+    "keepsake_markdown": "markdown",
+    "keepsake_timeline": "timeline",
+    "keepsake_window": "window",
+    "keepsake_csv": "csv",
+    "keepsake_compare": "compare",
+    "keepsake_roundtrip": "roundtrip",
+    "keepsake_digest": "digest"
+  }
+}

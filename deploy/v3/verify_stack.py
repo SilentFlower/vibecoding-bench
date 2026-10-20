@@ -57,6 +57,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--browser", action="store_true")
+    parser.add_argument("--project-iteration", action="store_true")
     parser.add_argument("--run-boundaries", action="store_true")
     parser.add_argument("--warmup-quota", action="store_true")
     parser.add_argument("--reauth", action="store_true")
@@ -76,6 +77,8 @@ def main() -> None:
         parser.error("本轮完成阈值页面验证需要 --browser，并单独执行")
     if args.run_boundaries and (not args.browser or args.warmup_quota or args.reauth or args.deleted_binding or args.topic_followups or args.quota_completion):
         parser.error("运行时段和物理面板验证需要 --browser，并单独执行")
+    if args.project_iteration and (not args.browser or any((args.warmup_quota,args.reauth,args.deleted_binding,args.topic_followups,args.quota_completion,args.run_boundaries))):
+        parser.error("项目迭代页面验证需要 --browser，并单独执行")
     manifest = json.loads(args.manifest.read_text())
     client = docker.from_env()
     deployment = "stack-verify-" + uuid.uuid4().hex[:10]
@@ -189,6 +192,9 @@ def main() -> None:
                         )
                 try:
                     with ExitStack() as fixtures:
+                        if args.project_iteration:
+                            from verify_project_browser import project_browser_fixture
+                            exercise = fixtures.enter_context(project_browser_fixture(client, deployment, data, browser, base))
                         if args.run_boundaries:
                             from verify_run_boundaries_browser import run_boundaries_browser_fixture
                             exercise = fixtures.enter_context(run_boundaries_browser_fixture(client, deployment, data, browser, base))

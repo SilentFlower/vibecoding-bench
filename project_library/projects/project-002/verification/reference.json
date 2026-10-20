@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "routine",
+    "metric": "minutes",
+    "group": "cycle",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "routine_focus_schedule": "focus_schedule",
+    "routine_focus_remaining": "focus_remaining",
+    "routine_filter": "filter",
+    "routine_totals": "totals",
+    "routine_group": "group",
+    "routine_average": "average",
+    "routine_timeline": "timeline",
+    "routine_window": "window",
+    "routine_cumulative": "cumulative",
+    "routine_moving": "moving",
+    "routine_streak": "streak",
+    "routine_missing_dates": "missing_dates",
+    "routine_budget": "budget",
+    "routine_capacity": "capacity",
+    "routine_ratio": "ratio",
+    "routine_percentages": "percentages",
+    "routine_rank": "rank",
+    "routine_csv": "csv",
+    "routine_roundtrip": "roundtrip",
+    "routine_digest": "digest"
+  }
+}

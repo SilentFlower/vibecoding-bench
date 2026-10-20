@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "check",
+    "metric": "severity",
+    "group": "change",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "check_word_count": "word_count",
+    "check_headings": "headings",
+    "check_links": "links",
+    "check_terms": "terms",
+    "check_search": "search",
+    "check_replace": "replace",
+    "check_template": "template",
+    "check_slug": "slug",
+    "check_normalize": "normalize",
+    "check_deduplicate": "deduplicate",
+    "check_group": "group",
+    "check_tags": "tags",
+    "check_tag_filter": "tag_filter",
+    "check_required": "required",
+    "check_sort": "sort",
+    "check_diff": "diff",
+    "check_html": "html",
+    "check_markdown": "markdown",
+    "check_roundtrip": "roundtrip",
+    "check_digest": "digest"
+  }
+}

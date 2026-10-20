@@ -28,6 +28,7 @@
 | [State Management](./state-management.md) | 单 `state` 对象 + 直接赋值 + 显式 render 触发 | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | 零构建保活、跨主题、`escapeHTML`、Review 清单 | Filled |
 | [Type Safety](./type-safety.md) | 无 TS;后端 Pydantic + 前端 `escapeHTML` + 约定 | Filled |
+| [项目迭代跨层契约](../backend/project-iterations.md) | `#projects`、按需目录展示、执行／验收分列、成果与用量、SSE 生命周期 | Filled |
 
 > 鉴权登录页 / cookie session 前端配套 / paste-helper 模式,跨层契约写在 [deploy/auth-design.md](../deploy/auth-design.md);本目录只覆盖前端实现风格。
 

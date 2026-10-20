@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "location",
+    "metric": "temperature",
+    "group": "region",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "location_average": "average",
+    "location_median": "median",
+    "location_rank": "rank",
+    "location_sort": "sort",
+    "location_group": "group",
+    "location_totals": "totals",
+    "location_histogram": "histogram",
+    "location_timeline": "timeline",
+    "location_window": "window",
+    "location_cumulative": "cumulative",
+    "location_moving": "moving",
+    "location_forecast": "forecast",
+    "location_percentages": "percentages",
+    "location_ratio": "ratio",
+    "location_outliers": "outliers",
+    "location_matrix": "matrix",
+    "location_filter": "filter",
+    "location_csv": "csv",
+    "location_compare": "compare",
+    "location_digest": "digest"
+  }
+}

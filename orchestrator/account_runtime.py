@@ -178,6 +178,7 @@ class AccountRuntime:
         self.client, self.data, self.host_data = client, data, host_data
         self.database, self.fingerprint, self.gateway = database, fingerprint, gateway
         self.quota_identity = quota_identity
+        self.project_iterations = None
         self.deployment = os.environ["V3_DEPLOYMENT_ID"]
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,35}", self.deployment):
             raise ValueError("V3_DEPLOYMENT_ID 格式不合法")
@@ -1313,6 +1314,9 @@ class AccountRuntime:
                             (row["environment_id"], row["generation"], source, self.release_id, run_id))
                 finally:
                     connection.close()
+                if (self.project_iterations and self.project_iterations.run_context(run_id)
+                        and not self.project_iterations.can_start(run_id)):
+                    raise RuntimeBusy("项目启动前门禁已改变，保留现场等待恢复")
                 self.client.api.exec_start(ex["Id"], detach=True)
                 return job["token"], job["token"]
             except Exception:
@@ -1557,6 +1561,14 @@ class AccountRuntime:
             shutil.rmtree(path)
         path.symlink_to(os.path.relpath(destination, path.parent), target_is_directory=True)
 
+    def set_project_iterations(self, manager) -> None:
+        """接入持久项目归属解析器，不改变普通运行路径。
+
+        :param manager: 项目迭代管理器。
+        :return: None。
+        """
+        self.project_iterations = manager
+
     def _project_view(self, row: dict, run_id: str) -> str:
         """
         为 run 创建不暴露内部 ID 的固定容器项目别名。
@@ -1565,8 +1577,15 @@ class AccountRuntime:
         :param run_id: 内部运行 ID
         :return: 容器内项目 cwd
         """
-        alias = "project-" + hashlib.sha256(f"{row['environment_id']}:{run_id}".encode()).hexdigest()[:12]
         root = self._root(row)
+        if (self.project_iterations and self.project_iterations.run_context(run_id)
+                and not self.project_iterations.can_start(run_id)):
+            raise RuntimeBusy("项目环境准备后需等待运行窗口、额度或批次恢复")
+        project = self.project_iterations.prepare_workspace(row, run_id, root) if self.project_iterations else None
+        alias = project[0] if project else "project-" + hashlib.sha256(f"{row['environment_id']}:{run_id}".encode()).hexdigest()[:12]
+        if project:
+            session_directory = root / "home" / ".claude" / "projects" / f"/home/node/projects/{alias}".replace("/", "-")
+            self.project_iterations.record_native_start(run_id, session_directory)
         projects = root / "projects"
         compatibility_root = root / "workspaces"
         projects.mkdir(parents=True, exist_ok=True)
@@ -1661,7 +1680,11 @@ class AccountRuntime:
         if not row:
             return self.data / "missing-run-session" / run_id
         row = dict(row)
-        alias = "project-" + hashlib.sha256(f"{row['environment_id']}:{run_id}".encode()).hexdigest()[:12]
+        context = self.project_iterations.run_context(run_id) if self.project_iterations else None
+        if context and not context["workspace_relative"]:
+            return self.data / "missing-run-session" / run_id
+        alias = self.project_iterations.workspace_alias(row, run_id) if context else None
+        alias = alias or "project-" + hashlib.sha256(f"{row['environment_id']}:{run_id}".encode()).hexdigest()[:12]
         project_key = f"/home/node/projects/{alias}".replace("/", "-")
         return self._root(row) / "home" / ".claude" / "projects" / project_key
 

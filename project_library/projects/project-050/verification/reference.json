@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "employee",
+    "metric": "hours",
+    "group": "shift",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "employee_filter": "filter",
+    "employee_search": "search",
+    "employee_sort": "sort",
+    "employee_required": "required",
+    "employee_totals": "totals",
+    "employee_budget": "budget",
+    "employee_ratio": "ratio",
+    "employee_weighted": "weighted",
+    "employee_group": "group",
+    "employee_capacity": "capacity",
+    "employee_transitions": "transitions",
+    "employee_eligibility": "eligibility",
+    "employee_timeline": "timeline",
+    "employee_window": "window",
+    "employee_rank": "rank",
+    "employee_percentages": "percentages",
+    "employee_csv": "csv",
+    "employee_compare": "compare",
+    "employee_roundtrip": "roundtrip",
+    "employee_digest": "digest"
+  }
+}

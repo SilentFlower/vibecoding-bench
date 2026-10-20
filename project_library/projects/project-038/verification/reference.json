@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "reading",
+    "metric": "pages",
+    "group": "book",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "reading_average": "average",
+    "reading_median": "median",
+    "reading_rank": "rank",
+    "reading_sort": "sort",
+    "reading_group": "group",
+    "reading_totals": "totals",
+    "reading_histogram": "histogram",
+    "reading_timeline": "timeline",
+    "reading_window": "window",
+    "reading_cumulative": "cumulative",
+    "reading_moving": "moving",
+    "reading_forecast": "forecast",
+    "reading_percentages": "percentages",
+    "reading_ratio": "ratio",
+    "reading_outliers": "outliers",
+    "reading_matrix": "matrix",
+    "reading_filter": "filter",
+    "reading_csv": "csv",
+    "reading_compare": "compare",
+    "reading_digest": "digest"
+  }
+}

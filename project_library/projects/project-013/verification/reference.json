@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "update",
+    "metric": "blockers",
+    "group": "person",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "update_filter": "filter",
+    "update_search": "search",
+    "update_sort": "sort",
+    "update_page": "page",
+    "update_group": "group",
+    "update_window": "window",
+    "update_timeline": "timeline",
+    "update_streak": "streak",
+    "update_missing_dates": "missing_dates",
+    "update_totals": "totals",
+    "update_tags": "tags",
+    "update_tag_filter": "tag_filter",
+    "update_budget": "budget",
+    "update_ratio": "ratio",
+    "update_transitions": "transitions",
+    "update_conflicts": "conflicts",
+    "update_csv": "csv",
+    "update_compare": "compare",
+    "update_roundtrip": "roundtrip",
+    "update_digest": "digest"
+  }
+}

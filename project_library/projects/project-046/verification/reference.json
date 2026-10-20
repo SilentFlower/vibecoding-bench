@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "post",
+    "metric": "minutes",
+    "group": "channel",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "post_filter": "filter",
+    "post_search": "search",
+    "post_sort": "sort",
+    "post_required": "required",
+    "post_totals": "totals",
+    "post_budget": "budget",
+    "post_ratio": "ratio",
+    "post_weighted": "weighted",
+    "post_group": "group",
+    "post_capacity": "capacity",
+    "post_transitions": "transitions",
+    "post_eligibility": "eligibility",
+    "post_timeline": "timeline",
+    "post_window": "window",
+    "post_rank": "rank",
+    "post_percentages": "percentages",
+    "post_csv": "csv",
+    "post_compare": "compare",
+    "post_roundtrip": "roundtrip",
+    "post_digest": "digest"
+  }
+}

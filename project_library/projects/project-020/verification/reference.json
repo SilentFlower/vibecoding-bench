@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "book",
+    "metric": "pages_read",
+    "group": "shelf",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "book_filter": "filter",
+    "book_search": "search",
+    "book_sort": "sort",
+    "book_page": "page",
+    "book_group": "group",
+    "book_window": "window",
+    "book_timeline": "timeline",
+    "book_streak": "streak",
+    "book_missing_dates": "missing_dates",
+    "book_totals": "totals",
+    "book_tags": "tags",
+    "book_tag_filter": "tag_filter",
+    "book_budget": "budget",
+    "book_ratio": "ratio",
+    "book_transitions": "transitions",
+    "book_conflicts": "conflicts",
+    "book_csv": "csv",
+    "book_compare": "compare",
+    "book_roundtrip": "roundtrip",
+    "book_digest": "digest"
+  }
+}

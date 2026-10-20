@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "customer_name",
+    "metric": "orders",
+    "group": "source",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "customer_name_required": "required",
+    "customer_name_errors": "errors",
+    "customer_name_uniqueness": "uniqueness",
+    "customer_name_normalize": "normalize",
+    "customer_name_mapping": "mapping",
+    "customer_name_duplicates": "duplicates",
+    "customer_name_merge": "merge",
+    "customer_name_deduplicate": "deduplicate",
+    "customer_name_filter": "filter",
+    "customer_name_range": "range",
+    "customer_name_sort": "sort",
+    "customer_name_group": "group",
+    "customer_name_totals": "totals",
+    "customer_name_average": "average",
+    "customer_name_histogram": "histogram",
+    "customer_name_outliers": "outliers",
+    "customer_name_matrix": "matrix",
+    "customer_name_csv": "csv",
+    "customer_name_compare": "compare",
+    "customer_name_digest": "digest"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "message",
+    "metric": "priority",
+    "group": "inbox",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "message_required": "required",
+    "message_errors": "errors",
+    "message_uniqueness": "uniqueness",
+    "message_deduplicate": "deduplicate",
+    "message_duplicates": "duplicates",
+    "message_merge": "merge",
+    "message_mapping": "mapping",
+    "message_normalize": "normalize",
+    "message_filter": "filter",
+    "message_search": "search",
+    "message_sort": "sort",
+    "message_transitions": "transitions",
+    "message_dependencies": "dependencies",
+    "message_eligibility": "eligibility",
+    "message_coverage": "coverage",
+    "message_conflicts": "conflicts",
+    "message_matrix": "matrix",
+    "message_csv": "csv",
+    "message_compare": "compare",
+    "message_digest": "digest"
+  }
+}

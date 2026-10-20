@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "event",
+    "metric": "duration",
+    "group": "calendar",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "event_filter": "filter",
+    "event_search": "search",
+    "event_sort": "sort",
+    "event_page": "page",
+    "event_group": "group",
+    "event_window": "window",
+    "event_timeline": "timeline",
+    "event_streak": "streak",
+    "event_missing_dates": "missing_dates",
+    "event_totals": "totals",
+    "event_tags": "tags",
+    "event_tag_filter": "tag_filter",
+    "event_budget": "budget",
+    "event_ratio": "ratio",
+    "event_transitions": "transitions",
+    "event_conflicts": "conflicts",
+    "event_csv": "csv",
+    "event_compare": "compare",
+    "event_roundtrip": "roundtrip",
+    "event_digest": "digest"
+  }
+}

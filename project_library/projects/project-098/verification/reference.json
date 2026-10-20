@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "cue",
+    "metric": "seconds",
+    "group": "broadcast",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "cue_search": "search",
+    "cue_filter": "filter",
+    "cue_sort": "sort",
+    "cue_rank": "rank",
+    "cue_tags": "tags",
+    "cue_tag_filter": "tag_filter",
+    "cue_group": "group",
+    "cue_totals": "totals",
+    "cue_budget": "budget",
+    "cue_ratio": "ratio",
+    "cue_percentages": "percentages",
+    "cue_timeline": "timeline",
+    "cue_window": "window",
+    "cue_capacity": "capacity",
+    "cue_eligibility": "eligibility",
+    "cue_transitions": "transitions",
+    "cue_csv": "csv",
+    "cue_compare": "compare",
+    "cue_roundtrip": "roundtrip",
+    "cue_digest": "digest"
+  }
+}

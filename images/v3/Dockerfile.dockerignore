@@ -26,6 +26,8 @@
 !webui
 !webui/**
 !topics.md
+!project_library
+!project_library/**
 **/target
 **/node_modules
 **/__pycache__

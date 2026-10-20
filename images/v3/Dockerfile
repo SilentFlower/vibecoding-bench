@@ -32,6 +32,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN python -c "from zoneinfo import ZoneInfo; [ZoneInfo(name) for name in ('UTC','Asia/Tokyo','Asia/Singapore','Asia/Seoul','Australia/Sydney','Europe/London','Europe/Berlin','Europe/Paris','America/Los_Angeles','America/New_York','America/Chicago')]"
 COPY orchestrator/*.py ./
 COPY topics.md /repo/topics.md
+COPY project_library /repo/project_library
 COPY images/worker/entrypoint.sh /opt/v3/worker.sh
 COPY webui /webui
 COPY --from=frontend /terminal/xterm/lib/xterm.js /webui/vendor/xterm.js

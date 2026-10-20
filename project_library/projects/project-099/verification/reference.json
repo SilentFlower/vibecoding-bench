@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "content",
+    "metric": "tier",
+    "group": "membership",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "content_search": "search",
+    "content_filter": "filter",
+    "content_sort": "sort",
+    "content_rank": "rank",
+    "content_tags": "tags",
+    "content_tag_filter": "tag_filter",
+    "content_group": "group",
+    "content_totals": "totals",
+    "content_budget": "budget",
+    "content_ratio": "ratio",
+    "content_percentages": "percentages",
+    "content_timeline": "timeline",
+    "content_window": "window",
+    "content_capacity": "capacity",
+    "content_eligibility": "eligibility",
+    "content_transitions": "transitions",
+    "content_csv": "csv",
+    "content_compare": "compare",
+    "content_roundtrip": "roundtrip",
+    "content_digest": "digest"
+  }
+}

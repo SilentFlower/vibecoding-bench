@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "document",
+    "metric": "bytes",
+    "group": "format",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "document_convert_records": "convert_records",
+    "document_required": "required",
+    "document_mapping": "mapping",
+    "document_normalize": "normalize",
+    "document_select": "select",
+    "document_csv": "csv",
+    "document_roundtrip": "roundtrip",
+    "document_errors": "errors",
+    "document_uniqueness": "uniqueness",
+    "document_duplicates": "duplicates",
+    "document_deduplicate": "deduplicate",
+    "document_merge": "merge",
+    "document_filter": "filter",
+    "document_range": "range",
+    "document_sort": "sort",
+    "document_group": "group",
+    "document_matrix": "matrix",
+    "document_compare": "compare",
+    "document_html": "html",
+    "document_digest": "digest"
+  }
+}

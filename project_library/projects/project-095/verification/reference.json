@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "question",
+    "metric": "votes",
+    "group": "topic",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "question_search": "search",
+    "question_filter": "filter",
+    "question_sort": "sort",
+    "question_rank": "rank",
+    "question_tags": "tags",
+    "question_tag_filter": "tag_filter",
+    "question_group": "group",
+    "question_totals": "totals",
+    "question_budget": "budget",
+    "question_ratio": "ratio",
+    "question_percentages": "percentages",
+    "question_timeline": "timeline",
+    "question_window": "window",
+    "question_capacity": "capacity",
+    "question_eligibility": "eligibility",
+    "question_transitions": "transitions",
+    "question_csv": "csv",
+    "question_compare": "compare",
+    "question_roundtrip": "roundtrip",
+    "question_digest": "digest"
+  }
+}

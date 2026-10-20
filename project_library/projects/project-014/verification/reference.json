@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "habit",
+    "metric": "checkins",
+    "group": "routine",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "habit_filter": "filter",
+    "habit_search": "search",
+    "habit_sort": "sort",
+    "habit_page": "page",
+    "habit_group": "group",
+    "habit_window": "window",
+    "habit_timeline": "timeline",
+    "habit_streak": "streak",
+    "habit_missing_dates": "missing_dates",
+    "habit_totals": "totals",
+    "habit_tags": "tags",
+    "habit_tag_filter": "tag_filter",
+    "habit_budget": "budget",
+    "habit_ratio": "ratio",
+    "habit_transitions": "transitions",
+    "habit_conflicts": "conflicts",
+    "habit_csv": "csv",
+    "habit_compare": "compare",
+    "habit_roundtrip": "roundtrip",
+    "habit_digest": "digest"
+  }
+}

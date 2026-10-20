@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "source",
+    "metric": "confidence",
+    "group": "study",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "source_required": "required",
+    "source_errors": "errors",
+    "source_uniqueness": "uniqueness",
+    "source_deduplicate": "deduplicate",
+    "source_duplicates": "duplicates",
+    "source_merge": "merge",
+    "source_mapping": "mapping",
+    "source_normalize": "normalize",
+    "source_filter": "filter",
+    "source_search": "search",
+    "source_sort": "sort",
+    "source_transitions": "transitions",
+    "source_dependencies": "dependencies",
+    "source_eligibility": "eligibility",
+    "source_coverage": "coverage",
+    "source_conflicts": "conflicts",
+    "source_matrix": "matrix",
+    "source_csv": "csv",
+    "source_compare": "compare",
+    "source_digest": "digest"
+  }
+}

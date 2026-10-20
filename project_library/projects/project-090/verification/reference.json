@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "order",
+    "metric": "amount",
+    "group": "exception",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "order_required": "required",
+    "order_errors": "errors",
+    "order_uniqueness": "uniqueness",
+    "order_normalize": "normalize",
+    "order_mapping": "mapping",
+    "order_duplicates": "duplicates",
+    "order_merge": "merge",
+    "order_deduplicate": "deduplicate",
+    "order_filter": "filter",
+    "order_range": "range",
+    "order_sort": "sort",
+    "order_group": "group",
+    "order_totals": "totals",
+    "order_average": "average",
+    "order_histogram": "histogram",
+    "order_outliers": "outliers",
+    "order_matrix": "matrix",
+    "order_csv": "csv",
+    "order_compare": "compare",
+    "order_digest": "digest"
+  }
+}

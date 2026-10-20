@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "variant",
+    "metric": "conversions",
+    "group": "experiment",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "variant_required": "required",
+    "variant_errors": "errors",
+    "variant_uniqueness": "uniqueness",
+    "variant_normalize": "normalize",
+    "variant_mapping": "mapping",
+    "variant_duplicates": "duplicates",
+    "variant_merge": "merge",
+    "variant_deduplicate": "deduplicate",
+    "variant_filter": "filter",
+    "variant_range": "range",
+    "variant_sort": "sort",
+    "variant_group": "group",
+    "variant_totals": "totals",
+    "variant_average": "average",
+    "variant_histogram": "histogram",
+    "variant_outliers": "outliers",
+    "variant_matrix": "matrix",
+    "variant_csv": "csv",
+    "variant_compare": "compare",
+    "variant_digest": "digest"
+  }
+}

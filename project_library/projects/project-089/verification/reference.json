@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "cohort",
+    "metric": "retained",
+    "group": "period",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "cohort_required": "required",
+    "cohort_errors": "errors",
+    "cohort_uniqueness": "uniqueness",
+    "cohort_normalize": "normalize",
+    "cohort_mapping": "mapping",
+    "cohort_duplicates": "duplicates",
+    "cohort_merge": "merge",
+    "cohort_deduplicate": "deduplicate",
+    "cohort_filter": "filter",
+    "cohort_range": "range",
+    "cohort_sort": "sort",
+    "cohort_group": "group",
+    "cohort_totals": "totals",
+    "cohort_average": "average",
+    "cohort_histogram": "histogram",
+    "cohort_outliers": "outliers",
+    "cohort_matrix": "matrix",
+    "cohort_csv": "csv",
+    "cohort_compare": "compare",
+    "cohort_digest": "digest"
+  }
+}

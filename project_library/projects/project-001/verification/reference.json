@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "text",
+    "metric": "characters",
+    "group": "document",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "text_render_documents": "render_documents",
+    "text_headings": "headings",
+    "text_links": "links",
+    "text_word_count": "word_count",
+    "text_terms": "terms",
+    "text_normalize": "normalize",
+    "text_replace": "replace",
+    "text_template": "template",
+    "text_search": "search",
+    "text_group": "group",
+    "text_tags": "tags",
+    "text_tag_filter": "tag_filter",
+    "text_sort": "sort",
+    "text_html": "html",
+    "text_markdown": "markdown",
+    "text_required": "required",
+    "text_deduplicate": "deduplicate",
+    "text_compare": "compare",
+    "text_roundtrip": "roundtrip",
+    "text_digest": "digest"
+  }
+}

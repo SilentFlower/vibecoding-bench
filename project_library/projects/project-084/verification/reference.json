@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "metric",
+    "metric": "version",
+    "group": "owner",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "metric_required": "required",
+    "metric_errors": "errors",
+    "metric_uniqueness": "uniqueness",
+    "metric_normalize": "normalize",
+    "metric_mapping": "mapping",
+    "metric_duplicates": "duplicates",
+    "metric_merge": "merge",
+    "metric_deduplicate": "deduplicate",
+    "metric_filter": "filter",
+    "metric_range": "range",
+    "metric_sort": "sort",
+    "metric_group": "group",
+    "metric_totals": "totals",
+    "metric_average": "average",
+    "metric_histogram": "histogram",
+    "metric_outliers": "outliers",
+    "metric_matrix": "matrix",
+    "metric_csv": "csv",
+    "metric_compare": "compare",
+    "metric_digest": "digest"
+  }
+}

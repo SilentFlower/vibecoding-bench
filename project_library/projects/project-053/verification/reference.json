@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "failure",
+    "metric": "occurrences",
+    "group": "suite",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "failure_required": "required",
+    "failure_errors": "errors",
+    "failure_uniqueness": "uniqueness",
+    "failure_deduplicate": "deduplicate",
+    "failure_duplicates": "duplicates",
+    "failure_merge": "merge",
+    "failure_mapping": "mapping",
+    "failure_normalize": "normalize",
+    "failure_filter": "filter",
+    "failure_search": "search",
+    "failure_sort": "sort",
+    "failure_transitions": "transitions",
+    "failure_dependencies": "dependencies",
+    "failure_eligibility": "eligibility",
+    "failure_coverage": "coverage",
+    "failure_conflicts": "conflicts",
+    "failure_matrix": "matrix",
+    "failure_csv": "csv",
+    "failure_compare": "compare",
+    "failure_digest": "digest"
+  }
+}

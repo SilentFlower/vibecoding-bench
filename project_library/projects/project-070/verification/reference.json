@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "reference",
+    "metric": "uses",
+    "group": "project",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "reference_search": "search",
+    "reference_filter": "filter",
+    "reference_tags": "tags",
+    "reference_tag_filter": "tag_filter",
+    "reference_sort": "sort",
+    "reference_group": "group",
+    "reference_totals": "totals",
+    "reference_page": "page",
+    "reference_required": "required",
+    "reference_duplicates": "duplicates",
+    "reference_merge": "merge",
+    "reference_template": "template",
+    "reference_html": "html",
+    "reference_markdown": "markdown",
+    "reference_timeline": "timeline",
+    "reference_window": "window",
+    "reference_csv": "csv",
+    "reference_compare": "compare",
+    "reference_roundtrip": "roundtrip",
+    "reference_digest": "digest"
+  }
+}

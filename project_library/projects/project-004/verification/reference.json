@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "filename",
+    "metric": "bytes",
+    "group": "directory",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "filename_rename": "rename",
+    "filename_sequence": "sequence",
+    "filename_regex": "regex",
+    "filename_glob": "glob",
+    "filename_extensions": "extensions",
+    "filename_paths": "paths",
+    "filename_search": "search",
+    "filename_sort": "sort",
+    "filename_deduplicate": "deduplicate",
+    "filename_required": "required",
+    "filename_template": "template",
+    "filename_replace": "replace",
+    "filename_diff": "diff",
+    "filename_word_count": "word_count",
+    "filename_group": "group",
+    "filename_csv": "csv",
+    "filename_compare": "compare",
+    "filename_digest": "digest",
+    "filename_roundtrip": "roundtrip",
+    "filename_uniqueness": "uniqueness"
+  }
+}

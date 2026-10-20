@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "answer",
+    "metric": "rating",
+    "group": "question",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "answer_filter": "filter",
+    "answer_search": "search",
+    "answer_sort": "sort",
+    "answer_required": "required",
+    "answer_totals": "totals",
+    "answer_budget": "budget",
+    "answer_ratio": "ratio",
+    "answer_weighted": "weighted",
+    "answer_group": "group",
+    "answer_capacity": "capacity",
+    "answer_transitions": "transitions",
+    "answer_eligibility": "eligibility",
+    "answer_timeline": "timeline",
+    "answer_window": "window",
+    "answer_rank": "rank",
+    "answer_percentages": "percentages",
+    "answer_csv": "csv",
+    "answer_compare": "compare",
+    "answer_roundtrip": "roundtrip",
+    "answer_digest": "digest"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "requirement",
+    "metric": "weight",
+    "group": "role",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "requirement_word_count": "word_count",
+    "requirement_headings": "headings",
+    "requirement_links": "links",
+    "requirement_terms": "terms",
+    "requirement_search": "search",
+    "requirement_replace": "replace",
+    "requirement_template": "template",
+    "requirement_slug": "slug",
+    "requirement_normalize": "normalize",
+    "requirement_deduplicate": "deduplicate",
+    "requirement_group": "group",
+    "requirement_tags": "tags",
+    "requirement_tag_filter": "tag_filter",
+    "requirement_required": "required",
+    "requirement_sort": "sort",
+    "requirement_diff": "diff",
+    "requirement_html": "html",
+    "requirement_markdown": "markdown",
+    "requirement_roundtrip": "roundtrip",
+    "requirement_digest": "digest"
+  }
+}

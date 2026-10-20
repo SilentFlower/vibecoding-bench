@@ -345,6 +345,10 @@ def verify() -> None:
         runtime.cleanup(runtime.execution_token(container.id, "login:abcdef654321"))
         assert (runtime._root(row) / "home" / ".claude" / ".credentials.json").read_bytes() == original
         verify_physical_observation(runtime, row)
+        if os.environ.get("VERIFY_PROJECT_ITERATIONS_ONLY") == "1":
+            from verify_project_execution import verify_project_execution
+            verify_project_execution(runtime, client, account, row)
+            return
         if os.environ.get("VERIFY_RUN_WINDOWS_ONLY") == "1":
             verify_run_window_completion(runtime, client, account, row)
             return

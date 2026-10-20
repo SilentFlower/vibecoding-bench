@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "action_item",
+    "metric": "effort",
+    "group": "meeting",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "action_item_word_count": "word_count",
+    "action_item_headings": "headings",
+    "action_item_links": "links",
+    "action_item_terms": "terms",
+    "action_item_search": "search",
+    "action_item_replace": "replace",
+    "action_item_template": "template",
+    "action_item_slug": "slug",
+    "action_item_normalize": "normalize",
+    "action_item_deduplicate": "deduplicate",
+    "action_item_group": "group",
+    "action_item_tags": "tags",
+    "action_item_tag_filter": "tag_filter",
+    "action_item_required": "required",
+    "action_item_sort": "sort",
+    "action_item_diff": "diff",
+    "action_item_html": "html",
+    "action_item_markdown": "markdown",
+    "action_item_roundtrip": "roundtrip",
+    "action_item_digest": "digest"
+  }
+}

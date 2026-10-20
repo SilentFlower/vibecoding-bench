@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "caption",
+    "metric": "length",
+    "group": "album",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "caption_word_count": "word_count",
+    "caption_headings": "headings",
+    "caption_links": "links",
+    "caption_terms": "terms",
+    "caption_search": "search",
+    "caption_replace": "replace",
+    "caption_template": "template",
+    "caption_slug": "slug",
+    "caption_normalize": "normalize",
+    "caption_deduplicate": "deduplicate",
+    "caption_group": "group",
+    "caption_tags": "tags",
+    "caption_tag_filter": "tag_filter",
+    "caption_required": "required",
+    "caption_sort": "sort",
+    "caption_diff": "diff",
+    "caption_html": "html",
+    "caption_markdown": "markdown",
+    "caption_roundtrip": "roundtrip",
+    "caption_digest": "digest"
+  }
+}

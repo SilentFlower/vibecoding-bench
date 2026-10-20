@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "heading",
+    "metric": "level",
+    "group": "article",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "heading_word_count": "word_count",
+    "heading_headings": "headings",
+    "heading_links": "links",
+    "heading_terms": "terms",
+    "heading_search": "search",
+    "heading_replace": "replace",
+    "heading_template": "template",
+    "heading_slug": "slug",
+    "heading_normalize": "normalize",
+    "heading_deduplicate": "deduplicate",
+    "heading_group": "group",
+    "heading_tags": "tags",
+    "heading_tag_filter": "tag_filter",
+    "heading_required": "required",
+    "heading_sort": "sort",
+    "heading_diff": "diff",
+    "heading_html": "html",
+    "heading_markdown": "markdown",
+    "heading_roundtrip": "roundtrip",
+    "heading_digest": "digest"
+  }
+}

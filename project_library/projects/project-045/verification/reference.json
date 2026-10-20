@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "subscription",
+    "metric": "monthly_fee",
+    "group": "plan",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "subscription_filter": "filter",
+    "subscription_search": "search",
+    "subscription_sort": "sort",
+    "subscription_required": "required",
+    "subscription_totals": "totals",
+    "subscription_budget": "budget",
+    "subscription_ratio": "ratio",
+    "subscription_weighted": "weighted",
+    "subscription_group": "group",
+    "subscription_capacity": "capacity",
+    "subscription_transitions": "transitions",
+    "subscription_eligibility": "eligibility",
+    "subscription_timeline": "timeline",
+    "subscription_window": "window",
+    "subscription_rank": "rank",
+    "subscription_percentages": "percentages",
+    "subscription_csv": "csv",
+    "subscription_compare": "compare",
+    "subscription_roundtrip": "roundtrip",
+    "subscription_digest": "digest"
+  }
+}

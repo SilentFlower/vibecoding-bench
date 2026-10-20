@@ -211,7 +211,7 @@ def build(release: str, manifest_path: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="vibebench-v3-source-") as temporary:
         snapshot = Path(temporary)
         folders = ("cc2api/src", "cc2api/vendor", "cc2api/craftls", "cc2api/web", "images/account",
-            "images/sidecar", "images/worker", "images/v3", "orchestrator", "webui")
+            "images/sidecar", "images/worker", "images/v3", "orchestrator", "webui", "project_library")
         ignored = shutil.ignore_patterns(".git", "target", "node_modules", "__pycache__", ".env", ".env.*", "*.log")
         for relative in folders:
             shutil.copytree(REPO / relative, snapshot / relative, ignore=ignored)

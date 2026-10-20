@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "paper",
+    "metric": "citations",
+    "group": "collection",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "paper_average": "average",
+    "paper_median": "median",
+    "paper_rank": "rank",
+    "paper_sort": "sort",
+    "paper_group": "group",
+    "paper_totals": "totals",
+    "paper_histogram": "histogram",
+    "paper_timeline": "timeline",
+    "paper_window": "window",
+    "paper_cumulative": "cumulative",
+    "paper_moving": "moving",
+    "paper_forecast": "forecast",
+    "paper_percentages": "percentages",
+    "paper_ratio": "ratio",
+    "paper_outliers": "outliers",
+    "paper_matrix": "matrix",
+    "paper_filter": "filter",
+    "paper_csv": "csv",
+    "paper_compare": "compare",
+    "paper_digest": "digest"
+  }
+}

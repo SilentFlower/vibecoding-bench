@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "label": "objective",
+    "metric": "progress",
+    "group": "team",
+    "state": "status",
+    "date": "date"
+  },
+  "actions": {
+    "objective_search": "search",
+    "objective_filter": "filter",
+    "objective_required": "required",
+    "objective_group": "group",
+    "objective_tags": "tags",
+    "objective_tag_filter": "tag_filter",
+    "objective_sort": "sort",
+    "objective_coverage": "coverage",
+    "objective_dependencies": "dependencies",
+    "objective_transitions": "transitions",
+    "objective_capacity": "capacity",
+    "objective_conflicts": "conflicts",
+    "objective_eligibility": "eligibility",
+    "objective_timeline": "timeline",
+    "objective_window": "window",
+    "objective_matrix": "matrix",
+    "objective_csv": "csv",
+    "objective_compare": "compare",
+    "objective_roundtrip": "roundtrip",
+    "objective_digest": "digest"
+  }
+}
