@@ -1,0 +1,42 @@
+{
+  "id": "v3-environment-physical-features",
+  "name": "v3-environment-physical-features",
+  "title": "v3 环境物理特征面板与实测信息",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-20",
+  "completedAt": "2026-10-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-20T01:40:02Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "10-20-v3-environment-panel-and-run-windows",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "partialStep": null,
+    "nextStep": "按需单独部署并核对线上既有账号默认配置",
+    "notes": "本地验收、规范和业务代码交付完成；未执行生产部署，保留其它未提交改动。",
+    "completedSteps": [
+      "完成物理特征配置/实测对照、空闲只读采集及私有缓存",
+      "验证真实 cgroup 口径、缓存/XSS 与身份凭据保持",
+      "通过单元、容器和页面验证，完成规范同步及业务代码推送"
+    ],
+    "updatedAt": "2026-10-20T01:40:02Z"
+  }
+}
