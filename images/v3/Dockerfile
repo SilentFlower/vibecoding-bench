@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certifi
 WORKDIR /app
 COPY orchestrator/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+RUN python -c "from zoneinfo import ZoneInfo; [ZoneInfo(name) for name in ('UTC','Asia/Tokyo','Asia/Singapore','Asia/Seoul','Australia/Sydney','Europe/London','Europe/Berlin','Europe/Paris','America/Los_Angeles','America/New_York','America/Chicago')]"
 COPY orchestrator/*.py ./
 COPY topics.md /repo/topics.md
 COPY images/worker/entrypoint.sh /opt/v3/worker.sh

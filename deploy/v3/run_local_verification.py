@@ -22,9 +22,10 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--legacy-control-image")
     parser.add_argument("--legacy-account-image")
+    parser.add_argument("--run-windows-only", action="store_true")
     parser.add_argument("--followups-only", action="store_true")
     parser.add_argument("--timed-followups-only", action="store_true")
-    parser.add_argument("--quota-hard-stop-only", action="store_true")
+    parser.add_argument("--quota-completion-only", "--quota-hard-stop-only", dest="quota_completion_only", action="store_true")
     args = parser.parse_args()
     if bool(args.legacy_control_image) != bool(args.legacy_account_image):
         parser.error("旧布局验证需要同时提供旧 control/account 镜像")
@@ -65,7 +66,8 @@ def main() -> None:
                     "VERIFY_SOURCE_ROOT": str(repository),
                     "VERIFY_FOLLOWUPS_ONLY": "1" if args.followups_only or args.timed_followups_only else "0",
                     "VERIFY_TIMED_FOLLOWUPS_ONLY": "1" if args.timed_followups_only else "0",
-                    "VERIFY_QUOTA_HARD_STOP_ONLY": "1" if args.quota_hard_stop_only else "0"},
+                    "VERIFY_QUOTA_COMPLETION_ONLY": "1" if args.quota_completion_only else "0",
+                    "VERIFY_RUN_WINDOWS_ONLY": "1" if args.run_windows_only else "0"},
                 volumes={str(repository): {"bind": "/source", "mode": "ro"}, str(fixtures): {"bind": "/fixtures", "mode": "ro"},
                     str(root): {"bind": "/verify", "mode": "rw"}, "/var/run/docker.sock": {"bind": "/var/run/docker.sock", "mode": "rw"}})
             # 完整补充矩阵包含逐次CLI启动和原生忙碌消费，外层等待不能先于场景自身截止时间结束。

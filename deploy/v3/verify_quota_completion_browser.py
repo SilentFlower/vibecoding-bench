@@ -1,4 +1,4 @@
-"""在独立管理栈核对强制中断提示及 stopped 原因，不使用真实账号。"""
+"""在独立管理栈核对本轮完成提示及历史 stopped 原因，不使用真实账号。"""
 import sqlite3
 import time
 from contextlib import contextmanager
@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 @contextmanager
-def quota_hard_stop_browser_fixture(data: Path):
+def quota_completion_browser_fixture(data: Path):
     """创建已停止的合成记录，供真实页面、API 和 SQLite 交叉核对。
 
     :param data: 本次随机验证部署的数据根。
@@ -32,8 +32,8 @@ def quota_hard_stop_browser_fixture(data: Path):
         await evaluate(f'{doc}.querySelector("[data-warmup-config]").click()')
         await wait_for(f'!{doc}.querySelector("#warmup-modal").classList.contains("hidden")')
         content = await evaluate(f'{doc}.querySelector("#warmup-modal").textContent')
-        assert all(text in content for text in ['强制结束当前','不自动续跑本轮','批次执行下一题','被动更新']),content
-        assert '自动查询额度' not in content and 'CLI 执行完整收尾' not in content,content
+        assert all(text in content for text in ['完成本轮','包括补充与收尾','下一轮等待','被动更新']),content
+        assert '自动查询额度' not in content and '强制结束当前' not in content,content
         assert await evaluate(f'{doc}.querySelector("#warmup-quota-5h-hint").textContent.includes("达到 60%")')
         await evaluate(f'{doc}.querySelector("#warmup-form").requestSubmit()')
         await wait_for(f'{doc}.querySelector("#warmup-modal").classList.contains("hidden")')
@@ -60,7 +60,7 @@ def quota_hard_stop_browser_fixture(data: Path):
             limits = connection.execute('SELECT warmup_quota_5h_limit_percent,warmup_quota_7d_limit_percent '
                                        'FROM accounts WHERE id=?',(aid,)).fetchone()
         assert saved==('stopped',reason,now) and limits==(60,80)
-        print('通过：真实页面阈值说明、保存重读、stopped API／SQLite 原因、XSS、1280／390px 明暗主题',flush=True)
+        print('通过：本轮完成说明、保存重读、历史 stopped API／SQLite 原因、XSS、1280／390px 明暗主题',flush=True)
 
     try:
         yield exercise

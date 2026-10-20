@@ -741,3 +741,61 @@ validate_computer_profile(saved['computer_profile'], saved['system_profile'])
 - `test_account_runtime.py` 覆盖两个独立运行时共享 SQLite 的首次并发、提交后写文件失败及 stale row 重试、损坏记录拒绝、未发布 UUID 碰撞、旧身份／legacy reprofile 保留和健康 API 不受 CLI 门禁影响。
 - `verify_system_profile.py --manifest` 与原生探针覆盖两目录六字段、Node/libuv statx、元数据／权限／只读、相对 fd／cwd、零／六参数 syscall 和 errno、静态／CPUID 边界，以及已有宿主值和坏标记不回退。
 - `run_local_verification.py` 核对跨任务／恢复／重建、三角色权限、HOME／凭据和 CLI／API 隔离；任务研究中的 `identity_lifecycle_probe.py` 使用独立控制端进程、持久合成 SQLite 和两批真实镜像证明静态摘要、HOME／设备配置保持。真实账号、OAuth、模型和公网遥测不用于本地验收。
+
+## Scenario: v3 只读物理特征面板与观察快照
+
+### 1. Scope / Trigger
+
+修改环境详情、配置与容器观察对照、物理探针或快照缓存时适用。展示已有身份和真实资源口径，采集不创建/唤醒/重建环境、不生成指纹、不调用模型或 OAuth。
+
+### 2. Signatures
+
+```text
+GET /api/environments -> 每行增加 physical_features 与关联账号 run_window
+POST /api/environments/{environment_id}/physical-features/refresh -> {ok: true}
+AccountRuntime.refresh_physical_features(row: dict) -> None
+validate_features(payload: object) -> dict
+configured_features(row: dict) -> dict
+physical_features_summary(row: dict, path: Path, now: float) -> dict
+runtime/physical-features.json = {
+  schema: 1, environment_id: string, generation: integer,
+  container_id: string, observed_at: UTC秒, values: 白名单字段对象
+}
+```
+
+### 3. Contracts
+
+- 白名单为 runtime_type、hostname、os、kernel、architecture、cpu、cpu_visible、cpu_affinity、cpu_quota、memory_bytes、account_memory_bytes、root_disk、mac、manufacturer、product、version、family、serial、uuid、shell、package_manager、toolchain、timezone、locale、machine_id。不采集完整环境变量、命令、凭据或 machine-id 内容，后者只返回是否存在。
+- 配置取已保存 fingerprint/system_profile/computer_profile，不为展示补齐身份；探针只读当前 CLI 本机文件和可执行工具。CPU 分开显示可见数量、亲和性及配额；RAM 来自实际 cgroup 上限，memory_bytes 对比 CLI 分配，account_memory_bytes 仅列账号合计预算。legacy 对比原总预算，未知不补零，0 只表示明确无限制；不把宿主总内存、RSS 或 RAM+swap 当作 CLI RAM。
+- 列表只读已有缓存并沿原路径读取角色状态，不执行探针。显式刷新按 owner → profile → environment 非阻塞取锁，锁内重读当前代；由 role_container/既有归属核对定位 CLI，有活动 CLI job 或停止容器即拒绝。UID1000、/tmp 下运行 `timeout --signal=KILL 5 python3 -I -c <固定探针>`，Docker SDK 沿已有有限传输超时，不改共享 client 超时。
+- 输出不超过 64 KiB，schema 必须整数 1，顶层及 values 必须精确匹配声明键。数字字段为非 bool、非负且小于 2^53 的整数；machine_id 为 bool；其它值为 null 或最多 512 字符的非空字符串，拒绝码点小于 32 的控制字符。
+- 成功才 atomic_json 原子发布 root 私有 0600 快照；采集失败、超时、坏输出均保留旧观察。读取使用 O_NOFOLLOW/O_NONBLOCK，仅普通文件，限制 64 KiB；核对归属、代次类型、容器 ID、有限正 observed_at 且不超 now+60 秒。
+- summary 返回 status、message、observed_at、generation、fields；字段为 `{key,label,configured,observed,status}`。快照状态 missing/cached/stale/invalid，逐字段 match/mismatch/observed/unobserved/stale；旧代或容器 ID 不符仍保留合法旧值和时间，明确标旧代。cached 只表示本代的上次观察，不承诺实时；保存值不回填到实测。
+- UI 用独立列显示保存配置、容器实测及对照，标采集时间和缺失项；所有来自快照的文字先转义，窄屏可横向查看。停止/占用时禁用刷新，后端仍独立校验。刷新失败保留旧值并明确提示，不能自动修复指纹或放宽容器权限。
+- 当地时钟和运行窗口沿账号已固化时区，契约见 [当地运行窗口](./database-guidelines.md#scenario-v3-账号当地运行窗口与准备后复查)。物理缓存与 SQLite 时段各自独立，不互相假设采集或环境创建已执行。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| v3 未启用或环境不存在/关联账号已删除 | 404，不采集 |
+| 锁占用、活动 CLI、停止或归属冲突 | 409，保留旧观察，不启动或重建 |
+| 探针超时、非零退出或非法输出 | 409，固定采集失败说明，旧快照保留 |
+| Docker/请求传输/系统读取失败 | 503，固定说明，旧快照保留 |
+| 缺少缓存、坏格式/链接/越界或跨环境快照 | missing 或 invalid，实测未知，配置仍独立展示 |
+| 合法旧代观察 | stale，保留旧时间和值，不标为当前一致 |
+| 配置与实测不同 | mismatch，如实显示，不自动重抽/改写身份 |
+
+### 5. Scenarios and Examples
+
+- 正常：点击空闲环境的“刷新实测”，真实 DMI/CPU/内核/时区与配置一致，CLI cgroup RAM 与账号总预算分列；指纹、HOME、凭据及绑定摘要保持。
+- 基础：从未采集的环境只显示配置和未采集；停止后打开页面仍显示合法上次观察，不唤醒容器。重建后旧快照标 stale，等空闲显式刷新。
+- 错误用法：把 fingerprint 值填入 observed、用 /proc/meminfo 总量当 RAM，或为 GET 调 ensure。正确处理：保存值与真实观察分列，使用 cgroup 限额，列表只读缓存。
+- 错误用法：把缓存文本拼成 HTML、遇到采集失败清空旧快照，或采集期间绕过 owner/profile 锁。正确处理：白名单严格校验、转义输出、成功才替换，并在锁内复核归属和代次。
+
+### 6. Tests Required
+
+- test_physical_features.py：无快照、实际 CLI/legacy RAM 口径、相同/差异、旧代、跨环境、坏类型/数值/控制字/额外字段及链接拒绝；配置不冒充实测。
+- test_account_runtime.py：只读采集命令与截止/UID、缓存权限、停止/占用不 exec、失败不覆盖、身份和凭据保持。
+- run_local_verification.py --manifest <联合清单> --run-windows-only：实际 CLI 采集 DMI/CPU/内核、cgroup、时区和 locale，核对配置、私有快照及采集前后凭据/指纹摘要。
+- verify_stack.py --manifest <联合清单> --browser --run-boundaries：页面/API/SQLite 与缓存对照、停止不唤醒、来源与旧值、XSS、1280/390px 明暗主题；保持独立 API/CLI 生命周期回归。

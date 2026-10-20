@@ -47,7 +47,11 @@ v3 回退先停止当前批次并保留最新停机备份。只在布局/桥协�
 
 登录在真实 CLI/tmux 内完成。CLI 与 Rust API 发送器位于不同角色容器，共享本账号网络命名空间及代理，但仍是不同客户端。gateway 内的 OAuth 客户端使用账号显式代理；v3 缺少或只有空白代理时在请求前拒绝，不自动直连。固定环境不保证完整指纹相同或避免封禁。身份没有明确来源时不应猜测。遥测专项继续留在后续任务。
 
-账号支持 5h/7d 已用百分比阈值，两个窗口独立配置 1～100 的整数或关闭，默认关闭。额度从正式响应被动更新，不在自动调度中查询 usage。首次观测到任一有效窗口达到阈值时，强制结束正在运行的普通 CLI 或养号轮次，保留 HOME、工作目录和主会话，并将本轮记为 stopped；不等待业务完整收尾、不自动续跑原轮次。后续批次任务等待额度恢复及原投放间隔，再执行下一未执行题目；定时养号按原间隔安排新一轮。窗口到期不伪造用量归零，仍复用持久单次正常更新机会。单次响应可能跨过阈值，强制停止不保证实际计费值绝不越界。未绑定但持有本地 OAuth 的账号也可以定时养号。抓包、继续对话与 cc2api API 保持原有门禁。此功能需要同批 control/account 镜像，回滚前先关闭阈值并收口等待工作，保留持久数据。
+账号支持 5h/7d 已用百分比阈值，两个窗口独立配置 1～100 的整数或关闭，默认关闭。额度从正式响应被动更新，不在自动调度中查询 usage。观测到任一有效窗口达到阈值时，当前普通 CLI 或养号继续按原计划完成整轮（包括补充与收尾），不因自设百分比直接 STOP；后续批次任务等待额度恢复及原投放间隔，定时养号沿用原随机间隔。真实额度耗尽、认证失败、用户停止及原超时仍按原流程处理。窗口到期不伪造用量归零，仍复用持久单次正常更新机会。整轮可能越过设定百分比，此阈值只约束下一轮入场。未绑定但持有本地 OAuth 的账号也可以定时养号。抓包、继续对话与 cc2api API 保持原有百分比门禁。此功能需要同批 control/account 镜像，回滚前先关闭阈值并收口等待工作，保留持久数据。
+
+账号页的“运行时段”按环境已固化时区设置星期和最多 8 个区间；结束早于开始表示跨午夜，并归属于开始日，夏令时按当地实际分钟判断。旧账号默认不限制时间。窗口外普通/抓包任务保持排队，批次和定时养号延后，立即养号与新续聊输入明确拒绝且不缓存；已开始的整轮及在途续聊输出继续。时间和自设额度阈值必须都允许才开始下一轮，原随机间隔仍生效。配置和排队信息持久化，等待不占 CLI 信号量或长期锁。对外 API、登录、OAuth 维护及手动额度查询不受时间窗口限制。回滚到不支持窗口的版本前，应先关闭限制并收口等待任务。
+
+环境页可展开“物理特征”，分列已保存配置与上次容器实测，并显示采集时间、差异或未采集。点击“刷新实测”只读取当前归属的空闲 CLI 容器，停止/占用/失败时保留已有观察；页面不会为采集唤醒、重建或重新生成指纹。RAM 分开显示账号合计预算与 CLI 实际 cgroup 上限，不把宿主内存或 swap 当作 CLI RAM。账号页和环境页同时显示当地时钟及北京时间参考。
 
 API 与同账号普通 CLI、养号、抓包独立调度，可以同时运行；CLI 之间串行，养号让位于正式 CLI 工作。API 准备发送器不安装 CLI。普通 CLI 的取消、心跳失联、调度器重启只清理本次进程和 CLI 观察上下文，保留账号容器与 API 长流；清理无法确认时标为 `cli_reconcile`，只禁止下一 CLI。旧无模式记录默认排他。重授权、代理修改、绑定切换、停止及重建仍关闭 API 入场并检查或排空已有请求。两条链路共享账号额度及容器资源，容器或公共网络故障仍可能影响两者。
 
@@ -58,13 +62,17 @@ run 与续聊的证据入口保持固定，各次执行在 `executions/<source_h
 ```bash
 # 需在已安装 orchestrator requirements 的 Python 环境运行。
 python3 deploy/v3/run_local_verification.py --manifest /absolute/path/release.json
-# 真实忙碌 driver、正式状态栏采集和调度器的强制中断，含 5h、7d、跨阈值和关闭阈值。
-python3 deploy/v3/run_local_verification.py --manifest /absolute/path/release.json --quota-hard-stop-only
+# 真实忙碌 driver 跨过 5h／7d 阈值后完成原补充和收尾，下一轮等待。
+python3 deploy/v3/run_local_verification.py --manifest /absolute/path/release.json --quota-completion-only
+# 真实物理采集、当前轮次跨时段及阈值、排队重启与两个门禁分别恢复。
+python3 deploy/v3/run_local_verification.py --manifest /absolute/path/release.json --run-windows-only
 python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json
 # 已安装 Chrome/Chromium 时，验证真实页面的统一退出和旧 Cookie 重放拒绝。
 python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser
-# 强制结束阈值说明、真实 API／SQLite 停止原因与页面转义。
-python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --quota-hard-stop
+# 本轮完成阈值说明、历史停止记录的 API／SQLite 兼容与页面转义。
+python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --quota-completion
+# 当地时段保存/重读、双时钟、物理特征来源、XSS 和窄屏明暗主题。
+python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --run-boundaries
 # 验证实际 Recorder 的本地 HTTPS/SSE、未知一次机会及重启不重复。
 python3 deploy/v3/verify_warmup_quota.py --manifest /absolute/path/release.json
 # 在统一后台验证合成账号阈值配置、保存重读、明暗主题和 390px。

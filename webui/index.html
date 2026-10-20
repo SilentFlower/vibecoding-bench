@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261013-quota-auto-refresh" />
+  <link rel="stylesheet" href="style.css?v=20261020-run-windows" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -375,6 +375,30 @@
     </div>
   </div>
 
+  <div class="modal hidden" id="run-window-modal">
+    <div class="modal-card modal-card-md">
+      <div class="modal-titlebar">
+        <span class="modal-titlebar-name">账号当地运行时段</span>
+        <button type="button" class="modal-close" data-close="#run-window-modal" aria-label="关闭运行时段配置">×</button>
+      </div>
+      <form id="run-window-form" class="form">
+        <input type="hidden" name="account_id">
+        <p>使用环境时区：<strong id="run-window-timezone"></strong></p>
+        <label><input type="checkbox" name="enabled">启用当地可运行时段</label>
+        <p class="hint">关闭限制时可全天运行。时段结束后，本轮仍按原计划完成（包括补充与收尾），下一轮再等待。</p>
+        <fieldset><legend>允许开始的星期</legend><div class="run-window-days" id="run-window-days"></div></fieldset>
+        <div id="run-window-intervals"></div>
+        <button type="button" class="btn btn-sm" id="run-window-add">添加时间段</button>
+        <p class="hint">最多 8 个区间。结束早于开始表示跨午夜，按开始星期归属；重叠区间合并生效。夏令时按当地实际时间执行。</p>
+        <p class="hint">作用于普通任务、批次、养号、抓包和新续聊输入；对外 API、登录与 OAuth 维护不受此时段限制。</p>
+        <div class="row row-end">
+          <button type="button" class="btn" data-close="#run-window-modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存运行时段</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal hidden" id="warmup-modal">
     <div class="modal-card modal-card-sm">
       <div class="modal-frame" aria-hidden="true">
@@ -423,7 +447,7 @@
             <p class="hint" id="warmup-quota-7d-hint"></p>
           </div>
         </div>
-        <p class="hint">额度从正常响应中被动更新。观测到任一阈值命中时，强制结束当前普通任务或养号轮次，保留文件和会话，不自动续跑本轮；窗口恢复后批次执行下一题，并遵守原投放间隔。单次响应仍可能跨过阈值。cc2api API 转发不受此阈值控制。</p>
+        <p class="hint">额度从正常响应中被动更新。观测到任一阈值命中时，当前普通任务或养号仍按原计划完成本轮（包括补充与收尾），下一轮等待窗口重置或真实额度更新，并遵守原投放间隔。单次响应仍可能跨过阈值。cc2api API 转发不受此阈值控制。</p>
         <div class="row-end">
           <button type="button" class="btn" data-close="#warmup-modal">cancel</button>
           <button type="submit" class="btn btn-primary">save</button>
@@ -695,6 +719,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20261018-quota-hard-stop"></script>
+  <script src="app.js?v=20261020-run-windows"></script>
 </body>
 </html>

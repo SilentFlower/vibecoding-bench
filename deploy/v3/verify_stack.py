@@ -57,11 +57,12 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--browser", action="store_true")
+    parser.add_argument("--run-boundaries", action="store_true")
     parser.add_argument("--warmup-quota", action="store_true")
     parser.add_argument("--reauth", action="store_true")
     parser.add_argument("--deleted-binding", action="store_true")
     parser.add_argument("--topic-followups", action="store_true")
-    parser.add_argument("--quota-hard-stop", action="store_true")
+    parser.add_argument("--quota-completion", "--quota-hard-stop", dest="quota_completion", action="store_true")
     args = parser.parse_args()
     if args.warmup_quota and not args.browser:
         parser.error("养号页面验证需要同时指定 --browser")
@@ -71,8 +72,10 @@ def main() -> None:
         parser.error("删除后解绑验证需要 --browser，并单独执行以隔离合成账号")
     if args.topic_followups and (not args.browser or args.warmup_quota or args.reauth or args.deleted_binding):
         parser.error("递进需求页面验证需要 --browser，并单独执行")
-    if args.quota_hard_stop and (not args.browser or args.warmup_quota or args.reauth or args.deleted_binding or args.topic_followups):
-        parser.error("强制阈值页面验证需要 --browser，并单独执行")
+    if args.quota_completion and (not args.browser or args.warmup_quota or args.reauth or args.deleted_binding or args.topic_followups):
+        parser.error("本轮完成阈值页面验证需要 --browser，并单独执行")
+    if args.run_boundaries and (not args.browser or args.warmup_quota or args.reauth or args.deleted_binding or args.topic_followups or args.quota_completion):
+        parser.error("运行时段和物理面板验证需要 --browser，并单独执行")
     manifest = json.loads(args.manifest.read_text())
     client = docker.from_env()
     deployment = "stack-verify-" + uuid.uuid4().hex[:10]
@@ -186,6 +189,9 @@ def main() -> None:
                         )
                 try:
                     with ExitStack() as fixtures:
+                        if args.run_boundaries:
+                            from verify_run_boundaries_browser import run_boundaries_browser_fixture
+                            exercise = fixtures.enter_context(run_boundaries_browser_fixture(client, deployment, data, browser, base))
                         if args.reauth:
                             from verify_reauth_stack import reauth_fixture
                             exercise = fixtures.enter_context(reauth_fixture(client, deployment, data, manifest, browser, base, authorization))
@@ -195,9 +201,9 @@ def main() -> None:
                         if args.topic_followups:
                             from verify_followup_browser import followup_browser_fixture
                             exercise = fixtures.enter_context(followup_browser_fixture(data))
-                        if args.quota_hard_stop:
-                            from verify_quota_hard_stop_browser import quota_hard_stop_browser_fixture
-                            exercise = fixtures.enter_context(quota_hard_stop_browser_fixture(data))
+                        if args.quota_completion:
+                            from verify_quota_completion_browser import quota_completion_browser_fixture
+                            exercise = fixtures.enter_context(quota_completion_browser_fixture(data))
                         asyncio.run(verify_visible_logout(base, values["V3_ADMIN_PASSWORD"], exercise=exercise, insecure_http=args.reauth))
                 finally:
                     if args.warmup_quota:

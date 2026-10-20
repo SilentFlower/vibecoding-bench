@@ -32,15 +32,17 @@ from contextlib import ExitStack, asynccontextmanager, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from stat import S_ISREG
-from typing import Callable, Literal, Optional, Sequence
+from typing import Literal, Optional, Sequence
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import docker
-from docker.errors import NotFound
+from docker.errors import DockerException, NotFound
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr, ValidationError
+from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt, StrictStr, ValidationError
+from requests.exceptions import RequestException
 from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
 
@@ -49,6 +51,8 @@ from account_runtime import AccountRuntime, RuntimeBusy, V3_DEFAULT_TIMEZONE, at
 from cli_quota import statusline_quota_observation
 from login_terminal import authorization_url
 from login_drafts import LoginDraftStore
+from physical_features import physical_features_summary
+from run_windows import normalize_run_window, run_window_snapshot
 from topic_library import (decode_followup_timing, decode_followups, encode_followups, parse_topics,
     sample_followup_timing, sample_followups)
 
@@ -276,7 +280,6 @@ _DEFAULT_CLAUDE_TOP_CONFIG: dict[str, object] = {
 _PROFILE_SYNC_FILES = (".credentials.json", "settings.json", ".claude.json")
 _PROFILE_CONFIG_SYNC_FILES = ("settings.json", ".claude.json")
 _TERMINAL_RUN_STATUSES = {"success", "failed", "timeout", "stopped", "auth_failed"}
-_THRESHOLD_STOP_PREFIX = "额度阈值强制中断："
 OAUTH_REFRESH_INTERVAL_SEC = 60
 OAUTH_REFRESH_BUFFER_SEC = 10 * 60
 _profile_locks: dict[str, threading.Lock] = {}
@@ -1317,6 +1320,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   upstream_socks5_user TEXT,
   upstream_socks5_pass TEXT,
   timezone TEXT,
+  run_window_json TEXT,
   cc2api_account_id INTEGER,
   warmup_enabled INTEGER DEFAULT 0,
   warmup_interval_min_hours INTEGER DEFAULT 3,
@@ -1377,6 +1381,7 @@ CREATE TABLE IF NOT EXISTS task_batches (
   timeout_sec INTEGER DEFAULT 1800,
   status TEXT NOT NULL DEFAULT 'active',
   next_launch_at REAL,
+  window_wait_until REAL,
   deleted_at REAL,
   created_at REAL DEFAULT (julianday('now')),
   updated_at REAL DEFAULT (julianday('now')),
@@ -1426,6 +1431,7 @@ CREATE TABLE IF NOT EXISTS runs (
   execution_model TEXT,
   quota_attempt INTEGER NOT NULL DEFAULT 0,
   quota_resume_at REAL,
+  window_wait_until REAL,
   quota_identity TEXT,
   started_at REAL,
   ended_at REAL,
@@ -1484,6 +1490,9 @@ def init_db() -> None:
             conn.executescript(_SCHEMA)
             _ensure_column(conn, "accounts", "upstream_proxy_scheme", "TEXT DEFAULT 'socks5'")
             _ensure_column(conn, "accounts", "timezone", "TEXT")
+            _ensure_column(conn, "accounts", "run_window_json", "TEXT")
+            _ensure_column(conn, "runs", "window_wait_until", "REAL")
+            _ensure_column(conn, "task_batches", "window_wait_until", "REAL")
             _ensure_column(conn, "accounts", "deleted_at", "REAL")
             _ensure_column(conn, "accounts", "cc2api_account_id", "INTEGER")
             _ensure_column(conn, "accounts", "warmup_enabled", "INTEGER DEFAULT 0")
@@ -2728,6 +2737,39 @@ def _effective_account_timezone(
     return normalized or derive_fingerprint(account_name)["tz"]
 
 
+def _account_run_window(account: dict, *, public: bool = False, zone: Optional[str] = None) -> dict:
+    """读取账号当地窗口，未启用的执行快速路径不查询环境或申请资源。
+
+    :param account: 最新账号行。
+    :param public: 是否包含时钟和完整公开配置。
+    :param zone: 页面已有的有效时区，避免重复读取。
+    :return: 准入、下次边界和公开提示；损坏配置拒绝新执行。
+    """
+    try:
+        raw = account.get("run_window_json")
+        configuration = normalize_run_window(json.loads(raw) if raw is not None else None)
+        if not public and (not account_runtime or not configuration["enabled"]):
+            return {"enabled": False, "allowed": True, "next_open_at": None, "message": "未限制运行时段"}
+        return run_window_snapshot(configuration, zone or _effective_account_timezone(account), time.time())
+    except (ValueError, TypeError, ZoneInfoNotFoundError):
+        return {"enabled": True, "allowed": False, "timezone": zone or account.get("timezone"),
+            "server_now": time.time(), "local_time": None, "next_open_at": None, "next_close_at": None,
+            "config": None, "message": "运行时段配置或时区无效，请检查账号设置"}
+
+
+def _window_message(policy: dict) -> str:
+    """生成明确的当地休息提示，不把时间等待误记为额度耗尽。
+
+    :param policy: 已计算的公开窗口摘要。
+    :return: 用户可见消息。
+    """
+    opening = policy.get("next_open_at")
+    if opening:
+        local = datetime.fromtimestamp(opening, timezone.utc).astimezone(ZoneInfo(policy["timezone"]))
+        return f"{policy['message']}；下次开放：{local:%Y-%m-%d %H:%M}（{policy['timezone']}）"
+    return policy["message"]
+
+
 def _wait_sidecar_ready(client: "docker.DockerClient", sidecar_id: str) -> None:
     """
     等 sidecar 自己的透明代理与通用 DNS resolver 就绪。
@@ -3130,21 +3172,28 @@ class QuotaGuard:
             self._publish(account)
             return True
 
-    def release(self, account: dict, source: str) -> None:
+    def release(self, account: dict, source: str, *, unstarted: bool = False) -> None:
         """
-        执行退出后释放恢复认领，旧代次不能释放新执行的认领。
+        释放恢复认领；确认未启动时退还精确来源许可，旧代次不能释放新执行。
 
         :param account: 执行使用的账号
         :param source: 本次执行来源
+        :param unstarted: 调用者已确认未发起执行时，退还本身份与来源的持久恢复机会
         :return: None
         """
         with self._lock:
+            identity = _quota_identity(account) if unstarted else None
             with _db_lock:
                 conn = get_db()
                 try:
                     with conn:
+                        if unstarted:
+                            # 关窗可能发生在凭据准备中；尚未发出的工作不能耗掉唯一恢复机会。
+                            conn.execute("DELETE FROM warmup_quota_admissions WHERE account_id=? AND identity=? AND source=?",
+                                         (account["id"], identity, source))
                         conn.execute("UPDATE account_quota_states SET recovery_source=NULL "
-                                     "WHERE account_id=? AND recovery_source=?", (account["id"], source))
+                                     "WHERE account_id=? AND recovery_source=?" + (" AND identity=?" if unstarted else ""),
+                                     (account["id"], source, identity) if unstarted else (account["id"], source))
                 finally:
                     conn.close()
             self._publish(account)
@@ -3484,6 +3533,10 @@ class QuotaGuard:
                 self.record_auth_failure(account, state["account_error"])
         for run in runs:
             account = by_id.get(run["account_id"])
+            if (run["status"] == "queued" and run.get("window_wait_until") is not None
+                    and run.get("started_at") is None and not run.get("worker_container") and not run.get("stop_requested_at")):
+                # 时间窗口排队还没产生执行，由专用恢复入口重投，不能当作崩溃任务清理。
+                continue
             control_status = self._recover_control(account, run) if account else None
             state = self.snapshot(account) if account else {}
             threshold_guarded = False
@@ -3588,7 +3641,7 @@ class QuotaGuard:
 
     def _resume_account(self, account: dict) -> None:
         state = self.snapshot(account)
-        if state["blocked"] or not scheduler:
+        if state["blocked"] or not scheduler or not _account_run_window(account)["allowed"]:
             return
         conn = get_db()
         try:
@@ -3622,6 +3675,8 @@ class QuotaGuard:
                 if not current or (parent and (parent["deleted_at"] or parent["status"] not in ("active", "quota_wait"))):
                     continue
                 account = dict(current)
+                if not _account_run_window(account)["allowed"]:
+                    continue
                 workload = (
                     "warmup" if run["run_kind"] == "warmup"
                     else "normal" if run["run_kind"] == "normal"
@@ -3639,7 +3694,8 @@ class QuotaGuard:
                     conn = get_db()
                     try:
                         with conn:
-                            cur = conn.execute("UPDATE runs SET status='queued',quota_attempt=?,quota_resume_at=NULL,error=NULL,"
+                            # 新代次还未发起执行，不能让上一代的开始时间阻止窗口排队的重启恢复。
+                            cur = conn.execute("UPDATE runs SET status='queued',quota_attempt=?,quota_resume_at=NULL,error=NULL,started_at=NULL,"
                                                "worker_container=NULL,sidecar_container=NULL,ended_at=NULL WHERE id=? AND status='quota_wait' "
                                                "AND quota_attempt=? AND stop_requested_at IS NULL AND deleted_at IS NULL",
                                                (attempt, run["id"], run["quota_attempt"]))
@@ -4022,15 +4078,14 @@ class Runner:
             # 容器可能已经退出或被删除；停止路径不应被配置兜底阻断。
             pass
 
-    def wait_worker(self, worker_id: str, on_running: Optional[Callable[[], None]] = None) -> int:
-        """等待当前执行，在 v3 活跃期间执行本地保护检查。
+    def wait_worker(self, worker_id: str) -> int:
+        """等待当前执行完成；自设额度阈值只约束下一轮启动。
 
         :param worker_id: 本代完整执行标识。
-        :param on_running: 活跃执行的可选本地检查回调。
         :return: 实际进程退出码。
         """
         if account_runtime:
-            return account_runtime.wait_worker(worker_id, on_running=on_running)
+            return account_runtime.wait_worker(worker_id)
         worker = self.client.containers.get(worker_id)
         result = worker.wait()
         return int(result.get("StatusCode", -1))
@@ -4940,7 +4995,7 @@ class ContinueSession:
 
     __slots__ = ("sid", "run_id", "account_id", "sidecar_id", "worker_id",
                  "session_id", "permission_mode", "created_at", "status", "generation",
-                 "connected", "run", "identity", "guard_lock", "quota", "resume_not_before")
+                 "connected", "run", "identity", "guard_lock", "quota", "resume_not_before", "run_window")
 
     def __init__(
         self,
@@ -4968,6 +5023,7 @@ class ContinueSession:
         self.guard_lock = threading.RLock()
         self.quota: dict = {}
         self.resume_not_before = 0.0
+        self.run_window: dict = {}
 
 
 class LoginManager:
@@ -5504,6 +5560,9 @@ class ContinueManager:
         :param account: accounts 表行
         :return: ContinueSession
         """
+        policy = _account_run_window(account)
+        if not policy["allowed"]:
+            raise ValueError(_window_message(policy))
         if login_manager and login_manager.has_active_name(str(account["name"])):
             raise ValueError("账号正在重新授权，请完成后再继续对话")
         session_id = _find_latest_claude_session_id(run["id"])
@@ -5517,6 +5576,7 @@ class ContinueManager:
                 raise ValueError(f"continue session already active for run {run['id']}")
             sid = uuid.uuid4().hex[:12]
             self._run_locks[run["id"]] = sid
+        unstarted_admission = False
         try:
             permission_mode = _resolve_capture_permission_mode(
                 run.get("capture_permission_mode")
@@ -5528,6 +5588,11 @@ class ContinueManager:
             if not quota_guard or quota_guard.admit(account, source):
                 if account.get("cc2api_account_id") is not None:
                     _sync_bound_account_credentials_locked(account, 2400)
+                # 凭据准备有外部等待，入场检查通过后仍可能跨过关窗边界。
+                policy = _account_run_window(account)
+                if not policy["allowed"]:
+                    unstarted_admission = True
+                    raise ValueError(_window_message(policy))
                 sidecar_id, worker_id = self.runner.start_continue(sid, run, account, session_id)
             session = ContinueSession(
                 sid,
@@ -5539,6 +5604,7 @@ class ContinueManager:
                 permission_mode,
             )
             session.run = dict(run)
+            session.run_window = policy
             session.identity = _quota_identity(account) if quota_guard else ""
             session.quota = quota_guard.snapshot(account) if quota_guard else {}
             with self._lock:
@@ -5551,7 +5617,7 @@ class ContinueManager:
             return session
         except Exception:
             if quota_guard:
-                quota_guard.release(account, f"continue:{sid}:0")
+                quota_guard.release(account, f"continue:{sid}:0", unstarted=unstarted_admission)
             with self._lock:
                 self._run_locks.pop(run["id"], None)
             raise
@@ -5666,6 +5732,7 @@ class ContinueManager:
                     self.cleanup(session.sid)
                     continue
                 source = f"continue:{session.sid}:{session.generation}"
+                session.run_window = _account_run_window(account)
                 if quota_guard.snapshot(account).get("account_error"):
                     session.quota = quota_guard.snapshot(account)
                     self.cleanup(session.sid)
@@ -5693,11 +5760,19 @@ class ContinueManager:
                         self.cleanup(session.sid)
                         continue
                     account = dict(current)
+                    session.run_window = _account_run_window(account)
+                    if not session.run_window["allowed"]:
+                        continue
                     if not quota_guard.admit(account, source):
                         continue
                     try:
                         if account.get("cc2api_account_id") is not None:
                             _sync_bound_account_credentials_locked(account, 2400)
+                        # 保留原等待会话，并退还尚未发起执行的恢复机会。
+                        session.run_window = _account_run_window(account)
+                        if not session.run_window["allowed"]:
+                            quota_guard.release(account, source, unstarted=True)
+                            continue
                         run = {**session.run, "continue_generation": session.generation}
                         session.sidecar_id, session.worker_id = self.runner.start_continue(
                             session.sid, run, account, session.session_id)
@@ -5723,16 +5798,19 @@ class ContinueManager:
         with session.guard_lock:
             if self.get(session.sid) is not session or session.status != "running" or generation != session.generation:
                 return False
+            conn = get_db()
+            try:
+                row = _get_available_account(conn, session.account_id)
+            finally:
+                conn.close()
+            if row is None:
+                self.cleanup(session.sid)
+                return False
+            account = dict(row)
+            session.run_window = _account_run_window(account)
+            if not session.run_window["allowed"]:
+                return False
             if quota_guard:
-                conn = get_db()
-                try:
-                    row = _get_available_account(conn, session.account_id)
-                finally:
-                    conn.close()
-                if not row:
-                    self.cleanup(session.sid)
-                    return False
-                account = dict(row)
                 quota_guard.consume(account)
                 if self._apply_control(session, account):
                     return False
@@ -6152,6 +6230,116 @@ class Scheduler:
         self._batch_lock = threading.Lock()
         self._executing: set[tuple[str, int]] = set()
         self._execution_lock = threading.Lock()
+        self._window_stop = threading.Event()
+
+    def stop_window_waits(self) -> None:
+        """关闭本进程时间等待，持久排队记录留待重启恢复。@return None。"""
+        self._window_stop.set()
+
+    def _wait_run_window(self, run_id: str, account: dict, attempt: int) -> Optional[dict]:
+        """在不占执行资源时等待窗口，每次重读取消、身份和父任务事实。"""
+        while not self._window_stop.is_set():
+            run = self._get_run_state(run_id)
+            if (not run or run["status"] != "queued" or run.get("deleted_at") is not None
+                    or run.get("stop_requested_at") is not None or int(run["quota_attempt"]) != attempt):
+                return None
+            connection = get_db()
+            try:
+                current = _get_available_account(connection, account["id"])
+                task = connection.execute("SELECT deleted_at FROM tasks WHERE id=?", (run["task_id"],)).fetchone()
+                batch = connection.execute("SELECT status,deleted_at FROM task_batches WHERE id=?",
+                    (run["batch_id"],)).fetchone() if run["batch_id"] else None
+            finally:
+                connection.close()
+            if current is None:
+                self._update_attempt(run_id, attempt, status="failed", error="账号不存在或已停用", ended_at=time.time())
+                self._update_batch_item_for_run(run_id, "failed")
+                return None
+            account = dict(current)
+            if (not task or task["deleted_at"] is not None or (batch and (batch["deleted_at"] is not None
+                    or batch["status"] not in ("active", "quota_wait")))
+                    or (run["run_kind"] == "warmup" and not account.get("warmup_enabled"))):
+                self._update_attempt(run_id, attempt, status="stopped", ended_at=time.time())
+                self._update_batch_item_for_run(run_id, "stopped")
+                return None
+            if quota_guard and quota_guard._cancel_changed_identity(run, account):
+                return None
+            policy = _account_run_window(account)
+            if policy["allowed"]:
+                return account
+            fields = {"window_wait_until": policy.get("next_open_at") or 0}
+            if not run.get("quota_identity"):
+                fields["quota_identity"] = _quota_identity(account)
+            if not self._update_attempt(run_id, attempt, **fields):
+                return None
+            self._window_stop.wait(min(15, max(0.05, (policy.get("next_open_at") or time.time() + 15) - time.time())))
+        return None
+
+    def _wait_batch_window(self, batch_id: int, account: dict) -> Optional[dict]:
+        """等待批次可投放窗口，保留原随机间隔和人工暂停状态。"""
+        while not self._window_stop.is_set():
+            if self._get_batch_status(batch_id) != "active":
+                return None
+            connection = get_db()
+            try:
+                current = _get_available_account(connection, account["id"])
+            finally:
+                connection.close()
+            if current is None:
+                self._pause_batch_for_unavailable_account(batch_id)
+                return None
+            account = dict(current)
+            policy = _account_run_window(account)
+            with _db_lock:
+                connection = get_db()
+                try:
+                    with connection:
+                        connection.execute("UPDATE task_batches SET window_wait_until=? WHERE id=? AND status='active'",
+                            (None if policy["allowed"] else policy.get("next_open_at") or 0, batch_id))
+                finally:
+                    connection.close()
+            if policy["allowed"]:
+                return account
+            self._window_stop.wait(min(15, max(0.05, (policy.get("next_open_at") or time.time() + 15) - time.time())))
+        return None
+
+    def recover_window_waits(self) -> None:
+        """恢复明确未启动的窗口排队，原停止意图只收口而不复活。
+
+        :return: None；复用原 run、attempt 和冻结执行计划。
+        """
+        connection = get_db()
+        try:
+            rows = [dict(row) for row in connection.execute("SELECT r.*,t.prompt,t.timeout_sec FROM runs r "
+                "JOIN tasks t ON t.id=r.task_id WHERE r.window_wait_until IS NOT NULL AND r.deleted_at IS NULL "
+                "AND t.deleted_at IS NULL AND r.status IN ('queued','stopping')")]
+        finally:
+            connection.close()
+        for run in rows:
+            if run.get("stop_requested_at") is not None or run["status"] == "stopping":
+                self._update_attempt(run["id"], int(run["quota_attempt"]), status="stopped", ended_at=time.time())
+                self._update_batch_item_for_run(run["id"], "stopped")
+                continue
+            if run.get("started_at") is not None or run.get("worker_container"):
+                continue
+            connection = get_db()
+            try:
+                row = connection.execute("SELECT * FROM accounts WHERE id=?", (run["account_id"],)).fetchone()
+            finally:
+                connection.close()
+            if row is None or not _account_is_available(dict(row)):
+                self._update_attempt(run["id"], int(run["quota_attempt"]), status="failed", error="账号不存在或已停用", ended_at=time.time())
+                self._update_batch_item_for_run(run["id"], "failed")
+                continue
+            account = dict(row)
+            task = {"id": run["task_id"], "prompt": run["prompt"], "timeout_sec": run["timeout_sec"],
+                "claude_code_version": run["claude_code_version"], "claude_effort_level": run["claude_effort_level"],
+                "quota_attempt": run["quota_attempt"], "model_override": (run["execution_model"]
+                    if run["execution_model"] is not None else run["capture_model_override"]),
+                "followup_plan_json": run["followup_plan_json"], "followup_timing_json": run["followup_timing_json"],
+                "capture_full_http": run["run_kind"] == "capture", "capture_mode": run["capture_mode"],
+                "capture_permission_mode": run["capture_permission_mode"]}
+            self.submit(run["id"], account, task)
 
     def is_executing(self, run_id: str, attempt: int) -> bool:
         """
@@ -6241,10 +6429,18 @@ class Scheduler:
             if V3_ENABLED and batch.get("next_launch_at") and batch["next_launch_at"] > time.time():
                 if not self._sleep_batch_delay(batch_id, batch["next_launch_at"] - time.time()):
                     return
-            active_runs: list[str] = []
+            connection = get_db()
+            try:
+                active_runs = [row["id"] for row in connection.execute("SELECT id FROM runs WHERE batch_id=? "
+                    "AND deleted_at IS NULL AND status IN ('queued','running','stopping','quota_wait')", (batch_id,))]
+            finally:
+                connection.close()
             for idx, item_row in enumerate(items):
                 current = self._get_batch_status(batch_id)
                 if current != "active":
+                    break
+                account = self._wait_batch_window(batch_id, account)
+                if account is None:
                     break
                 if quota_guard:
                     quota_guard.consume(account)
@@ -6265,6 +6461,9 @@ class Scheduler:
                         self._set_batch_next_launch(batch_id, time.time() + delay)
                         if not self._sleep_batch_delay(batch_id, delay):
                             break
+                account = self._wait_batch_window(batch_id, account)
+                if account is None:
+                    break
                 item = dict(item_row)
                 run_id = uuid.uuid4().hex[:12]
                 created = self._create_batch_task_and_run(batch, account, item, run_id)
@@ -6512,120 +6711,6 @@ class Scheduler:
         finally:
             conn.close()
 
-    def _enforce_running_quota(self, run_id: str, account: dict, attempt: int, worker_id: str) -> None:
-        """有效窗口命中后结束本轮，只清理仍归属该 run 的 v3 执行。
-
-        :param run_id: 当前运行标识。
-        :param account: 启动时账号快照，用于核对不可变归属。
-        :param attempt: 当前运行代次。
-        :param worker_id: 含执行来源的完整 token。
-        :return: None；清理失败保留门禁并向等待器报告错误。
-        """
-        if not account_runtime or not quota_guard:
-            return
-        run = self._get_run_state(run_id)
-        if (not run or run["status"] != "running" or run.get("deleted_at") is not None
-                or run.get("stop_requested_at") is not None or run["run_kind"] not in ("normal", "warmup")
-                or run["quota_attempt"] != attempt or run["account_id"] != account["id"]
-                or run.get("worker_container") != worker_id):
-            return
-        connection = get_db()
-        try:
-            row = _get_available_account(connection, account["id"])
-            current_account = dict(row) if row else None
-        finally:
-            connection.close()
-        if (not current_account or not any(current_account.get(key) is not None for key in
-                ("warmup_quota_5h_limit_percent", "warmup_quota_7d_limit_percent"))
-                or run.get("quota_identity") != _quota_identity(current_account)):
-            return
-        try:
-            job = account_runtime.job_for_container(worker_id)
-        except ValueError:
-            return
-        if (job["token"] != worker_id or job.get("run_id") != run_id
-                or job.get("source") != _quota_source(run_id, attempt)
-                or job["row"]["account_id"] != account["id"]
-                or job["row"]["environment_id"] != run.get("environment_id")
-                or job["row"]["generation"] != run.get("environment_generation")):
-            return
-        quota_guard.consume(current_account)
-        state = quota_guard.snapshot(current_account)
-        policy = quota_guard.policy_snapshot(current_account, run["run_kind"], quota_state=state)
-        if state.get("account_error") or not policy["hit"]:
-            return
-        if self.runner.read_worker_status(run_id).get("status") in _TERMINAL_RUN_STATUSES:
-            return
-        facts = []
-        for key in policy["hit"]:
-            window = state["windows"][key]
-            observed = datetime.fromtimestamp(window["observed_at"], timezone.utc).isoformat()
-            label = "5h" if key == "five_hour" else "7d"
-            facts.append(f"{label} 已用 {window['utilization']:g}% ≥ {policy['limits'][key]}%（观测 {observed}）")
-        reason = _THRESHOLD_STOP_PREFIX + "；".join(facts)
-        stopped_at = time.time()
-        with _db_lock:
-            connection = get_db()
-            try:
-                with connection:
-                    changed = connection.execute("UPDATE runs SET status='stopping',stop_requested_at=?,error=? "
-                        "WHERE id=? AND quota_attempt=? AND status='running' AND deleted_at IS NULL "
-                        "AND stop_requested_at IS NULL AND worker_container=? AND quota_identity=? "
-                        "AND EXISTS(SELECT 1 FROM accounts a WHERE a.id=runs.account_id AND a.enabled=1 "
-                        "AND a.deleted_at IS NULL AND a.warmup_quota_5h_limit_percent IS ? "
-                        "AND a.warmup_quota_7d_limit_percent IS ?)",
-                        (stopped_at, reason, run_id, attempt, worker_id, state["identity"],
-                         policy["limits"]["five_hour"], policy["limits"]["seven_day"])).rowcount
-                    if changed and run.get("batch_id"):
-                        # 本轮尚在清理时就阻止投放；投放时间保留原间隔，不与额度 reset 混写。
-                        connection.execute("UPDATE task_batches SET status='quota_wait' "
-                                           "WHERE id=? AND status='active'", (run["batch_id"],))
-            finally:
-                connection.close()
-        if not changed:
-            return
-        try:
-            self.runner.persist_worker_profile(worker_id)
-            self.runner.cleanup(None, worker_id)
-        except Exception as error:
-            with _db_lock:
-                connection = get_db()
-                try:
-                    with connection:
-                        connection.execute("UPDATE runs SET status='failed',error=?,ended_at=? "
-                            "WHERE id=? AND quota_attempt=? AND status='stopping' AND stop_requested_at=?",
-                            (reason + "；强制中断清理失败：" + str(error), time.time(), run_id, attempt, stopped_at))
-                        if run.get("batch_id"):
-                            connection.execute("UPDATE task_batches SET status='paused',next_launch_at=NULL "
-                                               "WHERE id=? AND status='quota_wait'", (run["batch_id"],))
-                finally:
-                    connection.close()
-            self._update_batch_item_for_run(run_id, "failed")
-            raise
-        worker_status = self.runner.read_worker_status(run_id)
-        account_error = quota_guard.snapshot(current_account).get("account_error")
-        if worker_status.get("status") == "auth_failed" or account_error:
-            # 终止过程中刚落盘的认证错误仍须保持永久门禁，不能被百分比原因掩盖。
-            error = account_error or worker_status.get("error") or "OAuth 认证失败"
-            with _db_lock:
-                connection = get_db()
-                try:
-                    with connection:
-                        changed = connection.execute("UPDATE runs SET status='auth_failed',error=?,ended_at=? "
-                            "WHERE id=? AND quota_attempt=? AND status='stopping' AND stop_requested_at=?",
-                            (error, time.time(), run_id, attempt, stopped_at)).rowcount
-                finally:
-                    connection.close()
-            if changed:
-                self._update_batch_item_for_run(run_id, "auth_failed")
-                for code in ("account_on_hold", "invalid_grant"):
-                    if code in error:
-                        quota_guard.record_auth_failure(current_account, code)
-                        break
-            return
-        if self._update_attempt(run_id, attempt, status="stopped", ended_at=time.time()):
-            self._update_batch_item_for_run(run_id, "stopped")
-
     def _execute(self, run_id: str, account: dict, task: dict) -> None:
         attempt = int(task.get("quota_attempt") or 0)
         with self._execution_lock:
@@ -6634,6 +6719,7 @@ class Scheduler:
             self._executing.add((run_id, attempt))
         sem = self._sem(account["id"])
         sem_acquired = False
+        deferred_for_window = False
         sid: Optional[str] = None
         wid: Optional[str] = None
         managed_refresh_stop = threading.Event()
@@ -6653,6 +6739,10 @@ class Scheduler:
             if initial_state["status"] in ("stopping", "stopped"):
                 self._update_batch_item_for_run(run_id, "stopped")
                 return
+            ready_account = self._wait_run_window(run_id, account, attempt)
+            if ready_account is None:
+                return
+            account = ready_account
             if quota_guard and initial_state.get("run_kind") in ("normal", "warmup"):
                 quota_guard.consume(account)
                 if quota_guard.policy_snapshot(account, initial_state["run_kind"], source)["blocked"]:
@@ -6706,6 +6796,11 @@ class Scheduler:
                     if self._update_attempt(run_id, attempt, status="stopped", ended_at=time.time()):
                         self._update_batch_item_for_run(run_id, "stopped")
                     return
+                policy = _account_run_window(account)
+                if not policy["allowed"]:
+                    self._update_attempt(run_id, attempt, window_wait_until=policy.get("next_open_at") or 0)
+                    deferred_for_window = True
+                    return
                 # 首次进入启动流程即固化模型；自动恢复读取原 run 的快照。
                 model = current.get("execution_model")
                 if model is None:
@@ -6750,10 +6845,17 @@ class Scheduler:
                         if warmup_scheduler:
                             warmup_scheduler.handle_run_sync_failure(run_id, account, exc)
                         return
+                # 同步凭据可能跨过边界，此时尚未发起执行，仍应回到原队列等待。
+                policy = _account_run_window(account)
+                if not policy["allowed"]:
+                    self._update_attempt(run_id, attempt, window_wait_until=policy.get("next_open_at") or 0)
+                    deferred_for_window = True
+                    return
                 if not self._update_attempt(
                     run_id,
                     attempt,
                     status="running",
+                    window_wait_until=None,
                     started_at=time.time(),
                     workspace_dir=str(WORKSPACES_DIR / run_id),
                     flows_dir=str(flows_path),
@@ -6790,18 +6892,14 @@ class Scheduler:
                     self._update_attempt(run_id, attempt, status="stopped", ended_at=time.time())
                     self._update_batch_item_for_run(run_id, "stopped")
                     return
-                if account_runtime and current["run_kind"] in ("normal", "warmup"):
-                    exit_code = self.runner.wait_worker(wid, on_running=lambda:
-                        self._enforce_running_quota(run_id, account, attempt, wid))
-                else:
-                    exit_code = self.runner.wait_worker(wid)
+                exit_code = self.runner.wait_worker(wid)
                 if quota_guard:
                     # 先消费最后的本地观察，再发布终态，让批次看到本次执行产生的额度。
                     quota_guard.consume(account)
                 run_state = self._get_run_state(run_id)
                 if (run_state and run_state["status"] in _TERMINAL_RUN_STATUSES
                         and run_state.get("stop_requested_at") is not None):
-                    # 强制停止已在清理成功后固化终态，此处只补实际退出码，保留原原因和结束时刻。
+                    # 兼容已持久化的停止终态，只补实际退出码，保留原原因和结束时刻。
                     with _db_lock:
                         connection = get_db()
                         try:
@@ -6874,7 +6972,7 @@ class Scheduler:
         finally:
             try:
                 if quota_guard:
-                    quota_guard.release(account, source)
+                    quota_guard.release(account, source, unstarted=deferred_for_window)
                 if warmup_scheduler:
                     warmup_scheduler.handle_run_terminal(run_id, account.get("cc2api_account_id"))
             finally:
@@ -6882,6 +6980,9 @@ class Scheduler:
                     sem.release()
                 with self._execution_lock:
                     self._executing.discard((run_id, attempt))
+                if deferred_for_window and not self._window_stop.is_set():
+                    # 先释放账号资源和本代去重标记，再由同一执行进入时间等待。
+                    self.submit(run_id, account, task)
 
     def _wait_batch_quota(self, batch_id: int, account: dict) -> None:
         state = quota_guard.snapshot(account)
@@ -7052,6 +7153,15 @@ class WarmupScheduler:
         :param require_due: 是否要求 `warmup_next_run_at` 已到期
         :return: 是否启动及新 run id
         """
+        connection = get_db()
+        try:
+            row = _get_available_account(connection, account_id)
+        finally:
+            connection.close()
+        if row:
+            policy = _account_run_window(dict(row))
+            if not policy["allowed"]:
+                return {"started": False, "run_id": None, "run_window": policy}
         if account_runtime:
             connection = get_db()
             try:
@@ -7603,10 +7713,12 @@ async def lifespan(app: FastAPI):
     warmup_scheduler.start()
     quota_guard.start()
     if V3_ENABLED:
+        scheduler.recover_window_waits()
         scheduler.recover_active_batches()
     try:
         yield
     finally:
+        scheduler.stop_window_waits()
         quota_guard.stop()
         warmup_scheduler.stop()
         oauth_refresh_scheduler.stop()
@@ -7953,6 +8065,77 @@ class AccountIn(BaseModel):
     enabled: bool = True
 
 
+class RunWindowIntervalIn(BaseModel):
+    """单个账号当地时间段，跨午夜由开始星期归属。"""
+
+    model_config = ConfigDict(extra="forbid")
+    start: StrictStr
+    end: StrictStr
+
+
+class RunWindowConfigIn(BaseModel):
+    """账号运行窗口配置；时区沿用固化环境，不接受单独覆盖。"""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: StrictBool
+    days: list[StrictInt]
+    intervals: list[RunWindowIntervalIn]
+
+
+@app.get("/api/accounts/{aid}/run-window")
+def get_account_run_window(aid: int) -> dict:
+    """返回账号当地时钟及运行时段，不唤醒环境或申请执行许可。
+
+    :param aid: bench 账号标识。
+    :return: 公开运行窗口摘要。
+    """
+    connection = get_db()
+    try:
+        row = connection.execute("SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL", (aid,)).fetchone()
+    finally:
+        connection.close()
+    if row is None:
+        raise HTTPException(404, "账号不存在")
+    return _account_run_window(dict(row), public=True)
+
+
+@app.put("/api/accounts/{aid}/run-window")
+def update_account_run_window(aid: int, body: RunWindowConfigIn) -> dict:
+    """保存 v3 账号当地时段，仅约束后续执行，不打断当前整轮。
+
+    :param aid: bench 账号标识。
+    :param body: 开关、星期及当地时间区间。
+    :return: 保存成功及当前公开窗口摘要。
+    """
+    if not account_runtime:
+        raise HTTPException(409, "运行时段配置仅适用于 v3 固定账号环境")
+    try:
+        configuration = normalize_run_window({"schema": 1, **body.model_dump()})
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from None
+    connection = get_db()
+    try:
+        row = connection.execute("SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL", (aid,)).fetchone()
+    finally:
+        connection.close()
+    if row is None:
+        raise HTTPException(404, "账号不存在")
+    with _oauth_owner_lock(row["name"]):
+        with _db_lock:
+            connection = get_db()
+            try:
+                with connection:
+                    current = connection.execute("SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL", (aid,)).fetchone()
+                    if current is None:
+                        raise HTTPException(404, "账号不存在")
+                    saved = json.dumps(configuration, separators=(",", ":"))
+                    connection.execute("UPDATE accounts SET run_window_json=? WHERE id=?", (saved, aid))
+                    account = {**dict(current), "run_window_json": saved}
+            finally:
+                connection.close()
+    return {"ok": True, "run_window": _account_run_window(account, public=True)}
+
+
 class WarmupConfigIn(BaseModel):
     """账号 cc2api 绑定、养号间隔与普通任务/养号共用额度阈值。
 
@@ -8152,6 +8335,7 @@ def list_accounts():
                 timezone,
             )
             account["timezone_mode"] = "manual" if timezone else "auto"
+            account["run_window"] = _account_run_window(account, public=True, zone=account["effective_timezone"])
             account.update(_read_account_oauth_status(account["name"]))
             account["passive_quota"] = _public_quota(account)
             policies = quota_guard.policy_snapshots(account) if quota_guard else {}
@@ -8557,6 +8741,15 @@ def run_account_warmup_now(aid: int):
     """
     if not warmup_scheduler:
         raise HTTPException(500, "养号调度器尚未就绪")
+    connection = get_db()
+    try:
+        account = _get_available_account(connection, aid)
+    finally:
+        connection.close()
+    if account:
+        policy = _account_run_window(dict(account))
+        if not policy["allowed"]:
+            raise HTTPException(409, _window_message(policy))
     result = warmup_scheduler.trigger_account(aid)
     if result.get("started"):
         return result
@@ -10039,6 +10232,7 @@ def list_task_batches():
         for item in items:
             account = conn.execute("SELECT * FROM accounts WHERE id=?", (item["account_id"],)).fetchone()
             item["passive_quota"] = _public_quota(dict(account)) if account else {}
+            item["run_window"] = _account_run_window(dict(account)) if account else {}
             item["quota_policy"] = _public_quota_policy(dict(account)) if account else {}
         return items
     finally:
@@ -10375,6 +10569,7 @@ def list_runs(limit: int = 200):
         for item in items:
             account = conn.execute("SELECT * FROM accounts WHERE id=?", (item["account_id"],)).fetchone()
             item["passive_quota"] = _public_quota(dict(account)) if account else {}
+            item["run_window"] = _account_run_window(dict(account)) if account else {}
             item["quota_policy"] = _public_quota_policy(dict(account), "warmup" if item["run_kind"] == "warmup" else "normal") if account else {}
         return items
     finally:
@@ -10481,6 +10676,7 @@ def get_run(rid: str):
         result["followups"] = _public_followup_progress(result)
         account = conn.execute("SELECT * FROM accounts WHERE id=?", (result["account_id"],)).fetchone()
         result["passive_quota"] = _public_quota(dict(account)) if account else {}
+        result["run_window"] = _account_run_window(dict(account)) if account else {}
         result["quota_policy"] = _public_quota_policy(dict(account), "warmup" if result["run_kind"] == "warmup" else "normal") if account else {}
         return result
     finally:
@@ -10806,6 +11002,9 @@ def continue_run_start(rid: str):
             account = dict(current_account_row)
         finally:
             conn.close()
+        policy = _account_run_window(account)
+        if not policy["allowed"]:
+            raise HTTPException(409, _window_message(policy))
         try:
             session = continue_manager.start(run, account)
         except ValueError as e:
@@ -10954,7 +11153,8 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
                     await asyncio.to_thread(open_bridge)
                 event = {"type": "quota_state", "status": session.status,
                          "message": session.quota.get("message", ""),
-                         "resume_at": session.quota.get("resume_at"), "generation": session.generation}
+                         "resume_at": session.quota.get("resume_at"), "generation": session.generation,
+                         "run_window": session.run_window}
                 signature = json.dumps(event)
                 if signature != last_state:
                     await websocket.send_text(signature)
@@ -11017,7 +11217,10 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
                     if event.get("type") == "input":
                         data = str(event.get("data") or "").encode()
                 if data and bridge["raw"] is not None:
-                    await asyncio.to_thread(continue_manager.send_input, session, bridge["generation"], bridge["raw"], data)
+                    sent = await asyncio.to_thread(continue_manager.send_input, session, bridge["generation"], bridge["raw"], data)
+                    if not sent and session.run_window and not session.run_window["allowed"]:
+                        await websocket.send_text(json.dumps({"type": "run_window", "run_window": session.run_window,
+                            "message": _window_message(session.run_window)}))
         except WebSocketDisconnect:
             pass
         finally:
@@ -11216,6 +11419,17 @@ def v3_environments() -> list[dict]:
         row["role_status"] = account_runtime.role_status(row)
         blocker = account_runtime.reprofile_blocker(row)
         row["fingerprint"] = json.loads(row.pop("fingerprint_json"))
+        if row["account_id"] is not None:
+            connection = get_db()
+            try:
+                account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
+            finally:
+                connection.close()
+            row["run_window"] = _account_run_window(dict(account), public=True, zone=row["fingerprint"]["tz"]) if account else None
+        else:
+            row["run_window"] = None
+        row["physical_features"] = physical_features_summary(row,
+            account_runtime._root(row) / "runtime/physical-features.json", time.time())
         with account_runtime.lock:
             row["busy"] = row["environment_id"] in account_runtime.jobs
         try:
@@ -11236,6 +11450,50 @@ def v3_environments() -> list[dict]:
         row["runtime_release"] = account_runtime.release_id
         row["cli_versions"] = sorted(path.name for path in (account_runtime._root(row) / "cli").glob("*/.ready") for path in [path.parent])
     return rows
+
+
+@app.post("/api/environments/{environment_id}/physical-features/refresh")
+def refresh_v3_physical_features(environment_id: str) -> dict:
+    """显式采集空闲环境特征，失败不覆盖已有观察或创建容器。
+
+    :param environment_id: 持久环境标识。
+    :return: 成功结果；停止/占用/归属冲突返回 409。
+    """
+    if not account_runtime:
+        raise HTTPException(404, "v3 环境未启用")
+    connection = get_db()
+    try:
+        environment = connection.execute("SELECT e.* FROM account_environments e WHERE e.environment_id=? "
+            "AND (e.account_id IS NULL OR EXISTS(SELECT 1 FROM accounts a "
+            "WHERE a.id=e.account_id AND a.deleted_at IS NULL))", (environment_id,)).fetchone()
+    finally:
+        connection.close()
+    if environment is None:
+        raise HTTPException(404, "环境不存在")
+    row = dict(environment)
+    try:
+        with ExitStack() as locks:
+            for guard in (_oauth_owner_lock(row["name"]), _profile_lock(row["name"]),
+                    account_runtime.environment_lock(environment_id)):
+                if not guard.acquire(blocking=False):
+                    raise RuntimeBusy("账号正在维护，请稍后刷新实测")
+                locks.callback(guard.release)
+            # 锁前的列表快照可能已被重建替换，采集必须使用锁内当前代次。
+            connection = get_db()
+            try:
+                current = connection.execute("SELECT e.* FROM account_environments e WHERE e.environment_id=? "
+                    "AND (e.account_id IS NULL OR EXISTS(SELECT 1 FROM accounts a "
+                    "WHERE a.id=e.account_id AND a.deleted_at IS NULL))", (environment_id,)).fetchone()
+            finally:
+                connection.close()
+            if current is None:
+                raise HTTPException(404, "环境不存在")
+            account_runtime.refresh_physical_features(dict(current))
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(409, str(error)) from None
+    except (DockerException, RequestException, OSError):
+        raise HTTPException(503, "容器暂时不可读取，已保留上次观察") from None
+    return {"ok": True}
 
 
 @app.post("/api/environments/{environment_id}/maintenance")

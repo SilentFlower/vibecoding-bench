@@ -26,6 +26,7 @@ from urllib.parse import quote, unquote, urlsplit
 from docker.errors import DockerException, NotFound
 from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, ROLE_LABELS, create_environment, role_container
 from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_process_metrics
+from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, validate_features
 from resource_budget import account_limits, isolated_account_limits
 from system_profile import (MAX_CPUINFO_BYTES, generate_computer_profile, generate_system_profile,
     render_computer_profile, render_system_profile, validate_computer_profile, validate_system_profile,
@@ -505,6 +506,34 @@ class AccountRuntime:
             except DockerException:
                 result[role] = "状态未知"
         return result
+
+    def refresh_physical_features(self, row: dict) -> None:
+        """在已归属的空闲 CLI 中只读采集，不唤醒容器或改变身份。
+
+        :param row: 调用者已持有 owner/profile/environment 锁的环境行。
+        :return: None；成功原子保存私有快照，占用或读取失败抛出 ValueError。
+        """
+        with self.environment_lock(row["environment_id"]):
+            with self.lock:
+                if row["environment_id"] in self.jobs:
+                    raise RuntimeBusy("CLI 正在执行，请在本轮完成后刷新实测")
+            container = (role_container(self, row, "cli") if row.get("isolation_version") == ISOLATION_VERSION
+                else self._container(row))
+            container.reload()
+            if container.status != "running":
+                raise ValueError("容器未运行，保留上次实测；可在正常启动后刷新")
+            # 探针进程有独立截止，Docker SDK 同时沿用已有有限传输超时。
+            result = container.exec_run(["timeout", "--signal=KILL", "5", "python3", "-I", "-c", PHYSICAL_FEATURES_PROBE],
+                user="1000:1000", workdir="/tmp")
+            if result.exit_code or not isinstance(result.output, bytes) or len(result.output) > MAX_SNAPSHOT_BYTES:
+                raise ValueError("物理特征采集失败或超时，已保留上次观察")
+            try:
+                values = validate_features(json.loads(result.output))
+            except (ValueError, TypeError):
+                raise ValueError("物理特征采集结果无效，已保留上次观察") from None
+            atomic_json(self._root(row) / "runtime/physical-features.json", {"schema": 1,
+                "environment_id": row["environment_id"], "generation": row["generation"],
+                "container_id": container.id, "observed_at": time.time(), "values": values})
 
     def _stop_environment(self, row: dict, remove: bool = False) -> None:
         """按角色归属停止完整环境，保留持久数据；停止失败不假报成功。
@@ -1384,11 +1413,10 @@ class AccountRuntime:
                 or payload.get("process") != ("passthrough" if mode == "passthrough" else "recorder")):
             raise ValueError("网络上下文确认不匹配")
 
-    def wait_worker(self, container_id: str, on_running: Callable[[], None] | None = None) -> int:
+    def wait_worker(self, container_id: str) -> int:
         """等待本次 exec，而非等待固定容器退出。
 
         :param container_id: 含本代执行来源的完整 token。
-        :param on_running: 仅当前 exec 仍存活时检查本地额度，不发起上游请求。
         :return: 本次 driver 的退出码
         """
         job = self.job_for_container(container_id)
@@ -1396,11 +1424,6 @@ class AccountRuntime:
             state = self.client.api.exec_inspect(job["exec"])
             if not state.get("Running"):
                 return int(state.get("ExitCode") if state.get("ExitCode") is not None else -1)
-            if on_running is not None:
-                with self.lock:
-                    current = self.jobs.get(job["row"]["environment_id"])
-                if current is job:
-                    on_running()
             time.sleep(0.5)
 
     def register_exec(self, token: str, exec_id: str) -> None:

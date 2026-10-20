@@ -28,7 +28,8 @@ from account_isolation import role_container
 from verify_isolation import memory_peaks, verify_roles, verify_route_failure
 from verify_system_profile import verify_system_information
 from verify_followups import verify_followup_delivery
-from verify_quota_hard_stop import verify_running_quota_stop
+from verify_quota_completion import verify_running_quota_completion
+from verify_run_windows import verify_physical_observation, verify_run_window_completion
 
 
 
@@ -343,8 +344,12 @@ def verify() -> None:
         time.sleep(0.3)
         runtime.cleanup(runtime.execution_token(container.id, "login:abcdef654321"))
         assert (runtime._root(row) / "home" / ".claude" / ".credentials.json").read_bytes() == original
-        if os.environ.get("VERIFY_QUOTA_HARD_STOP_ONLY") == "1":
-            verify_running_quota_stop(runtime, client, account, row, database)
+        verify_physical_observation(runtime, row)
+        if os.environ.get("VERIFY_RUN_WINDOWS_ONLY") == "1":
+            verify_run_window_completion(runtime, client, account, row)
+            return
+        if os.environ.get("VERIFY_QUOTA_COMPLETION_ONLY") == "1":
+            verify_running_quota_completion(runtime, client, account, row, database)
             return
         if os.environ.get("VERIFY_FOLLOWUPS_ONLY") == "1":
             verify_followup_delivery(runtime, client, account, row, database)

@@ -80,11 +80,70 @@ function navigate() {
 window.addEventListener('hashchange', navigate);
 
 /** 加载固定环境状态及空闲维护入口。@return 页面渲染完成。 */
+/**
+ * 按字段实际口径显示配置与观察值，零 RAM 仅表示明确无限制。
+ * @param {string} key 字段名
+ * @param {*} value 已校验的公开标量
+ * @return {string} 供转义后展示的文本
+ */
+function physicalFeatureValue(key, value) {
+  if (value == null) return '未采集';
+  if (typeof value === 'boolean') return value ? '有' : '无';
+  if (key.endsWith('_bytes')) return value === 0 ? '未限制' : `${(value / 1024 ** 2).toFixed(0)} MiB`;
+  return String(value);
+}
+
+/**
+ * 展示保存配置和上次容器实测，避免将缓存值描述为实时采集。
+ * @param {Object} row 环境公开摘要
+ * @return {string} 已转义的详情 HTML
+ */
+function renderPhysicalFeatures(row) {
+  const features = row.physical_features;
+  if (!features) return '';
+  const statuses = {match: '一致', mismatch: '有差异', observed: '已采集', unobserved: '未采集', stale: '旧代观察'};
+  const observed = features.observed_at ? new Date(features.observed_at * 1000).toLocaleString('zh-CN') : '未采集';
+  return `<details class="physical-features" data-physical-details="${escapeHTML(row.environment_id)}">
+    <summary>物理特征 · ${escapeHTML(observed)}</summary>
+    <p class="hint">${escapeHTML(features.message)}。实测取自 CLI 容器可见环境，资源按实际限制展示。</p>
+    <button type="button" class="btn btn-sm" data-physical-refresh="${escapeHTML(row.environment_id)}"
+      ${row.busy || row.role_status?.cli !== 'running' ? 'disabled' : ''}>刷新实测</button>
+    <div class="physical-table-wrap"><table class="data physical-table">
+      <thead><tr><th>特征</th><th>保存配置</th><th>容器实测</th><th>对照</th></tr></thead>
+      <tbody>${features.fields.map(field => `<tr>
+        <th>${escapeHTML(field.label)}</th>
+        <td>${escapeHTML(field.configured == null ? '无对应配置' : physicalFeatureValue(field.key, field.configured))}</td>
+        <td>${escapeHTML(physicalFeatureValue(field.key, field.observed))}</td>
+        <td>${escapeHTML(statuses[field.status] || '未采集')}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </details>`;
+}
+
+/**
+ * 读取固定环境及已有实测快照，并绑定显式维护和采集操作。
+ * @return {Promise<void>} 完成本次页面渲染
+ */
 async function renderEnvironments() {
   const rows = await API('/environments');
   const view = $('#view');
   view.innerHTML = '<h2>固定账号环境</h2><p>停止和重建会保留 HOME、身份和证据。画像校正只适用于没有运行历史的未绑定账号，保留原 HOME 和登录凭据。</p>' +
-    rows.map(row => `<article class="card"><h3>${escapeHTML(row.name)}</h3><p>${escapeHTML(row.state)} · ${row.busy ? '执行中' : '无 CLI 作业'} · ${escapeHTML(row.fingerprint.hostname)} · ${escapeHTML(row.fingerprint.mem)}</p><p>环境 ${escapeHTML(row.environment_id)} · 容器代次 ${row.generation} · profile v${escapeHTML(row.fingerprint.profile_version || 1)} · ${escapeHTML(row.fingerprint.tz)} / ${escapeHTML(row.fingerprint.lang)}</p><p>${escapeHTML(row.identity_status)} · CLI ${escapeHTML((row.cli_versions || []).join(", "))}</p><p>${escapeHTML(Object.entries(row.role_status || {}).map(([role, status]) => `${({cli:"CLI",network:"网络",sender:"API"})[role] || role}: ${status}`).join(" · "))}</p>${['stop', 'rebuild', 'reconcile'].map(operation => `<button data-environment="${escapeHTML(row.environment_id)}" data-operation="${operation}" ${row.busy ? 'disabled' : ''}>${({stop:'停止',rebuild:'重建容器',reconcile:'故障对账'})[operation]}</button>`).join('')}<button data-environment="${escapeHTML(row.environment_id)}" data-operation="reprofile" ${row.can_reprofile ? '' : 'disabled'} title="${escapeHTML(row.reprofile_message || '校正保留原登录凭据')}">校正画像</button></article>`).join('');
+    rows.map(row => `<article class="card"><h3>${escapeHTML(row.name)}</h3><p>${escapeHTML(row.state)} · ${row.busy ? '执行中' : '无 CLI 作业'} · ${escapeHTML(row.fingerprint.hostname)} · ${escapeHTML(row.fingerprint.mem)}</p><p>环境 ${escapeHTML(row.environment_id)} · 容器代次 ${row.generation} · profile v${escapeHTML(row.fingerprint.profile_version || 1)} · ${escapeHTML(row.fingerprint.tz)} / ${escapeHTML(row.fingerprint.lang)}</p><p>${escapeHTML(row.identity_status)} · CLI ${escapeHTML((row.cli_versions || []).join(", "))}</p><p>${escapeHTML(Object.entries(row.role_status || {}).map(([role, status]) => `${({cli:"CLI",network:"网络",sender:"API"})[role] || role}: ${status}`).join(" · "))}</p>${['stop', 'rebuild', 'reconcile'].map(operation => `<button data-environment="${escapeHTML(row.environment_id)}" data-operation="${operation}" ${row.busy ? 'disabled' : ''}>${({stop:'停止',rebuild:'重建容器',reconcile:'故障对账'})[operation]}</button>`).join('')}<button data-environment="${escapeHTML(row.environment_id)}" data-operation="reprofile" ${row.can_reprofile ? '' : 'disabled'} title="${escapeHTML(row.reprofile_message || '校正保留原登录凭据')}">校正画像</button>${row.run_window ? renderAccountRunWindow({id: row.account_id, run_window: row.run_window}) : ''}${renderPhysicalFeatures(row)}</article>`).join('');
+  $$('[data-physical-refresh]', view).forEach(button => {
+    button.onclick = async () => {
+      button.disabled = true;
+      try {
+        const id = button.dataset.physicalRefresh;
+        await API(`/environments/${encodeURIComponent(id)}/physical-features/refresh`, {method: 'POST'});
+        await renderEnvironments();
+        const details = $$('[data-physical-details]', view).find(item => item.dataset.physicalDetails === id);
+        if (details) details.open = true;
+      } catch (error) {
+        alert('采集失败：' + error.message);
+        button.disabled = false;
+      }
+    };
+  });
   $$('[data-operation]', view).forEach(button => button.addEventListener('click', async () => {
     const reprofile = button.dataset.operation === 'reprofile';
     const message = reprofile
@@ -235,6 +294,7 @@ async function renderAccounts() {
         ${a.cc2api_account_id == null ? `<button type="button" class="btn btn-sm" data-cc2-create="${a.id}">创建 cc2api 账号</button>
         <button type="button" class="btn btn-sm" data-cc2-bind="${a.id}">关联已有账号</button>` :
           (RUNTIME_BASE ? `<button type="button" class="btn btn-sm" data-cc2-process="${a.id}">更新进程指标</button>` : '')}
+        ${RUNTIME_BASE ? `<button type="button" class="btn btn-sm" data-run-window-config="${a.id}">运行时段</button>` : ''}
         <button class="btn btn-sm" data-warmup-config="${a.id}">养号 / 额度</button>
         ${Number(a.warmup_enabled || 0) === 1 ? `<button class="btn btn-sm btn-primary" data-warmup-now="${a.id}">立即运行</button>` : ''}
         ${Number(a.warmup_enabled || 0) !== 1 && (a.cc2api_account_id != null || a.warmup_last_status === 'paused') ? `<button class="btn btn-sm" data-warmup-resume="${a.id}">恢复</button>` : ''}
@@ -288,6 +348,11 @@ async function renderAccounts() {
     const createId = e.target.dataset.cc2Create;
     const bindId = e.target.dataset.cc2Bind;
     const processId = e.target.dataset.cc2Process;
+    if (e.target.dataset.runWindowConfig) {
+      try { await openRunWindowConfig(e.target.dataset.runWindowConfig); }
+      catch (error) { alert('载入运行时段失败：' + error.message); }
+      return;
+    }
     const warmupConfigId = e.target.dataset.warmupConfig;
     const warmupNowId = e.target.dataset.warmupNow;
     const warmupResumeId = e.target.dataset.warmupResume;
@@ -410,6 +475,14 @@ async function renderAccounts() {
     if (state.accLogin?.authorizationURL) window.open(state.accLogin.authorizationURL, '_blank', 'noopener,noreferrer');
   };
   $('#acc-modal-close').onclick = () => endAccLogin({ alsoCloseModal: true });
+  $('#run-window-form').onsubmit = saveRunWindowConfig;
+  $('#run-window-add').onclick = () => {
+    if ($$('.run-window-interval', $('#run-window-form')).length >= 8) return;
+    $('#run-window-intervals').insertAdjacentHTML('beforeend', runWindowIntervalRow());
+  };
+  $('#run-window-intervals').onclick = event => {
+    if (event.target.hasAttribute('data-window-remove')) event.target.closest('.run-window-interval').remove();
+  };
   $('#warmup-form').onsubmit = saveWarmupConfig;
   $('#cc2api-binding-form').onsubmit = saveCc2apiBinding;
 }
@@ -510,7 +583,7 @@ function updateWarmupQuotaInputs(form) {
     const value = Number(input.value);
     $(`#warmup-quota-${window}-hint`).textContent = !enabled ? '已关闭，沿用额度用满保护'
       : input.value && Number.isInteger(value) && value >= 1 && value <= 100
-        ? `观测已用达到 ${value}%（剩余 ${100 - value}%）时强制结束当前普通任务与养号轮次，后续执行等待`
+        ? `观测已用达到 ${value}%（剩余 ${100 - value}%）时当前普通任务与养号完成本轮，下一轮等待`
         : '请输入 1～100 的已用百分比整数';
   }
 }
@@ -556,12 +629,138 @@ function renderProxyEndpoint(account) {
   return `<code>${escapeHTML(scheme)}://${escapeHTML(account.upstream_socks5_host)}${port}</code>`;
 }
 
+/**
+ * 使用账号 IANA 时区显示指定时刻，时区无效时明确保留未知状态。
+ * @param {number} timestamp UTC 秒
+ * @param {string} zone IANA 时区
+ * @return {string} 当地日期和时间
+ */
+function accountLocalTime(timestamp, zone) {
+  if (!Number.isFinite(timestamp) || !zone) return '时区待核对';
+  try {
+    return new Intl.DateTimeFormat('zh-CN', {timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+      weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false}).format(new Date(timestamp * 1000));
+  } catch { return '时区待核对'; }
+}
+
+/**
+ * 渲染服务端窗口状态，时钟沿用服务器时刻偏移，不作为执行许可。
+ * @param {Object} account 含 id 和 run_window 的账号摘要
+ * @return {string} 已转义的当地时间及运行窗口
+ */
+function renderAccountRunWindow(account) {
+  const policy = account.run_window;
+  if (!policy) return '';
+  const now = Number(policy.server_now);
+  const boundary = policy.next_open_at || policy.next_close_at || '';
+  const opening = policy.next_open_at ? `下次开放 ${accountLocalTime(policy.next_open_at, policy.timezone)}`
+    : policy.next_close_at ? `本时段结束 ${accountLocalTime(policy.next_close_at, policy.timezone)}` : '';
+  return `<div class="run-window-display" data-run-window-account="${escapeHTML(account.id)}"
+    data-clock-offset="${Number.isFinite(now) ? now * 1000 - Date.now() : 0}" data-refresh-at="${escapeHTML(boundary)}">
+    <div data-local-clock="${escapeHTML(policy.timezone || '')}">${escapeHTML(accountLocalTime(now, policy.timezone))}</div>
+    <div class="muted" data-beijing-clock>北京时间 ${escapeHTML(accountLocalTime(now, 'Asia/Shanghai'))}</div>
+    <div>${escapeHTML(policy.message)}</div><div class="muted">${escapeHTML(opening)}</div>
+  </div>`;
+}
+
+/**
+ * 更新当地时钟，并仅在服务端给出的下一边界重新读取窗口状态。
+ * @return {void} 不重绘表单，不发送模型或额度查询
+ */
+function tickAccountRunWindows() {
+  $$('[data-run-window-account]').forEach(node => {
+    const now = (Date.now() + Number(node.dataset.clockOffset || 0)) / 1000;
+    const local = $('[data-local-clock]', node);
+    if (local) local.textContent = accountLocalTime(now, local.dataset.localClock);
+    const beijing = $('[data-beijing-clock]', node);
+    if (beijing) beijing.textContent = '北京时间 ' + accountLocalTime(now, 'Asia/Shanghai');
+    if (node.dataset.refreshAt && now >= Number(node.dataset.refreshAt)) {
+      node.dataset.refreshAt = '';
+      API(`/accounts/${encodeURIComponent(node.dataset.runWindowAccount)}/run-window`).then(policy => {
+        if (node.isConnected) node.outerHTML = renderAccountRunWindow({id: node.dataset.runWindowAccount, run_window: policy});
+      }).catch(() => {
+        if (node.isConnected) node.append(document.createTextNode(' 状态更新失败，请刷新页面'));
+      });
+    }
+  });
+}
+
+/**
+ * 显示每项等待的实际原因，已开始的运行不被标为休息。
+ * @param {Object} record run 或批次摘要
+ * @return {string} 用户可见状态
+ */
+function runStatusLabel(record) {
+  if (['queued', 'active', 'quota_wait'].includes(record.status) && record.run_window?.allowed === false) {
+    return record.status === 'quota_wait' ? '额度及时段等待' : '时段等待';
+  }
+  return record.status === 'quota_wait' ? '额度等待' : record.status;
+}
+
+/**
+ * 构造可增删的当地时间区间，输入始终由服务器严格校验。
+ * @param {Object} interval 起止时间
+ * @return {string} 已转义的输入行
+ */
+function runWindowIntervalRow(interval = {start: '09:00', end: '18:00'}) {
+  return `<div class="row run-window-interval"><label>开始<input type="time" data-window-start value="${escapeHTML(interval.start)}" required></label>
+    <label>结束<input type="time" data-window-end value="${escapeHTML(interval.end)}" required></label>
+    <button type="button" class="btn btn-sm" data-window-remove>移除</button></div>`;
+}
+
+/**
+ * 加载并打开账号时段配置，表单不提供另一个调度时区。
+ * @param {string|number} aid 账号标识
+ * @return {Promise<void>} 完成表单初始化
+ */
+async function openRunWindowConfig(aid) {
+  const policy = await API(`/accounts/${encodeURIComponent(aid)}/run-window`);
+  const config = policy.config || {enabled: false, days: [], intervals: []};
+  const form = $('#run-window-form');
+  form.elements.account_id.value = aid;
+  form.elements.enabled.checked = config.enabled;
+  $('#run-window-timezone').textContent = policy.timezone || '时区待核对';
+  $('#run-window-days').innerHTML = ['一', '二', '三', '四', '五', '六', '日'].map((day, index) =>
+    `<label><input type="checkbox" data-window-day value="${index}" ${config.days.includes(index) ? 'checked' : ''}>周${day}</label>`).join('');
+  $('#run-window-intervals').innerHTML = (config.intervals.length ? config.intervals : [{start: '09:00', end: '18:00'}]).map(runWindowIntervalRow).join('');
+  openModal('#run-window-modal');
+}
+
+/**
+ * 保存账号运行时间段，服务端只改变后续入场规则。
+ * @param {SubmitEvent} event 表单事件
+ * @return {Promise<void>} 保存并刷新当前列表
+ */
+async function saveRunWindowConfig(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const submit = $('button[type="submit"]', form);
+  submit.disabled = true;
+  try {
+    await API(`/accounts/${encodeURIComponent(form.elements.account_id.value)}/run-window`, {method: 'PUT', body: JSON.stringify({
+      enabled: form.elements.enabled.checked,
+      days: $$('[data-window-day]:checked', form).map(input => Number(input.value)),
+      intervals: $$('.run-window-interval', form).map(row => ({start: $('[data-window-start]', row).value, end: $('[data-window-end]', row).value})),
+    })});
+    closeModal('#run-window-modal');
+    if (currentTab() === 'environments') await renderEnvironments();
+    else await renderAccounts();
+  } catch (error) { alert('保存运行时段失败：' + error.message); }
+  finally { submit.disabled = false; }
+}
+
+/**
+ * 展示环境已生效时区及当地运行窗口。
+ * @param {Object} account 账号摘要
+ * @return {string} 已转义的时区信息
+ */
 function renderAccountTimezone(account) {
   const timezone = account.effective_timezone || account.timezone || '-';
   const mode = account.timezone_mode === 'manual' ? 'manual' : 'auto';
   return `
     <code>${escapeHTML(timezone)}</code>
     <div class="muted">${escapeHTML(mode)}</div>
+    ${renderAccountRunWindow(account)}
   `;
 }
 
@@ -1152,9 +1351,16 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
             const msg = JSON.parse(e.data);
             if (msg.type === 'error') term.write(`\r\n\x1b[31m${msg.msg}\x1b[0m\r\n`);
             if (msg.type === 'quota_state') {
-              inputAllowed = msg.status === 'running';
+              inputAllowed = msg.status === 'running' && msg.run_window?.allowed !== false;
               const status = $('#continue-quota-status');
-              if (status) status.textContent = inputAllowed ? '可继续输入' : `${msg.message || '额度等待'}${msg.resume_at ? `；恢复机会 ${formatWarmupTime(msg.resume_at)}` : '；暂无可信恢复时间'}`;
+              if (status) status.textContent = msg.run_window?.allowed === false
+                ? `${msg.run_window.message}${msg.run_window.next_open_at ? `；下次开放 ${accountLocalTime(msg.run_window.next_open_at, msg.run_window.timezone)}` : ''}`
+                : inputAllowed ? '可继续输入' : `${msg.message || '额度等待'}${msg.resume_at ? `；恢复机会 ${formatWarmupTime(msg.resume_at)}` : '；暂无可信恢复时间'}`;
+            }
+            if (msg.type === 'run_window') {
+              inputAllowed = msg.run_window?.allowed !== false;
+              const status = $('#continue-quota-status');
+              if (status) status.textContent = msg.message;
             }
           } catch { term.write(e.data); }
         }
@@ -1467,7 +1673,7 @@ async function renderTasks() {
     <tr>
       <td>${b.id}</td>
       <td>${escapeHTML(accMap[b.account_id] || `acc#${b.account_id}`)}</td>
-      <td><span class="pill pill-${b.status}">${escapeHTML(b.status === 'quota_wait' ? '额度等待' : b.status)}</span>${b.status === 'quota_wait' ? `<div class="warmup-error">${escapeHTML(b.quota_policy?.message || b.passive_quota?.message || '等待最新额度')}</div>` : ''}</td>
+      <td><span class="pill pill-${b.status}">${escapeHTML(runStatusLabel(b))}</span>${b.status === 'quota_wait' ? `<div class="warmup-error">${escapeHTML(b.quota_policy?.message || b.passive_quota?.message || '等待最新额度')}</div>` : ''}</td>
       <td>${b.done_count || 0}/${b.item_count || 0}</td>
       <td>${b.concurrency}</td>
       <td>${b.interval_min_sec}-${b.interval_max_sec}s</td>
@@ -1734,7 +1940,7 @@ function updateRunDetailContent(rid, run, files, stats, transcript, transcriptSt
   if (statusEl) {
     const nextClass = `pill pill-${safeStatus}`;
     if (statusEl.className !== nextClass) statusEl.className = nextClass;
-    const label = run.status === 'quota_wait' ? '额度等待' : run.status;
+    const label = runStatusLabel(run);
     if (statusEl.textContent !== label) statusEl.textContent = label;
   }
 
@@ -2040,7 +2246,7 @@ function paintRuns(runs) {
         <td><code>${r.id}</code></td>
         <td>${tname}${kind}</td>
         <td>${escapeHTML(accMap[r.account_id] || `acc#${r.account_id}`)}</td>
-        <td><span class="pill pill-${r.status}" title="${escapeHTML(r.status === 'quota_wait' ? r.quota_policy?.message || r.error || '额度等待' : '')}">${escapeHTML(r.status === 'quota_wait' ? '额度等待' : r.status)}</span></td>
+        <td><span class="pill pill-${r.status}" title="${escapeHTML(r.status === 'quota_wait' ? r.quota_policy?.message || r.error || '额度等待' : '')}">${escapeHTML(runStatusLabel(r))}</span></td>
         <td>${dur}</td>
         <td>${r.exit_code ?? '-'}</td>
         <td><div class="op-actions run-actions">
@@ -2290,6 +2496,7 @@ function startClock() {
   const tick = () => {
     const d = new Date();
     el.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    tickAccountRunWindows();
   };
   tick();
   setInterval(tick, 1000);

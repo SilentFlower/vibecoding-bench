@@ -20,6 +20,7 @@ from account_runtime import AccountRuntime, atomic_json, derive_v3_fingerprint, 
 from account_isolation import ROLE_COLUMNS, role_labels
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_PROBE, DMI_DIRECTORIES,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_PROBE, generate_computer_profile, generate_system_profile)
+from physical_features import FEATURE_LABELS, physical_features_summary
 import main
 
 
@@ -55,6 +56,53 @@ class AccountRuntimeTests(unittest.TestCase):
         self.addCleanup(environment.stop)
         self.runtime = AccountRuntime(self.client, self.root, self.root, database, self.fingerprint, self.gateway)
         self.addCleanup(self.runtime.heartbeat_pool.shutdown)
+
+    def test_physical_refresh_uses_current_cli_without_changing_identity(self) -> None:
+        """显式只读采集保留持久身份，并发布当前代的私有快照。@return None。"""
+        row = self.runtime._row("synthetic", 1)
+        self.runtime._update(row, container_id="cli-current", generation=1, isolation_version=2)
+        container = Mock(id="cli-current", status="running", labels=role_labels(self.runtime, row, "cli"))
+        container.exec_run.return_value = SimpleNamespace(exit_code=0,
+            output=json.dumps({"schema": 1, "values": dict.fromkeys(FEATURE_LABELS)}).encode())
+        self.client.containers.get.return_value = container
+        before = row["fingerprint_json"]
+        self.runtime.refresh_physical_features(row)
+        snapshot = self.runtime._root(row) / "runtime/physical-features.json"
+        self.assertEqual("cached", physical_features_summary(row, snapshot, time.time())["status"])
+        self.assertEqual(0o600, snapshot.stat().st_mode & 0o777)
+        self.assertEqual(before, row["fingerprint_json"])
+        self.client.containers.run.assert_not_called()
+        self.assertEqual("1000:1000", container.exec_run.call_args.kwargs["user"])
+
+    def test_physical_refresh_busy_and_stopped_do_not_exec_or_wake(self) -> None:
+        """占用或停止环境只拒绝采集，不唤醒容器。@return None。"""
+        row = self.runtime._row("synthetic", 1)
+        self.runtime.jobs[row["environment_id"]] = {"synthetic": True}
+        with self.assertRaisesRegex(ValueError, "CLI 正在执行"):
+            self.runtime.refresh_physical_features(row)
+        self.client.containers.get.assert_not_called()
+        self.runtime.jobs.clear()
+        self.runtime._update(row, container_id="cli-current", generation=1, isolation_version=2)
+        container = Mock(id="cli-current", status="exited", labels=role_labels(self.runtime, row, "cli"))
+        self.client.containers.get.return_value = container
+        with self.assertRaisesRegex(ValueError, "容器未运行"):
+            self.runtime.refresh_physical_features(row)
+        container.exec_run.assert_not_called()
+        self.client.containers.run.assert_not_called()
+
+    def test_physical_refresh_failure_preserves_previous_snapshot(self) -> None:
+        """采集超时或输出坏时保留上次合法观察。@return None。"""
+        row = self.runtime._row("synthetic", 1)
+        self.runtime._update(row, container_id="cli-current", generation=1, isolation_version=2)
+        container = Mock(id="cli-current", status="running", labels=role_labels(self.runtime, row, "cli"))
+        self.client.containers.get.return_value = container
+        snapshot = self.runtime._root(row) / "runtime/physical-features.json"
+        atomic_json(snapshot, {"previous": True})
+        for result in (SimpleNamespace(exit_code=137, output=b""), SimpleNamespace(exit_code=0, output=b"invalid")):
+            container.exec_run.return_value = result
+            with self.assertRaises(ValueError):
+                self.runtime.refresh_physical_features(row)
+            self.assertEqual({"previous": True}, json.loads(snapshot.read_text()))
 
     def _isolated_docker(self, network=None) -> dict:
         """提供具有独立角色、标签及来源网络的 Docker 替身。@return 容器登记。"""

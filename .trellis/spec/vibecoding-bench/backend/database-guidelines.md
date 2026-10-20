@@ -590,7 +590,7 @@ if "model_override" not in task:
 
 ### 1. Scope / Trigger
 
-修改 v3 账号阈值、普通任务／批次／养号启动、运行中强制停止及恢复、CLI 状态栏、usage 手动查询或页面摘要时适用。v3 不在执行边界或 tick 查询 usage；抓包、续聊和网关 API 不受账号百分比阈值限制，共同耗尽及认证门禁仍生效。旧 runner 保持原兼容行为。
+修改 v3 账号阈值、普通任务／批次／养号启动、本轮完成后的等待与恢复、CLI 状态栏、usage 手动查询或页面摘要时适用。v3 不在执行边界或 tick 查询 usage；抓包、续聊和网关 API 不受账号百分比阈值限制，共同耗尽及认证门禁仍生效。旧 runner 保持原兼容行为。
 
 ### 2. Signatures
 
@@ -606,9 +606,8 @@ QuotaGuard.policy_snapshot(account, workload, source=None, *, quota_state=None) 
 _public_quota_policy(account, workload="normal") -> dict
 statusline_quota_observation(rate_limits: object, observed_at: float) -> dict
 collect_statusline(payload: object, configuration: dict, now: float) -> bool
-AccountRuntime.wait_worker(container_id: str, on_running: Callable[[], None] | None = None) -> int
-Runner.wait_worker(worker_id: str, on_running: Optional[Callable[[], None]] = None) -> int
-Scheduler._enforce_running_quota(run_id: str, account: dict, attempt: int, worker_id: str) -> None
+AccountRuntime.wait_worker(container_id: str) -> int
+Runner.wait_worker(worker_id: str) -> int
 runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止意图与终态字段
 ```
 
@@ -618,12 +617,11 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 
 - 阈值是 1～100 的已用整数百分比，两个窗口独立，默认 NULL；省略保留，null 关闭，StrictInt 拒绝 bool／字符串／小数。保存不隐式改绑。
 - 未绑定账号有完整本地 OAuth 时可以启用定时养号；绑定账号核实身份与 active OAuth，只由 cc2api 刷新。未绑定配置缺凭据返回 409，不调用 cc2api；NULL 绑定的调度写入用 IS ?。
-- 首次额度未知不写成 0%，也不因无样本、进程重启或 300 秒缓存年龄而等待主动查询；没有真实拒绝或有效命中时可启动已有正常任务，由正式响应更新。任一有效窗口已用等于或高于启用阈值时，阻止下一执行，并强制结束正在运行的普通任务／养号本轮，不等待业务完整收尾，也不注入收尾或补充消息。单次响应可能跨阈值，只承诺可信观测后的停止，不能保证实际计费用量不越界或避免封禁。
-- 运行中检查复用当前 Docker exec 的 0.5 秒等待循环：已退出 exec 不再回调，替代 job 不接受旧回调。认领前核对账号身份、run／attempt、完整 token、source、环境及 generation；同一快照消费观察、判定 hit，再用数据库 CAS 核对 running、未停止／删除及仍启用的账号与当前两个阈值。提高／关闭配置使旧判定失效，下轮按新配置判断；缺失、非法或过期窗口不构成命中。
-- 停止先持久化 stopping、stop_requested_at 和包含命中窗口／实际百分比／阈值／UTC 观察时间的 error，再于数据库锁外复用本代 cleanup。TERM → 有界 KILL 与 UID1000 子进程收口确认后写 stopped／ended_at，等待器只补实际 exit_code，不覆盖原因或时间；HOME、项目、session、补充计划和已发证据保留。清理失败记 failed 并暂停批次，运行时保留 cli_reconcile 门禁，不能假报停止或放行下一 CLI；其它账号与独立 API 不随之停止。
-- 已有用户停止、删除和自然终态不被重新分类；清理过程中落盘的认证失败仍优先，明确 account_on_hold／invalid_grant 保留永久门禁。重启看见停止意图只完成旧轮收口，不把它改为 quota_wait 或再次提交。
+- 首次额度未知不写成 0%，也不因无样本、进程重启或 300 秒缓存年龄而等待主动查询；没有真实拒绝或有效命中时可启动已有正常任务，由正式响应更新。任一有效窗口已用等于或高于启用阈值时，只阻止下一轮；已启动的普通任务／养号按冻结计划完成本轮，包括原定补充、收尾和超时。运行中降低阈值同样只影响后续入场，本轮可能越过自设百分比。
+- Docker exec 等待循环只等待原执行退出并返回真实退出码，不再接受百分比强停回调。Scheduler 在发布终态之前消费最后的本地观察，保证下一轮门禁看到本轮用量；不因百分比写 stopping/stopped，不提前注入收尾。缺失、非法或过期窗口不构成有效阈值命中。
+- 真实额度耗尽、认证失败、用户停止、删除、原超时和清理失败保留各自处理。既有用户停止和自然终态不被百分比重新分类，明确 account_on_hold／invalid_grant 保留永久门禁。历史停止意图只完成旧轮收口；已持久化停止终态仅补实际退出码，不改原因或结束时刻，不改为 quota_wait 或再次提交。
 - 旧命中窗口 reset 到期只给一个已有执行正常恢复机会。共同耗尽到期同样参与认领，即使百分比阈值关闭；普通任务／养号／续聊／抓包共用 `policy_key="v3-passive-recovery"`，周期键包含阈值与 reset，以及已耗尽通用窗口的 reset。同周期并发、失败和重启不能再发探测；真实允许的新周期事实才能继续推进。
-- 真正额度耗尽的 quota_wait 仍保留原 run／批次、prompt、workspace/session 与版本／effort／模型快照并按旧恢复流程续跑。阈值强制中断则永久结束本轮 run／item 为 stopped：批次可进入 quota_wait，额度恢复及原 next_launch_at 允许后只投放下一 pending／paused item，不清空原间隔，不重试 stopped item；定时养号按既有间隔安排新一轮，停止不增加认证失败计数。零 run 活动批次依本地事实和恢复机会创建首个正常工作，后台不补查。
+- 真正额度耗尽的 quota_wait 仍保留原 run／批次、prompt、workspace/session 与版本／effort／模型快照并按既有恢复流程续跑。百分比命中后，已完成本轮保持实际终态；下一未执行 run／item 等待额度和原 next_launch_at，不重新执行已完成或历史 stopped item，不清空随机间隔。定时养号按既有间隔安排新一轮；零 run 活动批次依本地事实和恢复机会创建首个正常工作，后台不补查。
 - API 继续消费发送器白名单响应头；CLI 在普通任务、养号、原任务恢复和非抓包续聊临时包装 statusLine，stdin 的 `rate_limits.five_hour/seven_day.used_percentage` 为 0～100，`resets_at` 为 UTC 秒。bool、非有限值、越界值、非未来 reset、超过观察时间 6 小时／8 天的 reset 或缺失窗口不写入；缺失不补零，不删除其它窗口。
 - collector 校验 cwd、主会话目录／文件名、非链接 transcript，最多读取尾部 512 KiB；仅使用本代开始后且不超过当前时间 5 秒的正常主 assistant 响应，排除子会话、synthetic/API 错误和会话冲突。ts 使用响应时间；flock 去重 session／response ID／窗口内容，重复缓存不伪造新观察时间。
 - 观察只保存 source=`cli:<执行来源>`、identity、ts、origin=cli、session_id、response_id 和 rate_limits 白名单；不保存完整 stdin、prompt、工具内容或凭据。QuotaGuard 校验游标来源、身份与 origin，CLI 事件不能提供 account_error。现有用户状态栏获得原 stdin 并保持输出；collector 无网络调用，不增加定时刷新、usage 或模型请求。
@@ -638,13 +636,12 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 | 条件 | 结果 |
 | --- | --- |
 | 首次未知且无真实拒绝 | 正常启动，页面显示未知，不请求 usage |
-| 运行中任一有效窗口等于／跨过启用阈值 | 认领停止并清理当前代，原 run／item 永久 stopped，文件及 session 保留 |
-| 阈值中断后窗口恢复 | 持久单次更新机会仍生效；批次等原投放时间后做下一未执行题目，不续原轮 |
+| 运行中任一有效窗口等于／跨过启用阈值 | 完成原轮次及补充/收尾，按实际结果收口，下一轮等待 |
+| 本轮完成后窗口恢复 | 持久单次更新机会仍生效；下一未执行工作仍等原投放时间，不重跑已完成轮次 |
 | 真正共同耗尽的 quota_wait 在 reset 到期 | 持久认领一次已有执行，沿原题／session 恢复 |
-| 提高／关闭阈值在停止 CAS 前提交 | 旧判定取消，后续观察使用新配置 |
-| 执行代次替换／已自然结束／用户停止 | 旧回调不清理新代，不覆盖已有终态或用户停止 |
-| 强制停止清理失败 | failed，批次 paused；保留 cli_reconcile，禁止下一 CLI |
-| 终止时明确认证失败 | auth_failed 优先；永久认证门禁不被阈值原因掩盖 |
+| 运行中提高／降低／关闭阈值 | 当前轮次不受百分比停止；下一轮使用最新配置 |
+| 已自然结束／用户停止／历史停止意图 | 保留实际终态和停止原因，不因额度更新复活 |
+| 真实清理失败或明确认证失败 | 保留原清理/永久认证门禁，不被百分比策略掩盖 |
 | 恢复机会已使用、并发 tick 或服务重启 | 等待被动更新，不再新增探测 |
 | CLI 窗口缺失／非法／旧响应／重复缓存 | 不追加观察，不覆盖已有有效窗口 |
 | 手动 0%＋过去或空 reset | 沿已有空闲窗口规则记录真实事实，不伪造 reset |
@@ -657,14 +654,14 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 
 ### 5. Scenarios and Examples
 
-- 正常：5h 阈值 60%，普通任务从 55% 启动；正式响应报告 60% 或 68% 时即强制结束本轮，记录原因及实际退出码。reset 到期后下一 pending item 在原间隔允许时取得一次正常更新机会，新观察低位才继续批次，不调用 usage。
-- 边界：只启用 7d=80% 时，养号观察到 5h=55%／7d=80% 也结束本轮；关闭两个阈值则高位不触发百分比停止，共同耗尽和认证保护保持。
+- 正常：5h 阈值 60%，普通任务从 55% 启动；正式响应报告 60% 或 68% 后仍完成原补充和收尾，实际退出 0 才记 success。下一 pending item 等待阈值恢复及原间隔；reset 到期只取得一次正常更新机会，不调用 usage。
+- 边界：只启用 7d=80% 时，养号观察到 5h=55%／7d=80% 仍完成本轮；下一轮等待。关闭两个阈值不取消共同耗尽或认证保护。
 - 基础：600 题批次尚无 run，未知状态可创建第一条正常工作；已有持久投放时间仍须等待，不能补发历史 item。
 - 基础：未绑定账号持本地 OAuth 独立养号；明确绑定后才移交刷新权，不必为养号创建网关账号。
 - 错误用法：前置／后置／失败 tick 自动请求 usage，或用同一缓存状态栏不断刷新 observed_at。正确做法：仅消费正式响应／本地新响应观察，usage 留给手动按钮。
 - 错误用法：取消阈值后让多个 CLI 同时试探耗尽窗口，或重启清掉恢复机会。正确做法：共同耗尽加入同一持久周期认领，真实新观察确认恢复。
 - 错误用法：owner 锁内再次调用 _sync_bound_account_credentials。正确做法：调用 locked 入口，并用真实不可重入锁回归。
-- 错误用法：阈值命中后写 quota_wait 并在 reset 后续原题，或先改终态再调用只接受活动状态的 CAS。正确做法：先原子认领 stopping，清理成功后 stopped，等待器仅补实际退出码；批次恢复只选择尚未执行的 item。
+- 错误用法：运行中百分比命中就 cleanup，或先发布 success 再消费最后额度。正确处理：完成原轮次，先消费最后观察再发布实际终态，由下一轮准入处理等待；真实耗尽仍沿原 quota_wait 恢复。
 
 ### 6. Tests Required
 
@@ -674,10 +671,77 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 - 隔离官方 CLI＋本地 SSE 验证：采集命中 5h／7d，启用前后模型请求相同、usage 为零；安装在镜像中的 collector 被实际执行，测试替身和无真实账号边界明确。
 - 重启批次回归：只注册 active 且账号启用未删除；未来 next_launch_at 必须等待，取消时不创建 run 或清空时间；终态 item 保持。
 - test_warmup_quota.py/test_quota.py 保留旧 runner、Recorder 单次许可、停止／删除／永久异常、字段校验与历史合并回归。
-- test_quota_hard_stop.py：等值／跨阈值、5h／7d、普通／养号、未知／过期／关闭、动态降低与提高配置竞争、重复回调、旧代、自然完成、用户停止、认证竞争、清理失败、重启不续原轮及批次原间隔；真实 Scheduler 等待路径保留命中原因与实际退出码。
-- run_local_verification.py --manifest <本轮联合清单> --quota-hard-stop-only：真实 driver／tmux 用正式 statusLine 产生合成读数，验证 5h=60／68、7d=80 停止、关闭阈值成功；命中后两秒内认领停止、无额外补充／收尾输入、已有项目与会话保留，全部使用离线资料。
-- verify_stack.py --manifest <本轮联合清单> --browser --quota-hard-stop：真实页面配置保存重读、stopped API／SQLite 原因及退出码、XSS 和 1280／390px 明暗主题；不以合成页面终态代替真实 driver 终止验证。
+- test_quota_completion.py：等值／跨阈值、5h／7d、普通／养号、运行中降低阈值、下一轮及批次原间隔、真实超时/认证/用户停止、历史停止收口与原 exec 实际退出码。
+- run_local_verification.py --manifest <本轮联合清单> --quota-completion-only：真实 driver／tmux 和正式 statusLine 验证 5h=60／68、7d=80 后完成原两条补充与收尾，下一轮等待；关闭阈值成功。旧 --quota-hard-stop-only 保留为参数别名，行为采用新契约。
+- verify_stack.py --manifest <本轮联合清单> --browser --quota-completion：真实页面配置、当前说明、历史 stopped API／SQLite 原因不变、XSS 和 1280／390px 明暗主题；旧 --quota-hard-stop 参数保留为别名。
 - 固定 Docker 验证：真实 TLS 手动 usage JSON、监听 PID 不变、无 MITM CA，普通任务／养号透传与显式抓包、独立 API 长流及重建保持；页面 1280/390 明暗主题、未知／被动／手动／历史来源，只有按钮产生一次查询。
+
+---
+
+## Scenario: v3 账号当地运行窗口与准备后复查
+
+### 1. Scope / Trigger
+
+修改账号当地时段、普通/抓包/批次/养号准入、额度恢复、新续聊和 PTY 输入时适用。窗口仅约束下一轮入场；已启动 run 的补充、收尾和在途续聊输出继续。对外 API、登录、OAuth 维护与手动 usage 不加时间门禁。
+
+### 2. Signatures
+
+```text
+accounts.run_window_json TEXT NULL
+runs.window_wait_until REAL NULL
+task_batches.window_wait_until REAL NULL
+GET /api/accounts/{aid}/run-window -> 公开窗口摘要
+PUT /api/accounts/{aid}/run-window -> {ok: true, run_window: 公开窗口摘要}
+RunWindowIntervalIn(start: StrictStr, end: StrictStr), extra=forbid
+RunWindowConfigIn(enabled: StrictBool, days: list[StrictInt], intervals: list[RunWindowIntervalIn]), extra=forbid
+normalize_run_window(value: object) -> dict
+run_window_snapshot(configuration: dict, zone: str, now: float) -> dict
+Scheduler.recover_window_waits() -> None
+Scheduler.stop_window_waits() -> None
+QuotaGuard.release(account: dict, source: str, *, unstarted: bool = False) -> None
+```
+
+### 3. Contracts
+
+- HTTP PUT 不接收 schema 或独立 timezone；存储为 `{schema:1,enabled:boolean,days:[0..6],intervals:[{start:"HH:MM",end:"HH:MM"}]}`。0=周一，6=周日；最多 8 段，启用须同时有星期和区间，start=end 拒绝。关闭时保留已保存配置，历史 NULL 默认全天。
+- 时区沿 `_effective_account_timezone`，已有环境 fingerprint.tz 优先；不按服务器/浏览器时区执行，不为保存或读取创建环境、重抽指纹或同步凭据。PUT 在 owner 与短 DB 写锁内重读账号，仅写该配置；重复 init_db 幂等追加可空列。
+- 开始包含、结束不包含；跨午夜归开始日，重叠区间按并集。当前 UTC 换算当地分钟；下一边界沿真实 UTC 分钟最多搜索 15 天，有界缓存 256 项。DST 缺失分钟跳过，重复小时按两次真实时刻判断；时区或配置坏时拒绝新执行，不静默回退 UTC。控制镜像构建逐个校验允许的 IANA 时区。
+- 账号/环境页面的公开摘要含 enabled、allowed、timezone、server_now、local_time、config、next_open_at、next_close_at、message；未关联账号的草稿窗口为 null。run/batch 也带 run_window，未启用时执行快速路径可省略时钟/config 字段。
+- 窗口外 run 保持 queued，批次保持 active 并延后投放；window_wait_until 是可重算的 UTC 提示，不是许可，未知下次开放时可记 0。等待不计执行超时、不持 CLI 信号量、租约或长期 owner/profile/environment/DB 锁，每不超过 15 秒重读配置、取消、身份和父任务状态，next_launch_at 不被清零。
+- 信号量/owner 等待结束后及凭据准备完成后均复查窗口；发布 running 或调用 start_continue 前已关闭时，普通/抓包保留原 run、attempt 和冻结计划回到等待。立即养号/新续聊明确拒绝；定时养号不提前同步凭据或占许可，保留 due/随机间隔。
+- 续聊新文本和二进制输入由 send_input 再判，不发送、不缓存或重放；已有输出不因窗口结束 cleanup。WS quota_state 含 run_window，拒绝输入可发 type=run_window 事件；quota_tick 在休息时不恢复 CLI。
+- 准备中关窗且确认未发起执行时，release(unstarted=True) 只按 account_id、identity、完整 source 删除本次 warmup_quota_admissions 并释放对应 recovery_source。默认 release 保留已使用的持久机会；旧来源或其它身份不能退还新执行。新建续聊拒绝时去掉临时会话锁，恢复续聊保留原 sid/generation 等待。
+- 额度恢复发布新 queued attempt 时清除上一代 started_at/worker 标识；该代尚未开始才能由窗口等待恢复。启动时 QuotaGuard.recover 跳过明确未发起的窗口 queued，recover_window_waits 用原 run/attempt/prompt、CLI/effort/模型及补充计划重投；历史 stopping 只收口，停用/删除或身份变化不能复活。关停只结束本进程等待，持久队列留待恢复。
+- 下一轮必须同时满足窗口、百分比、真实额度、认证及人工状态。页面显示当地/北京双时钟及服务端边界，沿原秒钟更新并在边界重读摘要，不把前端时钟当许可，不覆盖编辑中的表单。回滚前关闭限制并收口等待，旧版不能保证时间策略。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 旧 NULL 或 enabled=false | 全天，原额度/认证/人工门禁仍有效 |
+| 未知 JSON 字段或 bool/整数/字符串类型错误 | DTO 422；语义非法、超过 8 段、同起止返回 400 |
+| 账号不存在/已删除；非 v3 PUT | 404；409 |
+| 窗口关闭或准备完成后已关闭 | queued/延后；立即养号和续聊前置检查 409，续聊准备后 ValueError 沿既有 HTTP 映射返回 400；提示可用的下次当地开放时间 |
+| 当前一轮跨过结束时刻 | 继续原补充/收尾及实际超时，下一轮等待 |
+| 准备中关窗且已认领恢复机会 | 不启动、退还精确来源许可；已用/其它来源/身份保持 |
+| 窗口与额度分别解除 | 另一个仍拒绝，全部满足才执行原排队 |
+| 配置或时区损坏 | allowed=false 及固定错误说明，等待修正 |
+| 等待中停止/停用/删除/暂停 | 不继续启动，旧间隔与终态不被窗口恢复覆盖 |
+
+### 5. Scenarios and Examples
+
+- 正常：PUT `{"enabled":true,"days":[0,4],"intervals":[{"start":"22:00","end":"02:00"}]}`；周二 01:00 属于周一窗口，02:00 起关闭。
+- 边界：当地 10:59 通过检查，凭据准备结束已为 11:00，不能发起新执行；退回同轮等待，开放后仍可取得尚未使用的恢复机会。已在 10:59 发起的一轮可完成原补充和收尾。
+- 基础：旧账号未设置窗口，控制端升级、重启或容器重建不替用户启用作息；设置只保存在账号 SQLite 行中。
+- 错误用法：只禁前端按钮、固定睡到旧 deadline、只在同步凭据前查一次，或把上一代 started_at 当作新代已开始。正确处理：服务端多入口复查、短周期取消等待、准备后最终判定及新代开始事实重置。
+- 错误用法：等待恢复删掉整个账号的许可，或普通执行结束也传 unstarted=true。正确处理：仅对明确未发起的精确身份/source 退还；已使用机会保持持久。
+
+### 6. Tests Required
+
+- test_run_windows.py：起止边界、跨午夜/周、重叠并集、两账号同 UTC 不同时区、DST 跳时/重复/整段不存在、NULL 及严格格式拒绝。
+- test_run_window_scheduling.py：等待不占信号量/写锁、排队和凭据准备跨关窗、普通/养号/抓包及新建/恢复续聊、精确来源许可退还和默认保留、已运行任务恢复新代后排队重启、取消/停用、原间隔与幂等配置/凭据保持。
+- run_local_verification.py --manifest <联合清单> --run-windows-only：真实 driver 完成本轮跨窗口/阈值、两个门禁分别解除、等待调度器重启、同 run/attempt 恢复及身份/凭据保持。明确镜像批次与挂载源码版本，不使用真实账号。
+- verify_stack.py --manifest <联合清单> --browser --run-boundaries：真实页面星期/多区间保存重读及关闭、固化时区与双时钟、API/SQLite 对照、1280/390px 明暗主题；复用既有取消/永久认证/独立 API 回归。
 
 ---
 
