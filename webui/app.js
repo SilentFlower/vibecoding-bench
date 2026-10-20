@@ -65,6 +65,31 @@ function projectStatus(status) {
 }
 
 /**
+ * 复用运行页的状态颜色，同时区分执行结果和业务验收。
+ * @param {string} status 后端状态
+ * @return {string} 已转义的状态徽章
+ */
+function projectStatusPill(status) {
+  const color = ({not_started: 'queued', ready: 'queued', queued: 'queued', pending: 'queued',
+    running: 'running', active: 'active', quota_wait: 'quota_wait', window_wait: 'quota_wait',
+    paused: 'paused', pausing: 'paused', stopping: 'paused', stopped: 'stopped', cancelled: 'stopped',
+    completed: 'success', passed: 'success', success: 'success', failed: 'failed', blocked: 'failed',
+    error: 'failed', timeout: 'timeout', auth_failed: 'auth_failed'})[status] || 'queued';
+  return `<span class="pill pill-${color}">${escapeHTML(projectStatus(status))}</span>`;
+}
+
+/**
+ * 同步项目勾选数量；没有账号或项目时禁止提交空批次。
+ * @return {void}
+ */
+function updateProjectSelection() {
+  const form = $('#project-batch-form');
+  const selected = $$('input[name="project_keys"]:checked', form).length;
+  $('#project-selected-count').textContent = `已选 ${selected} / ${state.projectCatalog.projects.length} 个项目`;
+  form.querySelector('[type="submit"]').disabled = form.dataset.submitting === 'true' || !form.elements.account_id.value || selected === 0;
+}
+
+/**
  * 加载独立模式，保留其它模式的默认入口。
  * @return {Promise<void>} 页面加载完成
  */
@@ -79,15 +104,41 @@ async function renderProjects() {
     state.projectBatches = batches;
     $('#project-library-count').textContent = `${catalog.projects.length} 个项目 · ${catalog.projects.reduce((n, p) => n + p.step_count, 0)} 个步骤`;
     const form = $('#project-batch-form');
-    form.elements.account_id.innerHTML = accounts.map(a => `<option value="${a.id}">${escapeHTML(a.name)}</option>`).join('');
-    form.elements.project_keys.innerHTML = catalog.projects.map(p => `<option value="${escapeHTML(p.project_key)}" selected>${escapeHTML(p.title)} · ${p.step_count} 步</option>`).join('');
+    form.elements.account_id.innerHTML = accounts.map(a => `<option value="${a.id}">${escapeHTML(a.name)}</option>`).join('') || '<option value="">请先添加可用账号</option>';
+    const choices = $('#project-choice-list');
+    choices.innerHTML = catalog.projects.map(p => `<label class="batch-topic">
+      <input type="checkbox" name="project_keys" value="${escapeHTML(p.project_key)}" checked />
+      <span class="batch-topic-title">${escapeHTML(p.title)}<span class="topic-cat">${escapeHTML(p.category)} · ${escapeHTML(p.project_key)}</span></span>
+      <span class="hint">${p.step_count} 步</span>
+    </label>`).join('') + '<p id="project-filter-empty" class="hint empty-panel hidden">没有匹配的项目</p>';
+    choices.onchange = updateProjectSelection;
+    form.elements.account_id.onchange = updateProjectSelection;
     form.onsubmit = createProjectBatch;
     if (batches.length) form.closest('details').open = false;
     if (!accounts.length) {
-      form.querySelector('[type="submit"]').disabled = true;
-      $('#project-feedback').textContent = '请先添加可用账号。';
+      $('#project-feedback').textContent = '请先在账号页添加可用账号，再创建迭代批次。';
+      $('#project-feedback').classList.remove('hidden');
     }
-    $('#project-select-all').onclick = () => Array.from(form.elements.project_keys.options).forEach(option => { option.selected = true; });
+    $('#project-new-batch').onclick = () => {
+      form.closest('details').open = true;
+      form.elements.name.focus();
+    };
+    $('#project-select-all').onclick = () => {
+      $$('input[name="project_keys"]', choices).forEach(input => { input.checked = true; });
+      updateProjectSelection();
+    };
+    $('#project-clear-all').onclick = () => {
+      $$('input[name="project_keys"]', choices).forEach(input => { input.checked = false; });
+      updateProjectSelection();
+    };
+    $('#project-filter').oninput = event => {
+      const query = event.target.value.trim().toLowerCase();
+      const items = $$('.batch-topic', choices);
+      // 过滤只改变可见性，保留被隐藏项目的勾选状态。
+      items.forEach(item => item.classList.toggle('hidden', !item.textContent.toLowerCase().includes(query)));
+      $('#project-filter-empty').classList.toggle('hidden', items.some(item => !item.classList.contains('hidden')));
+    };
+    updateProjectSelection();
     $('#project-catalog-list').innerHTML = catalog.projects.map(p => `<button type="button" class="project-catalog-item" data-project-preview="${escapeHTML(p.project_key)}"><strong>${escapeHTML(p.title)}</strong><span class="muted">${escapeHTML(p.category)} · ${p.step_count} 步</span></button>`).join('');
     $('#project-catalog-list').onclick = async event => {
       const button = event.target.closest('[data-project-preview]');
@@ -95,7 +146,7 @@ async function renderProjects() {
       try {
         const project = await API(`/project-catalog/${encodeURIComponent(button.dataset.projectPreview)}`);
         endRunDetail();
-        $('#modal-content').innerHTML = `<h3>${escapeHTML(project.title)}</h3><p>${escapeHTML(project.description)}</p><ol>${project.steps.map(step => `<li>${escapeHTML(step.goal.split('接口契约：')[0])}</li>`).join('')}</ol>`;
+        $('#modal-content').innerHTML = `<h3>${escapeHTML(project.title)}</h3><p>${escapeHTML(project.description)}</p><ol>${project.steps.map(step => `<li>${escapeHTML(step.goal.split(/Interface contract:|接口契约：/)[0].trim())}</li>`).join('')}</ol>`;
         openModal('#modal');
       } catch (error) { alert('读取项目路线失败：' + error.message); }
     };
@@ -104,7 +155,10 @@ async function renderProjects() {
     if (selected) await selectProjectBatch(selected.id);
     else connectProjectStream();
   } catch (error) {
-    if ($('#project-feedback')) $('#project-feedback').textContent = error.message;
+    if ($('#project-feedback')) {
+      $('#project-feedback').textContent = error.message;
+      $('#project-feedback').classList.remove('hidden');
+    }
     if ($('#project-batch-form')) $('#project-batch-form').querySelectorAll('input,select,button').forEach(node => { node.disabled = true; });
   }
 }
@@ -117,20 +171,28 @@ async function renderProjects() {
 async function createProjectBatch(event) {
   event.preventDefault();
   const form = event.currentTarget;
+  if (form.dataset.submitting === 'true') return;
+  const projectKeys = $$('input[name="project_keys"]:checked', form).map(input => input.value);
+  if (!projectKeys.length) return alert('请至少选择一个项目');
   const button = form.querySelector('[type="submit"]');
+  form.dataset.submitting = 'true';
   button.disabled = true;
   try {
     const result = await API('/project-iteration-batches', {method: 'POST', body: JSON.stringify({
       account_id: Number(form.elements.account_id.value), name: form.elements.name.value,
-      project_keys: Array.from(form.elements.project_keys.selectedOptions).map(option => option.value),
+      project_keys: projectKeys,
     })});
     state.projectBatches = await API('/project-iteration-batches');
     form.closest('details').open = false;
     $('#project-feedback').textContent = '批次已创建，工作目录将在项目首次实际启动时出现。';
+    $('#project-feedback').classList.remove('hidden');
     paintProjectBatches();
     await selectProjectBatch(result.id);
   } catch (error) { alert('创建项目批次失败：' + error.message); }
-  finally { button.disabled = false; }
+  finally {
+    delete form.dataset.submitting;
+    if (form.isConnected && currentTab() === 'projects') updateProjectSelection();
+  }
 }
 
 /**
@@ -141,10 +203,18 @@ function paintProjectBatches() {
   const host = $('#project-batches');
   if (!host) return;
   const names = Object.fromEntries(state.accounts.map(account => [account.id, account.name]));
-  host.innerHTML = state.projectBatches.map(batch => `<button type="button" class="project-batch-item ${batch.id === state.projectBatchId ? 'selected' : ''}" data-project-batch="${batch.id}"><strong>${escapeHTML(batch.name)}</strong><span>${escapeHTML(names[batch.account_id] || `账号 #${batch.account_id}`)}</span><span>${escapeHTML(projectStatus(batch.status))} · ${batch.counts.completed || 0} 个项目完成</span></button>`).join('') || '<p class="muted">暂无迭代批次</p>';
+  host.innerHTML = state.projectBatches.map(batch => `<tr class="${batch.id === state.projectBatchId ? 'project-selected-row' : ''}">
+    <td>${batch.id}</td><td class="project-name">${escapeHTML(batch.name)}</td>
+    <td>${escapeHTML(names[batch.account_id] || `账号 #${batch.account_id}`)}</td>
+    <td>${projectStatusPill(batch.status)}</td>
+    <td>${batch.counts.completed || 0} / ${Object.values(batch.counts).reduce((sum, count) => sum + count, 0)} 已完成</td>
+    <td><button type="button" class="btn btn-sm" data-project-batch="${batch.id}" ${batch.id === state.projectBatchId ? 'disabled' : ''}>${batch.id === state.projectBatchId ? '已选中' : '查看详情'}</button></td>
+  </tr>`).join('') || '<tr><td colspan="6" class="muted empty-cell">暂无迭代批次，选择项目后创建第一个批次。</td></tr>';
   host.onclick = event => {
     const button = event.target.closest('[data-project-batch]');
-    if (button) selectProjectBatch(Number(button.dataset.projectBatch)).catch(error => alert('读取批次失败：' + error.message));
+    if (button) selectProjectBatch(Number(button.dataset.projectBatch)).then(() => {
+      if (currentTab() === 'projects') $('#project-batch-panel').scrollIntoView({block: 'start'});
+    }).catch(error => alert('读取批次失败：' + error.message));
   };
 }
 
@@ -154,14 +224,21 @@ function paintProjectBatches() {
  * @return {Promise<void>} 加载完成
  */
 async function selectProjectBatch(id) {
+  if (state.projectEventSource) {
+    state.projectEventSource.close();
+    state.projectEventSource = null;
+  }
   state.projectBatchId = id;
+  state.projectBatchDetail = null;
   state.projectInstanceId = null;
   state.projectInstanceDetail = null;
-  state.projectBatchDetail = await API(`/project-iteration-batches/${id}`);
-  if (currentTab() !== 'projects') return;
+  $('#project-instance-detail').classList.add('hidden');
+  $('#project-batch-panel').classList.add('hidden');
+  const batch = await API(`/project-iteration-batches/${id}`);
+  if (currentTab() !== 'projects' || state.projectBatchId !== id) return;
+  state.projectBatchDetail = batch;
   paintProjectBatches();
   paintProjectBatch();
-  $('#project-instance-detail').innerHTML = '<p class="muted">选择项目查看路线、执行和验收。</p>';
   connectProjectStream();
 }
 
@@ -173,17 +250,18 @@ function paintProjectBatch() {
   const batch = state.projectBatchDetail;
   const host = $('#project-batch-detail');
   if (!batch || !host) return;
+  $('#project-batch-panel').classList.remove('hidden');
   const previousScroll = host.querySelector('.project-table-scroll');
   const scrollPosition = [previousScroll?.scrollTop || 0, previousScroll?.scrollLeft || 0];
   const canStart = ['paused', 'pausing'].includes(batch.status);
-  host.innerHTML = `<h2>${escapeHTML(batch.name)}</h2><div class="op-actions"><span class="pill">${escapeHTML(projectStatus(batch.status))}</span>
+  host.innerHTML = `<header class="row-between"><h3>${escapeHTML(batch.name)}</h3><div class="op-actions">${projectStatusPill(batch.status)}
     ${canStart ? '<button class="btn btn-sm btn-primary" type="button" data-project-action="start">启动自动推进</button>' : ''}
     ${batch.status === 'active' ? '<button class="btn btn-sm" type="button" data-project-action="pause">暂停</button>' : ''}
-    ${!['stopped', 'completed', 'stopping'].includes(batch.status) ? '<button class="btn btn-sm btn-danger" type="button" data-project-action="stop">停止批次</button>' : ''}</div>
+    ${!['stopped', 'completed', 'stopping'].includes(batch.status) ? '<button class="btn btn-sm btn-danger" type="button" data-project-action="stop">停止批次</button>' : ''}</div></header>
     ${batch.error ? `<p class="warmup-error">${escapeHTML(batch.error)}</p>` : ''}
-    <p class="muted">最多 ${batch.policy.active_projects} 个活动项目，按阶段轮换。业务失败最多修复 ${batch.policy.repair_limit} 次。</p>
-    <div class="project-table-scroll"><table class="data"><thead><tr><th>项目</th><th>进度</th><th>状态</th><th>工作目录</th></tr></thead><tbody>
-    ${batch.instances.map(item => `<tr><td><button type="button" class="btn btn-sm" data-project-instance="${item.id}">${escapeHTML(item.title)}</button></td><td>${item.next_step_index}/${item.step_count}</td><td>${escapeHTML(projectStatus(item.status))}${item.switch_reason ? `<div class="muted">${escapeHTML(item.switch_reason)}</div>` : ''}</td><td>${item.workspace_path ? `<code class="project-path">${escapeHTML(item.workspace_path)}</code>` : '<span class="muted">未开始</span>'}</td></tr>`).join('')}
+    <p class="hint project-description">最多 ${batch.policy.active_projects} 个活动项目，按阶段轮换；业务失败最多修复 ${batch.policy.repair_limit} 次。点击项目查看路线与执行记录。</p>
+    <div class="table-frame project-table-scroll"><table class="data project-instances-table"><thead><tr><th>project</th><th>steps</th><th>status</th><th>workspace</th></tr></thead><tbody>
+    ${batch.instances.map(item => `<tr class="${item.id === state.projectInstanceId ? 'project-selected-row' : ''}"><td><button type="button" class="btn btn-sm" data-project-instance="${item.id}">${escapeHTML(item.title)}</button></td><td>${item.next_step_index}/${item.step_count}</td><td>${projectStatusPill(item.status)}${item.switch_reason ? `<div class="hint">${escapeHTML(item.switch_reason)}</div>` : ''}</td><td>${item.workspace_path ? `<code class="project-path">${escapeHTML(item.workspace_path)}</code>` : '<span class="muted">首次运行后创建</span>'}</td></tr>`).join('')}
     </tbody></table></div>`;
   // 状态推送不能把正在浏览的百项目列表反复拉回顶部。
   const nextScroll = host.querySelector('.project-table-scroll');
@@ -194,14 +272,19 @@ function paintProjectBatch() {
     const instance = event.target.closest('[data-project-instance]');
     try {
       if (action) {
+        if (action.dataset.projectAction === 'stop' && !confirm('确定停止这个批次？停止后不能恢复，项目代码、数据和进度会保留。')) return;
         action.disabled = true;
         state.projectBatchDetail = await API(`/project-iteration-batches/${batch.id}/${action.dataset.projectAction}`, {method: 'POST'});
+        state.projectBatches = state.projectBatches.map(item => item.id === batch.id ? state.projectBatchDetail : item);
+        paintProjectBatches();
         paintProjectBatch();
       }
       if (instance) {
         state.projectInstanceId = Number(instance.dataset.projectInstance);
         state.projectInstanceDetail = await API(`/project-instances/${state.projectInstanceId}`);
+        paintProjectBatch();
         paintProjectInstance();
+        $('#project-instance-detail').scrollIntoView({block: 'start'});
         connectProjectStream();
       }
     } catch (error) { alert('项目操作失败：' + error.message); if (action) action.disabled = false; }
@@ -216,15 +299,16 @@ function paintProjectInstance() {
   const instance = state.projectInstanceDetail;
   const host = $('#project-instance-detail');
   if (!instance || !host) return;
+  host.classList.remove('hidden');
   const roadmapOpen = host.querySelector('[data-project-roadmap]')?.open || false;
   const previousScroll = host.querySelector('.project-table-scroll');
   const scrollPosition = [previousScroll?.scrollTop || 0, previousScroll?.scrollLeft || 0];
-  host.innerHTML = `<h2>${escapeHTML(instance.title)}</h2><p>${escapeHTML(projectStatus(instance.status))} · 已验收 ${instance.next_step_index}/${instance.step_count} 步</p>
+  host.innerHTML = `<header class="row-between"><h3>${escapeHTML(instance.title)}</h3><div class="op-actions">${projectStatusPill(instance.status)}<button class="btn btn-sm" type="button" data-project-usage="${instance.id}">步骤用量</button></div></header>
+    <p class="hint project-description">已验收 ${instance.next_step_index} / ${instance.step_count} 步；执行日志通过 Run ID 查看，业务验收结果单独记录。</p>
     ${instance.error ? `<p class="warmup-error">${escapeHTML(instance.error)}</p>` : ''}
-    <div class="op-actions"><button class="btn btn-sm" type="button" data-project-usage="${instance.id}">查看步骤用量</button></div>
-    <details data-project-roadmap ${roadmapOpen ? 'open' : ''}><summary>迭代路线</summary><ol>${instance.steps.map((step, index) => `<li>${index < instance.next_step_index ? '✓ ' : ''}${escapeHTML(step.goal.split('接口契约：')[0])}</li>`).join('')}</ol></details>
-    <div class="project-table-scroll"><table class="data"><thead><tr><th>步骤</th><th>尝试</th><th>执行</th><th>验收</th><th>证据</th></tr></thead><tbody>
-    ${instance.attempts.map(attempt => `<tr><td>${escapeHTML(attempt.step_id)}</td><td>${attempt.attempt_no}</td><td>${escapeHTML(projectStatus(attempt.execution_status))}</td><td>${escapeHTML(projectStatus(attempt.validation_status))}</td><td><div class="op-actions"><button type="button" class="btn btn-sm" data-project-run="${escapeHTML(attempt.run_id)}">运行日志</button><button type="button" class="btn btn-sm" data-project-artifact="${attempt.id}">验收与版本</button></div></td></tr>`).join('') || '<tr><td colspan="5" class="muted">尚未投放步骤</td></tr>'}
+    <details class="project-roadmap" data-project-roadmap ${roadmapOpen ? 'open' : ''}><summary>迭代路线</summary><ol>${instance.steps.map((step, index) => `<li>${index < instance.next_step_index ? '✓ ' : ''}${escapeHTML(step.goal.split(/Interface contract:|接口契约：/)[0].trim())}</li>`).join('')}</ol></details>
+    <div class="table-frame project-table-scroll"><table class="data project-attempts-table"><thead><tr><th>step</th><th>attempt</th><th>run</th><th>execution</th><th>verification</th><th>op</th></tr></thead><tbody>
+    ${instance.attempts.map(attempt => `<tr><td>${escapeHTML(attempt.step_id)}</td><td>${attempt.attempt_no}</td><td><button type="button" class="btn btn-sm" data-project-run="${escapeHTML(attempt.run_id)}">${escapeHTML(attempt.run_id)}</button></td><td>${projectStatusPill(attempt.execution_status)}</td><td>${projectStatusPill(attempt.validation_status)}</td><td><button type="button" class="btn btn-sm" data-project-artifact="${attempt.id}">验收与版本</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted empty-cell">尚未投放步骤，启动批次后自动生成执行记录。</td></tr>'}
     </tbody></table></div>`;
   const nextScroll = host.querySelector('.project-table-scroll');
   nextScroll.scrollTop = scrollPosition[0];
@@ -286,7 +370,10 @@ function connectProjectStream() {
       paintProjectBatches();
       paintProjectBatch();
       if (payload.instance) paintProjectInstance();
-    } catch (error) { $('#project-feedback').textContent = '状态流数据暂不可用'; }
+    } catch (error) {
+      $('#project-feedback').textContent = '状态流数据暂不可用';
+      $('#project-feedback').classList.remove('hidden');
+    }
   });
 }
 
@@ -2752,7 +2839,7 @@ function startClock() {
 }
 
 function bindShortcuts() {
-  const TAB_KEYS = { '1': 'accounts', '2': 'topics', '3': 'tasks', '4': 'runs' };
+  const TAB_KEYS = { '1': 'accounts', '2': 'topics', '3': 'tasks', '4': 'projects', '5': 'runs', '6': 'environments' };
   document.addEventListener('keydown', (e) => {
     const inField = /^(INPUT|TEXTAREA|SELECT)$/i.test(e.target.tagName);
 
@@ -2774,18 +2861,23 @@ function bindShortcuts() {
 
     if (inField) return;     // 后续快捷键在输入框中不响应
 
-    // 登录框未关之前 1-4/'/' 都不导航(防止键盘漏到底层 tab)
+    // 登录框未关之前，数字键和搜索键都不导航，防止键盘漏到底层页面。
     if ($('#auth-modal') && !$('#auth-modal').classList.contains('hidden')) return;
 
-    // '/': focus topic filter (auto-switch to topics tab if not there)
+    // 项目页优先搜索当前项目池，其它页面沿用题库搜索。
     if (e.key === '/') {
       e.preventDefault();
+      if (currentTab() === 'projects') {
+        $('#project-batch-form').closest('details').open = true;
+        $('#project-filter').focus();
+        return;
+      }
       if (currentTab() !== 'topics') location.hash = '#topics';
       setTimeout(() => { const f = $('#topic-filter'); if (f) f.focus(); }, 60);
       return;
     }
 
-    // 1..4: tabs
+    // 数字快捷键与导航栏顺序保持一致。
     if (TAB_KEYS[e.key]) {
       e.preventDefault();
       location.hash = '#' + TAB_KEYS[e.key];

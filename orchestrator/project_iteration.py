@@ -627,18 +627,19 @@ class ProjectIterationManager:
             self._clear_current(batch['id'],instance['id'])
             return
         sample = step['checks'][0]
-        recent = [item['goal'].split('接口契约：')[0] for item in
+        # 旧批次继续使用冻结的中文路线，摘要必须同时识别新旧分隔符。
+        recent = [item['goal'].split('Interface contract:',1)[0].split('接口契约：',1)[0].strip() for item in
             manifest['steps'][max(0,instance['next_step_index']-3):instance['next_step_index']]]
-        prompt = ('在当前已有项目中完成一项改动，不重新创建工程。保留已有代码与数据。\n'
-            f"项目：{manifest['title']}\n步骤：{step['id']}\n目标：{step['goal']}\n"
-            f"已有成果：已验收 {instance['next_step_index']} 步。最近成果："+'；'.join(recent)+'\n'
-            '程序协议：python3 app.py，从标准输入逐行读取 JSON 并逐行输出 JSON。仅使用已有运行时和标准库。\n'
-            '验收示例输入：'+canonical_json(sample['input']).decode()+'\n'
-            '示例预期结果：'+canonical_json(sample['expected']).decode()+'\n'
-            '完成当前改动和必要验证后给出简短结果，不自行扩展后续需求。')
+        prompt = ('Implement one change in the existing project. Do not recreate the project. Preserve the existing code and data.\n'
+            f"Project: {manifest['title']}\nStep: {step['id']}\nGoal: {step['goal']}\n"
+            f"Accepted steps: {instance['next_step_index']}. Recent results: "+('; '.join(recent) or 'None yet.')+'\n'
+            'Runtime contract: python3 app.py reads one JSON request from standard input per line and writes one JSON result per line. Use only the existing runtime and standard library.\n'
+            'Example verification input: '+canonical_json(sample['input']).decode()+'\n'
+            'Expected example result: '+canonical_json(sample['expected']).decode()+'\n'
+            'Complete the requested change and necessary checks, then give a brief summary. Do not implement future roadmap steps.')
         if previous and previous['report_relative']:
             report = read_document(self.data/safe_relative(previous['report_relative']))
-            prompt += '\n上一轮失败证据：'+canonical_json(report).decode()[:12000]
+            prompt += '\nPrevious attempt failure evidence: '+canonical_json(report).decode()[:12000]
         execution = self.settings()
         run_id,now = uuid.uuid4().hex[:12],time.time()
         with self.write_lock:
@@ -651,7 +652,7 @@ class ProjectIterationManager:
                     if connection.execute('SELECT a.id FROM project_step_attempts a JOIN project_instances i ON i.id=a.instance_id JOIN project_iteration_batches b ON b.id=i.batch_id WHERE b.account_id=? AND a.ended_at IS NULL',(batch['account_id'],)).fetchone():
                         return
                     task = connection.execute('INSERT INTO tasks(topic_no,title,prompt,account_id,timeout_sec,repeat_n) VALUES(?,?,?,?,?,1)',
-                        (manifest['source_topic_no'],f"[项目迭代] {manifest['title']} / {step['id']}",prompt,batch['account_id'],policy['timeout_sec']))
+                        (manifest['source_topic_no'],f"[Project iteration] {manifest['title']} / {step['id']}",prompt,batch['account_id'],policy['timeout_sec']))
                     task_id = task.lastrowid
                     connection.execute('INSERT INTO runs(id,task_id,account_id,status,run_kind,claude_code_version,claude_effort_level,execution_model,quota_identity) VALUES(?,?,?,?,?,?,?,?,?)',
                         (run_id,task_id,batch['account_id'],'queued',PROJECT_RUN_KIND,execution['claude_code_version'],execution['claude_effort_level'],execution['execution_model'],batch['account_identity']))
@@ -710,12 +711,12 @@ class ProjectIterationManager:
                 self.execution_released(run_id,int(attempt['quota_attempt']))
             return
         if status=='auth_failed':
-            self._finish_failure(attempt,{'status':'error','message':attempt['run_error'] or '账号认证失败'},block=True)
+            self._finish_failure(attempt,{'status':'error','message':attempt['run_error'] or 'Account authentication failed.'},block=True)
             self._batch_error(batch['id'],'账号认证失效，保留全部项目并停止投放')
             return
         if status!='success' or attempt['generation']!=batch['generation'] or batch['status'] in ('stopping','stopped'):
             cancelled = status=='stopped' or batch['status'] in ('stopping','stopped')
-            self._finish_failure(attempt,{'status':'cancelled' if cancelled else 'failed','message':attempt['run_error'] or '执行已停止或未正常结束'},
+            self._finish_failure(attempt,{'status':'cancelled' if cancelled else 'failed','message':attempt['run_error'] or 'Execution stopped or did not complete successfully.'},
                 block=status=='stopped' or batch['status'] in ('stopping','stopped'))
             return
         self._verify_attempt(batch,attempt)

@@ -64,7 +64,7 @@ class ProjectVerifier:
         suite_digest = digest_json(cases)
         payload = "".join(canonical_json(case["input"]).decode() + "\n" for case in cases)
         if len(payload.encode()) > 2 * 1024 * 1024:
-            return {"status": "error", "message": "验收输入超过上限", "suite_digest": suite_digest}
+            return {"status": "error", "message": "Verification input exceeds the size limit.", "suite_digest": suite_digest}
         host_candidate = self.host_data / candidate.relative_to(self.data)
         container = None
         input_root = self.data / "project-verification-inputs"
@@ -95,24 +95,24 @@ class ProjectVerifier:
                     completed = container.wait(timeout=max(1, min(timeout, 60)))
                 except ReadTimeout:
                     # 程序未在限定时间内退出属于候选行为，允许原项目的有限修复。
-                    return {"status": "failed", "message": "程序超过验收时限",
+                    return {"status": "failed", "message": "The program exceeded the verification time limit.",
                         "suite_digest": suite_digest}
                 output = container.logs(stdout=True, stderr=False, tail=1024)
                 errors = container.logs(stdout=False, stderr=True, tail=10)[-4096:]
                 if len(output) > 2 * 1024 * 1024:
-                    return {"status": "failed", "message": "程序输出超过验收上限", "suite_digest": suite_digest}
+                    return {"status": "failed", "message": "Program output exceeds the verification size limit.", "suite_digest": suite_digest}
                 if completed.get("StatusCode") != 0:
-                    return {"status": "failed", "message": "被测程序未正常退出",
+                    return {"status": "failed", "message": "The program exited unsuccessfully.",
                         "stderr": errors.decode(errors="replace"), "suite_digest": suite_digest}
                 try:
                     actual = [json.loads(line) for line in output.decode().splitlines() if line.strip()]
                     # JSON 的 NaN 等扩展不能绕过严格的预期结果比较。
                     canonical_json(actual)
                 except (ValueError, UnicodeError):
-                    return {"status": "failed", "message": "程序未输出约定的逐行 JSON", "suite_digest": suite_digest}
+                    return {"status": "failed", "message": "The program did not output valid newline-delimited JSON.", "suite_digest": suite_digest}
                 failures = []
                 if len(actual) != len(cases):
-                    failures.append({"message": "响应数量不符", "expected_count": len(cases), "actual_count": len(actual)})
+                    failures.append({"message": "The response count does not match the request count.", "expected_count": len(cases), "actual_count": len(actual)})
                 for index, (reply, case) in enumerate(zip(actual, cases)):
                     if not _same_json(reply, case["expected"]):
                         failures.append({"case": index, "input": case["input"],
@@ -123,7 +123,7 @@ class ProjectVerifier:
                     "case_count": len(cases), "failures": failures, "image": self.image}
             except Exception as error:
                 # 基础设施故障不进入模型业务修复，也不能被误记为通过。
-                return {"status": "error", "message": "独立验收环境失败：" + type(error).__name__,
+                return {"status": "error", "message": "Isolated verification environment failed: " + type(error).__name__,
                     "suite_digest": suite_digest}
             finally:
                 if container is not None:

@@ -1574,30 +1574,58 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .run-window-days label { display: inline-flex; align-items: center; gap: .3rem; }
 .run-window-interval { align-items: end; }
 
-/* 项目模式按批次展开；未开始项目不会生成工作目录入口。 */
-.project-create, .project-panel { border: 1px solid var(--border); padding: 16px; margin-block: 16px; background: var(--surface); }
+/* 项目模式复用 Tasks 的表单、勾选列表与表格，详情只在选中后展开。 */
+.project-create, .project-panel { min-width: 0; border: 1px solid var(--border); padding: 16px; background: var(--surface); }
 .project-create summary, .project-panel summary { cursor: pointer; color: var(--amber); }
-#project-batch-form { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(180px, 1fr); gap: 14px; margin-top: 16px; }
-#project-batch-form label { display: flex; flex-direction: column; gap: 6px; }
-#project-batch-form label:nth-child(3), #project-batch-form > p { grid-column: 1 / -1; }
-#project-batch-form select { width: 100%; }
-#project-batch-form select[multiple] { background-image: none; padding-right: 12px; }
-.project-layout { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: 16px; align-items: start; }
-.project-layout > .project-panel { min-width: 0; margin-block: 0 16px; }
-.project-batch-item, .project-catalog-item { display: flex; flex-direction: column; gap: 6px; text-align: left; width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); padding: 12px; cursor: pointer; font: inherit; overflow-wrap: anywhere; }
-.project-batch-item { margin-bottom: 10px; }
-.project-batch-item.selected, .project-batch-item:hover, .project-catalog-item:hover { border-color: var(--amber); }
+.project-create > summary { flex-wrap: wrap; }
+.project-create > summary::after { content: '展开'; margin-left: auto; font-size: 11px; color: var(--text-faint); }
+.project-create[open] > summary::after { content: '收起'; }
+.project-panel { scroll-margin-top: 100px; }
+#project-batch-form { margin-top: 16px; }
+#project-batch-form .row > label { min-width: 0; }
+.project-toolbar .filter-wrap { margin-left: auto; flex: 0 1 340px; min-width: 0; }
+.project-toolbar input[type=search] { min-width: 0; width: 100%; border: 0; background: transparent; box-shadow: none; }
+.project-choice-list .batch-topic { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
+.project-choice-list .batch-topic-title { overflow-wrap: anywhere; }
+.project-choice-list .topic-cat { display: block; color: var(--text-faint); letter-spacing: 0; text-transform: none; }
+.project-choice-list .hint { white-space: nowrap; }
+.project-choice-list .empty-panel { grid-column: 1 / -1; }
+table.project-batches-table { min-width: 880px; }
+.project-batches-table th:first-child { width: 64px; }
+.project-batches-table th:nth-child(2) { width: 30%; }
+.project-batches-table th:nth-child(4) { width: 170px; }
+.project-batches-table th:last-child { width: 140px; }
+.project-batches-table td.project-name { white-space: normal; overflow-wrap: anywhere; }
+table.data tr.project-selected-row { background: var(--surface-3); }
+.project-panel h3 { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+.project-description { margin-top: 12px; }
+.project-catalog-item { display: flex; flex-direction: column; gap: 6px; text-align: left; width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); padding: 12px; cursor: pointer; font: inherit; overflow-wrap: anywhere; }
+.project-catalog-item:hover { border-color: var(--amber); }
 .project-table-scroll { overflow: auto; max-height: min(60vh, 560px); margin-top: 16px; }
-.project-table-scroll table { min-width: 580px; width: 100%; }
+.project-table-scroll table { min-width: 680px; width: 100%; }
+.project-table-scroll table.data td { white-space: normal; overflow-wrap: anywhere; }
+.project-table-scroll .btn { max-width: 100%; text-align: left; }
+.project-instances-table th:first-child { width: 32%; }
+.project-instances-table th:nth-child(2) { width: 80px; }
+.project-instances-table th:nth-child(3) { width: 170px; }
+.project-table-scroll .project-attempts-table { min-width: 840px; }
+.project-attempts-table th:nth-child(2) { width: 90px; }
+.project-attempts-table th:nth-child(3) { width: 180px; }
+.project-attempts-table th:last-child { width: 140px; }
+.project-roadmap { margin-top: 16px; padding: 12px; border: 1px solid var(--border); background: var(--surface-2); }
 .project-path { overflow-wrap: anywhere; }
 .project-report { max-height: 480px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); color: var(--text); padding: 12px; }
 .project-catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-top: 16px; }
 .project-file { display: block; margin-block: 6px; max-width: 100%; overflow-wrap: anywhere; text-align: left; }
-.project-view h2 { font-size: 16px; margin-top: 0; }
 .project-view ol { padding-left: 24px; }
 .project-view li { margin-block: 8px; }
 @media (max-width: 720px) {
-  .project-layout, #project-batch-form { grid-template-columns: minmax(0, 1fr); }
+  #project-batch-form > .row { flex-direction: column; align-items: stretch; }
+  .project-toolbar .filter-wrap { flex-basis: 100%; margin-left: 0; }
+  .project-choice-list, .project-catalog { grid-template-columns: minmax(0, 1fr); }
   .project-create, .project-panel { padding: 10px; }
-  .project-catalog { grid-template-columns: minmax(0, 1fr); }
+  .project-view .view-title { flex-wrap: wrap; gap: 4px 12px; }
+}
+@media (max-width: 920px) {
+  .project-panel { scroll-margin-top: 190px; }
 }

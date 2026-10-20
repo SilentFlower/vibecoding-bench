@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261020-run-windows" />
+  <link rel="stylesheet" href="style.css?v=20261020-project-ui" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -35,8 +35,8 @@
       <a href="#accounts" data-tab="accounts"><span class="tab-en">accounts</span><span class="tab-cn">账号</span></a>
       <a href="#topics"   data-tab="topics"><span class="tab-en">topics</span><span class="tab-cn">题库</span></a>
       <a href="#tasks"    data-tab="tasks"><span class="tab-en">tasks</span><span class="tab-cn">任务</span></a>
-      <a href="#runs"     data-tab="runs"><span class="tab-en">runs</span><span class="tab-cn">运行</span></a>
       <a href="#projects" data-tab="projects"><span class="tab-en">projects</span><span class="tab-cn">项目迭代</span></a>
+      <a href="#runs"     data-tab="runs"><span class="tab-en">runs</span><span class="tab-cn">运行</span></a>
       <a href="#environments" data-tab="environments"><span class="tab-en">environments</span><span class="tab-cn">环境</span></a>
     </nav>
     <div class="statline">
@@ -60,7 +60,7 @@
     <span class="hintbar-sep">│</span>
     <span><kbd>/</kbd> focus filter</span>
     <span class="hintbar-sep">│</span>
-    <span><kbd>1-4</kbd> switch tab</span>
+    <span><kbd>1-6</kbd> switch tab</span>
     <span class="hintbar-spacer"></span>
     <span class="hintbar-build">build · <span id="build-tag">p1</span></span>
   </footer>
@@ -69,25 +69,47 @@
   <template id="tpl-projects">
     <section class="view project-view">
       <header class="view-head">
-        <div><h1>项目迭代</h1><p class="muted">在已有项目上持续改进，按阶段轮换，验收通过后自动推进。</p></div>
-        <span id="project-library-count" class="pill">加载项目库</span>
+        <div>
+          <h2 class="view-title"><span class="bracket">▌</span>projects <span class="muted">// continuous iteration</span></h2>
+          <p class="hint">在已有项目上按阶段持续迭代，验收通过后自动推进；每次执行同步记录到 Runs。</p>
+        </div>
+        <div class="view-actions">
+          <span id="project-library-count" class="hint">加载项目库</span>
+          <button class="btn btn-primary" type="button" id="project-new-batch">+ 创建批次</button>
+        </div>
       </header>
-      <p id="project-feedback" class="hint" role="status"></p>
-      <details class="project-create" open>
-        <summary>创建自动迭代批次</summary>
+      <p id="project-feedback" class="hint hidden" role="status"></p>
+      <details class="batch-panel project-create" open>
+        <summary class="capture-title"><strong>创建迭代批次</strong><span class="muted">// 选择账号与项目</span></summary>
         <form id="project-batch-form" class="form">
-          <label>运行账号<select name="account_id" required></select></label>
-          <label>批次名称<input name="name" value="项目迭代批次" maxlength="120" required></label>
-          <label>项目选择<select name="project_keys" multiple size="6" aria-label="选择迭代项目"></select></label>
-          <div class="op-actions"><button class="btn btn-sm" type="button" id="project-select-all">全选项目</button><button class="btn btn-sm btn-primary" type="submit">创建暂停批次</button></div>
-          <p class="muted">创建后可启动自动推进。项目首次实际启动时才建立工作目录，此后保留代码、数据和进度。</p>
+          <div class="row">
+            <label><span class="lbl">$ account · 运行账号</span><select name="account_id" required></select></label>
+            <label><span class="lbl">$ name · 批次名称</span><input name="name" value="项目迭代批次" maxlength="120" required></label>
+          </div>
+          <div class="batch-toolbar project-toolbar">
+            <button class="btn btn-sm" type="button" id="project-select-all">全选项目</button>
+            <button class="btn btn-sm" type="button" id="project-clear-all">清空</button>
+            <span class="hint" id="project-selected-count" role="status"></span>
+            <div class="filter-wrap">
+              <span class="filter-prefix">filter&gt;</span>
+              <input type="search" id="project-filter" placeholder="搜索项目 / 分类 / 编号" aria-label="搜索迭代项目" />
+            </div>
+          </div>
+          <div id="project-choice-list" class="batch-topic-list project-choice-list" role="group" aria-label="选择迭代项目"></div>
+          <div class="batch-toolbar">
+            <p class="hint">创建后为暂停状态，可在下方启动。项目首次运行时才建立工作目录，此后持续保留成果。</p>
+            <button class="btn btn-primary" type="submit">创建批次</button>
+          </div>
         </form>
       </details>
-      <div class="project-layout">
-        <section class="project-panel"><h2>迭代批次</h2><div id="project-batches"></div></section>
-        <section class="project-panel"><div id="project-batch-detail"><p class="muted">选择一个批次查看进度。</p></div></section>
+      <div class="table-frame">
+        <table class="data project-batches-table">
+          <thead><tr><th>id</th><th>batch</th><th>account</th><th>status</th><th>projects</th><th>op</th></tr></thead>
+          <tbody id="project-batches"></tbody>
+        </table>
       </div>
-      <section class="project-panel" id="project-instance-detail"><p class="muted">选择项目查看路线、执行和验收。</p></section>
+      <section class="batch-panel project-panel hidden" id="project-batch-panel"><div id="project-batch-detail"></div></section>
+      <section class="batch-panel project-panel hidden" id="project-instance-detail"></section>
       <details class="project-panel"><summary>浏览项目库与路线</summary><div id="project-catalog-list" class="project-catalog"></div></details>
     </section>
   </template>
@@ -746,6 +768,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20261020-run-windows"></script>
+  <script src="app.js?v=20261020-project-ui"></script>
 </body>
 </html>

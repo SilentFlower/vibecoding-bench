@@ -131,28 +131,28 @@ FAMILIES = [
 ]
 
 TITLES = {
-    'render_documents':'按 Markdown 标题和段落导出文档','focus_schedule':'生成连续专注与休息时段',
-    'focus_remaining':'按已用时间计算剩余专注时长','snippet_expand':'展开片段中的参数占位符',
-    'changelog':'按发布版本生成变更记录','convert_records':'在 JSON 与逐行 JSON 间转换',
-    'history_favorites':'按真实出现次数整理常用命令','typing_metrics':'计算输入准确率和每分钟词数',
-    'recipe_steps':'拆分命令配方并保留步骤顺序','stock_shortages':'计算库存补货缺口',
-    'quotation_tax':'计算报价折扣、税额与含税总价',
-    'filter':'按业务状态筛选','range':'按数值区间筛选','search':'不区分大小写检索','sort':'稳定排序',
-    'group':'按业务分组计数','totals':'分组累计','deduplicate':'保序去重','required':'必填项诊断',
-    'page':'分页与总数','select':'选择导出字段','csv':'标准 CSV 导出','roundtrip':'JSON 往返一致性',
-    'rank':'排名与同值顺序','average':'均值与极值','histogram':'数值分桶','timeline':'日期与同日顺序',
-    'window':'日期窗口筛选','cumulative':'逐期累计','weighted':'加权指标','median':'中位数',
-    'normalize':'空白规范化','mapping':'字段映射','duplicates':'重复记录预览','merge':'去重合并并保留标签',
-    'tags':'标签统计','tag_filter':'组合标签筛选','transitions':'状态转换准入','conflicts':'资源时间冲突',
-    'missing_dates':'缺失日期检查','streak':'连续日期统计','moving':'滚动均值','ratio':'目标完成比例',
-    'budget':'预算余量','forecast':'简单趋势外推','percentages':'占比统计','outliers':'中位数偏差检查',
-    'compare':'前后版本差异','digest':'规范内容摘要','markdown':'Markdown 清单导出','html':'转义后的 HTML 导出',
-    'word_count':'逐条词数统计','headings':'Markdown 标题提取','links':'文档引用提取','replace':'局部文本替换',
-    'template':'模板占位符填充','diff':'逐行文本差异','terms':'词频索引','slug':'稳定短标识',
-    'glob':'名称模式选择','extensions':'扩展名归类','rename':'前后缀命名预览','sequence':'编号命名预览',
-    'regex':'捕获替换与非法模式拒绝','paths':'相对路径越界诊断','capacity':'容量超额检查',
-    'dependencies':'依赖拓扑与环检查','eligibility':'业务阈值准入','coverage':'必需分组覆盖','matrix':'分组状态矩阵',
-    'errors':'负值记录定位','uniqueness':'业务 ID 唯一性检查',
+    'render_documents':'document rendering with Markdown headings and paragraphs','focus_schedule':'consecutive focus and rest periods',
+    'focus_remaining':'remaining focus time based on elapsed time','snippet_expand':'parameter placeholder expansion in snippets',
+    'changelog':'changelog generation by release version','convert_records':'conversion between JSON and newline-delimited JSON',
+    'history_favorites':'frequently used commands ranked by actual occurrence count','typing_metrics':'typing accuracy and words per minute',
+    'recipe_steps':'command recipe splitting that preserves step order','stock_shortages':'inventory replenishment shortage calculations',
+    'quotation_tax':'quotation discounts, tax amounts, and totals including tax',
+    'filter':'filtering by business status','range':'numeric range filtering','search':'case-insensitive search','sort':'stable sorting',
+    'group':'record counts by business group','totals':'grouped totals','deduplicate':'deduplication that preserves order','required':'required-field diagnostics',
+    'page':'pagination with total counts','select':'export field selection','csv':'standard CSV export','roundtrip':'JSON round-trip consistency',
+    'rank':'ranking with deterministic tie ordering','average':'averages and extrema','histogram':'numeric buckets','timeline':'date ordering with deterministic ties',
+    'window':'date window filtering','cumulative':'cumulative totals by period','weighted':'weighted metrics','median':'median calculations',
+    'normalize':'whitespace normalization','mapping':'field mapping','duplicates':'duplicate record previews','merge':'duplicate merging that preserves tags',
+    'tags':'tag counts','tag_filter':'combined tag filtering','transitions':'status transition eligibility checks','conflicts':'resource scheduling conflict checks',
+    'missing_dates':'missing-date checks','streak':'consecutive-date statistics','moving':'moving averages','ratio':'target completion ratios',
+    'budget':'remaining budget calculations','forecast':'simple trend extrapolation','percentages':'percentage shares','outliers':'median deviation checks',
+    'compare':'before-and-after version comparisons','digest':'canonical content digests','markdown':'Markdown list export','html':'escaped HTML export',
+    'word_count':'word counts per record','headings':'Markdown heading extraction','links':'document reference extraction','replace':'local text replacement',
+    'template':'template placeholder substitution','diff':'line-by-line text differences','terms':'word frequency indexing','slug':'stable short identifiers',
+    'glob':'name pattern matching','extensions':'file extension grouping','rename':'prefix and suffix rename previews','sequence':'numbered rename previews',
+    'regex':'capture-based replacement and invalid-pattern rejection','paths':'relative-path traversal diagnostics','capacity':'capacity limit checks',
+    'dependencies':'topological dependency ordering and cycle checks','eligibility':'business threshold eligibility checks','coverage':'required-group coverage checks','matrix':'group and status matrices',
+    'errors':'negative-value record identification','uniqueness':'business ID uniqueness checks',
 }
 
 # 工具项目按自身业务安排路线，避免对计时器或文档套用文件重命名步骤。
@@ -255,7 +255,7 @@ def build_catalog() -> dict:
         app = HEADER.format(title=topic.title, fields=fields, body=body)
         (seed/'app.py').write_text(app)
         (seed/'demo.json').write_text(json.dumps(rows,ensure_ascii=False,indent=2)+'\n')
-        (seed/'README.md').write_text(f'# {topic.title}\n\n这是可运行的初始版本，样例均为合成数据。\n\n运行：`python3 app.py`，每行输入一个 JSON 请求，每行输出一个 JSON 结果。\n\n初始请求：`{{"action":"overview"}}`。后续迭代在此代码和数据上继续。\n')
+        (seed/'README.md').write_text(f'# {topic.title}\n\nThis is a runnable starting point. All example data is synthetic.\n\nRun `python3 app.py`. Read one JSON request from standard input per line and write one JSON result per line.\n\nInitial request: `{{"action":"overview"}}`. Continue future iterations from this code and data.\n')
         baseline = []
         for data in (rows, []):
             request = {'action':'overview', 'items':data}
@@ -315,18 +315,18 @@ def build_catalog() -> dict:
                 cases.append({'input':request,'expected':evaluate(operator,request,fields)})
             step_id = f'step-{index:02d}'
             contract = {'action':action,'fields':fields,'options':options}
-            goal = f'为 {topic.title} 增加{TITLES[operator]}，处理领域字段 {label}、{metric}、{group}。保留已有能力，空数据须有确定结果。接口契约：'+json.dumps(contract,ensure_ascii=False)
+            goal = f'Add {TITLES[operator]} to {topic.title}, using the domain fields {label}, {metric}, and {group}. Preserve existing behavior and return deterministic results for empty data. Interface contract: '+json.dumps(contract,ensure_ascii=False)
             steps.append({'id':step_id,'goal':goal,'milestone':f'phase-{(index-1)//5+1}',
                 'requires':[] if index==1 else [f'step-{index-1:02d}'],'checks':cases})
             reference[action] = operator
         manifest = {'schema':1,'project_key':key,'title':topic.title,'category':family,'source_topic_no':topic.no,
-            'description':f'围绕 {topic.title} 的本地业务工作台，具有可运行的初始核心和分阶段改进路线。',
+            'description':f'A local {topic.title} workbench with a runnable initial core and a staged improvement roadmap.',
             'entrypoint':['python3','app.py'],'seed_digest':snapshot_tree(seed)['digest'],'baseline_checks':baseline,
-            'milestones':[{'id':f'phase-{n}','title':title} for n,title in enumerate(('基础查询与业务操作','组合工作流','边界与数据处理','交付与可核对结果'),1)],
+            'milestones':[{'id':f'phase-{n}','title':title} for n,title in enumerate(('Core queries and business operations','Combined workflows','Edge cases and data handling','Delivery and verifiable results'),1)],
             'steps':steps}
         (destination/'project.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
         (verification/'reference.json').write_text(json.dumps({'fields':fields,'actions':reference},ensure_ascii=False,indent=2)+'\n')
-    (root/'catalog.json').write_text(json.dumps({'schema':1,'version':'2026.10.1','projects':keys},ensure_ascii=False,indent=2)+'\n')
+    (root/'catalog.json').write_text(json.dumps({'schema':1,'version':'2026.10.2','projects':keys},ensure_ascii=False,indent=2)+'\n')
     return {'projects':len(keys),'steps':sum(len(ROUTE_OVERRIDES.get(topic.no,ops)) for topic,_,ops in selected)}
 
 
