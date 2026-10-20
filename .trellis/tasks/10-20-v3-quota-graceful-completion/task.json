@@ -1,0 +1,42 @@
+{
+  "id": "v3-quota-graceful-completion",
+  "name": "v3-quota-graceful-completion",
+  "title": "v3 额度阈值恢复为本轮完成后等待",
+  "description": "用户要求撤销自设额度百分比阈值的运行中强制停止，当前整轮正常完成，保留下一轮启动门禁、被动采集、真实耗尽与认证保护。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-20",
+  "completedAt": "2026-10-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-20T01:40:02Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "10-20-v3-environment-panel-and-run-windows",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "partialStep": null,
+    "nextStep": "按需单独部署并核对线上既有账号默认配置",
+    "notes": "本地验收、规范和业务代码交付完成；未执行生产部署，保留其它未提交改动。",
+    "completedSteps": [
+      "普通任务和养号达到自设阈值后完成原轮次，下一轮等待",
+      "保留被动额度、真实耗尽/认证/停止/超时保护及历史停止记录",
+      "通过模块与整体验证，完成规范同步和业务代码推送"
+    ],
+    "updatedAt": "2026-10-20T01:40:02Z"
+  }
+}
