@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/project-iterations.md", "reason": "项目内容、实例、目录、历史验收与管理桥的现行契约；本轮需明确更新单步与释放后验收假设"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md", "reason": "复用原 UI、主题、SSE、鉴权、转义与零构建约束"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "租约共享 helper 的 Rust 全量回归和敏感信息边界"}
+{"file": ".trellis/tasks/10-20-project-iteration-scheduling/research/tasks-scheduler.md", "reason": "Tasks 随机队列、持久间隔、并发回归提交及账号额度门禁证据"}
+{"file": ".trellis/tasks/10-20-project-iteration-scheduling/research/plan-recovery.md", "reason": "同 CLI 两步计划、1／2 超时接续与固定计划范围"}
+{"file": ".trellis/tasks/10-20-project-iteration-scheduling/research/runtime-concurrency.md", "reason": "多作业清理、逐步暂停、会话设置覆盖的可行性和不可夸大的验证范围"}
