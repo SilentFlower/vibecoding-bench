@@ -11,18 +11,26 @@ from task_followups import _matches_input, _write, read_dialogue
 
 
 def _read(path: Path, maximum: int = 65536) -> dict:
-    descriptor = os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
-    try:
-        info = os.fstat(descriptor)
-        if not stat.S_ISREG(info.st_mode) or info.st_nlink!=1 or info.st_size>maximum:
-            raise ValueError('计划文件类型或大小无效')
-        with os.fdopen(descriptor,'rb',closefd=False) as stream:
-            document = json.loads(stream.read(maximum+1))
-        if not isinstance(document,dict):
-            raise ValueError('计划文件不是对象')
-        return document
-    finally:
-        os.close(descriptor)
+    for _ in range(3):
+        descriptor = os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        try:
+            info = os.fstat(descriptor)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink>1 or info.st_size>maximum:
+                raise ValueError('计划文件类型或大小无效')
+            if info.st_nlink==0:
+                # 原子发布可能刚好移除已打开的旧inode；重开新文件，仍拒绝硬链接。
+                continue
+            with os.fdopen(descriptor,'rb',closefd=False) as stream:
+                content = stream.read(maximum+1)
+            if len(content)>maximum:
+                raise ValueError('计划文件超出大小上限')
+            document = json.loads(content)
+            if not isinstance(document,dict):
+                raise ValueError('计划文件不是对象')
+            return document
+        finally:
+            os.close(descriptor)
+    raise ValueError('计划文件持续被替换，无法取得稳定内容')
 
 
 def _configuration() -> dict:

@@ -47,7 +47,7 @@ def verify_project_execution(runtime, client, account: dict, row: dict) -> None:
             stack.enter_context(patch.object(main,key,value))
         manager = ProjectIterationManager(data,ProjectLibrary(repository/'project_library'),main.get_db,main._db_lock,
             scheduler.submit,lambda:{'claude_code_version':'9.9.9','claude_effort_level':'high','execution_model':''},
-            main._quota_identity,main.stop_run,ProjectVerifier(client,data,runtime.host_data,verified.image),scheduler.is_executing,
+            main._quota_identity,main._stop_project_run,ProjectVerifier(client,data,runtime.host_data,verified.image),scheduler.is_executing,
             admission=main._project_admission)
         verified.set_project_iterations(manager)
         stack.enter_context(patch.object(main,'project_iterations',manager))

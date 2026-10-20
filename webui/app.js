@@ -271,13 +271,23 @@ function paintProjectBatch() {
   const previousScroll = host.querySelector('.project-table-scroll');
   const scrollPosition = [previousScroll?.scrollTop || 0, previousScroll?.scrollLeft || 0];
   const canStart = ['paused', 'pausing'].includes(batch.status);
+  const schedulingMessages = {
+    paused: '批次已暂停，启动后继续推进', pausing: '正在暂停，等待在途计划收尾',
+    stopping: '正在停止，等待在途执行收口', stopped: '批次已停止，项目成果已保留',
+    completed: '全部项目路线已完成', blocked: '批次已阻塞，请查看上方原因',
+  };
+  const schedulingHint = batch.status === 'active'
+    ? (batch.scheduling?.wait_reasons || []).join('；') || '按保存的队列与容量自动推进'
+    : schedulingMessages[batch.status] || '调度状态待更新';
+  const nextLaunch = batch.status === 'active' && batch.next_launch_at > Date.now() / 1000
+    ? ` · 下一投放最早 ${escapeHTML(new Date(batch.next_launch_at * 1000).toLocaleString())}` : '';
   host.innerHTML = `<header class="row-between"><h3>${escapeHTML(batch.name)}</h3><div class="op-actions">${projectStatusPill(batch.status)}
     ${canStart ? '<button class="btn btn-sm btn-primary" type="button" data-project-action="start">启动自动推进</button>' : ''}
     ${batch.status === 'active' ? '<button class="btn btn-sm" type="button" data-project-action="pause">暂停</button>' : ''}
     ${!['stopped', 'completed', 'stopping'].includes(batch.status) ? '<button class="btn btn-sm btn-danger" type="button" data-project-action="stop">停止批次</button>' : ''}</div></header>
     ${batch.error ? `<p class="warmup-error">${escapeHTML(batch.error)}</p>` : ''}
     <p class="hint project-description">${batch.policy.schema === 2 ? `并发 ${batch.policy.concurrency} / 账号上限 ${batch.scheduling?.account_concurrency_limit ?? '—'}，在途 ${batch.scheduling?.active_runs?.length ?? 0}；活动池 ${batch.instances.filter(item => item.in_pool).length}/${batch.policy.active_projects}，连续通过 ${batch.policy.rotation_steps} 步后轮换；每次 CLI 计划 ${batch.policy.steps_per_plan} 步，超时 ${batch.policy.timeout_sec} 秒，计划间隔 ${batch.policy.interval_min_sec}～${batch.policy.interval_max_sec} 秒。` : `最多 ${batch.policy.active_projects} 个活动项目，按阶段轮换。`}业务失败最多修复 ${batch.policy.repair_limit} 次。</p>
-    ${batch.scheduling ? `<p class="hint">${escapeHTML((batch.scheduling.wait_reasons || []).join('；') || (batch.status === 'active' ? '按保存的队列与容量自动推进' : '等待批次启动'))}${batch.next_launch_at ? ` · 下一投放最早 ${escapeHTML(new Date(batch.next_launch_at * 1000).toLocaleString())}` : ''} · 额度阈值继承账号设置</p>` : ''}
+    ${batch.scheduling ? `<p class="hint project-scheduling-hint">${escapeHTML(schedulingHint)}${nextLaunch} · 额度阈值继承账号设置</p>` : ''}
     <div class="table-frame project-table-scroll"><table class="data project-instances-table"><thead><tr><th>project</th><th>steps</th><th>status</th><th>workspace</th></tr></thead><tbody>
     ${batch.instances.map(item => `<tr class="${item.id === state.projectInstanceId ? 'project-selected-row' : ''}"><td><div class="op-actions"><button type="button" class="btn btn-sm" data-project-instance="${item.id}">${escapeHTML(item.title)}</button>${item.in_pool ? '<span class="pill pill-queued">活动池</span>' : ''}</div></td><td>${item.next_step_index}/${item.step_count}</td><td>${projectStatusPill(item.status)}${item.switch_reason ? `<div class="hint">${escapeHTML(item.switch_reason)}</div>` : ''}</td><td>${item.workspace_path ? `<code class="project-path">${escapeHTML(item.workspace_path)}</code>` : '<span class="muted">首次运行后创建</span>'}</td></tr>`).join('')}
     </tbody></table></div>`;
@@ -831,6 +841,7 @@ async function renderAccounts() {
   };
   $('#acc-modal-close').onclick = () => endAccLogin({ alsoCloseModal: true });
   $('#run-window-form').onsubmit = saveRunWindowConfig;
+  $('#run-window-form').elements.enabled.onchange = updateRunWindowForm;
   $('#run-window-add').onclick = () => {
     if ($$('.run-window-interval', $('#run-window-form')).length >= 8) return;
     $('#run-window-intervals').insertAdjacentHTML('beforeend', runWindowIntervalRow());
@@ -1064,6 +1075,18 @@ function runWindowIntervalRow(interval = {start: '09:00', end: '18:00'}) {
 }
 
 /**
+ * 关闭时保留输入，只禁用时间配置，避免无效的必填控件阻挡关闭限制。
+ * @return {void}
+ */
+function updateRunWindowForm() {
+  const enabled = $('#run-window-form').elements.enabled.checked;
+  $('#run-window-options').disabled = !enabled;
+  $('#run-window-summary').textContent = enabled
+    ? '仅在选中的星期与时间段开始新任务，使用上方环境时区。'
+    : '当前不限制开始时间，可全天开始新任务；保存时保留原有星期和时间段。';
+}
+
+/**
  * 加载并打开账号时段配置，表单不提供另一个调度时区。
  * @param {string|number} aid 账号标识
  * @return {Promise<void>} 完成表单初始化
@@ -1074,10 +1097,12 @@ async function openRunWindowConfig(aid) {
   const form = $('#run-window-form');
   form.elements.account_id.value = aid;
   form.elements.enabled.checked = config.enabled;
+  form.dataset.savedWindowConfig = JSON.stringify(config);
   $('#run-window-timezone').textContent = policy.timezone || '时区待核对';
   $('#run-window-days').innerHTML = ['一', '二', '三', '四', '五', '六', '日'].map((day, index) =>
     `<label><input type="checkbox" data-window-day value="${index}" ${config.days.includes(index) ? 'checked' : ''}>周${day}</label>`).join('');
   $('#run-window-intervals').innerHTML = (config.intervals.length ? config.intervals : [{start: '09:00', end: '18:00'}]).map(runWindowIntervalRow).join('');
+  updateRunWindowForm();
   openModal('#run-window-modal');
 }
 
@@ -1092,14 +1117,18 @@ async function saveRunWindowConfig(event) {
   const submit = $('button[type="submit"]', form);
   submit.disabled = true;
   try {
-    await API(`/accounts/${encodeURIComponent(form.elements.account_id.value)}/run-window`, {method: 'PUT', body: JSON.stringify({
-      enabled: form.elements.enabled.checked,
+    const enabled = form.elements.enabled.checked;
+    // 关闭限制不应被尚未完成的编辑阻拦，也不能把已保存的配置清空。
+    const config = enabled ? {
       days: $$('[data-window-day]:checked', form).map(input => Number(input.value)),
       intervals: $$('.run-window-interval', form).map(row => ({start: $('[data-window-start]', row).value, end: $('[data-window-end]', row).value})),
+    } : JSON.parse(form.dataset.savedWindowConfig);
+    await API(`/accounts/${encodeURIComponent(form.elements.account_id.value)}/run-window`, {method: 'PUT', body: JSON.stringify({
+      enabled, days: config.days, intervals: config.intervals,
     })});
-    closeModal('#run-window-modal');
     if (currentTab() === 'environments') await renderEnvironments();
     else await renderAccounts();
+    closeModal('#run-window-modal');
   } catch (error) { alert('保存运行时段失败：' + error.message); }
   finally { submit.disabled = false; }
 }

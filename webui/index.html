@@ -449,11 +449,15 @@
       <form id="run-window-form" class="form">
         <input type="hidden" name="account_id">
         <p>使用环境时区：<strong id="run-window-timezone"></strong></p>
-        <label><input type="checkbox" name="enabled">启用当地可运行时段</label>
+        <label class="toggle-line"><input type="checkbox" name="enabled"><span>启用当地可运行时段</span></label>
+        <p class="hint" id="run-window-summary" aria-live="polite"></p>
         <p class="hint">关闭限制时可全天运行。时段结束后，本轮仍按原计划完成（包括补充与收尾），下一轮再等待。</p>
-        <fieldset><legend>允许开始的星期</legend><div class="run-window-days" id="run-window-days"></div></fieldset>
-        <div id="run-window-intervals"></div>
-        <button type="button" class="btn btn-sm" id="run-window-add">添加时间段</button>
+        <fieldset id="run-window-options" class="run-window-options">
+          <legend>允许开始的星期与时间段</legend>
+          <div class="run-window-days" id="run-window-days"></div>
+          <div id="run-window-intervals"></div>
+          <button type="button" class="btn btn-sm" id="run-window-add">添加时间段</button>
+        </fieldset>
         <p class="hint">最多 8 个区间。结束早于开始表示跨午夜，按开始星期归属；重叠区间合并生效。夏令时按当地实际时间执行。</p>
         <p class="hint">作用于普通任务、批次、养号、抓包和新续聊输入；对外 API、登录与 OAuth 维护不受此时段限制。</p>
         <div class="row row-end">

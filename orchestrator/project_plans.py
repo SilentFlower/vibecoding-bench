@@ -10,7 +10,7 @@ import time
 import uuid
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-from stat import S_ISREG
+from stat import S_IMODE, S_ISREG
 from typing import TYPE_CHECKING, Callable
 
 from project_library import canonical_json, digest_json, read_document, safe_relative, write_document
@@ -512,10 +512,18 @@ class ProjectPlans:
             return
         path = self.owner.data/safe_relative(execution['decision_relative'])
         self._relative(path)
-        write_document(path,document)
-        # 控制目录以只读方式挂载给 CLI，只允许该普通用户读取决定。
-        os.chown(path,0,1000,follow_symlinks=False)
-        path.chmod(0o640)
+        try:
+            metadata = path.lstat()
+            if not S_ISREG(metadata.st_mode) or metadata.st_nlink!=1:
+                raise ValueError('计划决定不能为链接或特殊文件')
+            current = self._request(path,maximum=65536)
+            if (metadata.st_uid==0 and metadata.st_gid==1000 and S_IMODE(metadata.st_mode)==0o640
+                    and current==document):
+                # 调度会重放已持久化决定，内容未变时不制造新的读取替换窗口。
+                return
+        except FileNotFoundError:
+            pass
+        write_document(path,document,mode=0o640,owner=(0,1000))
 
     def _evidence(self, execution: dict, attempt: dict, plan: dict, request: dict) -> dict:
         expected = {'schema':1,'plan_id':plan['id'],'run_id':execution['run_id'],
@@ -666,7 +674,9 @@ class ProjectPlans:
                 connection.close()
 
     def _block(self, execution: dict, message: str) -> None:
-        plan = self.owner._one('SELECT instance_id FROM project_execution_plans WHERE id=?',(execution['plan_id'],))
+        plan = self.owner._one('SELECT instance_id,status,error FROM project_execution_plans WHERE id=?',(execution['plan_id'],))
+        if plan['status']=='blocked' and plan['error']:
+            message = plan['error']
         self._write("UPDATE project_execution_plans SET status='blocked',error=?,updated_at=? WHERE id=?",
             (message,time.time(),execution['plan_id']))
         self.owner._set_instance(plan['instance_id'],status='blocked',error=message,switch_reason='项目阻塞后切换')
@@ -711,17 +721,23 @@ class ProjectPlans:
         plan = self.owner._one('SELECT * FROM project_execution_plans WHERE id=?',(execution['plan_id'],))
         attempt = self.owner._one('SELECT * FROM project_step_attempts WHERE id=?',(execution['current_attempt_id'],))
         instance = self.owner._one('SELECT * FROM project_instances WHERE id=?',(plan['instance_id'],))
-        cancelled = batch['generation']!=plan['generation'] or batch['status'] in ('stopping','stopped','blocked') or execution['run_status']=='stopped'
         complete = plan['completed_steps']==plan['target_index']-plan['start_index']
-        blocked = plan['status']=='blocked' or execution['run_status']=='auth_failed'
+        blocked = plan['status']=='blocked' or instance['status']=='blocked' or execution['run_status']=='auth_failed'
+        # 局部故障也会定向停止CLI，不能因此抹掉blocked及其原始原因。
+        cancelled = (batch['generation']!=plan['generation'] or batch['status'] in ('stopping','stopped','blocked')
+            or execution['run_status']=='stopped' and not blocked)
         if attempt['ended_at'] is None:
             uncertain = bool(not cancelled and not blocked and execution['source']
                 and not self._can_resume_input(execution,attempt,plan))
             blocked = blocked or uncertain
+            message = execution['run_error'] or 'Execution ended before independent verification.'
+            if uncertain:
+                message = '本步输入投递结果不确定，缺少原生消费证据，禁止自动重发'
+            elif blocked and not cancelled:
+                message = plan['error'] or instance['error'] or message
             # 超时现场属于失败候选而非检查点；原工作目录始终保留，不能回滚成已通过版本。
             self.owner._finish_failure(attempt,{'status':'cancelled' if cancelled else 'failed',
-                'message':'本步输入投递结果不确定，缺少原生消费证据，禁止自动重发' if uncertain else
-                    execution['run_error'] or 'Execution ended before independent verification.'},block=blocked)
+                'message':message},block=blocked)
             if execution.get('native_relative'):
                 end = self._sizes(self.owner.data/safe_relative(execution['native_relative']))
                 self._write('UPDATE project_step_attempts SET native_end_json=? WHERE id=?',(canonical_json(end).decode(),attempt['id']))
@@ -737,10 +753,10 @@ class ProjectPlans:
                     changed = connection.execute('UPDATE project_plan_executions SET ended_at=? WHERE id=? AND ended_at IS NULL',(now,execution['id']))
                     if changed.rowcount!=1:
                         return
-                    state = 'completed' if complete else 'stopped' if cancelled else 'blocked' if blocked else 'ready'
+                    state = 'stopped' if cancelled else 'blocked' if blocked else 'completed' if complete else 'ready'
                     connection.execute('UPDATE project_execution_plans SET status=?,updated_at=?,ended_at=? WHERE id=?',
                         (state,now,now if state!='ready' else None,plan['id']))
-                    if complete:
+                    if state=='completed':
                         finished = instance['next_step_index']==len(json.loads(instance['manifest_json'])['steps'])
                         rotate = instance['visit_completed']>=policy['rotation_steps']
                         order = connection.execute('SELECT COALESCE(MAX(visit_order),0)+1 FROM project_instances WHERE batch_id=?',(batch['id'],)).fetchone()[0]

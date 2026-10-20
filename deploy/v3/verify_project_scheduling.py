@@ -15,13 +15,14 @@ from project_library import ProjectLibrary
 from project_verifier import ProjectVerifier
 
 
-def verify_project_scheduling(runtime, client, account: dict, row: dict) -> None:
+def verify_project_scheduling(runtime, client, account: dict, row: dict, *, catalog_only: bool = False) -> None:
     """运行合成 CLI，但完整使用 Scheduler、tmux、监督器和 Docker 业务验收。
 
     :param runtime: 当前随机部署的账号运行时。
     :param client: Docker 客户端。
     :param account: 合成账号。
     :param row: 已完成合成登录的环境。
+    :param catalog_only: 单独执行默认稳定等待下的百项目规模场景。
     :return: None；任何证据不一致则失败。
     """
     data = runtime.data
@@ -62,7 +63,7 @@ def verify_project_scheduling(runtime, client, account: dict, row: dict) -> None
             stack.enter_context(patch.object(main,key,value))
         manager = ProjectIterationManager(data,ProjectLibrary(repository/'project_library'),main.get_db,main._db_lock,
             scheduler.submit,lambda:{'claude_code_version':'9.9.9','claude_effort_level':'high','execution_model':''},
-            main._quota_identity,main.stop_run,ProjectVerifier(client,data,runtime.host_data,verified.image),scheduler.is_executing,
+            main._quota_identity,main._stop_project_run,ProjectVerifier(client,data,runtime.host_data,verified.image),scheduler.is_executing,
             admission=main._project_admission,execution_control=main._project_execution_control,
             schedule_admission=main._project_schedule_admission,concurrency_limit=main.PER_ACCOUNT_CONCURRENCY)
         verified.set_project_iterations(manager)
@@ -86,8 +87,8 @@ def verify_project_scheduling(runtime, client, account: dict, row: dict) -> None
                 'runtime':(repository/'project_library/reference_runtime.py').read_text(),
                 'actions':{step['checks'][0]['input']['action']:reference['actions'][step['checks'][0]['input']['action']]
                     for step in manifest['steps']},'step_actions':[step['checks'][0]['input']['action'] for step in manifest['steps']],
-                'delay_sec':2}
-            if context['project_key']=='project-004':
+                'delay_sec':0.05 if catalog_only else 2}
+            if not catalog_only and context['project_key']=='project-004':
                 fixture['timeout_step'] = 2
             atomic_json(directory/(context['session_id']+'.json'),fixture,0o644)
             return original_start(run_id,current_account,task)
@@ -121,6 +122,10 @@ def verify_project_scheduling(runtime, client, account: dict, row: dict) -> None
                 time.sleep(0.1)
 
         stack.callback(finish_executions)
+        if catalog_only:
+            from verify_project_catalog import verify_project_catalog
+            verify_project_catalog(manager,verified,client,account,row)
+            return
 
         def await_condition(condition, seconds=180):
             """在有界循环中推进真实控制器并检查失败证据。"""
@@ -190,6 +195,31 @@ def verify_project_scheduling(runtime, client, account: dict, row: dict) -> None
             manager.tick()
             assert observed['overlap'] and observed['frozen_sibling'] and observed['maximum']==2,observed
             print('通过：真实两 CLI 重叠运行；暂停 A 验收时 B 继续；同一 Run/session 两步；逐步用量 11/22；补位截止跨恢复不变',flush=True)
+
+            fault = manager.create_batch(account['id'],'局部阻塞不停止健康项目',['project-005','project-006','project-007'],
+                {'concurrency':2,'active_projects':3,'rotation_steps':2,'steps_per_plan':2,'timeout_sec':180})
+            manager.transition(fault['id'],'start')
+            await_condition(lambda:len(manager.batch(fault['id'])['scheduling']['active_runs'])==2)
+            active = manager.batch(fault['id'])['scheduling']['active_runs']
+            active_instances = {item['instance_id'] for item in active}
+            # 首步已接受才注入，证明真实driver已经启动，避免把启动前取消当作交接故障。
+            await_condition(lambda:all(item['next_step_index']>=1 for item in manager.batch(fault['id'])['instances']
+                if item['id'] in active_instances))
+            victim = active[0]
+            with main.get_db() as connection:
+                execution = dict(connection.execute('SELECT * FROM project_plan_executions WHERE run_id=?',(victim['id'],)).fetchone())
+            manager.plans._block(execution,'合成局部交接故障，保留原始原因')
+            # 后续项目首步通过后再暂停，目录发布本身不能证明它已经越过启动门禁。
+            await_condition(lambda:all(item['next_step_index']>=1 for item in manager.batch(fault['id'])['instances']
+                if item['id']!=victim['instance_id']))
+            manager.transition(fault['id'],'pause')
+            await_condition(lambda:manager.batch(fault['id'])['status']=='paused'
+                and not manager.batch(fault['id'])['scheduling']['active_runs'])
+            failed_instance = manager.instance(victim['instance_id'])
+            assert failed_instance['status']=='blocked' and failed_instance['error']=='合成局部交接故障，保留原始原因',failed_instance
+            assert all(item['next_step_index']>=2 for item in manager.batch(fault['id'])['instances'] if item['id']!=victim['instance_id'])
+            manager.transition(fault['id'],'stop')
+            print('通过：实际停止故障CLI后保留局部blocked及原因；兄弟和原队列后续项目继续独立验收',flush=True)
 
             # 第二批保留一次实际 60 秒工作超时，不能用数据库伪造 timeout 冒充 driver 行为。
             timeout_batch = manager.create_batch(account['id'],'半步超时接续',['project-004'],{'concurrency':1,'timeout_sec':60})

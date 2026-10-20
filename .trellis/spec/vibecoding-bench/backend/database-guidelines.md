@@ -682,7 +682,7 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 
 ### 1. Scope / Trigger
 
-修改账号当地时段、普通/抓包/批次/养号准入、额度恢复、新续聊和 PTY 输入时适用。窗口仅约束下一轮入场；已启动 run 的补充、收尾和在途续聊输出继续。对外 API、登录、OAuth 维护与手动 usage 不加时间门禁。
+修改账号当地时段及其配置弹窗、普通/抓包/批次/养号准入、额度恢复、新续聊和 PTY 输入时适用。窗口仅约束下一轮入场；已启动 run 的补充、收尾和在途续聊输出继续。对外 API、登录、OAuth 维护与手动 usage 不加时间门禁。
 
 ### 2. Signatures
 
@@ -701,9 +701,13 @@ Scheduler.stop_window_waits() -> None
 QuotaGuard.release(account: dict, source: str, *, unstarted: bool = False) -> None
 ```
 
+前端入口为 `openRunWindowConfig(aid)`、`updateRunWindowForm()`、`saveRunWindowConfig(event)`；共享弹窗节点为 `#run-window-form`、`#run-window-options`。
+
 ### 3. Contracts
 
 - HTTP PUT 不接收 schema 或独立 timezone；存储为 `{schema:1,enabled:boolean,days:[0..6],intervals:[{start:"HH:MM",end:"HH:MM"}]}`。0=周一，6=周日；最多 8 段，启用须同时有星期和区间，start=end 拒绝。关闭时保留已保存配置，历史 NULL 默认全天。
+- 弹窗打开时将服务端config保存到form.dataset.savedWindowConfig。启用时从当前DOM读取days／intervals；关闭时禁用`#run-window-options`并提交打开时已保存的days／intervals，不能被未完成的必填时间编辑阻止关闭。关闭再启用保留本次DOM输入；保存关闭不覆盖已保存配置。PUT始终显式发送enabled／days／intervals，不发送schema／timezone。
+- 启用项和星期checkbox与文字同行，使用标准label／fieldset及主题变量；600px及以下时间区间改为单列。宽度检查须覆盖页面、弹窗表单、fieldset及内部控件，不能只以document不溢出判断通过。保存成功的自动关窗须等待API保存及列表刷新完成，自动关窗后立即切页不能与旧列表刷新竞争。
 - 时区沿 `_effective_account_timezone`，已有环境 fingerprint.tz 优先；不按服务器/浏览器时区执行，不为保存或读取创建环境、重抽指纹或同步凭据。PUT 在 owner 与短 DB 写锁内重读账号，仅写该配置；重复 init_db 幂等追加可空列。
 - 开始包含、结束不包含；跨午夜归开始日，重叠区间按并集。当前 UTC 换算当地分钟；下一边界沿真实 UTC 分钟最多搜索 15 天，有界缓存 256 项。DST 缺失分钟跳过，重复小时按两次真实时刻判断；时区或配置坏时拒绝新执行，不静默回退 UTC。控制镜像构建逐个校验允许的 IANA 时区。
 - 账号/环境页面的公开摘要含 enabled、allowed、timezone、server_now、local_time、config、next_open_at、next_close_at、message；未关联账号的草稿窗口为 null。run/batch 也带 run_window，未启用时执行快速路径可省略时钟/config 字段。
@@ -727,6 +731,8 @@ QuotaGuard.release(account: dict, source: str, *, unstarted: bool = False) -> No
 | 窗口与额度分别解除 | 另一个仍拒绝，全部满足才执行原排队 |
 | 配置或时区损坏 | allowed=false 及固定错误说明，等待修正 |
 | 等待中停止/停用/删除/暂停 | 不继续启动，旧间隔与终态不被窗口恢复覆盖 |
+| 弹窗中清空必填时间后关闭限制并保存 | 禁用配置控件，保存已保存的星期／区间；不会被该未完成编辑阻挡 |
+| 保存完成后立即切页 | 弹窗关闭前列表刷新已结束，不再有旧刷新访问移除节点 |
 
 ### 5. Scenarios and Examples
 
@@ -735,13 +741,14 @@ QuotaGuard.release(account: dict, source: str, *, unstarted: bool = False) -> No
 - 基础：旧账号未设置窗口，控制端升级、重启或容器重建不替用户启用作息；设置只保存在账号 SQLite 行中。
 - 错误用法：只禁前端按钮、固定睡到旧 deadline、只在同步凭据前查一次，或把上一代 started_at 当作新代已开始。正确处理：服务端多入口复查、短周期取消等待、准备后最终判定及新代开始事实重置。
 - 错误用法：等待恢复删掉整个账号的许可，或普通执行结束也传 unstarted=true。正确处理：仅对明确未发起的精确身份/source 退还；已使用机会保持持久。
+- 错误用法：关闭fieldset后直接依赖FormData收集完整配置，或只检查页面宽度而漏掉弹窗内溢出。正确处理：显式保留已保存配置，启用时读取当前DOM；关闭场景、内部边界和保存后立即切页分别实测。
 
 ### 6. Tests Required
 
 - test_run_windows.py：起止边界、跨午夜/周、重叠并集、两账号同 UTC 不同时区、DST 跳时/重复/整段不存在、NULL 及严格格式拒绝。
 - test_run_window_scheduling.py：等待不占信号量/写锁、排队和凭据准备跨关窗、普通/养号/抓包及新建/恢复续聊、精确来源许可退还和默认保留、已运行任务恢复新代后排队重启、取消/停用、原间隔与幂等配置/凭据保持。
 - run_local_verification.py --manifest <联合清单> --run-windows-only：真实 driver 完成本轮跨窗口/阈值、两个门禁分别解除、等待调度器重启、同 run/attempt 恢复及身份/凭据保持。明确镜像批次与挂载源码版本，不使用真实账号。
-- verify_stack.py --manifest <联合清单> --browser --run-boundaries：真实页面星期/多区间保存重读及关闭、固化时区与双时钟、API/SQLite 对照、1280/390px 明暗主题；复用既有取消/永久认证/独立 API 回归。
+- verify_stack.py --manifest <联合清单> --browser --run-boundaries：真实页面键盘空格启停、星期/多区间保存重读、关闭禁用但保留、无效编辑时关闭保存、关窗后立即切页；固化时区与双时钟、API/SQLite对照、1280/390px明暗主题。断言checkbox尺寸、同行布局、表单／fieldset无横向滚动及所有控件在内部边界内，并查看截图；复用既有取消/永久认证/独立API回归。
 
 ---
 

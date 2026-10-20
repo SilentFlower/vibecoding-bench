@@ -7845,7 +7845,7 @@ async def lifespan(app: FastAPI):
     if account_runtime:
         try:
             project_iterations = ProjectIterationManager(BENCH_DATA, ProjectLibrary(PROJECT_LIBRARY_DIR), get_db, _db_lock,
-                scheduler.submit, _project_execution_settings, _quota_identity, stop_run,
+                scheduler.submit, _project_execution_settings, _quota_identity, _stop_project_run,
                 ProjectVerifier(runner.client, BENCH_DATA, HOST_BENCH_DATA, account_runtime.image), scheduler.is_executing,
                 admission=_project_admission, execution_control=_project_execution_control,
                 schedule_admission=_project_schedule_admission, concurrency_limit=PER_ACCOUNT_CONCURRENCY)
@@ -11238,8 +11238,23 @@ def get_capture(rid: str):
 
 
 @app.post("/api/runs/{rid}/stop")
-def stop_run(rid: str):
-    """请求停止 queued/running run，并尽量先回写运行时凭据。"""
+def stop_run(rid: str) -> dict:
+    """停止用户指定的运行。@param rid 运行标识。@return 成功标记；初始终态仍拒绝。"""
+    return _request_run_stop(rid, allow_terminal=False)
+
+
+def _stop_project_run(rid: str) -> dict:
+    """按项目收口意图幂等停止。@param rid 运行标识。@return 停止或已终态标记，不伪造释放证明。"""
+    return _request_run_stop(rid, allow_terminal=True)
+
+
+def _request_run_stop(rid: str, *, allow_terminal: bool) -> dict:
+    """按当前执行代次认领停止，长IO留在数据库锁外。
+
+    :param rid: 运行标识。
+    :param allow_terminal: 内部收口是否接受已确定终态或已认领停止。
+    :return: 成功标记；归属、状态或执行代次不符时拒绝。
+    """
     if not runner:
         raise HTTPException(500, "运行器尚未就绪")
     warmup_binding_id: Optional[int] = None
@@ -11261,6 +11276,8 @@ def stop_run(rid: str):
                 warmup_binding_id = account_row["cc2api_account_id"]
     finally:
         conn.close()
+    if allow_terminal and run["status"] in _TERMINAL_RUN_STATUSES | {"stopping"}:
+        return {"ok": True}
     if run["status"] not in ("queued", "running", "quota_wait"):
         raise HTTPException(400, f"运行 {rid} 当前不是 queued/running 状态")
     runner.persist_worker_profile(run.get("worker_container"))
@@ -11268,10 +11285,29 @@ def stop_run(rid: str):
         conn = get_db()
         try:
             with conn:
-                conn.execute(
-                    "UPDATE runs SET status='stopping', stop_requested_at=? WHERE id=?",
-                    (time.time(), rid),
+                current = conn.execute("SELECT * FROM runs WHERE id=? AND deleted_at IS NULL", (rid,)).fetchone()
+                if not current:
+                    raise HTTPException(404, "运行记录不存在")
+                if current["status"] in _TERMINAL_RUN_STATUSES | {"stopping"}:
+                    # 另一个执行已完成或认领停止，旧快照不能把自然终态覆盖成stopped。
+                    return {"ok": True}
+                if current["quota_attempt"] != run["quota_attempt"]:
+                    raise HTTPException(409, "运行执行代次已变化，请重试停止")
+                if current["status"] not in ("queued", "running", "quota_wait"):
+                    raise HTTPException(400, f"运行 {rid} 当前不可停止")
+                run = dict(current)
+                claimed = conn.execute(
+                    "UPDATE runs SET status='stopping', stop_requested_at=? WHERE id=? AND quota_attempt=? AND status IN ('queued','running','quota_wait')",
+                    (time.time(), rid, run["quota_attempt"]),
                 )
+                if claimed.rowcount != 1:
+                    # 数据库状态条件同时保护其他连接刚写入的终态，未认领者不执行清理。
+                    latest = conn.execute("SELECT status FROM runs WHERE id=? AND deleted_at IS NULL", (rid,)).fetchone()
+                    if not latest:
+                        raise HTTPException(404, "运行记录不存在")
+                    if latest["status"] in _TERMINAL_RUN_STATUSES | {"stopping"}:
+                        return {"ok": True}
+                    raise HTTPException(409, "运行状态或执行代次已变化，请重试停止")
         finally:
             conn.close()
     runner.cleanup(run.get("sidecar_container"), run.get("worker_container"))
@@ -11282,8 +11318,8 @@ def stop_run(rid: str):
                 row = conn.execute("SELECT status FROM runs WHERE id=?", (rid,)).fetchone()
                 if row and row["status"] == "stopping":
                     conn.execute(
-                        "UPDATE runs SET status='stopped', ended_at=? WHERE id=?",
-                        (time.time(), rid),
+                        "UPDATE runs SET status='stopped', ended_at=? WHERE id=? AND quota_attempt=? AND status='stopping'",
+                        (time.time(), rid, run["quota_attempt"]),
                     )
         finally:
             conn.close()

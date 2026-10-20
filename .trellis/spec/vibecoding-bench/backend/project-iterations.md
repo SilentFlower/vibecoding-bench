@@ -5,6 +5,7 @@
 ### 1. Scope / Trigger
 
 - 修改 `orchestrator/project_{library,iteration,plans,verifier}.py`、`images/account/project_plan.py`、`run_kind='project_iteration'`、项目管理 API、`#projects` 页面或项目内容打包时适用。
+- 项目调用 `orchestrator/main.py` 的共享停止入口、决定文件跨 UID 交接时也适用。
 - 本模式依赖 v3 固定账号运行环境；普通题库、批次、养号、抓包和续聊继续使用原有身份及状态语义。
 - 内容、路线和业务验收归本文件；Docker 账号角色、租约、认证及原额度恢复继续遵守 [account-runtime-v3.md](./account-runtime-v3.md) 与 [database-guidelines.md](./database-guidelines.md)。
 
@@ -23,7 +24,11 @@ initialize_plan_schema(connection)
 ProjectPlans.execution_configuration(run_id, source, quota_attempt,
                                     native_directory, request_path, decision_path, cwd)
 ProjectVerifier.verify(candidate, cases, timeout=30)
+write_document(path, value, *, mode=0o600, owner=None) -> None
+_stop_project_run(rid) -> dict
 ```
+
+账号侧 `images/account/project_plan.py` 使用 `_read(path, maximum=65536) -> dict` 读取控制文件；仅原子替换引起的旧 fd 链接数归零允许有限重开。
 
 API 均位于原 cookie 鉴权下：
 
@@ -92,6 +97,10 @@ SQLite 的 `PROJECT_SCHEMA` 由 `init_db()` 幂等执行，新增：
 
 输入发送意图先持久化；确认丢失时先读实际原生 user，已消费不能重发。超时恢复若既无消费证据、又无检查点接受后尚未准备本步的明确证明，则阻塞实例。恢复前核对原 session 的持久字节位置和检查点清单／对象摘要；缺失、截断或冲突时保留现场并阻塞，不换会话、不重建 seed。
 
+**决定文件交接**：`write_document` 默认仍为私有0600。决定专用调用传 `mode=0o640,owner=(0,1000)`，在临时fd完成归属、权限、完整写入和fsync后再replace，不能发布后才chown/chmod。已存在的普通、单链接文件若内容及root:1000 0640均相同，`_decision()`不替换inode；缺失或决定变化时重发。driver保留NOFOLLOW／NONBLOCK、普通文件及字节上限检查，只有fstat发现nlink=0时关闭旧fd重开，最多打开3次；硬链接、特殊文件、超大内容和持续替换仍失败，所有fd均关闭。
+
+**停止与局部故障**：项目使用 `_stop_project_run()`，观察到终态或已认领stopping时返回 `{ok: true}`，不改写结果、不重复清理，也不生成释放证明；公开 `POST /api/runs/{rid}/stop` 对初始已终态请求仍400。长IO之后在短DB锁内重读，以quota_attempt及queued/running/quota_wait状态条件认领stopping并检查rowcount，只有认领者清理；竞争终态保留，代次变化拒绝409。清理后的stopped写入同样限定原代次及stopping状态。局部blocked导致的定向停止仍保留blocked及首次具体原因，不能泛化为人工cancelled；父代次变化／批次停止仍按取消处理。`is_executing`、最终释放代次及execution_error的门禁保持独立，认证／严格清理失败仍阻断批次。
+
 整个本次 CLI 计划共用工作超时，逐步通过和修复均不重置；管理暂停及验证另有有界时间。tmux 交互 shell 启动前 `set +m`，防止冻结／恢复后 shell 作业控制把终端改回规范输入，导致下一步不能被 CLI 消费。
 
 验证容器复用同批 account 镜像，显式覆盖入口、UID 1000、无网络、只读根、无账号 HOME／凭据／Docker socket；候选只读挂载，复制到临时可写目录运行。默认 30 秒，内存 256 MiB、PID 64，输入及输出有界。控制端比较行为结果并回归基线和此前全部已接受能力，不能信任程序自行宣告通过。
@@ -99,6 +108,8 @@ SQLite 的 `PROJECT_SCHEMA` 由 `init_db()` 幂等执行，新增：
 `validation_status` 为 `pending/running/passed/failed/error/cancelled`。程序超时／错误输出属于业务失败；验证基础设施故障最多在本地验证两次，不投递模型修复。通过后事务同时校验父状态、generation、步骤下标和预期 checkpoint，并依赖唯一约束防止重复接受。失败快照和最后通过版本同时保留，历史文件通过清单读取，不能用当前目录冒充旧成果。
 
 **集成与交付**：项目 API 的五类资源必须同步加入 `cc2api/src/service/runtime_bridge.rs` 白名单，保留内部路径和编码穿越拒绝；不得扩展鉴权豁免。`#projects` 复用 `RUNTIME_BASE`、API helper、主题变量及转义；离开页签关闭 EventSource，推送重绘保留滚动位置和路线展开状态。
+
+批次调度提示按七种状态分别显示：仅active使用实时wait_reasons或自动推进提示；暂停、收尾、停止、阻塞及完成各自说明。`next_launch_at`只有active且仍在未来时显示，终态不显示等待启动或失效投放时间。
 
 control 镜像的项目库、`images/v3/Dockerfile.dockerignore` 放行项、`deploy/v3/manage.py` 的源码快照列表须同步。`PROJECT_LIBRARY_DIR` 可覆盖内容路径，容器默认 `/repo/project_library`；损坏内容只使新模式返回 503，不替换旧题库入口。账号删除引用计数包含新批次，不能将尚无 run 的项目批次变成孤儿。
 
@@ -115,6 +126,10 @@ control 镜像的项目库、`images/v3/Dockerfile.dockerignore` 放行项、`de
 | 窗口／额度等待、暂停、未通过准备后门禁 | 不发布未开始的项目目录，不绕过门禁 |
 | schema 1 未严格释放／schema 2 无匹配暂停证明 | 不封存、不验收、不投递下一步 |
 | schema 2 最后一步通过但 Run 未释放 | 保持 finalizing，同实例不得开始下一计划 |
+| 合法原子替换使已打开fd的nlink=0 | 关闭旧fd有限重开；超过3次或其他文件校验失败则拒绝 |
+| 内部停止已终态／已认领停止的Run | 幂等确认；结果和释放证明保持，公开初始终态仍400 |
+| 停止认领前出现终态／新额度代次 | 保留终态且不清理；新代次拒绝409，不停止新执行 |
+| 局部blocked定向停止执行 | 保留首次原因，严格释放后健康项目继续，不能改成cancelled掩盖故障 |
 | 会话／检查点缺失、截断或输入消费不确定 | 保留代码与失败现场，阻塞该实例，不盲发或重建 |
 | CLI 退出正常但行为失败 | 不推进，在原目录有限修复；用尽后阻塞实例并切换 |
 | 验收期间停止或旧 generation／checkpoint 回包 | 不接受结果，不增加进度 |
@@ -127,14 +142,18 @@ control 镜像的项目库、`images/v3/Dockerfile.dockerignore` 放行项、`de
 - 边界：一轮 2＋2＋1 通过后轮换；第 2 步半成品超时显示 1／2，原 timeout Run 不变，恢复 Run 只补该步。暂停和额度等待保存进度，停止后目录仍可检查。
 - 错误用法：每个新 Run 重新复制 seed，或直接用退出码零推进步骤。正确做法是按实例复用目录，按 schema 取得严格释放或逐步定向暂停证明，再验收冻结候选。
 - 错误用法：用整个共享 cwd 的 JSONL 计作本轮 token，或把参考路线通过称为真实模型完成。正确做法是使用 run 字节边界；真实模型通过率和用量单独观察。
+- 边界：决定文件重复发布保持同一inode，文件缺失则补发；另一个连接先把Run写成success时，停止请求不能覆盖成stopped或执行第二次清理。
+- 错误用法：replace后才给决定文件改权限，或为处理nlink=0而接受所有链接。正确做法是发布前设置权限，仅对已打开旧inode归零有限重试，继续保留全部校验和阶段归属核对。
 
 ### 6. Tests Required
 
 - `python3 scripts/validate-project-library.py --all`：数量、依赖、摘要；全部 seed 真正运行；待开发步骤不能在基线通过；所有参考断言可达到。参考器另有手写业务金标准用例。
 - `test_project_iterations.py`：同账号不同批次及不同账号基线一致、修改隔离；100 元数据零目录；两步累积、失败修复与旧能力回归；三项目阶段轮换返回；重复接受、停止竞争、额度暂停恢复及重启；认证／清理失败阻断；不可变历史、路径和主日志边界。
 - `test_project_plans.py`：严格策略、实际容量 1、固定随机队列、2＋2＋1 轮换、共享容量与持久间隔；同 Run 两步、逐步 token、业务修复、停止竞争、重复决定及父链乱序；1／2 超时接续、原 Run quota_wait、检查点／会话缺失与截断、确认丢失和禁止盲发；旧结构主键／索引／序列幂等迁移。
+- 文件／停止回归：发布边界实际UID1000读取、相同决定inode不变、缺失补发、普通文档0600；open与fstat间替换、持续替换上限、非法文件与fd关闭；初始终态／SQL认领前独立连接终态／新代次／清理中终态不覆盖，不重复清理、不伪造释放，局部blocked首次原因与健康补位。
 - `ProjectVerifier`：独立 Docker 正例／反例、程序超时与基础设施错误区分；控制端 umask 不影响 UID 1000 读取候选。
 - `deploy/v3/run_local_verification.py --manifest <清单> --project-iterations-only`：合成 CLI 经过真实 Scheduler、driver、会话、清理和 Docker 验收的两步闭环。不得当作真实模型能力证据。
 - `deploy/v3/run_local_verification.py --manifest <清单> --project-scheduling-only`：真实 Docker／driver／tmux 中两个 CLI 重叠、冻结 A 时 B 继续、同 Run 两步及 60 秒真实 timeout 后只补剩余一步；Tasks 两 CLI 和既有 passthrough 长连接跨补位／清理保持。多个验收入口顺序创建独立网络，避免测试子网竞争。
 - `deploy/v3/verify_stack.py --manifest <清单> --browser --project-iteration`：真实 UI/API/SQLite，目录等待与重启保留、XSS、SSE 状态保持、1280/390px 明暗主题。
+- `--project-scheduling-only`还须验证定向局部阻塞后兄弟及原队列后续项目继续。`--project-catalog-only --evidence-dir <新目录>`为可选100×20长测，保持默认10秒稳定等待并独立对账；部分运行不能记为全库通过。中断先停止本次标签下的写入容器，再清临时目录，保留证据及精确清理结论。
 - 原 `--run-boundaries`、`--topic-followups` 分别回归；新管理桥运行 `cargo fmt --check` 与 `cargo test --locked`，保留内部路径拒绝断言。

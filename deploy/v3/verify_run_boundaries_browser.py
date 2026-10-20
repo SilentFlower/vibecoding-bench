@@ -1,5 +1,6 @@
 """在独立管理栈验证时段表单、当地时钟及物理面板，数据均为合成资料。"""
 import hashlib
+import base64
 import json
 import shutil
 import sqlite3
@@ -62,8 +63,12 @@ def run_boundaries_browser_fixture(client, deployment: str, data: Path, browser,
         await evaluate(f'{doc}.querySelector({json.dumps(selector)}).click()')
         await wait_for(f'!{doc}.querySelector("#run-window-modal").classList.contains("hidden")')
         assert await evaluate(f'{doc}.querySelector("#run-window-timezone").textContent') == "America/New_York"
+        assert await evaluate(f'{doc}.querySelector("#run-window-options").disabled')
+        await evaluate(f'{doc}.querySelector("#run-window-form").elements.enabled.focus()')
+        await rpc('Input.dispatchKeyEvent',{'type':'keyDown','key':' ','code':'Space','windowsVirtualKeyCode':32},session_id)
+        await rpc('Input.dispatchKeyEvent',{'type':'keyUp','key':' ','code':'Space','windowsVirtualKeyCode':32},session_id)
+        await wait_for(f'!{doc}.querySelector("#run-window-options").disabled')
         await evaluate(f'''(() => {{const form={doc}.querySelector('#run-window-form');
-            form.elements.enabled.checked=true;
             form.querySelectorAll('[data-window-day]').forEach(input=>input.checked=['0','4'].includes(input.value));
             form.querySelector('[data-window-start]').value='22:00';
             form.querySelector('[data-window-end]').value='02:00';
@@ -72,14 +77,42 @@ def run_boundaries_browser_fixture(client, deployment: str, data: Path, browser,
             rows[1].querySelector('[data-window-start]').value='07:00';
             rows[1].querySelector('[data-window-end]').value='08:30';form.requestSubmit();}})()''')
         await wait_for(f'{doc}.querySelector("#run-window-modal").classList.contains("hidden")')
+        assert not await evaluate(f'{doc}.querySelector("#run-window-form button[type=submit]").disabled')
         policy = await evaluate(f'fetch("/runtime/api/accounts/{aid}/run-window").then(response=>response.json())')
         assert policy["timezone"] == "America/New_York" and policy["enabled"] and policy["config"]["days"] == [0, 4], policy
         assert policy["config"]["intervals"] == [{"start": "07:00", "end": "08:30"}, {"start": "22:00", "end": "02:00"}], policy
         await evaluate(f'{doc}.querySelector({json.dumps(selector)}).click()')
         await wait_for(f'!{doc}.querySelector("#run-window-modal").classList.contains("hidden")')
         assert await evaluate(f'{doc}.querySelectorAll(".run-window-interval").length') == 2
-        await evaluate(f'{doc}.querySelector("#run-window-form").elements.enabled.checked=false;{doc}.querySelector("#run-window-form").requestSubmit()')
+        for width in (1280,390):
+            await rpc('Emulation.setDeviceMetricsOverride',{'width':width,'height':900,'deviceScaleFactor':1,'mobile':False},session_id)
+            for theme in ('dark','light'):
+                await evaluate(f'(() => {{const doc={doc};if(doc.documentElement.dataset.theme!=="{theme}")doc.querySelector("#theme-toggle").click();}})()')
+                bounds = await evaluate(f'''(() => {{const doc={doc};const form=doc.querySelector('#run-window-form');
+                    const enabled=form.elements.enabled;const label=enabled.closest('label');
+                    const options=doc.querySelector('#run-window-options');const edges=options.getBoundingClientRect();
+                    return {{checkbox:enabled.getBoundingClientRect().width,label:label.getBoundingClientRect().width,
+                        direction:doc.defaultView.getComputedStyle(label).flexDirection,
+                        days:[...form.querySelectorAll('.run-window-days label')].every(item=>doc.defaultView.getComputedStyle(item).flexDirection==='row'),
+                        formOverflow:form.scrollWidth>form.clientWidth+2,
+                        optionsOverflow:options.scrollWidth>options.clientWidth+2,
+                        controlsInside:[...options.querySelectorAll('input,button,label')].every(item=>{{const rect=item.getBoundingClientRect();return rect.left>=edges.left&&rect.right<=edges.right;}}),
+                        overflow:doc.documentElement.scrollWidth>doc.defaultView.innerWidth+2}};}})()''')
+                assert bounds['checkbox']<=20 and bounds['label']>bounds['checkbox'] and bounds['direction']=='row',bounds
+                assert bounds['days'] and not bounds['overflow'],bounds
+                assert not bounds['formOverflow'] and not bounds['optionsOverflow'] and bounds['controlsInside'],bounds
+                shot = await rpc('Page.captureScreenshot',{'format':'png'},session_id)
+                Path(f'/tmp/v3-run-window-fixed-{width}-{theme}.png').write_bytes(base64.b64decode(shot['data']))
+        await evaluate(f'{doc}.querySelector("#run-window-form").elements.enabled.click()')
+        assert await evaluate(f'{doc}.querySelector("#run-window-options").disabled')
+        await evaluate(f'{doc}.querySelector("#run-window-form").elements.enabled.click()')
+        assert await evaluate(f'{doc}.querySelectorAll("[data-window-day]:checked").length') == 2
+        assert await evaluate(f'{doc}.querySelectorAll(".run-window-interval").length') == 2
+        # 未完成的编辑不能阻止关闭限制；关闭保存保留上次成功保存的配置。
+        await evaluate(f'{doc}.querySelector("[data-window-start]").value="";{doc}.querySelector("#run-window-form").elements.enabled.click();{doc}.querySelector("#run-window-form").requestSubmit()')
         await wait_for(f'{doc}.querySelector("#run-window-modal").classList.contains("hidden")')
+        # 弹窗关闭应表示保存及列表刷新均完成，此时立即切页也不会与旧渲染竞争。
+        assert not await evaluate(f'{doc}.querySelector("#run-window-form button[type=submit]").disabled')
         await evaluate(f'{doc}.defaultView.location.hash="#environments"')
         details_selector = f'[data-physical-details="{environment_id}"]'
         await wait_for(f'Boolean({doc}.querySelector({json.dumps(details_selector)}))')

@@ -69,17 +69,24 @@ def read_document(path: Path) -> object:
     return json.loads(value)
 
 
-def write_document(path: Path, value: object) -> None:
-    """原子保存控制端私有 JSON。
+def write_document(path: Path, value: object, *, mode: int = 0o600,
+                   owner: tuple[int, int] | None = None) -> None:
+    """在完整内容与读取权限就绪后原子保存 JSON。
 
     :param path: 仅控制端可写的目标路径。
     :param value: JSON 对象。
+    :param mode: 发布前设置的权限；默认仍为控制端私有。
+    :param owner: 可选的用户与组，仅用于受控跨用户交接。
     :return: None。
     """
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     descriptor, temporary = tempfile.mkstemp(prefix=".project-", dir=path.parent)
     try:
         with os.fdopen(descriptor, "wb") as target:
+            # 目标一经替换就可能被账号进程打开，权限不能在发布后再补设。
+            if owner is not None:
+                os.fchown(target.fileno(), *owner)
+            os.fchmod(target.fileno(), mode)
             target.write(canonical_json(value))
             target.flush()
             os.fsync(target.fileno())

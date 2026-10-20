@@ -345,9 +345,10 @@ def verify() -> None:
         runtime.cleanup(runtime.execution_token(container.id, "login:abcdef654321"))
         assert (runtime._root(row) / "home" / ".claude" / ".credentials.json").read_bytes() == original
         verify_physical_observation(runtime, row)
-        if os.environ.get("VERIFY_PROJECT_SCHEDULING_ONLY") == "1":
+        if os.environ.get("VERIFY_PROJECT_SCHEDULING_ONLY") == "1" or os.environ.get("VERIFY_PROJECT_CATALOG_ONLY") == "1":
             from verify_project_scheduling import verify_project_scheduling
-            verify_project_scheduling(runtime, client, account, row)
+            verify_project_scheduling(runtime, client, account, row,
+                catalog_only=os.environ.get("VERIFY_PROJECT_CATALOG_ONLY") == "1")
             return
         if os.environ.get("VERIFY_PROJECT_ITERATIONS_ONLY") == "1":
             from verify_project_execution import verify_project_execution
@@ -643,9 +644,11 @@ def verify() -> None:
         print("通过：重复重建空实例后保留环境 ID、machine-id 和 HOME")
         print("真实 OAuth 和公网请求未执行；本地 usage 使用真实 TLS/JSON，CLI 生命周期使用测试替身。")
     except Exception:
-        for instance in client.containers.list(all=True, filters={"label": ["vibebench.product=v3", "vibebench.deployment=" + runtime.deployment, "vibebench.role=account-network"]}):
+        for instance in client.containers.list(all=True, filters={"label": ["vibebench.product=v3", "vibebench.deployment=" + runtime.deployment]}):
+            if instance.labels.get('vibebench.role') not in ('account-network','account-sender'):
+                continue
             print(instance.logs(tail=35).decode(), flush=True)
-            if instance.status == "running":
+            if instance.status == "running" and instance.labels.get('vibebench.role')=='account-network':
                 print(instance.exec_run(["tail", "-20", "/var/log/mitmdump.log"]).output.decode(), flush=True)
         raise
     finally:

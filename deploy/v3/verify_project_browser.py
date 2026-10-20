@@ -107,6 +107,18 @@ def project_browser_fixture(client, deployment: str, data: Path, browser, base: 
         await wait_for(f'{doc}.defaultView.__projectUpdates>=2')
         assert await evaluate(f'{doc}.querySelector("[data-project-roadmap]").open')
         assert await evaluate(f'{doc}.querySelector("#project-batch-detail .project-table-scroll").scrollTop')==240
+        # 瞬态会被后台迅速收口；暂停推送后，用真实公开结构验证每个渲染分支。
+        await evaluate(f'{doc}.defaultView.eval("state.projectEventSource.close();state.projectEventSource=null")')
+        for status, message in (('active','按保存的队列与容量自动推进'),('paused','批次已暂停'),
+                ('pausing','正在暂停'),('stopping','正在停止'),('stopped','批次已停止'),
+                ('blocked','批次已阻塞'),('completed','全部项目路线已完成')):
+            program = f"state.projectBatchDetail={{...state.projectBatchDetail,status:{json.dumps(status)},next_launch_at:Date.now()/1000+600,scheduling:{{...state.projectBatchDetail.scheduling,wait_reasons:[]}}}};paintProjectBatch()"
+            await evaluate(f'{doc}.defaultView.eval({json.dumps(program)})')
+            hint = await evaluate(f'{doc}.querySelector(".project-scheduling-hint").textContent')
+            assert message in hint and '等待批次启动' not in hint,(status,hint)
+            assert ('下一投放最早' in hint)==(status=='active'),(status,hint)
+        await evaluate(f'{doc}.defaultView.eval("selectProjectBatch({bid})")')
+        await wait_for(f'{doc}.querySelector(".project-scheduling-hint")?.textContent.includes("批次已暂停")')
         for width,height in ((1280,900),(390,844)):
             await rpc('Emulation.setDeviceMetricsOverride',{'width':width,'height':height,'deviceScaleFactor':1,'mobile':width<500},session_id)
             for theme in ('dark','light'):

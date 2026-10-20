@@ -2,6 +2,8 @@
 import json
 import os
 import sqlite3
+import stat
+import subprocess
 import threading
 import time
 from importlib.util import module_from_spec, spec_from_file_location
@@ -10,6 +12,7 @@ from unittest.mock import patch
 from unittest.mock import Mock
 
 import main
+import project_library
 from project_iteration import PROJECT_SCHEMA
 from project_plans import initialize_plan_schema
 from test_project_iterations import ProjectIterationFixture, ROOT
@@ -491,6 +494,259 @@ class ProjectPlanTests(ProjectIterationFixture):
         self.assertEqual('step-02',resumed['step_id'])
         self.assertEqual(config['session_id'],resumed['session_id'])
         self.assertEqual('complete',self.verify_step(resumed_id,resumed)['action'])
+
+
+    def test_decision_is_readable_at_publication_and_replay_keeps_inode(self) -> None:
+        """原子发布时就能由账号用户读取，相同决定重放不替换已发布文件。@return None。"""
+        self.begin_plan()
+        run_id = self.launches[-1][0]
+        config = self.configure(run_id)
+        execution = self.sql('SELECT * FROM project_plan_executions WHERE run_id=?',(run_id,))[0]
+        document = {'source':execution['source'],'action':'send'}
+        execution['decision_json'] = json.dumps(document)
+        destination = Path(config['decision_file'])
+        replace = os.replace
+        published = []
+
+        def inspect_publication(source, target):
+            """截取真正的发布边界，不能用发布后最终权限掩盖窗口。@return None。"""
+            if Path(target)==destination:
+                metadata = Path(source).stat()
+                self.assertEqual((0,1000,0o640),(metadata.st_uid,metadata.st_gid,stat.S_IMODE(metadata.st_mode)))
+                published.append(str(source))
+            return replace(source,target)
+
+        with patch.object(project_library.os,'replace',side_effect=inspect_publication):
+            self.manager.plans._decision(execution)
+        self.assertEqual(1,len(published))
+        self.data.chmod(0o755)
+        result = subprocess.run(['/usr/bin/python3','-c','import json,sys;print(json.load(open(sys.argv[1])))',str(destination)],
+            user=1000,group=1000,extra_groups=[],cwd='/tmp',capture_output=True,text=True,timeout=5)
+        self.assertEqual(0,result.returncode,result.stderr)
+        original = destination.stat().st_ino
+        self.manager.plans._decision(execution)
+        self.assertEqual(original,destination.stat().st_ino)
+        document['action'] = 'complete'
+        execution['decision_json'] = json.dumps(document)
+        self.manager.plans._decision(execution)
+        self.assertNotEqual(original,destination.stat().st_ino)
+        self.assertEqual(document,json.loads(destination.read_text()))
+        destination.unlink()
+        self.manager.plans._decision(execution)
+        self.assertEqual(document,json.loads(destination.read_text()))
+        private = self.data/'private.json'
+        project_library.write_document(private,document)
+        self.assertEqual(0o600,stat.S_IMODE(private.stat().st_mode))
+
+    def test_driver_reopens_atomically_replaced_file_and_closes_descriptors(self) -> None:
+        """合法文件在open后被替换时重开读取，旧描述符无泄漏。@return None。"""
+        path = self.data/'decision.json'
+        path.write_text('{"version":1}')
+        original_open = os.open
+        descriptors = []
+
+        def replace_after_open(name, *args, **kwargs):
+            """精确复现旧描述符链接数归零的窗口。@return 打开的描述符。"""
+            descriptor = original_open(name,*args,**kwargs)
+            if Path(name)==path:
+                descriptors.append(descriptor)
+                if len(descriptors)==1:
+                    replacement = path.with_suffix('.new')
+                    replacement.write_text('{"version":2}')
+                    os.replace(replacement,path)
+            return descriptor
+
+        with patch.object(self.driver.os,'open',side_effect=replace_after_open):
+            self.assertEqual({'version':2},self.driver._read(path))
+        self.assertGreater(len(descriptors),1)
+        for descriptor in descriptors:
+            with self.assertRaises(OSError):
+                os.fstat(descriptor)
+
+    def test_driver_replacement_retries_are_bounded_and_invalid_files_still_fail(self) -> None:
+        """持续替换有界失败，链接、FIFO和过大对象不能靠重试获得接受。@return None。"""
+        path = self.data/'decision.json'
+        path.write_text('{"version":1}')
+        original_open = os.open
+        opened = []
+
+        def always_replace(name, *args, **kwargs):
+            """每次打开后都替换，验证读取有明确上限。@return 原描述符。"""
+            descriptor = original_open(name,*args,**kwargs)
+            if Path(name)==path:
+                opened.append(descriptor)
+                replacement = path.with_suffix('.new')
+                replacement.write_text('{"version":2}')
+                os.replace(replacement,path)
+            return descriptor
+
+        with patch.object(self.driver.os,'open',side_effect=always_replace):
+            with self.assertRaises(ValueError):
+                self.driver._read(path)
+        self.assertGreater(len(opened),1)
+        self.assertLessEqual(len(opened),5)
+        for descriptor in opened:
+            with self.assertRaises(OSError):
+                os.fstat(descriptor)
+        link = self.data/'decision-link.json'
+        link.symlink_to(path)
+        with self.assertRaises(OSError):
+            self.driver._read(link)
+        link.unlink()
+        os.link(path,link)
+        with self.assertRaises(ValueError):
+            self.driver._read(path)
+        link.unlink()
+        fifo = self.data/'decision-fifo'
+        os.mkfifo(fifo)
+        with self.assertRaises(ValueError):
+            self.driver._read(fifo)
+        with self.assertRaises(ValueError):
+            self.driver._read(path,maximum=2)
+
+    def test_internal_stop_accepts_existing_terminal_without_rewriting_it(self) -> None:
+        """内部停止确认已终态时不重写结果，公开入口仍拒绝初始终态请求。@return None。"""
+        self.begin_plan()
+        run_id = self.launches[-1][0]
+        self.sql("UPDATE runs SET status='failed',error='交接失败原始原因',ended_at=123 WHERE id=?",(run_id,))
+        runner = Mock()
+        with patch.object(main,'runner',runner),patch.object(main,'warmup_scheduler',None):
+            self.assertEqual({'ok':True},main._stop_project_run(run_id))
+            with self.assertRaises(main.HTTPException) as error:
+                main.stop_run(run_id)
+        self.assertEqual(400,error.exception.status_code)
+        runner.cleanup.assert_not_called()
+        self.assertEqual({'status':'failed','error':'交接失败原始原因','ended_at':123.0},
+            self.sql('SELECT status,error,ended_at FROM runs WHERE id=?',(run_id,))[0])
+        self.assertIsNone(self.sql('SELECT released_at FROM project_plan_executions WHERE run_id=?',(run_id,))[0]['released_at'])
+
+    def test_stop_cannot_overwrite_run_that_finishes_before_stop_claim(self) -> None:
+        """读状态后出现的自然终态不得被旧停止请求写成stopped。@return None。"""
+        self.begin_plan()
+        run_id = self.launches[-1][0]
+        self.configure(run_id)
+        database = main.get_db
+        reads = []
+
+        def finish_before_claim():
+            """第二次数据库访问前完成原Run，确定性覆盖竞争。@return SQLite连接。"""
+            reads.append(True)
+            if len(reads)==2:
+                connection = database()
+                try:
+                    with connection:
+                        connection.execute("UPDATE runs SET status='failed',error='自然结束',ended_at=321 WHERE id=?",(run_id,))
+                finally:
+                    connection.close()
+            return database()
+
+        runner = Mock()
+        with patch.object(main,'runner',runner),patch.object(main,'warmup_scheduler',None),patch.object(main,'get_db',side_effect=finish_before_claim):
+            self.assertEqual({'ok':True},main.stop_run(run_id))
+        self.assertGreaterEqual(len(reads),2)
+        runner.cleanup.assert_not_called()
+        self.assertEqual({'status':'failed','error':'自然结束','ended_at':321.0},
+            self.sql('SELECT status,error,ended_at FROM runs WHERE id=?',(run_id,))[0])
+
+    def test_repeated_internal_stop_does_not_clean_same_execution_twice(self) -> None:
+        """停止已被另一请求认领时只等待原收口，不递归重复清理。@return None。"""
+        self.begin_plan()
+        run_id = self.launches[-1][0]
+        self.configure(run_id)
+        runner = Mock()
+        runner.cleanup.side_effect = lambda *args:main._stop_project_run(run_id)
+        with patch.object(main,'runner',runner),patch.object(main,'warmup_scheduler',None):
+            self.assertEqual({'ok':True},main._stop_project_run(run_id))
+        self.assertEqual(1,runner.cleanup.call_count)
+        self.assertEqual('stopped',self.sql('SELECT status FROM runs WHERE id=?',(run_id,))[0]['status'])
+
+    def test_stop_claim_cannot_overwrite_a_terminal_from_another_connection(self) -> None:
+        """独立连接在停止UPDATE前写入终态时，状态条件必须阻止旧快照覆盖。@return None。"""
+        self.begin_plan()
+        run_id = self.launches[-1][0]
+        self.configure(run_id)
+        database = main.get_db
+        finished = []
+
+        class FinishingConnection(sqlite3.Connection):
+            """在真实SQLite写入前插入另一连接的自然完成。"""
+
+            def execute(self, statement, parameters=()):
+                """执行真实SQL。@param statement 语句。@param parameters 参数。@return SQLite游标。"""
+                if statement.startswith("UPDATE runs SET status='stopping'") and not finished:
+                    finished.append(True)
+                    connection = database()
+                    try:
+                        with connection:
+                            connection.execute("UPDATE runs SET status='success',ended_at=654 WHERE id=?",(run_id,))
+                    finally:
+                        connection.close()
+                return super().execute(statement,parameters)
+
+        def racing_database():
+            """使用真实独立连接制造确定性竞争。@return SQLite连接。"""
+            connection = sqlite3.connect(main.DB_PATH,factory=FinishingConnection)
+            connection.row_factory = sqlite3.Row
+            return connection
+
+        runner = Mock()
+        with patch.object(main,'runner',runner),patch.object(main,'warmup_scheduler',None),patch.object(main,'get_db',racing_database):
+            self.assertEqual({'ok':True},main._stop_project_run(run_id))
+        self.assertTrue(finished)
+        runner.cleanup.assert_not_called()
+        self.assertEqual({'status':'success','ended_at':654.0},
+            self.sql('SELECT status,ended_at FROM runs WHERE id=?',(run_id,))[0])
+
+    def test_stop_does_not_cancel_a_new_quota_execution(self) -> None:
+        """停止准备期间额度代次变化时拒绝旧请求，不清理新执行。@return None。"""
+        self.begin_plan()
+        run_id = self.launches[-1][0]
+        self.configure(run_id)
+        runner = Mock()
+        runner.persist_worker_profile.side_effect = lambda worker:self.sql(
+            "UPDATE runs SET quota_attempt=1,status='queued' WHERE id=?",(run_id,))
+        with patch.object(main,'runner',runner),patch.object(main,'warmup_scheduler',None):
+            with self.assertRaises(main.HTTPException) as error:
+                main._stop_project_run(run_id)
+        self.assertEqual(409,error.exception.status_code)
+        runner.cleanup.assert_not_called()
+        self.assertEqual({'quota_attempt':1,'status':'queued'},
+            self.sql('SELECT quota_attempt,status FROM runs WHERE id=?',(run_id,))[0])
+
+    def test_run_that_finishes_during_cleanup_keeps_its_result(self) -> None:
+        """已认领停止后出现的自然终态仍保留，不被收尾写入覆盖。@return None。"""
+        self.begin_plan()
+        run_id = self.launches[-1][0]
+        self.configure(run_id)
+        runner = Mock()
+        runner.cleanup.side_effect = lambda *args:self.sql(
+            "UPDATE runs SET status='failed',error='清理期间结束',ended_at=456 WHERE id=?",(run_id,))
+        with patch.object(main,'runner',runner),patch.object(main,'warmup_scheduler',None):
+            self.assertEqual({'ok':True},main.stop_run(run_id))
+        self.assertEqual(1,runner.cleanup.call_count)
+        self.assertEqual({'status':'failed','error':'清理期间结束','ended_at':456.0},
+            self.sql('SELECT status,error,ended_at FROM runs WHERE id=?',(run_id,))[0])
+
+    def test_local_block_keeps_cause_and_allows_next_project_after_release(self) -> None:
+        """内部故障定向停止后仍保留blocked及原始原因，释放后补位健康项目。@return None。"""
+        batch = self.begin_plan(['project-001','project-002','project-003'])
+        victim, sibling = [item[0] for item in self.launches]
+        self.configure(victim)
+        self.configure(sibling)
+        execution = self.sql('SELECT * FROM project_plan_executions WHERE run_id=?',(victim,))[0]
+        context = self.manager.run_context(victim)
+        self.manager.plans._block(execution,'保留局部交接故障')
+        self.manager.plans._block(execution,'重复收口产生的次要消息')
+        self.manager.tick()
+        self.assertEqual(2,len(self.launches))
+        self.manager.execution_released(victim,0)
+        self.manager.tick()
+        instance = self.manager.instance(context['id'])
+        self.assertEqual(('blocked','保留局部交接故障'),(instance['status'],instance['error']))
+        self.assertEqual('blocked',instance['plans'][0]['status'])
+        self.assertEqual('active',self.manager.batch(batch['id'])['status'])
+        self.assertEqual('running',self.sql('SELECT status FROM runs WHERE id=?',(sibling,))[0]['status'])
+        self.assertEqual(3,len({item[0] for item in self.launches}))
 
 
 class ProjectPlanMigrationTests(ProjectIterationFixture):
