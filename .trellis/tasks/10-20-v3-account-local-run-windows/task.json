@@ -1,0 +1,42 @@
+{
+  "id": "v3-account-local-run-windows",
+  "name": "v3-account-local-run-windows",
+  "title": "v3 账号当地可运行时间窗口",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-20",
+  "completedAt": "2026-10-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-20T01:40:02Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "10-20-v3-environment-panel-and-run-windows",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "partialStep": null,
+    "nextStep": "按需单独部署并核对线上既有账号默认配置",
+    "notes": "本地验收、规范和业务代码交付完成；未执行生产部署，保留其它未提交改动。",
+    "completedSteps": [
+      "完成当地星期/多区间/跨午夜/DST、持久配置及各执行入口门禁",
+      "修复 CHK-001：准备后复查、精确来源机会退还及新代等待重启",
+      "20 项调度与 415 项全量单测、本地容器/页面验证通过，规范及业务代码已推送"
+    ],
+    "updatedAt": "2026-10-20T01:40:02Z"
+  }
+}
