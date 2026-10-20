@@ -48,6 +48,8 @@ const state = {
   projectBatchId: null,
   projectInstanceId: null,
   projectEventSource: null,
+  viewGeneration: 0,
+  runWindowConfig: null,
 };
 
 // ===================== 项目迭代 =====================
@@ -421,7 +423,10 @@ function currentTab() {
   return ROUTES[hash] ? hash : 'accounts';
 }
 
+/** 切换视图并使旧页面、时段弹窗的异步回调失效。@return {void} */
 function navigate() {
+  state.viewGeneration += 1;
+  closeModal('#run-window-modal');
   const tab = currentTab();
   $$('.tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === tab));
   const view = $('#view');
@@ -490,7 +495,9 @@ function renderPhysicalFeatures(row) {
  * @return {Promise<void>} 完成本次页面渲染
  */
 async function renderEnvironments() {
+  const generation = state.viewGeneration;
   const rows = await API('/environments');
+  if (currentTab() !== 'environments' || generation !== state.viewGeneration) return;
   const view = $('#view');
   view.innerHTML = '<h2>固定账号环境</h2><p>停止和重建会保留 HOME、身份和证据。画像校正只适用于没有运行历史的未绑定账号，保留原 HOME 和登录凭据。</p>' +
     rows.map(row => `<article class="card"><h3>${escapeHTML(row.name)}</h3><p>${escapeHTML(row.state)} · ${row.busy ? '执行中' : '无 CLI 作业'} · ${escapeHTML(row.fingerprint.hostname)} · ${escapeHTML(row.fingerprint.mem)}</p><p>环境 ${escapeHTML(row.environment_id)} · 容器代次 ${row.generation} · profile v${escapeHTML(row.fingerprint.profile_version || 1)} · ${escapeHTML(row.fingerprint.tz)} / ${escapeHTML(row.fingerprint.lang)}</p><p>${escapeHTML(row.identity_status)} · CLI ${escapeHTML((row.cli_versions || []).join(", "))}</p><p>${escapeHTML(Object.entries(row.role_status || {}).map(([role, status]) => `${({cli:"CLI",network:"网络",sender:"API"})[role] || role}: ${status}`).join(" · "))}</p>${['stop', 'rebuild', 'reconcile'].map(operation => `<button data-environment="${escapeHTML(row.environment_id)}" data-operation="${operation}" ${row.busy ? 'disabled' : ''}>${({stop:'停止',rebuild:'重建容器',reconcile:'故障对账'})[operation]}</button>`).join('')}<button data-environment="${escapeHTML(row.environment_id)}" data-operation="reprofile" ${row.can_reprofile ? '' : 'disabled'} title="${escapeHTML(row.reprofile_message || '校正保留原登录凭据')}">校正画像</button>${row.run_window ? renderAccountRunWindow({id: row.account_id, run_window: row.run_window}) : ''}${renderPhysicalFeatures(row)}</article>`).join('');
@@ -636,9 +643,17 @@ function renderWarmupStatus(account) {
  * @return {Promise<void>} 账号列表与操作入口就绪
  */
 async function renderAccounts() {
+  if (currentTab() !== 'accounts') return;
+  const generation = state.viewGeneration;
   try {
-    [state.accounts, state.loginDrafts] = await Promise.all([API('/accounts'), API('/accounts/login-drafts', { cache: 'no-store' })]);
-  } catch (e) { return alert('加载账号失败: ' + e.message); }
+    const [accounts, loginDrafts] = await Promise.all([API('/accounts'), API('/accounts/login-drafts', { cache: 'no-store' })]);
+    // 请求期间可能已切页，旧列表不能写入新视图或覆盖新一轮页面状态。
+    if (currentTab() !== 'accounts' || generation !== state.viewGeneration) return;
+    [state.accounts, state.loginDrafts] = [accounts, loginDrafts];
+  } catch (e) {
+    if (currentTab() === 'accounts' && generation === state.viewGeneration) alert('加载账号失败: ' + e.message);
+    return;
+  }
 
   const body = $('#accounts-body');
   const loginResult = $('#account-login-result');
@@ -1092,7 +1107,18 @@ function updateRunWindowForm() {
  * @return {Promise<void>} 完成表单初始化
  */
 async function openRunWindowConfig(aid) {
-  const policy = await API(`/accounts/${encodeURIComponent(aid)}/run-window`);
+  closeModal('#run-window-modal');
+  const request = {accountId: aid};
+  state.runWindowConfig = request;
+  let policy;
+  try {
+    policy = await API(`/accounts/${encodeURIComponent(aid)}/run-window`);
+  } catch (error) {
+    if (state.runWindowConfig === request) throw error;
+    return;
+  }
+  // 最后一次打开操作拥有弹窗，迟到的响应不能换掉当前账号。
+  if (state.runWindowConfig !== request) return;
   const config = policy.config || {enabled: false, days: [], intervals: []};
   const form = $('#run-window-form');
   form.elements.account_id.value = aid;
@@ -1115,6 +1141,8 @@ async function saveRunWindowConfig(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const submit = $('button[type="submit"]', form);
+  const request = state.runWindowConfig;
+  if (!request || submit.disabled || $('#run-window-modal').classList.contains('hidden')) return;
   submit.disabled = true;
   try {
     const enabled = form.elements.enabled.checked;
@@ -1123,14 +1151,19 @@ async function saveRunWindowConfig(event) {
       days: $$('[data-window-day]:checked', form).map(input => Number(input.value)),
       intervals: $$('.run-window-interval', form).map(row => ({start: $('[data-window-start]', row).value, end: $('[data-window-end]', row).value})),
     } : JSON.parse(form.dataset.savedWindowConfig);
-    await API(`/accounts/${encodeURIComponent(form.elements.account_id.value)}/run-window`, {method: 'PUT', body: JSON.stringify({
+    await API(`/accounts/${encodeURIComponent(request.accountId)}/run-window`, {method: 'PUT', body: JSON.stringify({
       enabled, days: config.days, intervals: config.intervals,
     })});
+    // 保存仍会落到原账号；关窗、切页或另开账号后不再操作共享弹窗。
+    if (state.runWindowConfig !== request) return;
     if (currentTab() === 'environments') await renderEnvironments();
-    else await renderAccounts();
-    closeModal('#run-window-modal');
-  } catch (error) { alert('保存运行时段失败：' + error.message); }
-  finally { submit.disabled = false; }
+    else if (currentTab() === 'accounts') await renderAccounts();
+    if (state.runWindowConfig === request) closeModal('#run-window-modal');
+  } catch (error) {
+    if (state.runWindowConfig === request) alert('保存运行时段失败：' + error.message);
+  } finally {
+    if (state.runWindowConfig === request) submit.disabled = false;
+  }
 }
 
 /**
@@ -2815,7 +2848,18 @@ function endContinueRun({ alsoCloseModal = false } = {}) {
 
 // ===================== Modal helpers =====================
 function openModal(sel) { $(sel).classList.remove('hidden'); }
-function closeModal(sel) { $(sel).classList.add('hidden'); }
+/**
+ * 统一关闭弹窗，时段弹窗的旧请求失效后不得操作下一次打开的表单。
+ * @param {string} sel 弹窗选择器
+ * @return {void}
+ */
+function closeModal(sel) {
+  if (sel === '#run-window-modal') {
+    state.runWindowConfig = null;
+    $('#run-window-form button[type="submit"]').disabled = false;
+  }
+  $(sel).classList.add('hidden');
+}
 
 document.addEventListener('click', (e) => {
   if (e.target.id === 'modal-close' || e.target.matches('[data-close]')) {
