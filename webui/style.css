@@ -1608,6 +1608,9 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 .project-instances-table th:first-child { width: 32%; }
 .project-instances-table th:nth-child(2) { width: 80px; }
 .project-instances-table th:nth-child(3) { width: 170px; }
+.project-plan-list { display: grid; gap: 12px; margin: 16px 0; }
+.project-plan { padding: 14px; border: 1px solid var(--border); }
+.project-plan .op-actions { flex-wrap: wrap; }
 .project-table-scroll .project-attempts-table { min-width: 840px; }
 .project-attempts-table th:nth-child(2) { width: 90px; }
 .project-attempts-table th:nth-child(3) { width: 180px; }

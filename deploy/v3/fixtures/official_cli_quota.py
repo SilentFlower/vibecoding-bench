@@ -14,6 +14,7 @@ from pathlib import Path
 
 root = Path('/lab')
 collect = os.environ.get('LAB_COLLECTOR', '1') == '1'
+override = os.environ.get('LAB_SETTINGS_OVERRIDE') == '1'
 cwd = Path('/workspace')
 cwd.mkdir(exist_ok=True)
 home = Path('/home/node')
@@ -78,6 +79,15 @@ threading.Thread(target=server.serve_forever,daemon=True).start()
 config = {'source':'cli:run:synthetic-official','identity':'synthetic-identity','cwd':str(cwd),'session_dir':str(home / '.claude/projects/-workspace'), 'output':'/lab/cli-quota.jsonl','started_at':started,'previous_command':'printf ORIGINAL_STATUSLINE'}
 (root / 'quota-config.json').write_text(json.dumps(config))
 (home / '.claude/settings.json').write_text(json.dumps({'statusLine':{'type':'command','command':'python3 /lab/wrapper.py' if collect else 'printf ORIGINAL_STATUSLINE'}, 'autoMemoryEnabled':False,'model':'claude-opus-4-6','skipDangerousModePermissionPrompt':True,'permissions':{'defaultMode':'bypassPermissions'}}))
+options = ['--dangerously-skip-permissions']
+pinned = 'e3216c9c-6d26-424d-a449-9709bde93c10'
+if override:
+    configuration = json.loads((home/'.claude/settings.json').read_text())
+    (root/'session-settings.json').write_text(json.dumps({'statusLine':configuration['statusLine']}))
+    configuration['statusLine'] = {'type':'command','command':'printf BASE_STATUSLINE'}
+    (home/'.claude/settings.json').write_text(json.dumps(configuration))
+    options += ['--settings','/lab/session-settings.json','--session-id',pinned]
+original_settings = (home/'.claude/settings.json').read_bytes()
 (home / '.claude.json').write_text(json.dumps({'userID':'a'*64,'machineID':'b'*64,
     'oauthAccount':{'accountUuid':'synthetic-account','emailAddress':'synthetic@example.invalid','organizationUuid':'synthetic-org'},
     'hasCompletedOnboarding':True,'bypassPermissionsModeAccepted':True,'hasSeenAutoDefaultNudge':True,'projects':{'/workspace':{'hasTrustDialogAccepted':True}}}))
@@ -86,7 +96,7 @@ subprocess.run(['chown','-R','1000:1000','/home/node','/workspace','/lab'],check
 master, slave = pty.openpty()
 fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH',60,220,0,0))
 environment = {**os.environ,'HOME':str(home),'TERM':'xterm-256color','ANTHROPIC_BASE_URL':f'http://127.0.0.1:{server.server_port}', 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC':'1'}
-process = subprocess.Popen(['setpriv','--reuid=1000','--regid=1000','--init-groups','/official/claude','--dangerously-skip-permissions'],cwd=cwd,env=environment,stdin=slave,stdout=slave,stderr=slave,start_new_session=True)
+process = subprocess.Popen(['setpriv','--reuid=1000','--regid=1000','--init-groups','/official/claude',*options],cwd=cwd,env=environment,stdin=slave,stdout=slave,stderr=slave,start_new_session=True)
 os.close(slave)
 transcript = bytearray()
 prompt_sent = False
@@ -114,4 +124,6 @@ finally:
     (root / 'terminal.log').write_bytes(transcript)
     (root / 'requests.json').write_text(json.dumps(requests_seen,indent=2))
     server.shutdown()
-print(json.dumps({'version':subprocess.check_output(['/official/claude','--version'],text=True).strip(),'requests':requests_seen,'quota':(root / 'cli-quota.jsonl').read_text() if (root / 'cli-quota.jsonl').is_file() else None,'statusline_calls':len((root / 'statusline.jsonl').read_text().splitlines()) if (root / 'statusline.jsonl').is_file() else 0},ensure_ascii=False))
+print(json.dumps({'version':subprocess.check_output(['/official/claude','--version'],text=True).strip(),'requests':requests_seen,'quota':(root / 'cli-quota.jsonl').read_text() if (root / 'cli-quota.jsonl').is_file() else None,'statusline_calls':len((root / 'statusline.jsonl').read_text().splitlines()) if (root / 'statusline.jsonl').is_file() else 0,
+    'settings_preserved':original_settings==(home/'.claude/settings.json').read_bytes(),
+    'pinned_session':(home/'.claude/projects/-workspace'/(pinned+'.jsonl')).is_file()},ensure_ascii=False))

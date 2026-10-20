@@ -188,10 +188,13 @@ class AccountRuntime:
         self.limit = int(os.environ.get("V3_MAX_ACTIVE_ACCOUNTS", "1"))
         if self.limit < 1:
             raise ValueError("v3 活跃环境预算必须大于零")
+        self.cli_limit = int(os.environ.get("PER_ACCOUNT_CONCURRENCY", "2"))
+        if self.cli_limit not in (1, 2):
+            raise ValueError("v3 每账号 CLI 并发必须为 1 或 2")
         self.lock = threading.RLock()
         self.environment_locks: dict[str, threading.RLock] = {}
         self.capacity_lock = threading.RLock()
-        self.heartbeat_pool = ThreadPoolExecutor(max_workers=self.limit + 1, thread_name_prefix="v3-lease")
+        self.heartbeat_pool = ThreadPoolExecutor(max_workers=self.limit * self.cli_limit + 1, thread_name_prefix="v3-lease")
         self.jobs: dict[str, dict] = {}
         self.stopping = threading.Event()
         self.heartbeat = threading.Thread(target=self._heartbeat, daemon=True)
@@ -216,6 +219,50 @@ class AccountRuntime:
                             connection.execute(f"ALTER TABLE runs ADD COLUMN {column} {kind}")
         finally:
             connection.close()
+
+    def environment_jobs(self, environment_id: str) -> list[dict]:
+        """列出一个环境的全部在途作业，兼容旧单作业登记。
+
+        :param environment_id: 持久环境 ID。
+        :return: 该环境当前登记的作业快照。
+        """
+        with self.lock:
+            return [job for key, job in self.jobs.items()
+                if key == environment_id or job.get("row", {}).get("environment_id") == environment_id]
+
+    def _owns_job(self, job: dict) -> bool:
+        return any(current is job for current in self.jobs.values())
+
+    def _register_job(self, job: dict) -> None:
+        environment_id = job["row"]["environment_id"]
+        key = environment_id + ":" + job["source"] if job.get("shared_cli") else environment_id
+        if key in self.jobs and self.jobs[key] is not job:
+            raise RuntimeBusy("该执行来源已经占用账号环境")
+        self.jobs[key] = job
+
+    def _remove_job(self, job: dict) -> None:
+        for key, current in list(self.jobs.items()):
+            if current is job:
+                self.jobs.pop(key)
+
+    def _execution_path(self, job: dict) -> Path:
+        root = self._root(job["row"]) / "runtime"
+        if job.get("shared_cli"):
+            return root / "executions" / (hashlib.sha256(job["source"].encode()).hexdigest() + ".json")
+        return root / "execution.json"
+
+    @staticmethod
+    def _owned_lease(snapshot: dict, source: str) -> dict | None:
+        holders = snapshot.get("holders")
+        if isinstance(holders, list):
+            if any(not isinstance(holder, dict) for holder in holders):
+                raise ValueError("账号门禁返回了损坏的执行列表")
+            matches = [holder for holder in holders if holder.get("owner") == source]
+            if len(matches) > 1:
+                raise ValueError("账号门禁存在重复执行来源")
+            return matches[0] if matches else None
+        lease = snapshot.get("lease")
+        return lease if isinstance(lease, dict) and lease.get("owner") == source else None
 
     def environment_lock(self, environment_id: str):
         """取得账号级生命周期锁，全局登记锁只用于读取锁映射。
@@ -336,7 +383,7 @@ class AccountRuntime:
         :param network: 同账号实际 Docker 网络角色，用于读取真实 CPU。
         :return: None；坏画像保留，不重新随机。
         """
-        if row["environment_id"] in self.jobs:
+        if self.environment_jobs(row["environment_id"]):
             raise ValueError("活动执行中不能生成或应用系统画像")
         if row.get("container_id"):
             raise ValueError("已有 CLI 实例不能切换系统画像，请先空闲重建")
@@ -355,7 +402,7 @@ class AccountRuntime:
                 saved = connection.execute("SELECT fingerprint_json,generation,container_id FROM account_environments"
                     " WHERE environment_id=?", (row["environment_id"],)).fetchone()
                 if not saved or saved["container_id"] or saved["generation"] != row["generation"] \
-                        or row["environment_id"] in self.jobs:
+                        or self.environment_jobs(row["environment_id"]):
                     raise ValueError("环境代次或执行状态已改变，禁止切换系统画像")
                 fingerprint = json.loads(saved["fingerprint_json"])
                 if not isinstance(fingerprint, dict):
@@ -516,7 +563,7 @@ class AccountRuntime:
         """
         with self.environment_lock(row["environment_id"]):
             with self.lock:
-                if row["environment_id"] in self.jobs:
+                if self.environment_jobs(row["environment_id"]):
                     raise RuntimeBusy("CLI 正在执行，请在本轮完成后刷新实测")
             container = (role_container(self, row, "cli") if row.get("isolation_version") == ISOLATION_VERSION
                 else self._container(row))
@@ -640,7 +687,7 @@ class AccountRuntime:
                         raise ValueError("账号隔离角色缺失，需要先对账") from None
                     configuration = _read_json(self._sender_config(row))
                     if configuration.get("proxy_source", configuration["proxy_url"]) != self._proxy(account):
-                        if any(current.status == "running" for current in containers.values()) or row["environment_id"] in self.jobs:
+                        if any(current.status == "running" for current in containers.values()) or self.environment_jobs(row["environment_id"]):
                             raise ValueError("代理已改变，请先空闲维护账号环境")
                         self._stop_environment(row, remove=True)
                         present = [False]
@@ -876,7 +923,7 @@ class AccountRuntime:
         """
         with self._account_lock(account):
             row = self._row(account["name"], account["id"])
-            if row["environment_id"] in self.jobs:
+            if self.environment_jobs(row["environment_id"]):
                 raise ValueError("账号环境正在执行工作，不能切换绑定")
             handoff = self._root(row) / "runtime/credential-handoff.json"
             profile = self.data / "profiles" / account["name"] / ".credentials.json"
@@ -956,17 +1003,26 @@ class AccountRuntime:
                         raise
 
     def claim(self, row: dict, account: dict, source: str, idle_only: bool = False,
-              exclusive: bool = False) -> dict:
-        """串行认领 CLI；只有环境维护需要排空独立 API。
+              exclusive: bool = False, shared_cli: bool = False) -> dict:
+        """认领有界 CLI 槽位；只有环境维护需要排空独立 API。
 
         :param row: 环境记录
         :param account: 当前账号
         :param source: 不可复用的执行来源
         :param idle_only: 低优先级工作遇到正式 CLI 或维护时立即顺延
         :param exclusive: 是否修改共享环境并需要排空 API
+        :param shared_cli: 是否可与同账号其他普通 CLI 并行
         :return: 本代执行句柄
         """
         with self.environment_lock(row["environment_id"]):
+            connection = self.database()
+            try:
+                current = connection.execute("SELECT state FROM account_environments WHERE environment_id=?",
+                    (row["environment_id"],)).fetchone()
+            finally:
+                connection.close()
+            if current:
+                row["state"] = current["state"]
             if not exclusive and (self._network_runtime(row) / "cli-unhealthy").exists():
                 self._update(row, state="cli_reconcile")
             maintenance = (row["state"] == "cli_reconcile" and exclusive and idle_only
@@ -977,15 +1033,28 @@ class AccountRuntime:
                 pending = self._root(row) / "runtime" / "login-commit.json"
                 if pending.exists() and source != f"login:{_read_json(pending)['sid']}":
                     raise ValueError("重授权提交尚未收口，请先对账")
-                if row["environment_id"] in self.jobs:
+                siblings = self.environment_jobs(row["environment_id"])
+                if (siblings and (not shared_cli or exclusive or idle_only
+                        or any(not current.get("shared_cli") for current in siblings)
+                        or len(siblings) >= self.cli_limit)):
                     if idle_only:
                         raise RuntimeBusy("账号环境正在执行其它工作，低优先级工作顺延")
-                    raise ValueError("账号环境正在执行其它工作")
+                    if shared_cli:
+                        raise RuntimeBusy("账号 CLI 槽位已满或正在进行独占操作")
+                    raise RuntimeBusy("账号环境正在执行其它工作")
+                if shared_cli and (self._root(row) / "runtime/execution.json").exists():
+                    raise RuntimeBusy("原单执行记录尚未收口，不能开始并行作业")
+                if shared_cli:
+                    registered = {hashlib.sha256(current["source"].encode()).hexdigest()
+                        for current in siblings if current.get("shared_cli")}
+                    if any(path.stem not in registered for path in self._execution_records(row)):
+                        raise RuntimeBusy("遗留共享执行记录尚未收口，不能开始下一作业")
                 job = {"row": row, "account": dict(account), "source": source, "lease": None, "exec": None,
-                    "claimed": False, "exclusive": exclusive, "last_used": time.monotonic()}
+                    "claimed": False, "exclusive": exclusive, "shared_cli": shared_cli,
+                    "last_used": time.monotonic()}
                 job["lease_lock"] = threading.RLock()
                 job["token"] = self.execution_token(row.get("container_id") or row["environment_id"], source)
-                self.jobs[row["environment_id"]] = job
+                self._register_job(job)
             account_id = account.get("cc2api_account_id")
             try:
                 if account_id is not None:
@@ -994,9 +1063,13 @@ class AccountRuntime:
                         snapshot = self.gateway._request("GET", path)
                         if snapshot["lease"] or (exclusive and (snapshot["active"] or snapshot.get("waiting"))):
                             raise RuntimeBusy("账号有正式请求，低优先级工作顺延")
-                    result = self.gateway._request("POST", path,
-                        {"operation": "prepare" if exclusive else "prepare-cli", "owner": source})
-                    job["lease"] = result["lease"]
+                    operation = "prepare" if exclusive else "prepare-cli-shared" if shared_cli else "prepare-cli"
+                    result = self.gateway._request("POST", path, {"operation": operation, "owner": source})
+                    job["lease"] = self._owned_lease(result, source)
+                    if job["lease"] is None:
+                        raise ValueError("账号门禁没有返回本执行的租约")
+                    if shared_cli and job["lease"].get("shared_cli") is not True:
+                        raise ValueError("账号网关未提供真实共享 CLI 槽位")
                     if exclusive and idle_only and (result["active"] or self._running_sender_active(row)):
                         raise RuntimeBusy("账号已有请求，低优先级工作顺延")
                     deadline = time.monotonic() + 120
@@ -1024,7 +1097,7 @@ class AccountRuntime:
                     raise
                 finally:
                     with self.lock:
-                        self.jobs.pop(row["environment_id"], None)
+                        self._remove_job(job)
                 raise
 
     def _lease(self, job: dict, operation: str) -> dict:
@@ -1034,18 +1107,22 @@ class AccountRuntime:
                 return {}
             result = self.gateway._request("POST", f"/admin/runtime/accounts/{job['account']['cc2api_account_id']}/lease",
                 {"operation": operation, "owner": lease["owner"], "generation": lease["generation"]})
-            job["lease"] = None if operation == "release" else result["lease"]
+            job["lease"] = None if operation == "release" else self._owned_lease(result, lease["owner"])
+            if operation != "release" and job["lease"] is None:
+                raise ValueError("本执行租约已经丢失")
             return result
 
     def _save_execution(self, job: dict) -> None:
-        execution = {"source": job["source"], "lease": job["lease"],
+        execution = {"schema": 2 if job.get("shared_cli") else 1,
+            "source": job["source"], "lease": job["lease"], "shared_cli": job.get("shared_cli", False),
             "account_id": job["account"].get("cc2api_account_id"), "phase": "claimed",
             "exclusive": job.get("exclusive", True), "container_id": job["row"].get("container_id"),
             "generation": job["row"]["generation"]}
-        for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before", "statusline_before", "statusline_command", "version"):
+        for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before", "statusline_before", "statusline_command",
+                "version", "process", "process_permitted", "run_id", "settings_override", "network_inspection_mode"):
             if key in job:
                 execution[key] = job[key]
-        atomic_json(self._root(job["row"]) / "runtime" / "execution.json", execution)
+        atomic_json(self._execution_path(job), execution)
 
     def _isolate_job(self, job: dict) -> None:
         # 普通 CLI 收口失败只禁止下一 CLI，独立发送器继续处理已接受的 API。
@@ -1067,7 +1144,7 @@ class AccountRuntime:
         row = job["row"]
         with self.environment_lock(row["environment_id"]):
             with self.lock:
-                if self.jobs.get(row["environment_id"]) is not job:
+                if not self._owns_job(job):
                     return
             try:
                 if job.get("exec") and self.client.api.exec_inspect(job["exec"]).get("Running"):
@@ -1082,15 +1159,15 @@ class AccountRuntime:
                         self._local_oauth(current)
                         atomic_json(self.data / "profiles" / row["name"] / ".credentials.json", current)
                 self._lease(job, "release")
-                (self._root(row) / "runtime" / "execution.json").unlink(missing_ok=True)
-                if row["state"] == "cli_reconcile":
+                self._execution_path(job).unlink(missing_ok=True)
+                if row["state"] == "cli_reconcile" and not job.get("shared_cli"):
                     self._update(row, state="ready")
             except Exception:
                 self._isolate_job(job)
                 raise
             finally:
                 with self.lock:
-                    self.jobs.pop(row["environment_id"], None)
+                    self._remove_job(job)
 
     def _heartbeat(self) -> None:
         while not self.stopping.wait(5):
@@ -1106,7 +1183,7 @@ class AccountRuntime:
         failed = False
         with job.setdefault("lease_lock", threading.RLock()):
             with self.lock:
-                if self.stopping.is_set() or self.jobs.get(job["row"]["environment_id"]) is not job:
+                if self.stopping.is_set() or not self._owns_job(job):
                     return
             try:
                 self._lease(job, "heartbeat")
@@ -1117,7 +1194,7 @@ class AccountRuntime:
             # 不能带租约锁等待环境锁，cleanup 的锁顺序相反；旧 token 也不能清理新代。
             with self.environment_lock(job["row"]["environment_id"]):
                 with self.lock:
-                    if self.jobs.get(job["row"]["environment_id"]) is not job:
+                    if not self._owns_job(job):
                         return
                 if job["claimed"]:
                     try:
@@ -1128,7 +1205,7 @@ class AccountRuntime:
             try:
                 with self.environment_lock(job["row"]["environment_id"]):
                     with self.lock:
-                        if self.jobs.get(job["row"]["environment_id"]) is not job:
+                        if not self._owns_job(job):
                             return
                     self._sample_cli_metrics(job["row"], self._container(job["row"]))
             except (OSError, ValueError, RuntimeError, DockerException):
@@ -1147,16 +1224,18 @@ class AccountRuntime:
 
     @contextmanager
     def _cli_setup(self, account: dict, source: str, version: str,
-                   idle_only: bool = False, exclusive: bool = False, allow_inactive_login: bool = False):
+                   idle_only: bool = False, exclusive: bool = False, allow_inactive_login: bool = False,
+                   shared_cli: bool = False):
         row, container = self.ensure(account, allow_inactive_login=allow_inactive_login,
             allow_login_recovery=source.startswith("login:"))
         self.check_system_profile(row, container)
-        job = self.claim(row, account, source, idle_only, exclusive)
+        shared_cli = shared_cli and row.get("isolation_version") == ISOLATION_VERSION and not exclusive
+        job = self.claim(row, account, source, idle_only, exclusive, shared_cli)
         try:
             self._ensure_version(container, version)
             with self.environment_lock(row["environment_id"]):
                 with self.lock:
-                    if self.jobs.get(row["environment_id"]) is not job or job.get("heartbeat_failed"):
+                    if not self._owns_job(job) or job.get("heartbeat_failed"):
                         raise ValueError("CLI 准备期间租约失效，执行未启动")
                 # CLI 版本由管理端固定，禁止账号 CLI 自行写入 root 管理的版本缓存。
                 settings = self._root(row) / "home/.claude/settings.json"
@@ -1181,12 +1260,14 @@ class AccountRuntime:
         :return: 相同的执行 token，供旧 DTO 的两个字段兼容使用
         """
         source = worker_env.get("QUOTA_SOURCE") or f"run:{run_id}:{task.get('quota_attempt', 0)}"
-        with self._cli_setup(account, source, worker_env["CLAUDE_CODE_VERSION"], bool(task.get("warmup"))) as (row, container, job):
+        with self._cli_setup(account, source, worker_env["CLAUDE_CODE_VERSION"], bool(task.get("warmup")),
+                shared_cli=not task.get("capture_full_http") and not task.get("warmup")) as (row, container, job):
             try:
                 self.sync_credentials(row, account)
                 root = self._root(row)
                 settings = root / "home" / ".claude" / "settings.json"
-                job["hooks_before"] = _read_json(settings).get("hooks") if settings.exists() else None
+                if not job.get("shared_cli"):
+                    job["hooks_before"] = _read_json(settings).get("hooks") if settings.exists() else None
                 cwd = self._project_view(row, run_id)
                 workspace = root / "projects" / Path(cwd).name
                 legacy = self.data / "workspaces" / run_id
@@ -1212,6 +1293,11 @@ class AccountRuntime:
                 for directory in (runtime_run, runtime_job):
                     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
                     os.chown(directory, 1000, 1000, follow_symlinks=False)
+                if job.get("shared_cli"):
+                    override = runtime_job / "settings.json"
+                    atomic_json(override, _read_json(settings) if settings.exists() else {})
+                    os.chown(override, 1000, 1000, follow_symlinks=False)
+                    job["settings_override"] = str(override.relative_to(root))
                 control_files = {
                     ".bench-status.json": runtime_run / "status.json",
                     ".bench-transcript.log": runtime_run / "transcript.log",
@@ -1290,8 +1376,18 @@ class AccountRuntime:
                         elif local.name == "state.json":
                             context[key] = f"/quota-accounts/{account['id']}/state.json"
                 context["QUOTA_CREDENTIALS_FILE"] = "/run/v3/access/.credentials.json"
-                atomic_json(self._network_runtime(row) / "context.json", context)
-                self._configure_network_context(container, context)
+                if job.get("shared_cli"):
+                    # 普通执行共享同一透传监听；不能用第二个作业的来源重启或覆盖第一个作业。
+                    shared_context = {"NETWORK_INSPECTION_MODE": "passthrough", "QUOTA_SOURCE": ""}
+                    current_context = self._network_runtime(row) / "context.json"
+                    if current_context.exists() and _read_json(current_context).get("NETWORK_INSPECTION_MODE") != "passthrough":
+                        raise RuntimeBusy("账号网络仍处于独占捕获模式")
+                    atomic_json(current_context, shared_context)
+                    self._configure_network_context(container, shared_context, reuse_passthrough=True,
+                        require_reuse=len(self.environment_jobs(row["environment_id"])) > 1)
+                else:
+                    atomic_json(self._network_runtime(row) / "context.json", context)
+                    self._configure_network_context(container, context)
                 environment = dict(worker_env)
                 environment.update(self.execution_environment(row))
                 environment.update(V3_PERSISTENT_HOME="1", USE_SIDECAR_DNS="1", HOME="/home/node",
@@ -1299,9 +1395,32 @@ class AccountRuntime:
                     QUOTA_SIGNAL_FILE=context.get("QUOTA_SIGNAL_FILE", ""), TMUX_TMPDIR=f"/run/v3/jobs/{handle}",
                     QUOTA_WARMUP="1" if inspection_mode == "quota" else "0",
                     NETWORK_INSPECTION_MODE=inspection_mode)
+                if job.get("shared_cli"):
+                    environment["CLAUDE_EXECUTION_SETTINGS"] = f"/run/v3/jobs/{handle}/settings.json"
+                if self.project_iterations and self.project_iterations.plans.context(run_id):
+                    if not job.get("shared_cli"):
+                        raise ValueError("同会话项目计划需要支持定向控制的账号环境")
+                    native = root / "home" / ".claude" / "projects" / encoded_project
+                    plan_config = self.project_iterations.plans.execution_configuration(run_id, source,
+                        int(task.get("quota_attempt") or 0), native, runtime_run / "project-plan-request.json",
+                        controls / "project-plan-decision.json", cwd)
+                    environment.update(PROJECT_PLAN_JSON=json.dumps(plan_config, ensure_ascii=False),
+                        PROJECT_SESSION_ID=plan_config["session_id"], TASK_PROMPT=plan_config["prompt"])
+                    if plan_config["resume"]:
+                        environment["RESUME_SESSION_ID"] = plan_config["session_id"]
+                    else:
+                        environment.pop("RESUME_SESSION_ID", None)
+                if job.get("shared_cli"):
+                    execution_command = ["python3", "-I", "/usr/local/bin/v3-cli-control", "supervise",
+                        "--source", source, "--proof", f"/run/v3/jobs/{handle}/process.json",
+                        "--ready", f"/controls/{handle}/start.json", "--result", f"/run/v3/jobs/{handle}/process-result.json",
+                        "--", "bash", f"/run/v3/drivers/job-{handle}.sh"]
+                else:
+                    execution_command = ["setsid", "--wait", "bash", "-c",
+                        f"echo $$ > /run/v3/jobs/{handle}/group.pid; exec bash /run/v3/drivers/job-{handle}.sh"]
                 ex = self.client.api.exec_create(container.id,
                     # setsid 默认可能先返回，必须让 exec 生命周期跟随真实 driver。
-                    ["setsid", "--wait", "bash", "-c", f"echo $$ > /run/v3/jobs/{handle}/group.pid; exec bash /run/v3/drivers/job-{handle}.sh"],
+                    execution_command,
                     environment=environment, workdir=cwd)
                 job.update(exec=ex["Id"], run_id=run_id, context=context, handle=handle, cwd=cwd,
                     network_inspection_mode=inspection_mode, tmux=f"claude-{run_id}",
@@ -1318,6 +1437,10 @@ class AccountRuntime:
                         and not self.project_iterations.can_start(run_id)):
                     raise RuntimeBusy("项目启动前门禁已改变，保留现场等待恢复")
                 self.client.api.exec_start(ex["Id"], detach=True)
+                if job.get("shared_cli"):
+                    self._attach_process(job, runtime_job / "process.json")
+                    atomic_json(controls / "start.json", job["process"], 0o640)
+                    os.chown(controls / "start.json", 0, 1000, follow_symlinks=False)
                 return job["token"], job["token"]
             except Exception:
                 self.cleanup(job["token"])
@@ -1350,14 +1473,16 @@ class AccountRuntime:
             raise ValueError("额度采集目录不能是链接")
         directory.mkdir(exist_ok=True, mode=0o700)
         os.chown(directory, 1000, 1000, follow_symlinks=False)
-        settings = root / "home/.claude/settings.json"
+        settings = (root / job["settings_override"] if job.get("settings_override")
+            else root / "home/.claude/settings.json")
         value = _read_json(settings) if settings.is_file() else {}
         original = value.get("statusLine")
         configuration = directory / "config.json"
         container_directory = "/flows/" + str(directory.relative_to(root / "flows"))
         command = "/usr/local/bin/v3-cli-quota --config " + shlex.quote(container_directory + "/config.json")
-        job["statusline_before"] = {"present": "statusLine" in value, "value": original}
-        job["statusline_command"] = command
+        if not job.get("shared_cli"):
+            job["statusline_before"] = {"present": "statusLine" in value, "value": original}
+            job["statusline_command"] = command
         self._save_execution(job)
         atomic_json(configuration, {"source": "cli:" + job["source"], "identity": identity, "cwd": cwd,
             "session_dir": "/home/node/.claude/projects/" + cwd.replace("/", "-"),
@@ -1389,12 +1514,15 @@ class AccountRuntime:
         atomic_json(settings, value)
         os.chown(settings, 1000, 1000, follow_symlinks=False)
 
-    def _configure_network_context(self, container, context: dict) -> None:
+    def _configure_network_context(self, container, context: dict, reuse_passthrough: bool = False,
+                                   require_reuse: bool = False) -> None:
         """
         切换 CLI 网络监听并核对当前执行的模式与来源。
 
         :param container: 固定账号容器
         :param context: 当前执行的私有网络上下文
+        :param reuse_passthrough: 是否先核对并复用已有透传监听
+        :param require_reuse: 已有兄弟执行时禁止重启监听
         :return: None
         """
         mode = str(context.get("NETWORK_INSPECTION_MODE") or "passthrough")
@@ -1402,7 +1530,12 @@ class AccountRuntime:
             raise ValueError("网络检查模式不合法")
         network = (self._network_container(self._row_for_container(container))
             if container.labels.get("vibebench.isolation-version") == str(ISOLATION_VERSION) else container)
-        result = network.exec_run(["/usr/local/bin/v3-network-context"])
+        command = ["/usr/local/bin/v3-network-context"]
+        if reuse_passthrough:
+            command.append("--reuse-passthrough")
+        if require_reuse:
+            command.append("--require-reuse")
+        result = network.exec_run(command)
         if result.exit_code != 0:
             output = result.output.decode("utf-8", errors="replace") if isinstance(result.output, bytes) else str(result.output or "")
             detail = output.strip().splitlines()
@@ -1428,7 +1561,87 @@ class AccountRuntime:
             state = self.client.api.exec_inspect(job["exec"])
             if not state.get("Running"):
                 return int(state.get("ExitCode") if state.get("ExitCode") is not None else -1)
+            if job.get("shared_cli") and job.get("handle"):
+                result = self._process_result(job)
+                if result is not None and not result.get("cleaned"):
+                    raise ValueError("本执行子进程未能完成定向收口")
             time.sleep(0.5)
+
+    def _attach_process(self, job: dict, path: Path) -> None:
+        deadline = time.monotonic() + 8
+        while not path.is_file():
+            if time.monotonic() >= deadline or not self.client.api.exec_inspect(job["exec"]).get("Running"):
+                raise ValueError("CLI 监督进程未能发布启动证明")
+            time.sleep(0.05)
+        proof = _read_json(path)
+        if (proof.get("schema") != 1 or proof.get("source") != job["source"]
+                or type(proof.get("pid")) is not int or proof["pid"] <= 1
+                or type(proof.get("started")) is not int or proof["started"] <= 0
+                or proof.get("parent") != 0 or proof.get("uid") != 1000):
+            raise ValueError("CLI 监督进程证明与本执行不符")
+        job["process"] = proof
+        observed = self.control_execution(job["token"], "inspect")
+        if not observed.get("exists") or observed.get("started") != proof["started"]:
+            raise ValueError("CLI 监督进程已经失效")
+        # 先把可信内核身份保存在 CLI 不可写的控制端，再发布只读启动许可。
+        job["process_permitted"] = True
+        self._save_execution(job)
+
+    def control_execution(self, token: str, operation: str) -> dict:
+        """按已登记的内核身份暂停、恢复或清理单个 CLI 执行。
+
+        :param token: 包含完整来源的执行 token。
+        :param operation: inspect、freeze、resume 或 stop-job。
+        :return: 受信任 helper 返回的内核状态；不能确认归属时拒绝。
+        """
+        if operation not in ("inspect", "freeze", "resume", "stop-job"):
+            raise ValueError("不支持的 CLI 作业控制操作")
+        job = self.job_for_container(token)
+        proof = job.get("process")
+        if not job.get("shared_cli") or not isinstance(proof, dict):
+            raise ValueError("本执行缺少独立监督进程证明")
+        container = self._container(job["row"])
+        answer = container.exec_run(["python3", "-I", "/usr/local/bin/v3-cli-control", operation,
+            "--source", job["source"], "--pid", str(proof["pid"]), "--started", str(proof["started"])])
+        if answer.exit_code:
+            raise ValueError("CLI 作业控制失败或进程代次不符")
+        observed = json.loads(answer.output)
+        if not isinstance(observed, dict) or observed.get("source") != job["source"]:
+            raise ValueError("CLI 作业控制返回了不同执行来源")
+        return observed
+
+    def _process_result(self, job: dict) -> dict | None:
+        if not job.get("handle"):
+            return None
+        path = self._root(job["row"]) / "runtime/jobs" / job["handle"] / "process-result.json"
+        if not path.is_file():
+            return None
+        result = _read_json(path)
+        proof = job.get("process") or {}
+        if any(result.get(key) != proof.get(key) for key in ("pid", "started", "source")):
+            raise ValueError("CLI 清理结果与监督进程代次不符")
+        return result
+
+    def _cleanup_shared_job(self, job: dict, container) -> None:
+        if job.get("exec") and not job.get("process"):
+            proof_path = self._root(job["row"]) / "runtime/jobs" / job["handle"] / "process.json"
+            if proof_path.is_file():
+                self._attach_process(job, proof_path)
+            elif self.client.api.exec_inspect(job["exec"]).get("Running"):
+                raise ValueError("启动证明缺失，拒绝猜测或清理整个账号")
+        if job.get("process"):
+            observed = self.control_execution(job["token"], "stop-job")
+            result = self._process_result(job)
+            if not observed.get("cleaned") and not (result and result.get("cleaned") is True):
+                raise ValueError("不能证明本执行子进程已经收口")
+            deadline = time.monotonic() + 3
+            while self.client.api.exec_inspect(job["exec"]).get("Running"):
+                if time.monotonic() >= deadline:
+                    raise ValueError("本执行的 Docker exec 尚未退出")
+                time.sleep(0.05)
+            answer = container.exec_run(["python3", "-I", "/usr/local/bin/v3-cli-control", "orphans"])
+            if answer.exit_code or json.loads(answer.output).get("orphans"):
+                raise ValueError("CLI 孤儿进程仍需对账，未清理兄弟执行")
 
     def register_exec(self, token: str, exec_id: str) -> None:
         """将交互执行句柄写入当前代次，支持重启后仅清理 CLI。
@@ -1440,7 +1653,7 @@ class AccountRuntime:
         job = self.job_for_container(token)
         with self.environment_lock(job["row"]["environment_id"]):
             with self.lock:
-                if self.jobs.get(job["row"]["environment_id"]) is not job:
+                if not self._owns_job(job):
                     raise ValueError("执行代次已改变")
             job["exec"] = exec_id
             self._save_execution(job)
@@ -1457,13 +1670,17 @@ class AccountRuntime:
             return
         with self.environment_lock(job["row"]["environment_id"]):
             with self.lock:
-                if self.jobs.get(job["row"]["environment_id"]) is not job:
+                if not self._owns_job(job):
                     return
             commit_path = self._root(job["row"]) / "runtime" / "login-commit.json"
             if commit_path.exists() and _read_json(commit_path).get("phase") != "mirrored":
                 raise ValueError("重授权提交结果尚未确认，必须先对账")
             container = self._container(job["row"])
             try:
+                if job.get("shared_cli"):
+                    self._cleanup_shared_job(job, container)
+                    self.release(job)
+                    return
                 if job.get("tmux"):
                     container.exec_run(["tmux", "-S", job["tmux_socket"], "kill-server"])
                     processes = container.exec_run(["pgrep", "-f", job["tmux_socket"]])
@@ -1524,7 +1741,7 @@ class AccountRuntime:
                     self._isolate_job(job)
                 finally:
                     with self.lock:
-                        self.jobs.pop(job["row"]["environment_id"], None)
+                        self._remove_job(job)
                 raise
 
     def execution_flows(self, account: dict, source: str, flows: Path) -> Path:
@@ -1697,7 +1914,7 @@ class AccountRuntime:
         :return: 环境 runtime 下的文件路径
         """
         if name not in {"status.json", "transcript.log", "session-baseline.json", "followups.json",
-                "oauth-refresh-request.json", "oauth-refresh-result.json"}:
+                "project-plan-request.json", "project-plan-state.json", "oauth-refresh-request.json", "oauth-refresh-result.json"}:
             raise ValueError("运行产物名称不合法")
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", run_id):
             raise ValueError("运行 ID 不合法")
@@ -1730,7 +1947,7 @@ class AccountRuntime:
                     continue
                 try:
                     with self.lock:
-                        busy = row["environment_id"] in self.jobs
+                        busy = self.environment_jobs(row["environment_id"])
                     if busy or row["environment_id"] not in active_environments:
                         continue
                     account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
@@ -1744,7 +1961,7 @@ class AccountRuntime:
                     (self._root(row) / "runtime" / "execution.json").unlink(missing_ok=True)
                     self._lease(job, "release")
                     with self.lock:
-                        self.jobs.pop(row["environment_id"], None)
+                        self._remove_job(job)
                     return
                 finally:
                     guard.release()
@@ -1840,11 +2057,11 @@ class AccountRuntime:
         :return: 当前执行句柄
         """
         with self.lock:
-            job = next((job for job in self.jobs.values() if job["token"] == container_id
-                or (":" not in container_id and job["row"]["container_id"] == container_id)), None)
-        if not job:
+            jobs = [job for job in self.jobs.values() if job["token"] == container_id
+                or (":" not in container_id and job["row"]["container_id"] == container_id)]
+        if len(jobs) != 1:
             raise ValueError("账号执行已过期")
-        return job
+        return jobs[0]
 
     def commit_login(self, session, account_id: int) -> None:
         """提交暂存登录配置，并把环境绑定到不可变账号 ID。
@@ -2035,7 +2252,7 @@ class AccountRuntime:
         :param flows: 当前续聊证据目录
         :return: 当前执行 token 的兼容二元组
         """
-        version = run.get("claude_code_version") or os.environ.get("CLAUDE_CODE_VERSION", "2.1.280")
+        version = run.get("claude_code_version") or os.environ.get("CLAUDE_CODE_VERSION", "2.1.293")
         with self._cli_setup(account, context["QUOTA_SOURCE"], version) as (row, container, job):
             try:
                 self.sync_credentials(row, account)
@@ -2085,7 +2302,7 @@ class AccountRuntime:
         if int(fingerprint.get("profile_version") or 1) >= 2:
             return "账号已经使用固定 profile v2，禁止再次旋转设备画像"
         with self.lock:
-            if row["environment_id"] in self.jobs:
+            if self.environment_jobs(row["environment_id"]):
                 return "环境仍有活动 CLI 作业"
         connection = self.database()
         try:
@@ -2167,7 +2384,7 @@ class AccountRuntime:
                 if (self._root(row) / "runtime" / "login-commit.json").exists():
                     raise ValueError("重授权提交结果仍需对账，暂存和门禁已保留")
                 return
-            if environment_id in self.jobs:
+            if self.environment_jobs(environment_id):
                 raise ValueError("环境正在执行工作")
             if operation == "reconcile" and row["state"] == "cli_reconcile":
                 self.reconcile(environment_id)
@@ -2197,7 +2414,7 @@ class AccountRuntime:
             if job:
                 self._lease(job, "release")
                 with self.lock:
-                    self.jobs.pop(environment_id, None)
+                    self._remove_job(job)
             elif account.get("cc2api_account_id") is not None and snapshot["lease"]:
                 lease = snapshot["lease"]
                 self.gateway._request("POST", f"/admin/runtime/accounts/{account['cc2api_account_id']}/lease",
@@ -2235,7 +2452,7 @@ class AccountRuntime:
             "created_at": time.time(), "credential_restore": "禁止恢复历史凭据，沿用最新合法所有者"})
 
     def _recover_cli(self, row: dict) -> None:
-        if row["environment_id"] in self.jobs or (self._root(row) / "runtime/execution.json").exists():
+        if self.environment_jobs(row["environment_id"]) or (self._root(row) / "runtime/execution.json").exists():
             raise ValueError("CLI 执行尚未确认收口")
         roles = {role: role_container(self, row, role) for role in ROLE_COLUMNS}
         for current in roles.values():
@@ -2419,6 +2636,12 @@ class AccountRuntime:
                 if commit_path.exists():
                     self._reconcile_login_import(row, container, commit_path)
                     continue
+                shared_directory = self._root(row) / "runtime/executions"
+                if shared_directory.exists() or shared_directory.is_symlink():
+                    shared = True
+                if self._execution_records(row):
+                    self._reconcile_shared_executions(row, container)
+                    continue
                 if record.exists():
                     execution = _read_json(record)
                     shared = execution.get("exclusive") is False
@@ -2440,9 +2663,9 @@ class AccountRuntime:
                                 job[key] = execution[key]
                         with self.environment_lock(row["environment_id"]):
                             with self.lock:
-                                if row["environment_id"] in self.jobs:
+                                if self.environment_jobs(row["environment_id"]):
                                     continue
-                                self.jobs[row["environment_id"]] = job
+                                self._register_job(job)
                             if container:
                                 container.reload()
                             if container and container.status == "running":
@@ -2498,6 +2721,77 @@ class AccountRuntime:
                 state = "cli_reconcile" if shared else "reconcile"
                 self._update(row, state=state)
 
+    def _execution_records(self, row: dict) -> list[Path]:
+        directory = self._root(row) / "runtime/executions"
+        if directory.is_symlink():
+            raise ValueError("逐执行登记目录不能为链接")
+        paths = sorted(directory.glob("*.json"))
+        if len(paths) > 2 or any(path.is_symlink() for path in paths):
+            raise ValueError("逐执行登记数量或路径不合法")
+        return paths
+
+    def _reconcile_shared_executions(self, row: dict, container) -> None:
+        with self.environment_lock(row["environment_id"]):
+            if self.environment_jobs(row["environment_id"]):
+                raise ValueError("当前 CLI 作业仍在本进程运行，不能作为遗留执行收口")
+            if (self._root(row) / "runtime/execution.json").exists():
+                raise ValueError("存在不兼容的单执行与多执行登记，需明确对账")
+            connection = self.database()
+            try:
+                account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
+            finally:
+                connection.close()
+            if not account:
+                raise ValueError("遗留 CLI 的原账号不存在")
+            account = dict(account)
+            jobs = []
+            for path in self._execution_records(row):
+                execution = _read_json(path)
+                source = execution.get("source")
+                if (execution.get("schema") != 2 or execution.get("shared_cli") is not True
+                        or not isinstance(source, str) or not source or len(source) > 160
+                        or execution.get("exclusive") is not False
+                        or execution.get("container_id") != row["container_id"]
+                        or execution.get("generation") != row["generation"]
+                        or execution.get("account_id") != account.get("cc2api_account_id")
+                        or path.stem != hashlib.sha256(source.encode()).hexdigest()):
+                    raise ValueError("遗留 CLI 登记与账号、来源或容器代次不符")
+                lease = execution.get("lease")
+                if lease:
+                    snapshot = self.gateway._request("GET", f"/admin/runtime/accounts/{execution['account_id']}/lease")
+                    current = self._owned_lease(snapshot, source)
+                    if current and (current.get("generation") != lease.get("generation")
+                            or current.get("exclusive") is not False or current.get("shared_cli") is not True):
+                        raise ValueError("遗留共享 CLI 租约已被其他代次接管")
+                    lease = current
+                job = {"row": row, "account": account, "source": source, "lease": lease,
+                    "shared_cli": True, "exclusive": False, "claimed": True,
+                    "token": self.execution_token(row["container_id"] or row["environment_id"], source),
+                    "lease_lock": threading.RLock()}
+                for key in ("exec", "handle", "tmux", "tmux_socket", "process", "process_permitted",
+                        "run_id", "version", "settings_override", "network_inspection_mode"):
+                    if key in execution:
+                        job[key] = execution[key]
+                jobs.append(job)
+            with self.lock:
+                for job in jobs:
+                    self._register_job(job)
+            if container:
+                container.reload()
+            errors = []
+            for job in jobs:
+                try:
+                    if container and container.status == "running":
+                        self.cleanup(job["token"])
+                    else:
+                        job["exec"] = None
+                        self.release(job)
+                except Exception as error:
+                    errors.append(type(error).__name__)
+            if errors:
+                raise ValueError("遗留共享 CLI 尚未完成定向收口：" + ",".join(errors))
+            self._update(row, state="ready" if container and container.status == "running" else "cli_reconcile")
+
     def _reconcile_login_import(self, row: dict, container, path: Path) -> None:
         """撤销迟到提交权限后对账；结果未知时保持门禁和暂存。
 
@@ -2511,7 +2805,12 @@ class AccountRuntime:
             if record.get("environment_id") != row["environment_id"] or not re.fullmatch(r"[a-f0-9]{12}", record.get("sid", "")):
                 raise ValueError("重授权提交记录归属不合法")
             with self.lock:
-                job = self.jobs.pop(row["environment_id"], None)
+                jobs = self.environment_jobs(row["environment_id"])
+                if len(jobs) > 1:
+                    raise ValueError("重授权对账发现多个在途 CLI，必须先收口")
+                job = jobs[0] if jobs else None
+                if job:
+                    self._remove_job(job)
             if job:
                 # 等待已经在途的心跳退出；移除作业后不会再启动新的续租。
                 with job["lease_lock"]:

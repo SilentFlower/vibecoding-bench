@@ -529,26 +529,26 @@ class ClaudeCodeVersionTests(unittest.TestCase):
 
         :return: None
         """
-        self.assertEqual("2.1.280", main.CLAUDE_CODE_VERSION)
+        self.assertEqual("2.1.293", main.CLAUDE_CODE_VERSION)
         self.assertEqual({
             "configured_version": None,
-            "env_default_version": "2.1.280",
-            "effective_version": "2.1.280",
+            "env_default_version": "2.1.293",
+            "effective_version": "2.1.293",
         }, main.get_claude_code_version())
 
         overridden = main.update_claude_code_version(
             main.ClaudeCodeVersionIn(claude_code_version="2.1.220")
         )
         self.assertEqual("2.1.220", overridden["configured_version"])
-        self.assertEqual("2.1.280", overridden["env_default_version"])
+        self.assertEqual("2.1.293", overridden["env_default_version"])
         self.assertEqual("2.1.220", overridden["effective_version"])
 
         reset = main.update_claude_code_version(
             main.ClaudeCodeVersionIn(claude_code_version=None)
         )
         self.assertIsNone(reset["configured_version"])
-        self.assertEqual("2.1.280", reset["env_default_version"])
-        self.assertEqual("2.1.280", reset["effective_version"])
+        self.assertEqual("2.1.293", reset["env_default_version"])
+        self.assertEqual("2.1.293", reset["effective_version"])
 
     def test_run_workers_use_snapshot_and_ephemeral_workers_use_effective_version(self) -> None:
         """
@@ -1220,10 +1220,10 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             Path(__file__).resolve().parents[1] / "images" / "worker" / "entrypoint.sh"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            'CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.280}"',
+            'CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.293}"',
             entrypoint,
         )
-        self.assertIn("process.argv[3] || '2.1.280'", entrypoint)
+        self.assertIn("process.argv[3] || '2.1.293'", entrypoint)
         ensure_match = re.search(
             r"ensure_claude_code_version\(\) \{(?P<body>.*?)\n\}",
             entrypoint,
@@ -3013,10 +3013,10 @@ global.fetch = async (_url, options) => {
             conn.close()
         self.assertEqual("warmup", run["run_kind"])
         self.assertEqual("queued", run["status"])
-        self.assertEqual("2.1.280", run["claude_code_version"])
+        self.assertEqual("2.1.293", run["claude_code_version"])
         self.assertEqual("high", run["claude_effort_level"])
         submitted_task = run_scheduler.submit.call_args.args[2]
-        self.assertEqual("2.1.280", submitted_task["claude_code_version"])
+        self.assertEqual("2.1.293", submitted_task["claude_code_version"])
         self.assertEqual("high", submitted_task["claude_effort_level"])
         self.assertEqual(task["prompt"], submitted_task["prompt"])
         self.assertIn("标准题目", task["prompt"])

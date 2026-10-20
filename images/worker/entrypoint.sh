@@ -29,7 +29,7 @@
 set -euo pipefail
 
 WORKER_MODE="${WORKER_MODE:-task}"
-CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.280}"
+CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-2.1.293}"
 CLAUDE_CODE_EFFORT_LEVEL="${CLAUDE_CODE_EFFORT_LEVEL:-max}"
 CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-bypassPermissions}"
 PROFILE_CLAUDE_CODE_EFFORT_LEVEL="${PROFILE_CLAUDE_CODE_EFFORT_LEVEL:-$CLAUDE_CODE_EFFORT_LEVEL}"
@@ -105,6 +105,7 @@ validate_claude_permission_mode() {
 write_default_settings() {
   # settings.json 既要补齐默认值，又不能覆盖 Claude 自己写入的隐藏 gate。
   # 用 jq 递归合并：已有字段保留，默认字段补齐；同名字段以默认值为准。
+  local settings_file="${CLAUDE_EXECUTION_SETTINGS:-$CLAUDE_DIR/settings.json}"
   node - "$CLAUDE_CODE_EFFORT_LEVEL" > /tmp/default-settings.json <<'JS'
 const effort = process.argv[2] || 'max';
 process.stdout.write(`${JSON.stringify({
@@ -126,11 +127,17 @@ process.stdout.write(`${JSON.stringify({
   model: 'opus[1m]',
 }, null, 2)}\n`);
 JS
-  if [ -f "$CLAUDE_DIR/settings.json" ]; then
-    jq -s '(.[0] | del(.hooks, .statusLine)) * .[1]' "$CLAUDE_DIR/settings.json" /tmp/default-settings.json > "$CLAUDE_DIR/settings.json.tmp" \
-      && mv "$CLAUDE_DIR/settings.json.tmp" "$CLAUDE_DIR/settings.json"
+  if [ -f "$settings_file" ]; then
+    if [ -n "${CLAUDE_EXECUTION_SETTINGS:-}" ]; then
+      # 并行 CLI 的临时设置只写本次覆盖文件，不能影响另一会话正在读取的用户设置。
+      jq -s '.[0] * .[1]' "$settings_file" /tmp/default-settings.json > "$settings_file.tmp" \
+        && mv "$settings_file.tmp" "$settings_file"
+    else
+      jq -s '(.[0] | del(.hooks, .statusLine)) * .[1]' "$settings_file" /tmp/default-settings.json > "$settings_file.tmp" \
+        && mv "$settings_file.tmp" "$settings_file"
+    fi
   else
-    cp /tmp/default-settings.json "$CLAUDE_DIR/settings.json"
+    cp /tmp/default-settings.json "$settings_file"
   fi
 }
 
@@ -691,7 +698,7 @@ force_refresh_profile_credentials_unlocked() {
   node - "$credentials_path" "$CLAUDE_CODE_VERSION" "$reason" <<'JS'
 const fs = require('fs');
 const path = process.argv[2];
-const claudeCodeVersion = process.argv[3] || '2.1.280';
+const claudeCodeVersion = process.argv[3] || '2.1.293';
 const reason = process.argv[4] || 'auth_error';
 const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
@@ -1621,6 +1628,7 @@ write_default_settings
 # 避免工具调用中间态被误判为 success。固定账号 HOME 会在作业结束后恢复原 hooks，
 # 因此无需把控制配置写进 Claude 可见项目树。
 if [ "${V3_PERSISTENT_HOME:-0}" = "1" ]; then
+  if [ -z "${CLAUDE_EXECUTION_SETTINGS:-}" ]; then
   node - "$CLAUDE_DIR/settings.json" <<'JS'
 const fs = require('fs');
 const path = process.argv[2];
@@ -1633,6 +1641,7 @@ const temporary = `${path}.tmp.${process.pid}`;
 fs.writeFileSync(temporary, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
 fs.renameSync(temporary, path);
 JS
+  fi
 else
   # 旧版每-run HOME 仍使用 project-local 配置，保持原有生命周期。
   mkdir -p /workspace/.claude
@@ -1711,9 +1720,16 @@ check_claude_auth_status
 SESSION="claude-${RUN_ID}"
 log "Launching tmux session: $SESSION ($CLAUDE_USER $CLAUDE_PERMISSION_MODE mode)"
 claude_args=(claude --permission-mode "$CLAUDE_PERMISSION_MODE")
+if [ -n "${CLAUDE_EXECUTION_SETTINGS:-}" ]; then
+  claude_args+=(--settings "$CLAUDE_EXECUTION_SETTINGS")
+fi
 if [ -n "${RESUME_SESSION_ID:-}" ]; then
   claude_args+=(--resume "$RESUME_SESSION_ID")
-  TASK_PROMPT="Continue the original task from the current session and file state. Do not start over."
+  if [ -z "${PROJECT_PLAN_JSON:-}" ]; then
+    TASK_PROMPT="Continue the original task from the current session and file state. Do not start over."
+  fi
+elif [ -n "${PROJECT_SESSION_ID:-}" ]; then
+  claude_args+=(--session-id "$PROJECT_SESSION_ID")
 fi
 if [ -n "${CLAUDE_MODEL_OVERRIDE:-}" ]; then
   # 后端已校验模型名字符集；这里用数组参数传递，避免把用户输入拼进 shell。
@@ -1721,8 +1737,10 @@ if [ -n "${CLAUDE_MODEL_OVERRIDE:-}" ]; then
   log "Using one-shot Claude model override: $CLAUDE_MODEL_OVERRIDE"
 fi
 tmux new-session -d -s "$SESSION" -x 220 -y 60
+# 暂停整个作业树后，交互 shell 的作业控制会恢复行规程，导致下一步输入被回显或截断。
+# 自动 driver 自行拥有 CLI 生命周期，禁用 shell 的作业控制后再启动原生 TUI。
 tmux send-keys -t "$SESSION" \
-  "${TLS_SHELL_EXPORT}export HOME='$CLAUDE_HOME' && cd /workspace && runuser -u '$CLAUDE_USER' -- env HOME='$CLAUDE_HOME' ${TLS_EXEC_ENV} $(printf '%q ' "${claude_args[@]}"); code=\$?; echo; echo \"[entrypoint] claude exited with code \$code\"; echo \$code >/tmp/claude-exit-code; touch /tmp/claude-exited; sleep 3600" Enter
+  "set +m; ${TLS_SHELL_EXPORT}export HOME='$CLAUDE_HOME' && cd /workspace && runuser -u '$CLAUDE_USER' -- env HOME='$CLAUDE_HOME' ${TLS_EXEC_ENV} $(printf '%q ' "${claude_args[@]}"); code=\$?; echo; echo \"[entrypoint] claude exited with code \$code\"; echo \$code >/tmp/claude-exit-code; touch /tmp/claude-exited; sleep 3600" Enter
 
 # 等 claude TUI 就绪
 sleep 6
@@ -1734,6 +1752,12 @@ handle_claude_startup_gates || startup_ready=0
 
 # ---------- 5) 输入完整 prompt（默认按键，保留多行且只提交一次） ----------
 if [ ! -f /tmp/claude-exited ] && [ "$startup_ready" = "1" ]; then
+  if [ -n "${PROJECT_PLAN_JSON:-}" ]; then
+    if ! python3 /usr/local/bin/v3-project-plan begin >/dev/null; then
+      write_bench_status "failed" "项目计划初始会话证据无效，已保留现场"
+      exit 1
+    fi
+  fi
   log "Injecting prompt (${#TASK_PROMPT} chars)"
   inject_tmux_prompt prompt "$TASK_PROMPT"
 elif [ ! -f /tmp/claude-exited ]; then
@@ -1896,6 +1920,37 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     break
   fi
   if [ "$completion_status" -eq 0 ]; then
+    if [ -n "${PROJECT_PLAN_JSON:-}" ]; then
+      plan_wait_started=$(date +%s)
+      if ! python3 /usr/local/bin/v3-project-plan advance >/tmp/project-plan-action.json; then
+        write_bench_status "failed" "项目计划交接证据无效或验收等待超时，已保留现场"
+        touch /tmp/claude-followup-error
+        break
+      fi
+      # 管理暂停与独立验收不消耗模型工作预算；已经消耗的工作时间不会重置。
+      deadline=$(( deadline + $(date +%s) - plan_wait_started ))
+      plan_action=$(jq -r '.action' /tmp/project-plan-action.json)
+      case "$plan_action" in
+        complete) completion_done=1; break ;;
+        failed)
+          write_bench_status "failed" "项目步骤独立验收失败，已保留现场"
+          touch /tmp/claude-followup-error
+          break ;;
+        send)
+          if check_quota_pause; then
+            touch /tmp/claude-quota-wait
+            break
+          fi
+          if ! inject_tmux_prompt project-plan "$(jq -r '.prompt' /tmp/project-plan-action.json)" \
+              || ! python3 /usr/local/bin/v3-project-plan sent >/dev/null; then
+            write_bench_status "failed" "项目步骤指令投递结果不确定，已保留原会话"
+            touch /tmp/claude-followup-error
+            break
+          fi ;;
+      esac
+      sleep 0.2
+      continue
+    fi
     if [ "$FOLLOWUP_COUNT" -gt 0 ]; then
       followup_status=0
       advance_task_followups || followup_status=$?
@@ -1935,7 +1990,7 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
       break
     fi
     if [ "$completion_status" -eq 0 ]; then
-      if [ "$FOLLOWUP_COUNT" -eq 0 ]; then
+      if [ "$FOLLOWUP_COUNT" -eq 0 ] && [ -z "${PROJECT_PLAN_JSON:-}" ]; then
         completion_done=1
       elif python3 /usr/local/bin/v3-task-followups advance --state /workspace/.bench-followups.json \
           --project "$CLAUDE_DIR/projects/-workspace" --idle 0 --no-next | jq -e '.action == "complete"' >/dev/null; then
@@ -1958,7 +2013,7 @@ done
 capture_transcript_snapshot
 persist_runtime_claude_state
 tmux kill-session -t "$SESSION" 2>/dev/null || true
-if [ "$completion_done" -ne 1 ] && [ ! -f /tmp/claude-fatal-error ] && [ ! -f /tmp/claude-quota-wait ] && [ ! -f /tmp/claude-api-fatal-error ] && [ ! -f /tmp/claude-followup-error ] && [ ! -f /tmp/claude-followup-incomplete ]; then
+if [ "$completion_done" -ne 1 ] && [ -z "${PROJECT_PLAN_JSON:-}" ] && [ ! -f /tmp/claude-fatal-error ] && [ ! -f /tmp/claude-quota-wait ] && [ ! -f /tmp/claude-api-fatal-error ] && [ ! -f /tmp/claude-followup-error ] && [ ! -f /tmp/claude-followup-incomplete ]; then
   completion_status=0
   classify_claude_completion 0 >/tmp/claude-completion-state 2>/dev/null || completion_status=$?
   handle_completion_failure "$completion_status" || true

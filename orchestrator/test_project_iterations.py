@@ -38,8 +38,8 @@ class LocalFixtureVerifier:
         return {'status':'passed' if passed else 'failed','case_count':len(cases)}
 
 
-class ProjectIterationTests(unittest.TestCase):
-    """通过真实表和文件证明无人推进边界，不发起模型请求。"""
+class ProjectIterationFixture(unittest.TestCase):
+    """提供真实表和文件夹具，不发起模型请求。"""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -99,9 +99,9 @@ class ProjectIterationTests(unittest.TestCase):
         self.sql("UPDATE runs SET status='running',started_at=1 WHERE id=?",(run_id,))
         return self.manager.prepare_workspace(environment,run_id,self.data/'environments'/environment['environment_id'])[1]
 
-    def solve_fixture(self, run_id: str) -> Path:
-        """模拟程序员实现当前业务动作，参考源码仅用于测试夹具。@param run_id 运行。@return 目录。"""
-        workspace = self.materialize(run_id)
+    def solve_fixture(self, run_id: str, workspace: Path | None = None) -> Path:
+        """模拟当前业务动作。@param run_id 运行。@param workspace 在途时复用目录。@return 夹具目录。"""
+        workspace = workspace or self.materialize(run_id)
         context = self.manager.run_context(run_id)
         project = self.library.projects[context['project_key']]
         reference = json.loads((project.root/'verification/reference.json').read_text())
@@ -124,6 +124,9 @@ class ProjectIterationTests(unittest.TestCase):
         self.sql('UPDATE runs SET status=?,ended_at=2 WHERE id=?',(status,run_id))
         if release:
             self.manager.execution_released(run_id,0)
+
+class ProjectIterationTests(ProjectIterationFixture):
+    """通过真实表和文件证明原单步批次的兼容性。"""
 
     def test_create_hundred_has_no_working_directories(self) -> None:
         """全量选择只写元数据；暂停和排队都不预先铺目录。@return None。"""

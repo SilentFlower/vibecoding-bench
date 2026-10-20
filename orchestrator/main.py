@@ -54,7 +54,7 @@ from login_drafts import LoginDraftStore
 from physical_features import physical_features_summary
 from run_windows import normalize_run_window, run_window_snapshot
 from project_library import ProjectLibrary
-from project_iteration import PROJECT_RUN_KIND, PROJECT_SCHEMA, ProjectIterationManager
+from project_iteration import PROJECT_RUN_KIND, PROJECT_SCHEMA, ProjectIterationManager, initialize_plan_schema
 from project_verifier import ProjectVerifier
 from topic_library import (decode_followup_timing, decode_followups, encode_followups, parse_topics,
     sample_followup_timing, sample_followups)
@@ -79,7 +79,7 @@ HOST_BENCH_DATA = Path(os.environ.get("HOST_BENCH_DATA", str(BENCH_DATA)))
 WORKER_IMAGE = os.environ.get("WORKER_IMAGE", "vibebench-worker:latest")
 SIDECAR_IMAGE = os.environ.get("SIDECAR_IMAGE", "vibebench-sidecar:latest")
 V3_ENABLED = bool(os.environ.get("V3_DEPLOYMENT_ID"))
-PER_ACCOUNT_CONCURRENCY = 1 if V3_ENABLED else int(os.environ.get("PER_ACCOUNT_CONCURRENCY", "2"))
+PER_ACCOUNT_CONCURRENCY = int(os.environ.get("PER_ACCOUNT_CONCURRENCY", "2"))
 SIDECAR_READY_TIMEOUT = float(os.environ.get("SIDECAR_READY_TIMEOUT", "120"))
 DNS_READY_HOST = os.environ.get("DNS_READY_HOST", "example.com")
 _SIDECAR_DNS_READY_SH = (
@@ -209,9 +209,9 @@ WORKER_HOME = "/home/node"
 WORKER_UID = 1000
 WORKER_GID = 1000
 CLAUDE_CODE_VERSION = _normalize_claude_code_version(
-    os.environ.get("CLAUDE_CODE_VERSION") or "2.1.280",
+    os.environ.get("CLAUDE_CODE_VERSION") or "2.1.293",
     "CLAUDE_CODE_VERSION",
-) or "2.1.280"
+) or "2.1.293"
 CLAUDE_CODE_EFFORT_LEVEL = _normalize_claude_effort_level(
     os.environ.get("CLAUDE_CODE_EFFORT_LEVEL") or "max",
     "CLAUDE_CODE_EFFORT_LEVEL",
@@ -1494,6 +1494,7 @@ def init_db() -> None:
         with conn:
             conn.executescript(_SCHEMA)
             conn.executescript(PROJECT_SCHEMA)
+            initialize_plan_schema(conn)
             _ensure_column(conn, "accounts", "upstream_proxy_scheme", "TEXT DEFAULT 'socks5'")
             _ensure_column(conn, "accounts", "timezone", "TEXT")
             _ensure_column(conn, "accounts", "run_window_json", "TEXT")
@@ -4521,7 +4522,7 @@ const path = require('path');
 
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
 const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
-const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.280';
+const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.293';
 
 function emit(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
@@ -4783,7 +4784,7 @@ const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
 const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
 const refreshBufferMs = Number(process.env.OAUTH_REFRESH_BUFFER_SEC || '600') * 1000;
-const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.280';
+const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.293';
 
 function emit(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
@@ -5516,13 +5517,13 @@ class LoginManager:
                     if not row or row["account_id"] is not None or row["state"] != "stopped":
                         continue
                     record = drafts.guard(row, session.draft_generation)
-                    if (record.get("sid") != session.sid or environment_id in account_runtime.jobs
+                    if (record.get("sid") != session.sid or account_runtime.environment_jobs(environment_id)
                         or (account_runtime._root(row) / "runtime" / "execution.json").exists()):
                         continue
                     # 只收口本代已停止的未绑定会话，不让旧名称占用挡住恢复/重登。
                     self.cleanup(session.sid)
                     continue
-                if environment_id in account_runtime.jobs or session.commit_context["path"].exists():
+                if account_runtime.environment_jobs(environment_id) or session.commit_context["path"].exists():
                     continue
                 snapshot = cc2api_client.import_status(session.binding_id, session.import_payload["operation_id"]) if session.import_payload else None
                 self.cleanup(session.sid)
@@ -6898,7 +6899,7 @@ class Scheduler:
                 try:
                     sid, wid = self.runner.start_run(run_id, account, task)
                 except Exception as exc:
-                    if current["run_kind"] == PROJECT_RUN_KIND and isinstance(exc, RuntimeBusy):
+                    if V3_ENABLED and isinstance(exc, RuntimeBusy) and not task.get("warmup"):
                         state = quota_guard.snapshot(account) if quota_guard else {}
                         policy = quota_guard.policy_snapshot(account, "normal", source) if quota_guard else {}
                         if state.get("blocked") or policy.get("blocked"):
@@ -7035,7 +7036,8 @@ class Scheduler:
                     project_iterations.execution_released(run_id, attempt, cleanup_error)
                 if deferred_for_window and not self._window_stop.is_set():
                     # 先释放账号资源和本代去重标记，再由同一执行进入时间等待。
-                    self.submit(run_id, account, task)
+                    if not self._window_stop.wait(0.5):
+                        self.submit(run_id, account, task)
 
     def _wait_batch_quota(self, batch_id: int, account: dict) -> None:
         state = quota_guard.snapshot(account)
@@ -7760,6 +7762,53 @@ def _project_execution_settings() -> dict:
         "claude_effort_level": effective_runtime_effort(), "execution_model": effective_runtime_model()}
 
 
+def _project_schedule_admission(account: dict) -> dict:
+    """只读汇总新计划的窗口、额度和环境门禁，不发起上游探测。
+
+    :param account: 当前账号。
+    :return: 放行状态及可公开等待原因，额度阈值继承账号设置。
+    """
+    window = _account_run_window(account)
+    state = quota_guard.snapshot(account) if quota_guard else {}
+    policy = quota_guard.policy_snapshot(account, "normal", quota_state=state) if quota_guard else {}
+    connection = get_db()
+    try:
+        environment = connection.execute("SELECT state,environment_id FROM account_environments WHERE account_id=?", (account["id"],)).fetchone()
+    finally:
+        connection.close()
+    message = (state.get("message") or "账号额度或认证门禁尚未解除" if state.get("blocked") or state.get("account_error") else
+        policy.get("message") if policy.get("blocked") else _window_message(window) if not window["allowed"] else
+        "账号环境等待对账" if environment and environment["state"] in ("reconcile", "cli_reconcile", "rebuilding") else "")
+    if not message and login_manager and login_manager.has_active_name(str(account["name"])):
+        message = "账号正在登录或重新授权"
+    jobs = account_runtime.environment_jobs(environment["environment_id"]) if account_runtime and environment else []
+    if not message and any(not job.get("shared_cli") for job in jobs):
+        message = "等待账号独占 CLI 作业结束"
+    if not message and len(jobs) >= PER_ACCOUNT_CONCURRENCY:
+        message = "等待账号 CLI 容量"
+    return {"allowed": not bool(message), "message": message, "run_window": window,
+        "quota_policy": {key: policy.get(key) for key in ("enabled", "hit", "limits", "resume_at", "message")},
+        "quota_source": "account", "account_concurrency_limit": PER_ACCOUNT_CONCURRENCY, "cli_active": len(jobs)}
+
+
+def _project_execution_control(run_id: str, quota_attempt: int, operation: str) -> dict:
+    """按 Run 与额度代次定向控制当前作业，禁止按任意容器首项猜测。
+
+    :param run_id: 原运行。
+    :param quota_attempt: 当前额度代次。
+    :param operation: freeze 或 resume。
+    :return: 内核核对后的进程证明。
+    """
+    source = _quota_source(run_id, quota_attempt)
+    jobs = []
+    if account_runtime:
+        with account_runtime.lock:
+            jobs = [job for job in account_runtime.jobs.values() if job.get("run_id") == run_id and job.get("source") == source]
+    if len(jobs) != 1:
+        raise ValueError("当前计划的独立执行证明缺失或冲突")
+    return account_runtime.control_execution(jobs[0]["token"], operation)
+
+
 runner: Optional[Runner] = None
 scheduler: Optional[Scheduler] = None
 login_manager: Optional[LoginManager] = None
@@ -7798,7 +7847,8 @@ async def lifespan(app: FastAPI):
             project_iterations = ProjectIterationManager(BENCH_DATA, ProjectLibrary(PROJECT_LIBRARY_DIR), get_db, _db_lock,
                 scheduler.submit, _project_execution_settings, _quota_identity, stop_run,
                 ProjectVerifier(runner.client, BENCH_DATA, HOST_BENCH_DATA, account_runtime.image), scheduler.is_executing,
-                admission=_project_admission)
+                admission=_project_admission, execution_control=_project_execution_control,
+                schedule_admission=_project_schedule_admission, concurrency_limit=PER_ACCOUNT_CONCURRENCY)
             account_runtime.set_project_iterations(project_iterations)
         except (ValueError, OSError) as error:
             # 新内容损坏只隔离新入口，原题库执行仍可使用。
@@ -8430,6 +8480,7 @@ def list_accounts():
             if _login_save_pending(conn, row["name"]):
                 continue
             account = dict(row)
+            account["cli_concurrency_limit"] = min(2, PER_ACCOUNT_CONCURRENCY)
             account["upstream_proxy_scheme"] = _normalize_upstream_proxy_scheme(
                 account.get("upstream_proxy_scheme")
             )
@@ -10088,10 +10139,26 @@ class ProjectIterationBatchIn(BaseModel):
     :param account_id: 运行账号。
     :param name: 批次名称。
     :param project_keys: 所选项目，省略时选择全部。
+    :param concurrency: 同账号并发，省略时按有效容量取默认值。
+    :param active_projects: 活动项目池容量。
+    :param rotation_steps: 连续验收通过后轮换的步数。
+    :param steps_per_plan: 同一次 CLI 计划推进的步数。
+    :param timeout_sec: 整个单次 CLI 计划的工作超时。
+    :param interval_min_sec: 两次计划补位的随机间隔下限。
+    :param interval_max_sec: 两次计划补位的随机间隔上限。
     """
     account_id: StrictInt
     name: StrictStr = "项目迭代批次"
     project_keys: Optional[list[StrictStr]] = None
+    concurrency: Optional[StrictInt] = None
+    active_projects: StrictInt = 3
+    rotation_steps: StrictInt = 5
+    steps_per_plan: StrictInt = 2
+    timeout_sec: StrictInt = 1800
+    interval_min_sec: StrictInt = 0
+    interval_max_sec: StrictInt = 0
+
+    model_config = ConfigDict(extra="forbid")
 
 
 def _project_manager() -> ProjectIterationManager:
@@ -10123,7 +10190,8 @@ def project_catalog_entry(key: str) -> dict:
 def create_project_iteration_batch(body: ProjectIterationBatchIn) -> dict:
     """创建尚未投放的独立批次。@param body 账号与项目选择。@return 批次详情。"""
     try:
-        return _project_manager().create_batch(body.account_id, body.name, body.project_keys)
+        policy = body.model_dump(exclude={"account_id", "name", "project_keys"}, exclude_none=True)
+        return _project_manager().create_batch(body.account_id, body.name, body.project_keys, policy)
     except ValueError as error:
         raise HTTPException(400, str(error))
 
@@ -10191,7 +10259,8 @@ def get_project_instance_usage(iid: int) -> dict:
             "tokens_out": 0, "requests": 0, "attempts": 0, "known_attempts": 0})
         item["attempts"] += 1
         try:
-            usage = get_stats(attempt["run_id"])
+            usage = (_project_manager().step_usage(attempt["id"], _usage_input_tokens)
+                if attempt.get("plan_id") else get_stats(attempt["run_id"]))
         except (HTTPException, OSError, ValueError):
             usage = {}
         if usage.get("usage_available"):
@@ -10424,6 +10493,10 @@ def create_task_batch(body: BatchIn):
     if not topic_ids:
         raise HTTPException(400, "topic_ids required")
     concurrency = max(1, min(2, int(body.concurrency or 2)))
+    if "concurrency" not in body.model_fields_set:
+        concurrency = min(concurrency, PER_ACCOUNT_CONCURRENCY)
+    elif concurrency > PER_ACCOUNT_CONCURRENCY:
+        raise HTTPException(400, "并发超过账号 CLI 上限 " + str(PER_ACCOUNT_CONCURRENCY))
     interval_min = max(0, int(body.interval_min_sec or 0))
     interval_max = max(0, int(body.interval_max_sec or 0))
     if interval_max < interval_min:
@@ -10507,6 +10580,8 @@ def list_task_batches():
         ).fetchall()
         items = [dict(r) for r in rows]
         for item in items:
+            item["account_concurrency_limit"] = min(2, PER_ACCOUNT_CONCURRENCY)
+            item["effective_concurrency"] = min(int(item["concurrency"] or 2), item["account_concurrency_limit"])
             account = conn.execute("SELECT * FROM accounts WHERE id=?", (item["account_id"],)).fetchone()
             item["passive_quota"] = _public_quota(dict(account)) if account else {}
             item["run_window"] = _account_run_window(dict(account)) if account else {}
@@ -11657,7 +11732,7 @@ def v3_quiesce(account_id: int, body: dict):
             raise HTTPException(409, "配置门禁证明无效")
         row = account_runtime._row(account["name"], account["id"])
         with account_runtime.lock:
-            busy = row["environment_id"] in account_runtime.jobs
+            busy = bool(account_runtime.environment_jobs(row["environment_id"]))
         if busy or account_runtime._running_sender_active(row):
             raise HTTPException(409, "账号环境仍有工作或发送连接")
         if row["container_id"]:
@@ -11723,7 +11798,7 @@ def v3_environments() -> list[dict]:
         row["physical_features"] = physical_features_summary(row,
             account_runtime._root(row) / "runtime/physical-features.json", time.time())
         with account_runtime.lock:
-            row["busy"] = row["environment_id"] in account_runtime.jobs
+            row["busy"] = bool(account_runtime.environment_jobs(row["environment_id"]))
         try:
             with ExitStack() as locks:
                 # 列表只取可立即获得的一致快照，不能等待登录或同步持有的维护锁。

@@ -4,6 +4,7 @@ import ast
 import io
 import json
 import socket
+import shutil
 import sqlite3
 import sys
 import tempfile
@@ -155,6 +156,62 @@ class PreflightTests(unittest.TestCase):
             self.assertFalse((target / "data/bench/tmux.sock").exists())
             self.assertTrue((target / "data/bench/metadata-link").is_symlink())
             self.assertEqual('{"preserved":true}', (target / "data/bench/metadata-link").read_text())
+
+    def test_backup_rotation_only_removes_owned_completed_siblings(self) -> None:
+        """成功后只留本次完整备份，未知／跨部署／链接目录不参与轮换。@return None。"""
+        self.root.mkdir()
+        (self.root/'.v3-deployment.json').write_text('{"deployment":"test"}')
+        (self.root/'preserved.txt').write_text('first')
+        parent = self.root.parent/'backups'
+        first,second = parent/'first',parent/'second'
+        manifest = {'layout_version':2,'bridge_protocol':1,'release':'synthetic'}
+        with patch.object(manage,'command',return_value=''),patch.object(manage,'inspect_images',return_value=manifest):
+            manage.backup(self.values,first)
+            foreign = parent/'foreign'
+            shutil.copytree(first,foreign)
+            marker = json.loads((foreign/'.v3-backup.json').read_text())
+            marker['deployment'] = 'other'
+            (foreign/'.v3-backup.json').write_text(json.dumps(marker))
+            (parent/'unknown').mkdir()
+            (parent/'alias').symlink_to(foreign,target_is_directory=True)
+            (self.root/'preserved.txt').write_text('second')
+            manage.backup(self.values,second)
+        self.assertFalse(first.exists())
+        self.assertEqual('second',(second/'data/preserved.txt').read_text())
+        self.assertTrue((second/'.v3-backup.json').is_file())
+        self.assertTrue(foreign.is_dir())
+        self.assertTrue((parent/'unknown').is_dir())
+        self.assertTrue((parent/'alias').is_symlink())
+
+    def test_failed_new_backup_preserves_previous_snapshot(self) -> None:
+        """新备份失败不淘汰原恢复点，不留下伪成功目录。@return None。"""
+        self.root.mkdir()
+        (self.root/'.v3-deployment.json').write_text('{"deployment":"test"}')
+        parent = self.root.parent/'backups'
+        first,second = parent/'first',parent/'second'
+        manifest = {'layout_version':2,'bridge_protocol':1,'release':'synthetic'}
+        with patch.object(manage,'command',return_value=''),patch.object(manage,'inspect_images',return_value=manifest):
+            manage.backup(self.values,first)
+            with patch.object(manage.shutil,'copytree',side_effect=OSError('synthetic disk full')):
+                with self.assertRaises(OSError):
+                    manage.backup(self.values,second)
+        self.assertTrue((first/'.v3-backup.json').is_file())
+        self.assertFalse(second.exists())
+
+    def test_rotation_failure_keeps_new_complete_backup(self) -> None:
+        """轮换删除失败也保留刚完成的恢复点，并向调用方返回失败。@return None。"""
+        self.root.mkdir()
+        (self.root/'.v3-deployment.json').write_text('{"deployment":"test"}')
+        parent = self.root.parent/'backups'
+        first,second = parent/'first',parent/'second'
+        manifest = {'layout_version':2,'bridge_protocol':1,'release':'synthetic'}
+        with patch.object(manage,'command',return_value=''),patch.object(manage,'inspect_images',return_value=manifest):
+            manage.backup(self.values,first)
+            with patch.object(manage.shutil,'rmtree',side_effect=OSError('synthetic permission denied')):
+                with self.assertRaises(OSError):
+                    manage.backup(self.values,second)
+        self.assertTrue((first/'.v3-backup.json').is_file())
+        self.assertTrue((second/'.v3-backup.json').is_file())
 
 
 class ResourceBudgetTests(unittest.TestCase):

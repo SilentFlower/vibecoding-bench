@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """v3 两镜像的联合构建、冲突检查及受限启停入口。"""
 import argparse
+import fcntl
 import hashlib
 import gzip
 import shutil
@@ -19,7 +20,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from stat import S_ISSOCK
+from stat import S_ISREG, S_ISSOCK
 from urllib.parse import quote
 
 REPO = Path(__file__).resolve().parents[2]
@@ -238,7 +239,7 @@ def build(release: str, manifest_path: Path) -> None:
                 "platform": info["Os"] + "/" + info["Architecture"]}
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     with manifest_path.open("x") as output:
-        json.dump({"schema": 3, "bridge_protocol": 1, "layout_version": 2, "default_cli_version": "2.1.280",
+        json.dump({"schema": 3, "bridge_protocol": 1, "layout_version": 2, "default_cli_version": "2.1.293",
             "release": release, "parent_revision": parent, "gateway_revision": gateway,
             "dirty_worktree": dirty, "source_content_sha256": source_hash, "images": images}, output, indent=2)
         output.write("\n")
@@ -580,6 +581,10 @@ def status(values: dict) -> dict:
                 lease = snapshot.get("lease")
                 environment["occupancy"] = {"active": snapshot["active"], "waiting": snapshot.get("waiting", 0),
                     "lease": {key: lease.get(key) for key in ("owner", "generation", "phase", "expires_at")} if lease else None, "available": True}
+                environment["occupancy"]["holders"] = [{key: holder.get(key) for key in
+                    ("owner", "generation", "phase", "expires_at", "shared_cli")}
+                    for holder in snapshot.get("holders", [lease] if lease else [])]
+                environment["occupancy"]["cli_capacity"] = snapshot.get("cli_capacity", 1)
             except (OSError, ValueError, KeyError):
                 pass
         else:
@@ -589,6 +594,15 @@ def status(values: dict) -> dict:
             if execution.is_file() and execution.resolve().is_relative_to(root):
                 proof = json.loads(execution.read_text())
                 environment["execution"] = {key: proof.get(key) for key in ("source", "phase")}
+            records = execution.parent / "executions"
+            if records.is_symlink():
+                raise ValueError("共享执行登记目录不能是链接")
+            environment["executions"] = []
+            for record in sorted(records.glob("*.json")):
+                if record.is_symlink() or not record.resolve().is_relative_to(root) or record.stat().st_size > 65536:
+                    raise ValueError("共享执行登记路径或大小无效")
+                proof = json.loads(record.read_text())
+                environment["executions"].append({key: proof.get(key) for key in ("source", "phase", "run_id", "shared_cli")})
     result = {"deployment": values["V3_DEPLOYMENT_ID"], "release": manifest["release"],
         "images": manifest["images"], "containers": containers, "environments": environments}
     print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -698,12 +712,43 @@ def import_offline(values: dict, source: Path, apply: bool = False) -> dict:
     return counts
 
 
+def _prune_previous_backups(target: Path, deployment: str, root: Path) -> int:
+    removed = 0
+    for candidate in target.parent.iterdir():
+        if candidate==target or candidate.is_symlink() or not candidate.is_dir():
+            continue
+        marker = candidate/'.v3-backup.json'
+        release = candidate/'release.json'
+        data = candidate/'data'
+        try:
+            if (any(path.is_symlink() or not path.is_file() or path.stat().st_size>65536 for path in (marker,release))
+                    or data.is_symlink() or not data.is_dir()):
+                continue
+            record = json.loads(marker.read_text())
+            manifest = json.loads(release.read_text())
+            owner_path = data/'.v3-deployment.json'
+            if owner_path.is_symlink() or not owner_path.is_file() or owner_path.stat().st_size>65536:
+                continue
+            owner = json.loads(owner_path.read_text())
+            if (record.get('deployment')!=deployment or record.get('source_root')!=str(root)
+                    or owner.get('deployment')!=deployment or manifest.get('release')!=record.get('release')
+                    or manifest.get('layout_version')!=record.get('layout_version')
+                    or manifest.get('bridge_protocol')!=record.get('bridge_protocol')):
+                continue
+        except (OSError,ValueError,TypeError,AttributeError):
+            # 未知、未完成或跨部署目录不属于自动轮换范围。
+            continue
+        shutil.rmtree(candidate)
+        removed += 1
+    return removed
+
+
 def backup(values: dict, destination: Path) -> None:
     """仅在本部署全部停止后保存持久目录和一致的 SQLite 快照。
 
     :param values: 当前部署配置
     :param destination: 全新且与数据根分离的绝对备份目录
-    :return: None；不停机、不覆盖任何已有目录
+    :return: None；新备份校验成功后只保留同目录、同部署及同数据根的本次备份。
     """
     deployment = values["V3_DEPLOYMENT_ID"]
     root = _owned_root(values, stopped=True)
@@ -711,32 +756,52 @@ def backup(values: dict, destination: Path) -> None:
     if not destination.is_absolute() or target.exists() or target == root or root in target.parents or target in root.parents:
         raise ValueError("备份必须使用数据根以外的全新绝对目录")
     manifest = inspect_images(values)
-    target.mkdir(mode=0o700, parents=True)
+    target.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
+    lock_name = '.v3-backup-'+hashlib.sha256((deployment+':'+str(root)).encode()).hexdigest()[:20]+'.lock'
+    descriptor = os.open(target.parent/lock_name,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
     try:
-        # tmux 留下的 Unix socket 无法复制或恢复连接；持久文件和符号链接仍完整保留。
-        shutil.copytree(root, target / "data", symlinks=True,
-            ignore=lambda directory, names: [name for name in names
-                if S_ISSOCK((Path(directory) / name).lstat().st_mode)])
-        for relative in ("gateway/gateway.sqlite", "bench/db.sqlite"):
-            source = root / relative
-            if not source.exists():
-                continue
-            output = target / "data" / relative
-            for suffix in ("", "-wal", "-shm"):
-                Path(str(output) + suffix).unlink(missing_ok=True)
-            # 使用 SQLite backup API 而非只复制主文件，保留尚未 checkpoint 的合法事务。
-            with sqlite3.connect("file:" + quote(str(source), safe="/") + "?mode=ro", uri=True) as current:
-                with sqlite3.connect(output) as snapshot:
-                    current.backup(snapshot)
-            output.chmod(0o600)
-        (target / "release.json").write_text(json.dumps(manifest, indent=2) + "\n")
-        (target / ".v3-backup.json").write_text(json.dumps({"deployment": deployment,
-            "source_root": str(root), "layout_version": manifest["layout_version"],
-            "bridge_protocol": manifest["bridge_protocol"], "release": manifest["release"]}) + "\n")
-    except Exception:
-        shutil.rmtree(target)
-        raise
-    print("v3 停机备份完成：" + str(target))
+        if not S_ISREG(os.fstat(descriptor).st_mode):
+            raise ValueError('备份锁必须为普通文件')
+        try:
+            fcntl.flock(descriptor,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise ValueError('本部署已有备份操作进行中') from error
+        target.mkdir(mode=0o700)
+        try:
+            # tmux 留下的 Unix socket 无法复制或恢复连接；持久文件和符号链接仍完整保留。
+            shutil.copytree(root, target / "data", symlinks=True,
+                ignore=lambda directory, names: [name for name in names
+                    if S_ISSOCK((Path(directory) / name).lstat().st_mode)])
+            for relative in ("gateway/gateway.sqlite", "bench/db.sqlite"):
+                source = root / relative
+                if not source.exists():
+                    continue
+                output = target / "data" / relative
+                for suffix in ("", "-wal", "-shm"):
+                    Path(str(output) + suffix).unlink(missing_ok=True)
+                # 使用 SQLite backup API 而非只复制主文件，保留尚未 checkpoint 的合法事务。
+                with sqlite3.connect("file:" + quote(str(source), safe="/") + "?mode=ro", uri=True) as current:
+                    with sqlite3.connect(output) as snapshot:
+                        current.backup(snapshot)
+                        if snapshot.execute('PRAGMA quick_check').fetchall()!=[('ok',)]:
+                            raise ValueError('备份数据库完整性检查未通过')
+                output.chmod(0o600)
+            (target / "release.json").write_text(json.dumps(manifest, indent=2) + "\n")
+            marker = target/".v3-backup.json"
+            with marker.open('x') as stream:
+                json.dump({"deployment":deployment,"source_root":str(root),"layout_version":manifest["layout_version"],
+                    "bridge_protocol":manifest["bridge_protocol"],"release":manifest["release"],"completed_at":time.time()},stream)
+                stream.write('\n')
+                stream.flush()
+                os.fsync(stream.fileno())
+        except Exception:
+            shutil.rmtree(target)
+            raise
+        # 必须在新快照完成后才淘汰旧副本；轮换失败也不能删除刚完成的恢复点。
+        removed = _prune_previous_backups(target,deployment,root)
+        print('v3 停机备份完成：'+str(target)+'；保留最近 1 份，已移除旧备份 '+str(removed)+' 份')
+    finally:
+        os.close(descriptor)
 
 
 def main() -> None:

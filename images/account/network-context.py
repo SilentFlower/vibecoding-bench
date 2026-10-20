@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """在账号无 CLI 作业时切换原始透传或受控 Recorder。"""
+import argparse
 import fcntl
 import json
 import os
@@ -136,21 +137,50 @@ def _publish_capture_ca(process: subprocess.Popen) -> None:
     Path("/etc/mitm/mitmproxy-ca-cert.pem").chmod(0o644)
 
 
+def _reuse_passthrough(root: Path, context: dict) -> bool:
+    if context.get("NETWORK_INSPECTION_MODE") != "passthrough" or context.get("QUOTA_SOURCE"):
+        return False
+    try:
+        acknowledgement = json.loads((root / "context-ack.json").read_text())
+        pid = int((root / "network.pid").read_text())
+        identity = _listener_identity(pid)
+        command = Path(f"/proc/{pid}/cmdline").read_bytes()
+        valid = (identity is not None and identity[0] != "Z" and b"v3-passthrough" in command
+            and acknowledgement.get("pid") == pid and acknowledgement.get("started_at") == identity[1]
+            and acknowledgement.get("NETWORK_INSPECTION_MODE") == "passthrough"
+            and acknowledgement.get("QUOTA_SOURCE") == "" and acknowledgement.get("process") == "passthrough")
+        if valid:
+            with socket.create_connection(("127.0.0.1", 8080), timeout=0.2):
+                return True
+    except (OSError, ValueError, RuntimeError):
+        pass
+    return False
+
+
 def main() -> None:
     """停止旧监听，启动新网络上下文并写入确认。
 
     :return: None，失败以非零退出码报告
     """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--reuse-passthrough", action="store_true")
+    parser.add_argument("--require-reuse", action="store_true")
+    arguments = parser.parse_args()
     root = Path("/run/v3")
     with (root / "network.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
+        context_file = root / "context.json"
+        context = json.loads(context_file.read_text()) if context_file.exists() else {}
+        if arguments.reuse_passthrough and _reuse_passthrough(root, context):
+            return
+        if arguments.require_reuse:
+            # 已有兄弟 CLI 时，监听证明不完整只能拒绝新入场，不能重启并截断旧连接。
+            raise RuntimeError("共享透传监听不可复用，拒绝影响在途 CLI")
         pid_file = root / "network.pid"
         legacy_pid = root / "mitm.pid"
         _terminate_listener(pid_file if pid_file.exists() else legacy_pid)
         legacy_pid.unlink(missing_ok=True)
         (root / "context-ack.json").unlink(missing_ok=True)
-        context_file = root / "context.json"
-        context = json.loads(context_file.read_text()) if context_file.exists() else {}
         mode = str(context.get("NETWORK_INSPECTION_MODE") or "passthrough")
         if mode not in _NETWORK_MODES:
             raise RuntimeError("网络检查模式不合法")
@@ -191,10 +221,15 @@ def main() -> None:
                     if process_kind == "recorder":
                         _publish_capture_ca(process)
                     temporary = root / "context-ack.tmp"
+                    identity = _listener_identity(process.pid)
+                    if identity is None:
+                        raise RuntimeError("新网络监听已退出")
                     temporary.write_text(json.dumps({
                         "QUOTA_SOURCE": context.get("QUOTA_SOURCE", ""),
                         "NETWORK_INSPECTION_MODE": mode,
                         "process": process_kind,
+                        "pid": process.pid,
+                        "started_at": identity[1],
                     }))
                     temporary.replace(root / "context-ack.json")
                     return

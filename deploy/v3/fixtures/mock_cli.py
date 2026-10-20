@@ -2,6 +2,7 @@
 """仅用于隔离生命周期测试的 CLI 替身，不打入产品镜像。"""
 import json
 import os
+import re
 import select
 import shlex
 import socket
@@ -22,7 +23,11 @@ def run_followup_fixture() -> None:
 
     :return: None；由外部 driver 结束本测试进程。
     """
-    config = json.loads((home / '.synthetic-followups.json').read_text())
+    plan = json.loads(os.environ['PROJECT_PLAN_JSON']) if os.environ.get('PROJECT_PLAN_JSON') else None
+    config = (json.loads((home/'.synthetic-projects'/f"{plan['session_id']}.json").read_text()) if plan
+        else json.loads((home / '.synthetic-followups.json').read_text()))
+    if config.get('session_by_run'):
+        config['session'] = os.environ['RUN_ID']
     cwd = Path.cwd()
     project = home / '.claude/projects' / str(cwd).replace('/', '-')
     project.mkdir(parents=True, exist_ok=True)
@@ -57,7 +62,7 @@ def run_followup_fixture() -> None:
             with session.open('a') as stream:
                 stream.write(json.dumps(response)+'\n')
             previous = identity
-            settings = json.loads((home/'.claude/settings.json').read_text())
+            settings = json.loads(Path(os.environ.get('CLAUDE_EXECUTION_SETTINGS',str(home/'.claude/settings.json'))).read_text())
             payload = {'cwd':str(cwd),'session_id':config['session'],'transcript_path':str(session),
                 'rate_limits':{key:{'used_percentage':sample[key],'resets_at':observed+delay}
                     for key,delay in (('five_hour',600),('seven_day',3600))}}
@@ -145,10 +150,47 @@ def run_followup_fixture() -> None:
             recorded = f'\n\n<pasted_content id="316b-{input_count}">\n{text}\n</pasted_content id="316b-{input_count}">\n'
         if config.get('unmatched_input') and input_count == 1:
             recorded = 'Unrecognized transport: ' + recorded
-        identity = f"{config['session']}-{input_count}"
+        identity = f"{config['session']}-{os.getpid()}-{input_count}"
         user = {'type': 'user', 'uuid': identity+'-user', 'parentUuid': previous,
             'timestamp': datetime.now(timezone.utc).isoformat(), 'message': {'role': 'user',
             'content': recorded if input_count == 1 else [{'type': 'text', 'text': recorded}]}}
+        if plan:
+            match = re.search(r'^Current step: step-(\d+)\s*$',text,re.M)
+            if match is None:
+                raise ValueError('合成项目指令没有当前步骤')
+            step = int(match[1])
+            if '--session-id' in sys.argv:
+                assert sys.argv[sys.argv.index('--session-id')+1]==config['session']
+            else:
+                assert sys.argv[sys.argv.index('--resume')+1]==config['session']
+            with session.open('a') as stream:
+                stream.write(json.dumps(user)+'\n')
+            previous = user['uuid']
+            marker = cwd/'.synthetic-timeout-once'
+            if config.get('timeout_step')==step and not marker.exists():
+                marker.write_text('此次合成执行保留半成品，下一执行可接续')
+                (cwd/'partial-artifact.txt').write_text('half of step '+str(step))
+                while True:
+                    time.sleep(1)
+            if config.get('delay_sec'):
+                time.sleep(config['delay_sec'])
+            # 仅合成 CLI 使用可信测试程序，生产镜像不会携带参考实现。
+            (cwd/'fixture_behaviors.py').write_text(config['runtime'])
+            actions = {name:config['actions'][name] for name in config['step_actions'][:step]}
+            source = config['seed'].replace('def handle(request):','def original_handle(request):')
+            implementation = '\nfrom fixture_behaviors import evaluate\nACTIONS = '+repr(actions)+'\ndef handle(request):\n    action=request.get("action","overview")\n    if action in ACTIONS:\n        return evaluate(ACTIONS[action],request,FIELDS)\n    return original_handle(request)\n\n'
+            (cwd/'app.py').write_text(source.replace("if __name__ == '__main__':",implementation+"if __name__ == '__main__':"))
+            with (cwd/'fixture-progress.txt').open('a') as stream:
+                stream.write('step-'+str(step).zfill(2)+'\n')
+            reply = {'type':'assistant','uuid':identity+'-reply','parentUuid':previous,
+                'timestamp':datetime.now(timezone.utc).isoformat(),'message':{'role':'assistant','id':identity,
+                    'usage':{'input_tokens':7,'output_tokens':step*11},'stop_reason':'end_turn',
+                    'content':[{'type':'text','text':'Completed the current project step.'}]}}
+            with session.open('a') as stream:
+                stream.write(json.dumps(reply)+'\n')
+            previous = reply['uuid']
+            print('Fixture project step complete',flush=True)
+            continue
         if config.get('busy_seconds') and not config.get('auth_failure'):
             if input_count == 1:
                 with session.open('a') as stream:
@@ -235,7 +277,7 @@ elif sys.argv[1:] == ["auth", "login"]:
     while True:
         time.sleep(1)
 else:
-    if (home / '.synthetic-followups.json').exists():
+    if os.environ.get('PROJECT_PLAN_JSON') or (home / '.synthetic-followups.json').exists():
         run_followup_fixture()
         sys.exit(0)
     if os.environ.get("SYNTHETIC_TLS_PROBE") == "1":

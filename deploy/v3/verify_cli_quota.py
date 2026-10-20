@@ -9,11 +9,12 @@ from pathlib import Path
 import docker
 
 
-def verify(image: str, binary: Path) -> None:
+def verify(image: str, binary: Path, settings_override: bool = False) -> None:
     """在无外部网络、空 HOME 和合成凭据下核实官方本地额度入口。
 
     :param image: 本地账号镜像
     :param binary: 已安装的官方 CLI 原生二进制；不下载、不读取真实凭据
+    :param settings_override: 用会话设置覆盖验证原配置保持和固定 session。
     :return: None；字段、原输出或请求计数不符时抛出异常
     """
     repository = Path(__file__).resolve().parents[2]
@@ -27,7 +28,8 @@ def verify(image: str, binary: Path) -> None:
             shutil.copy2(fixtures / "official_cli_quota.py", root / "run.py")
             shutil.copy2(fixtures / "quota_statusline.py", root / "wrapper.py")
             container = client.containers.run(image, ["/lab/run.py"], entrypoint="python3", detach=True,
-                network_mode="none", environment={"LAB_COLLECTOR": "1" if mode == "collected" else "0"},
+                network_mode="none", environment={"LAB_COLLECTOR": "1" if mode == "collected" else "0",
+                    "LAB_SETTINGS_OVERRIDE": "1" if settings_override else "0"},
                 labels={"vibebench.verification": "official-cli-quota"},
                 volumes={str(root): {"bind": "/lab", "mode": "rw"},
                     str(binary.resolve()): {"bind": "/official/claude", "mode": "ro"}})
@@ -37,6 +39,8 @@ def verify(image: str, binary: Path) -> None:
                 results[mode] = json.loads(container.logs().decode().splitlines()[-1])
                 assert b"ORIGINAL_STATUSLINE" in (root / "terminal.log").read_bytes(), "原状态栏输出丢失"
                 assert not (root / "collector-errors.log").exists(), "本地采集脚本出现错误"
+                if settings_override:
+                    assert results[mode]['settings_preserved'] and results[mode]['pinned_session'], '会话覆盖污染原设置或忽略固定 session'
             finally:
                 container.remove(force=True)
         baseline, collected = results["baseline"], results["collected"]
@@ -64,8 +68,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--account-image", required=True)
     parser.add_argument("--cli-binary", type=Path, required=True)
+    parser.add_argument("--settings-override", action="store_true")
     arguments = parser.parse_args()
-    verify(arguments.account_image, arguments.cli_binary)
+    verify(arguments.account_image, arguments.cli_binary, arguments.settings_override)
 
 
 if __name__ == "__main__":

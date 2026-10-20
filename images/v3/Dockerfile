@@ -34,6 +34,7 @@ COPY orchestrator/*.py ./
 COPY topics.md /repo/topics.md
 COPY project_library /repo/project_library
 COPY images/worker/entrypoint.sh /opt/v3/worker.sh
+COPY images/worker/task_followups.py /app/task_followups.py
 COPY webui /webui
 COPY --from=frontend /terminal/xterm/lib/xterm.js /webui/vendor/xterm.js
 COPY --from=frontend /terminal/xterm/css/xterm.css /webui/vendor/xterm.css
@@ -82,6 +83,7 @@ COPY images/account/passthrough.py /usr/local/bin/v3-passthrough
 COPY images/account/network-guard.py /usr/local/bin/v3-network-guard
 COPY images/account/cli-control.py /usr/local/bin/v3-cli-control
 COPY images/worker/task_followups.py /usr/local/bin/task_followups.py
+COPY images/account/project_plan.py /usr/local/bin/v3-project-plan
 RUN ln -s task_followups.py /usr/local/bin/v3-task-followups
 COPY images/account/system-profile.c /opt/v3/system-profile.c
 RUN cc -shared -fPIC -O2 -Wall -Wextra -Werror -Wl,-z,relro,-z,now \

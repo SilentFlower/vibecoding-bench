@@ -385,6 +385,22 @@ class LoginDraftTests(unittest.TestCase):
         self.container.remove.side_effect = None
         self.assertTrue(main.delete_login_draft(self.row["environment_id"], draft["generation"])["ok"])
 
+    def test_shared_execution_keys_protect_draft_deletion(self) -> None:
+        """共享执行改用复合键后，删除草稿仍检查全部作业并保留目录。@return None。"""
+        generation = main.list_login_drafts()[0]['generation']
+        self.runtime.jobs[self.row['environment_id']+':run:unexpected:0'] = {'row':self.row,'source':'run:unexpected:0'}
+        with self.assertRaises(HTTPException):
+            main.delete_login_draft(self.row['environment_id'],generation)
+        self.container.remove.assert_not_called()
+        self.assertTrue(self.envroot.exists())
+        self.runtime.jobs.clear()
+        records = self.envroot/'runtime/executions'
+        records.mkdir(parents=True,exist_ok=True)
+        atomic_json(records/('a'*64+'.json'),{'source':'run:unexpected:0'})
+        with self.assertRaises(HTTPException):
+            main.delete_login_draft(self.row['environment_id'],generation)
+        self.container.remove.assert_not_called()
+
     def test_formal_soft_deleted_history_and_pending_are_protected(self) -> None:
         """正式/软删除、历史和未知提交都不能进入草稿删除路径。@return None。"""
         generation = main.list_login_drafts()[0]["generation"]

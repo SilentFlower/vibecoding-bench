@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261020-project-ui" />
+  <link rel="stylesheet" href="style.css?v=20261020-project-scheduling" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -71,7 +71,7 @@
       <header class="view-head">
         <div>
           <h2 class="view-title"><span class="bracket">▌</span>projects <span class="muted">// continuous iteration</span></h2>
-          <p class="hint">在已有项目上按阶段持续迭代，验收通过后自动推进；每次执行同步记录到 Runs。</p>
+          <p class="hint">多个项目并行迭代，同一次 CLI 计划逐步验收；每次执行同步记录到 Runs。</p>
         </div>
         <div class="view-actions">
           <span id="project-library-count" class="hint">加载项目库</span>
@@ -86,6 +86,21 @@
             <label><span class="lbl">$ account · 运行账号</span><select name="account_id" required></select></label>
             <label><span class="lbl">$ name · 批次名称</span><input name="name" value="项目迭代批次" maxlength="120" required></label>
           </div>
+          <div class="row">
+            <label><span class="lbl">$ concurrency · 同账号并发</span><input name="concurrency" type="number" min="1" max="2" value="2" required></label>
+            <label><span class="lbl">$ active_projects · 活动项目池</span><input name="active_projects" type="number" min="1" max="100" value="3" required></label>
+            <label><span class="lbl">$ rotation_steps · 连续通过后轮换</span><input name="rotation_steps" type="number" min="1" value="5" required></label>
+          </div>
+          <div class="row">
+            <label><span class="lbl">$ steps_per_plan · 每次 CLI 计划步数</span><input name="steps_per_plan" type="number" min="1" value="2" required></label>
+            <label><span class="lbl">$ timeout_sec · 单次计划超时（秒）</span><input name="timeout_sec" type="number" min="60" max="86400" value="1800" required></label>
+          </div>
+          <div class="row">
+            <label><span class="lbl">$ interval_min_sec · 计划补位间隔下限（秒）</span><input name="interval_min_sec" type="number" min="0" max="86400" value="0" required></label>
+            <label><span class="lbl">$ interval_max_sec · 计划补位间隔上限（秒）</span><input name="interval_max_sec" type="number" min="0" max="86400" value="0" required></label>
+          </div>
+          <p class="hint" id="project-capacity" role="status"></p>
+          <p class="hint">5h／7d 消耗阈值继承账号设置；命中后等待后续计划，已投放计划完成当前范围。间隔只用于两次计划之间，0 表示不额外休息。</p>
           <div class="batch-toolbar project-toolbar">
             <button class="btn btn-sm" type="button" id="project-select-all">全选项目</button>
             <button class="btn btn-sm" type="button" id="project-clear-all">清空</button>
@@ -283,8 +298,9 @@
         <div class="row">
           <label><span class="lbl">$ claude_code_version</span>
             <span class="hint inline">页面保存后立即影响新启动的 task / 抓包 / 登录容器；留空并保存则回退到 .env。</span>
-            <input name="claude_code_version" list="claude-code-version-options" placeholder="例如 2.1.280 或 2.1.260" />
+            <input name="claude_code_version" list="claude-code-version-options" placeholder="例如 2.1.293 或 2.1.280" />
             <datalist id="claude-code-version-options">
+              <option value="2.1.293"></option>
               <option value="2.1.280"></option>
               <option value="2.1.260"></option>
               <option value="2.1.257"></option>
@@ -768,6 +784,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20261020-project-ui"></script>
+  <script src="app.js?v=20261020-project-scheduling"></script>
 </body>
 </html>

@@ -32,6 +32,7 @@ AccountRuntime.start_run(account, task, run_id, worker_env, quota_env) -> tuple[
 AccountRuntime.execution_environment(row: dict) -> dict[str, str]
 V3_DEFAULT_TIMEZONE = "America/Los_Angeles"
 AccountRuntime.cleanup(container_id: str) -> None
+AccountRuntime.environment_jobs(environment_id: str) -> list[dict]
 AccountRuntime.run_session_path(run_id: str) -> Path
 AccountRuntime.reprofile_blocker(row: dict) -> str | None
 derive_v3_fingerprint(timezone: str | None = None) -> dict[str, object]
@@ -40,7 +41,7 @@ NetworkInspectionMode = "passthrough" | "quota" | "capture"
 /run/v3/context-ack.json -> {NETWORK_INSPECTION_MODE, QUOTA_SOURCE, process}
 ```
 
-管理租约输入为 `operation: string`、`owner: string`、`generation: string | null`；操作为 `prepare-cli`、`prepare`、`claim`、`heartbeat`、`fence`、`release`。查询返回 `lease`、`active`、`waiting`、`importing`；租约包含 `owner`、`generation`、`expires_at`（UTC 秒）、`phase`、`exclusive`，TTL 为 30 秒。旧记录缺少 `exclusive` 时默认 `true`。fence 与在途导入保护见下方重授权场景。
+管理租约输入为 `operation: string`、`owner: string`、`generation: string | null`；操作为 `prepare-cli-shared`、`prepare-cli`、`prepare`、`claim`、`heartbeat`、`fence`、`release`。查询返回 `lease,holders,cli_capacity,active,waiting,importing`；`lease` 保留为旧占用提示，新调用按 `holders` 核对具体 owner／generation。租约包含 `owner,generation,expires_at,phase,exclusive,shared_cli`，TTL 为 30 秒。持久状态 schema 2 保存全部 holder，旧单租约保守读入；旧记录缺少 `exclusive` 时默认 `true`。fence 与在途导入保护见下方重授权场景。
 
 发送绑定 `TransportBinding`：`account_id: i64`、`environment_id: string`、`generation: u64`、`endpoint: string`、`secret: string`、`release_id: string`。`PreparedRequest` 增加 `request_id`（UUID）、`deadline_unix_ms`、`method`、`target_url`、有序 `headers` 及 `preserve_header_casing`；最终 body 独立传原始字节。秘密只在服务间传递。
 
@@ -64,18 +65,21 @@ scripts/v3-stack stop --env <独立配置>
 
 **调度**：
 
-- `prepare-cli` 创建共享租约：普通 CLI、养号、抓包、续聊彼此串行，API 可同时入场。共享 claim/release 不等待独立 API 排空；养号只让位于正式 CLI 工作与租约。
+- `prepare-cli-shared` 用于布局 2 的普通 Tasks／项目计划，账号至多两个 CLI holder，API 可同时入场。`PER_ACCOUNT_CONCURRENCY` 默认 2，合法较低配置继续限制 Tasks 与 Projects 总容量；API 容量独立。`prepare-cli` 仍为 CLI 专用排他，用于养号、抓包和续聊等既有操作，阻止其他 CLI 但允许 API；不能把旧调用自动解释成多 CLI。养号仍让位于正式工作。
 - `prepare` 创建排他维护门禁：重授权、代理修改、绑定切换、停止、重建检查或排空 API。配置 quiesce 验证排他 owner/generation、API 活动数和本环境 CLI/发送器状态。
 - CLI 安装在认领后执行，不持有环境生命周期锁；API 就绪不安装 CLI。原 weighted slot/FIFO/RPM/粘性请求和 SSE permit 规则保留，OAuth resolve 不等待 CLI 租约。
 - driver 和续聊 wrapper 使用 `setsid --wait`，Docker exec 生命周期必须跟随实际进程。tmux 登录 shell 显式保留选定 CLI 缓存 PATH。
 - v3 生成 driver 时去除内部时间戳 Stop hook；UID1000 无权写 root 私有 runtime 树，该信号也没有消费者。完成仍由真实主会话 JSONL 的最新稳定最终 assistant 文本判定；配置业务补充时还需 [阶段契约](./topic-prompt-contract.md#scenario-自包含题库与冻结的有限业务补充) 核验全部选定轮次，不需要放宽控制目录权限。原 hooks 在作业收口时按快照恢复。
 - `_cli_setup()` 在已认领的环境锁内合并固定 HOME 的 `settings.json.env.DISABLE_AUTOUPDATER="1"` 及画像的 TZ/LANG/LC_ALL，保留其他 env/model/hooks 并发布为 UID1000 文件。普通任务、抓包、登录和续聊的 CLI 准备共用此入口；CLI 版本继续由管理端精确缓存与全局运行配置选择。
 - 实际任务 driver 在合并 worker_env 后覆盖画像的 TZ/LANG/LC_ALL；登录 tmux 命令、短命令、OAuth 探测和续聊 PTY 使用同源值。账号列表 `effective_timezone` 优先只读既有画像，否则返回显式配置或新默认；GET 不创建环境，不再把旧账号名派生值当作 v3 有效设置。
-- 正式普通任务／养号／恢复及非抓包续聊临时安装 `/usr/local/bin/v3-cli-quota` 状态栏包装，只消费官方 rate_limits 与当前主会话的真实响应；不新增 usage 或模型请求。先落盘原 statusLine 及本代命令，收口／重启对账在停止进程后仅恢复仍由本代管理的字段，保留用户运行中改写；具体采集与周期认领见 [额度契约](./database-guidelines.md)。
-- 清理必须匹配完整执行 token，不接受裸 container ID。停止本代进程组、tmux、UID1000 子进程，把 CLI 网络恢复为空闲 `passthrough`，恢复 hook 后释放租约；不通过停止整个容器清理普通 CLI。
-- `runtime/execution.json` 保存租约模式、owner/generation、driver/tmux/hook 证明。共享清理/心跳/重启对账失败进入 `cli_reconcile`，阻止下一 CLI，健康 API 继续；未知/旧排他记录保守隔离。公共网络或发送器故障仍关闭容器；CLI 专用 Recorder 故障只标记 CLI 不健康。
+- 正式普通任务通过 `CLAUDE_EXECUTION_SETTINGS` 和 `--settings` 使用每执行独立的模型／effort／hooks／`v3-cli-quota` 状态栏覆盖，原用户状态栏仍接收相同 stdin；不能来回改写共享 HOME 的运行态设置。原排他入口继续保存并按本代归属恢复字段。采集只消费官方 rate_limits 和主会话响应，不新增 usage／模型请求，详见 [额度契约](./database-guidelines.md)。
+- 普通并行作业以环境＋source 登记，私有 `runtime/executions/<source摘要>.json` 保存 schema 2、租约及监督器证明；旧排他入口保留 `runtime/execution.json`。启动监督器是 child subreaper，收养 double-fork／setsid 后代；管理端核对 source、容器、PID／内核启动时刻后才发出启动许可。`v3-cli-control inspect/freeze/resume/stop-job --source <source> --pid <pid> --started <tick>` 仅操作匹配树。
+- 清理使用完整 token；存在多个作业时拒绝裸 container ID。并行入口不按整个 UID 清理、不在结束一个作业时重置兄弟网络／设置。旧 token 不能触及新作业，暂停验收一个作业时兄弟继续。不通过停止整个容器清理普通 CLI。
+- 清理／心跳／重启逐个对账全部执行，失败进入 `cli_reconcile`，阻止下一 CLI、保留健康 API；未知、损坏或链接登记不能视为空闲。维护、登录、重授权、删除和驱逐检查全部作业。公共网络或发送器故障仍关闭容器，CLI 专用 Recorder 故障仅隔离 CLI。
 
 **CLI 网络模式**：CLI 始终经 `tun0 -> hev-socks5-tunnel -> 127.0.0.1:8080` 使用账号代理。普通任务、养号、登录/重授权、额度查询和未绑定账号 OAuth 刷新选择 `passthrough`，本地 relay 只完成 SOCKS5 入站与 HTTP CONNECT/SOCKS5 上游握手并复制原始字节，不启动 mitmproxy，也不注入 MITM CA。显式完整抓包选择 `capture`；`quota` 只保留历史格式兼容，v3 不再用模型请求补样。usage 查询复用原生监听并解析返回 JSON，不需要 MITM。模式切换在 `network.lock` 内先核对并定向收口旧 PID，再写原子 ACK；调度器必须逐字段匹配 mode、source、process 才能启动 CLI。代理缺失、认证失败、旧监听未知、ACK 不符或监听退出都失败关闭，不回退直连；relay 的共享空闲计时由任一方向新字节重置。
+
+普通并行作业复用已核验 PID／启动时刻及 ACK 的 passthrough relay；兄弟存活时不能重启监听。每 source 的额度与采集文件仍独立；结束一个执行，既有 TLS 长连接和另一个执行必须继续。capture 切换使用 CLI 专用排他。
 
 **HTTPS 与证据**：管理端完成选号、改写、重试和响应分类，目标账号内发送器复用现有 HTTP/TLS 实现实际建立上游连接。每账号独立进程/连接池及代理，API 不经 CLI 网络监听。普通 `passthrough` 不生成 HTTP 明文、stats 或 flow；`quota/capture` 才显式信任当前 CA 并由 Recorder 产生对应证据。绑定、批次、目标、截止时间和秘密不符时拒绝；桥接失败无直连回退，提交不确定不能盲重发。API 被动观察单独写 `flows/api/observations.jsonl`，不混入 run 统计。
 
@@ -112,9 +116,11 @@ bench/flows/<account>/<task>/<run>/    固定兼容链接
 
 artifact `v3-release-<run_id>-<run_attempt>` 保存发布清单与同批 gzip 镜像包，保留14天；`bundle={name,sha256,size}` 核对完整包。pull 按 registry_digest 下载再建立受控标签，load 先核对名称/大小/SHA256；现有本地标签若镜像内容不同都拒绝覆盖。包不含部署配置/账号数据或 registry 登录资料；首次私有包不能匿名 pull 时使用同批 artifact，不在服务器保存 PAT或自动改变包可见性。
 
-关键配置：`V3_DEPLOYMENT_ID`、`V3_RELEASE`、`V3_CONTROL_IMAGE`、`V3_ACCOUNT_IMAGE`、`V3_DATA_ROOT`、`V3_INTERNAL_TOKEN`、`V3_SESSION_SECRET`、`V3_ADMIN_PASSWORD`；服务间使用 `V3_RUNTIME_URL`、`V3_NETWORK`、`V3_LEASE_DIR`。默认宿主端口 `18080`、活跃账号上限 1，实际冲突拒绝，不自动停旧服务。内存/CPU、空闲停机与日志轮转由 v3 配置控制。
+关键配置：`V3_DEPLOYMENT_ID`、`V3_RELEASE`、`V3_CONTROL_IMAGE`、`V3_ACCOUNT_IMAGE`、`V3_DATA_ROOT`、`V3_INTERNAL_TOKEN`、`V3_SESSION_SECRET`、`V3_ADMIN_PASSWORD`；服务间使用 `V3_RUNTIME_URL`、`V3_NETWORK`、`V3_LEASE_DIR`。默认 CLI 为 `2.1.293`，`V3_CLI_VERSION`、页面覆盖及已有 Run 冻结版本保持原优先级；不覆写用户显式版本。默认宿主端口 `18080`、活跃账号上限 1，与账号内 CLI 并发分别表达；实际冲突拒绝，不自动停旧服务。内存/CPU、空闲停机与日志轮转由 v3 配置控制。
 
 停机 backup 用 lstat 排除不可复制的 Unix socket，保留普通文件及符号链接和 SQLite backup API 快照；tmux 等连接由新进程重建，不把运行 socket 当作持久数据，也不删除源 socket。真实 socket、WAL 事务、普通文件和符号链接须一并回归。
+
+`backup --backup-dir <全新绝对目录>` 在同父目录对本部署／数据根加非阻塞锁；SQLite `quick_check`、清单及完成标记成功后，才删除该父目录内同部署、同源数据根的旧完整备份，仅留本次一份。新备份失败保留旧副本，轮换失败保留新副本并报错；未知、未完成、跨部署或目录链接不删除。该轮换不清理远端其他路径或 Docker 镜像。
 
 统一 Vue 后台通过受鉴权的 `/runtime/` 桥访问 bench，保留 HTTP/SSE/WS。浏览器桥限定路径/方法，拒绝内部和编码绕过；v3 Cookie 名和 scope 独立，退出撤销服务端会话及旧票据。终端资源打包到镜像，不依赖运行时 CDN。
 
@@ -133,7 +139,8 @@ bench 导航项不拆分中英文标签；宽度不超过 1440px 时导航独立
 | `.claude-home` 空目录 / 非空或未知链接 | 只移除空目录 / 保留内容与链接 |
 | UID1000 读取管理脚本 / 执行 collector | 拒绝读取 / 允许本地执行 |
 | API 活动或排队，普通 CLI 认领 | 共享认领，不关闭 API 入场 |
-| 两个 CLI 同账号竞争 | 只认领一个；低优先级养号顺延 |
+| 两个普通 CLI 同账号竞争／第三个 CLI | 真实容量允许时两个各持独立 holder／第三个等待；低优先级养号顺延 |
+| 普通并行作业与旧排他 CLI／维护竞争 | CLI 专用排他拒绝其他 CLI；维护继续排空 API 和全部 CLI |
 | 活动 API/CLI，空闲维护 | 拒绝，不中断已接受工作 |
 | 旧 token/租约代次清理 | 不清理新作业 |
 | 共享租约过期/服务重启 | 保留 API，先确认旧 CLI 收口，再允许下一 CLI |
@@ -152,6 +159,7 @@ bench 导航项不拆分中英文标签；宽度不超过 1440px 时导航独立
 | 非当前 v3 Action、dirty 来源、同 attempt 或已有输出 | 拒绝发布，不覆盖批次 |
 | 任一推送、仓库 digest 或镜像包失败 | 无完整发布清单，已推镜像保留 |
 | 包名称/大小/SHA256、镜像角色/ID/平台不符 | 拒绝交付；本地同批标签不覆盖 |
+| 新备份失败／旧目录无完整同源归属 | 保留旧恢复点／该目录不参与自动轮换 |
 | 桌面或窄屏打开环境与任务 | iframe 全宽，底边贴合视口；标签保持横排，外层不产生额外滚动 |
 
 ### 5. Scenarios and Examples
@@ -159,6 +167,8 @@ bench 导航项不拆分中英文标签；宽度不超过 1440px 时导航独立
 - 正常：首次未指定时区使用洛杉矶；改名或重建后沿用已保存值，旧 worker_env 不影响实际 locale。
 - 错误用法：只设置容器默认 LANG，却在 exec 注入旧日文 LANG/LC_ALL。正确做法：所有实际 CLI 入口与 HOME settings.env 从画像同源覆盖。
 - 正常：API SSE 运行时启动养号 CLI，取消 CLI 后继续收到新 API 数据；同账号第二个 CLI 仍需等待。
+- 正常：同账号两个普通 Tasks 或项目计划独立运行，冻结／停止 A 后 B 和既有 API SSE 继续；默认账号内 CLI 容量为 2，不增加原资源预算。
+- 错误用法：只扩大信号量，仍修改共享 statusLine、按 UID 杀进程或重启 relay。正确做法：每执行独立 settings／租约／监督器及清理，复用已核验的原生透传监听。
 - 正常：普通任务和可信额度养号经 HTTP CONNECT/SOCKS5 账号代理传递原始 TLS 字节，项目 cwd 只含 `project-<摘要>`；显式抓包切到 capture 后仍产生独立 flow。
 - 基础/历史：停止唤醒或镜像重建保留 HOME、环境 ID 和 machine-id；平铺历史统计/抓包仍可读取，空环境返回可展示状态。
 - 基础/历史：legacy 画像继续固定；满足全部条件时用户显式 reprofile 一次，HOME 与原凭据保留，不强制重新授权，profile v2 不可再次旋转。
@@ -184,6 +194,9 @@ bench 导航项不拆分中英文标签；宽度不超过 1440px 时导航独立
 - 目录信任回归：实际 `_project_view()` 写入当前 cwd 的信任标记，同时原账号 userID/OAuth 和其他项目配置保持；生产验收必须观察真实会话响应或工具调用，不能只凭 runs.status=running 宣称题目已执行。
 - Stop hook 回归：调用实际 start_run 生成 driver，执行其中 Node 设置片段，断言不注入 Stop；执行生成脚本的完成判定函数，在没有 Stop 信号文件时仍识别最终 assistant。保留 shell 语法校验，不能靠给 runtime 树开放写权限消除错误。
 - Recorder 与部署回归：请求归属冻结、ACK/身份、冲突预检、准确资源归属、停机、备份和导入幂等。
+- 并行回归：`test_account_runtime.py` 的两 holder／独立 settings／全部登记恢复／旧 token 保护，Rust 全量覆盖共享容量 2、旧 CLI 排他、维护和持久 holder；`verify_cli_jobs.py` 在真实 UID1000 容器核验脱离进程组、过期 PID 证明及兄弟保护。
+- 固定 CLI 参数验证：官方 2.1.293 以本地合成 SSE、无外网 Docker 验证 `--settings`、指定 session、原状态栏和零 usage；不能以本机其它版本 help 或合成回复称为真实模型效果。
+- `test_manage.py`：最近一份备份轮换、失败保留、外部署／链接目录不删除、轮换失败保留新备份；`verify_project_scheduling.py` 核对 Tasks 并行与长连接跨补位／收口、relay PID／启动时刻不变。
 - 资源/发布回归：1536m＋2048m 实际 Docker 限额，默认/旧缺字段、非法无限值、RAM/swap不足、已固化预算拒绝；当前 Action 来源/attempt、第一/第二件推送失败无完整清单、错误digest/包拒绝、本地标签不覆盖，跨 store ID相同配置可核对。
 - actionlint 核对 ref、权限与 artifact；实际本地 registry 的 push/pull、归档 config 哈希以及双镜像 save/load 核对。CI/GHCR发布结果与指定服务器实时预检/健康/旧服务不变在发布后验收，不能以本地替身称其已完成。
 - 联合重建后串行跑 `run_local_verification.py --manifest ...`、`verify_stack.py --manifest ... --browser`：实际运行中的合成 CLI、同 run 第二代、API 长流与新增 API、CLI 取消/重启/Recorder故障保留 API、tmux 重连、两账号传输隔离、旧哨兵及数据库不变。

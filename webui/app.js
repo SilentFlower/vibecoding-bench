@@ -59,7 +59,8 @@ const state = {
 function projectStatus(status) {
   return ({not_started: '未开始', ready: '待推进', queued: '排队', running: '执行中',
     quota_wait: '额度等待', window_wait: '时段等待', paused: '已暂停', active: '自动推进中',
-    pausing: '当前步骤收尾后暂停', stopping: '正在停止', stopped: '已停止', blocked: '已阻塞',
+    pausing: '当前计划收尾后暂停', stopping: '正在停止', stopped: '已停止', blocked: '已阻塞',
+    finalizing: '正在收尾', plan_completed: '计划完成',
     completed: '路线完成', pending: '等待执行收口', passed: '验收通过', failed: '未通过',
     error: '验收异常', cancelled: '已停止，未验收', success: '执行结束', timeout: '超时', auth_failed: '认证失效'})[status] || status || '未知';
 }
@@ -73,7 +74,7 @@ function projectStatusPill(status) {
   const color = ({not_started: 'queued', ready: 'queued', queued: 'queued', pending: 'queued',
     running: 'running', active: 'active', quota_wait: 'quota_wait', window_wait: 'quota_wait',
     paused: 'paused', pausing: 'paused', stopping: 'paused', stopped: 'stopped', cancelled: 'stopped',
-    completed: 'success', passed: 'success', success: 'success', failed: 'failed', blocked: 'failed',
+    completed: 'success', plan_completed: 'success', finalizing: 'running', passed: 'success', success: 'success', failed: 'failed', blocked: 'failed',
     error: 'failed', timeout: 'timeout', auth_failed: 'auth_failed'})[status] || 'queued';
   return `<span class="pill pill-${color}">${escapeHTML(projectStatus(status))}</span>`;
 }
@@ -86,6 +87,15 @@ function updateProjectSelection() {
   const form = $('#project-batch-form');
   const selected = $$('input[name="project_keys"]:checked', form).length;
   $('#project-selected-count').textContent = `已选 ${selected} / ${state.projectCatalog.projects.length} 个项目`;
+  const limit = state.projectCatalog.scheduling_defaults?.concurrency || 1;
+  const capacity = Math.max(1, Math.min(limit, selected, Number(form.elements.active_projects.value) || 1));
+  form.elements.concurrency.max = capacity;
+  if (Number(form.elements.concurrency.value) > capacity) form.elements.concurrency.value = capacity;
+  const maximumSteps = Math.max(...state.projectCatalog.projects.filter(p =>
+    $$('input[name="project_keys"]:checked', form).some(input => input.value === p.project_key)).map(p => p.step_count), 1);
+  form.elements.rotation_steps.max = maximumSteps;
+  form.elements.steps_per_plan.max = maximumSteps;
+  $('#project-capacity').textContent = `账号 CLI 上限 ${limit}；当前所选项目与活动池允许 ${selected ? capacity : 0} 并发，保存并发 ${form.elements.concurrency.value}。Tasks 与项目共用账号容量。`;
   form.querySelector('[type="submit"]').disabled = form.dataset.submitting === 'true' || !form.elements.account_id.value || selected === 0;
 }
 
@@ -104,6 +114,9 @@ async function renderProjects() {
     state.projectBatches = batches;
     $('#project-library-count').textContent = `${catalog.projects.length} 个项目 · ${catalog.projects.reduce((n, p) => n + p.step_count, 0)} 个步骤`;
     const form = $('#project-batch-form');
+    Object.entries(catalog.scheduling_defaults || {}).forEach(([key, value]) => {
+      if (form.elements[key]) form.elements[key].value = value;
+    });
     form.elements.account_id.innerHTML = accounts.map(a => `<option value="${a.id}">${escapeHTML(a.name)}</option>`).join('') || '<option value="">请先添加可用账号</option>';
     const choices = $('#project-choice-list');
     choices.innerHTML = catalog.projects.map(p => `<label class="batch-topic">
@@ -113,6 +126,8 @@ async function renderProjects() {
     </label>`).join('') + '<p id="project-filter-empty" class="hint empty-panel hidden">没有匹配的项目</p>';
     choices.onchange = updateProjectSelection;
     form.elements.account_id.onchange = updateProjectSelection;
+    form.elements.active_projects.onchange = updateProjectSelection;
+    form.elements.concurrency.onchange = updateProjectSelection;
     form.onsubmit = createProjectBatch;
     if (batches.length) form.closest('details').open = false;
     if (!accounts.length) {
@@ -181,6 +196,8 @@ async function createProjectBatch(event) {
     const result = await API('/project-iteration-batches', {method: 'POST', body: JSON.stringify({
       account_id: Number(form.elements.account_id.value), name: form.elements.name.value,
       project_keys: projectKeys,
+      ...Object.fromEntries(['concurrency', 'active_projects', 'rotation_steps', 'steps_per_plan',
+        'timeout_sec', 'interval_min_sec', 'interval_max_sec'].map(key => [key, Number(form.elements[key].value)])),
     })});
     state.projectBatches = await API('/project-iteration-batches');
     form.closest('details').open = false;
@@ -259,9 +276,10 @@ function paintProjectBatch() {
     ${batch.status === 'active' ? '<button class="btn btn-sm" type="button" data-project-action="pause">暂停</button>' : ''}
     ${!['stopped', 'completed', 'stopping'].includes(batch.status) ? '<button class="btn btn-sm btn-danger" type="button" data-project-action="stop">停止批次</button>' : ''}</div></header>
     ${batch.error ? `<p class="warmup-error">${escapeHTML(batch.error)}</p>` : ''}
-    <p class="hint project-description">最多 ${batch.policy.active_projects} 个活动项目，按阶段轮换；业务失败最多修复 ${batch.policy.repair_limit} 次。点击项目查看路线与执行记录。</p>
+    <p class="hint project-description">${batch.policy.schema === 2 ? `并发 ${batch.policy.concurrency} / 账号上限 ${batch.scheduling?.account_concurrency_limit ?? '—'}，在途 ${batch.scheduling?.active_runs?.length ?? 0}；活动池 ${batch.instances.filter(item => item.in_pool).length}/${batch.policy.active_projects}，连续通过 ${batch.policy.rotation_steps} 步后轮换；每次 CLI 计划 ${batch.policy.steps_per_plan} 步，超时 ${batch.policy.timeout_sec} 秒，计划间隔 ${batch.policy.interval_min_sec}～${batch.policy.interval_max_sec} 秒。` : `最多 ${batch.policy.active_projects} 个活动项目，按阶段轮换。`}业务失败最多修复 ${batch.policy.repair_limit} 次。</p>
+    ${batch.scheduling ? `<p class="hint">${escapeHTML((batch.scheduling.wait_reasons || []).join('；') || (batch.status === 'active' ? '按保存的队列与容量自动推进' : '等待批次启动'))}${batch.next_launch_at ? ` · 下一投放最早 ${escapeHTML(new Date(batch.next_launch_at * 1000).toLocaleString())}` : ''} · 额度阈值继承账号设置</p>` : ''}
     <div class="table-frame project-table-scroll"><table class="data project-instances-table"><thead><tr><th>project</th><th>steps</th><th>status</th><th>workspace</th></tr></thead><tbody>
-    ${batch.instances.map(item => `<tr class="${item.id === state.projectInstanceId ? 'project-selected-row' : ''}"><td><button type="button" class="btn btn-sm" data-project-instance="${item.id}">${escapeHTML(item.title)}</button></td><td>${item.next_step_index}/${item.step_count}</td><td>${projectStatusPill(item.status)}${item.switch_reason ? `<div class="hint">${escapeHTML(item.switch_reason)}</div>` : ''}</td><td>${item.workspace_path ? `<code class="project-path">${escapeHTML(item.workspace_path)}</code>` : '<span class="muted">首次运行后创建</span>'}</td></tr>`).join('')}
+    ${batch.instances.map(item => `<tr class="${item.id === state.projectInstanceId ? 'project-selected-row' : ''}"><td><div class="op-actions"><button type="button" class="btn btn-sm" data-project-instance="${item.id}">${escapeHTML(item.title)}</button>${item.in_pool ? '<span class="pill pill-queued">活动池</span>' : ''}</div></td><td>${item.next_step_index}/${item.step_count}</td><td>${projectStatusPill(item.status)}${item.switch_reason ? `<div class="hint">${escapeHTML(item.switch_reason)}</div>` : ''}</td><td>${item.workspace_path ? `<code class="project-path">${escapeHTML(item.workspace_path)}</code>` : '<span class="muted">首次运行后创建</span>'}</td></tr>`).join('')}
     </tbody></table></div>`;
   // 状态推送不能把正在浏览的百项目列表反复拉回顶部。
   const nextScroll = host.querySelector('.project-table-scroll');
@@ -306,6 +324,7 @@ function paintProjectInstance() {
   host.innerHTML = `<header class="row-between"><h3>${escapeHTML(instance.title)}</h3><div class="op-actions">${projectStatusPill(instance.status)}<button class="btn btn-sm" type="button" data-project-usage="${instance.id}">步骤用量</button></div></header>
     <p class="hint project-description">已验收 ${instance.next_step_index} / ${instance.step_count} 步；执行日志通过 Run ID 查看，业务验收结果单独记录。</p>
     ${instance.error ? `<p class="warmup-error">${escapeHTML(instance.error)}</p>` : ''}
+    ${(instance.plans || []).length ? `<div class="project-plan-list">${[...instance.plans].reverse().map(plan => `<div class="project-plan"><div class="row-between"><strong>计划第 ${plan.start_index + 1}～${plan.target_index} 步 · 已通过 ${plan.completed_steps}/${plan.step_count}</strong>${projectStatusPill(plan.status === 'completed' ? 'plan_completed' : plan.status)}</div><p class="hint">${plan.completed_steps < plan.step_count ? `当前第 ${plan.start_index + plan.completed_steps + 1} 步待完成；剩余 ${plan.step_count - plan.completed_steps} 步` : '计划范围已全部验收'}${plan.error ? ` · ${escapeHTML(plan.error)}` : ''}</p><div class="op-actions">${plan.runs.map(run => `<button type="button" class="btn btn-sm" data-project-run="${escapeHTML(run.id)}">Run ${escapeHTML(run.id)}</button>${projectStatusPill(run.status)}`).join('')}</div></div>`).join('')}</div>` : ''}
     <details class="project-roadmap" data-project-roadmap ${roadmapOpen ? 'open' : ''}><summary>迭代路线</summary><ol>${instance.steps.map((step, index) => `<li>${index < instance.next_step_index ? '✓ ' : ''}${escapeHTML(step.goal.split(/Interface contract:|接口契约：/)[0].trim())}</li>`).join('')}</ol></details>
     <div class="table-frame project-table-scroll"><table class="data project-attempts-table"><thead><tr><th>step</th><th>attempt</th><th>run</th><th>execution</th><th>verification</th><th>op</th></tr></thead><tbody>
     ${instance.attempts.map(attempt => `<tr><td>${escapeHTML(attempt.step_id)}</td><td>${attempt.attempt_no}</td><td><button type="button" class="btn btn-sm" data-project-run="${escapeHTML(attempt.run_id)}">${escapeHTML(attempt.run_id)}</button></td><td>${projectStatusPill(attempt.execution_status)}</td><td>${projectStatusPill(attempt.validation_status)}</td><td><button type="button" class="btn btn-sm" data-project-artifact="${attempt.id}">验收与版本</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted empty-cell">尚未投放步骤，启动批次后自动生成执行记录。</td></tr>'}
@@ -1961,6 +1980,10 @@ function openTaskModal(topicNo) {
   form.topic_no.value = topicNo;
   form.account_id.innerHTML = state.accounts
     .map(a => `<option value="${a.id}">${escapeHTML(a.name)}</option>`).join('');
+  const concurrencyLimit = state.accounts[0].cli_concurrency_limit || 2;
+  form.elements.concurrency.max = concurrencyLimit;
+  form.elements.concurrency.value = Math.min(Number(form.elements.concurrency.value), concurrencyLimit);
+  $('.view-head .hint').textContent = `先选账号，再多选 topic；批次随机打乱选中题目，账号最多 ${concurrencyLimit} 并发，按保存的随机间隔投放。Tasks 与项目共用账号容量。`;
   form.prompt.value = '';
   form.prompt_mode.value = 'natural';
   openModal('#task-modal');
@@ -2011,7 +2034,7 @@ async function renderTasks() {
       <td>${escapeHTML(accMap[b.account_id] || `acc#${b.account_id}`)}</td>
       <td><span class="pill pill-${b.status}">${escapeHTML(runStatusLabel(b))}</span>${b.status === 'quota_wait' ? `<div class="warmup-error">${escapeHTML(b.quota_policy?.message || b.passive_quota?.message || '等待最新额度')}</div>` : ''}</td>
       <td>${b.done_count || 0}/${b.item_count || 0}</td>
-      <td>${b.concurrency}</td>
+      <td>${b.effective_concurrency ?? b.concurrency}${b.effective_concurrency != null && b.effective_concurrency !== b.concurrency ? `<div class="hint">已存配置 ${b.concurrency}，受账号上限限制</div>` : ''}</td>
       <td>${b.interval_min_sec}-${b.interval_max_sec}s</td>
       <td>${renderBatchActions(b)}</td>
     </tr>

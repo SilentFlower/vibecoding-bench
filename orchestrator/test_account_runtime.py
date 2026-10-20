@@ -901,6 +901,112 @@ class AccountRuntimeTests(unittest.TestCase):
         self.client.containers.get.assert_not_called()
         self.assertFalse(self.runtime.jobs)
 
+    def _shared_gateway(self) -> dict:
+        """模拟按来源更新的共享租约，返回全量 holder 而非任意首项。@return 租约登记。"""
+        holders = {}
+
+        def request(method, path, body=None):
+            """保留兄弟租约用于核对释放和续期。@return 全量门禁快照。"""
+            if body:
+                owner = body['owner']
+                if body['operation'] == 'prepare-cli-shared':
+                    holders[owner] = {'owner':owner, 'generation':'generation-'+owner,
+                        'exclusive':False, 'shared_cli':True, 'expires_at':9999999999, 'phase':'prepared'}
+                else:
+                    self.assertEqual(holders[owner]['generation'], body['generation'])
+                    if body['operation'] == 'release':
+                        del holders[owner]
+                    elif body['operation'] == 'claim':
+                        holders[owner]['phase'] = 'claimed'
+            return {'lease':next(iter(holders.values()), None), 'holders':list(holders.values()), 'active':2}
+
+        self.gateway._request.side_effect = request
+        return holders
+
+    def test_parallel_cli_claims_share_capacity_and_release_the_exact_holder(self) -> None:
+        """第二个作业取得自己的租约，释放第一个不会删除第二个或放大容量。@return None。"""
+        holders = self._shared_gateway()
+        row = self.runtime._row('synthetic', 1)
+        row['container_id'] = 'container'
+        account = {'id':1, 'name':'synthetic', 'cc2api_account_id':7}
+        first = self.runtime.claim(row, account, 'run:first', shared_cli=True)
+        second = self.runtime.claim(row, account, 'run:second', shared_cli=True)
+        self.assertEqual('run:second', second['lease']['owner'])
+        self.assertEqual(2, len(self.runtime.environment_jobs(row['environment_id'])))
+        self.assertFalse((self.runtime._root(row)/'runtime/execution.json').exists())
+        with self.assertRaisesRegex(ValueError, '槽位已满'):
+            self.runtime.claim(row, account, 'run:third', shared_cli=True)
+        with self.assertRaisesRegex(ValueError, '其它工作'):
+            self.runtime.claim(row, account, 'login:exclusive', exclusive=True)
+        self.runtime.release(first)
+        self.assertEqual({'run:second'}, set(holders))
+        self.assertEqual([second], self.runtime.environment_jobs(row['environment_id']))
+        self.runtime._lease(second, 'heartbeat')
+        self.runtime.release(second)
+        self.assertFalse(self.runtime.jobs)
+        self.assertFalse(self.runtime._execution_records(row))
+
+    def test_parallel_cli_quota_overrides_preserve_shared_home_and_each_other(self) -> None:
+        """两条采集命令各写自己的会话覆盖文件，不互相恢复或改写账号设置。@return None。"""
+        self._shared_gateway()
+        row = self.runtime._row('synthetic', 1)
+        account = {'id':1, 'name':'synthetic', 'cc2api_account_id':7}
+        root = self.runtime._root(row)
+        original = {'statusLine':{'type':'command','command':'printf original'}, 'model':'unchanged'}
+        atomic_json(root/'home/.claude/settings.json', original)
+        jobs = []
+        for name in ('first', 'second'):
+            job = self.runtime.claim(row, account, 'run:'+name, shared_cli=True)
+            job['settings_override'] = 'runtime/jobs/'+name+'/settings.json'
+            atomic_json(root/job['settings_override'], original)
+            flow = root/'flows'/name
+            flow.mkdir(parents=True)
+            self.runtime._install_cli_quota(job, '/home/node/projects/'+name, flow, 'identity')
+            jobs.append(job)
+        first_path = root/jobs[0]['settings_override']
+        saved = first_path.read_bytes()
+        self.assertNotEqual(json.loads(saved)['statusLine']['command'],
+            json.loads((root/jobs[1]['settings_override']).read_text())['statusLine']['command'])
+        self.runtime.release(jobs[1])
+        self.assertEqual(saved, first_path.read_bytes())
+        self.assertEqual(original, json.loads((root/'home/.claude/settings.json').read_text()))
+        self.runtime.release(jobs[0])
+
+    def test_parallel_cli_reconcile_reads_and_releases_all_persisted_sources(self) -> None:
+        """重启对账遍历两个来源，不能只收口首个 lease 或忽略第二个登记。@return None。"""
+        holders = self._shared_gateway()
+        row = self.runtime._row('synthetic', 1)
+        row['container_id'] = 'container'
+        account = {'id':1, 'name':'synthetic', 'cc2api_account_id':7}
+        self.runtime.claim(row, account, 'run:first', shared_cli=True)
+        self.runtime.claim(row, account, 'run:second', shared_cli=True)
+        self.runtime.jobs.clear()
+        container = Mock(status='running')
+        seen = []
+
+        def cleanup(token):
+            """仅替换已由独立 Docker 实验覆盖的进程控制。@param token 执行 token。@return None。"""
+            job = self.runtime.job_for_container(token)
+            seen.append(job['source'])
+            self.runtime.release(job)
+
+        with patch.object(self.runtime, 'cleanup', side_effect=cleanup):
+            self.runtime._reconcile_shared_executions(row, container)
+        self.assertEqual({'run:first','run:second'}, set(seen))
+        self.assertFalse(holders)
+        self.assertFalse(self.runtime.jobs)
+        self.assertFalse(self.runtime._execution_records(row))
+
+    def test_unregistered_persisted_cli_prevents_new_shared_admission(self) -> None:
+        """遗留文件不能因为内存登记丢失而被当成空闲槽位。@return None。"""
+        self._shared_gateway()
+        row = self.runtime._row('synthetic', 1)
+        account = {'id':1, 'name':'synthetic', 'cc2api_account_id':7}
+        first = self.runtime.claim(row, account, 'run:first', shared_cli=True)
+        self.runtime._remove_job(first)
+        with self.assertRaisesRegex(ValueError, '遗留共享执行'):
+            self.runtime.claim(row, account, 'run:next', shared_cli=True)
+
     def test_idle_maintenance_refuses_api_waiting(self) -> None:
         """停机仍不能排空低优先级之前的 API 等待请求。@return None。"""
         row = self.runtime._row("synthetic", 1)

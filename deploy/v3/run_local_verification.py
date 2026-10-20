@@ -23,6 +23,7 @@ def main() -> None:
     parser.add_argument("--legacy-control-image")
     parser.add_argument("--legacy-account-image")
     parser.add_argument("--project-iterations-only", action="store_true")
+    parser.add_argument("--project-scheduling-only", action="store_true")
     parser.add_argument("--run-windows-only", action="store_true")
     parser.add_argument("--followups-only", action="store_true")
     parser.add_argument("--timed-followups-only", action="store_true")
@@ -69,7 +70,9 @@ def main() -> None:
                     "VERIFY_TIMED_FOLLOWUPS_ONLY": "1" if args.timed_followups_only else "0",
                     "VERIFY_QUOTA_COMPLETION_ONLY": "1" if args.quota_completion_only else "0",
                     "VERIFY_RUN_WINDOWS_ONLY": "1" if args.run_windows_only else "0",
-                    "VERIFY_PROJECT_ITERATIONS_ONLY": "1" if args.project_iterations_only else "0"},
+                    "VERIFY_PROJECT_ITERATIONS_ONLY": "1" if args.project_iterations_only else "0",
+                    "VERIFY_PROJECT_SCHEDULING_ONLY": "1" if args.project_scheduling_only else "0",
+                    "VERIFY_PROJECT_SCHEDULING_TASKS_ONLY": os.environ.get("VERIFY_PROJECT_SCHEDULING_TASKS_ONLY", "0")},
                 volumes={str(repository): {"bind": "/source", "mode": "ro"}, str(fixtures): {"bind": "/fixtures", "mode": "ro"},
                     str(root): {"bind": "/verify", "mode": "rw"}, "/var/run/docker.sock": {"bind": "/var/run/docker.sock", "mode": "rw"}})
             # 完整补充矩阵包含逐次CLI启动和原生忙碌消费，外层等待不能先于场景自身截止时间结束。

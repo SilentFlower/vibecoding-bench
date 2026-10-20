@@ -167,9 +167,11 @@ class LoginDraftStore:
         root = self.runtime._root(row)
         if (record["phase"] in ("preparing", "deleting", "submitting")
             or not re.fullmatch(r"[a-f0-9]{12}", record.get("sid", ""))
-            or row["environment_id"] in self.runtime.jobs or root.is_symlink() or root.parent.is_symlink()
+            or self.runtime.environment_jobs(row["environment_id"]) or root.is_symlink() or root.parent.is_symlink()
             or (root / "runtime").is_symlink()):
             raise ValueError("草稿正在操作或归属无法核对，请查看环境")
+        if self.runtime._execution_records(row):
+            raise ValueError("存在不属于登录草稿的共享执行登记，请查看环境")
         path = root / "runtime" / "execution.json"
         if path.is_symlink():
             raise ValueError("遗留执行不是本环境的私有记录，请查看环境")
@@ -267,17 +269,17 @@ class LoginDraftStore:
             self._safe_tree(profile, self.runtime.data / "profiles")
             with manager._lock:
                 sessions = [session for session in manager.sessions.values() if session.name == row["name"]]
-            job = self.runtime.jobs.get(row["environment_id"])
-            if job and (not sessions or job["source"] not in {"login:" + session.sid for session in sessions}):
+            jobs = self.runtime.environment_jobs(row["environment_id"])
+            if any(not sessions or job["source"] not in {"login:" + session.sid for session in sessions} for job in jobs):
                 raise ValueError("环境有其他活动工作，不能清理")
             if self.runtime._running_sender_active(row):
                 raise ValueError("账号发送连接尚未收口")
-            if not job and (root / "runtime" / "execution.json").exists():
+            if not jobs and ((root / "runtime" / "execution.json").exists() or self.runtime._execution_records(row)):
                 raise ValueError("遗留执行尚未对账，不能清理")
             self.save(row, phase="deleting", deleting_at=time.time())
             for session in sessions:
                 manager.cleanup(session.sid)
-            if row["environment_id"] in self.runtime.jobs:
+            if self.runtime.environment_jobs(row["environment_id"]):
                 raise ValueError("登录执行尚未收口")
             self.runtime._stop_environment(row, remove=True)
             for path in (root, profile):

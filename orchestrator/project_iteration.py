@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import random
 import shutil
 import threading
 import time
@@ -13,6 +14,7 @@ from typing import Callable
 
 from project_library import (ProjectLibrary, canonical_json, digest_json, materialize_snapshot,
     read_document, safe_relative, snapshot_tree, write_document)
+from project_plans import PLAN_DEFAULTS, ProjectPlans, initialize_plan_schema, normalized_policy
 
 
 PROJECT_RUN_KIND = 'project_iteration'
@@ -71,11 +73,16 @@ class ProjectIterationManager:
     :param verifier: 独立容器业务验证器。
     :param is_executing: 检查原调度器是否仍持有执行资源。
     :param admission: 环境准备后重新检查公共门禁的可选函数。
+    :param execution_control: 按运行代次控制独立进程树的回调。
+    :param schedule_admission: 创建新计划前的只读账号门禁。
+    :param concurrency_limit: 实际账号 CLI 容量。
     """
 
     def __init__(self, data: Path, library: ProjectLibrary, database: Callable, write_lock,
                  submit: Callable, settings: Callable, identity: Callable, stop_run: Callable,
-                 verifier, is_executing: Callable, admission: Callable | None = None) -> None:
+                 verifier, is_executing: Callable, admission: Callable | None = None,
+                 execution_control: Callable | None = None, schedule_admission: Callable | None = None,
+                 concurrency_limit: int = 2) -> None:
         """注册内容版本并初始化推进依赖；参数契约见类说明。@return None。"""
         self.data, self.database, self.write_lock = data, database, write_lock
         self.submit, self.settings, self.identity, self.stop_run = submit, settings, identity, stop_run
@@ -100,6 +107,7 @@ class ProjectIterationManager:
             finally:
                 connection.close()
         self._libraries[self.release_id] = self.library
+        self.plans = ProjectPlans(self,execution_control,schedule_admission,concurrency_limit)
 
     def _rows(self, sql: str, parameters=()) -> list[dict]:
         connection = self.database()
@@ -118,17 +126,20 @@ class ProjectIterationManager:
         :return: 固定内容版本和项目列表，不包含私有参考实现。
         """
         return {'version':self.library.version,'digest':self.library.digest,
+            'scheduling_defaults':{**PLAN_DEFAULTS,'concurrency':self.plans.limit},
             'projects':[project.summary() for project in self.library.projects.values()]}
 
-    def create_batch(self, account_id: int, name: str, project_keys: list[str] | None = None) -> dict:
+    def create_batch(self, account_id: int, name: str, project_keys: list[str] | None = None,
+                     policy: dict | None = None) -> dict:
         """建立暂停批次；这里只写记录，不创建项目工作目录。
 
         :param account_id: 可用账号 ID。
         :param name: 用户可见的批次名称。
         :param project_keys: 选中项目；None 表示完整项目库。
+        :param policy: 新调度策略；内部历史调用省略时保留旧单步语义。
         :return: 新批次详情。
         """
-        keys = list(self.library.projects) if project_keys is None else project_keys
+        keys = list(self.library.projects) if project_keys is None else list(project_keys)
         if (not keys or len(keys)>100 or len(set(keys))!=len(keys)
                 or any(key not in self.library.projects for key in keys)):
             raise ValueError('项目选择为空、重复或不属于当前内容版本')
@@ -137,6 +148,11 @@ class ProjectIterationManager:
         account = self._one('SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL',(account_id,))
         if account is None:
             raise ValueError('账号不存在或已停用')
+        selected_policy = DEFAULT_POLICY
+        if policy is not None:
+            maximum = max(len(self.library.projects[key].manifest['steps']) for key in keys)
+            selected_policy = normalized_policy(policy,len(keys),maximum,self.plans.limit)
+            random.shuffle(keys)
         identity, now = self.identity(account), time.time()
         with self.write_lock:
             connection = self.database()
@@ -145,13 +161,13 @@ class ProjectIterationManager:
                     if not connection.execute('SELECT id FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL',(account_id,)).fetchone():
                         raise ValueError('账号不存在或已停用')
                     cursor = connection.execute('INSERT INTO project_iteration_batches(account_id,account_identity,name,catalog_release_id,policy_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',
-                        (account_id,identity,name.strip(),self.release_id,canonical_json(DEFAULT_POLICY).decode(),now,now))
+                        (account_id,identity,name.strip(),self.release_id,canonical_json(selected_policy).decode(),now,now))
                     batch_id = cursor.lastrowid
                     for order,key in enumerate(keys):
                         manifest = self.library.projects[key].manifest
-                        connection.execute('INSERT INTO project_instances(batch_id,project_key,manifest_json,seed_digest,roadmap_digest,checkpoint_digest,visit_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)',
+                        connection.execute('INSERT INTO project_instances(batch_id,project_key,manifest_json,seed_digest,roadmap_digest,checkpoint_digest,visit_order,initial_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
                             (batch_id,key,canonical_json(manifest).decode(),manifest['seed_digest'],digest_json(manifest['steps']),
-                            manifest['seed_digest'],order,now,now))
+                            manifest['seed_digest'],order,order,now,now))
             finally:
                 connection.close()
         return self.batch(batch_id)
@@ -167,6 +183,8 @@ class ProjectIterationManager:
             item['policy'] = json.loads(item.pop('policy_json'))
             item['counts'] = {row['status']:row['count'] for row in self._rows(
                 'SELECT status,COUNT(*) AS count FROM project_instances WHERE batch_id=? GROUP BY status',(item['id'],))}
+            if item['policy'].get('schema')==2:
+                item['scheduling'] = self.plans.batch_summary(item)
         return result
 
     def batch(self, batch_id: int) -> dict:
@@ -192,10 +210,11 @@ class ProjectIterationManager:
         if item is None:
             raise ValueError('项目实例不存在')
         result = self._public_instance(item,True)
-        result['attempts'] = self._rows('SELECT a.id,a.step_id,a.attempt_no,a.run_id,a.validation_status,a.execution_released_at,'
+        result['attempts'] = self._rows('SELECT a.id,a.step_id,a.attempt_no,a.run_id,a.plan_id,a.validation_status,a.execution_released_at,'
             'a.candidate_digest,a.accepted_checkpoint_digest,a.created_at,a.ended_at,r.status AS execution_status,'
             'r.error AS execution_error,r.window_wait_until FROM project_step_attempts a LEFT JOIN runs r ON r.id=a.run_id '
             'WHERE a.instance_id=? ORDER BY a.id',(instance_id,))
+        result['plans'] = self.plans.summaries(instance_id)
         return result
 
     def _public_instance(self, item: dict, include_steps: bool) -> dict:
@@ -240,7 +259,7 @@ class ProjectIterationManager:
             finally:
                 connection.close()
         if action=='stop':
-            for run in self._rows("SELECT r.id FROM runs r JOIN project_step_attempts a ON a.run_id=r.id JOIN project_instances i ON i.id=a.instance_id WHERE i.batch_id=? AND r.status IN ('queued','running','stopping','quota_wait')",(batch_id,)):
+            for run in self._rows("SELECT DISTINCT r.id FROM runs r JOIN project_step_attempts a ON a.run_id=r.id JOIN project_instances i ON i.id=a.instance_id WHERE i.batch_id=? AND r.status IN ('queued','running','stopping','quota_wait')",(batch_id,)):
                 self.stop_run(run['id'])
         return self.batch(batch_id)
 
@@ -250,6 +269,9 @@ class ProjectIterationManager:
         :param run_id: 原运行 ID。
         :return: 尝试、实例和批次的内部联合视图，普通运行返回 None。
         """
+        planned = self.plans.context(run_id)
+        if planned is not None:
+            return planned
         return self._one('SELECT a.id AS attempt_id,a.generation AS attempt_generation,a.step_id,a.attempt_no,'
             'i.*,b.account_id,b.account_identity,b.catalog_release_id,b.status AS batch_status,b.generation AS batch_generation '
             'FROM project_step_attempts a JOIN project_instances i ON i.id=a.instance_id '
@@ -263,6 +285,9 @@ class ProjectIterationManager:
         :return: 本代是否仍有执行权限。
         """
         context = self.run_context(run_id)
+        if context and context.get('plan_id') and (context['not_before']>time.time()
+                or context['plan_status'] not in ('running','quota_wait')):
+            return False
         return bool(context and context['attempt_generation']==context['batch_generation']
             and (context['batch_status']=='active' or started and context['batch_status']=='pausing'))
 
@@ -374,6 +399,9 @@ class ProjectIterationManager:
         :param error: 严格清理失败原因。
         :return: None。
         """
+        if self.plans.context(run_id):
+            self.plans.execution_released(run_id,quota_attempt,error)
+            return
         with self.write_lock:
             connection = self.database()
             try:
@@ -412,6 +440,10 @@ class ProjectIterationManager:
         :param directory: 原生主会话目录。
         :return: 本轮会话 ID 或 None。
         """
+        context = self.plans.context(run_id)
+        if context:
+            path = directory/(context['session_id']+'.jsonl')
+            return context['session_id'] if path.is_file() and not path.is_symlink() else None
         try:
             start = read_document(self.data/'project-artifacts/runs'/run_id/'native-start.json')
             files = [path for path in directory.glob('*.jsonl') if path.is_file() and not path.is_symlink()
@@ -420,20 +452,23 @@ class ProjectIterationManager:
         except (OSError,ValueError,TypeError,AttributeError):
             return None
 
-    def native_usage(self, run_id: str, directory: Path, input_counter: Callable) -> dict:
+    def native_usage(self, run_id: str, directory: Path, input_counter: Callable, *, boundaries: tuple | None = None) -> dict:
         """仅统计本轮字节区间中的去重主响应。
 
         :param run_id: 项目运行。
         :param directory: 稳定项目会话目录。
         :param input_counter: 既有输入及缓存用量归一函数。
+        :param boundaries: 单步骤自己的字节起止；省略时统计整个 Run。
         :return: 用量与可用性；证据缺失时不会回退为整个项目的历史。
         """
         empty = {'tokens_in':0,'tokens_out':0,'requests':0,'usage_available':False}
         root = self.data/'project-artifacts/runs'/run_id
         try:
-            start = read_document(root/'native-start.json')
+            start = boundaries[0] if boundaries else read_document(root/'native-start.json')
             run = self._one('SELECT status FROM runs WHERE id=?',(run_id,))
-            if (root/'native-end.json').exists() and run and run['status'] in TERMINAL_RUNS | {'quota_wait'}:
+            if boundaries and boundaries[1] is not None:
+                end = boundaries[1]
+            elif (root/'native-end.json').exists() and run and run['status'] in TERMINAL_RUNS | {'quota_wait'}:
                 end = read_document(root/'native-end.json')
             else:
                 end = {p.name:p.stat().st_size for p in directory.glob('*.jsonl') if p.is_file() and not p.is_symlink()}
@@ -475,6 +510,23 @@ class ProjectIterationManager:
         except (OSError,ValueError,TypeError,KeyError,AttributeError):
             return empty
 
+    def step_usage(self, attempt_id: int, input_counter: Callable) -> dict:
+        """按步骤的独立字节边界汇总用量，不复制共享 Run 的总数。
+
+        :param attempt_id: 尝试 ID。
+        :param input_counter: 原输入统计函数。
+        :return: 该尝试的用量；缺少证据返回未知。
+        """
+        empty = {'usage_available':False}
+        attempt = self._one('SELECT * FROM project_step_attempts WHERE id=?',(attempt_id,))
+        if not attempt or not attempt['plan_id'] or not attempt['native_start_json']:
+            return empty
+        execution = self._one('SELECT native_relative FROM project_plan_executions WHERE run_id=?',(attempt['run_id'],))
+        if not execution or not execution['native_relative'] or attempt['ended_at'] is not None and not attempt['native_end_json']:
+            return empty
+        return self.native_usage(attempt['run_id'],self.data/safe_relative(execution['native_relative']),input_counter,
+            boundaries=(json.loads(attempt['native_start_json']),json.loads(attempt['native_end_json']) if attempt['native_end_json'] else None))
+
     def start(self) -> None:
         """启动自动推进线程。
 
@@ -507,8 +559,9 @@ class ProjectIterationManager:
         :param cleanup: Runner.cleanup_quota_run。
         :return: None。
         """
+        self.plans.recover(cleanup)
         attempts = self._rows('SELECT a.run_id,r.status,r.started_at,r.worker_container,r.quota_attempt '
-            'FROM project_step_attempts a JOIN runs r ON r.id=a.run_id WHERE a.ended_at IS NULL')
+            'FROM project_step_attempts a JOIN runs r ON r.id=a.run_id WHERE a.ended_at IS NULL AND a.plan_id IS NULL')
         for item in attempts:
             if item['status']=='quota_wait' or item['status']=='queued' and not item['started_at'] and not item['worker_container']:
                 continue
@@ -534,7 +587,7 @@ class ProjectIterationManager:
         if self._stop.is_set() or not self._tick_lock.acquire(blocking=False):
             return
         try:
-            for batch in self._rows("SELECT * FROM project_iteration_batches WHERE status IN ('active','pausing','stopping','paused','blocked') ORDER BY id"):
+            for batch in self._rows("SELECT * FROM project_iteration_batches WHERE status IN ('active','pausing','stopping','paused','blocked') ORDER BY COALESCE(last_launch_at,0),id"):
                 try:
                     self._drive_batch(batch)
                 except Exception as error:
@@ -551,13 +604,16 @@ class ProjectIterationManager:
                         (message,time.time(),batch_id))
             finally:
                 connection.close()
-        for run in self._rows("SELECT r.id FROM runs r JOIN project_step_attempts a ON a.run_id=r.id JOIN project_instances i ON i.id=a.instance_id WHERE i.batch_id=? AND r.status IN ('queued','running','stopping','quota_wait')",(batch_id,)):
+        for run in self._rows("SELECT DISTINCT r.id FROM runs r JOIN project_step_attempts a ON a.run_id=r.id JOIN project_instances i ON i.id=a.instance_id WHERE i.batch_id=? AND r.status IN ('queued','running','stopping','quota_wait')",(batch_id,)):
             self.stop_run(run['id'])
 
     def _drive_batch(self, batch: dict) -> None:
         account = self._one('SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL',(batch['account_id'],))
         if batch['status'] not in ('paused','stopping','blocked') and (account is None or self.identity(account)!=batch['account_identity']):
             self._batch_error(batch['id'],'账号已停用、删除或身份已改变')
+            return
+        if json.loads(batch['policy_json']).get('schema')==2:
+            self.plans.drive(batch,account)
             return
         attempts = self._rows('SELECT a.*,i.batch_id,r.status AS run_status,r.quota_attempt,r.started_at AS run_started_at,'
             'r.window_wait_until,r.error AS run_error,r.worker_container FROM project_step_attempts a '

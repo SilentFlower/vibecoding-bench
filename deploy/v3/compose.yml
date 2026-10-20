@@ -56,7 +56,7 @@ services:
       WEBUI_SESSION_SECRET: ${V3_SESSION_SECRET:?需要会话秘密}
       WEBUI_DIR: /webui
       TOPICS_FILE: /repo/topics.md
-      CLAUDE_CODE_VERSION: ${V3_CLI_VERSION:-2.1.280}
+      CLAUDE_CODE_VERSION: ${V3_CLI_VERSION:-2.1.293}
     volumes:
       - ${V3_DATA_ROOT}/bench:/data
       - /var/run/docker.sock:/var/run/docker.sock
