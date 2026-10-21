@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "task_id": "SC-P02",
+  "source_commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+  "comparison": "Evaluate behavior, evidence, assumptions and scope. Accept concise equivalent valid answers; do not grade keywords, length, reference wording or a particular patch style.",
+  "criteria": [
+    {
+      "id": "consecutive-independent",
+      "requirement": "Keep the counter in each job wrapper or equivalent isolated state, reset it on success, and cancel only after three consecutive ReportDataError failures. The supplied failure/success/failure/failure/failure sequence cancels on its fifth invocation.",
+      "evidence": [
+        "library/schedule/__init__.py:172-176",
+        "library/docs/exception-handling.rst"
+      ]
+    },
+    {
+      "id": "exception-and-cancel",
+      "requirement": "Catch only the specified application ReportDataError, record the expected failure, and return CancelJob at the limit through Scheduler. Unexpected TypeError or other exceptions propagate. Healthy callbacks continue after handled expected failures; do not alter the library default.",
+      "evidence": [
+        "library/schedule/__init__.py:172-176",
+        "library/docs/exception-handling.rst"
+      ]
+    },
+    {
+      "id": "validation-plan",
+      "requirement": "Include independent job counters, success reset, threshold cancellation, healthy-job progress and unexpected-error propagation in the validation plan. The native witness establishes feasibility, not correctness of an unseen candidate implementation.",
+      "evidence": [
+        "library/schedule/__init__.py:172-176",
+        "library/docs/exception-handling.rst"
+      ]
+    },
+    {
+      "id": "read-only",
+      "requirement": "Answer or propose a plan only. Do not edit any repository file; allowed_paths is empty. Native witnesses establish facts or feasibility, while these semantic criteria judge the actual answer.",
+      "evidence": []
+    }
+  ]
+}

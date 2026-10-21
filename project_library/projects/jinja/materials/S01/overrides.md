@@ -1,0 +1,2 @@
+# Business-unit overrides
+A business unit overrides weekly.html with CUSTOM. Shared templates contain weekly.html=SHARED and base.html=BASE. The business-unit layer has first priority. All template sources are trusted. Missing templates should follow normal Jinja errors; invalid override syntax must remain visible. Explain source refresh and the distinction between re-fetching a template and re-rendering an old Template object. Give a plan, not an implementation.

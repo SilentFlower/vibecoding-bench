@@ -1,0 +1,41 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "fragment"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "memory_forward_flat": true,
+    "memory_forward_deep": true,
+    "memory_reverse_flat": true,
+    "memory_reverse_deep": true,
+    "json_forward_flat": true,
+    "json_forward_deep": true,
+    "json_reverse_flat": true,
+    "json_reverse_deep": true,
+    "root_empty_missing": true,
+    "boolean_composition": true,
+    "fragment_values_unicode": true,
+    "map_remains_uncacheable": true,
+    "unhashable_fallback": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "cwd": "library",
+    "argv": [
+      "python",
+      "-m",
+      "pytest",
+      "tests",
+      "-q",
+      "-ra",
+      "-p",
+      "no:cacheprovider"
+    ],
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

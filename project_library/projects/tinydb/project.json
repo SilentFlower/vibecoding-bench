@@ -1,0 +1,415 @@
+{
+  "schema": 2,
+  "project_key": "tinydb",
+  "title": "TinyDB 本地订单工作场景",
+  "category": "数据存储",
+  "description": "固定真实源码上的接入咨询、查询分诊、批量规则与落盘方案；4 场景、12 稳定任务。",
+  "seed_digest": "d478acdf6f6cf1c05645ad6ec2ceadd0a83d76755a2df6c34689e4bcae52cac7",
+  "environment": "tinydb-py312",
+  "source": {
+    "repository": "https://github.com/msiemens/tinydb",
+    "commit": "edff96aeb2616402e9489d46e90a592c05565621",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/docs/_themes/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TD-S01",
+      "title": "单机订单小工具接入",
+      "goal": "了解存储边界、判断适用范围并取得可运行接入示例",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TD-U01",
+            "TD-C01",
+            "TD-C02"
+          ]
+        },
+        {
+          "id": "consult_only",
+          "task_ids": [
+            "TD-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TD-U01",
+          "kind": "understand",
+          "goal": "理解订单从 API 到文件的路径和数据边界",
+          "prompt": "I am taking over a small, single-user order notebook. Explain what this frozen TinyDB project does, how a call reaches the stored JSON file, and how the default table differs from table('orders'). What survives closing and reopening the database? Ground the explanation in the current code; do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/notebook.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "understood"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-U01.rubric.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TD-C01",
+          "kind": "consult",
+          "goal": "判断多进程服务是否适合沿用 TinyDB",
+          "prompt": "We plan to turn the notebook into a service with four writer processes and require an order and inventory change to commit atomically. Is the current TinyDB implementation an appropriate fit? Explain the relevant guarantees and recommend a practical next step. Do not implement a new database or modify files.",
+          "requires": [],
+          "materials": [
+            "materials/service-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-C01.rubric.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TD-C02",
+          "kind": "consult",
+          "goal": "用现有 API 给出可重开的最小订单接入示例",
+          "prompt": "Give me exactly one complete runnable Python fenced code block for a script accepting a JSON database path as its first argument. Store orders A(qty=1) and B(qty=2) in table 'orders', increment only A using existing APIs, close the database, reopen it and query A, then print the queried order as JSON. Include the invocation. Do not create project files or change TinyDB itself.",
+          "requires": [],
+          "materials": [
+            "materials/order-example.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "usable_example"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-C02.rubric.json",
+            "native": "verification/consult.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TD-S02",
+      "title": "查询结果不一致分诊",
+      "goal": "先取得必要材料，再区分正常缓存约定与独立查询缺陷",
+      "default_entry": "diagnose_then_repair",
+      "entries": [
+        {
+          "id": "diagnose_then_repair",
+          "task_ids": [
+            "TD-D01",
+            "TD-D02",
+            "TD-M01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "TD-D01",
+            "TD-D02"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "TD-D01"
+          ],
+          "materials": [
+            "disclosure/tags-unavailable.md"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "TD-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TD-D01",
+          "kind": "diagnose",
+          "goal": "先补材料，再辨别共享缓存文档的正常约定",
+          "prompt": "An order's tags seem to change after I search for it. Is this a TinyDB bug? Tell me what evidence you need before drawing a conclusion. Do not patch the library on the basis of this report alone.",
+          "requires": [],
+          "materials": [
+            "materials/tags-report.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-D01.rubric.json"
+          },
+          "branches": [
+            {
+              "id": "caller-evidence",
+              "when": "The actual conversation does not contain a record that the requested incident evidence is unavailable, the caller and storage/reopen control have not been disclosed, and the answer reasonably requests the caller, storage configuration, mutation sequence, or before/after evidence. Disclose the complete fixed caller and observations together; never disclose them for the evidence-unavailable entry.",
+              "materials": [
+                "disclosure/tags-caller.py",
+                "disclosure/tags-observed.txt"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "TD-D02",
+          "kind": "diagnose",
+          "goal": "定位不同嵌套字段 fragment 查询的缓存串用",
+          "prompt": "Two orders have different billing and shipping objects. A billing fragment search followed by the same fragment on shipping returns the first search's IDs, while applying the shipping predicate directly gives different IDs. Use the attached original-version reproducer and current source to explain the cause, distinguish it from a data problem, and suggest a safe temporary workaround. Do not change files yet.",
+          "requires": [],
+          "materials": [
+            "materials/fragment-reproducer.py",
+            "materials/fragment-observed.txt"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-D02.rubric.json",
+            "native": "verification/fragment-baseline.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TD-M01",
+          "kind": "modify",
+          "goal": "让 fragment 缓存身份包含完整字段路径",
+          "prompt": "Fix the nested fragment query-cache collision demonstrated here. Queries with the same fragment on different complete field paths must return their own matching documents regardless of evaluation order. Preserve root-level fragments, missing-field behavior, normal query caching, and the uncacheable map-path contract. Add focused public regression coverage without changing storage APIs or private verification files. The attached reproduction is sufficient; no earlier answer is required.",
+          "requires": [],
+          "materials": [
+            "materials/fragment-reproducer.py",
+            "materials/fragment-observed.txt",
+            "materials/fragment-repair.md"
+          ],
+          "allowed_paths": [
+            "library/tinydb/queries.py",
+            "library/tests/test_queries.py",
+            "library/tests/test_tables.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-M01.rubric.json",
+            "native": "verification/fragment.native.json",
+            "semantic": true
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TD-S03",
+      "title": "批量促销规则一致性",
+      "goal": "理解规则顺序，诊断并修复有限一次性规则的处理差异",
+      "default_entry": "diagnose_then_repair",
+      "entries": [
+        {
+          "id": "diagnose_then_repair",
+          "task_ids": [
+            "TD-U02",
+            "TD-D03",
+            "TD-M02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "TD-D03"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "TD-M02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TD-U02",
+          "kind": "understand",
+          "goal": "解释多规则顺序和重复返回文档 ID",
+          "prompt": "Our two promotion rules first increment qty, then mark orders whose new qty is 1 as ready. update_multiple returns [1, 1, 2, 2] for two orders. Explain the rule evaluation order and what the returned IDs mean. Is it evidence of duplicate orders? Use the supplied list-based example and current source; do not change the implementation.",
+          "requires": [],
+          "materials": [
+            "materials/rule-order.py",
+            "materials/rule-order-observed.txt"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "understood"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-U02.rubric.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TD-D03",
+          "kind": "diagnose",
+          "goal": "定位一次性规则流只更新第一单的原因",
+          "prompt": "The same promotion rules update every order when passed as a list, but only the first order when passed as a generator. Diagnose this with the attached original-version list/generator control and the current Iterable-annotated update_multiple implementation. Explain a minimal caller-side workaround. Do not modify the library yet.",
+          "requires": [],
+          "materials": [
+            "materials/generator-reproducer.py",
+            "materials/generator-observed.txt"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-D03.rubric.json",
+            "native": "verification/batch-baseline.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TD-M02",
+          "kind": "modify",
+          "goal": "让有限一次性规则与列表规则更新结果一致",
+          "prompt": "Make update_multiple apply a finite one-shot iterable of update rules to all matching documents just as it applies an equivalent list or tuple. Preserve rule order, in-place callback behavior, repeated returned IDs, and existing storage interfaces. If enumerating the rules fails, no part of those rules should have been applied. Add focused public regressions; do not introduce general transaction semantics or modify private verification files. The attached reproduction is self-contained; this scene starts from the original baseline.",
+          "requires": [],
+          "materials": [
+            "materials/generator-reproducer.py",
+            "materials/generator-observed.txt",
+            "materials/generator-repair.md",
+            "materials/rule-order.py",
+            "materials/rule-order-observed.txt"
+          ],
+          "allowed_paths": [
+            "library/tinydb/table.py",
+            "library/tests/test_tinydb.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-M02.rubric.json",
+            "native": "verification/batch.native.json",
+            "semantic": true
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TD-S04",
+      "title": "落盘预期、导入和可靠性方案",
+      "goal": "用现有能力解释持久化时点，并规划安全导入与备份恢复",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TD-C03",
+            "TD-P01",
+            "TD-P02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TD-C03",
+          "kind": "consult",
+          "goal": "解释缓冲写入的落盘时点并给出现有配置建议",
+          "prompt": "With CachingMiddleware(JSONStorage), insert returns successfully but the JSON file is still empty after one write. The script has not flushed or closed the database yet. Explain whether this matches the current implementation, how to ensure a normal script exit publishes the data using existing APIs, and what failure window remains. Do not change the library.",
+          "requires": [],
+          "materials": [
+            "materials/buffered-write.py",
+            "materials/buffered-write-observed.txt"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-C03.rubric.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TD-P01",
+          "kind": "plan",
+          "goal": "规划有限本地订单导入，利用现有批量 API 控制写入次数",
+          "prompt": "We import a finite file of about 1,000 orders in one writer process. Repeated insert calls are slow, and rerunning the import must reconcile existing orders by SKU. Review the attached importer and propose a safe plan using APIs that actually exist in this version. Ask about unresolved duplicate-SKU rules before fixing them in the plan. Do not implement or run a migration.",
+          "requires": [],
+          "materials": [
+            "materials/importer.py",
+            "materials/import-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "plan_ready",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-P01.rubric.json"
+          },
+          "branches": [
+            {
+              "id": "duplicate-policy",
+              "when": "The duplicate-SKU policy has not been disclosed and the answer requests the intended conflict behavior for duplicate SKUs within input or in the existing database before finalizing a reconciliation plan. Supply the fixed owner decision, then continue the same task.",
+              "materials": [
+                "disclosure/duplicate-policy.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "TD-P02",
+          "kind": "plan",
+          "goal": "制定本地 JSON 备份及崩溃恢复边界，不承诺现有原子写",
+          "prompt": "For this single-writer local order notebook, propose a backup and recovery procedure that preserves tables and document IDs and makes the failure boundaries explicit. Explain what JSONStorage.write currently guarantees and what it does not. Prefer a reviewable operational plan; if you discuss an atomic-storage extension, label it as proposed work rather than an existing API. Do not implement it or touch real data.",
+          "requires": [],
+          "materials": [
+            "materials/recovery-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "plan_ready"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-P02.rubric.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

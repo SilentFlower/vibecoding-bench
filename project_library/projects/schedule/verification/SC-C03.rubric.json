@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "task_id": "SC-C03",
+  "source_commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+  "comparison": "Evaluate behavior, evidence, assumptions and scope. Accept concise equivalent valid answers; do not grade keywords, length, reference wording or a particular patch style.",
+  "criteria": [
+    {
+      "id": "cancel-signal",
+      "requirement": "Return CancelJob (class or instance) after successful work and explain that Scheduler._run_job consumes it. Direct Job.run only returns the signal and does not remove the job from the Scheduler list.",
+      "evidence": [
+        "library/schedule/__init__.py:135-176",
+        "library/schedule/__init__.py:674-697"
+      ]
+    },
+    {
+      "id": "operator-actions",
+      "requirement": "Use cancel_job for one job and clear(tag) for a group. Keep unrelated jobs. Do not invent a once_at API or conflate clear/get_jobs with execution.",
+      "evidence": [
+        "library/schedule/__init__.py:135-176",
+        "library/schedule/__init__.py:674-697"
+      ]
+    },
+    {
+      "id": "read-only",
+      "requirement": "Answer or propose a plan only. Do not edit any repository file; allowed_paths is empty. Native witnesses establish facts or feasibility, while these semantic criteria judge the actual answer.",
+      "evidence": []
+    }
+  ]
+}

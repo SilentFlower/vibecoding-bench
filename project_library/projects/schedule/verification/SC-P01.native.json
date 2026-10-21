@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SC-P01"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "startup_and_periodic": true,
+    "tag_inspection": true,
+    "empty_state": true,
+    "bounded_idle_wait": true
+  },
+  "resource_profile": "business"
+}

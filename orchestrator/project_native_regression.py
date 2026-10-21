@@ -1,4 +1,4 @@
-"""三仓独立原生回归草案：固定原版测试、配置和插件，叠加授权实现后运行。
+"""独立原生回归：固定原版测试、配置和插件，叠加授权实现后运行。
 
 宿主／控制端契约：只在无网络、UID1000、只读根的验证容器内调用本脚本，不能在
 控制宿主执行候选。/source 为只读候选（含 library/app），/baseline/library 为只读
@@ -14,7 +14,7 @@ tmpfs／证据挂载。资源使用环境 profile.regression，不能复用较�
       --candidate-root /source --contract /request-data/fm-contract.json \
       --evidence-dir /evidence/candidate --timeout-sec 180
 
-三个 project 值为 python-frontmatter、pydantic-settings、typer；主进程只输出一个 JSON。
+支持的 project 由固定 SUITES 定义；主进程只输出一个 JSON。
 pytest 的完整 stdout／stderr 和逐节点证据保存在指定目录，返回 JSON 只带有界尾段。
 contract 冻结原版节点、结果类型、pytest／Python／插件版本和 baseline 摘要；没有匹配
 contract 的候选不能判通过。它是可信测试支架，不替代外层容器隔离和业务独立断言。
@@ -66,6 +66,15 @@ SUITES = {
             ('pytest-xdist', 'xdist.looponfail'), ('pytest-sugar', 'pytest_sugar')],
         'env': {'TERMINAL_WIDTH': '3000', '_TYPER_FORCE_DISABLE_TERMINAL': '1',
             '_TYPER_RUN_INSTALL_COMPLETION_TESTS': '1', 'CONTEXT': 'native-frozen-regression'}},
+    'tinydb': {'package': 'tinydb', 'overlay': True, 'doctests': 0,
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-cov', 'pytest_cov.plugin')], 'env': {}},
+    'jinja': {'package': 'jinja2', 'implementation_dir': 'src/jinja2', 'import_root': 'src',
+        'overlay': True, 'doctests': 0,
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-timeout', 'pytest_timeout')], 'env': {}},
+    'schedule': {'package': 'schedule', 'overlay': True, 'doctests': 0,
+        'args': ['test_schedule.py', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
 }
 _STATE: dict = {}
 
@@ -130,19 +139,37 @@ def _pytest_controls(path: Path) -> list[str]:
     return sorted(controls)
 
 
+def _suite_paths(suite: dict) -> tuple[Path, Path]:
+    """校验固定套件的实现与导入路径。@param suite 套件。@return 两个相对路径。"""
+    package = suite['package']
+    if not re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*', package):
+        raise ValueError('原生套件模块名无效')
+    implementation = Path(suite.get('implementation_dir', package.replace('.', '/')))
+    import_root = Path(suite.get('import_root', '.'))
+    if any(path.is_absolute() or '..' in path.parts for path in (implementation, import_root)):
+        raise ValueError('原生套件路径必须在项目内')
+    if implementation != import_root.joinpath(*package.split('.')):
+        raise ValueError('原生套件实现路径与导入模块不一致')
+    return implementation, import_root
+
+
 def _overlay(baseline: Path, candidate: Path, destination: Path, suite: dict) -> dict:
     """从原版构建测试树，仅覆盖授权实现并恢复原版控制。@return 叠加证据。"""
     shutil.copytree(baseline, destination, ignore=shutil.ignore_patterns(*IGNORE_DIRS, '*.pyc', '*.pyo', '.coverage'))
     original = _files(baseline)
-    implementation = candidate / suite['package']
-    if not implementation.is_dir() or implementation.is_symlink():
+    implementation_dir, _ = _suite_paths(suite)
+    implementation = candidate / implementation_dir
+    if (not implementation.is_dir() or implementation.is_symlink()
+            or not implementation.resolve().is_relative_to(candidate.resolve())
+            or any((candidate / Path(*implementation_dir.parts[:index])).is_symlink()
+                for index in range(1, len(implementation_dir.parts)))):
         raise CandidateViolation('候选缺少实际实现包')
     if not suite['overlay']:
         if _files(candidate) != original:
             raise CandidateViolation('Typer 应用增强不能修改或删减固定库源码、测试或配置')
         return {'mode': 'fixed-upstream', 'restored_controls': 0}
     candidate_files = _files(implementation)
-    target = destination / suite['package']
+    target = destination / implementation_dir
     shutil.rmtree(target)
     target.mkdir()
     for relative in candidate_files:
@@ -154,7 +181,7 @@ def _overlay(baseline: Path, candidate: Path, destination: Path, suite: dict) ->
             controls = _pytest_controls(source)
         except SyntaxError as error:
             raise CandidateViolation('候选实现语法错误：' + relative) from error
-        if controls != _pytest_controls(baseline / suite['package'] / relative):
+        if controls != _pytest_controls(baseline / implementation_dir / relative):
             raise CandidateViolation('候选实现新增或改写 pytest 控制声明：' + relative)
         output = target / relative
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -320,6 +347,7 @@ def _tail(path: Path, limit: int) -> str:
 def _run(options) -> dict:
     """构建并执行可信测试树。@param options 已验证命令参数。@return 最终报告。"""
     suite = SUITES[options.project]
+    _, import_root = _suite_paths(suite)
     baseline = options.baseline_root.resolve(strict=True)
     baseline_files = _files(baseline)
     baseline_digest = _digest(baseline_files)
@@ -368,7 +396,7 @@ def _run(options) -> dict:
         for key in ['PYTEST_ADDOPTS', 'PYTEST_PLUGINS', 'PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP']:
             environment.pop(key, None)
         environment.update(PYTEST_DISABLE_PLUGIN_AUTOLOAD='1', PYTHONDONTWRITEBYTECODE='1',
-            PYTHONNOUSERSITE='1', PYTHONPATH=os.pathsep.join([str(control_root), str(project)]),
+            PYTHONNOUSERSITE='1', PYTHONPATH=os.pathsep.join([str(control_root), str(project / import_root)]),
             HOME=str(home), XDG_CONFIG_HOME=str(home / '.config'), BENCH_NATIVE_CONTROL=str(control_path), **suite['env'])
         argv = [sys.executable, '-m', 'pytest', '-p', '_bench_native_regression_control']
         for _, module in suite['plugins']:
@@ -413,9 +441,10 @@ def _run(options) -> dict:
         xml_skipped = len(list(xml.iter('skipped'))) if xml is not None else 0
         nodes = [{**item, 'outcome': outcomes[item['id']]} for item in collection]
         collection_errors = [error for state in states for error in state['errors']]
-        expected_counts = {name: suite[name] for name in ['passed', 'skipped', 'xfailed']}
+        # 新套件在当前镜像校准真实集合，候选随后必须逐节点匹配；不把历史数量写成准入结果。
+        expected_counts = {name: suite[name] for name in ['passed', 'skipped', 'xfailed'] if name in suite}
         valid = (returncode == 0 and not timed_out and consistent and not collection_errors and xml_bad == 0
-            and len(node_ids) == len(set(node_ids)) == xml_cases == suite['total']
+            and 0 < len(node_ids) == len(set(node_ids)) == xml_cases == suite.get('total', len(node_ids))
             and xml_skipped == counts['skipped'] + counts['xfailed']
             and len(doctests) == suite['doctests'] and all(outcomes[node] == 'passed' for node in doctests)
             and not any(counts[key] for key in ['failed', 'error', 'xpassed', 'unexecuted'])
@@ -480,7 +509,7 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
-else:
+elif os.environ.get('BENCH_NATIVE_CONTROL'):
     # 只在受控 python -m pytest 进程注册 hook，控制脚本本身不提前加载 pytest。
     import pytest
 

@@ -1,0 +1,35 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "JI-M02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "explicit_none_sync": true,
+    "omitted_sync_undefined": true,
+    "false_default": true,
+    "zero_default": true,
+    "empty_default": true,
+    "explicit_none_async": true,
+    "omitted_async_undefined": true,
+    "strict_explicit_none": true,
+    "strict_omitted_undefined": true,
+    "nested_missing": true,
+    "shared_callers": true,
+    "preserved_mapping_dict_items": true,
+    "preserved_mapping_userdict_items": true,
+    "preserved_mapping_readonly_mapping_items": true,
+    "preserved_mapping_duplicate_pairs": true,
+    "preserved_mapping_string_path": true,
+    "preserved_mapping_invalid_pairs_raise": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

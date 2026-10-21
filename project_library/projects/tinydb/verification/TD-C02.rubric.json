@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "task_id": "TD-C02",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "runnable",
+      "requirement": "Provide exactly one complete runnable Python fenced code block accepting the first command-line argument as the JSON path, and an invocation. Native verification must actually persist the two orders, increment only A, close, reopen, query A and print that queried order as JSON; printing expected output alone is insufficient.",
+      "evidence": [
+        "materials/order-example.md"
+      ]
+    },
+    {
+      "id": "existing-api",
+      "requirement": "Use current TinyDB, named table orders, query/update and existing increment or equivalent public update semantics. Do not modify project files, invent save/commit, or put the business records in _default.",
+      "evidence": [
+        "library/tinydb/table.py:179-232",
+        "library/tinydb/table.py:427-480",
+        "library/tinydb/operations.py:52-71"
+      ]
+    },
+    {
+      "id": "reopen",
+      "requirement": "Explain or demonstrate that the query occurs after closing and reopening the same path. Do not promise repeat-import idempotence or transactions outside the request.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and constraints. Accept concise or equivalent valid answers; do not grade keyword matching, answer length, or similarity to a reference answer."
+}

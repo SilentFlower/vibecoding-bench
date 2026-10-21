@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "task_id": "JI-D04",
+  "criteria": [
+    {
+      "id": "dispatch",
+      "requirement": "Explain that the pinned original accepts Mapping in its contract but dispatches only dict to items; other mappings are iterated as pair inputs, so Aa unpacks as A,a and one-character keys fail. Diagnose the frozen original reproduction, not an assumed installed version.",
+      "evidence": [
+        "library/src/jinja2/filters.py:147",
+        "materials/S03/urlencode.md"
+      ]
+    },
+    {
+      "id": "workaround",
+      "requirement": "Give a caller workaround using mapping.items() or dict(mapping). Preserve pair duplicates and string-path slash behavior. Do not edit source for this diagnosis.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate supported behavior, constraints and delivered evidence, not keywords, verbosity or reference-answer similarity.",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044"
+}

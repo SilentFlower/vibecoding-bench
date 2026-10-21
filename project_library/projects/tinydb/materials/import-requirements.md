@@ -1,0 +1,2 @@
+# Import review context
+A finite local input contains about 1,000 objects of shape {"sku": "A", "qty": 1}. There is one writer process. Repeated imports must reconcile by SKU rather than append duplicates. The policy for duplicate SKUs within the file or already present in the database has not been decided in this initial report. Ask for that policy before finalizing the plan. Do not implement the importer or perform a migration.

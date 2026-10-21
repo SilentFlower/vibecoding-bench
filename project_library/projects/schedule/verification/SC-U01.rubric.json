@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "task_id": "SC-U01",
+  "source_commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+  "comparison": "Evaluate behavior, evidence, assumptions and scope. Accept concise equivalent valid answers; do not grade keywords, length, reference wording or a particular patch style.",
+  "criteria": [
+    {
+      "id": "registration-state",
+      "requirement": "Distinguish Scheduler.every creating an unconfigured Job, Job.do binding and registering it, and run_pending/Job.run actually executing it. Registration is not an immediate callback.",
+      "evidence": [
+        "library/schedule/__init__.py:83-121",
+        "library/schedule/__init__.py:644-697"
+      ]
+    },
+    {
+      "id": "isolation-and-file",
+      "requirement": "Two explicit Scheduler instances own independent job lists. Explain the first due time, last_run/next_run, and why the first same-time poll produces no reconciliation file.",
+      "evidence": [
+        "library/schedule/__init__.py:83-121",
+        "library/schedule/__init__.py:644-697"
+      ]
+    },
+    {
+      "id": "read-only",
+      "requirement": "Answer or propose a plan only. Do not edit any repository file; allowed_paths is empty. Native witnesses establish facts or feasibility, while these semantic criteria judge the actual answer.",
+      "evidence": []
+    }
+  ]
+}

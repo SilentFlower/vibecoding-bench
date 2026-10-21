@@ -1,0 +1,55 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "batch-baseline"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "memory": {
+      "list": {
+        "ids": [
+          1,
+          2
+        ],
+        "done": [
+          true,
+          true
+        ]
+      },
+      "generator": {
+        "ids": [
+          1
+        ],
+        "done": [
+          true,
+          false
+        ]
+      }
+    },
+    "json": {
+      "list": {
+        "ids": [
+          1,
+          2
+        ],
+        "done": [
+          true,
+          true
+        ]
+      },
+      "generator": {
+        "ids": [
+          1
+        ],
+        "done": [
+          true,
+          false
+        ]
+      }
+    }
+  },
+  "resource_profile": "business"
+}

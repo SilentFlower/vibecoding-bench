@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "task_id": "JI-P01",
+  "criteria": [
+    {
+      "id": "precedence",
+      "requirement": "Plan ChoiceLoader with the business-unit layer first and shared defaults second; use real existing loader APIs.",
+      "evidence": [
+        "library/src/jinja2/loaders.py:560",
+        "materials/S01/overrides.md"
+      ]
+    },
+    {
+      "id": "errors-refresh",
+      "requirement": "Distinguish TemplateNotFound fallback from syntax/render errors that propagate. Explain reload or explicit cache invalidation plus a new get_template call, and that an already held Template does not update itself.",
+      "evidence": [
+        "library/src/jinja2/environment.py:956"
+      ]
+    }
+  ],
+  "comparison": "Evaluate supported behavior, constraints and delivered evidence, not keywords, verbosity or reference-answer similarity.",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044"
+}

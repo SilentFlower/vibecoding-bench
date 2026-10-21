@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "task_id": "JI-C01",
+  "criteria": [
+    {
+      "id": "configuration",
+      "requirement": "Use the existing select_autoescape policy to escape HTML (including uppercase extensions), preserve literal text in TXT, and make the string-template default explicit. Do not propose manually escaping all input data.",
+      "evidence": [
+        "library/src/jinja2/utils.py:581"
+      ],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "runnable",
+      "requirement": "Provide one complete program conforming to the supplied input.json/stdout contract; execute actual candidate Jinja rendering. Independent native verification must pass. Do not modify files.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate supported behavior, constraints and delivered evidence, not keywords, verbosity or reference-answer similarity.",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044"
+}

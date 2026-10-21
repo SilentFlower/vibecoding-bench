@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SC-C01"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "process_one_registered": 1,
+    "process_two_empty": 0,
+    "independent_instances": true
+  },
+  "resource_profile": "business"
+}

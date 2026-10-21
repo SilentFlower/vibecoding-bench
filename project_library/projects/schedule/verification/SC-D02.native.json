@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SC-D02"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "completion_time_schedule": true,
+    "zero_duration_control": true
+  },
+  "resource_profile": "business"
+}

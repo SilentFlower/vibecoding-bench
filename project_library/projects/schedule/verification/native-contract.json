@@ -1,0 +1,421 @@
+{
+  "baseline_digest": "6cd77aa178866a10690c1fbd9f0539f2a355d244c06d566ab6180ffdbf277c4f",
+  "nodes": [
+    {
+      "id": "test_schedule.py::SchedulerTests::test_align_utc_offset_after_fold_fixate",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_align_utc_offset_no_change",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_align_utc_offset_no_timezone",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_align_utc_offset_with_dst_fold",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_align_utc_offset_with_dst_fold_fixate_1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_align_utc_offset_with_dst_fold_fixate_2",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_align_utc_offset_with_dst_gap",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_at_time",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_at_time_hour",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_at_time_minute",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_cancel_job",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_cancel_jobs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_clear_by_tag",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_daylight_saving_time",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_get_by_tag",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_idle_seconds",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_job_func_args_are_passed_on",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_misconfigured_job_wont_break_scheduler",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_move_to_next_weekday_nextweek",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_move_to_next_weekday_today",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_move_to_next_weekday_tommorrow",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_next_run_property",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_next_run_time",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_next_run_time_day_end",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_next_run_time_hour_end",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_next_run_time_hour_end_katmandu",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_next_run_time_hour_end_london",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_next_run_time_minute_end",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_next_run_time_minute_end_katmhandu",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_next_run_time_minute_end_london",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_next_run_with_tag",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_repr_functools_partial_job_func",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_run_all",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_run_all_with_decorator",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_run_all_with_decorator_args",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_run_all_with_decorator_defaultargs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_run_every_n_days_at_specific_time",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_run_every_weekday_at_specific_time_past_today",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_run_every_weekday_at_specific_time_today",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_run_pending",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_singular_time_units_match_plural_units",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tag_type_enforcement",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_time_range",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_time_range_repr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_time_units",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_to_repr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_to_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_to_string_functools_partial_job_func",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_to_string_lambda_job_func",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_different_simultaneous_dst_change",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_dst",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_dst_ending_point",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_dst_overlap_hour",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_dst_skip_hour",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_dst_starting_point",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_end_month_offset",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_end_year_cross_continent",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_exact_future_scheduling",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_exact_seconds_precision",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_half_hour_offset",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_issue_592",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_issue_605",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_issue_608_before_dst_end",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_issue_608_mid_dst",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_issue_608_post_dst",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_issue_608_pre_dst",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_leap_year",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_midnight",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_new_year_offset",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_opposite_dst_change",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_skip_dst_change",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_daily_utc",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_hourly_intermediate_conversion",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_invalid_timezone_exceptions",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_minutes_year_round",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_weekly_large_interval_backward",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_weekly_large_interval_forward",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_tz_weekly_sunday_conversion",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_until_time",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_schedule.py::SchedulerTests::test_weekday_at_todady",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "schedule",
+  "python": "3.12.15",
+  "schema": 1
+}

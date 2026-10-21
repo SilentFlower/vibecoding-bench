@@ -1,0 +1,18 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "consult"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "unique_program": true,
+    "returncode": 0,
+    "persisted_values": true,
+    "named_table_only": true,
+    "queried_order_printed": true
+  },
+  "resource_profile": "business"
+}

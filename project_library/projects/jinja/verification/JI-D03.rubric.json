@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "task_id": "JI-D03",
+  "criteria": [
+    {
+      "id": "lexer-setting",
+      "requirement": "Locate the source-template trailing newline rule and recommend keep_trailing_newline=True as the minimal existing setting for render and stream.",
+      "evidence": [
+        "library/src/jinja2/lexer.py:685",
+        "materials/S02/newline.md"
+      ]
+    },
+    {
+      "id": "value-boundary",
+      "requirement": "Distinguish source final newlines from newlines supplied inside a variable value. Do not propose rstrip or modifying the stream implementation. Return no_change_needed.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate supported behavior, constraints and delivered evidence, not keywords, verbosity or reference-answer similarity.",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044"
+}

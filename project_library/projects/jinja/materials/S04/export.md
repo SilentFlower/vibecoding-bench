@@ -1,0 +1,3 @@
+# Caller-side stream export
+Template('中文').stream().dump(Path('report.html')) raises AttributeError because Path is treated as a writable object. No library modification is authorized.
+Provide exactly one complete Python code block. Read input.json containing {"text":"中文"}; export its text to report.html using a caller-side Path compatibility conversion, export through caller-owned StringIO to text-stream.txt, and through caller-owned BytesIO to binary-stream.bin with explicit UTF-8. The verifier reads the resulting file bytes and varies the text. Print one JSON object with text_stream_open and binary_stream_open booleans measured after dump. Explain ownership and propagation of write errors. Do not catch errors merely to report success.

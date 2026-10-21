@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "task_id": "JI-C03",
+  "criteria": [
+    {
+      "id": "path-boundary",
+      "requirement": "Explain TemplateStream.dump recognizes str paths and otherwise assumes a writable object; use str(path) as a caller workaround. No library patch is needed.",
+      "evidence": [
+        "library/src/jinja2/environment.py:1585"
+      ],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "streams",
+      "requirement": "Provide one runnable program handling UTF-8 text and caller-owned text/binary streams per the supplied contract. Keep caller-owned streams open, explain who closes them and propagate write/type errors. Native files must contain actual varied input text.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate supported behavior, constraints and delivered evidence, not keywords, verbosity or reference-answer similarity.",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044"
+}

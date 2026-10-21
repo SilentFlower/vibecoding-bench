@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SC-P02"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "reset_and_threshold": true,
+    "healthy_progress": true,
+    "independent_counters": true,
+    "unexpected_propagates": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,22 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "JI-D04"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "dict": "Aa=A%2B1",
+    "userdict": "A=a",
+    "single_key": {
+      "error_type": "ValueError"
+    },
+    "workaround": "Aa=A%2B1",
+    "duplicates": "q=a&q=b",
+    "path": "a/b%20c"
+  },
+  "resource_profile": "business"
+}

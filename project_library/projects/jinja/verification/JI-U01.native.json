@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "JI-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "rendered": "<h1>研发周报</h1><p>完成3项</p><p>修复2项</p><p>待办1项</p>",
+    "changed_context": "<h1>研发周报</h1><p>变更1项</p>"
+  },
+  "resource_profile": "business"
+}

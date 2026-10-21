@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SC-C02"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "chain_overwrites": true,
+    "two_at_times": true,
+    "reports_and_tags": true,
+    "clear_only_group": true
+  },
+  "resource_profile": "business"
+}

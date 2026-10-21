@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "task_id": "SC-C02",
+  "source_commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+  "comparison": "Evaluate behavior, evidence, assumptions and scope. Accept concise equivalent valid answers; do not grade keywords, length, reference wording or a particular patch style.",
+  "criteria": [
+    {
+      "id": "one-time-per-job",
+      "requirement": "Explain that Job.at assigns one at_time; chaining overwrites the previous value. This does not violate a promised multiple-times API.",
+      "evidence": [
+        "library/schedule/__init__.py:457-483",
+        "library/schedule/__init__.py:560-571",
+        "library/schedule/__init__.py:122-160"
+      ]
+    },
+    {
+      "id": "two-jobs",
+      "requirement": "Use two separate daily jobs for the same callback, each with the requested at-time, and a shared tag for inspection/clear. A single job identity is not required; no library extension is necessary.",
+      "evidence": [
+        "library/schedule/__init__.py:457-483",
+        "library/schedule/__init__.py:560-571",
+        "library/schedule/__init__.py:122-160"
+      ]
+    },
+    {
+      "id": "read-only",
+      "requirement": "Answer or propose a plan only. Do not edit any repository file; allowed_paths is empty. Native witnesses establish facts or feasibility, while these semantic criteria judge the actual answer.",
+      "evidence": []
+    }
+  ]
+}

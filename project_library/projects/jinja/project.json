@@ -1,0 +1,402 @@
+{
+  "schema": 2,
+  "project_key": "jinja",
+  "title": "Jinja 报表模板工作场景",
+  "category": "模板与文档生成",
+  "description": "真实固定版本的模板接入、异常诊断、方案咨询与过滤器修复；4 场景、12 稳定任务。",
+  "seed_digest": "9320c12fdfe6e1c5b4cf38faf7c1895c7bfbe578ca4ad8e57eae22f1cc3eb354",
+  "environment": "jinja-py312",
+  "source": {
+    "repository": "https://github.com/pallets/jinja",
+    "commit": "5ef70112a1ff19c05324ff889dd30405b1002044",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "JI-S01",
+      "title": "中文周报与通知接入",
+      "goal": "理解模板流程并评估转义及模板覆盖方案",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "JI-U01",
+            "JI-C01",
+            "JI-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JI-U01",
+          "kind": "understand",
+          "goal": "理解模板引擎职责与周报加载渲染流程",
+          "prompt": "Explain what this pinned Jinja project does and trace a weekly-report template from loader to rendered text. Identify the roles of Environment, Template, context, inheritance and filters, and whether this is a lossless document editor. Do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/S01/brief.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "resolved"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JI-U01.rubric.json",
+            "native": "verification/JI-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "JI-C01",
+          "kind": "consult",
+          "goal": "用现有配置区分网页与纯文本转义",
+          "prompt": "We render both report.html and report.txt from the supplied trusted templates. Propose an existing Jinja configuration so the title <评审> is escaped in HTML and stays literal in plain text. Include one complete runnable Python example following the supplied input/output contract. Do not change the library, templates or other files.",
+          "requires": [],
+          "materials": [
+            "materials/S01/escaping.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "resolved"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JI-C01.rubric.json",
+            "native": "verification/JI-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "JI-P01",
+          "kind": "plan",
+          "goal": "规划业务模板优先与共享默认回退",
+          "prompt": "Design a small template-loading setup where a business unit overrides selected templates and falls back to shared defaults. Use existing Jinja APIs, define precedence and missing-template behavior, and explain how template updates become visible. Give a plan only; do not implement it.",
+          "requires": [],
+          "materials": [
+            "materials/S01/overrides.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JI-P01.rubric.json",
+            "native": "verification/JI-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "JI-S02",
+      "title": "周报异常分诊",
+      "goal": "补齐异常证据并排除缓存与换行的误判",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "JI-D01",
+            "JI-D02",
+            "JI-D03"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "JI-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "JI-D01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JI-D01",
+          "kind": "diagnose",
+          "goal": "先补齐证据再判断渲染异常原因",
+          "prompt": "Our weekly report raises UndefinedError. Is Jinja broken? I have not provided the template, rendering call, input data or traceback yet. Diagnose only as far as the available evidence supports and request the minimum missing material. Do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/S02/symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JI-D01.rubric.json"
+          },
+          "branches": [
+            {
+              "id": "incident-evidence",
+              "when": "No consumed business record says the evidence is unavailable; the answer reasonably asks for the missing template, render call, context or full traceback, and the incident evidence has not yet been disclosed.",
+              "materials": [
+                "disclosure/undefined-reproducer.md"
+              ]
+            },
+            {
+              "id": "certainty-challenge",
+              "when": "No consumed business record says the evidence is unavailable; before incident evidence has been disclosed, the answer asserts a definite cause or reproduction without supporting material.",
+              "materials": [
+                "disclosure/request-evidence.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "JI-D02",
+          "kind": "diagnose",
+          "goal": "定位模板更新后仍输出旧内容的缓存语义",
+          "prompt": "The supplied service keeps an Environment with auto_reload=False. After its DictLoader mapping changes from v1 to v2, a fresh get_template still renders v1. Explain the cause and a minimal existing-API remedy, including what happens to an already-held Template. Do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/S02/cache.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "no_change_needed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JI-D02.rubric.json",
+            "native": "verification/JI-D02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "JI-D03",
+          "kind": "diagnose",
+          "goal": "解释末尾换行规则并选择最小配置",
+          "prompt": "The supplied source template is the exact text \"x\\n\". Both render() and stream() omit its trailing newline under the default environment. Locate the behavior and recommend the smallest existing configuration change. Distinguish source-template newlines from newlines inside variable values. Do not patch Jinja.",
+          "requires": [],
+          "materials": [
+            "materials/S02/newline.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "no_change_needed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JI-D03.rubric.json",
+            "native": "verification/JI-D03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "JI-S03",
+      "title": "模板数据转换修复",
+      "goal": "诊断映射编码并累计修复两个过滤器问题",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "JI-D04",
+            "JI-M01",
+            "JI-M02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "JI-D04"
+          ]
+        },
+        {
+          "id": "repair",
+          "task_ids": [
+            "JI-M01",
+            "JI-M02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JI-D04",
+          "kind": "diagnose",
+          "goal": "解释 UserDict 查询值变成键字符的分派错误",
+          "prompt": "Using the frozen original reproduction, explain why urlencode(UserDict({\"Aa\":\"A+1\"})) produces A=a while the equivalent dict produces Aa=A%2B1. Identify the dispatch error, show a safe caller workaround and delimit affected inputs. Diagnose only; do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/S03/urlencode.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JI-D04.rubric.json",
+            "native": "verification/JI-D04.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "JI-M01",
+          "kind": "modify",
+          "goal": "修复标准 Mapping 编码并保持现有输入兼容",
+          "prompt": "Fix the demonstrated urlencode dispatch bug so standard Mapping implementations are encoded as their items. Preserve dict behavior, duplicate keys in pair iterables and existing string-path quoting. Limit changes to the allowed paths and deliver meaningful public regression tests.",
+          "requires": [],
+          "materials": [
+            "materials/S03/urlencode.md",
+            "materials/S03/repair-boundaries.md"
+          ],
+          "allowed_paths": [
+            "library/src/jinja2/filters.py",
+            "library/tests/test_filters.py",
+            "library/tests/test_async_filters.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JI-M01.rubric.json",
+            "native": "verification/JI-M01.native.json",
+            "semantic": true
+          },
+          "branches": []
+        },
+        {
+          "id": "JI-M02",
+          "kind": "modify",
+          "goal": "区分 map 显式 None 默认值并保留首项修复",
+          "prompt": "Fix map(attribute=\"field\", default=none) so missing fields produce the explicit None default. Omitting default must retain Undefined; existing None, False, 0 and empty-string values must remain unchanged. Cover synchronous and asynchronous templates, deliver public regression tests and preserve the previously accepted Mapping urlencode behavior.",
+          "requires": [
+            {
+              "task_id": "JI-M01",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/S03/map-default.md",
+            "materials/S03/repair-boundaries.md"
+          ],
+          "allowed_paths": [
+            "library/src/jinja2/filters.py",
+            "library/tests/test_filters.py",
+            "library/tests/test_async_filters.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JI-M02.rubric.json",
+            "native": "verification/JI-M02.native.json",
+            "semantic": true
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "JI-S04",
+      "title": "批量生成与导出边界",
+      "goal": "评估异步排序、依赖跟踪与兼容导出",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "JI-C02",
+            "JI-P02",
+            "JI-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JI-C02",
+          "kind": "consult",
+          "goal": "用有界物化解决异步映射后的排序问题",
+          "prompt": "In enable_async=True the supplied rows|map(attribute=\"x\")|sort expression raises TypeError. Explain the sync/async boundary and an existing-filter workaround for our bounded 200-row report. State whether sorting stays fully streaming. Provide one complete runnable async example following the material contract; do not modify files.",
+          "requires": [],
+          "materials": [
+            "materials/S04/async.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "resolved"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JI-C02.rubric.json",
+            "native": "verification/JI-C02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "JI-P02",
+          "kind": "plan",
+          "goal": "规划静态依赖与本次动态依赖的记录边界",
+          "prompt": "Plan dependency tracking for an incremental report builder. The template extends base.html and includes the runtime variable section. Explain what find_referenced_templates proves, what stays unknown and how an application could obtain actual render dependencies without claiming a new built-in Jinja API. Give a plan only.",
+          "requires": [],
+          "materials": [
+            "materials/S04/dependencies.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JI-P02.rubric.json",
+            "native": "verification/JI-P02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "JI-C03",
+          "kind": "consult",
+          "goal": "采用兼容调用导出 Path 并明确文件流所有权",
+          "prompt": "Template.stream().dump(Path(\"report.html\")) raises AttributeError in this checkout. Explain why and provide one complete caller-side example using existing APIs, following the material contract. Cover UTF-8 Chinese text and caller-owned text/binary streams, including ownership. Do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/S04/export.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "resolved"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JI-C03.rubric.json",
+            "native": "verification/JI-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "task_id": "SC-D02",
+  "source_commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+  "comparison": "Evaluate behavior, evidence, assumptions and scope. Accept concise equivalent valid answers; do not grade keywords, length, reference wording or a particular patch style.",
+  "criteria": [
+    {
+      "id": "completion-clock",
+      "requirement": "Job.run invokes the callback, records last_run after completion, and then calls _schedule_next_run. The observed 12:04:30 is consistent with this implementation rather than proof of a scheduling defect.",
+      "evidence": [
+        "library/schedule/__init__.py:674-749"
+      ]
+    },
+    {
+      "id": "cadence-tradeoff",
+      "requirement": "Describe a feasible application-owned cadence or work-offload approach with explicit overlap/backpressure assumptions. Do not invent a fixed_rate option or guarantee hard real-time execution.",
+      "evidence": [
+        "library/schedule/__init__.py:674-749"
+      ]
+    },
+    {
+      "id": "read-only",
+      "requirement": "Answer or propose a plan only. Do not edit any repository file; allowed_paths is empty. Native witnesses establish facts or feasibility, while these semantic criteria judge the actual answer.",
+      "evidence": []
+    }
+  ]
+}

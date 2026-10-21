@@ -1,0 +1,3 @@
+# Authorized correction
+
+Apply delay_seconds only between executions of jobs in the snapshot taken at the start of run_all. With a positive delay of 2 seconds, 0, 1, and 3 jobs must request 0, 0, and 2 sleeps. Maintain the snapshot if callbacks add or cancel jobs. Preserve order, positional/keyword arguments, decorator use, CancelJob handling, and exception propagation. If a callback raises, stop immediately without an extra sleep. Zero-delay sleeps may be omitted. Only library/schedule/__init__.py and library/test_schedule.py may change. Add focused public regression tests. Do not change test configuration, dependencies, or verifier files.

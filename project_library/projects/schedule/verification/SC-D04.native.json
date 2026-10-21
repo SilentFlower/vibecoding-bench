@@ -1,0 +1,24 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SC-D04"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "sleep_counts": [
+      0,
+      1,
+      3
+    ],
+    "sleep_totals": [
+      0,
+      2,
+      6
+    ],
+    "order_preserved": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "task_id": "SC-C01",
+  "source_commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+  "comparison": "Evaluate behavior, evidence, assumptions and scope. Accept concise equivalent valid answers; do not grade keywords, length, reference wording or a particular patch style.",
+  "criteria": [
+    {
+      "id": "fit",
+      "requirement": "The rebuildable single-process daily report fits the documented lightweight in-process use. Distinguish that option from the comparison requirements.",
+      "evidence": [
+        "library/docs/index.rst:50-73",
+        "library/schedule/__init__.py:83-121"
+      ]
+    },
+    {
+      "id": "limits",
+      "requirement": "Do not claim built-in persistence, distributed ownership, cross-machine synchronization, or strict sub-second guarantees. State what application lifecycle or a different scheduling design must provide, without inventing APIs or treating missing promised capabilities as a bug.",
+      "evidence": [
+        "library/docs/index.rst:50-73",
+        "library/schedule/__init__.py:83-121"
+      ]
+    },
+    {
+      "id": "read-only",
+      "requirement": "Answer or propose a plan only. Do not edit any repository file; allowed_paths is empty. Native witnesses establish facts or feasibility, while these semantic criteria judge the actual answer.",
+      "evidence": []
+    }
+  ]
+}

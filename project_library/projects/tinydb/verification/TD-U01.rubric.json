@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "task_id": "TD-U01",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "responsibility",
+      "requirement": "Explain TinyDB as a small document database/library rather than an HTTP service, renderer, relational engine, or server. Trace TinyDB/default-table delegation or table(name), Table data manipulation, and JSONStorage read/write using the frozen code.",
+      "evidence": [
+        "library/tinydb/database.py:87-147",
+        "library/tinydb/table.py:804-849",
+        "library/tinydb/storages.py:119-163"
+      ]
+    },
+    {
+      "id": "table-boundaries",
+      "requirement": "Distinguish the default _default table from the named orders table; their documents and ID spaces are separate. Explain that table('orders') does not redirect later default-table calls.",
+      "evidence": [
+        "library/tinydb/database.py:17-42",
+        "library/tinydb/database.py:245-269"
+      ]
+    },
+    {
+      "id": "persistence",
+      "requirement": "A normal JSONStorage close/reopen at the same path retains committed documents; a fresh MemoryStorage instance does not. Describe database/table/document boundaries without inventing commit/save APIs. No source change is requested.",
+      "evidence": [
+        "library/tinydb/storages.py:80-186"
+      ]
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and constraints. Accept concise or equivalent valid answers; do not grade keyword matching, answer length, or similarity to a reference answer."
+}

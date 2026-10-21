@@ -1,0 +1,40 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "batch"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "memory_list": true,
+    "memory_tuple": true,
+    "memory_iterator": true,
+    "memory_generator": true,
+    "memory_enumeration_failure": true,
+    "memory_boundary_cases": true,
+    "json_list": true,
+    "json_tuple": true,
+    "json_iterator": true,
+    "json_generator": true,
+    "json_enumeration_failure": true,
+    "json_boundary_cases": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "cwd": "library",
+    "argv": [
+      "python",
+      "-m",
+      "pytest",
+      "tests",
+      "-q",
+      "-ra",
+      "-p",
+      "no:cacheprovider"
+    ],
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "JI-M02",
+  "criteria": [
+    {
+      "id": "explicit-default",
+      "requirement": "Explicit None replaces missing fields; omitting default retains Undefined. Existing None, False, 0 and empty-string values retain value and type. Cover sync, async, nested and StrictUndefined paths. Independent business and full upstream regression must pass.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "preserved-capabilities",
+      "requirement": "Preserve the accepted JI-M01 Mapping behavior and shared attrgetter callers such as groupby/sum/unique. Do not globally turn all Undefined into None.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver actual public regression tests for explicit None versus omitted default and sync/async behavior, preserving the earlier Mapping tests. Cite delivered candidate files; do not count fixed oracle results as delivered public tests.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Evaluate supported behavior, constraints and delivered evidence, not keywords, verbosity or reference-answer similarity.",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044"
+}

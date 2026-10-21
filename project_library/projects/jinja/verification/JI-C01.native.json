@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "JI-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "runnable_example": true,
+    "varied_input_count": 2
+  },
+  "resource_profile": "business"
+}

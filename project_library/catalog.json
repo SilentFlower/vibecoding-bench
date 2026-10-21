@@ -2,8 +2,11 @@
   "projects": [
     "python-frontmatter",
     "pydantic-settings",
-    "typer"
+    "typer",
+    "tinydb",
+    "jinja",
+    "schedule"
   ],
   "schema": 2,
-  "version": "real-project-scenarios-v2-en"
+  "version": "real-project-scenarios-v3-en"
 }

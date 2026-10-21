@@ -1,0 +1,3 @@
+list [1, 2] [True, True]
+generator [1] [True, False]
+Both input documents satisfy qty > 0 when the predicate is applied directly. The JSONStorage control produces the same discrepancy. Diagnose this frozen original-version behavior before any repair.

@@ -1,0 +1,53 @@
+{
+  "delay_seconds": 2,
+  "synthetic_callbacks": true,
+  "cases": [
+    {
+      "jobs": 0,
+      "events": []
+    },
+    {
+      "jobs": 1,
+      "events": [
+        [
+          "job",
+          0
+        ],
+        [
+          "sleep",
+          2
+        ]
+      ]
+    },
+    {
+      "jobs": 3,
+      "events": [
+        [
+          "job",
+          0
+        ],
+        [
+          "sleep",
+          2
+        ],
+        [
+          "job",
+          1
+        ],
+        [
+          "sleep",
+          2
+        ],
+        [
+          "job",
+          2
+        ],
+        [
+          "sleep",
+          2
+        ]
+      ]
+    }
+  ],
+  "measurement": "Only schedule.time.sleep is replaced by an event recorder in the isolated business subprocess. Platform timeouts and budgets use the real clock."
+}

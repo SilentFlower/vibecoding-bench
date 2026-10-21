@@ -1,0 +1,1162 @@
+{
+  "baseline_digest": "88f01faa6cabd6211b4c8a1d6b4ec48c8ba2c43d72ead9a37bb583dea1560f40",
+  "nodes": [
+    {
+      "id": "tests/test_middlewares.py::test_caching",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_middlewares.py::test_caching_flush",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_middlewares.py::test_caching_flush_manually",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_middlewares.py::test_caching_json_write",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_middlewares.py::test_caching_read",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_middlewares.py::test_caching_rejects_use_after_close",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_middlewares.py::test_caching_write",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_middlewares.py::test_caching_write_many",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_middlewares.py::test_nested",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_operations.py::test_add_int[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_operations.py::test_add_int[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_operations.py::test_add_str[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_operations.py::test_add_str[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_operations.py::test_decrement[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_operations.py::test_decrement[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_operations.py::test_delete[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_operations.py::test_delete[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_operations.py::test_increment[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_operations.py::test_increment[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_operations.py::test_set[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_operations.py::test_set[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_operations.py::test_subtract[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_operations.py::test_subtract[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_all",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_and",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_any",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_callable_in_path_with_chain",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_callable_in_path_with_map",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_custom",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_custom_with_params",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_custom_with_unhashable_params",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_empty_query_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_eq",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_equality",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_fragment",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_fragment_with_path",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_ge",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_get_item",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_gt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_has",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_has_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_hash",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_le",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_lt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_ne",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_no_path",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_noop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_not",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_one_of",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_or",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_orm_usage",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_path_and",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_path_exists",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_regex",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_regex_flags_affect_hash_and_query_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queries.py::test_subclass",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_storages.py::test_create_dirs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_storages.py::test_custom",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_storages.py::test_custom_with_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_storages.py::test_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_storages.py::test_in_memory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_storages.py::test_in_memory_close",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_storages.py::test_json",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_storages.py::test_json_invalid_directory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_storages.py::test_json_invalid_mode_warning",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_storages.py::test_json_kwargs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_storages.py::test_json_read",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_storages.py::test_json_readwrite",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_storages.py::test_read_once",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_storages.py::test_yaml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_caching[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_caching[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_lru_cache[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_lru_cache[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_multiple_tables[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_multiple_tables[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_next_id[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_next_id[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_one_table[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_one_table[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_persist_empty_does_not_wipe_existing_data",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_persist_table[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_persist_table[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_query_cache[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_query_cache[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_query_cache_size[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_query_cache_size[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_query_cache_with_mutable_callable[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_query_cache_with_mutable_callable[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_table_is_iterable[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_table_is_iterable[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_table_name[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_table_name[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_table_repr[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_table_repr[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_tables_list[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_tables_list[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_truncate_table[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_truncate_table[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_zero_cache_size[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_zero_cache_size[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_access_storage",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_all[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_all[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_contains[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_contains[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_contains_ids[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_contains_ids[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_contains_invalid[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_contains_invalid[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_count[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_count[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_custom_mapping_type_with_json",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_delete",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_doc_id_missing_consistency[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_doc_id_missing_consistency[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_doc_ids_json",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_drop_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_drop_tables[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_drop_tables[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_empty_db_len",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_empty_write",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_gc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_get[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_get[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_get_idempotent[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_get_idempotent[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_get_ids[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_get_ids[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_get_invalid[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_get_invalid[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_get_multiple_ids[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_get_multiple_ids[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_ids[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_ids[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_invalid_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_invalid_type_raises_error[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_invalid_type_raises_error[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_multiple[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_multiple[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_multiple_mixed_document_and_dict[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_multiple_mixed_document_and_dict[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_multiple_with_doc_ids[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_multiple_with_doc_ids[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_multiple_with_ids[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_multiple_with_ids[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_multiple_with_single_dict[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_multiple_with_single_dict[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_on_existing_db",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_valid_mapping_type[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_valid_mapping_type[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_with_doc_id[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_with_doc_id[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_with_duplicate_doc_id[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_insert_with_duplicate_doc_id[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_lambda_query",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_lastid_after_open",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_move_document_between_tables[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_move_document_between_tables[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_multiple_dbs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_query_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_query_cache_documents_are_shared_with_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_remove[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_remove[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_remove_all_fails[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_remove_all_fails[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_remove_ids[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_remove_ids[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_remove_ids_missing[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_remove_ids_missing[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_remove_ids_mixed[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_remove_ids_mixed[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_remove_multiple[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_remove_multiple[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_remove_returns_ids[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_remove_returns_ids[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_search[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_search[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_search_no_results_cache[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_search_no_results_cache[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_search_path[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_search_path[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_storage_access",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_storage_closed_once",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_tinydb_is_iterable[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_tinydb_is_iterable[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_unique_ids",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_all[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_all[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_custom_transform_callable[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_custom_transform_callable[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_ids[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_ids[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_ids_missing[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_ids_missing[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_ids_mixed[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_ids_mixed[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_multiple[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_multiple[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_multiple_operation[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_multiple_operation[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_returns_ids[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_returns_ids[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_transform[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_update_transform[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_upsert[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_upsert[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_upsert_by_id[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tinydb.py::test_upsert_by_id[memory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_freeze",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_lru_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_lru_cache_clear",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_lru_cache_delete",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_lru_cache_falsy_values_bug",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_lru_cache_get",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_lru_cache_iteration_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_lru_cache_none_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_lru_cache_set_multiple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_lru_cache_set_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_lru_cache_unlimited",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_lru_cache_unlimited_explicit",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "pytest-cov",
+      "module": "pytest_cov.plugin",
+      "module_sha256": "7cc8a14b8cc8effa886c40fdfa058459d89686d62c53fea6721750e722a60f40",
+      "version": "7.1.0"
+    }
+  ],
+  "project": "tinydb",
+  "python": "3.12.15",
+  "schema": 1
+}

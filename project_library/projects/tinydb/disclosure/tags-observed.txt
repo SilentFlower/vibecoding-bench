@@ -1,0 +1,5 @@
+Storage: default JSONStorage, one writer, fresh path.
+second_search [{"sku": "A", "tags": ["new", "review"]}]
+after_clear_cache [{"sku": "A", "tags": ["new"]}]
+after_reopen [{"sku": "A", "tags": ["new"]}]
+No update API was called. The complete caller is supplied beside this output.

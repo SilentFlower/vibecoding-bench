@@ -1,0 +1,2 @@
+# Repair contract
+Modify only library/src/jinja2/filters.py, library/tests/test_filters.py, and library/tests/test_async_filters.py. Include regression tests. Do not change dependencies, test configuration, the runner, unrelated APIs, string-path quoting, pair-iterable ordering or duplicate keys. Native acceptance uses independent tests and the frozen full upstream collection; editing public tests cannot replace that collection.

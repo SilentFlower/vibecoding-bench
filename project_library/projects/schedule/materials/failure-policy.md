@@ -1,0 +1,3 @@
+# Application failure policy
+
+`ReportDataError` is a synthetic application exception, not a class provided by Schedule. Handle only that type. Track consecutive failures per wrapped job, reset after success, and return `CancelJob` after the third consecutive failure. A known data failure must not block healthy jobs in that round. Unexpected exceptions, such as TypeError, must propagate. Keep Schedule's default behavior unchanged. Check the sequence failure, success, failure, failure, failure: cancellation occurs on the fifth invocation, not on the fourth. Separate jobs have separate counters. Propose the integration and validation plan only; do not modify files.

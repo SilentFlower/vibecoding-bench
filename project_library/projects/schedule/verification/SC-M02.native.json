@@ -1,0 +1,32 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SC-M02"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "unconfigured_safe": true,
+    "unchanged_state": true,
+    "configured_compatible": true,
+    "no_execution": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "cwd": "library",
+    "argv": [
+      "python",
+      "-m",
+      "pytest",
+      "test_schedule.py",
+      "-q",
+      "-ra",
+      "-p",
+      "no:cacheprovider"
+    ],
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

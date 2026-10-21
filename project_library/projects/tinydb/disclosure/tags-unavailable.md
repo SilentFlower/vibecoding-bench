@@ -1,0 +1,2 @@
+# Reporter follow-up: requested evidence is unavailable
+The caller script, storage configuration, original database file, and complete before/after record were lost. The reporter cannot provide a reproducer or any further incident materials. The only surviving information is the initial symptom. Conclude within that limitation: explain what cannot be established, name the missing evidence and a safe verification plan, and do not claim to have identified or reproduced the cause. No reproduction material is available for this entry.

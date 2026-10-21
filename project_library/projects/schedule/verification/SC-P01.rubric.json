@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "task_id": "SC-P01",
+  "source_commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+  "comparison": "Evaluate behavior, evidence, assumptions and scope. Accept concise equivalent valid answers; do not grade keywords, length, reference wording or a particular patch style.",
+  "criteria": [
+    {
+      "id": "startup-and-periodic",
+      "requirement": "Use an explicit initial call or Job.run and explain registration alone does not run it. Abort startup on callback failure, then poll the recurring job using supported APIs.",
+      "evidence": [
+        "library/schedule/__init__.py:122-211",
+        "library/schedule/__init__.py:644-697"
+      ]
+    },
+    {
+      "id": "inspection-idle",
+      "requirement": "Use tag/get_jobs/clear or equivalent supported operations. Check idle_seconds or next_run for None and choose a bounded default wait for an empty queue; do not perform arithmetic on None or busy-spin.",
+      "evidence": [
+        "library/schedule/__init__.py:122-211",
+        "library/schedule/__init__.py:644-697"
+      ]
+    },
+    {
+      "id": "failure-boundary",
+      "requirement": "Do not invent an immediate-run option or automatic exception handling. A direct Job.run does not automatically consume a returned CancelJob signal; note that distinction if cancellation is relevant to the plan.",
+      "evidence": [
+        "library/schedule/__init__.py:122-211",
+        "library/schedule/__init__.py:644-697"
+      ]
+    },
+    {
+      "id": "read-only",
+      "requirement": "Answer or propose a plan only. Do not edit any repository file; allowed_paths is empty. Native witnesses establish facts or feasibility, while these semantic criteria judge the actual answer.",
+      "evidence": []
+    }
+  ]
+}

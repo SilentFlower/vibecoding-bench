@@ -1,0 +1,20 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "JI-D03"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "default_render": "x",
+    "default_stream": "x",
+    "keep_render": "x\n",
+    "keep_stream": "x\n",
+    "variable_newline": "x\n",
+    "no_source_newline": "x"
+  },
+  "resource_profile": "business"
+}

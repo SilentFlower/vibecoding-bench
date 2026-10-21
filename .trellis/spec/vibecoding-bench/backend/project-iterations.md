@@ -77,7 +77,7 @@ SQLite 的 `PROJECT_SCHEMA` 由 `init_db()` 幂等执行，新增：
 
 **legacy 内容与版本**：内容 schema 1 的 `catalog.json` 为 schema 1；每个项目包含 `project.json`、可运行 `seed/` 和控制端 `verification/`。当前适配协议固定为 `python3 app.py`，逐行输入／输出 JSON。基线代码必须具有自己的业务核心；通用算法与启动脚手架可以复用。每步依赖紧邻前一步并属于明确阶段。
 
-旧 100 个生成项目、生成器和参考运行时保持退役。当前正式 catalog 为内容 schema 2，三个真实项目共 13 场景／20 任务；原生适配与场景执行见后节。legacy 调度回归由 `orchestrator/project_test_content.py` 在临时目录构造夹具；源码变更不代表生产已部署，不删除历史发布及实例成果。
+旧 100 个生成项目、生成器和参考运行时保持退役。当前源码 catalog 为内容 schema 2，六个真实项目共 26 场景／57 任务；原生适配与场景执行见后节。legacy 调度回归由 `orchestrator/project_test_content.py` 在临时目录构造夹具；源码变更不代表生产已部署，不删除历史发布及实例成果。
 
 内容首次注册到 `BENCH_DATA/project-library/releases/<digest>`，旧批次固定旧版本。账号只复制 `seed/`，不挂载参考器或冻结验收目录。内容摘要覆盖相对路径和字节，不包括账号、mtime；拒绝链接、特殊文件及越界路径。快照上限为 128 MiB／10,000 文件，JSON 文件上限为 4 MiB。
 
@@ -167,7 +167,7 @@ control 镜像的项目库、`images/v3/Dockerfile.dockerignore` 放行项、`de
 ### 1. Scope / Trigger
 
 - 修改 `project_scenario_content.py`、`project_scenarios.py`、`project_evaluation.py`、`project_scenario_usage.py`、`project_review_runtime.py`、`project_native_regression.py`、原生验证器、场景 API／页面或正式内容时适用。账号角色、租约、唯一凭据所有者仍遵守 account-runtime-v3；旧线性模式按前节版本读取。
-- 当前正式内容为 `real-project-scenarios-v2-en`，python-frontmatter 4场景／6任务、pydantic-settings 5／7、Typer 4／7，共17个非工程任务和3个工程任务。任务类型固定 `understand/consult/diagnose/plan/modify`，不要求每项目20步。内容就绪、本地模拟机制、真实模型完成及生产部署分别计数。
+- 当前源码内容为 `real-project-scenarios-v3-en`：python-frontmatter 4场景／6任务、pydantic-settings 5／7、Typer 4／7、TinyDB 4／12、Jinja 4／12、schedule 5／13，合计6项目／26场景／57任务，其中48个非工程任务、9个工程任务。线上基线 `ci-39609484070-1` 仍为原3项目／13场景／20任务，本地内容通过不代表已部署。任务类型固定 `understand/consult/diagnose/plan/modify`，不要求每项目20步。内容就绪、本地模拟机制、真实模型完成及生产部署分别计数。
 
 ### 2. Signatures
 
@@ -179,7 +179,10 @@ ProjectVerifier.verify_native(candidate, project_root, specification, environmen
                               *, answer='', regression=False) -> dict
 ProjectScenarios.finish_captured_quota(run_id) -> bool
 observed_model(directory, response, session_id) -> str
+_suite_paths(suite: dict) -> tuple[Path, Path]
 ```
+
+受控回归 CLI 为 `project_native_regression.py --project <SUITES中的key> --baseline-root <原版> (--freeze-baseline-contract <新合同> | --contract <冻结合同> --candidate-root <候选>) --evidence-dir <空目录> [--timeout-sec 600]`，超时范围为1～1800秒。校准与候选回归互斥，不能覆盖既有合同或非空证据目录。
 
 | API | schema 2 内容的公开契约 |
 | --- | --- |
@@ -209,6 +212,8 @@ observed_model(directory, response, session_id) -> str
 
 **内容与离线环境**：内容 schema 2 项目必须固定上游HTTPS GitHub URL、40位commit、seed内许可、seed_digest、environment及可变scenarios/tasks。entry列必要task_ids；branch只选固定披露材料／setup／同场景activate_tasks。requires精确声明answer或code依赖，首版仅同场景无环，code仅引用modify。公开materials与控制verification隔离；setup来源固定，目标仅app/。每项目源码对象上限128MiB／10000文件；环境wheel独立存放，逐制品hash、精确requirements及Python版本冻结，business/regression资源分开，不能把venv放进源码快照。
 
+**材料与评审证据**：首问尚未消费的隐藏复现或业务决策，不能提前写成通用 rubric 的具体事实，也不能无条件放入 `source_evidence`。披露判断依据实际消费对话和公开源码。`allow_candidate_evidence=true` 不仅允许引用候选文件，还会让 satisfied／violated 判定必须给出证据；只读任务没有候选修改文件，不能以空静态 evidence 加该 flag 构造无法满足的规则。确有文件交付的修改任务仍须按冻结清单引用 `candidate:<path>`。
+
 **模型输入与页面语言**：正式内容的 `task.prompt`、`branches[].when`、rubric 的自然语言规则、业务材料中的指令与说明，以及候选的材料包装、quota／timeout／infra 接续、补充与修正、`review_prompt` 均使用英文。`title/category/description`、场景及任务 `goal` 是中文页面字段，`scenario_summary(..., include_tasks=True)` 的浏览项目与路线投影保持中文。固定业务字面、原始代码、报错、帮助与证据原文不翻译；例如英文首问要求 status 为 `已校对`，不能把该验收值替换成英文，也不能仅凭出现汉字拒绝原始资料。语言修正发布新内容版本与评审版本，由内容树重算摘要；不原地改写已冻结的问题、回答或历史发布。schema 2 的通用结构校验不自动推断语言，正式内容需另行逐项核对指令与业务数据边界。
 
 **发布与状态**：新批次paused且只写元数据，首次实际启动才物化场景独立工作区／候选session。同项目至多一个候选写入；逻辑计划默认2任务、通过5任务或局部收口轮换，活动池默认3，共享并发最多2并受账号真实容量约束。任务通过、代码接受、场景收口与批次运行完成分开；只读任务不会创建代码检查点，completed可包含明确失败／耗尽／受阻。
@@ -227,6 +232,8 @@ observed_model(directory, response, session_id) -> str
 
 **原生验证**：`verify_native` 在同批account镜像、UID1000／network none／只读根／无账号凭据内执行；源码、baseline、offline、控制脚本与输入只读，临时运行树隔离。离线准备阶段证明与业务时限分开；环境error只本地有限重试，不投递业务修正。工程回归从固定baseline恢复上游适用集合，核Python／插件／baseline与节点contract，业务通过后真实执行，不只检查声明或退出码0。新原生验证的并发名额覆盖容器清理；清理无法确认时保留阻断记录。内容复制、Docker忽略与源码快照须一致；Typer上游公开.env仅按精确固定路径／摘要保留，不放开其他环境文件。
 
+**原生套件布局与校准**：`SUITES.package` 是可导入模块名，`implementation_dir` 默认按模块点号转路径，`import_root` 默认为 `.`；两路径必须相对、无 `..`，且实现路径等于导入根拼接模块路径。Jinja 固定 `package=jinja2,implementation_dir=src/jinja2,import_root=src`；只叠加实际实现，拒绝实现及父目录链接，恢复 baseline 测试／配置并拒绝新增 pytest 控制声明，实际 import 必须落在受控测试树。新增 TinyDB／Jinja／schedule 套件在目标镜像收集非空、无重复的真实节点并完整执行，冻结 schema／project／baseline_digest／python／plugins／nodes；候选逐节点及结果精确匹配合同。旧三个 suite 保留原硬固定计数和默认布局。新增内容的回归脚本副本与共享可信实现逐 SHA 一致，旧内容私有脚本不原地升级。
+
 **Git 字节保真**：正式 `project_library/**` 和本任务冻结研究证据使用 `-text`，禁止 Git 行尾转换改变已验证摘要。python-frontmatter 固定提交的 `seed/library/AGENTS.md` 按来源文件清单精确保留，忽略例外仅限正式副本与对应研究副本，本地工具 AGENTS.md 仍忽略。提交前从索引导出内容，逐文件核对清单与原始字节，并重新加载 `ProjectLibrary` 比较 catalog 摘要；工作区校验不能替代 Git 导出校验。上游空白、原始帮助输出及统一补丁上下文按原样保存，原创实现仍做空白检查。
 
 ### 4. Validation & Error Matrix
@@ -242,6 +249,8 @@ observed_model(directory, response, session_id) -> str
 | 完整候选／评审输出后quota或重启 | 只续收口与验收，保留Run中断事实，不重复模型输入或计量。 |
 | 新source未许可／许可后尾段不明 | 前者有持久证明可结算未投递；后者保留预留并受阻，不盲给新预算。 |
 | 原生准备异常／业务断言或已进入业务后的超时 | error／failed，前者本地有限重试，后者可用有限业务修正。 |
+| suite 模块／相对路径不匹配、实现或父目录链接、候选错导入安装库 | 拒绝回归；候选源码违规为 failed，不借环境重试接受。 |
+| 冻结合同来源不符／Python或插件漂移／空节点或节点结果不符 | 拒绝；环境漂移须重新校准原版，候选不能靠删测试或退出码零通过。 |
 | 评审实际模型不一致／格式或身份错误 | 评审error，最多一次错误重评，不算业务失败；合法uncertain直接blocked。 |
 | 次数或累计预算先到上限 | exhausted／最终failed或评测blocked，独立任务继续，真实后继依赖受阻。 |
 | 停止、旧generation、非最新作业迟到结果 | 留历史不接受；认证／真正严格清理失败沿原强门禁阻断批次。 |
@@ -254,6 +263,8 @@ observed_model(directory, response, session_id) -> str
 - 代码依赖边界：A接受为作业10、B接受为作业11；以后另一作业把源码回退成A相同字节，不能因此声称B与该回退分支有共同接受父链。使用parent_code_job_id逐作业追溯，无共同链则受阻。
 - 错误用法：配置execution_model为空便让评审使用当前全局默认，或给review另开供应商调用；正确做法是沿原Scheduler，冻结候选实际message.model并在review原生日志再次核对。
 - 错误用法：CLI success、问答passed或批次completed都算代码成功；正确做法是分别显示执行、任务、代码接受及收口分布。固定测试／模拟CLI通过不计真实模型完成数。
+- 正常与边界：TinyDB 的两个修改位于不同场景，分别从原版开始；Jinja M02 声明本场景 M01 的 code 依赖，必须承接真实已接受作业。37 个唯一任务的默认与分支试跑可形成66条路径、10次接受，仍只计37任务与6个唯一修改目标。
+- 错误用法：把 `src/jinja2` 当模块名或使用已安装的 Jinja 代替候选。正确配置模块 `jinja2` 与相对导入根 `src`，并以实际 `__file__` 和完整节点合同核对；只读咨询没有候选文件时，移除不适用的候选证据 flag，保留可由公开资料支持的规则。
 
 ### 6. Tests Required
 
@@ -261,7 +272,9 @@ observed_model(directory, response, session_id) -> str
 - 语言修正：穷举正式首问、分支、材料说明、rubric 与运行时提示，核对英文语义及原授权／验收约束；比较修正前后的中文 `summary(include_steps=True)` 完全相等，新旧内容分别 install／复开仍按各自摘要读取。seed、固定业务输入、原生检查和 wheel 字节保持不变；Unicode 测试夹具与证据原文不作为必须翻译的正式指令。
 - 状态／恢复／父链：`test_project_scenarios.py` 覆盖实际消费认领、澄清不加attempt、3次上限、工作高水位／崩溃预留、review三层预算、候选与review严格释放、完整输出quota／重启只续验收、迟到结果、文件交付进review包、局部轮换／分支激活、代码依赖恢复与不兼容／相同字节回退分支、实际模型漂移不扣业务修正。
 - 协议／用量／私有运行：`test_project_evaluation.py` 覆盖严格单JSON／错误身份／重复项／未知证据／程序失败不能被pass覆盖、合法uncertain、显式candidate证据许可及缓存字段去重／未知；`test_project_review_runtime.py` 覆盖owner刷新身份、创建／停净／缺失／孤儿、清理失败保留holder及资源份额；`test_project_native_verifier.py` 覆盖准备阶段error、业务exit80为failed、清理前不放slot、合法等价程序提取。
-- 原生内容：`python3 scripts/validate-project-library.py` 仅静态摘要／3-13-20；`scripts/validate-project-scenarios.py --project <key> --task <key> --image <隔离账号镜像>` 真实业务，按需 `--candidate/--answer/--entry/--branch/--expect failed`；`--regression-only` 或 `--with-regression` 使用独立回归资源。保留三工程原版失败／参考通过、原生完整集合与skip/xfail证据，不用宿主旧基线替代。
+- 原生内容：`python3 scripts/validate-project-library.py` 仅静态摘要／当前6-26-57；`scripts/validate-project-scenarios.py --project <key> --task <key> --image <隔离账号镜像>` 真实业务，按需 `--candidate/--answer/--entry/--branch/--expect failed`；`--regression-only` 或 `--with-regression` 使用独立回归资源。保留适用工程目标的原版失败／参考通过、原生完整集合与skip/xfail证据，不用宿主旧基线替代。
+- 套件适配：`test_project_native_regression.NativeRegressionTests` 断言 src 叠加恢复原测试／配置、新 pytest hook 拒绝、旧默认不变、父链接与非法路径／模块拒绝、安装库错导入拒绝。目标镜像实际冻结并执行全部节点，再对每个参考候选跑完整适用回归；当前新增原版集合为228／911／81，数字是本轮实测记录，不作为后续套件的通用硬编码。
+- 内容评审协议：逐任务及必要披露／无材料路径构造真实 `review_package` 并执行 `parse_review`，核证据标识与候选文件存在性；隐藏具体事实只有实际消费后可用于相应结论。模拟对账同时统计唯一码、路径、披露消费、业务尝试和接受父链，不能把分支或补充材料当作独立任务。
 - Git 交付：`git check-attr text` 核对冻结数据 `unset`、普通代码保持原规则；`git check-ignore` 验证仅两个固定上游文件可追踪、本地工具文件仍忽略。用 `git checkout-index` 导出拟提交内容，核对文件全集、逐文件字节及 catalog 摘要，覆盖 CRLF 上游文件与被忽略的同名工具说明文件反例。
 - 真实调度与UI：`deploy/v3/run_local_verification.py --manifest <隔离清单> --project-scenarios-only --scenario-capacity 1`，另测容量2；需要UI与失败恢复时加现有 `--scenario-browser`／`--scenario-failures`。核原Scheduler／driver／SQLite、holder容量、私有挂载与AT-only、超时半成品、仅续验收及页面状态／预算／用量对账；模拟CLI证据明确real_model_calls=0。旧project-iterations／project-scheduling、quota／window及普通题库适用回归继续保留。
 

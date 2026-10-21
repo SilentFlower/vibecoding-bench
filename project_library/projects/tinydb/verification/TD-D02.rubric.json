@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "task_id": "TD-D02",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "cause",
+      "requirement": "Use the original-version attached control: the billing and shipping predicates work on their own, but fragment omits the full field path from its cache identity; equal QueryInstances reuse a Table query-cache entry. Link identity/equality to the observed order-dependent results rather than blaming duplicated input or JSON decoding.",
+      "evidence": [
+        "library/tinydb/queries.py:59-114",
+        "library/tinydb/queries.py:489-508",
+        "library/tinydb/table.py:249-301"
+      ]
+    },
+    {
+      "id": "controls",
+      "requirement": "Use the direct-predicate or cleared/disabled-cache comparison to distinguish correct predicate evaluation from cache reuse. State that reverse order can reverse the contaminated result. Clearing/disabling cache is a temporary workaround, not a permanent repair.",
+      "evidence": []
+    },
+    {
+      "id": "boundary",
+      "requirement": "Do not patch files in this diagnostic task, and do not attribute every unexplained search symptom to the same defect. The supplied observations refer to the frozen original version before repair.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and constraints. Accept concise or equivalent valid answers; do not grade keyword matching, answer length, or similarity to a reference answer."
+}

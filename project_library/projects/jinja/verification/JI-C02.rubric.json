@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "task_id": "JI-C02",
+  "criteria": [
+    {
+      "id": "boundary",
+      "requirement": "Explain async map produces an async iterable while sort uses synchronous sorted; for this bounded report materialize with the existing async-aware list filter before sort. A complete sort is not fully streaming or constant memory.",
+      "evidence": [
+        "library/src/jinja2/filters.py:386",
+        "library/src/jinja2/filters.py:1365"
+      ],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "runnable",
+      "requirement": "Provide one complete real async rendering program following input.json/stdout instructions; preserve sorting of duplicate and empty data. Do not modify the library. Independent native execution must pass.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate supported behavior, constraints and delivered evidence, not keywords, verbosity or reference-answer similarity.",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044"
+}

@@ -1,0 +1,5 @@
+Frozen upstream observation with the attached two orders:
+billing [1]
+shipping_after_billing [1]
+shipping_direct [2]
+The same discrepancy is reproduced with JSONStorage. Clearing the query cache before the shipping search gives [2]. Reversing the query order lets the first shipping result contaminate billing instead. Diagnose this frozen original-version observation before any repair.

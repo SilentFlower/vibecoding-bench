@@ -1,0 +1,15 @@
+Pinned checkout observations (independent Scheduler instances):
+
+>>> repr(schedule.Scheduler().every())
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "schedule/__init__.py", line 320, in __repr__
+    unit=(self.unit[:-1] if self.interval == 1 else self.unit),
+          ~~~~~~~~~^^^^^
+TypeError: 'NoneType' object is not subscriptable
+>>> str(schedule.Scheduler().every())
+'Job(interval=1, unit=None, do=None, args=(), kwargs={})'
+>>> repr(schedule.Scheduler().every(2))
+'Every 2 None do [None] (last run: [never], next run: [never])'
+
+Each object has unit=None, job_func=None, last_run=None and next_run=None. No job has been registered in its scheduler. The interval-one formatting branch is the differing case; do not assume every unconfigured interval raises.

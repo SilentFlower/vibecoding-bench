@@ -1,0 +1,18 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SC-C03"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "direct_run_retains": true,
+    "scheduler_consumes": true,
+    "idempotent_cancel": true,
+    "clear_tag_only": true,
+    "export_file": true
+  },
+  "resource_profile": "business"
+}

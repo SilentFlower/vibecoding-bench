@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/work/incident/driver.py", line 7, in <module>
+    scheduler.run_all()
+  File "/source/library/schedule/__init__.py", line 119, in run_all
+    self._run_job(job)
+  File "/source/library/schedule/__init__.py", line 173, in _run_job
+    ret = job.run()
+          ^^^^^^^^^
+  File "/source/library/schedule/__init__.py", line 691, in run
+    ret = self.job_func()
+          ^^^^^^^^^^^^^^^
+  File "/work/incident/callback.py", line 8, in validate_rows
+    raise ValueError("synthetic row amount is missing")
+ValueError: synthetic row amount is missing

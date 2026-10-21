@@ -1,0 +1,53 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "fragment-baseline"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "memory": {
+      "billing_first": [
+        1
+      ],
+      "shipping_after": [
+        1
+      ],
+      "shipping_direct": [
+        2
+      ],
+      "uncached_shipping": [
+        2
+      ],
+      "reversed_first": [
+        2
+      ],
+      "billing_after_reverse": [
+        2
+      ]
+    },
+    "json": {
+      "billing_first": [
+        1
+      ],
+      "shipping_after": [
+        1
+      ],
+      "shipping_direct": [
+        2
+      ],
+      "uncached_shipping": [
+        2
+      ],
+      "reversed_first": [
+        2
+      ],
+      "billing_after_reverse": [
+        2
+      ]
+    }
+  },
+  "resource_profile": "business"
+}

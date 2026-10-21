@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "task_id": "SC-D03",
+  "source_commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+  "comparison": "Evaluate behavior, evidence, assumptions and scope. Accept concise equivalent valid answers; do not grade keywords, length, reference wording or a particular patch style.",
+  "criteria": [
+    {
+      "id": "initial-evidence",
+      "requirement": "The initial symptom does not establish a root cause. Request callback code, registration/polling invocation and the full traceback, or equivalently sufficient evidence. Conditional hypotheses are allowed, but do not claim an unobserved reproduction.",
+      "evidence": [
+        "library/schedule/__init__.py:103-121",
+        "library/schedule/__init__.py:172-176",
+        "library/schedule/__init__.py:674-697",
+        "library/docs/exception-handling.rst"
+      ]
+    },
+    {
+      "id": "after-disclosure",
+      "requirement": "Only after the full incident materials have actually been disclosed, explain the observed callback order, actual exception and propagation by connecting the supplied invocation and traceback to the cited source. Distinguish a supported application-level cause and documented default behavior from an unsupported library-bug claim. Do not demand or infer any particular exception or caller behavior before the evidence is available.",
+      "evidence": [
+        "library/schedule/__init__.py:103-121",
+        "library/schedule/__init__.py:172-176",
+        "library/schedule/__init__.py:674-697",
+        "library/docs/exception-handling.rst"
+      ]
+    },
+    {
+      "id": "complete-and-read-only",
+      "requirement": "Once complete materials are supplied, merely requesting more evidence does not complete this task. Give an application-level handling recommendation with an explicit exception boundary, preserving unexpected exception propagation and the library default. Do not edit repository files.",
+      "evidence": [
+        "library/schedule/__init__.py:103-121",
+        "library/schedule/__init__.py:172-176",
+        "library/schedule/__init__.py:674-697",
+        "library/docs/exception-handling.rst"
+      ]
+    },
+    {
+      "id": "read-only",
+      "requirement": "Answer or propose a plan only. Do not edit any repository file; allowed_paths is empty. Native witnesses establish facts or feasibility, while these semantic criteria judge the actual answer.",
+      "evidence": []
+    }
+  ]
+}

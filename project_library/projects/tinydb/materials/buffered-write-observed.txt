@@ -1,0 +1,1 @@
+The database path was new and empty. With the supplied caller, before_flush_or_close_bytes is 0. After explicit flush, it is greater than zero and a reopened database contains order A. With a normal context-manager exit, the order also survives reopening. The report does not describe a crash after close or a damaged file system.

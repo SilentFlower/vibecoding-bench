@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "task_id": "JI-D01",
+  "criteria": [
+    {
+      "id": "initial-evidence",
+      "requirement": "With only UndefinedError and no reproducible input, do not identify a definite root cause or claim reproduction. Conditional hypotheses and a minimum request for template, render call/context and traceback are appropriate.",
+      "evidence": []
+    },
+    {
+      "id": "available-material",
+      "requirement": "After incident evidence is actually disclosed in the consumed conversation, accurately explain the demonstrated lookup, supplied rendering context and resulting exception, and give a feasible caller-side correction. Distinguish missing root from missing leaf data and the relevant Undefined/StrictUndefined policy. Do not infer any undisclosed reproducer or private diagnosis. If the consumed incident-owner record explicitly states the materials cannot be provided, this evidence-specific diagnosis is not required.",
+      "evidence": []
+    },
+    {
+      "id": "unavailable",
+      "requirement": "Only if the consumed incident-owner record states the missing materials cannot be provided, accept insufficient_information with clear limits and a next-time evidence checklist; never claim a definite diagnosis or reproduction in that path.",
+      "evidence": []
+    },
+    {
+      "id": "read-only",
+      "requirement": "Do not patch Jinja. Request an available disclosure when needed; once complete evidence is supplied, give a supported diagnosis rather than endless clarification.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate supported behavior, constraints and delivered evidence, not keywords, verbosity or reference-answer similarity.",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044"
+}

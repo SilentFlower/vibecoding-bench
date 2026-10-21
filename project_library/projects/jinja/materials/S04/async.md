@@ -1,0 +1,3 @@
+# Bounded asynchronous report
+The service uses Environment(enable_async=True). The expression {{ rows|map(attribute='x')|sort }} raises TypeError: 'async_generator' object is not iterable. Each report has at most 200 rows.
+Provide exactly one complete Python code block. Read input.json containing {"rows":[{"x":"d"},{"x":"a"}]} and print a JSON list of sorted x values using an actual async template render. The verifier varies the rows, including duplicates and an empty list. Use existing filters only, do not modify files or run asyncio.run inside an already running event loop. Explain the bounded materialization cost and why a complete sort is not fully streaming.

@@ -1,0 +1,426 @@
+{
+  "schema": 2,
+  "project_key": "schedule",
+  "title": "schedule 日常调度工作场景",
+  "category": "调度与可靠运行",
+  "description": "真实固定版本的进程内调度接入、排障、方案与兼容修复；5 场景、13 稳定任务。",
+  "seed_digest": "8dd7615bcf48a05cc7f71d9b856eb76ce05e8531c4c41974863a2038ad6665c6",
+  "environment": "schedule-py312",
+  "source": {
+    "repository": "https://github.com/dbader/schedule",
+    "commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "SC-S01",
+      "title": "日常对账接入",
+      "goal": "理解进程内调度并规划最小对账服务",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SC-U01",
+            "SC-C01",
+            "SC-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SC-U01",
+          "kind": "understand",
+          "goal": "理解注册、执行时机与独立调度器状态",
+          "prompt": "Trace how the reconciliation callback is registered and executed. Does registration run it immediately? Do two Scheduler instances share jobs? Explain the relevant state transitions and source symbols. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change. Do not edit repository files.",
+          "requires": [],
+          "materials": [
+            "materials/registration.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SC-C01",
+          "kind": "consult",
+          "goal": "判断进程内调度与持久化、跨机精度的适用边界",
+          "prompt": "Assess the pinned library for the three options in the requirements: a single-process daily report, durable scheduling across restarts, and synchronized sub-second work across machines. Recommend where it fits and where the application needs another design. No library change is requested. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change. Do not edit repository files.",
+          "requires": [],
+          "materials": [
+            "materials/fit-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "recommendation"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SC-P01",
+          "kind": "plan",
+          "goal": "规划启动首跑、轮询、标签停用与空队列待机",
+          "prompt": "Propose a minimal integration plan for one immediate startup reconciliation, recurring execution, tag-based inspection and shutdown, and an idle loop that does not busy-spin when no jobs exist. Use existing public APIs and the supplied failure policy. Discuss the plan only. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change. Do not edit repository files.",
+          "requires": [],
+          "materials": [
+            "materials/service-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SC-S02",
+      "title": "报告迟到或次数变少",
+      "goal": "区分暂停不补跑、回调耗时和多个每日时点需求",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SC-D01",
+            "SC-D02",
+            "SC-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SC-D01",
+          "kind": "diagnose",
+          "goal": "判断暂停后只执行一次是否符合不补跑约定",
+          "prompt": "A one-minute report was registered at 12:00. The process did not poll until 12:30, then polled twice at the same time. Only one report was written. Diagnose whether this matches documented behavior and explain what a catch-up requirement would change. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change. Do not edit repository files.",
+          "requires": [],
+          "materials": [
+            "materials/paused-polling.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "not_a_bug"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-D01.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-D01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SC-D02",
+          "kind": "diagnose",
+          "goal": "解释回调耗时对下一执行时刻的影响",
+          "prompt": "A two-minute job starts at 12:02 and finishes at 12:02:30. Its next run is 12:04:30. Explain this using the pinned implementation and recommend an application-level approach if the requirement is a stable cadence. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change. Do not edit repository files.",
+          "requires": [],
+          "materials": [
+            "materials/callback-duration.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "not_a_bug"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-D02.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-D02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SC-C02",
+          "kind": "consult",
+          "goal": "使用两个现有任务满足每天两个报表时点",
+          "prompt": "The same report is needed daily at 10:00 and 16:00. Chaining at(\"10:00\").at(\"16:00\") keeps one time. Recommend the smallest supported solution and compare the maintenance cost of a new multi-time API. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change. Do not edit repository files.",
+          "requires": [],
+          "materials": [
+            "materials/daily-times.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "existing_api"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SC-S03",
+      "title": "失败后的队列与取消",
+      "goal": "先取得证据诊断异常，再选择取消与有限失败策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SC-D03",
+            "SC-C03",
+            "SC-P02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "SC-D03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SC-D03",
+          "kind": "diagnose",
+          "goal": "先索取完整材料，再定位报表中断与默认异常传播",
+          "prompt": "The scheduled report did not appear today. Determine the smallest missing evidence before assigning a root cause. Request it, then diagnose the supplied reproduction and explain whether changing the library is necessary. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change. Do not edit repository files.",
+          "requires": [],
+          "materials": [
+            "materials/missing-report.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-D03.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-incident",
+              "when": "The synthetic reproduction has not yet been disclosed, and the answer reasonably requests the callback, full traceback and registration/polling invocation (or an equivalently sufficient set). Supply all frozen incident files together.",
+              "materials": [
+                "disclosure/incident-evidence.md",
+                "disclosure/callback.py",
+                "disclosure/driver.py",
+                "disclosure/traceback.txt"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "SC-C03",
+          "kind": "consult",
+          "goal": "区分取消信号、直接运行和按任务或标签取消",
+          "prompt": "Recommend how a one-off export callback removes itself after success, and how an operator cancels one job or a tagged group. Explain the difference between calling Job.run directly and executing through Scheduler. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change. Do not edit repository files.",
+          "requires": [],
+          "materials": [
+            "materials/cancel-export.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "existing_api"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-C03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SC-P02",
+          "kind": "plan",
+          "goal": "设计指定业务异常的连续失败计数与有限取消",
+          "prompt": "Plan an application wrapper that catches only ReportDataError, records consecutive failures per job, cancels that job after three failures, resets after success, and lets healthy jobs continue. Unexpected exceptions must propagate. Keep Schedule unchanged; discuss the plan and its tests only. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change. Do not edit repository files.",
+          "requires": [],
+          "materials": [
+            "materials/failure-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-P02.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-P02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SC-S04",
+      "title": "批量执行尾部等待",
+      "goal": "独立定位并修复快照批次最后一次多余等待",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SC-D04",
+            "SC-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SC-D04",
+          "kind": "diagnose",
+          "goal": "定位批量执行最后一次多余等待",
+          "prompt": "Three short jobs run with run_all(delay_seconds=2). The supplied trace sleeps six seconds rather than four. Locate the extra delay, distinguish it from callback runtime, and describe the smallest compatible correction. Diagnose only. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change. Do not edit repository files.",
+          "requires": [],
+          "materials": [
+            "materials/run-all-trace.json"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-D04.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-D04.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SC-M01",
+          "kind": "modify",
+          "goal": "修复批量执行的尾等待并保持快照与取消语义",
+          "prompt": "Fix Scheduler.run_all so delay_seconds is applied only between jobs in the current snapshot, with no trailing delay. Preserve execution order, snapshot semantics, callback arguments, cancellation and exception propagation. Add focused public regression tests. Do not change unrelated scheduling behavior. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change.",
+          "requires": [
+            {
+              "task_id": "SC-D04",
+              "artifact": "answer"
+            }
+          ],
+          "materials": [
+            "materials/run-all-trace.json",
+            "materials/run-all-contract.md"
+          ],
+          "allowed_paths": [
+            "library/schedule/__init__.py",
+            "library/test_schedule.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SC-S05",
+      "title": "交互查看未配置任务",
+      "goal": "独立解释并修复默认未配置任务的表示异常",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SC-U02",
+            "SC-M02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SC-U02",
+          "kind": "understand",
+          "goal": "解释默认未配置任务的表示异常与正常对照",
+          "prompt": "Explain the difference between repr(Scheduler().every()), str(Scheduler().every()), and repr(Scheduler().every(2)) in the pinned checkout. Identify the unconfigured fields and exact formatting branch responsible for the exception, without assigning a default unit. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change. Do not edit repository files.",
+          "requires": [],
+          "materials": [
+            "materials/interactive.txt"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SC-M02",
+          "kind": "modify",
+          "goal": "安全展示未配置任务并保留已配置格式与状态",
+          "prompt": "Make repr safe for an unconfigured Job, including default interval one. Preserve its unconfigured state and exact representation of configured jobs. Do not assign a default unit, register it, or run a callback merely to format it. Add focused public tests. This independent scenario starts from the original checkout and does not inherit the run_all repair. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change.",
+          "requires": [
+            {
+              "task_id": "SC-U02",
+              "artifact": "answer"
+            }
+          ],
+          "materials": [
+            "materials/interactive.txt",
+            "materials/repr-contract.md"
+          ],
+          "allowed_paths": [
+            "library/schedule/__init__.py",
+            "library/test_schedule.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-M02.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-M02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

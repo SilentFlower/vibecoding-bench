@@ -1,0 +1,3 @@
+# Authorized safe formatting
+
+Make repr safe for a Job that has not finished configuration, including Scheduler().every() and every(2), and for a unit-selected job before do(). Return a nonempty readable string without changing state, registering jobs, or invoking callbacks. Do not choose a default time unit. Keep str behavior and exact configured repr output compatible for intervals one/two, random ranges, at-times, positional/keyword arguments and functools.partial callbacks. Only library/schedule/__init__.py and library/test_schedule.py may change. Add focused public regression tests. This is an independent scenario based on the pinned original checkout: it does not inherit the run_all repair from another scenario.

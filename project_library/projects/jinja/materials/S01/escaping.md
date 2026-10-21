@@ -1,0 +1,3 @@
+# HTML and text outputs
+Trusted report.html and report.txt each contain exactly {{ title }}. Add report.HTML with the same source to check case-insensitive extension selection. The business title is <评审>.
+Provide exactly one complete Python code block. Read input.json, which contains {"title":"<评审>"}, create these trusted templates with DictLoader, and print one JSON object with html, text, upper_html, and string keys. string is from from_string('{{ title }}') using the same environment. Use select_autoescape with the existing documented string-template default. The verifier also runs another title; do not hard-code rendered outputs. Do not write files.

@@ -1,0 +1,3 @@
+updated_ids [1, 1, 2, 2]
+orders [{'sku': 'A', 'qty': 1, 'stage': 'ready'}, {'sku': 'B', 'qty': 1, 'stage': 'ready'}]
+There are still exactly two orders. This report uses a reusable list of rules.

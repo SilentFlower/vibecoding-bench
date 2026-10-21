@@ -1,0 +1,36 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SC-M01"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "no_tail_empty": true,
+    "no_tail_single": true,
+    "between_three": true,
+    "cancel_snapshot": true,
+    "addition_snapshot": true,
+    "arguments_decorator": true,
+    "exception_without_sleep": true,
+    "zero_delay": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "cwd": "library",
+    "argv": [
+      "python",
+      "-m",
+      "pytest",
+      "test_schedule.py",
+      "-q",
+      "-ra",
+      "-p",
+      "no:cacheprovider"
+    ],
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "JI-D02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "cached": [
+      "v1",
+      "v1"
+    ],
+    "after_clear": "v2",
+    "old_template": "v1",
+    "auto_reload": [
+      "v1",
+      "v2"
+    ]
+  },
+  "resource_profile": "business"
+}

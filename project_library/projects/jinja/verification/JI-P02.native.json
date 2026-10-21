@@ -1,0 +1,20 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "JI-P02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "static_references": [
+      "base.html",
+      null
+    ],
+    "render_a": "<main>A</main>",
+    "render_b": "<main>B</main>"
+  },
+  "resource_profile": "business"
+}

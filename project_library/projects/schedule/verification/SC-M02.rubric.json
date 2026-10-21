@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "task_id": "SC-M02",
+  "source_commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+  "comparison": "Evaluate behavior, evidence, assumptions and scope. Accept concise equivalent valid answers; do not grade keywords, length, reference wording or a particular patch style.",
+  "criteria": [
+    {
+      "id": "controlled-repr",
+      "requirement": "All independent native assertions must pass for empty/default/two/selected-unit Jobs, unchanged state and scheduler lists, no callback execution, and exact configured interval/range/at-time/argument/partial representations.",
+      "evidence": [
+        "library/schedule/__init__.py:227-334",
+        "materials/repr-contract.md"
+      ]
+    },
+    {
+      "id": "focused-public-tests",
+      "requirement": "Deliver meaningful focused public tests in library/test_schedule.py for default unconfigured repr, normal str and interval-two contrasts, state preservation and configured compatibility. Inspect actual candidate test assertions; native behavior alone does not fulfill the requested test delivery.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope-regression",
+      "requirement": "Only library/schedule/__init__.py and library/test_schedule.py may change. Preserve configured representations and pass the complete frozen applicable upstream collection. Do not require or import the run_all correction from the separate scene.",
+      "evidence": [
+        "library/schedule/__init__.py:227-334",
+        "materials/repr-contract.md"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "id": "schedule-py312",
+  "adapter": "python-native",
+  "python": "3.12.15",
+  "platform": "linux-amd64",
+  "source_commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+  "requirements": [
+    "pytest==9.1.1",
+    "pytz==2026.5",
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 90,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+      "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+      "size": 386536
+    },
+    {
+      "path": "artifacts/pytz-2026.5-py2.py3-none-any.whl",
+      "digest": "e658af3757f9e26a9d25dd2aff38335acd92bc9104f890a894b2c1ba28311b03",
+      "size": 506342
+    }
+  ],
+  "tested_image": "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+  "verification_status": "verified_target_runtime",
+  "notes": "本轮目标 account 镜像、Python3.12.15、UID1000、无网络、只读来源、256MiB/PID64 实测：原版完整81项通过，无跳过；两个独立参考各81项完整回归，公开回归85/83项通过。业务与回归分别计时，整个校准容器峰值103157760字节；非模型质量证明。",
+  "tested_repo_digest": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+}

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "task_id": "TD-C03",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "buffer",
+      "requirement": "Explain why one successful buffered write can leave a fresh file empty until WRITE_CACHE_SIZE is reached or flush/close is called; this attached case matches the existing implementation and needs no core patch.",
+      "evidence": [
+        "library/tinydb/middlewares.py:76-143",
+        "materials/buffered-write.py"
+      ]
+    },
+    {
+      "id": "normal-exit",
+      "requirement": "Give existing explicit db.storage.flush(), close(), or context-manager usage for a normal script exit and explain the latency/durability tradeoff of buffering. Plain JSONStorage is a relevant alternative when delayed publishing is undesirable.",
+      "evidence": [
+        "library/tinydb/database.py:205-249"
+      ]
+    },
+    {
+      "id": "limits",
+      "requirement": "Acknowledge the remaining crash/power-loss window and lack of cross-process transaction guarantees. A loss after confirmed normal close is a different report and cannot be dismissed by this pre-flush explanation. Do not modify files.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and constraints. Accept concise or equivalent valid answers; do not grade keyword matching, answer length, or similarity to a reference answer."
+}

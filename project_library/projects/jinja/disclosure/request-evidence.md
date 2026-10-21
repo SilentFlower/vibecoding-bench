@@ -1,0 +1,1 @@
+The incident owner asks which evidence supports the definite root-cause claim. No template, render call, input context or full traceback has yet been supplied. Request the minimum evidence before claiming certainty.

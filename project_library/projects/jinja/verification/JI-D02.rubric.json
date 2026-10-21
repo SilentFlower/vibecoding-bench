@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "task_id": "JI-D02",
+  "criteria": [
+    {
+      "id": "cache-cause",
+      "requirement": "Explain the supplied auto_reload=False cache behavior and why fresh get_template still returns v1. This is the documented configuration, not a demonstrated engine bug.",
+      "evidence": [
+        "library/src/jinja2/environment.py:956",
+        "library/src/jinja2/loaders.py:444"
+      ]
+    },
+    {
+      "id": "remedy",
+      "requirement": "Give an existing remedy: enable reload in a suitable environment or clear its cache, then get_template again. State that an already held Template still renders its old compiled source. No code changes are needed.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate supported behavior, constraints and delivered evidence, not keywords, verbosity or reference-answer similarity.",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044"
+}

@@ -1,0 +1,2 @@
+# Incident owner record: evidence unavailable
+The incident owner confirms that the original template, render call, context data, and full traceback were not retained and cannot now be provided. The only surviving fact is that one weekly-report render raised UndefinedError. There is no reproducible sample to disclose in this entry. State the limits of the available evidence, identify the minimum evidence to retain next time, and end as insufficient_information if the cause cannot be established. Do not claim to have reproduced or diagnosed a definite bug.

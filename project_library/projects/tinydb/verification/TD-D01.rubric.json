@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "task_id": "TD-D01",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "ask-evidence",
+      "requirement": "The initial symptom does not identify a cause. Request the caller and mutation sequence, storage/configuration, original/observed values and persistence/reopen control as needed. Conditional hypotheses are allowed; an unsupported definite reproduction or library-bug claim is not.",
+      "evidence": []
+    },
+    {
+      "id": "disclosure",
+      "requirement": "When the actual conversation has no evidence-unavailable record and does not yet contain the caller/reopen control, disclose caller-evidence in response to a reasonable evidence request. A question alone does not finish the normal available-material path.",
+      "evidence": []
+    },
+    {
+      "id": "normal-diagnosis",
+      "requirement": "Only after the actual incident evidence has been consumed, derive its supported explanation by connecting the supplied caller operations, storage configuration and observed persistence controls to the cited source. Distinguish documented API behavior and application effects from a demonstrated library defect. When the evidence is explicitly unavailable, judge the stated limitations instead of requiring any particular diagnosis.",
+      "evidence": [
+        "library/tinydb/table.py:249-301"
+      ]
+    },
+    {
+      "id": "solution-or-limitation",
+      "requirement": "For a disclosed normal case, recommend read-only results, an application-side deep copy if nested mutation is necessary, or supported update APIs for intentional writes; avoid deleting business data or changing core storage. If the actual conversation explicitly says the requested evidence was lost and cannot be supplied, insufficient_information is valid after naming limits, missing materials and a safe verification plan. Do not disclose the normal caller or claim its cause for that unavailable entry.",
+      "evidence": []
+    },
+    {
+      "id": "read-only",
+      "requirement": "Do not change files. The unavailable path is a legitimate concluded diagnostic limitation, not an identified bug or an indefinitely pending task.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and constraints. Accept concise or equivalent valid answers; do not grade keyword matching, answer length, or similarity to a reference answer."
+}

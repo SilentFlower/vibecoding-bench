@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "task_id": "JI-P02",
+  "criteria": [
+    {
+      "id": "static-unknown",
+      "requirement": "find_referenced_templates yields base.html and an unknown dynamic reference represented by None. This is not proof of no dependency or the actual selected section.",
+      "evidence": [
+        "library/src/jinja2/meta.py:62",
+        "materials/S04/dependencies.md"
+      ]
+    },
+    {
+      "id": "runtime-plan",
+      "requirement": "Separate conservative possible dependencies from actual per-render dependencies; offer explicit application dependency registration or a credible existing-API instrumentation plan. Cover cached loads, fallback, deduplication and concurrent render isolation. A loader.get_source hook alone misses cache hits; do not invent a built-in Jinja collector.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate supported behavior, constraints and delivered evidence, not keywords, verbosity or reference-answer similarity.",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044"
+}

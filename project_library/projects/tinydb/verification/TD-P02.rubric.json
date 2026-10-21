@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "task_id": "TD-P02",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "current-guarantees",
+      "requirement": "Describe JSONStorage write as serialization followed by overwrite/flush/fsync/truncate of the current file, not an atomic temporary-file replace or transaction. Do not invent existing AtomicJSONStorage/export_backup/import_backup or automatic backups.",
+      "evidence": [
+        "library/tinydb/storages.py:136-163"
+      ]
+    },
+    {
+      "id": "procedure",
+      "requirement": "Prefer a single-writer stop/close consistent backup point, byte/JSON validation, retention of all named tables and document IDs, protected restore to a checked empty/new destination, and synthetic reopen/next-ID rehearsal. Reject malformed/incompatible backups and unrelated nonempty-target overwrite.",
+      "evidence": []
+    },
+    {
+      "id": "failure-boundaries",
+      "requirement": "Separate current guarantees from proposed future storage work. If discussing atomic replace, identify serialization/temporary-write failure preservation and same-directory/same-filesystem considerations without promising universal crash durability. This is a plan only: do not touch real files or claim an implementation exists.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and constraints. Accept concise or equivalent valid answers; do not grade keyword matching, answer length, or similarity to a reference answer."
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "task_id": "JI-U01",
+  "criteria": [
+    {
+      "id": "purpose",
+      "requirement": "Describe Jinja as a text-template engine, with loader, Environment compilation/cache, Template, context, inheritance and filters in the supplied render path. It is usable without Flask.",
+      "evidence": [
+        "library/src/jinja2/environment.py:956",
+        "materials/S01/brief.md"
+      ]
+    },
+    {
+      "id": "boundary",
+      "requirement": "Explain that rendering produces new text; it is not a lossless frontmatter or Markdown source editor. Keep source files unchanged.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate supported behavior, constraints and delivered evidence, not keywords, verbosity or reference-answer similarity.",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044"
+}

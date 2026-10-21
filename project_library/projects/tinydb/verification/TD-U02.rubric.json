@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "task_id": "TD-U02",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "order",
+      "requirement": "For the supplied reusable-list example, the outer loop visits documents and the inner loop visits rules in list order. A later condition sees earlier in-place changes to that document; reversing the rules can change the result.",
+      "evidence": [
+        "library/tinydb/table.py:531-581"
+      ]
+    },
+    {
+      "id": "ids",
+      "requirement": "Returned IDs record matching rule applications, so [1,1,2,2] can describe two documents matched twice each and is not a duplicate-insert count. Do not propose deduplication or make rule order irrelevant.",
+      "evidence": [
+        "materials/rule-order.py",
+        "materials/rule-order-observed.txt"
+      ]
+    },
+    {
+      "id": "readonly",
+      "requirement": "Explain the current documented/source behavior without creating or accepting a code change. Do not conflate this list case with a one-shot rule stream.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and constraints. Accept concise or equivalent valid answers; do not grade keyword matching, answer length, or similarity to a reference answer."
+}

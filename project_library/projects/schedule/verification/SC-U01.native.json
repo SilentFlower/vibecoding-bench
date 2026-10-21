@@ -1,0 +1,18 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SC-U01"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "not_immediate": true,
+    "separate_schedulers": true,
+    "file_matches": true,
+    "run_state": true,
+    "same_time_no_repeat": true
+  },
+  "resource_profile": "business"
+}

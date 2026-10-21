@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "task_id": "TD-C01",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "fit",
+      "requirement": "Recommend against using the current uncoordinated TinyDB JSON backend directly for four independent writers and cross-table ACID requirements; ground the recommendation in both official scope and actual whole-database read/modify/write behavior.",
+      "evidence": [
+        "library/docs/intro.rst:38-79",
+        "library/tinydb/table.py:804-849"
+      ]
+    },
+    {
+      "id": "guarantees",
+      "requirement": "Do not equate fsync, CachingMiddleware, one successful test, or a context manager with multi-process coordination, atomic file replacement or cross-table transactions.",
+      "evidence": [
+        "library/tinydb/storages.py:136-163",
+        "library/tinydb/middlewares.py:76-143"
+      ]
+    },
+    {
+      "id": "next-step",
+      "requirement": "Give a practical next step such as evaluating an appropriate transactional database and rehearsing a checked migration, or explicitly narrowing requirements to a serialized single-writer application. Include preservation/validation of orders and inventory; do not claim to have implemented or migrated anything.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and constraints. Accept concise or equivalent valid answers; do not grade keyword matching, answer length, or similarity to a reference answer."
+}

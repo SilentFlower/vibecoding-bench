@@ -1,0 +1,3 @@
+# Incident reproduction now supplied
+
+These are the complete synthetic callback and polling files for the incident. The invocation is `python driver.py` in a directory containing callback.py and the pinned Schedule checkout on PYTHONPATH. The application calls Scheduler.run_all; its first registered callback rejects a synthetic row before the second callback can write report.json. The attached traceback is complete for this isolated invocation. No credentials, external service, or private user data are involved. Diagnose this supplied case; do not claim this reproduces another unobserved production failure.

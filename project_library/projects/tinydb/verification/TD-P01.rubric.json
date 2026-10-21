@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "task_id": "TD-P01",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "clarify",
+      "requirement": "Before finalizing SKU reconciliation, ask about duplicate SKUs in the file and in the existing database. If duplicate-policy has not been disclosed, a reasonable request should select that fixed branch; do not invent a policy or conclude a fully specified plan prematurely.",
+      "evidence": []
+    },
+    {
+      "id": "policy",
+      "requirement": "After the actual owner policy has been disclosed, faithfully apply its decisions for duplicates within input and existing data, pre-write checks, preservation and retry behavior. Before disclosure, do not infer or reveal a fixed policy. Request the available owner decision rather than treating the missing policy as a terminal insufficient_information outcome.",
+      "evidence": []
+    },
+    {
+      "id": "api-plan",
+      "requirement": "Use real APIs: insert_multiple can reduce writes for new documents; upsert handles one document and updates every matching document; there is no upsert_multiple. Discuss validation, backup, finite input normalization, lookup/update/insert strategy, batching/buffering tradeoffs and normal flush/reopen checks. Do not call repeated upserts a single atomic transaction.",
+      "evidence": [
+        "library/tinydb/table.py:179-232",
+        "library/tinydb/table.py:583-627",
+        "library/tinydb/middlewares.py:76-143"
+      ]
+    },
+    {
+      "id": "review-only",
+      "requirement": "Deliver an ordered reviewable plan with checks and failure/retry boundaries. Do not implement or execute the importer, claim measured speedup, delete data to gain speed, or promise multi-process safety.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and constraints. Accept concise or equivalent valid answers; do not grade keyword matching, answer length, or similarity to a reference answer."
+}

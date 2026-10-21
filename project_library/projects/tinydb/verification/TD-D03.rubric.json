@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "TD-D03",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "cause",
+      "requirement": "Explain the frozen list/generator control through update_multiple iterating the same updates object inside the document loop: the first document exhausts a one-shot iterator. Show why the second document still matches the predicate, and distinguish exhaustion from a nonmatching rule.",
+      "evidence": [
+        "library/tinydb/table.py:531-581",
+        "materials/generator-reproducer.py"
+      ]
+    },
+    {
+      "id": "workaround",
+      "requirement": "Suggest materializing the known finite small rule stream once at the caller before calling update_multiple. Explain the finite-memory boundary; do not promise support for an unbounded stream or invent a new public method.",
+      "evidence": []
+    },
+    {
+      "id": "readonly",
+      "requirement": "Diagnose and recommend a workaround without changing files. List/tuple controls and empty/nonmatching cases must not be called defective merely because a generator case is defective.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and constraints. Accept concise or equivalent valid answers; do not grade keyword matching, answer length, or similarity to a reference answer."
+}

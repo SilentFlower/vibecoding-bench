@@ -1,0 +1,2 @@
+# Owner decision on duplicate SKUs
+Within an input file, the last occurrence of a SKU wins. If the existing database already contains duplicate orders for any SKU, stop before changing anything, report all conflicts, and preserve the original database. For a conflict-free database, rerunning the same input should reconcile by SKU without adding duplicates. The input is finite and small enough to validate before writes. This is a requested plan, not authorization to execute a migration.
