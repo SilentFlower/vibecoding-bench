@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "task_id": "TN-D04",
+  "source_commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain + builds nested binary wait_combine calls so a deep left tree overflows while one flat combination works. Preserve every original float(sum(...)) grouping, left-to-right calls and opaque custom subclasses. A flat sum can produce 1.0 where the grouped tree gives 0.0 and a custom strategy retains its extra value. Raising recursionlimit or indiscriminate flattening is not a compatible library repair.",
+      "evidence": [
+        "library/tenacity/wait.py:95-108"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Use pinned real APIs and actual consumed materials, cite relevant source symbols and state limits. Native witness facts do not prove an implemented application or answer quality. No library edits or invented APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, business behavior and stated constraints; accept equivalent correct answers without keyword, verbosity or reference-answer matching."
+}

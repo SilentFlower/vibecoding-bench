@@ -1,0 +1,29 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TN-D03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "float_zero": 60,
+    "float_base_zero": 60,
+    "integer_control": 0,
+    "random": 15,
+    "jitter": 60,
+    "draws": [
+      [
+        0,
+        60
+      ],
+      [
+        0,
+        1
+      ]
+    ]
+  },
+  "resource_profile": "business"
+}

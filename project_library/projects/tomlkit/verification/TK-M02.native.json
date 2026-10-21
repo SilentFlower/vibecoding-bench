@@ -1,0 +1,22 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TK-M02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "empty_parent_matrix": true,
+    "flat_delete_bytes": true,
+    "dotted_insertion": true,
+    "explicit_parent_removal": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

@@ -1,0 +1,5 @@
+CREATE TABLE [orders] (
+   [id] INTEGER PRIMARY KEY,
+   [code] INTEGER
+)
+{'id': 200, 'code': 7}

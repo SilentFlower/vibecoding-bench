@@ -1,0 +1,434 @@
+{
+  "schema": 2,
+  "project_key": "tomlkit",
+  "title": "TOMLKit 配置保真工作场景",
+  "category": "配置与文档编辑",
+  "description": "真实固定版本的保真接入、解析诊断、兼容方案与独立修复；5 场景、12 稳定任务。",
+  "seed_digest": "3bed3305cd2ed71e2dc402c2102f17b17f9f08b5557ad380a10876eaca2e0da3",
+  "environment": "tomlkit-py312",
+  "source": {
+    "repository": "https://github.com/python-poetry/tomlkit",
+    "commit": "eddd27e43a62fe58707c311bfad2f52e72493f53",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/tests/toml-test/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TK-S01",
+      "title": "配置编辑接入与局部保真",
+      "goal": "理解文档树，使用既有 API 安全编辑字面值与带点键",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TK-U01",
+            "TK-C01",
+            "TK-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TK-U01",
+          "kind": "understand",
+          "goal": "这个项目与普通 dict 或标准库 TOML 读取有什么区别？适合编辑配置到什么程度？",
+          "prompt": "Explain how this pinned TOMLKit checkout parses, represents, edits, and serializes a TOML configuration. Distinguish semantic values from retained layout and comments, explain the roles of TOMLDocument, Table, InlineTable, Array, and Trivia, and state the documented layout-preservation limit. Do not edit files or claim every possible mutation is byte-preserving.",
+          "requires": [],
+          "materials": [
+            "materials/editor-context.md",
+            "materials/editor-sample.toml"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "understood"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TK-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/TK-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TK-C01",
+          "kind": "consult",
+          "goal": "改配置端口和名称，怎么保留评论与原单引号？新值含单引号怎么办？",
+          "prompt": "Using existing public APIs only, provide exactly one complete Python fenced block defining update_config(source: str, name: str, port: int) -> str. Update the supplied name and server.port while retaining untouched text and comments. Keep the original single-line literal quoting when the new name fits it; otherwise fall back to a valid basic string with the same semantic value. Explain why assigning a plain str alone does not promise preservation of the old quote style. Do not modify library files.",
+          "requires": [],
+          "materials": [
+            "materials/leaf-edit.toml",
+            "materials/leaf-edit.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "usable_example"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TK-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/TK-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TK-C02",
+          "kind": "consult",
+          "goal": "io.containerd.grpc.v1.cri 是一个插件名，为什么按点切路径找不到？怎样只更新其镜像？",
+          "prompt": "The supplied configuration uses [plugins.\"io.containerd.grpc.v1.cri\"]. Provide exactly one complete Python fenced block defining update_plugin(source: str, image: str) -> str that updates only its sandbox_image. Explain literal string keys versus dotted-key construction in this version. Use public existing APIs, retain unrelated plugins and comments, and do not add a new path-query API or modify the library.",
+          "requires": [],
+          "materials": [
+            "materials/plugins.toml"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "usable_example"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TK-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/TK-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TK-S02",
+      "title": "解析失败与方言兼容",
+      "goal": "先取得诊断证据，区分解析方言并规划兼容发布",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TK-D01",
+            "TK-D02",
+            "TK-P01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "TK-D01"
+          ],
+          "materials": [
+            "disclosure/parse-unavailable.md"
+          ]
+        },
+        {
+          "id": "dialect_plan",
+          "task_ids": [
+            "TK-D02",
+            "TK-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TK-D01",
+          "kind": "diagnose",
+          "goal": "只知道配置报 ParseError，能直接说库有 BUG 吗？",
+          "prompt": "Our configuration loader raises ParseError. I have not provided the exact TOML, loading call, full error, or runtime version. Assess only what the current evidence supports and request the smallest useful reproducer before claiming a root cause. Do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/parse-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "no_change_needed",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TK-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "parse-reproducer",
+              "when": "The requested evidence has not yet been disclosed and the actual conversation does not say it is unavailable. The answer reasonably requests the exact TOML, loading call, full error and runtime version, or an equivalently sufficient minimal reproducer. Supply the frozen incident evidence together.",
+              "materials": [
+                "disclosure/parse-reproducer.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "TK-D02",
+          "kind": "diagnose",
+          "goal": "同一配置 TOMLKit 能读，Python 3.12 的 tomllib 不接受，是谁解析错了？",
+          "prompt": "The pinned TOMLKit reads the supplied configuration containing v = \"\\e\", while Python 3.12 tomllib rejects it. Explain the dialect boundary using the actual code and declared TOML support. Verify an equivalent TOML 1.0-compatible spelling and state whether this evidence justifies patching either parser. Diagnose only; do not modify files.",
+          "requires": [],
+          "materials": [
+            "materials/dialects.toml",
+            "materials/dialect-reproducer.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "no_change_needed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TK-D02.rubric.json",
+            "semantic": true,
+            "native": "verification/TK-D02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TK-P01",
+          "kind": "plan",
+          "goal": "编辑端支持1.1，运行端还用Python3.12，怎么避免发布到不能读的配置？",
+          "prompt": "Using the accepted dialect diagnosis, plan a configuration publishing flow for a TOMLKit editor whose downstream consumers must remain on Python 3.12 tomllib. Address pre-existing human-authored TOML 1.1 syntax, generated values, validation before replacement, and preserving semantic values. State the limits of format preservation during explicit conversion. Provide a plan only; do not invent an existing TOMLKit version= or toml_version= parameter or implement a new converter.",
+          "requires": [
+            {
+              "task_id": "TK-D02",
+              "artifact": "answer"
+            }
+          ],
+          "materials": [
+            "materials/publish-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "plan_ready"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TK-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/TK-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TK-S03",
+      "title": "数组扩容一致性",
+      "goal": "独立诊断并修复原位重复后的逻辑与文本分歧",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TK-D03",
+            "TK-M01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "TK-D03"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "TK-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TK-D03",
+          "kind": "diagnose",
+          "goal": "配置数组乘二后内存是四项，为什么写出来还是两项？",
+          "prompt": "With the complete supplied reproducer, an Array referenced from a document is repeated in place. Its Python values change but dumps still shows the old values. Locate the exact split in representations, compare *= 0, *= 1, and *= 2, and give a bounded caller workaround for doubling using existing APIs. Diagnose only; do not edit library files.",
+          "requires": [],
+          "materials": [
+            "materials/array-reproducer.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TK-D03.rubric.json",
+            "semantic": true,
+            "native": "verification/TK-D03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TK-M01",
+          "kind": "modify",
+          "goal": "修复 Array 的 *=，保留文档绑定、合法格式和现有数组操作。",
+          "prompt": "Fix in-place repetition for Array in the supplied reproducer. The same Array object must remain bound to the document, and its values, index operations, unwrap, and serialized TOML must agree after valid repetition counts. Follow Python list index-count semantics, preserve exact text for *= 1, and retain existing comments and the behavior of unrelated array operations. Changes to formatting may be local to material newly added or cleared by repetition. Include regression tests within the allowed paths.",
+          "requires": [],
+          "materials": [
+            "materials/array-reproducer.py",
+            "materials/array-repair.md"
+          ],
+          "allowed_paths": [
+            "library/tomlkit/items.py",
+            "library/tests/test_items.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TK-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/TK-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TK-S04",
+      "title": "inline 点分配置删除",
+      "goal": "独立诊断并修复叶子删除后的空父表与分隔符",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TK-D04",
+            "TK-M02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "TK-D04"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "TK-M02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TK-D04",
+          "kind": "diagnose",
+          "goal": "删除 inline 配置的最后子字段后，为什么出现两个逗号，甚至空父表消失？",
+          "prompt": "After deleting only t.b.c from the complete supplied inline-table example, the logical tree still contains b = {}, but rendering is invalid or omits that empty parent. Explain the rendering path and distinguish deletion of a leaf from deletion of its parent. Do not modify files or silently redefine empty-parent retention.",
+          "requires": [],
+          "materials": [
+            "materials/inline-delete-reproducer.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TK-D04.rubric.json",
+            "semantic": true,
+            "native": "verification/TK-D04.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TK-M02",
+          "kind": "modify",
+          "goal": "删除叶子时保留仍存在的空父表，不影响普通 inline 删除的既有排版。",
+          "prompt": "Fix inline-table rendering after deleting the last leaf of a dotted child. Deleting the leaf must retain every still-present parent as an explicit empty inline table at the correct path, and the result must parse to the independently expected logical tree. Preserve ordinary flat-key deletion output, untouched documents, sibling values, ordering, and existing dotted-child insertion. Keep the change limited to the allowed paths and add regression coverage.",
+          "requires": [],
+          "materials": [
+            "materials/inline-delete-reproducer.py",
+            "materials/inline-repair.md"
+          ],
+          "allowed_paths": [
+            "library/tomlkit/items.py",
+            "library/tests/test_items.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TK-M02.rubric.json",
+            "semantic": true,
+            "native": "verification/TK-M02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TK-S05",
+      "title": "编码扩展与写盘边界",
+      "goal": "使用已有自定义编码器并规划调用方安全写盘",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TK-C03",
+            "TK-P02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TK-C03",
+          "kind": "consult",
+          "goal": "导出含 Path 值的配置，现有 API 能处理吗？怎样避免给后续导出遗留规则？",
+          "prompt": "Use existing APIs to encode supplied pathlib.PurePath values as TOML strings. Give exactly one complete Python fenced block defining render_artifact(path) -> str, including cleanup when encoding succeeds or raises. Explain that encoder registration is process-global and that a try/finally cleanup is not concurrent isolation. Unsupported types must still fail rather than being blindly stringified. Do not modify TOMLKit or read the filesystem.",
+          "requires": [],
+          "materials": [
+            "materials/encoder-context.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "usable_example"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TK-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/TK-C03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TK-P02",
+          "kind": "plan",
+          "goal": "工具修改配置时如何保留换行，避免写失败破坏旧文件和覆盖同事改动？",
+          "prompt": "Plan a local configuration editing workflow around the actual TOMLFile API. Preserve existing LF, CRLF, or mixed line endings, prevent partial writes from replacing the original, and detect stale edits among cooperating writers. Distinguish atomic replacement, conflict detection, and crash durability. Specify caller-side responsibilities and a test plan; do not implement the feature or invent existing atomic=, expected_digest=, or lock parameters on TOMLFile.write.",
+          "requires": [],
+          "materials": [
+            "materials/file-edit-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "plan_ready"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TK-P02.rubric.json",
+            "semantic": true,
+            "native": "verification/TK-P02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

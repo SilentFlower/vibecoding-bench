@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "startup"
+  ],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "cwd_independent": true,
+    "missing_stops_application": true,
+    "missing_mapping": true
+  },
+  "resource_profile": "business"
+}

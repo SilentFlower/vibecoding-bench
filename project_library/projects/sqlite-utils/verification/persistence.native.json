@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "persistence"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "file_cli_python_sqlite": true,
+    "memory_does_not_persist": true
+  },
+  "resource_profile": "business"
+}

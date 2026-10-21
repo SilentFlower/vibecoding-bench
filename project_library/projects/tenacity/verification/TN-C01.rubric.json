@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "task_id": "TN-C01",
+  "source_commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use existing retry_if_exception_type(FileNotFoundError) and stop_after_attempt(3) for the stated transient boundary. Bad JSON must propagate immediately and permanent absence must end after three total calls. Do not recommend retrying every Exception or all OSError indiscriminately, or a library change.",
+      "evidence": [
+        "library/tenacity/__init__.py:434-507"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Use pinned real APIs and actual consumed materials, cite relevant source symbols and state limits. Native witness facts do not prove an implemented application or answer quality. No library edits or invented APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, business behavior and stated constraints; accept equivalent correct answers without keyword, verbosity or reference-answer matching."
+}

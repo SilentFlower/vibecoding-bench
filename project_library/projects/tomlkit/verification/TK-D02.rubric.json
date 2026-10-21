@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "task_id": "TK-D02",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Connect declared TOML 1.1 support and actual escape parsing to Python 3.12 TOML 1.0 consumers. Verify the equivalent U+001B value using the compatible Unicode escape; parser disagreement alone does not demonstrate a bug, and invalid duplicate definitions are not excused by dialect differences.",
+      "evidence": [
+        "library/README.md:16-30",
+        "library/tomlkit/parser.py:815-870"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Answer this task using the pinned public APIs, actual consumed materials and independent native facts. State assumptions and limits, cite relevant source symbols, and do not modify files or invent unsupported APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and authorized constraints. Accept equivalent valid answers; do not grade keywords, verbosity or reference-answer similarity.",
+  "source_commit": "eddd27e43a62fe58707c311bfad2f52e72493f53"
+}

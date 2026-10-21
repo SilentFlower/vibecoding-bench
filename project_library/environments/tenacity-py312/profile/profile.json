@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "id": "tenacity-py312",
+  "adapter": "python-native",
+  "platform": "linux-amd64",
+  "python": "3.12.15",
+  "requirements": [
+    "attrs==26.1.0",
+    "idna==3.20",
+    "iniconfig==2.3.1",
+    "outcome==1.3.0.post0",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==9.1.1",
+    "sniffio==1.3.1",
+    "sortedcontainers==2.4.0",
+    "tornado==6.5.10",
+    "trio==0.34.0"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 90,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/attrs-26.1.0-py3-none-any.whl",
+      "digest": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+      "size": 67548
+    },
+    {
+      "path": "artifacts/idna-3.20-py3-none-any.whl",
+      "digest": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+      "size": 69583
+    },
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/outcome-1.3.0.post0-py2.py3-none-any.whl",
+      "digest": "e771c5ce06d1415e356078d3bdd68523f284b4ce5419828922b6871e65eda82b",
+      "size": 10692
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+      "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+      "size": 386536
+    },
+    {
+      "path": "artifacts/sniffio-1.3.1-py3-none-any.whl",
+      "digest": "2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2",
+      "size": 10235
+    },
+    {
+      "path": "artifacts/sortedcontainers-2.4.0-py2.py3-none-any.whl",
+      "digest": "a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0",
+      "size": 29575
+    },
+    {
+      "path": "artifacts/tornado-6.5.10-cp39-abi3-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+      "digest": "bdf942448169e5336451d0494d7e3d81cfa726d5aa312affdc4682dd62a62f6d",
+      "size": 467096
+    },
+    {
+      "path": "artifacts/trio-0.34.0-py3-none-any.whl",
+      "digest": "6c7c9f49917694dcdcd5f67abd168df5599eca480d61f29854d17a61a75c2f05",
+      "size": 511840
+    }
+  ],
+  "source_commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+  "verification_status": "verified_target_runtime",
+  "notes": "当前固定account镜像Python3.12.15、UID1000/无网/只读来源下完成全部业务及两独立参考完整185主项＋15子测试回归。业务30秒/256MiB/PID64，回归独立90秒/512MiB/PID64，均实际通过。原版校准子进程峰值72756KiB只代表该测量口径，非所有角色总资源或真实模型成绩。README.rst上游link blob按原目标字节保存为普通文件，无实际链接。",
+  "tested_image": "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+  "tested_repository_digests": [
+    "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+  ],
+  "tested_image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+}

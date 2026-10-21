@@ -1,0 +1,40 @@
+--- a/library/src/dotenv/main.py
++++ b/library/src/dotenv/main.py
+@@ -239,6 +239,10 @@
+     modifying a file at a potentially untrusted path. If you don't need this
+     protection and need symlinks to be followed, use `follow_symlinks`.
+     """
++    # 在进入rewrite前拒绝跨行键，避免创建文件或临时文件。
++    if "\r" in key_to_set or "\n" in key_to_set:
++        raise ValueError("key must not contain CR or LF")
++
+     if isinstance(dotenv_path, str):
+         dotenv_path = os.path.expanduser(dotenv_path)
+     else:
+--- a/library/tests/test_main.py
++++ b/library/tests/test_main.py
+@@ -948,3 +948,24 @@
+     result = dotenv.dotenv_values(stream=io.StringIO(string))
+ 
+     assert result == expected
++
++
++@pytest.mark.parametrize("key", ["REPORT\nREGION", "REPORT\rREGION", "REPORT\r\nREGION"])
++@pytest.mark.parametrize("present", [True, False])
++def test_set_key_rejects_newline_before_rewrite(tmp_path, monkeypatch, key, present):
++    """跨行键不能触发rewrite或创建目标。@param tmp_path 临时目录。@param monkeypatch 测试替换。@param key 键。@param present 目标状态。@return None。"""
++    path = tmp_path / "synthetic.env"
++    content = b"COLOR=blue\r\n"
++    if present:
++        path.write_bytes(content)
++    entries = list(tmp_path.iterdir())
++
++    def forbidden(*args, **kwargs):
++        """一旦进入rewrite即说明拒绝太迟。@param args 位置参数。@param kwargs 关键字参数。@return 不返回。"""
++        pytest.fail("rewrite entered before rejecting key")
++
++    monkeypatch.setattr(dotenv.main, "rewrite", forbidden)
++    with pytest.raises(ValueError):
++        dotenv.set_key(path, key, "ready")
++    assert list(tmp_path.iterdir()) == entries
++    assert path.read_bytes() == content if present else not path.exists()

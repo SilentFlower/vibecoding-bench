@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "task_id": "TN-C03",
+  "source_commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "At elapsed 2, upcoming 4 or 3 crosses or reaches the limit 5 for stop_before_delay; upcoming 2 does not. stop_after_delay tests completed elapsed time only. Neither interrupts a synchronous function already blocked or retroactively cancels first success. Recommend the scheduling boundary and separate outer operation deadline responsibility.",
+      "evidence": [
+        "library/tenacity/stop.py:100-138"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Use pinned real APIs and actual consumed materials, cite relevant source symbols and state limits. Native witness facts do not prove an implemented application or answer quality. No library edits or invented APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, business behavior and stated constraints; accept equivalent correct answers without keyword, verbosity or reference-answer matching."
+}

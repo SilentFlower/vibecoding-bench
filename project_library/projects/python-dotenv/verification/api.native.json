@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "api"
+  ],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "mapping_only": true,
+    "default_environment": true,
+    "override_environment": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "task_id": "DE-D04",
+  "source_commit": "0b2880591780a426b0551436f47a17e7a76d954f",
+  "criteria": [
+    {
+      "id": "correctness",
+      "requirement": "Trace direct key formatting in set_key and record/key grammar in the parser. Explain why returned success does not guarantee that the original multiline key round-trips. Recommend explicit rejection of CR/LF before rewriting rather than silent transformation; preserve ordinary and Unicode keys.",
+      "evidence": [
+        "library/src/dotenv/main.py:224-286",
+        "library/src/dotenv/parser.py:112-134",
+        "materials/key-reproduction.md"
+      ]
+    },
+    {
+      "id": "read-only",
+      "requirement": "Answer or plan only; allowed_paths is empty and no code checkpoint is requested. Native witnesses establish source/API facts or feasibility; the semantic review must still assess the actual answer and its assumptions.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and explicit constraints. Accept concise or equivalent valid answers; do not grade keyword matching, length or similarity to a reference."
+}

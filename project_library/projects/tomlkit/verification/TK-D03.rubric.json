@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "task_id": "TK-D03",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Identify inherited list in-place repetition bypassing Array logical/render/index maintenance. Ground count 0/1/2 observations in the supplied reproducer and distinguish unrelated numeric arithmetic. Give a bounded doubling workaround with a finite snapshot, not iteration over a growing live array.",
+      "evidence": [
+        "library/tomlkit/_types.py:44-57",
+        "library/tomlkit/items.py:1421-1508"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Answer this task using the pinned public APIs, actual consumed materials and independent native facts. State assumptions and limits, cite relevant source symbols, and do not modify files or invent unsupported APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and authorized constraints. Accept equivalent valid answers; do not grade keywords, verbosity or reference-answer similarity.",
+  "source_commit": "eddd27e43a62fe58707c311bfad2f52e72493f53"
+}

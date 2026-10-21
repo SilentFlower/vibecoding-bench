@@ -1,0 +1,423 @@
+{
+  "schema": 2,
+  "project_key": "sqlite-utils",
+  "title": "sqlite-utils 本地数据整理工作场景",
+  "category": "数据处理",
+  "description": "固定真实工程的订单接入、导入分诊、全文搜索与转换隔离；4 场景、13 稳定任务。",
+  "seed_digest": "ad04f5bd2eab0ed5a5df85293e9e4a4d93c3fd0dfbe1212f30f668a87a971eb9",
+  "environment": "sqlite-utils-py312",
+  "source": {
+    "repository": "https://github.com/simonw/sqlite-utils",
+    "commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "SQ-S01",
+      "title": "本地订单接入与重复导入",
+      "goal": "理解单机数据路径并规划保留已有备注的可重复导入",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SQ-U01",
+            "SQ-C01",
+            "SQ-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SQ-U01",
+          "kind": "understand",
+          "goal": "理解 API、CLI 与本地文件的数据路径",
+          "prompt": "Explain this pinned project purpose and trace the supplied local order import from CLI through Database and Table to the SQLite file. Compare Python and CLI entry points, file versus memory databases, and what persists after exit. Ground the explanation in current code. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/local-import.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "understood"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SQ-U01.rubric.json",
+            "native": "verification/persistence.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SQ-C01",
+          "kind": "consult",
+          "goal": "判断单机整理与共享应用的适用边界",
+          "prompt": "Assess this pinned library for a single-writer local reporting script, a browser-based multi-user editing application and distributed job scheduling. Explain which existing APIs cover the needs and which require application components. No library change is requested.",
+          "requires": [],
+          "materials": [
+            "materials/fit-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SQ-C01.rubric.json",
+            "native": "verification/persistence.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SQ-P01",
+          "kind": "plan",
+          "goal": "规划保留备注的可重复订单导入",
+          "prompt": "Plan repeatable local order import with existing APIs: stable text IDs, unique IDs per finite file, later supplied quantities replace earlier values, and omitted memo fields are preserved. Explain validation, prospective schema, reruns and recovery boundaries. Provide a plan only.",
+          "requires": [],
+          "materials": [
+            "materials/upsert-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "plan_ready"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SQ-P01.rubric.json",
+            "native": "verification/upsert.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SQ-S02",
+      "title": "导入证据与数据语义",
+      "goal": "先收集错误材料，再区分格式、类型推断与空值政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SQ-D01",
+            "SQ-D02",
+            "SQ-C02"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "SQ-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SQ-D01",
+          "kind": "diagnose",
+          "goal": "补齐导入材料后判断是否需要改库",
+          "prompt": "Our order import failed. The exact command, sample format and complete error output have not been provided. Diagnose only as far as the actual evidence supports and request the smallest useful materials. Do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/import-report.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SQ-D01.rubric.json"
+          },
+          "branches": [
+            {
+              "id": "import-evidence",
+              "when": "The actual conversation has no evidence-unavailable record, the incident command/input/error have not already been disclosed, and the candidate reasonably requests the invocation, sample format or complete error. Deliver the fixed incident evidence once. Do not disclose it for an explicitly unavailable incident.",
+              "materials": [
+                "disclosure/import-evidence.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "SQ-D02",
+          "kind": "diagnose",
+          "goal": "诊断首批类型推断与前导零丢失",
+          "prompt": "The supplied importer inserts 200 integer code values followed by string 007, but the final value reads as integer 7. Diagnose table creation, batch inference and SQLite affinity. Give a safe prospective schema/input policy and explain limits of recovering already-lost zeros. Do not change the library.",
+          "requires": [],
+          "materials": [
+            "materials/inference.py",
+            "materials/inference-observed.txt"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SQ-D02.rubric.json",
+            "native": "verification/inference.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SQ-C02",
+          "kind": "consult",
+          "goal": "用现有 CLI 区分空串与 SQL NULL",
+          "prompt": "Return exactly one complete runnable Python fenced block for the attached interface, invoking the pinned CLI to import empty CSV cells as SQL NULL while retaining nonempty values. Explain the default behavior and existing option, include invocation, and do not edit repository files.",
+          "requires": [],
+          "materials": [
+            "materials/null-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SQ-C02.rubric.json",
+            "native": "verification/null-example.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SQ-S03",
+      "title": "全文索引维护与列配置",
+      "goal": "区分索引同步需求和一次性输入缺陷并实施独立修复",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SQ-U02",
+            "SQ-C03",
+            "SQ-D03",
+            "SQ-M01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "SQ-U02",
+            "SQ-C03",
+            "SQ-D03"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "SQ-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SQ-U02",
+          "kind": "understand",
+          "goal": "理解内容表、全文索引与触发器职责",
+          "prompt": "Trace enable_fts for the supplied notes table. Explain content table, FTS virtual table, initial population, optional triggers and how Table.search obtains matches. Distinguish configuration from replacing the business table. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/fts-context.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "understood"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SQ-U02.rubric.json",
+            "native": "verification/fts-lifecycle.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SQ-C03",
+          "kind": "consult",
+          "goal": "选择触发器或重建同步 FTS5 搜索",
+          "prompt": "A list-based FTS5 enable_fts call succeeded, then a later insert was not searchable. Recommend the smallest existing-API setup for ongoing writes and a separate rebuild procedure for an existing index. Explain defaults and tradeoffs without changing the library.",
+          "requires": [],
+          "materials": [
+            "materials/fts-timeline.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SQ-C03.rubric.json",
+            "native": "verification/fts-lifecycle.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SQ-D03",
+          "kind": "diagnose",
+          "goal": "定位一次性列迭代耗尽的建索引失败",
+          "prompt": "The attached list-based FTS setup succeeds, but replacing the same column list with a finite one-shot iterator fails with a SQL syntax error and leaves an FTS table. Diagnose the exact consumption path and give a safe caller workaround. Do not modify files.",
+          "requires": [],
+          "materials": [
+            "materials/fts-reproducer.py",
+            "materials/fts-observed.txt"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SQ-D03.rubric.json",
+            "native": "verification/fts-diagnosis.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SQ-M01",
+          "kind": "modify",
+          "goal": "修复有限一次性列配置的全文索引行为",
+          "prompt": "Fix enable_fts so a finite one-shot iterable of column names behaves like equivalent list/tuple throughout creation, initial population and optional triggers. Preserve the attached exact compatibility boundaries, tokenization, quoted identifiers and replace behavior. FTS4 existing update-trigger error is outside this change; retain FTS5 CRUD. Add focused public regressions within allowed paths.",
+          "requires": [],
+          "materials": [
+            "materials/fts-reproducer.py",
+            "materials/fts-observed.txt",
+            "materials/fts-repair.md"
+          ],
+          "allowed_paths": [
+            "library/sqlite_utils/db.py",
+            "library/tests/test_fts.py"
+          ],
+          "outcomes": [
+            "modified"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SQ-M01.rubric.json",
+            "native": "verification/fts.native.json",
+            "semantic": true
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SQ-S04",
+      "title": "标准化试点与回调隔离",
+      "goal": "保留原始数据并诊断、修复连续转换的回调复用",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SQ-P02",
+            "SQ-D04",
+            "SQ-M02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "SQ-D04"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "SQ-M02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SQ-P02",
+          "kind": "plan",
+          "goal": "规划保留原列的选择性标准化试点",
+          "prompt": "Plan a small normalization pilot using existing Table.convert: preserve raw, write normalized separately, restrict to id=1 using bound WHERE parameters, then define checks before expansion. Use the supplied pure conversion and synthetic rows; do not implement a migration.",
+          "requires": [],
+          "materials": [
+            "materials/normalization-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "plan_ready"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SQ-P02.rubric.json",
+            "native": "verification/normalization.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SQ-D04",
+          "kind": "diagnose",
+          "goal": "诊断连续转换串用旧同名回调",
+          "prompt": "The attached state conversion succeeds, but following country conversion with a different dict.get returns NULL despite a valid mapping. Diagnose callback registration in the pinned code, compare the lambda control and give a safe caller workaround without changing files.",
+          "requires": [],
+          "materials": [
+            "materials/convert-reproducer.py",
+            "materials/convert-observed.txt"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SQ-D04.rubric.json",
+            "native": "verification/convert-diagnosis.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SQ-M02",
+          "kind": "modify",
+          "goal": "确保每次转换使用当次传入的回调",
+          "prompt": "Fix Table.convert so each call uses the supplied callable, including consecutive dict.get, partial, callable-object and same-named function cases on the same Database. Preserve output, bound WHERE, falsey values, lambdas, multi, exceptions and the public register_function replace contract. Add focused public regressions within allowed paths.",
+          "requires": [],
+          "materials": [
+            "materials/convert-reproducer.py",
+            "materials/convert-observed.txt",
+            "materials/convert-repair.md"
+          ],
+          "allowed_paths": [
+            "library/sqlite_utils/db.py",
+            "library/tests/test_convert.py",
+            "library/tests/test_register_function.py"
+          ],
+          "outcomes": [
+            "modified"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SQ-M02.rubric.json",
+            "native": "verification/convert.native.json",
+            "semantic": true
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

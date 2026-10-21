@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "task_id": "DE-C01",
+  "source_commit": "0b2880591780a426b0551436f47a17e7a76d954f",
+  "criteria": [
+    {
+      "id": "correctness",
+      "requirement": "Recommend ordered merging of existing dotenv_values results and the explicit deployment mapping. Preserve meaningful empty values. Explain that each file is already parsed and merging does not recursively re-expand cross-file expressions. No new library API or environment mutation is needed.",
+      "evidence": [
+        "library/src/dotenv/main.py:482-517",
+        "materials/layers.md",
+        "materials/shared.env.txt",
+        "materials/local.env.txt",
+        "materials/deployment.json"
+      ]
+    },
+    {
+      "id": "read-only",
+      "requirement": "Answer or plan only; allowed_paths is empty and no code checkpoint is requested. Native witnesses establish source/API facts or feasibility; the semantic review must still assess the actual answer and its assumptions.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and explicit constraints. Accept concise or equivalent valid answers; do not grade keyword matching, length or similarity to a reference."
+}

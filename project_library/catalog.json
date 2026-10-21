@@ -5,8 +5,12 @@
     "typer",
     "tinydb",
     "jinja",
-    "schedule"
+    "schedule",
+    "python-dotenv",
+    "tomlkit",
+    "sqlite-utils",
+    "tenacity"
   ],
   "schema": 2,
-  "version": "real-project-scenarios-v3-en"
+  "version": "real-project-scenarios-v4-en"
 }

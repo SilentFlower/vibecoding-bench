@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "task_id": "DE-D01",
+  "source_commit": "0b2880591780a426b0551436f47a17e7a76d954f",
+  "criteria": [
+    {
+      "id": "correctness",
+      "requirement": "Initially request the smallest useful sanitized call, target input, process state and observation without guessing a cause. Diagnose only evidence actually consumed. If evidence is explicitly unavailable, report insufficient_information and conditional checks without asserting a specific root cause. If supplied evidence establishes an existing API policy, distinguish that behavior from a proven library defect.",
+      "evidence": [
+        "library/src/dotenv/main.py:99-119",
+        "library/src/dotenv/main.py:431-479",
+        "materials/old-mode-report.md"
+      ]
+    },
+    {
+      "id": "read-only",
+      "requirement": "Answer or plan only; allowed_paths is empty and no code checkpoint is requested. Native witnesses establish source/API facts or feasibility; the semantic review must still assess the actual answer and its assumptions.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and explicit constraints. Accept concise or equivalent valid answers; do not grade keyword matching, length or similarity to a reference."
+}

@@ -1,0 +1,452 @@
+{
+  "schema": 2,
+  "project_key": "tenacity",
+  "title": "Tenacity 有界重试工作场景",
+  "category": "可靠运行与重试策略",
+  "description": "真实固定版本的重试接入、证据诊断、等待方案与独立修复；5 场景、13 稳定任务。",
+  "seed_digest": "da47c91c3b8656616942cbe854ce3a1c833d1df34dde5cb59af7eac3616f206d",
+  "environment": "tenacity-py312",
+  "source": {
+    "repository": "https://github.com/jd/tenacity",
+    "commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TN-S01",
+      "title": "等配置文件就绪再继续启动",
+      "goal": "理解生命周期并用现有策略规划有界启动",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TN-U01",
+            "TN-C01",
+            "TN-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TN-U01",
+          "kind": "understand",
+          "goal": "理解 retry、wait、stop 和回调的调用顺序",
+          "prompt": "Trace the supplied local file loader through Retrying: two FileNotFoundError outcomes followed by success on the third attempt. Explain when retry, wait, stop, before_sleep and sleep are evaluated, and why success does not trigger another wait. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/local-loader.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TN-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/TN-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TN-C01",
+          "kind": "consult",
+          "goal": "只重试暂态缺文件，保留配置解析错误",
+          "prompt": "A configuration file may appear a little later, but malformed JSON must fail immediately. Recommend existing retry and stop policies for at most three total attempts. Do we need to modify Tenacity? Explain the difference from retrying every Exception.",
+          "requires": [],
+          "materials": [
+            "materials/local-loader.py",
+            "materials/startup-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TN-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/TN-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TN-P01",
+          "kind": "plan",
+          "goal": "规划有界文件就绪重试与正常启动失败处理",
+          "prompt": "Plan a local startup loader that retries only a missing file, reads valid JSON once available, reports final failure clearly and does not repeat any already completed startup side effect. Use existing public APIs, a bounded attempt policy and application-level validation.",
+          "requires": [],
+          "materials": [
+            "materials/local-loader.py",
+            "materials/startup-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan_no_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TN-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/TN-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TN-S02",
+      "title": "重试排查与运行观测",
+      "goal": "先取证诊断，再区分异常政策、钩子与共享统计",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TN-D01",
+            "TN-C02",
+            "TN-U02",
+            "TN-D02"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "TN-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "TN-D01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TN-D01",
+          "kind": "diagnose",
+          "goal": "先索取完整异常和重试策略，再判断为何没有重试",
+          "prompt": "The loader failed once instead of retrying. Determine which minimal evidence is missing before assigning a cause. Request the complete exception type and retry configuration, then diagnose the supplied reproduction. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/missing-retry-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TN-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "loader-evidence",
+              "when": "The full exception and retry configuration have not yet been disclosed, and the actual conversation does not state they are unavailable. The answer reasonably requests the complete exception and exact retry predicate/controller call, or an equivalently sufficient reproduction. Supply all frozen incident materials together.",
+              "materials": [
+                "disclosure/loader.py",
+                "disclosure/incident.md",
+                "disclosure/traceback.txt"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "TN-C02",
+          "kind": "consult",
+          "goal": "选择最终异常、RetryError 与显式 fallback",
+          "prompt": "After three missing-file attempts, should our caller receive RetryError, the original FileNotFoundError or a fallback object? Compare reraise and retry_error_callback in this version and choose an explicit application policy without modifying the library.",
+          "requires": [],
+          "materials": [
+            "materials/final-error-policies.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TN-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/TN-C02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TN-U02",
+          "kind": "understand",
+          "goal": "区分 after 与调用最终完成事件",
+          "prompt": "The after hook is absent on first-attempt success and on the final successful attempt after earlier failures. Explain whether this matches the pinned lifecycle, contrast before and before_sleep, and suggest where an application should observe final completion without claiming a new hook.",
+          "requires": [],
+          "materials": [
+            "materials/lifecycle.md",
+            "materials/local-loader.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TN-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/TN-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TN-D02",
+          "kind": "diagnose",
+          "goal": "区分重入包装器统计与当前调用真实尝试",
+          "prompt": "The attached recursive use of one retry-decorated function reports wrapper statistics that do not match the outer call's attempt number. Diagnose which state is shared, distinguish observations from RetryCallState, and propose a bounded application workaround without modifying Tenacity.",
+          "requires": [],
+          "materials": [
+            "materials/reentrant.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_with_workaround"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TN-D02.rubric.json",
+            "semantic": true,
+            "native": "verification/TN-D02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TN-S03",
+      "title": "等待预算与异步取消",
+      "goal": "选择有界等待并规划可取消异步流程",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TN-C03",
+            "TN-P02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TN-C03",
+          "kind": "consult",
+          "goal": "解释 stop_before_delay 的边界及同步超时能力",
+          "prompt": "We have a five-second retry window and a next wait of four seconds after two seconds have elapsed. Compare stop_after_delay and stop_before_delay. Can either stop a synchronous function that is already blocked? Recommend the appropriate boundary without modifying Tenacity.",
+          "requires": [],
+          "materials": [
+            "materials/wait-window.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TN-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/TN-C03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TN-P02",
+          "kind": "plan",
+          "goal": "用已有异步控制器规划可取消的文件就绪流程",
+          "prompt": "Plan an async local loader with bounded missing-file retries and an outer asyncio timeout. Cancellation must propagate immediately rather than become another retry. Use AsyncRetrying or the existing async decorator, explain the role of an awaitable sleep, and avoid promising interruption of arbitrary synchronous work.",
+          "requires": [],
+          "materials": [
+            "materials/async-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_async_plan"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TN-P02.rubric.json",
+            "semantic": true,
+            "native": "verification/TN-P02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TN-S04",
+      "title": "零倍率为什么跳到等待上限",
+      "goal": "独立定位并修复零指数贡献的无意义溢出",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TN-D03",
+            "TN-M01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "TN-D03"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "TN-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TN-D03",
+          "kind": "diagnose",
+          "goal": "定位浮点零倍率的大编号溢出",
+          "prompt": "At attempt 1025, wait_exponential(multiplier=0.0, max=60) returns 60 instead of zero. Compare integer and float multipliers and bases, then explain the corresponding random-exponential and additive-jitter behavior without actually sleeping. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/zero-reproducer.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TN-D03.rubric.json",
+            "semantic": true,
+            "native": "verification/TN-D03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TN-M01",
+          "kind": "modify",
+          "goal": "零指数贡献保持下界和抖动，不误跳上限",
+          "prompt": "Avoid computing an irrelevant exponential contribution when the multiplier is zero in wait_exponential and wait_exponential_jitter. Preserve min/max ordering, random-exponential bounds, one jitter draw and all non-zero behavior. Cover integer and float zero/base cases without changing public signatures or sleeping.",
+          "requires": [],
+          "materials": [
+            "materials/zero-reproducer.py",
+            "materials/zero-contract.md"
+          ],
+          "allowed_paths": [
+            "library/tenacity/wait.py",
+            "library/tests/test_tenacity.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TN-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/TN-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TN-S05",
+      "title": "大型组合等待策略",
+      "goal": "独立定位并修复深树求值，保护分组与扩展语义",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TN-D04",
+            "TN-M02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "TN-D04"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "TN-M02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TN-D04",
+          "kind": "diagnose",
+          "goal": "解释深组合栈溢出及不能直接展平的原因",
+          "prompt": "A sum of 1000 wait_fixed strategies raises RecursionError, while one flat wait_combine works. Explain the shape created by + and why flattening every nested strategy could change floating-point grouping or custom strategy calls. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/combine-reproducer.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TN-D04.rubric.json",
+            "semantic": true,
+            "native": "verification/TN-D04.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TN-M02",
+          "kind": "modify",
+          "goal": "迭代求值内置组合树，同时保留分组与自定义策略",
+          "prompt": "Evaluate deeply nested built-in wait_combine trees without relying on Python recursion. Preserve each node's original float(sum(...)) grouping, left-to-right leaf calls, callable argument convention, custom subclasses and changes visible when a node is entered. Do not flatten opaque strategies or raise the global recursion limit. Reject cyclic built-in combination graphs with a clear ValueError while allowing shared acyclic subtrees. Add focused tests.",
+          "requires": [],
+          "materials": [
+            "materials/combine-reproducer.py",
+            "materials/combine-contract.md"
+          ],
+          "allowed_paths": [
+            "library/tenacity/wait.py",
+            "library/tests/test_tenacity.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TN-M02.rubric.json",
+            "semantic": true,
+            "native": "verification/TN-M02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

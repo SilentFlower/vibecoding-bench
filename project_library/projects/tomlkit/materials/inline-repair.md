@@ -1,0 +1,3 @@
+# Inline dotted leaf deletion contract
+
+Deleting the last leaf does not delete its still-present parent. Render explicit empty inline tables at the correct path, including nested and quoted dotted paths. Preserve sibling values and ordering; the rendered tree must equal an independently specified expected tree, not merely the candidate unwrap. Protect ordinary flat-key deletion exact output, untouched round trips, existing dotted insertion and explicit parent deletion. Do not rebuild whole documents through dict/unwrap or change Container deletion semantics. Authorized source and public test changes only, with meaningful regression tests. This independent scene does not inherit the Array repair.

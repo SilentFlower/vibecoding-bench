@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "task_id": "SQ-M02",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "comparison": "Judge supported business reasoning and actual behavior. Accept concise equivalent valid answers, not keywords, answer length or similarity to a reference patch.",
+  "criteria": [
+    {
+      "id": "behavior",
+      "requirement": "Independent native assertions must demonstrate current callables across columns/tables and all declared callable forms, with repeated same callback, output/WHERE, falsey inputs, lambda, multi and exception/transaction compatibility.",
+      "evidence": [
+        "materials/convert-repair.md",
+        "library/sqlite_utils/db.py:4177-4329"
+      ]
+    },
+    {
+      "id": "public-registration",
+      "requirement": "Public register_function keeps replace=False default preserving old same-name/arity callback; explicit replace=True replaces it. Local convert correction must not globally reset SQL functions or change the public default.",
+      "evidence": [
+        "library/sqlite_utils/db.py:793-847",
+        "materials/convert-repair.md"
+      ]
+    },
+    {
+      "id": "focused-tests",
+      "requirement": "Deliver meaningful public regressions for consecutive different callbacks with conflicting names and protected public default behavior. Inspect actual candidate test assertions; independent native pass alone does not fulfill delivery.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Only authorized implementation/public test paths may change, complete frozen applicable regression passes, and this scenario does not inherit the independent FTS repair.",
+      "evidence": [
+        "materials/convert-repair.md"
+      ]
+    }
+  ]
+}

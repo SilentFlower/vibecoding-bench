@@ -1,0 +1,35 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "keys"
+  ],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "lf_existing": true,
+    "lf_missing": true,
+    "cr_existing": true,
+    "cr_missing": true,
+    "crlf_existing": true,
+    "crlf_missing": true,
+    "normal_keys_and_multiline_values": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "cwd": "library",
+    "argv": [
+      "python",
+      "-m",
+      "pytest",
+      "tests",
+      "-q",
+      "-ra",
+      "-p",
+      "no:cacheprovider"
+    ],
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

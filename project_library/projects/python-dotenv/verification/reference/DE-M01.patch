@@ -1,0 +1,37 @@
+--- a/library/src/dotenv/main.py
++++ b/library/src/dotenv/main.py
+@@ -168,7 +168,7 @@
+         path = os.path.realpath(path)
+ 
+     try:
+-        source: IO[str] = open(path, encoding=encoding)
++        source: IO[str] = open(path, encoding=encoding, newline="")
+         try:
+             path_stat = os.lstat(path)
+             original_mode: Optional[int] = (
+@@ -187,6 +187,7 @@
+         temp_file = tempfile.NamedTemporaryFile(
+             mode="w",
+             encoding=encoding,
++            newline="",
+             delete=False,
+             prefix=".tmp_",
+             dir=os.path.dirname(os.path.abspath(path)),
+--- a/library/tests/test_main.py
++++ b/library/tests/test_main.py
+@@ -948,3 +948,15 @@
+     result = dotenv.dotenv_values(stream=io.StringIO(string))
+ 
+     assert result == expected
++
++
++@pytest.mark.parametrize("newline", [b"\r\n", b"\n", b"\r"])
++def test_edit_preserves_non_target_newlines(tmp_path, newline):
++    """非目标记录保留原字节，目标行继续使用LF。@param tmp_path 临时目录。@param newline 原换行。@return None。"""
++    path = tmp_path / "synthetic.env"
++    untouched = b'# comment' + newline + b'KEEP="first' + newline + b'second"' + newline
++    path.write_bytes(untouched + b'COLOR=old' + newline)
++    assert dotenv.set_key(path, "COLOR", "new") == (True, "COLOR", "new")
++    assert path.read_bytes() == untouched + b"COLOR='new'\n"
++    assert dotenv.unset_key(path, "COLOR") == (True, "COLOR")
++    assert path.read_bytes() == untouched

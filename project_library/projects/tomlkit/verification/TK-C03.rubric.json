@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "task_id": "TK-C03",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The unique render_artifact example uses existing register/unregister APIs, encodes only PurePath as a TOML string, returns Item and raises ConvertError for unsupported values. Preserve the full prior global registry object order after success and failure. Explain that process-global registration plus finally is not concurrent isolation.",
+      "evidence": [
+        "library/tomlkit/api.py:355-379"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Answer this task using the pinned public APIs, actual consumed materials and independent native facts. State assumptions and limits, cite relevant source symbols, and do not modify files or invent unsupported APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and authorized constraints. Accept equivalent valid answers; do not grade keywords, verbosity or reference-answer similarity.",
+  "source_commit": "eddd27e43a62fe58707c311bfad2f52e72493f53"
+}

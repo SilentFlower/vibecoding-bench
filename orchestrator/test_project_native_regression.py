@@ -1,4 +1,5 @@
 """固定原生集合的实现路径、控制恢复与候选导入回归。"""
+from contextlib import ExitStack
 import tempfile
 import unittest
 from pathlib import Path
@@ -88,6 +89,78 @@ class NativeRegressionTests(unittest.TestCase):
                     regression.pytest_sessionstart(None)
             self.assertTrue(state['errors'])
             self.assertEqual(state['imports'], {})
+
+    def test_dotenv_console_binds_src_and_cleans_private_files(self) -> None:
+        """真实命令入口绑定src候选，并在本次验证结束移除。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            venv, purelib = root / 'python', root / 'python/lib/site-packages'
+            purelib.mkdir(parents=True)
+            (venv / 'bin').mkdir()
+            with patch.object(regression, '_WORK_ROOT', root), \
+                    patch.object(regression.sys, 'prefix', str(venv)), \
+                    patch.object(regression.sys, 'base_prefix', '/system'), \
+                    patch.object(regression.sys, 'executable', str(venv / 'bin/python')), \
+                    patch.object(regression.sysconfig, 'get_path', return_value=str(purelib)):
+                with ExitStack() as cleanup:
+                    result = regression._bind_source(root / 'project', Path('src'), cleanup, console=True)
+                    path_file, console = Path(result['path_file']), Path(result['console']['path'])
+                    self.assertEqual(path_file.read_text(), str(root / 'project/src') + '\n')
+                    self.assertIn('from dotenv.__main__ import cli', console.read_text())
+                    self.assertEqual(console.stat().st_mode & 0o777, 0o755)
+                    self.assertEqual(result['console']['target'], 'dotenv.__main__:cli')
+                self.assertFalse(path_file.exists())
+                self.assertFalse(console.exists())
+
+    def test_dotenv_console_does_not_replace_existing_entry(self) -> None:
+        """未知安装入口必须拒绝且原字节不变，已建路径文件仍清理。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            venv, purelib = root / 'python', root / 'python/lib/site-packages'
+            purelib.mkdir(parents=True)
+            (venv / 'bin').mkdir()
+            entry = venv / 'bin/dotenv'
+            entry.write_text('original entry\n')
+            with patch.object(regression, '_WORK_ROOT', root), \
+                    patch.object(regression.sys, 'prefix', str(venv)), \
+                    patch.object(regression.sys, 'base_prefix', '/system'), \
+                    patch.object(regression.sysconfig, 'get_path', return_value=str(purelib)):
+                with self.assertRaises(RuntimeError), ExitStack() as cleanup:
+                    regression._bind_source(root / 'project', Path('src'), cleanup, console=True)
+            self.assertEqual(entry.read_text(), 'original entry\n')
+            self.assertEqual(list(purelib.glob('*.pth')), [])
+
+    def test_source_binding_rejects_system_or_external_venv(self) -> None:
+        """绑定只能修改本轮work内的独占venv，不触碰系统或共享环境。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for prefix, base in [('/system', '/system'), ('/external/venv', '/system')]:
+                with patch.object(regression, '_WORK_ROOT', root), \
+                        patch.object(regression.sys, 'prefix', prefix), \
+                        patch.object(regression.sys, 'base_prefix', base), \
+                        patch.object(regression.sysconfig, 'get_path', return_value=prefix + '/lib'), \
+                        self.assertRaises(RuntimeError), ExitStack() as cleanup:
+                    regression._bind_source(root / 'project', Path('src'), cleanup, console=True)
+
+    def test_subtests_keep_duplicate_contexts_and_failed_outcome(self) -> None:
+        """相同上下文的多次子执行不能折叠，主项通过也不能掩盖子项失败。@return None。"""
+        common = {'id': 'test_parent', 'when': 'call', 'wasxfail': False,
+            'subtest_context': {'msg': None, 'kwargs': {}}}
+        reports = [{**common, 'outcome': 'passed'}, {**common, 'outcome': 'failed'},
+            {'id': 'test_parent', 'when': 'call', 'outcome': 'passed', 'wasxfail': False}]
+        result = regression._subtest_results(reports, ['test_parent'])
+        self.assertEqual([item['ordinal'] for item in result], [1, 2])
+        self.assertEqual([item['outcome'] for item in result], ['passed', 'failed'])
+        self.assertEqual(regression._node_results(reports, ['test_parent']), {'test_parent': 'failed'})
+
+    def test_subtests_reject_unknown_parent_or_unserialized_context(self) -> None:
+        """缺少真实主节点或无法稳定冻结的上下文必须明确拒绝。@return None。"""
+        common = {'id': 'test_parent', 'when': 'call', 'outcome': 'passed', 'wasxfail': False,
+            'subtest_context': {'msg': None, 'kwargs': {}}}
+        for changes in ({'id': 'not_collected'}, {'when': 'setup'},
+                {'subtest_context': {'msg': None, 'kwargs': {'value': object()}}}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                regression._subtest_results([{**common, **changes}], ['test_parent'])
 
 
 if __name__ == '__main__':

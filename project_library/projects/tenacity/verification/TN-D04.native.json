@@ -1,0 +1,24 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TN-D04"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "deep_error": "RecursionError",
+    "flat": 1000,
+    "grouped": 0,
+    "flat_float": 1,
+    "custom_value": 14,
+    "leaf_order": [
+      1,
+      2,
+      4
+    ]
+  },
+  "resource_profile": "business"
+}

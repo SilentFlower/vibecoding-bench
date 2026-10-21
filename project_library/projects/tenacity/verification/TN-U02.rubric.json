@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "task_id": "TN-U02",
+  "source_commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain after is on the retry-decision branch, including final exhausted failure, rather than finally or a success-completion hook. Ground before, after, before_sleep and sleep order in the complete traces. Put application completion observation around normal return/except/finally rather than inventing an existing new hook.",
+      "evidence": [
+        "library/tenacity/__init__.py:434-507"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Use pinned real APIs and actual consumed materials, cite relevant source symbols and state limits. Native witness facts do not prove an implemented application or answer quality. No library edits or invented APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, business behavior and stated constraints; accept equivalent correct answers without keyword, verbosity or reference-answer matching."
+}

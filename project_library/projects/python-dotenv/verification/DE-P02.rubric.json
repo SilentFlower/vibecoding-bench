@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "task_id": "DE-P02",
+  "source_commit": "0b2880591780a426b0551436f47a17e7a76d954f",
+  "criteria": [
+    {
+      "id": "correctness",
+      "requirement": "Parse with existing APIs, preserve raw values as needed, normalize and validate only REGION, then derive REGION_LABEL. Preserve OTHER_EMPTY, source bytes and environment. Do not change global Variable.resolve, apply blanket truthiness fallback or execute shell expressions.",
+      "evidence": [
+        "library/src/dotenv/main.py:482-517",
+        "library/src/dotenv/variables.py:64-94",
+        "materials/policy.md"
+      ]
+    },
+    {
+      "id": "read-only",
+      "requirement": "Answer or plan only; allowed_paths is empty and no code checkpoint is requested. Native witnesses establish source/API facts or feasibility; the semantic review must still assess the actual answer and its assumptions.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and explicit constraints. Accept concise or equivalent valid answers; do not grade keyword matching, length or similarity to a reference."
+}

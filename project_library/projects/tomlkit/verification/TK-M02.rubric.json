@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "TK-M02",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Render every still-present empty dotted parent at the correct path and preserve the independently specified logical tree. Protect untouched bytes, ordinary flat-deletion exact outputs, siblings, order, dotted insertion and explicit parent deletion. Do not remove parents or rebuild entire documents from unwrap. Independent business and full frozen upstream regression must pass.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "tests",
+      "requirement": "Deliver meaningful public regression tests within library/tests/test_items.py that fail for the original target defect and cover compatibility. Cite the actual delivered tests and implementation; a claim of tests is insufficient.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Modify only the explicitly authorized source and public test paths. Do not change dependencies, frozen tests, pytest controls or unrelated public semantics.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and authorized constraints. Accept equivalent valid answers; do not grade keywords, verbosity or reference-answer similarity.",
+  "source_commit": "eddd27e43a62fe58707c311bfad2f52e72493f53"
+}

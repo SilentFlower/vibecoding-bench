@@ -1,0 +1,1 @@
+Equivalent list columns=['body'] succeeds. A finite iter(['body']) fails with sqlite3.OperationalError: near ")": syntax error while populating the virtual table. A notes_fts table remains after the failed call. Same pinned version and synthetic rows. Initial material is complete; no disclosure is required.

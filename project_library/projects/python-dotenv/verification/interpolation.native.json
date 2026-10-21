@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "interpolation"
+  ],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "forward": true,
+    "reverse": true,
+    "disabled": true,
+    "external": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "task_id": "TN-D02",
+  "source_commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Distinguish real outer RetryCallState attempt numbers and independent call events from the shared wrapper.statistics dictionary. wraps copies the controller but reuses and clears that dict on reentry, so the outer second call can observe shared statistics 4 without actually running four times. Use per-call controller or real state callbacks with call identity as a bounded workaround; do not claim reentrant statistics isolation or implement a lifecycle rewrite.",
+      "evidence": [
+        "library/tenacity/__init__.py:381-422"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Use pinned real APIs and actual consumed materials, cite relevant source symbols and state limits. Native witness facts do not prove an implemented application or answer quality. No library edits or invented APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, business behavior and stated constraints; accept equivalent correct answers without keyword, verbosity or reference-answer matching."
+}

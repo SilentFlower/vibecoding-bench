@@ -1,0 +1,7 @@
+# plugins
+[plugins."io.containerd.grpc.v1.cri"]
+sandbox_image = "old" # target
+[plugins.other]
+x=2
+[plugins.io.containerd]
+sandbox_image="nested"

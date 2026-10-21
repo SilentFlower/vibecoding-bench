@@ -1,0 +1,45 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TK-D03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "cases": [
+      [
+        [],
+        "a = [1, 2]\n",
+        true
+      ],
+      [
+        [
+          1,
+          2
+        ],
+        "a = [1, 2]\n",
+        true
+      ],
+      [
+        [
+          1,
+          2,
+          1,
+          2
+        ],
+        "a = [1, 2]\n",
+        true
+      ]
+    ],
+    "workaround": [
+      1,
+      2,
+      1,
+      2
+    ]
+  },
+  "resource_profile": "business"
+}

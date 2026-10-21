@@ -167,7 +167,7 @@ control 镜像的项目库、`images/v3/Dockerfile.dockerignore` 放行项、`de
 ### 1. Scope / Trigger
 
 - 修改 `project_scenario_content.py`、`project_scenarios.py`、`project_evaluation.py`、`project_scenario_usage.py`、`project_review_runtime.py`、`project_native_regression.py`、原生验证器、场景 API／页面或正式内容时适用。账号角色、租约、唯一凭据所有者仍遵守 account-runtime-v3；旧线性模式按前节版本读取。
-- 当前源码内容为 `real-project-scenarios-v3-en`：python-frontmatter 4场景／6任务、pydantic-settings 5／7、Typer 4／7、TinyDB 4／12、Jinja 4／12、schedule 5／13，合计6项目／26场景／57任务，其中48个非工程任务、9个工程任务。线上基线 `ci-39609484070-1` 仍为原3项目／13场景／20任务，本地内容通过不代表已部署。任务类型固定 `understand/consult/diagnose/plan/modify`，不要求每项目20步。内容就绪、本地模拟机制、真实模型完成及生产部署分别计数。
+- 当前源码内容为 `real-project-scenarios-v4-en`：原六仓6项目／26场景／57任务，加python-dotenv 5／12、TOMLKit 5／12、sqlite-utils 4／13、Tenacity 5／13，合计10项目／45场景／107任务，其中90个非工程任务、17个工程任务。线上基线 `ci-39609484070-1` 仍为原3项目／13场景／20任务，本地内容通过不代表已部署。任务类型固定 `understand/consult/diagnose/plan/modify`，不要求每项目20步。内容就绪、本地模拟机制、真实模型完成及生产部署分别计数。
 
 ### 2. Signatures
 
@@ -180,6 +180,8 @@ ProjectVerifier.verify_native(candidate, project_root, specification, environmen
 ProjectScenarios.finish_captured_quota(run_id) -> bool
 observed_model(directory, response, session_id) -> str
 _suite_paths(suite: dict) -> tuple[Path, Path]
+_bind_source(project: Path, import_root: Path, cleanup: ExitStack, *, console: bool = False) -> dict
+_subtest_results(reports: list[dict], node_ids: list[str]) -> list[dict]
 ```
 
 受控回归 CLI 为 `project_native_regression.py --project <SUITES中的key> --baseline-root <原版> (--freeze-baseline-contract <新合同> | --contract <冻结合同> --candidate-root <候选>) --evidence-dir <空目录> [--timeout-sec 600]`，超时范围为1～1800秒。校准与候选回归互斥，不能覆盖既有合同或非空证据目录。
@@ -234,6 +236,12 @@ _suite_paths(suite: dict) -> tuple[Path, Path]
 
 **原生套件布局与校准**：`SUITES.package` 是可导入模块名，`implementation_dir` 默认按模块点号转路径，`import_root` 默认为 `.`；两路径必须相对、无 `..`，且实现路径等于导入根拼接模块路径。Jinja 固定 `package=jinja2,implementation_dir=src/jinja2,import_root=src`；只叠加实际实现，拒绝实现及父目录链接，恢复 baseline 测试／配置并拒绝新增 pytest 控制声明，实际 import 必须落在受控测试树。新增 TinyDB／Jinja／schedule 套件在目标镜像收集非空、无重复的真实节点并完整执行，冻结 schema／project／baseline_digest／python／plugins／nodes；候选逐节点及结果精确匹配合同。旧三个 suite 保留原硬固定计数和默认布局。新增内容的回归脚本副本与共享可信实现逐 SHA 一致，旧内容私有脚本不原地升级。
 
+**dotenv CLI与第二批套件**：dotenv固定 `package=dotenv,implementation_dir=src/dotenv,import_root=src`；TOMLKit／sqlite-utils／Tenacity导入根为`.`。sqlite-utils显式启用已冻结Hypothesis分发的 `_hypothesis_pytestplugin`，不依赖关闭autoload后消失的隐式插件。Typer与dotenv的子进程绑定只写`/work`下本次独占venv的纯路径`.pth`，purelib须位于该venv，系统或外部共享解释器拒绝。dotenv额外以排他创建生成该venv `bin/dotenv`，固定目标 `dotenv.__main__:cli`、0755；已有入口或链接拒绝覆盖。路径文件及新入口注册退出清理，直接CLI测试实际导入受控src；不能用安装发行包或仅`python -m`代替原生可执行入口。
+
+**真实子测试合同**：仅Tenacity suite启用 `subtests=True`，从真实 `SubtestReport.context._to_json()` 记录；条目为 `parent_nodeid,ordinal,when,context,outcome`，context恰为`msg`（null或字符串）及`kwargs`（字符串键／序列化字符串值）。同父节点按实际出现ordinal保留重复context，不折叠；仅允许已收集主节点的call阶段。schema1合同新增可选subtests，旧suite保持原行为；Tenacity候选合同缺少／为空须拒绝，候选完整子项与冻结集合逐项相等，失败／xpass不能被父项passed遮蔽。主collection／唯一节点／JUnit testcase元素仍严格相等，不能以suite汇总tests属性替代。当前Tenacity真实185主项／15子项、XML185元素及汇总200分别记录，不重复计数。
+
+**上游文件表示与运行取证**：来源清单同时记录Git blob及mode；内容快照禁止真实symlink时，上游文档link blob可按原目标文本字节存普通文件，明确表示差异并保留完整许可／文档原件，不能伪称原类型未变。普通上游执行位在源码Git／Docker交付保持；既有快照只按路径／字节／大小封存并统一物化0644，不承诺模式保真。TOMLKit固定测试子模块独立来源／许可、完整展开，不能用空目录或Python3.12 TOML1.0解析器否决TOML1.1语料。私有评审挂载检查先将runtime私有根按data相对路径映射到host_data，再与Docker Mounts.Source双向比较父子重叠，不能跨命名空间直接比路径。source.created_at／released_at包含启动配置及释放后取证收账，不能当精确holder占用区间；实际工作窗口、进程清理、holder采样和源码门禁分别报告，缺逐holder事件不得声称完整时序已重建。
+
 **Git 字节保真**：正式 `project_library/**` 和本任务冻结研究证据使用 `-text`，禁止 Git 行尾转换改变已验证摘要。python-frontmatter 固定提交的 `seed/library/AGENTS.md` 按来源文件清单精确保留，忽略例外仅限正式副本与对应研究副本，本地工具 AGENTS.md 仍忽略。提交前从索引导出内容，逐文件核对清单与原始字节，并重新加载 `ProjectLibrary` 比较 catalog 摘要；工作区校验不能替代 Git 导出校验。上游空白、原始帮助输出及统一补丁上下文按原样保存，原创实现仍做空白检查。
 
 ### 4. Validation & Error Matrix
@@ -251,6 +259,7 @@ _suite_paths(suite: dict) -> tuple[Path, Path]
 | 原生准备异常／业务断言或已进入业务后的超时 | error／failed，前者本地有限重试，后者可用有限业务修正。 |
 | suite 模块／相对路径不匹配、实现或父目录链接、候选错导入安装库 | 拒绝回归；候选源码违规为 failed，不借环境重试接受。 |
 | 冻结合同来源不符／Python或插件漂移／空节点或节点结果不符 | 拒绝；环境漂移须重新校准原版，候选不能靠删测试或退出码零通过。 |
+| dotenv系统或外部venv／已有CLI入口；Tenacity缺失子合同、非法父节点或子项不匹配 | 拒绝；不覆盖未知入口，不以主项pass或XML汇总替代子项证明。 |
 | 评审实际模型不一致／格式或身份错误 | 评审error，最多一次错误重评，不算业务失败；合法uncertain直接blocked。 |
 | 次数或累计预算先到上限 | exhausted／最终failed或评测blocked，独立任务继续，真实后继依赖受阻。 |
 | 停止、旧generation、非最新作业迟到结果 | 留历史不接受；认证／真正严格清理失败沿原强门禁阻断批次。 |
@@ -265,6 +274,8 @@ _suite_paths(suite: dict) -> tuple[Path, Path]
 - 错误用法：CLI success、问答passed或批次completed都算代码成功；正确做法是分别显示执行、任务、代码接受及收口分布。固定测试／模拟CLI通过不计真实模型完成数。
 - 正常与边界：TinyDB 的两个修改位于不同场景，分别从原版开始；Jinja M02 声明本场景 M01 的 code 依赖，必须承接真实已接受作业。37 个唯一任务的默认与分支试跑可形成66条路径、10次接受，仍只计37任务与6个唯一修改目标。
 - 错误用法：把 `src/jinja2` 当模块名或使用已安装的 Jinja 代替候选。正确配置模块 `jinja2` 与相对导入根 `src`，并以实际 `__file__` 和完整节点合同核对；只读咨询没有候选文件时，移除不适用的候选证据 flag，保留可由公开资料支持的规则。
+- 正常与边界：第二批50唯一任务形成114路径／16次接受，仍只计8唯一修改；八修改从各场景原版独立开始，只有TK-P01真实消费TK-D02的answer。四仓D01按实际请求披露，材料不足合法结案；不能把澄清或分支另计任务。
+- 错误用法：Tenacity的200汇总当200主节点，或source收账三重叠直接当三个holder。正确做法是185主项＋15真实子项分别核合同，并按实际工作、严格清理和门禁证据说明并发口径及事件留存限制。
 
 ### 6. Tests Required
 
@@ -272,8 +283,9 @@ _suite_paths(suite: dict) -> tuple[Path, Path]
 - 语言修正：穷举正式首问、分支、材料说明、rubric 与运行时提示，核对英文语义及原授权／验收约束；比较修正前后的中文 `summary(include_steps=True)` 完全相等，新旧内容分别 install／复开仍按各自摘要读取。seed、固定业务输入、原生检查和 wheel 字节保持不变；Unicode 测试夹具与证据原文不作为必须翻译的正式指令。
 - 状态／恢复／父链：`test_project_scenarios.py` 覆盖实际消费认领、澄清不加attempt、3次上限、工作高水位／崩溃预留、review三层预算、候选与review严格释放、完整输出quota／重启只续验收、迟到结果、文件交付进review包、局部轮换／分支激活、代码依赖恢复与不兼容／相同字节回退分支、实际模型漂移不扣业务修正。
 - 协议／用量／私有运行：`test_project_evaluation.py` 覆盖严格单JSON／错误身份／重复项／未知证据／程序失败不能被pass覆盖、合法uncertain、显式candidate证据许可及缓存字段去重／未知；`test_project_review_runtime.py` 覆盖owner刷新身份、创建／停净／缺失／孤儿、清理失败保留holder及资源份额；`test_project_native_verifier.py` 覆盖准备阶段error、业务exit80为failed、清理前不放slot、合法等价程序提取。
-- 原生内容：`python3 scripts/validate-project-library.py` 仅静态摘要／当前6-26-57；`scripts/validate-project-scenarios.py --project <key> --task <key> --image <隔离账号镜像>` 真实业务，按需 `--candidate/--answer/--entry/--branch/--expect failed`；`--regression-only` 或 `--with-regression` 使用独立回归资源。保留适用工程目标的原版失败／参考通过、原生完整集合与skip/xfail证据，不用宿主旧基线替代。
-- 套件适配：`test_project_native_regression.NativeRegressionTests` 断言 src 叠加恢复原测试／配置、新 pytest hook 拒绝、旧默认不变、父链接与非法路径／模块拒绝、安装库错导入拒绝。目标镜像实际冻结并执行全部节点，再对每个参考候选跑完整适用回归；当前新增原版集合为228／911／81，数字是本轮实测记录，不作为后续套件的通用硬编码。
+- 原生内容：`python3 scripts/validate-project-library.py` 仅静态摘要／当前10-45-107；`scripts/validate-project-scenarios.py --project <key> --task <key> --image <隔离账号镜像>` 真实业务，按需 `--candidate/--answer/--entry/--branch/--expect failed`；`--regression-only` 或 `--with-regression` 使用独立回归资源。保留适用工程目标的原版失败／参考通过、原生完整集合与skip/xfail证据，不用宿主旧基线替代。
+- 套件适配：`test_project_native_regression.NativeRegressionTests` 断言 src 叠加恢复原测试／配置、新 pytest hook 拒绝、旧默认不变、父链接与非法路径／模块拒绝、安装库错导入拒绝。目标镜像实际冻结并执行全部节点，再对每个参考候选跑完整适用回归；首批新增原版集合为228／911／81，数字是首批实测记录，不作为后续套件的通用硬编码。
+- 第二批适配：同测试类核dotenv受控src／0755入口与退出清理、拒覆盖／系统venv；子测试保留重复context和失败、未知父节点／非call／未序列化值拒绝。当前镜像四仓完整集合为288、1203、1513（1497通过／16冻结skip）、185主项＋15子项，逐参考完整核对；数值是实测，不能硬抄为未来版本通用分母。Git／Docker导出另核来源全集／双SHA、原执行位和link blob表示，私有mount比较核host路径双向重叠。
 - 内容评审协议：逐任务及必要披露／无材料路径构造真实 `review_package` 并执行 `parse_review`，核证据标识与候选文件存在性；隐藏具体事实只有实际消费后可用于相应结论。模拟对账同时统计唯一码、路径、披露消费、业务尝试和接受父链，不能把分支或补充材料当作独立任务。
 - Git 交付：`git check-attr text` 核对冻结数据 `unset`、普通代码保持原规则；`git check-ignore` 验证仅两个固定上游文件可追踪、本地工具文件仍忽略。用 `git checkout-index` 导出拟提交内容，核对文件全集、逐文件字节及 catalog 摘要，覆盖 CRLF 上游文件与被忽略的同名工具说明文件反例。
 - 真实调度与UI：`deploy/v3/run_local_verification.py --manifest <隔离清单> --project-scenarios-only --scenario-capacity 1`，另测容量2；需要UI与失败恢复时加现有 `--scenario-browser`／`--scenario-failures`。核原Scheduler／driver／SQLite、holder容量、私有挂载与AT-only、超时半成品、仅续验收及页面状态／预算／用量对账；模拟CLI证据明确real_model_calls=0。旧project-iterations／project-scheduling、quota／window及普通题库适用回归继续保留。
@@ -331,7 +343,7 @@ _suite_paths(suite: dict) -> tuple[Path, Path]
 
 ### 5. Scenarios and Examples
 
-- 正常：`simonw/sqlite-utils` 固定 `9c66bafa52ae23d40499c74b0db3b635bcddb876`，原版全套测试 1,497 通过、16 跳过；相关原生测试在正式账号镜像隔离运行 75 项通过。二十步路线含 9 步已复现问题修复和 11 步功能增强提案；截至本节记录，尚未实施这二十步或完成平台原生接入。
+- 正常：`simonw/sqlite-utils` 固定 `9c66bafa52ae23d40499c74b0db3b635bcddb876`，原版全套测试 1,497 通过、16 跳过；相关原生测试在正式账号镜像隔离运行 75 项通过。二十步路线含9步已复现问题修复和11步功能增强提案，研究本身不等于实施；第二批现已另行接入本仓4场景／13任务和两个独立修改验收，不表示原二十步已全部实施。
 - 证据入口：[单仓审查](../../../../research/github-projects/sqlite-utils.md)、[二十步路线](../../../../research/github-projects/sqlite-utils-roadmap-20.md)。原始 JSON／脚本位置以报告为准，不能将本地证据目录可用性当作跨机器保证。
 - 边界：前 2 步闭环通过只证明这 2 步完成；后 18 步仍按各自状态记录。一个适用基线通过、20 步研究齐备但未接入的项目，只增加研究完成数。
 - 错误用法：批量生成 100 个 44 行 app.py，给每项拼接 20 个通用操作，再声称真实 GitHub 项目库扩充完成。正确做法：逐仓读取真实代码、执行原生基线、核实需求和路线；未满足条件的保持候选状态。

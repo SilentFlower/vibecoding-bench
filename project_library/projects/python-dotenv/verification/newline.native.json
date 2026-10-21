@@ -1,0 +1,40 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "newline"
+  ],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "crlf_replace": true,
+    "crlf_append": true,
+    "crlf_unset": true,
+    "lf_replace": true,
+    "lf_append": true,
+    "lf_unset": true,
+    "cr_replace": true,
+    "cr_append": true,
+    "cr_unset": true,
+    "mixed_records": true,
+    "append_separator": true,
+    "duplicate_targets": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "cwd": "library",
+    "argv": [
+      "python",
+      "-m",
+      "pytest",
+      "tests",
+      "-q",
+      "-ra",
+      "-p",
+      "no:cacheprovider"
+    ],
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

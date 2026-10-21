@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SQ-D04",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "comparison": "Judge supported business reasoning and actual behavior. Accept concise equivalent valid answers, not keywords, answer length or similarity to a reference patch.",
+  "criteria": [
+    {
+      "id": "registration",
+      "requirement": "Connect convert wrapping/naming, shared get name and public same-name/arity registration deduplication to stale first callable. Distinct lambda names or appropriately distinct named caller wrappers avoid this case. Do not blame invalid US data or claim every single/multi call fails.",
+      "evidence": [
+        "materials/convert-reproducer.py",
+        "materials/convert-observed.txt",
+        "library/sqlite_utils/db.py:793-847",
+        "library/sqlite_utils/db.py:4237-4267"
+      ]
+    }
+  ]
+}

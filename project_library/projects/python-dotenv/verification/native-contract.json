@@ -1,0 +1,1456 @@
+{
+  "baseline_digest": "fb3eafc0ccffde57686d76efd1574520bad96305f5be5a2014ced06aea226815",
+  "nodes": [
+    {
+      "id": "tests/test_cli.py::test_file_option_expands_user[get]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_file_option_expands_user[list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_file_option_expands_user[run]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_file_option_expands_user[set]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_file_option_expands_user[unset]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_get_default_path",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_get_empty_string_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_get_existing_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_get_non_existent_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_get_non_existent_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_get_not_a_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_get_value_without_equals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_list[None-x='a b c'-x=a b c\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_list[export-x='a b c'-export x='a b c'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_list[json-x='a b c'-{\\n  \"x\": \"a b c\"\\n}\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_list[shell-x=\"'a b c'\"-x=''\"'\"'a b c'\"'\"''\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_list[shell-x='\"a b c\"'-x='\"a b c\"'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_list[shell-x='a b c'-x='a b c'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_list[shell-x='a\\nb\\nc'-x='a\\nb\\nc'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_list[simple-x=\"'a b c'\"-x='a b c'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_list[simple-x='\"a b c\"'-x=\"a b c\"\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_list[simple-x='a b c'-x=a b c\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_list_no_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_list_non_existent_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_list_not_a_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_run",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_run_interpolation_respects_override[--no-override--\\n/suffix\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_run_interpolation_respects_override[--no-override-environment-environment\\nenvironment/suffix\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_run_interpolation_respects_override[--override-environment-file\\nfile/suffix\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_run_with_command_flags",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_run_with_dotenv_and_command_flags",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_run_with_env_missing_and_invalid_cmd",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_run_with_existing_variable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_run_with_existing_variable_not_overridden",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_run_with_invalid_cmd",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_run_with_none_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_run_with_other_env",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_run_with_version",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_run_without_cmd",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_set_export[dotenv_path0-true-a-x-export a='x'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_set_export[dotenv_path1-false-a-x-a='x'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_set_missing_directory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_set_no_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_set_non_existent_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_set_quote_options[always-a-x-a='x'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_set_quote_options[auto-a-$-a='$'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_set_quote_options[auto-a-x y-a='x y'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_set_quote_options[auto-a-x-a=x\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_set_quote_options[never-a-x-a=x\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_unset_existing_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_unset_non_existent_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_unset_read_only_directory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_fifo_dotenv.py::test_load_dotenv_from_fifo",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ipython.py::test_ipython_existing_variable_no_override",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ipython.py::test_ipython_existing_variable_override",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ipython.py::test_ipython_new_variable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ipython.py::test_ipython_path_expands_user",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_is_interactive.py::TestIsInteractive::test_is_interactive_main_module_not_found",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_is_interactive.py::TestIsInteractive::test_is_interactive_main_module_with_file_attribute_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_is_interactive.py::TestIsInteractive::test_is_interactive_main_with_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_is_interactive.py::TestIsInteractive::test_is_interactive_main_without_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_is_interactive.py::TestIsInteractive::test_is_interactive_no_ps_attributes_and_normal_execution",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_is_interactive.py::TestIsInteractive::test_is_interactive_precedence_ps1_over_main",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_is_interactive.py::TestIsInteractive::test_is_interactive_ps1_and_ps2_both_exist",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_is_interactive.py::TestIsInteractive::test_is_interactive_with_ps1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_is_interactive.py::TestIsInteractive::test_is_interactive_with_ps2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_is_interactive.py::TestIsInteractive::test_is_interactive_with_usecwd_override",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_path_expands_user[dotenv_values-Path]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_path_expands_user[dotenv_values-str]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_path_expands_user[get_key-Path]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_path_expands_user[get_key-str]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_path_expands_user[set_key-Path]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_path_expands_user[set_key-str]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_path_expands_user[unset_key-Path]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_path_expands_user[unset_key-str]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_path_keeps_type[.env-.env]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_path_keeps_type[None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_path_keeps_type[path1-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_path_keeps_type[~/.env-{home}/.env]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_empty_value_with_inline_comment[KEY=  # comment-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_empty_value_with_inline_comment[KEY= # comment-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_empty_value_with_inline_comment[KEY= # comment\\nOTHER=val-expected7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_empty_value_with_inline_comment[KEY=# # comment-expected5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_empty_value_with_inline_comment[KEY=#novalue-expected4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_empty_value_with_inline_comment[KEY=\\t# comment-expected6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_empty_value_with_inline_comment[KEY=a#b-expected3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_empty_value_with_inline_comment[KEY=val # comment-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_file_stream",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env0-a=$b-False-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env1-a=$b-True-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env10-a='${b}'-True-expected10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env11-a=x${b}y-True-expected11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env12-a=${a}-True-expected12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env13-a=${a}-True-expected13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env14-a=${a:-c}-True-expected14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env15-a=${a:-c}-True-expected15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env16-a=${b}${b}-True-expected16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env17-b=d\\na=${b}-True-expected17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env18-a=b\\na=c\\nd=${a}-True-expected18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env19-a=b\\nc=${a}\\nd=e\\nc=${d}-True-expected19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env2-a=${b}-False-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env3-a=${b}-True-expected3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env4-a=${b:-d}-False-expected4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env5-a=${b:-d}-True-expected5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env6-b=c\\na=${b}-True-expected6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env7-a=${b}-True-expected7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env8-a=${b:-d}-True-expected8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_dotenv_values_string_io[env9-a=\"${b}\"-True-expected9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_empty_dotenv_dict_is_cached",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_find_dotenv_expands_user",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_find_dotenv_found",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_find_dotenv_no_file_no_raise",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_find_dotenv_no_file_raise",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_get_key_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_get_key_no_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_get_key_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_get_key_not_found",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_get_key_ok",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled[TRUE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled[T]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled[YES]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled[Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled[Yes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled[t]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled[true]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled[y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled[yes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled_notification[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled_notification[TRUE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled_notification[T]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled_notification[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled_notification[YES]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled_notification[Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled_notification[Yes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled_notification[t]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled_notification[true]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled_notification[y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_disabled_notification[yes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_doesnt_disable_itself",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled[0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled[FALSE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled[F]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled[NO]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled[N]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled[No]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled[]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled[f]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled[false]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled[n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled[no]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled_no_notification[0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled_no_notification[FALSE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled_no_notification[F]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled_no_notification[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled_no_notification[NO]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled_no_notification[N]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled_no_notification[No]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled_no_notification[]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled_no_notification[f]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled_no_notification[false]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled_no_notification[n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_enabled_no_notification[no]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_existing_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_existing_variable_no_override",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_existing_variable_override",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_expands_user",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_file_stream",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_in_current_dir",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_no_file_verbose",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_redefine_var_used_in_file_no_override",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_redefine_var_used_in_file_with_override",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_load_dotenv_string_io_utf_8",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_rewrite_closes_file_handle_on_lstat_failure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_rewrite_read_only_file_leaves_no_temp_file[set_key]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_rewrite_read_only_file_leaves_no_temp_file[unset_key]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_rewrite_reports_original_error_when_cleanup_fails",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[-a-\"b\"-expected3-a='\"b\"'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[-a-'b'-expected2-a='\\\\'b\\\\''\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[-a--expected0-a=''\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[-a-b\"c-expected5-a='b\"c'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[-a-b'c-expected4-a='b\\\\'c'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[-a-b-expected1-a='b'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[-a-b\\\\'c-expected15-a='b\\\\\\\\\\\\'c'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[-a-b\\\\-expected14-a='b\\\\\\\\'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[-a-b\\\\c-expected13-a='b\\\\\\\\c'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[a=b-a-c-expected6-a='c'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[a=b-c-d-expected12-a=b\\nc='d'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[a=b\\n-a-c-expected7-a='c'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[a=b\\n-c-d-expected11-a=b\\nc='d'\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[a=b\\n\\n-a-c-expected8-a='c'\\n\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[a=b\\nc=d-a-e-expected9-a='e'\\nc=d]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key[a=b\\nc=d\\ne=f-c-g-expected10-a=b\\nc='g'\\ne=f]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_follow_symlinks",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_missing_directory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_no_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_permission_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_permission_error_leaves_no_temp_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_preserves_file_mode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_read_only_directory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_round_trips[C:\\\\Users\\\\]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_round_trips[C:\\\\Users]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_round_trips[\\\\d+]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_round_trips[]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_round_trips[a\\\\'b]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_round_trips[a\\\\nb]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_round_trips[back\\\\]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_round_trips[it's]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_round_trips[plain]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_round_trips[say \"hi\"]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_symlink_to_existing_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_set_key_symlink_to_missing_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_unset_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_unset_key_follow_symlinks",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_unset_key_symlink_to_existing_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_unset_key_symlink_to_missing_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_unset_no_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_unset_non_existent_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::test_unset_with_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[ a = b -expected4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[ export 'a'=b-expected6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[# a=b-expected7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[# comment 1\\n# comment 2-expected52]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[# comment\\na=\"b\\nc\"\\nd=e\\n-expected50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream['a'=b-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[[=b-expected3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[\\n\\n-expected46]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[\\ufeffa=b-expected54]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[\\ufeffa=b\\nc=d-expected55]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a: b-expected41]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=  # b-expected12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a= #b-expected11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a= #c\\nd=e-expected16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=\"\\nb=c-expected49]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=\"\\xe0\"-expected39]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=\"b c \"-expected23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=\"b\\\\\"c\"-expected31]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=\"b\\\\\\\\\"\\nc=\"d\"-expected36]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=\"b\\\\\\\\c\"-expected34]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=\"b\\\\nc\"-expected29]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=\"b\\nc\"-expected26]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=\"b\\nc\"-expected28]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=# # comment-expected14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=#b-expected13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a='b c '-expected22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a='b\\\\'c'-expected32]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a='b\\\\\\\\'\\nc='d'-expected35]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a='b\\\\\\\\\\\\'c'-expected37]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a='b\\\\\\\\c'-expected33]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a='b\\\\nc'-expected30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a='b\\nc'-expected27]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=\\nb=c-expected45]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=\\t#c-expected15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=\\xe0-expected38]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b  c-expected19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b #c-expected9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b c -expected21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b c-expected17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b#c-expected8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b\\n# comment 1-expected51]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b\\n\\n-expected47]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b\\n\\nc=d-expected48]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b\\nc=d-expected42]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b\\r\\nc=d-expected44]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b\\rc=d-expected43]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b\\t#c-expected10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b\\tc-expected18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[a=b\\xa0 c-expected20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[export a=b-expected5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[export export_a=1-expected24]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[export port=8000-expected25]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[no_value_var-expected40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_stream[uglyKey[%$=\"S3cr3t_P4ssw#rD\" #\\na=b-expected53]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_to_cli_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_variables.py::test_parse_variables[${a:-b}-expected3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_variables.py::test_parse_variables[${a}${b}-expected4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_variables.py::test_parse_variables[${a}-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_variables.py::test_parse_variables[-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_variables.py::test_parse_variables[a${b}c${d}e-expected5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_variables.py::test_parse_variables[a-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_zip_imports.py::test_load_dotenv_gracefully_handles_zip_imports_when_no_env_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_zip_imports.py::test_load_dotenv_outside_zip_file_when_called_in_zipfile",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "python-dotenv",
+  "python": "3.12.15",
+  "schema": 1
+}

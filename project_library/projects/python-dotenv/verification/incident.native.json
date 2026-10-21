@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "incident"
+  ],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "default_preserves_process": true,
+    "override_control": true,
+    "missing_process_control": true
+  },
+  "resource_profile": "business"
+}

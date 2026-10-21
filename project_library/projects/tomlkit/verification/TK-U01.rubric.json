@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "task_id": "TK-U01",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain the real parse, Container/Item and as_string path, semantic unwrap versus retained layout and comments, document types and the documented AoT placement limitation. Do not promise universal byte preservation, business-schema validation or transactional files.",
+      "evidence": [
+        "library/README.md:16-45",
+        "library/tomlkit/api.py:48-115"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Answer this task using the pinned public APIs, actual consumed materials and independent native facts. State assumptions and limits, cite relevant source symbols, and do not modify files or invent unsupported APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and authorized constraints. Accept equivalent valid answers; do not grade keywords, verbosity or reference-answer similarity.",
+  "source_commit": "eddd27e43a62fe58707c311bfad2f52e72493f53"
+}

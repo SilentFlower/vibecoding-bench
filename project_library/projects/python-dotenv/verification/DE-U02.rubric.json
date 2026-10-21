@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "task_id": "DE-U02",
+  "source_commit": "0b2880591780a426b0551436f47a17e7a76d954f",
+  "criteria": [
+    {
+      "id": "correctness",
+      "requirement": "Explain single-pass ordered resolution using previously resolved entries and environment priority, braced syntax versus literal $B, and interpolate=False. Do not promise shell execution, recursive expansion or unsupported APIs.",
+      "evidence": [
+        "library/src/dotenv/main.py:333-360",
+        "library/src/dotenv/variables.py:64-94",
+        "materials/interpolation.md",
+        "materials/forward.env.txt",
+        "materials/reverse.env.txt"
+      ]
+    },
+    {
+      "id": "read-only",
+      "requirement": "Answer or plan only; allowed_paths is empty and no code checkpoint is requested. Native witnesses establish source/API facts or feasibility; the semantic review must still assess the actual answer and its assumptions.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and explicit constraints. Accept concise or equivalent valid answers; do not grade keyword matching, length or similarity to a reference."
+}

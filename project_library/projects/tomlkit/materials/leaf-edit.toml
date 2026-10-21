@@ -1,0 +1,5 @@
+# 配置
+name = 'old' # owner
+[server]
+port = 5432 # port
+keep = 'untouched'

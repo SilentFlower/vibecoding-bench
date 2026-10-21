@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "merge"
+  ],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "layers": true,
+    "order_matters": true,
+    "environment_unchanged": true
+  },
+  "resource_profile": "business"
+}

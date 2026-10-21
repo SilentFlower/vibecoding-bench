@@ -1,0 +1,47 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TN-D02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "result": "ok",
+    "attempts": [
+      3,
+      2
+    ],
+    "events": [
+      [
+        1,
+        1,
+        1
+      ],
+      [
+        0,
+        1,
+        1
+      ],
+      [
+        0,
+        2,
+        2
+      ],
+      [
+        0,
+        3,
+        3
+      ],
+      [
+        1,
+        2,
+        4
+      ]
+    ],
+    "ordinary_control": true
+  },
+  "resource_profile": "business"
+}

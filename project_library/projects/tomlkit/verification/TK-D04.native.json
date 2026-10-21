@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TK-D04"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "middle": "t = {a=\"\", , d=1}\n",
+    "only": "t = {}\n",
+    "retained_parent": true
+  },
+  "resource_profile": "business"
+}

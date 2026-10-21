@@ -1,0 +1,4 @@
+{
+  "load_dotenv_return": true,
+  "APP_MODE_after": "deployment"
+}

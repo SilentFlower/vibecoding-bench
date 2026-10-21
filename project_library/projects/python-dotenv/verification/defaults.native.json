@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "defaults"
+  ],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "missing_empty_bare_nonempty": true,
+    "literal": true
+  },
+  "resource_profile": "business"
+}

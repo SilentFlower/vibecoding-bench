@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "fts-diagnosis"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "list_control_succeeds": true,
+    "one_shot_syntax_error": true,
+    "partial_fts_table_remains": true
+  },
+  "resource_profile": "business"
+}

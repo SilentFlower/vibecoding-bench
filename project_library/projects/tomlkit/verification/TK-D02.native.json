@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TK-D02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "escape_value": true,
+    "consumer_rejected": true,
+    "compatible_equal": true
+  },
+  "resource_profile": "business"
+}

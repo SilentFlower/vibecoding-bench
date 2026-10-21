@@ -1,0 +1,22 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TK-M01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "repetition_matrix": true,
+    "invalid_counts_unchanged": true,
+    "nested_array_alias": true,
+    "inline_value_alias": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

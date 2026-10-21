@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "task_id": "TK-P02",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Ground the plan in actual TOMLFile read/write line-ending behavior and signatures. Put complete serialization and validation before same-directory temporary publication, preserve old bytes on failure and define permissions and cleanup. Coordinate cooperating writers across conflict check and replace; distinguish replacement atomicity, conflict detection, crash durability and limits for noncooperating writers.",
+      "evidence": [
+        "library/tomlkit/toml_file.py:18-64"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Answer this task using the pinned public APIs, actual consumed materials and independent native facts. State assumptions and limits, cite relevant source symbols, and do not modify files or invent unsupported APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and authorized constraints. Accept equivalent valid answers; do not grade keywords, verbosity or reference-answer similarity.",
+  "source_commit": "eddd27e43a62fe58707c311bfad2f52e72493f53"
+}

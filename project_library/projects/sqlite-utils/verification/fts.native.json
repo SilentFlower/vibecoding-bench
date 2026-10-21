@@ -1,0 +1,47 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "fts"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "FTS4_manual_list": true,
+    "FTS4_manual_tuple": true,
+    "FTS4_manual_iterator": true,
+    "FTS4_manual_generator": true,
+    "FTS4_triggers_list": true,
+    "FTS4_triggers_tuple": true,
+    "FTS4_triggers_iterator": true,
+    "FTS4_triggers_generator": true,
+    "FTS5_manual_list": true,
+    "FTS5_manual_tuple": true,
+    "FTS5_manual_iterator": true,
+    "FTS5_manual_generator": true,
+    "FTS5_triggers_list": true,
+    "FTS5_triggers_tuple": true,
+    "FTS5_triggers_iterator": true,
+    "FTS5_triggers_generator": true,
+    "empty_table": true,
+    "quoted_tokenize": true,
+    "replace_semantics": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "cwd": "library",
+    "argv": [
+      "python",
+      "-m",
+      "pytest",
+      "tests",
+      "-q",
+      "-ra",
+      "-p",
+      "no:cacheprovider"
+    ],
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

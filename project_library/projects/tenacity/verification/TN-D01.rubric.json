@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "task_id": "TN-D01",
+  "source_commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+  "criteria": [
+    {
+      "id": "ask-evidence",
+      "requirement": "The incomplete one-call symptom does not identify a cause. Ask for the full exception/traceback and exact retry configuration or an equivalent minimal reproducer before making a definite root-cause claim.",
+      "evidence": []
+    },
+    {
+      "id": "disclosure",
+      "requirement": "On an available-material conversation, use loader-evidence for a reasonable evidence request; a question alone does not finish that path. When the actual conversation explicitly says evidence is unavailable, do not disclose the hidden incident.",
+      "evidence": []
+    },
+    {
+      "id": "conclusion",
+      "requirement": "Only after actual incident materials are consumed, derive their supported behavior from the actual exception, configured policy and public controller code, distinguish library defects from intentional application policy and give a bounded next action. With explicitly unavailable evidence, insufficient_information is a legitimate conclusion after limits, conditional hypotheses and a future evidence plan. Do not invent hidden facts or modify files.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, business behavior and stated constraints; accept equivalent correct answers without keyword, verbosity or reference-answer matching."
+}

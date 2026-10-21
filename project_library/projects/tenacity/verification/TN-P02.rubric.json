@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "task_id": "TN-P02",
+  "source_commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use existing AsyncRetrying/async decorator, an awaitable nonblocking sleep, bounded missing-file retries and an outer asyncio timeout. Cancellation must propagate rather than become another retry; do not use catch-all cancellation swallowing or blocking synchronous sleep, or promise arbitrary synchronous interruption. Include success, permanent absence and cancellation-during-wait tests.",
+      "evidence": [
+        "library/tenacity/asyncio/__init__.py:110-177"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Use pinned real APIs and actual consumed materials, cite relevant source symbols and state limits. Native witness facts do not prove an implemented application or answer quality. No library edits or invented APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, business behavior and stated constraints; accept equivalent correct answers without keyword, verbosity or reference-answer matching."
+}

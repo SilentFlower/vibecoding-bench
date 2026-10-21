@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "task_id": "TK-C02",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The unique executable update_plugin example indexes the complete literal dotted plugin name, changes only its existing sandbox_image and preserves nested-path controls, unrelated values and comments. Explain literal string keys versus iterable dotted-key construction, and retain missing-target KeyError behavior.",
+      "evidence": [
+        "library/tomlkit/api.py:276-307"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Answer this task using the pinned public APIs, actual consumed materials and independent native facts. State assumptions and limits, cite relevant source symbols, and do not modify files or invent unsupported APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and authorized constraints. Accept equivalent valid answers; do not grade keywords, verbosity or reference-answer similarity.",
+  "source_commit": "eddd27e43a62fe58707c311bfad2f52e72493f53"
+}

@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "newline-baseline"
+  ],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "original_normalizes_non_targets": true,
+    "untouched_value_same": true,
+    "lf_control": true
+  },
+  "resource_profile": "business"
+}

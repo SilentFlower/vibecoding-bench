@@ -1,0 +1,20 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "normalization"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "output_where_preserves_raw": true,
+    "falsey_values_called": true,
+    "same_callback_repeated": true,
+    "multi_preserved": true,
+    "callback_error_rolls_back_update": true,
+    "public_default_preserved": true,
+    "public_explicit_replace": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,23 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TK-P02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "line_endings_preserved": [
+      true,
+      true,
+      true
+    ],
+    "write_parameters": [
+      "self",
+      "data"
+    ]
+  },
+  "resource_profile": "business"
+}

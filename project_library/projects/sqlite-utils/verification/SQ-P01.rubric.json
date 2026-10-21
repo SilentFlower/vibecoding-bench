@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "task_id": "SQ-P01",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "comparison": "Judge supported business reasoning and actual behavior. Accept concise equivalent valid answers, not keywords, answer length or similarity to a reference patch.",
+  "criteria": [
+    {
+      "id": "repeatable",
+      "requirement": "Use actual upsert_all with an explicit text primary-key schema and input validation. Reruns must avoid duplicates, update supplied quantity and retain omitted memo on existing rows. Explain new-row NULL and avoid replace semantics that erase memo.",
+      "evidence": [
+        "materials/upsert-policy.md",
+        "library/sqlite_utils/db.py:5031-5108"
+      ]
+    },
+    {
+      "id": "boundaries",
+      "requirement": "Distinguish a proposed plan from executed migration. Include backup/verification, existing-schema checks and source-dependent recovery of lost data; do not promise whole-stream atomicity or automatic retyping.",
+      "evidence": [
+        "materials/upsert-policy.md"
+      ]
+    }
+  ]
+}

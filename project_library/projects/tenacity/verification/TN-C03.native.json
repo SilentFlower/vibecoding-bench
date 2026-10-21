@@ -1,0 +1,29 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TN-C03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "boundaries": [
+      [
+        false,
+        true
+      ],
+      [
+        false,
+        true
+      ],
+      [
+        false,
+        false
+      ]
+    ],
+    "successful_call_not_retroactively_stopped": true
+  },
+  "resource_profile": "business"
+}

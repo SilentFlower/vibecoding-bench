@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "inference"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "inferred_integer_loses_zeros": true,
+    "prospective_text_preserves": true,
+    "ordinary_text_preserved": true,
+    "existing_text_preserved": true
+  },
+  "resource_profile": "business"
+}

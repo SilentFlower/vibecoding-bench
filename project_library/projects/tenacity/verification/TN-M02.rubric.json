@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "TN-M02",
+  "source_commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Meet the complete public built-in combination-tree contract without recursive traversal, flattening opaque subclasses or changing recursionlimit. Preserve per-node builtin float(sum(...)), argument convention, leaf order, dynamic node-entry tuple behavior, shared DAG multiplicity, leaf exceptions and bounded ValueError cycles. Independent business and full frozen 185-main/15-subtest upstream regression must pass.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "tests",
+      "requirement": "Deliver meaningful original-failing public regression tests within library/tests/test_tenacity.py and cite actual candidate implementation and test files. Claims without delivered tests are insufficient.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Change only the explicitly authorized source and public test files, without dependencies, pytest controls, unrelated lifecycle changes or global recursion-limit changes.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Evaluate factual grounding, business behavior and stated constraints; accept equivalent correct answers without keyword, verbosity or reference-answer matching."
+}

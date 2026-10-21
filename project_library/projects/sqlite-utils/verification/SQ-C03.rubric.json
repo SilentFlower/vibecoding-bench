@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "task_id": "SQ-C03",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "comparison": "Judge supported business reasoning and actual behavior. Accept concise equivalent valid answers, not keywords, answer length or similarity to a reference patch.",
+  "criteria": [
+    {
+      "id": "sync",
+      "requirement": "For this supplied FTS5 timeline distinguish default create_triggers=False from a broken iterator. Recommend create_triggers=True at index setup for ongoing writes and rebuild_fts for an existing stale index; do not blindly repeat ordinary enable_fts over an existing index.",
+      "evidence": [
+        "library/sqlite_utils/db.py:3754-3844",
+        "library/sqlite_utils/db.py:3890-3907",
+        "materials/fts-timeline.md"
+      ]
+    },
+    {
+      "id": "boundary",
+      "requirement": "Explain ongoing-write synchronization versus explicit rebuild cost. Preserve FTS5 INSERT/UPDATE/DELETE behavior and do not generalize those guarantees to the known separate FTS4 update-trigger limitation.",
+      "evidence": [
+        "materials/fts-timeline.md"
+      ]
+    }
+  ]
+}

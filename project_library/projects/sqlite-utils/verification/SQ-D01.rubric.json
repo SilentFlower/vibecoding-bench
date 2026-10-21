@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "task_id": "SQ-D01",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "comparison": "Judge supported business reasoning and actual behavior. Accept concise equivalent valid answers, not keywords, answer length or similarity to a reference patch.",
+  "criteria": [
+    {
+      "id": "evidence-first",
+      "requirement": "Before evidence has actually been consumed, request the exact invocation, representative input and full error. Keep hypotheses conditional; do not assert a specific missing option, malformed value or library bug from the initial symptom.",
+      "evidence": []
+    },
+    {
+      "id": "disclosure",
+      "requirement": "If the actual conversation does not record evidence unavailable and incident evidence has not yet been delivered, disclose import-evidence after a reasonable request. A question alone does not conclude the available-material path.",
+      "evidence": []
+    },
+    {
+      "id": "supported-result",
+      "requirement": "After actual disclosure, derive the explanation from the supplied command, input, stderr and public implementation, and recommend the smallest supported correction. If evidence is explicitly unavailable, insufficient_information is valid after naming limits, missing evidence and safe next checks. Do not invent the normal incident or its cause for the unavailable case.",
+      "evidence": []
+    },
+    {
+      "id": "read-only",
+      "requirement": "No repository edits, destructive data repair or unsupported certainty. Asking for unavailable materials forever is not required; a concluded evidence limitation is valid.",
+      "evidence": []
+    }
+  ]
+}

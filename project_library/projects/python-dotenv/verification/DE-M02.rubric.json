@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "task_id": "DE-M02",
+  "source_commit": "0b2880591780a426b0551436f47a17e7a76d954f",
+  "criteria": [
+    {
+      "id": "correctness",
+      "requirement": "The independent pre-rewrite CR/LF rejection matrix and full frozen upstream regression must pass. Reject before any rewrite entry, preserve existing bytes and missing targets, and preserve normal/Unicode keys, multiline values, quoting and return tuples. Do not trim, truncate, write then restore, broaden key policy or change unset_key.",
+      "evidence": [
+        "library/src/dotenv/main.py:224-286",
+        "library/src/dotenv/parser.py:112-134",
+        "materials/key-contract.md",
+        "materials/key-reproduction.md",
+        "materials/key-contract.md"
+      ]
+    },
+    {
+      "id": "delivery-tests",
+      "requirement": "Deliver meaningful focused public tests within the allowed test file. They must exercise the reported defect with assertions that fail against the original implementation and preserve normal controls. Inspect actual candidate files rather than accepting a prose claim.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Only edit the authorized implementation and public test file. Do not modify private verification, dependencies or unrelated behavior. Preserve the stated compatibility boundary.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and explicit constraints. Accept concise or equivalent valid answers; do not grade keyword matching, length or similarity to a reference."
+}

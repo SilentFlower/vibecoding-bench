@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "task_id": "SQ-U02",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "comparison": "Judge supported business reasoning and actual behavior. Accept concise equivalent valid answers, not keywords, answer length or similarity to a reference patch.",
+  "criteria": [
+    {
+      "id": "fts-model",
+      "requirement": "Explain the content table remains, selected columns create/populate an associated FTS virtual table, and search maps hits to content rows. Optional triggers maintain later writes, not an automatic default. Do not claim unindexed extra text is searched or hardcode internal table count across FTS versions.",
+      "evidence": [
+        "library/sqlite_utils/db.py:3754-3871",
+        "materials/fts-context.md"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "task_id": "SQ-U01",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "comparison": "Judge supported business reasoning and actual behavior. Accept concise equivalent valid answers, not keywords, answer length or similarity to a reference patch.",
+  "criteria": [
+    {
+      "id": "data-path",
+      "requirement": "Explain the real sqlite_utils.__main__/cli entry, Database connection and Table insertion paths. Both entry points access the same explicitly selected SQLite file; no separate database server is required.",
+      "evidence": [
+        "library/sqlite_utils/__main__.py:1-8",
+        "library/sqlite_utils/db.py:538-591"
+      ]
+    },
+    {
+      "id": "persistence",
+      "requirement": "Distinguish durable local file rows from Python objects and separate in-memory connections. Do not claim process memory persists or that every import is atomic.",
+      "evidence": [
+        "materials/local-import.md"
+      ]
+    }
+  ]
+}

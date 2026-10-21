@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "task_id": "SQ-D03",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "comparison": "Judge supported business reasoning and actual behavior. Accept concise equivalent valid answers, not keywords, answer length or similarity to a reference patch.",
+  "criteria": [
+    {
+      "id": "consumption",
+      "requirement": "Trace repeated consumption across CREATE column formatting, populate_fts and optional trigger formatting. Explain exhausted columns yield malformed subsequent SQL and partial FTS table; materializing the finite columns at the caller is a workaround. Distinguish list-based later staleness from index construction failure.",
+      "evidence": [
+        "materials/fts-reproducer.py",
+        "materials/fts-observed.txt",
+        "library/sqlite_utils/db.py:3754-3871"
+      ]
+    }
+  ]
+}

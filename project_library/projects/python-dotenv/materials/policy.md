@@ -1,0 +1,2 @@
+# Application field policy
+Only REGION treats missing, bare (None), and empty text as local. REGION_LABEL is the validated region plus /app. OTHER_EMPTY= remains empty. Read with existing APIs, optionally interpolate=False; validate REGION before deriving REGION_LABEL. Preserve the original file and process environment. Do not change global interpolation, execute a shell, or apply truthiness fallback to every field.

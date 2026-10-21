@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "task_id": "TN-D03",
+  "source_commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain both original overflow routes: float zero times an enormous integer power, and integer zero with an overflowing floating power. OverflowError returns/clamps to max, while integer zero with integer base is a normal control. Preserve non-zero minimum and sampled jitter; random-exponential bounds follow the fixed strategy. No actual long sleep or code edits.",
+      "evidence": [
+        "library/tenacity/wait.py:227-341"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Use pinned real APIs and actual consumed materials, cite relevant source symbols and state limits. Native witness facts do not prove an implemented application or answer quality. No library edits or invented APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, business behavior and stated constraints; accept equivalent correct answers without keyword, verbosity or reference-answer matching."
+}

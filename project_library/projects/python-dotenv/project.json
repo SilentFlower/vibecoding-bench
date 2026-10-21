@@ -1,0 +1,420 @@
+{
+  "schema": 2,
+  "project_key": "python-dotenv",
+  "title": "python-dotenv 配置接入与编辑工作场景",
+  "category": "配置与本地工具",
+  "description": "冻结真实版本上的加载解释、配置分诊、字段政策和保真编辑；5 场景、12 稳定任务。",
+  "seed_digest": "7adb719502909d3fd4bdfbec74b9445fb6c735dfd4df52bd559e5f37407439f7",
+  "environment": "python-dotenv-py312",
+  "source": {
+    "repository": "https://github.com/theskumar/python-dotenv",
+    "commit": "0b2880591780a426b0551436f47a17e7a76d954f",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "DE-S01",
+      "title": "把配置加载接入本地应用",
+      "goal": "理解现有 API 并规划不依赖工作目录的接入",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DE-U01",
+            "DE-C01",
+            "DE-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DE-U01",
+          "kind": "understand",
+          "goal": "区分解析映射、加载环境与覆盖优先级",
+          "prompt": "Trace dotenv_values and load_dotenv for the supplied synthetic configuration. Explain which call mutates the process environment, how override affects both final values and interpolation, and which existing values remain untouched. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/configuration.env.txt",
+            "materials/environment.json",
+            "materials/loading-calls.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DE-U01.rubric.json",
+            "native": "verification/api.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DE-C01",
+          "kind": "consult",
+          "goal": "用现有映射 API 选择有序配置合并方式",
+          "prompt": "We have a shared file, a local file and an explicit deployment mapping. Later layers win. No value refers to another file. Recommend a minimal solution using this version, without adding a multi-file API or mutating os.environ.",
+          "requires": [],
+          "materials": [
+            "materials/layers.md",
+            "materials/shared.env.txt",
+            "materials/local.env.txt",
+            "materials/deployment.json"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DE-C01.rubric.json",
+            "native": "verification/merge.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DE-P01",
+          "kind": "plan",
+          "goal": "规划显式路径加载及启动校验",
+          "prompt": "Plan startup for a local application launched from different working directories. The caller supplies an absolute configuration path; loading must preserve existing deployment values and missing required application fields must stop startup. Use existing APIs and separate application validation from dotenv parsing.",
+          "requires": [],
+          "materials": [
+            "materials/startup-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DE-P01.rubric.json",
+            "native": "verification/startup.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DE-S02",
+      "title": "加载后为什么仍然是旧值",
+      "goal": "先补最小材料，区分优先级、空值与真实故障",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DE-D01",
+            "DE-C02"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "DE-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DE-D01",
+          "kind": "diagnose",
+          "goal": "先补材料再判断旧值现象",
+          "prompt": "The application still reports its old mode after dotenv loading. Determine what evidence is missing before choosing a root cause. Request the smallest useful sanitized reproduction, then diagnose only what the supplied evidence supports. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/old-mode-report.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DE-D01.rubric.json"
+          },
+          "branches": [
+            {
+              "id": "incident-evidence",
+              "when": "The conversation does not record that incident evidence is unavailable, the fixed incident evidence has not been supplied, and the answer reasonably requests a sanitized call, target file, process state or before/after observation before selecting a cause. Supply the complete fixed evidence together. Never disclose this for the unavailable entry.",
+              "materials": [
+                "disclosure/loader.py",
+                "disclosure/synthetic-config.env.txt",
+                "disclosure/environment.json",
+                "disclosure/observed.json",
+                "disclosure/call-context.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "DE-C02",
+          "kind": "consult",
+          "goal": "区分空赋值、裸键与缺失键",
+          "prompt": "Our export tool must distinguish EMPTY=, a bare OPTIONAL key and an absent key. Explain the mapping and CLI get results, recommend an explicit application policy, and say whether the current library needs a change.",
+          "requires": [],
+          "materials": [
+            "materials/empty-policy.md",
+            "materials/empty.env.txt"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DE-C02.rubric.json",
+            "native": "verification/cli.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DE-S03",
+      "title": "插值顺序与空值兼容",
+      "goal": "解释固定版本行为并规划字段级业务政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DE-U02",
+            "DE-D02",
+            "DE-P02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DE-U02",
+          "kind": "understand",
+          "goal": "解释顺序插值与已有关闭选项",
+          "prompt": "Explain why A=${B} before B=ready differs from the reverse order, why $B remains literal, and how to preserve all interpolation expressions literally with existing options. Use the pinned parser and resolver; do not add recursive expansion.",
+          "requires": [],
+          "materials": [
+            "materials/interpolation.md",
+            "materials/forward.env.txt",
+            "materials/reverse.env.txt"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DE-U02.rubric.json",
+            "native": "verification/interpolation.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DE-D02",
+          "kind": "diagnose",
+          "goal": "识别空值默认的既有兼容行为",
+          "prompt": "For B= followed by A=${B:-d}, A is empty rather than d. Compare missing, empty, bare and non-empty B in this pinned version. Explain the implementation and compatibility implications before calling for a change; do not modify the library.",
+          "requires": [],
+          "materials": [
+            "materials/defaults.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_compatibility_behavior"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DE-D02.rubric.json",
+            "native": "verification/defaults.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DE-P02",
+          "kind": "plan",
+          "goal": "规划指定字段的显式空值政策",
+          "prompt": "Design an application-level policy where only REGION treats missing, bare and empty input as local. Empty values of other fields must keep their meaning, and derived REGION_LABEL must use the validated region. Preserve python-dotenv defaults and the source file.",
+          "requires": [],
+          "materials": [
+            "materials/policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan_no_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DE-P02.rubric.json",
+            "native": "verification/policy.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DE-S04",
+      "title": "配置编辑只改变目标记录",
+      "goal": "定位并修复非目标记录原始换行变化",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DE-D03",
+            "DE-M01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "DE-D03"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "DE-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DE-D03",
+          "kind": "diagnose",
+          "goal": "从实际字节定位非目标换行变化",
+          "prompt": "After set_key updates COLOR, unrelated comments and a multi-line value have changed from CRLF to LF. Explain the read/parse/rewrite path using the supplied before/after bytes, distinguish semantic value changes from file-format changes, and identify the smallest correction. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/newline-reproduction.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DE-D03.rubric.json",
+            "native": "verification/newline-baseline.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DE-M01",
+          "kind": "modify",
+          "goal": "保留 set/unset 非目标记录的原始换行",
+          "prompt": "Preserve the original text and newline bytes of every non-target parsed record when set_key or unset_key edits a UTF-8 file. Keep existing LF serialization of changed or newly appended target lines and existing return values, quoting, file modes, symlink behavior and failure cleanup. Add focused public tests. The attached reproduction and contract are complete; no earlier answer is required.",
+          "requires": [],
+          "materials": [
+            "materials/newline-reproduction.md",
+            "materials/newline-contract.md"
+          ],
+          "allowed_paths": [
+            "library/src/dotenv/main.py",
+            "library/tests/test_main.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DE-M01.rubric.json",
+            "native": "verification/newline.native.json",
+            "semantic": true
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DE-S05",
+      "title": "配置表单的键不能跨行",
+      "goal": "区分写入成功与可读回性并增加窄范围拒绝",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DE-D04",
+            "DE-M02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "DE-D04"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "DE-M02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DE-D04",
+          "kind": "diagnose",
+          "goal": "定位跨行键写入与解析不一致",
+          "prompt": "Our local configuration editor accidentally passed a line break in a field name. set_key returned success, but the same key cannot be read back. Explain the mismatch between writer and parser and propose a narrow data-integrity rule; do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/key-reproduction.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DE-D04.rubric.json",
+            "native": "verification/keys-baseline.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DE-M02",
+          "kind": "modify",
+          "goal": "跨行键在打开或创建文件前失败",
+          "prompt": "Make set_key raise ValueError for a key containing CR or LF before opening rewrite or creating a destination file. Existing files must remain byte-identical and missing destination files must remain absent on rejection. Preserve normal keys, values, return values and other editing behavior. Add focused tests; do not broaden the accepted-key policy. This scene starts independently from the original baseline and the attachments are self-contained.",
+          "requires": [],
+          "materials": [
+            "materials/key-reproduction.md",
+            "materials/key-contract.md"
+          ],
+          "allowed_paths": [
+            "library/src/dotenv/main.py",
+            "library/tests/test_main.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DE-M02.rubric.json",
+            "native": "verification/keys.native.json",
+            "semantic": true
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

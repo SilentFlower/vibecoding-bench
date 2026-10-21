@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "id": "sqlite-utils-py312",
+  "adapter": "python-native",
+  "python": "3.12.15",
+  "platform": "linux-amd64",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "requirements": [
+    "click==8.5.0",
+    "click-default-group==1.2.4",
+    "hypothesis==6.170.5",
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==9.1.1",
+    "python-dateutil==2.9.0.post0",
+    "six==1.17.0",
+    "sortedcontainers==2.4.0",
+    "sqlite-fts4==1.0.3",
+    "tabulate==0.10.0",
+    "pip==24.0"
+  ],
+  "artifacts": [
+    {
+      "path": "artifacts/click-8.5.0-py3-none-any.whl",
+      "digest": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360",
+      "size": 125251
+    },
+    {
+      "path": "artifacts/click_default_group-1.2.4-py2.py3-none-any.whl",
+      "digest": "9b60486923720e7fc61731bdb32b617039aba820e22e1c88766b1125592eaa5f",
+      "size": 4123
+    },
+    {
+      "path": "artifacts/hypothesis-6.170.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "digest": "83a29bd457f5aad739bc22b15cc295545c9372a254d6be77f253eae2908e5e5a",
+      "size": 1163728
+    },
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pip-24.0-py3-none-any.whl",
+      "digest": "ba0d021a166865d2265246961bec0152ff124de910c5cc39f1156ce3fa7c69dc",
+      "size": 2110226
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+      "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+      "size": 386536
+    },
+    {
+      "path": "artifacts/python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+      "digest": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
+      "size": 229892
+    },
+    {
+      "path": "artifacts/six-1.17.0-py2.py3-none-any.whl",
+      "digest": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+      "size": 11050
+    },
+    {
+      "path": "artifacts/sortedcontainers-2.4.0-py2.py3-none-any.whl",
+      "digest": "a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0",
+      "size": 29575
+    },
+    {
+      "path": "artifacts/sqlite_fts4-1.0.3-py3-none-any.whl",
+      "digest": "0359edd8dea6fd73c848989e1e2b1f31a50fe5f9d7272299ff0e8dbaa62d035f",
+      "size": 9972
+    },
+    {
+      "path": "artifacts/tabulate-0.10.0-py3-none-any.whl",
+      "digest": "f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3",
+      "size": 39814
+    }
+  ],
+  "business": {
+    "memory_mb": 256,
+    "timeout_sec": 30,
+    "pids_limit": 64
+  },
+  "regression": {
+    "memory_mb": 512,
+    "timeout_sec": 180,
+    "pids_limit": 64
+  },
+  "verification_status": "verified_current_target_runtime",
+  "notes": "当前正式目标镜像已在 UID1000、network none、只读根验证，Python3.12.15／SQLite3.40.1；业务256MiB/PID64/30秒，原版与两独立参考完整回归512MiB/PID64/180秒。当前1513节点中1497通过、16按实际可选能力跳过（3缺compiled ext.c、1缺pandas/numpy、12缺SpatiaLite），无失败；逐节点合同和日志已冻结。校准pytest21.59秒、子进程峰值292300KiB，资源为已验证上限非最优值。真实模型质量／成本和生产部署未验证。",
+  "tested_image": "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+  "tested_repo_digest": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+}

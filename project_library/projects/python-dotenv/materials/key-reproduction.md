@@ -1,0 +1,2 @@
+# Synthetic field-name reproduction
+In a dedicated temporary file initially COLOR=blue\n, set_key(path, "REPORT\nREGION", "ready") reports success but get_key(path, "REPORT\nREGION") returns None; the writer emits the line break into separate records. Repeat with CR. A normal REPORT_REGION and a Unicode key remain ordinary valid controls. This is a local form-data integrity issue. Do not use any real configuration.

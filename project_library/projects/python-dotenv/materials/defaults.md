@@ -1,0 +1,2 @@
+# Empty default expression observation
+Use fresh streams and no process B. Compare these complete cases: A=${B:-d}; B= then A=${B:-d}; bare B then A=${B:-d}; B=ready then A=${B:-d}. Our application expected d for the empty case, but this is not a claim that upstream promised shell semantics. Explain the current implementation and compatibility cost without changing it. Include interpolate=False as a control.

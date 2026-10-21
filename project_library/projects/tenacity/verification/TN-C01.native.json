@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TN-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "native_lifecycle": true,
+    "exception_boundaries": true
+  },
+  "resource_profile": "business"
+}

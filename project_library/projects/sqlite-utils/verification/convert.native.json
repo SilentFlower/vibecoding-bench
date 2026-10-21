@@ -1,0 +1,45 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "convert"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "bound_same_table": true,
+    "bound_cross_table": true,
+    "partial_same_table": true,
+    "partial_cross_table": true,
+    "object_same_table": true,
+    "object_cross_table": true,
+    "same_name_same_table": true,
+    "same_name_cross_table": true,
+    "lambda_same_table": true,
+    "lambda_cross_table": true,
+    "output_where_preserves_raw": true,
+    "falsey_values_called": true,
+    "same_callback_repeated": true,
+    "multi_preserved": true,
+    "callback_error_rolls_back_update": true,
+    "public_default_preserved": true,
+    "public_explicit_replace": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "cwd": "library",
+    "argv": [
+      "python",
+      "-m",
+      "pytest",
+      "tests",
+      "-q",
+      "-ra",
+      "-p",
+      "no:cacheprovider"
+    ],
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

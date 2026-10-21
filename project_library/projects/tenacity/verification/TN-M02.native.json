@@ -1,0 +1,24 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TN-M02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "deep_trees": true,
+    "grouping_and_numbers": true,
+    "opaque_order_and_dag": true,
+    "dynamic_entry": true,
+    "exceptions_and_cycles": true,
+    "recursion_limit_unchanged": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

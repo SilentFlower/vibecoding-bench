@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "task_id": "TK-C01",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The unique executable update_config example uses existing public APIs, retains untouched bytes and comments, preserves single-line literal quoting only when representable, and otherwise encodes the exact name safely as a basic string. Explain why plain str assignment alone does not preserve the previous quote style.",
+      "evidence": [
+        "library/tomlkit/api.py:158-181"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Answer this task using the pinned public APIs, actual consumed materials and independent native facts. State assumptions and limits, cite relevant source symbols, and do not modify files or invent unsupported APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and authorized constraints. Accept equivalent valid answers; do not grade keywords, verbosity or reference-answer similarity.",
+  "source_commit": "eddd27e43a62fe58707c311bfad2f52e72493f53"
+}

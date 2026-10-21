@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "task_id": "SQ-C01",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "comparison": "Judge supported business reasoning and actual behavior. Accept concise equivalent valid answers, not keywords, answer length or similarity to a reference patch.",
+  "criteria": [
+    {
+      "id": "fit",
+      "requirement": "Existing Python/CLI APIs are appropriate for local reporting. Distinguish data manipulation from HTTP UI, authentication, conflict policy and distributed job execution. Do not invent those application features or categorically forbid multiple SQLite connections.",
+      "evidence": [
+        "materials/fit-requirements.md",
+        "library/README.md:1-52"
+      ]
+    }
+  ]
+}

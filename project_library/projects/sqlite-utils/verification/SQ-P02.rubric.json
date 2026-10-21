@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "task_id": "SQ-P02",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "comparison": "Judge supported business reasoning and actual behavior. Accept concise equivalent valid answers, not keywords, answer length or similarity to a reference patch.",
+  "criteria": [
+    {
+      "id": "pilot",
+      "requirement": "Use actual output/where/where_args options, bound values and prospective TEXT output. Keep raw values; id=1 becomes CA and unprocessed id=2 has NULL normalized. Include backup and verification before expanding.",
+      "evidence": [
+        "materials/normalization-policy.md",
+        "library/sqlite_utils/db.py:4177-4271"
+      ]
+    },
+    {
+      "id": "limits",
+      "requirement": "Plan is not an executed migration. Do not overwrite raw, interpolate user SQL values or claim add-column DDL and all conversion steps necessarily share one atomic boundary.",
+      "evidence": [
+        "materials/normalization-policy.md"
+      ]
+    }
+  ]
+}

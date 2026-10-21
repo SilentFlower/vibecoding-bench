@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "task_id": "TK-D04",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain the real empty dotted Table rendering path and outer key/separator tracking, using both invalid middle rendering and valid-but-semantically-wrong singleton output. The user deleted a leaf; its still-present empty parent cannot silently be redefined as removed. Distinguish ordinary flat deletion and remaining-child controls.",
+      "evidence": [
+        "library/tomlkit/items.py:2104-2245"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "Answer this task using the pinned public APIs, actual consumed materials and independent native facts. State assumptions and limits, cite relevant source symbols, and do not modify files or invent unsupported APIs.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and authorized constraints. Accept equivalent valid answers; do not grade keywords, verbosity or reference-answer similarity.",
+  "source_commit": "eddd27e43a62fe58707c311bfad2f52e72493f53"
+}

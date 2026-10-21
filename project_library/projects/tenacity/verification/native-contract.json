@@ -1,0 +1,1099 @@
+{
+  "baseline_digest": "0a518dc2ab05c2ac0de0c21434423eaabcbc0fd6d7054f376a649e9db7715b56",
+  "nodes": [
+    {
+      "id": "tests/test_after.py::TestAfterLogFormat::test_01_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_after.py::TestAfterLogFormat::test_02_custom_sec_format",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_after.py::TestAfterLogFormat::test_02_none_seconds_since_start",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncEnabled::test_enabled_false_aiter_raises_original_exception",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncEnabled::test_enabled_false_aiter_succeeds_on_first_attempt",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncEnabled::test_enabled_false_call_raises_original_exception",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncEnabled::test_enabled_false_call_succeeds_on_first_attempt",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncEnabled::test_enabled_false_skips_retry",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncio::test_attempt_number_is_correct_for_interleaved_coroutines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncio::test_iscoroutinefunction",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncio::test_repr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncio::test_retry",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncio::test_retry_attributes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncio::test_retry_preserves_argument_defaults",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncio::test_retry_using_async_retying",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncio::test_statistics_visible_through_outer_decorator",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncio::test_stop_after_attempt",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestAsyncio::test_wait_falsy_values_mean_no_wait",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestContextManager::test_async_retying_iterator",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestContextManager::test_async_with_attempt_manager",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestContextManager::test_do_max_attempts",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestContextManager::test_reraise",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestContextManager::test_reraise_try_again_with_cause",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestContextManager::test_retry_with_async_exc",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestContextManager::test_retry_with_async_result",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestContextManager::test_retry_with_async_result_and",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestContextManager::test_retry_with_async_result_or",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestContextManager::test_retry_with_async_result_rand",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestContextManager::test_retry_with_async_result_ror",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestContextManager::test_retry_with_result",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestContextManager::test_sleeps",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestDecoratorWrapper::test_retry_function_attributes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestSyncFunctionWithAsyncSleep::test_sync_function_with_async_sleep",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_asyncio.py::TestTrio::test_trio_basic",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_issue_478.py::TestIssue478::test_async",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_issue_478.py::TestIssue478::test_issue",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestBase::test_callstate_repr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestBase::test_retrying_repr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestBeforeAfterAttempts::test_after_attempts",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestBeforeAfterAttempts::test_before_attempts",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestBeforeAfterAttempts::test_before_sleep",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestBeforeAfterAttempts::test_before_sleep_log_raises",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestBeforeAfterAttempts::test_before_sleep_log_raises_with_exc_info",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestBeforeAfterAttempts::test_before_sleep_log_returns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestBeforeAfterAttempts::test_before_sleep_log_returns_with_exc_info",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestContextManager::test_context_manager_on_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestContextManager::test_context_manager_reraise",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestContextManager::test_context_manager_retry_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestContextManager::test_context_manager_retry_one",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_defaults",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_except_exception_of_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_function_attributes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_function_object",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_if_exception_cause_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_if_exception_cause_type_handles_cause_cycles",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_if_exception_message",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_if_exception_message_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_if_exception_of_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_if_not_exception_message",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_if_not_exception_message_delay",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_if_not_exception_message_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_preserves_argument_defaults",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_until_exception_of_type_attempt_number",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_until_exception_of_type_no_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_retry_until_exception_of_type_wrong_exception",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_with_stop_on_exception",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_with_stop_on_return_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestDecoratorWrapper::test_with_wait",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestEnabled::test_enabled_false_call_raises_original_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestEnabled::test_enabled_false_call_succeeds_on_first_attempt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestEnabled::test_enabled_false_iter_raises_original_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestEnabled::test_enabled_false_iter_succeeds_on_first_attempt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestEnabled::test_enabled_false_preserves_attributes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestEnabled::test_enabled_false_skips_retry",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestEnabled::test_enabled_false_via_retry_with",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestEnabled::test_enabled_true_retries_normally",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestInvokeAsCallable::test_on_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestInvokeAsCallable::test_reraise",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestInvokeAsCallable::test_retry_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestInvokeAsCallable::test_retry_one",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestMockingSleep::test_decorated",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestMockingSleep::test_decorated_retry_with",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestPickle::test_retry_strategies_picklable",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestPickle::test_retrying_picklable",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestPickle::test_retrying_picklable_after_run",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestPickle::test_retrying_pickle_round_trip_works",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestReraiseExceptions::test_reraise_by_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestReraiseExceptions::test_reraise_from_retry_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestReraiseExceptions::test_reraise_no_exception",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestReraiseExceptions::test_reraise_timeout_from_retry_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_all",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_and",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_and_coalesces",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_and_with_plain_function",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_any",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_if_exception_message_empty_message",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_if_exception_message_negative_no_inputs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_if_exception_message_negative_too_many_inputs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_if_not_exception_message_empty_message",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_if_not_result",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_if_result",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_or",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_or_coalesces",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_or_with_plain_function",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_try_again",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_try_again_forever",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_try_again_forever_reraise",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_try_again_from_cause_reraise",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryConditions::test_retry_try_again_with_cause_reraise",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryErrorCallback::test_retry_error_callback",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryException::test_retry_error_is_pickleable",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryTyping::test_retry_decorated_method_keeps_bound_signature",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryTyping::test_retry_type_annotations",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryWith::test_redefine_stop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryWith::test_redefine_wait",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryWith::test_retry_error_callback_should_be_preserved",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryWith::test_retry_error_cls_should_be_preserved",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryingName::test_get_fn_name_context_manager_no_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryingName::test_get_fn_name_context_manager_with_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryingName::test_get_fn_name_decorator",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryingName::test_logging_uses_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryingName::test_str_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryingName::test_str_overridden_by_copy",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryingName::test_str_preserved_by_copy",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestRetryingName::test_str_with_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStatistics::test_retry_object_statistics_during_execution",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStatistics::test_retry_object_statistics_synced",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStatistics::test_stats",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStatistics::test_stats_failing",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStatisticsKeys::test_delay_since_first_attempt_available_on_first_attempt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStatisticsKeys::test_statistics_visible_through_outer_decorator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStopConditions::test_legacy_explicit_stop_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStopConditions::test_never_stop",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStopConditions::test_stop_after_attempt",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStopConditions::test_stop_after_delay",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStopConditions::test_stop_all",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStopConditions::test_stop_and",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStopConditions::test_stop_any",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStopConditions::test_stop_before_delay",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStopConditions::test_stop_func_with_retry_state",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestStopConditions::test_stop_or",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_exponential",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_exponential_caps_when_max_multiplier_ratio_underflows",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_exponential_skips_power_after_reaching_max",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_exponential_with_max_wait",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_exponential_with_max_wait_and_multiplier",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_exponential_with_min_wait",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_exponential_with_min_wait_and_multiplier",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_exponential_with_min_wait_andmax__wait",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_fixed_sleep",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_incrementing_sleep",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_legacy_explicit_wait_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_no_sleep",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_random_sleep",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_random_sleep_withoutmin_",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_arbitrary_sum",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_chain",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_chain_multiple_invocations",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_chain_requires_at_least_one_strategy",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_combine",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_combine_passes_state_positionally",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_double_sum",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_exception",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_exponential_jitter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_exponential_jitter_initial_and_multiplier_raises",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_exponential_jitter_initial_deprecated",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_exponential_jitter_min",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_exponential_jitter_multiplier",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_exponential_jitter_timedelta",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_falsy_callable_is_called",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_falsy_values_mean_no_wait",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_func",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_radd_plain_callable",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_radd_rejects_non_zero_number",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_random_exponential",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_random_exponential_statistically",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_retry_state_attributes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tenacity.py::TestWaitConditions::test_wait_triple_sum",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tornado.py::TestTornado::test_old_tornado",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tornado.py::TestTornado::test_repr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tornado.py::TestTornado::test_retry",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tornado.py::TestTornado::test_stop_after_attempt",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tornado.py::TestTornado::test_tornado_set_to_none",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_find_ordinal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_coroutine_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "tenacity",
+  "python": "3.12.15",
+  "schema": 1,
+  "subtests": [
+    {
+      "context": {
+        "kwargs": {},
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_after_delay",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_after_delay",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_before_delay",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_before_delay",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_exponential_with_min_wait_andmax__wait",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_exponential_with_min_wait_andmax__wait",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_fixed_sleep",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_fixed_sleep",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_incrementing_sleep",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_incrementing_sleep",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_random_sleep",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_random_sleep",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "wait": "None"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_wait_falsy_values_mean_no_wait",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "wait": "0"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_wait_falsy_values_mean_no_wait",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "wait": "0"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_wait_falsy_values_mean_no_wait",
+      "when": "call"
+    }
+  ]
+}

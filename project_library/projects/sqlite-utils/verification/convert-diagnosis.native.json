@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "convert-diagnosis"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "original_bound_collision": true,
+    "lambda_control": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "TN-M01",
+  "source_commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Meet the full public zero-contribution contract in wait_exponential and wait_exponential_jitter without public signature changes. Cover both overflow routes, integer normal controls, clamp ordering/minima, random-exponential bounds, exactly one ordered jitter draw and nonzero behavior. The independent business oracle and complete 185-main/15-subtest frozen upstream regression must pass.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "tests",
+      "requirement": "Deliver meaningful original-failing public regression tests within library/tests/test_tenacity.py and cite actual candidate implementation and test files. Claims without delivered tests are insufficient.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Change only the explicitly authorized source and public test files, without dependencies, pytest controls, unrelated lifecycle changes or global recursion-limit changes.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Evaluate factual grounding, business behavior and stated constraints; accept equivalent correct answers without keyword, verbosity or reference-answer matching."
+}

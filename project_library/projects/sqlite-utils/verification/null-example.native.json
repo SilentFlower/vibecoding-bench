@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "null-example"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "unique_python_block": true,
+    "default_empty_string": true,
+    "example_creates_actual_nulls": true
+  },
+  "resource_profile": "business"
+}

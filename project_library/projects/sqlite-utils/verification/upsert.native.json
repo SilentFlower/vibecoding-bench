@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "upsert"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "upsert_preserves_omitted": true,
+    "plain_insert_duplicates": true,
+    "replace_loses_memo": true
+  },
+  "resource_profile": "business"
+}

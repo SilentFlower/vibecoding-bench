@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "task_id": "DE-D03",
+  "source_commit": "0b2880591780a426b0551436f47a17e7a76d954f",
+  "criteria": [
+    {
+      "id": "correctness",
+      "requirement": "Trace rewrite text opening, universal-newline translation, parser Binding.original.string and writing of untouched records. Distinguish byte preservation from read-value normalization and target LF serialization. Identify a narrow read/write newline correction without redesigning the parser.",
+      "evidence": [
+        "library/src/dotenv/main.py:162-223",
+        "library/src/dotenv/main.py:259-285",
+        "library/src/dotenv/parser.py:69-98",
+        "materials/newline-reproduction.md"
+      ]
+    },
+    {
+      "id": "read-only",
+      "requirement": "Answer or plan only; allowed_paths is empty and no code checkpoint is requested. Native witnesses establish source/API facts or feasibility; the semantic review must still assess the actual answer and its assumptions.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and explicit constraints. Accept concise or equivalent valid answers; do not grade keyword matching, length or similarity to a reference."
+}

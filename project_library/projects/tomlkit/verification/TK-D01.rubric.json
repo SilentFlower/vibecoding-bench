@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "task_id": "TK-D01",
+  "criteria": [
+    {
+      "id": "evidence-request",
+      "requirement": "An exception-family symptom alone does not identify the cause. Request a minimal useful exact input, call, full error and version; conditional hypotheses are acceptable, unsupported certainty is not.",
+      "evidence": []
+    },
+    {
+      "id": "disclosure",
+      "requirement": "When evidence is available but not consumed yet, use parse-reproducer for a reasonable evidence request; a question alone does not conclude the available-material path. If the actual conversation explicitly records lost evidence, do not disclose or require hidden facts.",
+      "evidence": []
+    },
+    {
+      "id": "conclusion",
+      "requirement": "After actual incident evidence is consumed, derive only its supported diagnosis from that evidence and public parser code, distinguish valid input corrections from a demonstrated library bug, and give a bounded next action. With explicitly unavailable evidence, insufficient_information is a legitimate final outcome after explaining limits and future verification. Do not change files or invent a confirmed cause.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and authorized constraints. Accept equivalent valid answers; do not grade keywords, verbosity or reference-answer similarity.",
+  "source_commit": "eddd27e43a62fe58707c311bfad2f52e72493f53"
+}

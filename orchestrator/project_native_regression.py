@@ -48,6 +48,7 @@ from pathlib import Path
 SCHEMA = 1
 IGNORE_DIRS = {'.git', '.venv', 'venv', '__pycache__', '.pytest_cache', '.mypy_cache', '.ruff_cache'}
 CONTROL_NAMES = {'conftest.py', 'pyproject.toml', 'pytest.ini', 'tox.ini', 'setup.cfg', '.coveragerc'}
+_WORK_ROOT = Path('/work')
 SUITES = {
     'python-frontmatter': {'package': 'frontmatter', 'overlay': True, 'total': 67,
         'passed': 67, 'skipped': 0, 'xfailed': 0, 'doctests': 11,
@@ -75,6 +76,16 @@ SUITES = {
         'plugins': [('pytest-timeout', 'pytest_timeout')], 'env': {}},
     'schedule': {'package': 'schedule', 'overlay': True, 'doctests': 0,
         'args': ['test_schedule.py', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'python-dotenv': {'package': 'dotenv', 'implementation_dir': 'src/dotenv', 'import_root': 'src',
+        'overlay': True, 'doctests': 0,
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'tomlkit': {'package': 'tomlkit', 'overlay': True, 'doctests': 0,
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'sqlite-utils': {'package': 'sqlite_utils', 'overlay': True, 'doctests': 0,
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('hypothesis', '_hypothesis_pytestplugin')], 'env': {}},
+    'tenacity': {'package': 'tenacity', 'overlay': True, 'doctests': 0, 'subtests': True,
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
 }
 _STATE: dict = {}
 
@@ -233,6 +244,41 @@ def _plugins(suite: dict) -> list[dict]:
     return result
 
 
+def _bind_source(project: Path, import_root: Path, cleanup: ExitStack, *, console: bool = False) -> dict:
+    """绑定独占验证环境的子进程源码与固定入口。
+
+    :param project: 控制端构建的测试树。
+    :param import_root: 固定套件相对导入根。
+    :param cleanup: 本次运行退出时的清理栈。
+    :param console: 是否生成 dotenv 的固定命令行入口。
+    :return: 实际绑定及可执行文件摘要；拒绝共享或系统解释器。
+    """
+    private_venv = Path(sys.prefix).resolve()
+    purelib = Path(sysconfig.get_path('purelib')).resolve()
+    if (sys.prefix == sys.base_prefix or not private_venv.is_relative_to(_WORK_ROOT)
+            or not purelib.is_relative_to(private_venv)):
+        raise RuntimeError('原生子进程回归需要 /work 下独占的验证 venv，拒绝修改共享解释器')
+    target = project / import_root
+    source_path = purelib / ('_bench_native_source_' + uuid.uuid4().hex + '.pth')
+    cleanup.callback(source_path.unlink, missing_ok=True)
+    source_path.write_text(str(target) + '\n', encoding='utf-8')
+    result = {'mode': 'private-venv-pure-path', 'venv': str(private_venv),
+        'path_file': str(source_path), 'path_target': str(target), 'cleanup_on_exit_registered': True}
+    if console:
+        entry = private_venv / 'bin/dotenv'
+        if entry.exists() or entry.is_symlink():
+            raise RuntimeError('独占验证环境已有 dotenv 入口，拒绝覆盖未知安装')
+        # 上游测试会直接 exec 命令；入口位于允许执行的私有 venv，模块仍取受控源码。
+        script = '#!' + sys.executable + '\nfrom dotenv.__main__ import cli\nraise SystemExit(cli())\n'
+        with entry.open('x', encoding='utf-8') as output:
+            cleanup.callback(entry.unlink, missing_ok=True)
+            output.write(script)
+        entry.chmod(0o755)
+        result['console'] = {'path': str(entry), 'target': 'dotenv.__main__:cli',
+            'sha256': hashlib.sha256(entry.read_bytes()).hexdigest()}
+    return result
+
+
 def _state() -> dict:
     """取得当前 pytest 进程的受控插件状态。@return 状态。"""
     if not _STATE:
@@ -299,8 +345,12 @@ def pytest_collection_modifyitems(session, config, items) -> None:
 
 def pytest_runtest_logreport(report) -> None:
     """保留逐阶段真实结果，包括空理由的 xfail。@param report pytest 报告。@return None。"""
-    _state()['reports'].append({'id': report.nodeid, 'when': report.when, 'outcome': report.outcome,
-        'wasxfail': hasattr(report, 'wasxfail'), 'reason': str(getattr(report, 'wasxfail', '') or report.longrepr or '')[-2048:]})
+    state = _state()
+    value = {'id': report.nodeid, 'when': report.when, 'outcome': report.outcome,
+        'wasxfail': hasattr(report, 'wasxfail'), 'reason': str(getattr(report, 'wasxfail', '') or report.longrepr or '')[-2048:]}
+    if state['control'].get('subtests') and type(report).__name__ == 'SubtestReport':
+        value['subtest_context'] = report.context._to_json()
+    state['reports'].append(value)
 
 
 def pytest_sessionfinish(session, exitstatus) -> None:
@@ -337,6 +387,36 @@ def _node_results(reports: list[dict], node_ids: list[str]) -> dict[str, str]:
     return outcomes
 
 
+def _subtest_results(reports: list[dict], node_ids: list[str]) -> list[dict]:
+    """保留每个父节点下逐次子测试，避免相同上下文被错误去重。
+
+    :param reports: 真实 pytest 阶段报告。
+    :param node_ids: 本轮固定主节点。
+    :return: 按父节点和出现序号排序的子测试合同条目。
+    """
+    ordinals = {node: 0 for node in node_ids}
+    result = []
+    for report in reports:
+        if 'subtest_context' not in report:
+            continue
+        context = report['subtest_context']
+        if (report['id'] not in ordinals or report['when'] != 'call'
+                or report['outcome'] not in ('passed', 'failed', 'skipped')
+                or not isinstance(context, dict) or set(context) != {'msg', 'kwargs'}
+                or context['msg'] is not None and not isinstance(context['msg'], str)
+                or not isinstance(context['kwargs'], dict)
+                or any(not isinstance(key, str) or not isinstance(value, str)
+                    for key, value in context['kwargs'].items())):
+            raise ValueError('原生子测试身份、阶段或上下文不完整')
+        ordinals[report['id']] += 1
+        outcome = report['outcome']
+        if report['wasxfail'] and outcome in ('passed', 'skipped'):
+            outcome = 'xpassed' if outcome == 'passed' else 'xfailed'
+        result.append({'parent_nodeid': report['id'], 'ordinal': ordinals[report['id']],
+            'when': report['when'], 'context': context, 'outcome': outcome})
+    return sorted(result, key=lambda item: (item['parent_nodeid'], item['ordinal']))
+
+
 def _tail(path: Path, limit: int) -> str:
     """只返回有界日志尾部。@param path 日志。@param limit 字节。@return 文本。"""
     with path.open('rb') as stream:
@@ -358,6 +438,8 @@ def _run(options) -> dict:
     plugins = _plugins(suite)
     if contract is not None and (contract['plugins'] != plugins or contract['python'] != sys.version.split()[0]):
         raise RuntimeError('原生回归环境已变，必须先校准同平台原版 contract')
+    if suite.get('subtests') and contract is not None and not contract.get('subtests'):
+        raise ValueError('本套件的冻结合同缺少原生子测试，须先重新校准')
     evidence = options.evidence_dir.resolve()
     if evidence.exists() and any(evidence.iterdir()):
         raise ValueError('回归证据目录非空，拒绝覆盖原始当轮')
@@ -375,23 +457,17 @@ def _run(options) -> dict:
         control = {'project': str(project), 'package': suite['package'], 'baseline_files': baseline_files,
             'documents': _documents(baseline, suite['package']), 'evidence': str(evidence),
             'required_nodes': [node['id'] for node in contract['nodes']] if contract else []}
+        if suite.get('subtests'):
+            control['subtests'] = True
         control_path = control_root / 'control.json'
         _save(control_path, control)
         shutil.copyfile(Path(__file__), control_root / '_bench_native_regression_control.py')
         home = scratch / 'home'
         home.mkdir()
         source_binding = {'mode': 'controlled-pythonpath'}
-        if options.project == 'typer':
-            # 原生 test_scripts 会覆盖 PYTHONPATH；私有 venv 的纯路径文件保留子进程候选绑定。
-            private_venv = Path(sys.prefix).resolve()
-            purelib = Path(sysconfig.get_path('purelib')).resolve()
-            if sys.prefix == sys.base_prefix or not private_venv.is_relative_to(Path('/work')) or not purelib.is_relative_to(private_venv):
-                raise RuntimeError('Typer 原生回归需要 /work 下独占的验证 venv，拒绝修改共享解释器')
-            source_path = purelib / ('_bench_native_source_' + uuid.uuid4().hex + '.pth')
-            source_path.write_text(str(project) + '\n', encoding='utf-8')
-            runtime_cleanup.callback(source_path.unlink, missing_ok=True)
-            source_binding = {'mode': 'private-venv-pure-path', 'venv': str(private_venv),
-                'path_file': str(source_path), 'path_target': str(project), 'cleanup_on_exit_registered': True}
+        if options.project in ('typer', 'python-dotenv'):
+            source_binding = _bind_source(project, import_root, runtime_cleanup,
+                console=options.project == 'python-dotenv')
         environment = dict(os.environ)
         for key in ['PYTEST_ADDOPTS', 'PYTEST_PLUGINS', 'PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP']:
             environment.pop(key, None)
@@ -440,6 +516,7 @@ def _run(options) -> dict:
         xml_bad = len(list(xml.iter('failure'))) + len(list(xml.iter('error'))) if xml is not None else 1
         xml_skipped = len(list(xml.iter('skipped'))) if xml is not None else 0
         nodes = [{**item, 'outcome': outcomes[item['id']]} for item in collection]
+        subtests = _subtest_results(reports, node_ids) if suite.get('subtests') else None
         collection_errors = [error for state in states for error in state['errors']]
         # 新套件在当前镜像校准真实集合，候选随后必须逐节点匹配；不把历史数量写成准入结果。
         expected_counts = {name: suite[name] for name in ['passed', 'skipped', 'xfailed'] if name in suite}
@@ -454,8 +531,14 @@ def _run(options) -> dict:
             valid = valid and parent_executable is not None and Path(parent_executable).name == 'bash'
         if contract is not None:
             valid = valid and nodes == contract['nodes']
+        if subtests is not None:
+            valid = (valid and bool(subtests)
+                and all(item['outcome'] in ('passed', 'skipped', 'xfailed') for item in subtests)
+                and (contract is None or subtests == contract['subtests']))
         frozen = {'schema': SCHEMA, 'project': options.project, 'baseline_digest': baseline_digest,
             'python': sys.version.split()[0], 'plugins': plugins, 'nodes': nodes}
+        if subtests is not None:
+            frozen['subtests'] = subtests
         if options.freeze_baseline_contract and valid:
             if options.freeze_baseline_contract.exists():
                 raise ValueError('冻结 contract 已存在，拒绝覆盖')
@@ -478,6 +561,9 @@ def _run(options) -> dict:
                 for node, result in outcomes.items() if result in ('skipped', 'xfailed', 'xpassed')],
             'stderr': _tail(stderr, 4096), 'stdout_tail': _tail(stdout, 8192),
             'scope': '冻结原生集合回归，不代表模型完成或独立业务目标已满足'}
+        if subtests is not None:
+            report.update(subtests=subtests, subtest_count=len(subtests),
+                subtests_match_contract=subtests == contract['subtests'] if contract else None)
         _save(evidence / 'summary.json', report)
         return report
 

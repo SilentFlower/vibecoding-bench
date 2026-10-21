@@ -1,0 +1,19 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "cli"
+  ],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "mapping_distinctions": true,
+    "empty_success": true,
+    "bare_and_missing_failure": true,
+    "normal_value": true,
+    "list_null": true,
+    "simple_omits_bare": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "fts-lifecycle"
+  ],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "content_preserved_and_selected_columns": true,
+    "default_later_insert_stale": true,
+    "rebuild_restores_search": true,
+    "FTS5_trigger_crud": true
+  },
+  "resource_profile": "business"
+}
