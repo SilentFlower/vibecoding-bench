@@ -1,0 +1,20 @@
+{
+  "script": "verification/native_checks.py",
+  "args": [
+    "--mode",
+    "types"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_library": true,
+    "literal_choices": true,
+    "custom_parser": true,
+    "custom_type": true,
+    "parser_and_type_rejected": true,
+    "invalid_parser_input_rejected": true
+  },
+  "resource_profile": "business"
+}

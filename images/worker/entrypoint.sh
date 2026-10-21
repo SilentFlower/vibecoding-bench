@@ -617,6 +617,15 @@ JS
 
 force_refresh_profile_credentials_once() {
   local reason="${1:-auth_error}"
+  if [ "${EXTERNAL_OAUTH_REFRESH:-0}" = "1" ] && [ "$CC2API_MANAGED_OAUTH" != "1" ]; then
+    # 私有评审没有RT；先收口共享作业，再由控制端的原凭据所有者刷新。
+    node - "/workspace/.cc2api-oauth-refresh-request.json" "$reason" <<'JS'
+const fs = require('fs');
+fs.writeFileSync(process.argv[2], JSON.stringify({reason: process.argv[3], owner: 'original'}));
+JS
+    touch /tmp/claude-owner-refresh-required
+    return 1
+  fi
   if [ "$CC2API_MANAGED_OAUTH" = "1" ]; then
     request_managed_profile_credentials_refresh "$reason"
     return $?
@@ -925,6 +934,9 @@ cleanup_task_mode() {
   fi
   _CLEANUP_TASK_MODE_DONE=1
   if [ "$WORKER_MODE" = "task" ]; then
+    if [ -n "${PROJECT_PLAN_JSON:-}" ]; then
+      python3 /usr/local/bin/v3-project-plan finish >/dev/null 2>&1 || true
+    fi
     stop_profile_credentials_sync || true
     persist_runtime_claude_state || true
     cleanup_workspace_dependencies || true
@@ -1789,6 +1801,16 @@ completion_done=0
 capture_transcript_snapshot
 while [ "$(date +%s)" -lt "$deadline" ]; do
   now=$(date +%s)
+  if [ -n "${PROJECT_PLAN_JSON:-}" ]; then
+    if ! python3 /usr/local/bin/v3-project-plan tick >/tmp/project-work-action.json; then
+      write_bench_status "failed" "项目工作计时证据无效，已保留现场"
+      touch /tmp/claude-followup-error
+      break
+    fi
+    if jq -e '.exhausted == true' /tmp/project-work-action.json >/dev/null; then
+      break
+    fi
+  fi
   capture_transcript_snapshot
   if check_quota_pause; then
     if python3 -c 'import json; import sys; sys.exit(0 if json.load(open("/workspace/.bench-status.json"))["status"] == "quota_wait" else 1)'; then

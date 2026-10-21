@@ -1636,6 +1636,12 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 .project-file { display: block; margin-block: 6px; max-width: 100%; overflow-wrap: anywhere; text-align: left; }
 .project-view ol { padding-left: 24px; }
 .project-view li { margin-block: 8px; }
+.project-scenario { margin-top: 14px; padding: 12px; border: 1px solid var(--border); }
+.project-scenario summary { overflow-wrap: anywhere; }
+.project-scenario-task { margin-top: 14px; padding: 12px; border: 1px solid var(--border); background: var(--surface-2); min-width: 0; }
+.project-scenario-task header, .project-scenario-task .op-actions { flex-wrap: wrap; gap: 8px; }
+.project-scenario-task p, .project-scenario-task strong, .project-scenario-task .btn { overflow-wrap: anywhere; }
+.project-scenario-task .btn { max-width: 100%; }
 @media (max-width: 720px) {
   #project-batch-form > .row { flex-direction: column; align-items: stretch; }
   .project-toolbar .filter-wrap { flex-basis: 100%; margin-left: 0; }

@@ -41,3 +41,20 @@ def isolated_account_limits(memory: str, swap: str = "0") -> dict[str, tuple[int
     if cli < 512 * 1024 ** 2:
         raise ValueError("账号内存不足以容纳隔离网络、发送器和 CLI，请先明确调整资源预算")
     return {"network": (network, network), "sender": (sender, sender), "cli": (cli, cli + total - ram)}
+
+
+def scenario_account_limits(memory: str, swap: str = '0') -> dict[str, tuple[int, int]]:
+    """从原账号预算静态预留一个评审池，不叠加额外RAM或swap。
+
+    :param memory: 已保存的账号合计RAM。
+    :param swap: 已保存额外swap，仅保留给固定CLI。
+    :return: 三个原角色及单评审的有限份额；小环境明确拒绝。
+    """
+    limits = isolated_account_limits(memory, swap)
+    review = 512 * 1024 ** 2
+    ram, total = limits['cli']
+    if ram - review < 512 * 1024 ** 2:
+        raise ValueError('当前账号RAM不足以静态预留独立评审，不能超分或借swap补足')
+    limits['cli'] = (ram - review, total - review)
+    limits['review'] = (review, review)
+    return limits

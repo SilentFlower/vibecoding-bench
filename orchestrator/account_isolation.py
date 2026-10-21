@@ -10,7 +10,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from docker.types import Mount
 
-from resource_budget import isolated_account_limits
+from resource_budget import isolated_account_limits, scenario_account_limits
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_VERSION, SYSTEM_PROFILE_DIRECTORY,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_VERSION)
 
@@ -74,6 +74,13 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     root = runtime._root(row)
     fingerprint = json.loads(row['fingerprint_json'])
     limits = isolated_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'))
+    layout_path = root / 'runtime/project-review-layout.json'
+    review_layout = json.loads(layout_path.read_text()) if layout_path.is_file() else None
+    if review_layout:
+        expected_limits = scenario_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'))
+        if review_layout.get('limits') != {key: list(value) for key, value in expected_limits.items()}:
+            raise ValueError('冻结评审资源布局与原账号预算不符')
+        limits = expected_limits
     proxy = runtime._proxy(account)
     parsed = urlsplit(proxy)
     if not parsed.hostname:
@@ -143,6 +150,10 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
             mem_limit=memory, memswap_limit=total, nano_cpus=cpu * (6 if role == 'cli' else 1) // 8,
             pids_limit=512 if role == 'cli' else 128, security_opt=['no-new-privileges:true'],
             log_config={'type': 'json-file', 'config': {'max-size': '10m', 'max-file': '3'}}, mounts=[machine_mount])
+        if role == 'cli' and review_layout:
+            options.update(nano_cpus=review_layout['cli_nano_cpus'], pids_limit=384)
+            options['labels']['vibebench.review-layout'] = '1'
+            options['tmpfs']['/tmp'] = 'rw,noexec,nosuid,nodev,size=64m,mode=1777'
         if role == 'cli':
             options['labels'][SYSTEM_PROFILE_LABEL] = str(SYSTEM_PROFILE_VERSION)
             options['labels'][COMPUTER_PROFILE_LABEL] = str(COMPUTER_PROFILE_VERSION)

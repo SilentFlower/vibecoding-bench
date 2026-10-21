@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import runpy
 import subprocess
 import sys
 from pathlib import Path
@@ -11,8 +12,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'orchestrator'))
 from project_library import ProjectLibrary
-sys.path.insert(0, str(ROOT / 'project_library'))
-from reference_runtime import evaluate
 
 
 def validate(root: Path, run_all: bool = False) -> dict:
@@ -23,6 +22,14 @@ def validate(root: Path, run_all: bool = False) -> dict:
     :return: 数量与通过证据摘要。
     """
     library = ProjectLibrary(root)
+    if library.schema == 2:
+        if run_all:
+            raise ValueError('场景内容不使用旧参考运行时；请使用 scripts/validate-project-scenarios.py')
+        return {'content_schema':2,'projects':len(library.projects),
+            'scenarios':sum(project.summary()['scenario_count'] for project in library.projects.values()),
+            'tasks':sum(project.summary()['task_count'] for project in library.projects.values()),
+            'digest':library.digest,'evidence':'内容结构及离线制品摘要，不代表原生验收或模型完成'}
+    evaluate = runpy.run_path(str(root/'reference_runtime.py'))['evaluate'] if run_all else None
     baseline_count = reference_count = incomplete_steps = 0
     for project in library.projects.values():
         manifest = project.manifest

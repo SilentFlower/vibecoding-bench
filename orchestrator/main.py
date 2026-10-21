@@ -54,7 +54,8 @@ from login_drafts import LoginDraftStore
 from physical_features import physical_features_summary
 from run_windows import normalize_run_window, run_window_snapshot
 from project_library import ProjectLibrary
-from project_iteration import PROJECT_RUN_KIND, PROJECT_SCHEMA, ProjectIterationManager, initialize_plan_schema
+from project_scenarios import initialize_scenario_schema
+from project_iteration import PROJECT_RUN_KIND, PROJECT_RUN_KINDS, PROJECT_SCHEMA, ProjectIterationManager, initialize_plan_schema
 from project_verifier import ProjectVerifier
 from topic_library import (decode_followup_timing, decode_followups, encode_followups, parse_topics,
     sample_followup_timing, sample_followups)
@@ -1495,6 +1496,7 @@ def init_db() -> None:
             conn.executescript(_SCHEMA)
             conn.executescript(PROJECT_SCHEMA)
             initialize_plan_schema(conn)
+            initialize_scenario_schema(conn)
             _ensure_column(conn, "accounts", "upstream_proxy_scheme", "TEXT DEFAULT 'socks5'")
             _ensure_column(conn, "accounts", "timezone", "TEXT")
             _ensure_column(conn, "accounts", "run_window_json", "TEXT")
@@ -3552,7 +3554,7 @@ class QuotaGuard:
             threshold_guarded = False
             if account and run["run_kind"] == "warmup":
                 threshold_guarded = bool(self.warmup_snapshot(account)["enabled"])
-            elif account and run["run_kind"] in ("normal", PROJECT_RUN_KIND):
+            elif account and run["run_kind"] in {"normal", *PROJECT_RUN_KINDS}:
                 threshold_guarded = bool(self.policy_snapshot(account, "normal")["blocked"])
             if (run["status"] != "quota_wait" and not state.get("exhausted")
                     and not run["quota_attempt"] and run["id"] not in observed_runs and not control_status and not threshold_guarded):
@@ -3662,11 +3664,13 @@ class QuotaGuard:
         finally:
             conn.close()
         for run in rows:
-            if run["run_kind"] == PROJECT_RUN_KIND and (not project_iterations or not project_iterations.execution_allowed(run["id"])):
+            if run["run_kind"] in PROJECT_RUN_KINDS and (not project_iterations or not project_iterations.execution_allowed(run["id"])):
                 continue
             if self._cancel_changed_identity(run, account):
                 continue
             if scheduler.is_executing(run["id"], int(run["quota_attempt"])):
+                continue
+            if run['run_kind'] in PROJECT_RUN_KINDS and project_iterations.scenarios.finish_captured_quota(run['id']):
                 continue
             if run["run_kind"] == "capture" and run["quota_resume_at"] is not None and run["quota_resume_at"] > time.time():
                 continue
@@ -3802,7 +3806,7 @@ def _execution_workload(run_kind: Optional[str]) -> Optional[Literal["normal", "
     :param run_kind: 已持久化的运行类型。
     :return: 普通／养号策略，抓包等原独立类型返回 None。
     """
-    return "warmup" if run_kind == "warmup" else "normal" if run_kind in ("normal", PROJECT_RUN_KIND) else None
+    return "warmup" if run_kind == "warmup" else "normal" if run_kind in {"normal", *PROJECT_RUN_KINDS} else None
 
 
 def _public_quota(account: dict) -> dict:
@@ -3843,9 +3847,15 @@ class Runner:
     def _quota_mounts(self, account: dict, run_id: str, source: str, flows: Path, warmup: bool = False) -> tuple[dict, dict, dict]:
         if not quota_guard:
             return {}, {}, {}
-        if account_runtime:
+        review = bool(account_runtime and account_runtime.reviews.is_review(run_id))
+        if review:
+            private = account_runtime.reviews.root_for_run(run_id)
+            flows = private / 'flows'
+            control = private / 'controls' / hashlib.sha256(source.encode()).hexdigest()[:20]
+        elif account_runtime:
             flows = account_runtime.execution_flows(account, source, flows)
-        control = _quota_control(run_id, source)
+        if not review:
+            control = _quota_control(run_id, source)
         env = quota_guard.prepare(account, source, flows, control, warmup=warmup)
         host_control = HOST_BENCH_DATA / control.relative_to(BENCH_DATA)
         return env, {
@@ -3896,11 +3906,14 @@ class Runner:
             (BENCH_DATA / "workspaces" / run_id).mkdir(parents=True, exist_ok=True)
         if not account_runtime:
             (BENCH_DATA / "workspaces" / run_id / ".claude-home").mkdir(parents=True, exist_ok=True)
-        (BENCH_DATA / "flows" / acc_name / str(task["id"]) / run_id).mkdir(parents=True, exist_ok=True)
+        review = bool(account_runtime and account_runtime.reviews.is_review(run_id))
+        if not review:
+            (BENCH_DATA / "flows" / acc_name / str(task["id"]) / run_id).mkdir(parents=True, exist_ok=True)
         CA_DIR.mkdir(parents=True, exist_ok=True)
-        _persist_default_claude_settings(BENCH_DATA / "profiles" / acc_name)
-        _persist_default_claude_top_config(BENCH_DATA / "profiles" / acc_name)
-        _make_worker_owned(BENCH_DATA / "workspaces" / run_id)
+        if not review:
+            _persist_default_claude_settings(BENCH_DATA / "profiles" / acc_name)
+            _persist_default_claude_top_config(BENCH_DATA / "profiles" / acc_name)
+            _make_worker_owned(BENCH_DATA / "workspaces" / run_id)
 
         host_workspace = HOST_BENCH_DATA / "workspaces" / run_id
         host_claude_home = HOST_BENCH_DATA / "workspaces" / run_id / ".claude-home"
@@ -4174,6 +4187,15 @@ class Runner:
             if not request_path.exists():
                 continue
             try:
+                if account_runtime and account.get('cc2api_account_id') is None:
+                    job = account_runtime.job_for_container(worker_id or 'expired')
+                    if job.get('execution_role') != 'project-review':
+                        return
+                    # 本地刷新需要排他owner；必须先严格释放评审shared holder，避免自锁。
+                    account_runtime.reviews.defer_owner_refresh(job)
+                    account_runtime.cleanup(worker_id)
+                    account_runtime.reviews.retry_owner_refresh(account,_refresh_project_review_owner)
+                    return
                 _sync_bound_account_credentials(account, 600, force_refresh=True)
                 if stop_event.is_set():
                     return
@@ -4181,6 +4203,8 @@ class Runner:
                     job = account_runtime.job_for_container(worker_id or "expired")
                     with account_runtime.environment_lock(job["row"]["environment_id"]):
                         account_runtime.job_for_container(worker_id or "expired")
+                        if job.get('execution_role') == 'project-review':
+                            account_runtime.reviews.sync_credentials(job)
                         _write_json_atomically(result_path, {"ok": True})
                     return
                 _write_json_atomically(result_path, {"ok": True})
@@ -4215,6 +4239,8 @@ class Runner:
         if account_runtime:
             job = account_runtime.job_for_container(worker_id)
             account_runtime.sync_credentials(job["row"], job["account"])
+            if job.get('execution_role') == 'project-review':
+                account_runtime.reviews.sync_credentials(job)
             return
         script = """
 const fs = require('fs');
@@ -4637,11 +4663,12 @@ JS
             parsed["error"] = f"quota probe failed with exit {inspected.get('ExitCode')}"
         return parsed
 
-    def refresh_account_oauth_token(self, account: dict) -> bool:
+    def refresh_account_oauth_token(self, account: dict, *, force_refresh: bool = False) -> bool:
         """
         用账号代理刷新 OAuth access token，并回写账号 profile。
 
         :param account: accounts 表行
+        :param force_refresh: 原凭据所有者确认401后强制刷新，不按剩余有效期跳过。
         :return: 发生刷新并成功回写时返回 True
         """
         if not _account_is_available(account):
@@ -4651,7 +4678,7 @@ JS
         acc_name = account["name"]
         with _profile_lock(acc_name):
             status = _read_account_oauth_status(acc_name)
-            if status["oauth_token_state"] == "valid" and int(status.get("oauth_expires_in_sec") or 0) > OAUTH_REFRESH_BUFFER_SEC:
+            if not force_refresh and status["oauth_token_state"] == "valid" and int(status.get("oauth_expires_in_sec") or 0) > OAUTH_REFRESH_BUFFER_SEC:
                 return False
             if account_runtime:
                 version = effective_claude_code_version()
@@ -4663,7 +4690,7 @@ JS
                     context = {"NETWORK_INSPECTION_MODE": "passthrough", "QUOTA_SOURCE": source}
                     atomic_json(account_runtime._network_runtime(row) / "context.json", context)
                     account_runtime._configure_network_context(container, context)
-                    raw = self._exec_oauth_refresh_probe(job["token"], use_mitm=False)
+                    raw = self._exec_oauth_refresh_probe(job["token"], use_mitm=False, force_refresh=force_refresh)
                     if raw.get("skipped"):
                         return False
                     if raw.get("error"):
@@ -4739,7 +4766,7 @@ JS
                     },
                 )
                 worker_id = worker.id
-                raw = self._exec_oauth_refresh_probe(worker_id)
+                raw = self._exec_oauth_refresh_probe(worker_id, force_refresh=force_refresh)
                 if raw.get("skipped"):
                     return False
                 if raw.get("error"):
@@ -4754,12 +4781,13 @@ JS
                 self.cleanup(sidecar_id, worker_id)
                 shutil.rmtree(temp_workspace, ignore_errors=True)
 
-    def _exec_oauth_refresh_probe(self, worker_id: str, use_mitm: bool = True) -> dict:
+    def _exec_oauth_refresh_probe(self, worker_id: str, use_mitm: bool = True, *, force_refresh: bool = False) -> dict:
         """
         在临时 worker 内使用 refreshToken 刷新 accessToken。
 
         :param worker_id: refresh worker 容器 ID
         :param use_mitm: 是否为当前 exec 显式注入 Recorder CA
+        :param force_refresh: 已确认401时绕过有效期预检查。
         :return: 刷新结果对象
         """
         script = r'''
@@ -4846,6 +4874,7 @@ async function main() {
     throw new Error('.credentials.json 缺少 claudeAiOauth');
   }
   if (
+    process.env.OAUTH_FORCE_REFRESH !== '1' &&
     typeof oauth.accessToken === 'string' &&
     oauth.accessToken &&
     typeof oauth.expiresAt === 'number' &&
@@ -4929,6 +4958,7 @@ JS
                 **account_runtime.execution_environment(job["row"]),
                 "CLAUDE_CODE_VERSION": effective_claude_code_version(),
                 "OAUTH_REFRESH_BUFFER_SEC": str(OAUTH_REFRESH_BUFFER_SEC),
+                "OAUTH_FORCE_REFRESH": "1" if force_refresh else "0",
             })
             workdir = "/home/node"
         else:
@@ -4936,6 +4966,7 @@ JS
             command = ["sh", "-lc", script]
             environment = _claude_exec_env(use_mitm, {
                 "OAUTH_REFRESH_BUFFER_SEC": str(OAUTH_REFRESH_BUFFER_SEC),
+                "OAUTH_FORCE_REFRESH": "1" if force_refresh else "0",
             })
             workdir = WORKER_HOME
         ex = api.exec_create(
@@ -6275,7 +6306,7 @@ class Scheduler:
                     (run["batch_id"],)).fetchone() if run["batch_id"] else None
             finally:
                 connection.close()
-            if run["run_kind"] == PROJECT_RUN_KIND:
+            if run["run_kind"] in PROJECT_RUN_KINDS:
                 context = project_iterations.run_context(run_id) if project_iterations else None
                 if not context or context["batch_status"] in ("stopping", "stopped", "blocked") or context["attempt_generation"] != context["batch_generation"]:
                     self._update_attempt(run_id, attempt, status="stopped", ended_at=time.time())
@@ -6762,6 +6793,8 @@ class Scheduler:
             flows_path = FLOWS_DIR / account["name"] / str(task["id"]) / run_id
             capture_full_http = bool(task.get("capture_full_http"))
             initial_state = self._get_run_state(run_id)
+            if initial_state and initial_state.get('run_kind') == 'project_review' and account_runtime:
+                flows_path = account_runtime.reviews.root_for_run(run_id) / 'flows'
             task = dict(task, followup_plan_json=(initial_state or {}).get("followup_plan_json"),
                 followup_timing_json=(initial_state or {}).get("followup_timing_json"))
             if not initial_state or initial_state.get("deleted_at") is not None:
@@ -6829,7 +6862,7 @@ class Scheduler:
                         self._update_batch_item_for_run(run_id, "stopped")
                     return
                 policy = _account_run_window(account)
-                if not policy["allowed"] or (current["run_kind"] == PROJECT_RUN_KIND and
+                if not policy["allowed"] or (current["run_kind"] in PROJECT_RUN_KINDS and
                         (not project_iterations or not project_iterations.execution_allowed(run_id))):
                     self._update_attempt(run_id, attempt, window_wait_until=(policy.get("next_open_at") or 0) if not policy["allowed"] else None)
                     deferred_for_window = True
@@ -6878,7 +6911,7 @@ class Scheduler:
                         return
                 # 同步凭据可能跨过边界，此时尚未发起执行，仍应回到原队列等待。
                 policy = _account_run_window(account)
-                if not policy["allowed"] or (current["run_kind"] == PROJECT_RUN_KIND and
+                if not policy["allowed"] or (current["run_kind"] in PROJECT_RUN_KINDS and
                         (not project_iterations or not project_iterations.execution_allowed(run_id))):
                     self._update_attempt(run_id, attempt, window_wait_until=(policy.get("next_open_at") or 0) if not policy["allowed"] else None)
                     deferred_for_window = True
@@ -6921,7 +6954,7 @@ class Scheduler:
                     return
                 self._update_attempt(run_id, attempt, sidecar_container=sid, worker_container=wid)
             try:
-                if account.get("cc2api_account_id") is not None:
+                if account.get("cc2api_account_id") is not None or current.get('run_kind') == 'project_review':
                     managed_refresh_thread = threading.Thread(
                         target=self.runner.watch_managed_oauth_refresh,
                         args=(run_id, account, managed_refresh_stop, wid),
@@ -7024,7 +7057,7 @@ class Scheduler:
                 with self._execution_lock:
                     self._executing.discard((run_id, attempt))
                 current_project_run = self._get_run_state(run_id)
-                if (project_iterations and current_project_run and current_project_run["run_kind"] == PROJECT_RUN_KIND
+                if (project_iterations and current_project_run and current_project_run["run_kind"] in PROJECT_RUN_KINDS
                         and current_project_run["status"] in _TERMINAL_RUN_STATUSES | {"quota_wait"}):
                     cleanup_error = None
                     try:
@@ -7730,6 +7763,37 @@ class WarmupScheduler:
 
 
 # ============== FastAPI ==============
+def _refresh_project_review_owner(account: dict, request: dict) -> None:
+    """复用原owner锁重读身份后，处理私有评审401的强制刷新。
+
+    :param account: 待办账号，仅用ID和名称定位原所有者。
+    :param request: 原线程冻结的刷新请求，不能让旧回调处理新待办。
+    :return: None；身份或环境变化时保留待办错误。
+    """
+    with _oauth_owner_lock(str(account['name'])):
+        connection = get_db()
+        try:
+            row = _get_available_account(connection,int(account['id']))
+            environment = connection.execute('SELECT environment_id,generation FROM account_environments WHERE account_id=?',
+                (account['id'],)).fetchone()
+        finally:
+            connection.close()
+        if not row or not account_runtime:
+            raise ValueError('原评审账号已经不可用')
+        current = dict(row)
+        state = account_runtime.reviews.owner_refresh_state(current)
+        if (not state or state['status']=='error' or current['name']!=account['name']
+                or state['request_id']!=request['request_id'] or state['identity']!=request['identity']
+                or state['environment_id']!=request['environment_id'] or state['environment_generation']!=request['environment_generation']
+                or not environment or state['environment_id']!=environment['environment_id']
+                or state['environment_generation']!=environment['generation']):
+            raise ValueError('评审刷新原身份或环境代次已经变化')
+        if current.get('cc2api_account_id') is not None:
+            _sync_bound_account_credentials_locked(current,600,force_refresh=True)
+        elif not runner.refresh_account_oauth_token(current,force_refresh=True):
+            raise ValueError('原所有者未完成请求的强制刷新')
+
+
 def _project_admission(account: dict, run_id: str) -> bool:
     """在环境准备后只读复核共同门禁。
 
@@ -7843,13 +7907,20 @@ async def lifespan(app: FastAPI):
     project_iterations = None
     project_iteration_error = None
     if account_runtime:
+        library = None
         try:
-            project_iterations = ProjectIterationManager(BENCH_DATA, ProjectLibrary(PROJECT_LIBRARY_DIR), get_db, _db_lock,
+            library = ProjectLibrary(PROJECT_LIBRARY_DIR).install(BENCH_DATA)
+        except (ValueError, OSError) as error:
+            # 当前内容准入失败不能遮住已冻结的历史发布、实例与成果。
+            project_iteration_error = "项目内容库不可用：" + str(error)[:300]
+        try:
+            project_iterations = ProjectIterationManager(BENCH_DATA, library, get_db, _db_lock,
                 scheduler.submit, _project_execution_settings, _quota_identity, _stop_project_run,
                 ProjectVerifier(runner.client, BENCH_DATA, HOST_BENCH_DATA, account_runtime.image), scheduler.is_executing,
                 admission=_project_admission, execution_control=_project_execution_control,
                 schedule_admission=_project_schedule_admission, concurrency_limit=PER_ACCOUNT_CONCURRENCY)
             account_runtime.set_project_iterations(project_iterations)
+            project_iterations.review_refresh = lambda account: account_runtime.reviews.retry_owner_refresh(account,_refresh_project_review_owner)
         except (ValueError, OSError) as error:
             # 新内容损坏只隔离新入口，原题库执行仍可使用。
             project_iteration_error = "项目内容库不可用：" + str(error)[:300]
@@ -10139,48 +10210,59 @@ class ProjectIterationBatchIn(BaseModel):
     :param account_id: 运行账号。
     :param name: 批次名称。
     :param project_keys: 所选项目，省略时选择全部。
+    :param scenario_entries: 按项目／场景选择的固定入口，省略时使用冻结默认入口。
     :param concurrency: 同账号并发，省略时按有效容量取默认值。
     :param active_projects: 活动项目池容量。
     :param rotation_steps: 连续验收通过后轮换的步数。
-    :param steps_per_plan: 同一次 CLI 计划推进的步数。
-    :param timeout_sec: 整个单次 CLI 计划的工作超时。
+    :param steps_per_plan: 逻辑计划的任务数；旧策略 2 在同一 CLI 中推进。
+    :param timeout_sec: 单次候选执行上限；旧策略 2 覆盖整个 CLI 计划。
+    :param task_budget_sec: 新场景任务跨执行的累计工作预算。
+    :param review_timeout_sec: 同模型每次逻辑评审的累计工作上限。
+    :param review_budget_sec: 新场景任务全部轮次的累计评审预算。
     :param interval_min_sec: 两次计划补位的随机间隔下限。
     :param interval_max_sec: 两次计划补位的随机间隔上限。
     """
     account_id: StrictInt
     name: StrictStr = "项目迭代批次"
     project_keys: Optional[list[StrictStr]] = None
+    scenario_entries: Optional[dict[StrictStr,dict[StrictStr,StrictStr]]] = None
     concurrency: Optional[StrictInt] = None
     active_projects: StrictInt = 3
     rotation_steps: StrictInt = 5
     steps_per_plan: StrictInt = 2
     timeout_sec: StrictInt = 1800
+    task_budget_sec: StrictInt = 1800
+    review_timeout_sec: StrictInt = 180
+    review_budget_sec: StrictInt = 720
     interval_min_sec: StrictInt = 0
     interval_max_sec: StrictInt = 0
 
     model_config = ConfigDict(extra="forbid")
 
 
-def _project_manager() -> ProjectIterationManager:
+def _project_manager(*, require_catalog: bool = False) -> ProjectIterationManager:
     """取得可用的 v3 项目迭代能力。
 
+    :param require_catalog: 新目录准入是否必须就绪；历史读取不依赖它。
     :return: 项目管理器；不可用时返回明确的 HTTP 错误。
     """
     if not project_iterations:
         raise HTTPException(503, project_iteration_error or "项目迭代需要 v3 固定账号运行环境")
+    if require_catalog and project_iterations.library is None:
+        raise HTTPException(503, project_iteration_error or "当前项目内容库不可用，历史批次仍可读取")
     return project_iterations
 
 
 @app.get("/api/project-catalog")
 def project_catalog() -> dict:
     """浏览预置项目和固定基线版本。@return 公开项目摘要。"""
-    return _project_manager().catalog()
+    return _project_manager(require_catalog=True).catalog()
 
 
 @app.get("/api/project-catalog/{key}")
 def project_catalog_entry(key: str) -> dict:
     """读取一条项目路线。@param key 项目标识。@return 不含参考实现的路线。"""
-    project = _project_manager().library.projects.get(key)
+    project = _project_manager(require_catalog=True).library.projects.get(key)
     if project is None:
         raise HTTPException(404, "项目不存在")
     return project.summary(include_steps=True)
@@ -10190,8 +10272,10 @@ def project_catalog_entry(key: str) -> dict:
 def create_project_iteration_batch(body: ProjectIterationBatchIn) -> dict:
     """创建尚未投放的独立批次。@param body 账号与项目选择。@return 批次详情。"""
     try:
-        policy = body.model_dump(exclude={"account_id", "name", "project_keys"}, exclude_none=True)
-        return _project_manager().create_batch(body.account_id, body.name, body.project_keys, policy)
+        policy = body.model_dump(exclude={"account_id", "name", "project_keys", "scenario_entries"}, exclude_unset=True)
+        if policy.get('concurrency', 1) is None:
+            policy.pop('concurrency')
+        return _project_manager(require_catalog=True).create_batch(body.account_id, body.name, body.project_keys, policy, body.scenario_entries)
     except ValueError as error:
         raise HTTPException(400, str(error))
 
@@ -10253,6 +10337,8 @@ def get_project_instance_usage(iid: int) -> dict:
     :return: 每步骤的请求、输出和数据完整性。
     """
     instance = get_project_instance(iid)
+    if instance.get('content_schema') == 2:
+        return _project_manager().scenarios.usage(iid)
     steps = {}
     for attempt in instance["attempts"]:
         item = steps.setdefault(attempt["step_id"], {"step_id": attempt["step_id"], "tokens_in": 0,
@@ -10281,6 +10367,33 @@ def get_project_attempt_artifacts(aid: int) -> dict:
         return _project_manager().artifacts(aid)
     except ValueError as error:
         raise HTTPException(404, str(error))
+
+
+@app.get('/api/project-instances/{iid}/scenario-tasks/{tid}/attempts')
+def get_project_scenario_attempts(iid: int, tid: int) -> dict:
+    """读取场景任务的实际尝试。@param iid 实例。@param tid 任务。@return 尝试与执行。"""
+    try:
+        return _project_manager().scenarios.attempts(iid,tid)
+    except ValueError as error:
+        raise HTTPException(404,str(error))
+
+
+@app.get('/api/project-instances/{iid}/scenario-tasks/{tid}/artifacts')
+def get_project_scenario_artifacts(iid: int, tid: int, evaluation_id: Optional[int] = None) -> dict:
+    """读取固定场景回答与证据。@param iid 实例。@param tid 任务。@param evaluation_id 版本。@return 固定成果。"""
+    try:
+        return _project_manager().scenarios.artifacts(iid,tid,evaluation_id)
+    except ValueError as error:
+        raise HTTPException(404,str(error))
+
+
+@app.get('/api/project-instances/{iid}/scenario-tasks/{tid}/file')
+def get_project_scenario_file(iid: int, tid: int, path: str, evaluation_id: Optional[int] = None) -> dict:
+    """预览清单内固定文件。@param iid 实例。@param tid 任务。@param path 路径。@param evaluation_id 版本。@return 文本。"""
+    try:
+        return _project_manager().scenarios.artifact_file(iid,tid,path,evaluation_id)
+    except ValueError as error:
+        raise HTTPException(404,str(error))
 
 
 @app.get("/api/project-iterations-stream")
@@ -10860,7 +10973,8 @@ def run_task(tid: int):
         if not task_row:
             raise HTTPException(404, "task not found")
         task = dict(task_row)
-        if conn.execute("SELECT a.id FROM project_step_attempts a JOIN runs r ON r.id=a.run_id WHERE r.task_id=?", (tid,)).fetchone():
+        if (conn.execute("SELECT a.id FROM project_step_attempts a JOIN runs r ON r.id=a.run_id WHERE r.task_id=?", (tid,)).fetchone()
+                or conn.execute('SELECT e.id FROM project_task_executions e JOIN runs r ON r.id=e.run_id WHERE r.task_id=?',(tid,)).fetchone()):
             raise HTTPException(409, "项目迭代任务请通过项目批次推进，不能单独再次运行")
         account_row = _get_available_account(conn, int(task["account_id"]))
         if not account_row:
@@ -11068,11 +11182,16 @@ def list_workspace(rid: str):
         visible_run = dict(connection.execute("SELECT run_kind FROM runs WHERE id=?", (rid,)).fetchone())
     finally:
         connection.close()
-    if visible_run["run_kind"] == PROJECT_RUN_KIND:
+    if visible_run["run_kind"] in PROJECT_RUN_KINDS:
         if not project_iterations:
             raise HTTPException(503, "项目历史成果读取器未就绪")
         context = project_iterations.run_context(rid)
-        artifact = project_iterations.artifacts(context["attempt_id"]) if context else {"files": []}
+        if context and context.get('scenario_execution'):
+            job = project_iterations._one('SELECT j.id FROM project_evaluation_jobs j JOIN project_execution_sources x ON x.id=j.source_id '
+                'JOIN project_task_executions e ON e.id=x.execution_id WHERE e.run_id=? ORDER BY j.id DESC LIMIT 1',(rid,))
+            artifact = project_iterations.scenarios.artifacts(context['id'],context['scenario_task_id'],job['id']) if job else {'files':[]}
+        else:
+            artifact = project_iterations.artifacts(context["attempt_id"]) if context else {"files": []}
         return [{"path": item["path"], "size": item["size"], "type": "file"} for item in artifact["files"]]
     base = WORKSPACES_DIR / rid
     if not base.exists():
@@ -11378,7 +11497,7 @@ def continue_run_start(rid: str):
         if not run_row:
             raise HTTPException(404, "运行记录不存在")
         run = dict(run_row)
-        if run["run_kind"] == PROJECT_RUN_KIND:
+        if run["run_kind"] in PROJECT_RUN_KINDS:
             raise HTTPException(409, "项目迭代通过项目批次自动推进，首版不提供人工续聊")
         if run["status"] not in _TERMINAL_RUN_STATUSES:
             raise HTTPException(400, f"运行 {rid} 尚未结束")

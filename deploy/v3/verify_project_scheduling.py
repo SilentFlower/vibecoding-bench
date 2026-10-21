@@ -11,7 +11,7 @@ from unittest.mock import patch
 import main
 from account_runtime import AccountRuntime, atomic_json
 from project_iteration import ProjectIterationManager
-from project_library import ProjectLibrary
+from project_test_content import create_project_fixture
 from project_verifier import ProjectVerifier
 
 
@@ -26,7 +26,6 @@ def verify_project_scheduling(runtime, client, account: dict, row: dict, *, cata
     :return: None；任何证据不一致则失败。
     """
     data = runtime.data
-    repository = Path('/source')
     paths = {'BENCH_DATA':data,'HOST_BENCH_DATA':runtime.host_data,'DB_PATH':data/'project-scheduling.sqlite',
         'PROFILES_DIR':data/'profiles','WORKSPACES_DIR':data/'workspaces','FLOWS_DIR':data/'flows','CA_DIR':data/'ca',
         'TOPICS_FILE':data/'missing-topics.md'}
@@ -61,7 +60,8 @@ def verify_project_scheduling(runtime, client, account: dict, row: dict, *, cata
         guard = main.QuotaGuard(runner)
         for key,value in (('account_runtime',verified),('runner',runner),('scheduler',scheduler),('quota_guard',guard)):
             stack.enter_context(patch.object(main,key,value))
-        manager = ProjectIterationManager(data,ProjectLibrary(repository/'project_library'),main.get_db,main._db_lock,
+        library = create_project_fixture(data/'project-scheduling-fixtures')
+        manager = ProjectIterationManager(data,library,main.get_db,main._db_lock,
             scheduler.submit,lambda:{'claude_code_version':'9.9.9','claude_effort_level':'high','execution_model':''},
             main._quota_identity,main._stop_project_run,ProjectVerifier(client,data,runtime.host_data,verified.image),scheduler.is_executing,
             admission=main._project_admission,execution_control=main._project_execution_control,
@@ -84,7 +84,7 @@ def verify_project_scheduling(runtime, client, account: dict, row: dict, *, cata
             directory = verified._root(row)/'home/.synthetic-projects'
             directory.mkdir(exist_ok=True)
             fixture = {'session':context['session_id'],'seed':(definition.root/'seed/app.py').read_text(),
-                'runtime':(repository/'project_library/reference_runtime.py').read_text(),
+                'runtime':(library.root/'reference_runtime.py').read_text(),
                 'actions':{step['checks'][0]['input']['action']:reference['actions'][step['checks'][0]['input']['action']]
                     for step in manifest['steps']},'step_actions':[step['checks'][0]['input']['action'] for step in manifest['steps']],
                 'delay_sec':0.05 if catalog_only else 2}

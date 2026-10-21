@@ -281,7 +281,21 @@ def verify() -> None:
         (evidence_root / name).chmod(0o600)
     container = None
     try:
-        row, container = runtime.ensure(account, "9.9.9")
+        scenario_mode=os.environ.get('VERIFY_PROJECT_SCENARIOS_ONLY')=='1'
+        row, container = runtime.ensure(account, "9.9.9",scenario_resources=scenario_mode)
+        if scenario_mode:
+            row,container,profile,home=runtime.begin_login('abcdef123456',account,'9.9.9',False)
+            deadline=time.monotonic()+10
+            while not (profile/'.credentials.json').exists():
+                if time.monotonic()>deadline:
+                    raise AssertionError('合成场景登录没有就绪')
+                time.sleep(0.1)
+            token=runtime.execution_token(container.id,'login:abcdef123456')
+            runtime.commit_login(SimpleNamespace(sid='abcdef123456',worker_id=container.id,profile_dir=profile,name=account['name']),1)
+            runtime.cleanup(token)
+            from verify_project_scenarios import verify_project_scenarios
+            verify_project_scenarios(runtime,client,account,row)
+            return
         isolation = verify_roles(container, role_container(runtime, row, "sender"), runtime._network_container(row),
             json.loads(row['fingerprint_json']))
         system_profile = json.loads(row['fingerprint_json'])['system_profile']

@@ -10,7 +10,7 @@ from unittest.mock import patch
 import main
 from account_runtime import AccountRuntime, atomic_json
 from project_iteration import ProjectIterationManager
-from project_library import ProjectLibrary
+from project_test_content import create_project_fixture
 from project_verifier import ProjectVerifier
 
 
@@ -24,7 +24,6 @@ def verify_project_execution(runtime, client, account: dict, row: dict) -> None:
     :return: None；状态、目录或验收不满足时失败。
     """
     data = runtime.data
-    repository = Path('/source')
     paths = {'BENCH_DATA':data,'HOST_BENCH_DATA':runtime.host_data,'DB_PATH':data/'project-execution.sqlite',
         'PROFILES_DIR':data/'profiles','WORKSPACES_DIR':data/'workspaces','FLOWS_DIR':data/'flows','CA_DIR':data/'ca',
         'TOPICS_FILE':data/'missing-topics.md'}
@@ -45,7 +44,8 @@ def verify_project_execution(runtime, client, account: dict, row: dict) -> None:
         guard = main.QuotaGuard(runner)
         for key,value in (('account_runtime',verified),('runner',runner),('scheduler',scheduler),('quota_guard',guard)):
             stack.enter_context(patch.object(main,key,value))
-        manager = ProjectIterationManager(data,ProjectLibrary(repository/'project_library'),main.get_db,main._db_lock,
+        library = create_project_fixture(data/'project-execution-fixtures')
+        manager = ProjectIterationManager(data,library,main.get_db,main._db_lock,
             scheduler.submit,lambda:{'claude_code_version':'9.9.9','claude_effort_level':'high','execution_model':''},
             main._quota_identity,main._stop_project_run,ProjectVerifier(client,data,runtime.host_data,verified.image),scheduler.is_executing,
             admission=main._project_admission)
@@ -75,7 +75,7 @@ def verify_project_execution(runtime, client, account: dict, row: dict) -> None:
             manifest = json.loads(context['manifest_json'])
             actions = {step['checks'][0]['input']['action']:reference['actions'][step['checks'][0]['input']['action']]
                 for step in manifest['steps'][:context['next_step_index']+1]}
-            shutil.copy2(repository/'project_library/reference_runtime.py',workspace/'fixture_behaviors.py')
+            shutil.copy2(library.root/'reference_runtime.py',workspace/'fixture_behaviors.py')
             source = (definition.root/'seed/app.py').read_text().replace('def handle(request):','def original_handle(request):')
             insertion = '\nfrom fixture_behaviors import evaluate\nACTIONS = '+repr(actions)+'\ndef handle(request):\n    action=request.get("action","overview")\n    if action in ACTIONS:\n        return evaluate(ACTIONS[action],request,FIELDS)\n    return original_handle(request)\n\n'
             (workspace/'app.py').write_text(source.replace("if __name__ == '__main__':",insertion+"if __name__ == '__main__':"))

@@ -104,7 +104,7 @@ bench/flows/<account>/<task>/<run>/    固定兼容链接
 
 **显式画像校正**：`maintenance(..., "reprofile")` 只接受未绑定 cc2api、无 task/run/identity/草稿/提交/活动作业、容器已停止的 legacy 正式环境。操作保留账号/HOME/代理/资源预算，清理旧容器网络与 CA 产物，生成一次 profile v2 并回到 stopped，保留原登录凭据；不因环境字段变化强制重授权。启动时原 `profile_reauth` 迁回正常生命周期；原 `profile_reauth_reconcile` 的真实执行/提交故障仍按 reconcile 隔离。profile v2 永久拒绝再次 reprofile，真实认证失败才要求重新授权。
 
-**部署**：两个最终镜像 control/account；control 按 gateway/orchestrator 两个角色启动，N 个账号共 N+2 个容器，只有 orchestrator 挂 Docker socket。CLI 为 UID1000、无网络能力并禁止提权，服务秘密/控制目录不对项目写入开放。root 管理的 `v3-account-init`、`v3-network-context`、`v3-cli-version`、`v3-passthrough` 和 `/sidecar` 为 0700；本地 CLI 额度采集 `v3-cli-quota` 为 0755，中文源码注释不必删除。
+**部署**：两个最终镜像 control/account；control 按 gateway/orchestrator 两个角色启动，当前隔离布局的 N 个账号固定角色共 3N+2 个容器，评审另有受共享门禁约束的临时子容器；只有 orchestrator 挂 Docker socket。CLI 为 UID1000、无网络能力并禁止提权，服务秘密/控制目录不对项目写入开放。root 管理的 `v3-account-init`、`v3-network-context`、`v3-cli-version`、`v3-passthrough` 和 `/sidecar` 为 0700；本地 CLI 额度采集 `v3-cli-quota` 为 0755，中文源码注释不必删除。
 
 **资源**：`resource_budget.account_limits(memory: str, swap: str = "0") -> tuple[int, int]` 共用于预检与账号创建；返回 RAM 字节数和 RAM＋swap 总字节数。`V3_ACCOUNT_MEMORY` 支持正整数 m/g，默认 4g；`V3_ACCOUNT_SWAP` 是额外 swap，默认 0，仅接受 0 或正整数 m/g，不接受 -1/无限额。首次保存 `fingerprint_json.mem/swap`；旧缺 swap 字段为 0，改全局配置不重算旧身份或预算。Compose 必须显式传递两参数。
 
@@ -592,7 +592,8 @@ verify_roles(cli, sender, network, fingerprint: dict) -> dict
 - 创建角色前移交旧 `flows/api/observations.jsonl` 和 `.previous`：逐级 O_NOFOLLOW 目录 fd，以该 fd 将目录设为 1001:1001、0700；文件 O_NOFOLLOW/O_NONBLOCK，确认普通文件且硬链接数为 1 后 fchown 为 1001:1001、fchmod 为 0600。缺失文件由 sender 首次创建，已有内容不重写；只修改父目录无法使旧 root:root 0600 文件可追加。
 - 网络过滤器在本账号 netns 原子安装 INPUT/FORWARD/OUTPUT 默认 DROP，先拒绝 Docker DNS 127.0.0.11，再开放回环、既有连接、指定代理 TCP、TUN；其他私网和 IPv6 拒绝。sender 8091 入站仅允许核验过的本部署 gateway/orchestrator 及桥网关。网络 ready 最多等 120 秒，确认前不启动业务；删路由/网络进程故障不能回退 bridge 直连，不修改宿主共享规则。
 - 服务端 OAuth 仍由 gateway 的原 HTTP/TLS 客户端发出，账号 netns 防火墙不能保护它。`V3_RUNTIME_URL` 或 `V3_DEPLOYMENT_ID` 任一非空时，空串/空白代理在创建 OAuth 客户端前返回 ServiceUnavailable；授权交换、刷新和 usage 共用该入口。非空非法代理解析失败也不得直连；两个标识均为空的独立部署保留原空代理语义。不伪造浏览器网页授权的出口。
-- 总 RAM/swap 来自已保存画像：network 256 MiB、sender 128 MiB、CLI 取剩余且至少 512 MiB，额外 swap 只归 CLI；Docker memswap 为角色 RAM 加其额外 swap。CPU 按 CLI:network:sender=6:1:1 分配，pids 分别为 512/128/128；CLI /tmp 为 128 MiB noexec。部署预检、容量及停止不能漏计辅助角色或放大账号总预算。
+- 基础布局总 RAM/swap 来自已保存画像：network 256 MiB、sender 128 MiB、CLI 取剩余且至少 512 MiB，额外 swap 只归 CLI；Docker memswap 为角色 RAM 加其额外 swap。CPU 按 CLI:network:sender=6:1:1 分配，pids 分别为 512/128/128；CLI /tmp 为 128 MiB noexec。部署预检、容量及停止不能漏计辅助角色或放大账号总预算。
+- 场景评审布局从同一原预算静态预留512MiB单评审池，固定CLI至少512MiB；CPU、PID与tmpfs从原CLI份额拆出，不能临时超分。`runtime/project-review-layout.json`记录份额与容量；已创建旧环境缺匹配布局时拒绝新场景，须显式空闲重建。`account_environments.container_id`始终指固定CLI；评审创建意图、私有目录、原owner刷新及严格收口以[项目场景契约](./project-iterations.md#scenario-内容-schema-2-的真实项目多场景任务与-policy-3)为准。
 - 创建按网络 ready 再业务角色，逐个登记；失败停止本代已创建实例并保留对账证据，未知/部分角色不能 ready。停止按 CLI→sender→network；维护、备份、草稿删除与孤儿处理核对完整角色集合。管理端重启与 CLI 单次取消保留健康 API/SSE；CLI 单独异常仅关闭下一 CLI。
 - 布局 0 的已有实例只在显式空闲重建时转换，GET/普通发送不能静默迁移。先停机备份，转换保存私有 isolation-upgrade 快照；回退保留最新 HOME/凭据，不恢复旧 RT/数据库覆盖轮换结果。未创建实例的新行保持布局 0，受控 ensure 才登记 2。
 - 业务指标取 CLI 实际 PID/cgroup，管理端写私有观察记录。验证 CA 仅供 verification 镜像，sender 的只读 /run/v3 下嵌套 CA bind 必须预置目标；正式镜像不读取该 CA。测试依赖的系统目录仍只读，故障注入使用网络私有运行记录。

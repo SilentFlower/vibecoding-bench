@@ -1,0 +1,1 @@
+已核验的诊断摘要：EnvSettingsSource.next_field 在字典值位置返回原始类型注解；explode_env_vars 对 FieldInfo 调用 _field_is_complex，对原始注解只调用 _annotation_is_complex。普通 Union 字段已有 _union_is_complex 检查。当前改动请求仅修复字典值 list[str] | str 的分段环境解码，保持普通文本及既有顶层解码控制。此摘要作为修复入口材料，不要求待测模型先做一次诊断任务。

@@ -195,9 +195,13 @@ class ProjectDefinition:
         :param include_steps: 是否附带步骤目标。
         :return: 可序列化的项目摘要。
         """
+        if self.manifest['schema'] == 2:
+            from project_scenario_content import scenario_summary
+            return scenario_summary(self.manifest, include_tasks=include_steps)
         result = {key: self.manifest[key] for key in
             ("project_key", "title", "category", "source_topic_no", "description", "seed_digest")}
         result["step_count"] = len(self.manifest["steps"])
+        result['content_schema'] = 1
         result["milestones"] = self.manifest["milestones"]
         if include_steps:
             result["steps"] = [{key: step[key] for key in ("id", "goal", "milestone", "requires")}
@@ -217,10 +221,13 @@ class ProjectLibrary:
         """加载并校验内容；参数契约见类说明。@return None。"""
         self.root = root
         catalog = read_document(root / "catalog.json")
-        if not isinstance(catalog, dict) or type(catalog.get("schema")) is not int or catalog["schema"] != 1:
+        if (not isinstance(catalog, dict) or type(catalog.get("schema")) is not int
+                or catalog['schema'] not in (1, 2)):
             raise ValueError("项目目录 schema 不合法")
+        self.schema = catalog['schema']
+        self.catalog_document = catalog
         keys = catalog.get("projects")
-        if (not isinstance(keys, list) or len(keys) < minimum_projects
+        if (not isinstance(keys, list) or len(keys) < (minimum_projects if self.schema == 1 else 1)
                 or any(not isinstance(key, str) or not PROJECT_KEY.fullmatch(key) for key in keys)
                 or len(set(keys)) != len(keys)):
             raise ValueError("项目目录数量、标识或唯一性不合法")
@@ -228,17 +235,50 @@ class ProjectLibrary:
         if not isinstance(self.version, str) or not self.version.strip():
             raise ValueError("项目目录缺少内容版本")
         self.projects: dict[str, ProjectDefinition] = {}
+        project_digests, self.environments = {}, {}
         for key in keys:
             project_root = root / "projects" / key
             if project_root.is_symlink():
                 raise ValueError("项目内容目录不能是链接")
             manifest = read_document(project_root / "project.json")
-            self._validate(manifest, key, minimum_steps)
+            if self.schema == 2:
+                from project_scenario_content import validate_scenario_project
+                validate_scenario_project(project_root, manifest, key)
+            else:
+                self._validate(manifest, key, minimum_steps)
             actual = snapshot_tree(project_root / "seed")
             if actual["digest"] != manifest["seed_digest"]:
                 raise ValueError(f"项目 {key} 初始版本摘要不一致")
             self.projects[key] = ProjectDefinition(project_root, manifest)
-        self.digest = snapshot_tree(root)["digest"]
+            if self.schema == 2:
+                project_digests[key] = snapshot_tree(project_root)['digest']
+        if self.schema == 2:
+            from project_scenario_content import validate_environment
+            for project in self.projects.values():
+                environment = project.manifest['environment']
+                if environment not in self.environments:
+                    profile = validate_environment(root / 'environments', environment)
+                    for artifact in profile['artifacts']:
+                        path = root / 'environments' / environment / artifact['path']
+                        if self._artifact_digest(path) != artifact['digest']:
+                            raise ValueError('原生环境离线制品已损坏')
+                    self.environments[environment] = profile
+            self.digest = digest_json({'catalog': catalog, 'projects': project_digests,
+                'environments': self.environments})
+        else:
+            self.digest = snapshot_tree(root)["digest"]
+
+    @staticmethod
+    def _artifact_digest(path: Path) -> str:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(descriptor, 'rb') as source:
+            metadata = os.fstat(source.fileno())
+            if not S_ISREG(metadata.st_mode) or metadata.st_size > 256 * 1024 * 1024:
+                raise ValueError('离线制品类型或大小不合法')
+            checksum = hashlib.sha256()
+            while content := source.read(1024 * 1024):
+                checksum.update(content)
+        return checksum.hexdigest()
 
     @staticmethod
     def _validate(manifest: object, key: str, minimum_steps: int) -> None:
@@ -290,15 +330,36 @@ class ProjectLibrary:
         destination = releases / self.digest
         if not destination.exists():
             objects = data / "project-artifacts" / "objects"
-            snapshot = snapshot_tree(self.root, objects)
             temporary = releases / (".register-" + os.urandom(8).hex())
-            materialize_snapshot(snapshot, objects, temporary)
             try:
+                if self.schema == 1:
+                    materialize_snapshot(snapshot_tree(self.root, objects), objects, temporary)
+                else:
+                    temporary.mkdir(mode=0o700)
+                    write_document(temporary / 'catalog.json', self.catalog_document)
+                    for key, project in self.projects.items():
+                        materialize_snapshot(snapshot_tree(project.root, objects), objects,
+                            temporary / 'projects' / key)
+                    # wheel 不属于源码对象；逐制品校验并复制，避免 venv 链接及全库树上限。
+                    for key, profile in self.environments.items():
+                        target = temporary / 'environments' / key
+                        write_document(target / 'profile/profile.json', profile)
+                        for artifact in profile['artifacts']:
+                            path = target / artifact['path']
+                            path.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copyfile(self.root / 'environments' / key / artifact['path'], path,
+                                follow_symlinks=False)
+                    installed = ProjectLibrary(temporary)
+                    if installed.digest != self.digest:
+                        raise ValueError('注册期间项目内容发生变化')
                 os.rename(temporary, destination)
             except FileExistsError:
                 shutil.rmtree(temporary)
+            finally:
+                if temporary.exists():
+                    shutil.rmtree(temporary)
         installed = ProjectLibrary(destination, minimum_projects=len(self.projects),
-            minimum_steps=min(len(p.manifest["steps"]) for p in self.projects.values()))
+            minimum_steps=min((len(p.manifest.get('steps', [])) for p in self.projects.values()), default=0))
         if installed.digest != self.digest:
             raise ValueError("已注册内容版本已损坏")
         return installed

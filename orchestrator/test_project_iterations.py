@@ -9,7 +9,6 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
-from importlib.util import module_from_spec, spec_from_file_location
 from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
@@ -18,6 +17,7 @@ from requests.exceptions import ReadTimeout
 import main
 from project_iteration import ProjectIterationManager
 from project_library import ProjectLibrary, materialize_snapshot, snapshot_tree
+from project_test_content import create_project_fixture
 from project_verifier import ProjectVerifier
 
 
@@ -43,8 +43,10 @@ class ProjectIterationFixture(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        """只读取一次完整内容契约。@return None。"""
-        cls.library = ProjectLibrary(ROOT/'project_library')
+        """在类专属临时目录构造调度夹具。@return None。"""
+        cls.library_temporary = tempfile.TemporaryDirectory(prefix='project-content-fixture-')
+        cls.addClassCleanup(cls.library_temporary.cleanup)
+        cls.library = create_project_fixture(Path(cls.library_temporary.name)/'library')
 
     def setUp(self) -> None:
         """建立隔离数据库与可观测投放器。@return None。"""
@@ -108,7 +110,7 @@ class ProjectIterationFixture(unittest.TestCase):
         manifest = json.loads(context['manifest_json'])
         actions = {step['checks'][0]['input']['action']:reference['actions'][step['checks'][0]['input']['action']]
             for step in manifest['steps'][:context['next_step_index']+1]}
-        shutil.copy2(ROOT/'project_library/reference_runtime.py',workspace/'fixture_behaviors.py')
+        shutil.copy2(self.library.root/'reference_runtime.py',workspace/'fixture_behaviors.py')
         source = (project.root/'seed/app.py').read_text()
         source = source.replace('def handle(request):','def original_handle(request):')
         insertion = '\nfrom fixture_behaviors import evaluate\nACTIONS = '+repr(actions)+'\ndef handle(request):\n    action = request.get("action", "overview")\n    if action in ACTIONS:\n        return evaluate(ACTIONS[action],request,FIELDS)\n    return original_handle(request)\n\n'
@@ -453,23 +455,23 @@ class ProjectIterationTests(ProjectIterationFixture):
         self.assertEqual(0o644,(restored/'module/data.json').stat().st_mode & 0o777)
         self.assertEqual(snapshot['digest'],snapshot_tree(restored)['digest'])
 
-    def test_reference_behavior_matches_independent_business_examples(self) -> None:
-        """手写业务结果校验参考器，避免只验证生成器与自身一致。@return None。"""
-        spec = spec_from_file_location('project_reference_gold',ROOT/'project_library/reference_runtime.py')
-        reference = module_from_spec(spec)
-        spec.loader.exec_module(reference)
-        fields = {'label':'name','metric':'amount','group':'team','state':'status','date':'date'}
-        self.assertEqual([{'id':1,'html':'<h1>A &amp; B</h1>\n<p>&lt;unsafe&gt;</p>'}],
-            reference.evaluate('render_documents',{'items':[{'id':1,'name':'# A & B\n<unsafe>'}]},fields))
-        self.assertEqual([{'cycle':1,'phase':'focus','start':0,'end':10},
-            {'cycle':1,'phase':'rest','start':10,'end':12},{'cycle':2,'phase':'focus','start':12,'end':22}],
-            reference.evaluate('focus_schedule',{'options':{'cycles':2,'focus_minutes':10,'rest_minutes':2}},fields))
-        self.assertEqual({'subtotal':30,'net':27,'tax':5.4,'total':32.4},
-            reference.evaluate('quotation_tax',{'items':[{'amount':3,'unit_price':10}],
-                'options':{'discount':0.1,'tax_rate':0.2}},fields))
-        self.assertEqual([{'id':1,'text':'Hello Ada {missing}'}],
-            reference.evaluate('snippet_expand',{'items':[{'id':1,'name':'Hello {user} {missing}'}],
-                'options':{'values':{'user':'Ada'}}},fields))
+    def test_retired_generated_content_is_not_a_production_catalog(self) -> None:
+        """正式库只接入就绪真实内容，临时调度夹具不计真实项目。@return None。"""
+        root = ROOT/'project_library'
+        catalog = json.loads((root/'catalog.json').read_text())
+        self.assertEqual(2,catalog['schema'])
+        self.assertEqual({'python-frontmatter','pydantic-settings','typer'},set(catalog['projects']))
+        self.assertFalse(any((root/'projects'/f'project-{number:03d}').exists() for number in range(1,101)))
+        self.assertFalse((root/'build_catalog.py').exists())
+        self.assertFalse((root/'reference_runtime.py').exists())
+        self.assertEqual(3,len(ProjectLibrary(root).projects))
+        with patch.multiple(main,project_iterations=None,project_iteration_error='项目内容库不可用',_AUTH_ENABLED=False):
+            client = TestClient(main.app)
+            try:
+                self.assertEqual(503,client.get('/api/project-catalog').status_code)
+            finally:
+                client.close()
+        self.assertEqual(100,len(self.library.projects))
 
     def test_candidate_timeout_is_a_business_failure(self) -> None:
         """候选超时触发有限业务修复，Docker 创建故障仍归类基础设施错误。@return None。"""

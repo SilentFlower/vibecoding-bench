@@ -1,0 +1,14 @@
+--- a/library/pydantic_settings/sources/providers/env.py
++++ b/library/pydantic_settings/sources/providers/env.py
+@@ -326,8 +326,10 @@
+                         enum_val = _annotation_enum_name_to_val(target_field.annotation, env_val)
+                         env_val = env_val if enum_val is None else enum_val
+                 elif target_field:
+-                    # target_field is a raw type (e.g. from dict value type annotation)
++                    # 字典值只有原始注解，也需像普通字段一样识别含复杂成员的联合类型。
+                     is_complex = _annotation_is_complex(target_field, [], self._init_state)
++                    if not is_complex and is_union_origin(get_origin(target_field)):
++                        is_complex = _union_is_complex(target_field, [], self._init_state)
+                     allow_json_failure = True
+                 else:
+                     # nested field type is dict

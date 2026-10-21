@@ -26,7 +26,7 @@
 | [Logging Guidelines](./logging-guidelines.md) | P1 不写 log,uvicorn + stats.jsonl 兜底 | Filled |
 | [Topic Prompt Contract](./topic-prompt-contract.md) | 英文题库、默认 prompt、冻结随机时间补充、恢复证据与进度 API | Filled |
 | [v3 固定账号环境](./account-runtime-v3.md) | 三角色 Docker 隔离、持久 DMI/CPU/内核画像、只读物理特征快照、OAuth、独立 API/CLI、真实指标与转发验收 | Filled |
-| [项目迭代模式](./project-iterations.md) | 冻结项目库、共享并发、持久轮换与间隔、同会话多步验收、超时接续及项目 API | Filled |
+| [项目迭代模式](./project-iterations.md) | 多场景任务、同实际模型私有评审、原生离线验收、预算／恢复与旧线性模式兼容；真实项目研究准入 | Filled |
 
 > 镜像构建 / GitHub Actions 与 GHCR 发布 / 远程部署 / Cookie session 鉴权契约,移到独立的 [deploy/](../deploy/index.md) 层,见那边的 image-build-push / remote-deploy / auth-design 三个 spec。本目录只覆盖 orchestrator 内部代码规范。
 > `cc2api/` 是 Git submodule,协议升级规范见 [cc2api/protocol](../../cc2api/protocol/index.md),不要塞进本目录。

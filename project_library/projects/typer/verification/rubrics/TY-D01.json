@@ -1,0 +1,34 @@
+{
+  "criteria": [
+    {
+      "id": "no_bug",
+      "requirement": "明确当前不是 BUG、也不是注册失效；一个已注册命令且没有 callback/子组时采用单命令模式。",
+      "evidence": [
+        "library/typer/main.py:1176",
+        "library/typer/main.py:1188"
+      ]
+    },
+    {
+      "id": "evidence",
+      "requirement": "把材料中的唯一 command 和无 callback 对应到 get_command 的构造条件，并给出直接调用方式；不能把所有应用笼统称为 group。",
+      "evidence": [
+        "materials/TY-D01/shop.py",
+        "library/typer/main.py:1173"
+      ]
+    },
+    {
+      "id": "no_unasked_change",
+      "requirement": "不索要现有材料已足够回答的无关信息，不要求修 Typer，不擅自改应用或库。",
+      "evidence": [
+        "project.json"
+      ]
+    }
+  ],
+  "allowed_outcomes": [
+    "normal_behavior"
+  ],
+  "schema": 1,
+  "task_id": "TY-D01",
+  "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+  "result_version": 1
+}

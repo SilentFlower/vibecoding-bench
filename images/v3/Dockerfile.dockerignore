@@ -34,3 +34,4 @@
 **/.git
 **/.env
 **/.env.*
+!project_library/projects/typer/seed/library/.env

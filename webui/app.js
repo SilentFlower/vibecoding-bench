@@ -56,29 +56,37 @@ const state = {
 /**
  * 展示项目状态中文，未知值保留为可见诊断。
  * @param {string} status 后端状态
+ * @param {string} domain 批次、场景、任务或旧状态的展示语义
  * @return {string} 状态文本
  */
-function projectStatus(status) {
+function projectStatus(status, domain = 'legacy') {
+  if (status === 'completed' && domain === 'batch') return '运行结束';
+  if (status === 'completed' && domain === 'scenario') return '场景已收口';
+  if (status === 'passed' && domain === 'task') return '任务通过';
   return ({not_started: '未开始', ready: '待推进', queued: '排队', running: '执行中',
     quota_wait: '额度等待', window_wait: '时段等待', paused: '已暂停', active: '自动推进中',
     pausing: '当前计划收尾后暂停', stopping: '正在停止', stopped: '已停止', blocked: '已阻塞',
     finalizing: '正在收尾', plan_completed: '计划完成',
     completed: '路线完成', pending: '等待执行收口', passed: '验收通过', failed: '未通过',
+    evaluating: '独立验收中', waiting_material: '待材料', waiting_release: '候选已封存，等待释放',
+    review_ready: '等待同模型评审', review_queued: '评审已排队', waiting_review_release: '评审完成，等待释放',
+    uncertain: '评审受阻', exhausted: '预算或次数耗尽', mechanical_running: '原生验收中',
     error: '验收异常', cancelled: '已停止，未验收', success: '执行结束', timeout: '超时', auth_failed: '认证失效'})[status] || status || '未知';
 }
 
 /**
  * 复用运行页的状态颜色，同时区分执行结果和业务验收。
  * @param {string} status 后端状态
+ * @param {string} domain 状态归属，避免把运行收口显示为业务通过
  * @return {string} 已转义的状态徽章
  */
-function projectStatusPill(status) {
+function projectStatusPill(status, domain = 'legacy') {
   const color = ({not_started: 'queued', ready: 'queued', queued: 'queued', pending: 'queued',
     running: 'running', active: 'active', quota_wait: 'quota_wait', window_wait: 'quota_wait',
     paused: 'paused', pausing: 'paused', stopping: 'paused', stopped: 'stopped', cancelled: 'stopped',
     completed: 'success', plan_completed: 'success', finalizing: 'running', passed: 'success', success: 'success', failed: 'failed', blocked: 'failed',
     error: 'failed', timeout: 'timeout', auth_failed: 'auth_failed'})[status] || 'queued';
-  return `<span class="pill pill-${color}">${escapeHTML(projectStatus(status))}</span>`;
+  return `<span class="pill pill-${status === 'completed' && domain !== 'legacy' ? 'paused' : color}">${escapeHTML(projectStatus(status, domain))}</span>`;
 }
 
 /**
@@ -93,7 +101,7 @@ function updateProjectSelection() {
   const capacity = Math.max(1, Math.min(limit, selected, Number(form.elements.active_projects.value) || 1));
   form.elements.concurrency.max = capacity;
   if (Number(form.elements.concurrency.value) > capacity) form.elements.concurrency.value = capacity;
-  const maximumSteps = Math.max(...state.projectCatalog.projects.filter(p =>
+  const maximumSteps = state.projectCatalog.content_schema === 2 ? 100 : Math.max(...state.projectCatalog.projects.filter(p =>
     $$('input[name="project_keys"]:checked', form).some(input => input.value === p.project_key)).map(p => p.step_count), 1);
   form.elements.rotation_steps.max = maximumSteps;
   form.elements.steps_per_plan.max = maximumSteps;
@@ -107,24 +115,34 @@ function updateProjectSelection() {
  */
 async function renderProjects() {
   try {
-    const [accounts, catalog, batches] = await Promise.all([
+    const loaded = await Promise.allSettled([
       API('/accounts'), API('/project-catalog'), API('/project-iteration-batches'),
     ]);
+    if (loaded[0].status === 'rejected') throw loaded[0].reason;
+    if (loaded[2].status === 'rejected') throw loaded[2].reason;
+    const accounts = loaded[0].value, batches = loaded[2].value;
+    const catalog = loaded[1].status === 'fulfilled' ? loaded[1].value : {projects: [], scheduling_defaults: {}};
     if (currentTab() !== 'projects') return;
     state.accounts = accounts;
     state.projectCatalog = catalog;
     state.projectBatches = batches;
-    $('#project-library-count').textContent = `${catalog.projects.length} 个项目 · ${catalog.projects.reduce((n, p) => n + p.step_count, 0)} 个步骤`;
+    $('#project-library-count').textContent = catalog.content_schema === 2
+      ? `${catalog.projects.length} 个项目 · ${catalog.projects.reduce((n, p) => n + p.scenario_count, 0)} 个场景 · ${catalog.projects.reduce((n, p) => n + p.task_count, 0)} 个任务`
+      : `${catalog.projects.length} 个项目 · ${catalog.projects.reduce((n, p) => n + p.step_count, 0)} 个步骤`;
     const form = $('#project-batch-form');
     Object.entries(catalog.scheduling_defaults || {}).forEach(([key, value]) => {
-      if (form.elements[key]) form.elements[key].value = value;
+      if (form.elements[key] && !form.elements[key].dataset.userEdited) form.elements[key].value = value;
     });
+    form.oninput = event => { if (event.target.name) event.target.dataset.userEdited = 'true'; };
+    $$('[data-scenario-budgets]', form).forEach(node => node.classList.toggle('hidden', catalog.content_schema !== 2));
+    form.elements.steps_per_plan.closest('label').querySelector('.lbl').textContent = catalog.content_schema === 2 ? '每个逻辑计划任务数' : '$ steps_per_plan · 每次 CLI 计划步数';
+    form.elements.timeout_sec.closest('label').querySelector('.lbl').textContent = catalog.content_schema === 2 ? '候选单次工作上限（秒）' : '$ timeout_sec · 单次计划超时（秒）';
     form.elements.account_id.innerHTML = accounts.map(a => `<option value="${a.id}">${escapeHTML(a.name)}</option>`).join('') || '<option value="">请先添加可用账号</option>';
     const choices = $('#project-choice-list');
     choices.innerHTML = catalog.projects.map(p => `<label class="batch-topic">
       <input type="checkbox" name="project_keys" value="${escapeHTML(p.project_key)}" checked />
       <span class="batch-topic-title">${escapeHTML(p.title)}<span class="topic-cat">${escapeHTML(p.category)} · ${escapeHTML(p.project_key)}</span></span>
-      <span class="hint">${p.step_count} 步</span>
+      <span class="hint">${p.content_schema === 2 ? `${p.scenario_count} 场景 / ${p.task_count} 任务` : `${p.step_count} 步`}</span>
     </label>`).join('') + '<p id="project-filter-empty" class="hint empty-panel hidden">没有匹配的项目</p>';
     choices.onchange = updateProjectSelection;
     form.elements.account_id.onchange = updateProjectSelection;
@@ -156,14 +174,15 @@ async function renderProjects() {
       $('#project-filter-empty').classList.toggle('hidden', items.some(item => !item.classList.contains('hidden')));
     };
     updateProjectSelection();
-    $('#project-catalog-list').innerHTML = catalog.projects.map(p => `<button type="button" class="project-catalog-item" data-project-preview="${escapeHTML(p.project_key)}"><strong>${escapeHTML(p.title)}</strong><span class="muted">${escapeHTML(p.category)} · ${p.step_count} 步</span></button>`).join('');
+    $('#project-catalog-list').innerHTML = catalog.projects.map(p => `<button type="button" class="project-catalog-item" data-project-preview="${escapeHTML(p.project_key)}"><strong>${escapeHTML(p.title)}</strong><span class="muted">${escapeHTML(p.category)} · ${p.content_schema === 2 ? `${p.task_count} 个任务` : `${p.step_count} 步`}</span></button>`).join('');
     $('#project-catalog-list').onclick = async event => {
       const button = event.target.closest('[data-project-preview]');
       if (!button) return;
       try {
         const project = await API(`/project-catalog/${encodeURIComponent(button.dataset.projectPreview)}`);
         endRunDetail();
-        $('#modal-content').innerHTML = `<h3>${escapeHTML(project.title)}</h3><p>${escapeHTML(project.description)}</p><ol>${project.steps.map(step => `<li>${escapeHTML(step.goal.split(/Interface contract:|接口契约：/)[0].trim())}</li>`).join('')}</ol>`;
+        const goals = project.content_schema === 2 ? project.scenarios.flatMap(scene => scene.tasks) : project.steps;
+        $('#modal-content').innerHTML = `<h3>${escapeHTML(project.title)}</h3><p>${escapeHTML(project.description)}</p><ol>${goals.map(step => `<li>${escapeHTML(step.goal.split(/Interface contract:|接口契约：/)[0].trim())}</li>`).join('')}</ol>`;
         openModal('#modal');
       } catch (error) { alert('读取项目路线失败：' + error.message); }
     };
@@ -171,6 +190,11 @@ async function renderProjects() {
     const selected = batches.find(b => b.id === state.projectBatchId) || batches[0];
     if (selected) await selectProjectBatch(selected.id);
     else connectProjectStream();
+    if (loaded[1].status === 'rejected') {
+      $('#project-feedback').textContent = `${loaded[1].reason.message}；已有批次和成果仍可查看。`;
+      $('#project-feedback').classList.remove('hidden');
+      form.querySelectorAll('input,select,button').forEach(node => { node.disabled = true; });
+    }
   } catch (error) {
     if ($('#project-feedback')) {
       $('#project-feedback').textContent = error.message;
@@ -199,7 +223,8 @@ async function createProjectBatch(event) {
       account_id: Number(form.elements.account_id.value), name: form.elements.name.value,
       project_keys: projectKeys,
       ...Object.fromEntries(['concurrency', 'active_projects', 'rotation_steps', 'steps_per_plan',
-        'timeout_sec', 'interval_min_sec', 'interval_max_sec'].map(key => [key, Number(form.elements[key].value)])),
+        'timeout_sec', 'interval_min_sec', 'interval_max_sec', ...(state.projectCatalog.content_schema === 2
+          ? ['task_budget_sec', 'review_timeout_sec', 'review_budget_sec'] : [])].map(key => [key, Number(form.elements[key].value)])),
     })});
     state.projectBatches = await API('/project-iteration-batches');
     form.closest('details').open = false;
@@ -225,7 +250,7 @@ function paintProjectBatches() {
   host.innerHTML = state.projectBatches.map(batch => `<tr class="${batch.id === state.projectBatchId ? 'project-selected-row' : ''}">
     <td>${batch.id}</td><td class="project-name">${escapeHTML(batch.name)}</td>
     <td>${escapeHTML(names[batch.account_id] || `账号 #${batch.account_id}`)}</td>
-    <td>${projectStatusPill(batch.status)}</td>
+    <td>${projectStatusPill(batch.status, batch.policy.schema === 3 ? 'batch' : 'legacy')}</td>
     <td>${batch.counts.completed || 0} / ${Object.values(batch.counts).reduce((sum, count) => sum + count, 0)} 已完成</td>
     <td><button type="button" class="btn btn-sm" data-project-batch="${batch.id}" ${batch.id === state.projectBatchId ? 'disabled' : ''}>${batch.id === state.projectBatchId ? '已选中' : '查看详情'}</button></td>
   </tr>`).join('') || '<tr><td colspan="6" class="muted empty-cell">暂无迭代批次，选择项目后创建第一个批次。</td></tr>';
@@ -276,22 +301,23 @@ function paintProjectBatch() {
   const schedulingMessages = {
     paused: '批次已暂停，启动后继续推进', pausing: '正在暂停，等待在途计划收尾',
     stopping: '正在停止，等待在途执行收口', stopped: '批次已停止，项目成果已保留',
-    completed: '全部项目路线已完成', blocked: '批次已阻塞，请查看上方原因',
+    completed: batch.policy.schema === 3 ? '本轮已收口，任务结果分别列示' : '全部项目路线已完成', blocked: '批次已阻塞，请查看上方原因',
   };
   const schedulingHint = batch.status === 'active'
     ? (batch.scheduling?.wait_reasons || []).join('；') || '按保存的队列与容量自动推进'
     : schedulingMessages[batch.status] || '调度状态待更新';
   const nextLaunch = batch.status === 'active' && batch.next_launch_at > Date.now() / 1000
     ? ` · 下一投放最早 ${escapeHTML(new Date(batch.next_launch_at * 1000).toLocaleString())}` : '';
-  host.innerHTML = `<header class="row-between"><h3>${escapeHTML(batch.name)}</h3><div class="op-actions">${projectStatusPill(batch.status)}
+  const scenarioMode = batch.policy.schema === 3;
+  host.innerHTML = `<header class="row-between"><h3>${escapeHTML(batch.name)}</h3><div class="op-actions">${projectStatusPill(batch.status, scenarioMode ? 'batch' : 'legacy')}
     ${canStart ? '<button class="btn btn-sm btn-primary" type="button" data-project-action="start">启动自动推进</button>' : ''}
     ${batch.status === 'active' ? '<button class="btn btn-sm" type="button" data-project-action="pause">暂停</button>' : ''}
     ${!['stopped', 'completed', 'stopping'].includes(batch.status) ? '<button class="btn btn-sm btn-danger" type="button" data-project-action="stop">停止批次</button>' : ''}</div></header>
     ${batch.error ? `<p class="warmup-error">${escapeHTML(batch.error)}</p>` : ''}
-    <p class="hint project-description">${batch.policy.schema === 2 ? `并发 ${batch.policy.concurrency} / 账号上限 ${batch.scheduling?.account_concurrency_limit ?? '—'}，在途 ${batch.scheduling?.active_runs?.length ?? 0}；活动池 ${batch.instances.filter(item => item.in_pool).length}/${batch.policy.active_projects}，连续通过 ${batch.policy.rotation_steps} 步后轮换；每次 CLI 计划 ${batch.policy.steps_per_plan} 步，超时 ${batch.policy.timeout_sec} 秒，计划间隔 ${batch.policy.interval_min_sec}～${batch.policy.interval_max_sec} 秒。` : `最多 ${batch.policy.active_projects} 个活动项目，按阶段轮换。`}业务失败最多修复 ${batch.policy.repair_limit} 次。</p>
+    <p class="hint project-description">${scenarioMode ? `并发 ${batch.policy.concurrency}；活动池 ${batch.policy.active_projects}；每个逻辑计划 ${batch.policy.steps_per_plan} 个任务，通过 ${batch.policy.rotation_steps} 个任务后轮换。候选单次 ${batch.policy.timeout_sec} 秒／任务累计 ${batch.policy.task_budget_sec} 秒；评审单次 ${batch.policy.review_timeout_sec} 秒／任务累计 ${batch.policy.review_budget_sec} 秒。` : batch.policy.schema === 2 ? `并发 ${batch.policy.concurrency} / 账号上限 ${batch.scheduling?.account_concurrency_limit ?? '—'}，在途 ${batch.scheduling?.active_runs?.length ?? 0}；活动池 ${batch.instances.filter(item => item.in_pool).length}/${batch.policy.active_projects}，连续通过 ${batch.policy.rotation_steps} 步后轮换；每次 CLI 计划 ${batch.policy.steps_per_plan} 步，超时 ${batch.policy.timeout_sec} 秒，计划间隔 ${batch.policy.interval_min_sec}～${batch.policy.interval_max_sec} 秒。` : `最多 ${batch.policy.active_projects} 个活动项目，按阶段轮换。`}业务失败最多修复 ${batch.policy.repair_limit} 次。</p>
     ${batch.scheduling ? `<p class="hint project-scheduling-hint">${escapeHTML(schedulingHint)}${nextLaunch} · 额度阈值继承账号设置</p>` : ''}
     <div class="table-frame project-table-scroll"><table class="data project-instances-table"><thead><tr><th>project</th><th>steps</th><th>status</th><th>workspace</th></tr></thead><tbody>
-    ${batch.instances.map(item => `<tr class="${item.id === state.projectInstanceId ? 'project-selected-row' : ''}"><td><div class="op-actions"><button type="button" class="btn btn-sm" data-project-instance="${item.id}">${escapeHTML(item.title)}</button>${item.in_pool ? '<span class="pill pill-queued">活动池</span>' : ''}</div></td><td>${item.next_step_index}/${item.step_count}</td><td>${projectStatusPill(item.status)}${item.switch_reason ? `<div class="hint">${escapeHTML(item.switch_reason)}</div>` : ''}</td><td>${item.workspace_path ? `<code class="project-path">${escapeHTML(item.workspace_path)}</code>` : '<span class="muted">首次运行后创建</span>'}</td></tr>`).join('')}
+    ${batch.instances.map(item => `<tr class="${item.id === state.projectInstanceId ? 'project-selected-row' : ''}"><td><div class="op-actions"><button type="button" class="btn btn-sm" data-project-instance="${item.id}">${escapeHTML(item.title)}</button>${item.in_pool ? '<span class="pill pill-queued">活动池</span>' : ''}</div></td><td>${item.content_schema === 2 ? `${item.task_counts.passed || 0}/${item.selected_task_count} 任务通过` : `${item.next_step_index}/${item.step_count}`}</td><td>${projectStatusPill(item.status, item.content_schema === 2 ? 'batch' : 'legacy')}${item.switch_reason ? `<div class="hint">${escapeHTML(item.switch_reason)}</div>` : ''}</td><td>${item.content_schema === 2 ? '按场景独立保留' : item.workspace_path ? `<code class="project-path">${escapeHTML(item.workspace_path)}</code>` : '<span class="muted">首次运行后创建</span>'}</td></tr>`).join('')}
     </tbody></table></div>`;
   // 状态推送不能把正在浏览的百项目列表反复拉回顶部。
   const nextScroll = host.querySelector('.project-table-scroll');
@@ -329,6 +355,7 @@ function paintProjectInstance() {
   const instance = state.projectInstanceDetail;
   const host = $('#project-instance-detail');
   if (!instance || !host) return;
+  if (instance.content_schema === 2) { paintScenarioInstance(instance, host); return; }
   host.classList.remove('hidden');
   const roadmapOpen = host.querySelector('[data-project-roadmap]')?.open || false;
   const previousScroll = host.querySelector('.project-table-scroll');
@@ -377,6 +404,94 @@ async function showProjectArtifact(id) {
       const file = await API(`/project-step-attempts/${id}/file?path=${encodeURIComponent(button.dataset.projectFile)}`);
       $('#project-file-preview').textContent = file.text + (file.truncated ? '\n…内容已截断' : '');
     } catch (error) { alert('读取历史文件失败：' + error.message); }
+  };
+  openModal('#modal');
+}
+
+/**
+ * 展示场景任务状态，执行收口与业务通过分别解释。
+ * @param {object} task 服务端任务投影
+ * @return {string} 中文状态
+ */
+function scenarioTaskStatus(task) {
+  if (!task.selected) return '此入口未选择';
+  if (['passed', 'failed', 'exhausted', 'blocked', 'cancelled'].includes(task.status)) return projectStatus(task.status, 'task');
+  const execution = task.executions[task.executions.length - 1];
+  if (execution?.execution_status === 'quota_wait') return execution.role === 'review' ? '评审额度等待' : '额度等待，已保留会话';
+  if (task.phase === 'timeout_resume' && task.status === 'ready') return '超时待续';
+  if (task.phase === 'material_ready' && task.status === 'ready') return '补充材料待投放';
+  if (task.phase === 'waiting_release') return '候选已封存，等待释放';
+  if (task.status === 'evaluating') return projectStatus(task.evaluation?.status || 'evaluating');
+  if (task.status === 'pending') return '等待前置任务';
+  return projectStatus(task.status, 'task');
+}
+
+/**
+ * 渲染新内容的场景、任务、预算和独立执行记录。
+ * @param {object} instance 实例公开投影
+ * @param {HTMLElement} host 已存在的详情容器
+ * @return {void}
+ */
+function paintScenarioInstance(instance, host) {
+  const opened = new Set($$('details[data-scenario-id][open]', host).map(node => node.dataset.scenarioId));
+  const scroll = host.scrollTop;
+  const kinds = {understand: '理解', consult: '咨询', diagnose: '诊断', plan: '方案', modify: '修改'};
+  const tasks = instance.scenarios.flatMap(scene => scene.tasks).filter(task => task.selected);
+  host.classList.remove('hidden');
+  host.innerHTML = `<header class="row-between"><h3>${escapeHTML(instance.title)}</h3><button class="btn btn-sm" type="button" data-scenario-usage>任务与评审用量</button></header>
+    <p class="hint">${instance.scenario_count} 个场景 · 当前入口 ${tasks.length} 个任务 · ${tasks.filter(task => task.status === 'passed').length} 个通过 · ${tasks.filter(task => task.accepted_checkpoint_digest).length} 个代码检查点已接受。</p>
+    <p class="hint">同模型独立会话评审；回答通过、代码接受与运行结束分别记录。</p>
+    ${instance.scenarios.map(scene => `<details class="project-scenario" data-scenario-id="${scene.id}" ${opened.has(String(scene.id)) ? 'open' : ''}>
+      <summary><strong>${escapeHTML(scene.title)}</strong> · ${escapeHTML(projectStatus(scene.status, 'scenario'))}</summary>
+      <p class="hint">${escapeHTML(scene.goal)}</p>
+      ${scene.tasks.map(task => `<article class="project-scenario-task"><header class="row-between"><strong>${escapeHTML(task.task_key)} · ${escapeHTML(kinds[task.kind] || task.kind)}</strong><span class="pill pill-${task.status === 'passed' ? 'success' : task.status === 'running' ? 'running' : 'queued'}">${escapeHTML(scenarioTaskStatus(task))}</span></header>
+        <p>${escapeHTML(task.goal)}</p>
+        ${task.selected ? `<p class="hint">业务尝试 ${task.attempt_count}/3 · 第 ${task.turn_no} 轮 · 工作剩余 ${Math.max(0, Math.floor(task.candidate_budget.remaining_sec))} 秒 · 评审剩余 ${Math.max(0, Math.floor(task.review_budget.remaining_sec))} 秒${task.candidate_budget.reserved_sec ? ` · 未决工作预留 ${Math.ceil(task.candidate_budget.reserved_sec)} 秒` : ''}</p>` : ''}
+        ${task.requires.length ? `<p class="hint">依赖：${task.requires.map(dependency => `${escapeHTML(dependency.task_id)}（${dependency.artifact === 'code' ? '已接受代码' : '回答'}）`).join('、')}</p>` : ''}
+        ${task.error ? `<p class="warmup-error">${escapeHTML(task.error)}</p>` : ''}
+        ${task.result?.outcome ? `<p class="hint">业务结果：${escapeHTML(task.result.outcome)}</p>` : ''}
+        <p class="hint">${task.accepted_checkpoint_digest ? `代码已接受：${escapeHTML(task.accepted_checkpoint_digest.slice(0, 16))}` : '代码未产生新的已接受检查点'}</p>
+        <div class="op-actions">${task.evaluation ? `<button class="btn btn-sm" type="button" data-scenario-artifact="${task.id}">回答与验收证据</button>` : ''}
+          ${task.executions.map(execution => `<button class="btn btn-sm" type="button" data-project-run="${escapeHTML(execution.run_id)}">${execution.role === 'review' ? '评审' : '任务'} ${escapeHTML(execution.run_id)}</button>${projectStatusPill(execution.execution_status)}`).join('')}</div>
+      </article>`).join('')}
+    </details>`).join('')}`;
+  host.scrollTop = scroll;
+  host.onclick = async event => {
+    try {
+      const run = event.target.closest('[data-project-run]');
+      const artifact = event.target.closest('[data-scenario-artifact]');
+      if (run) await openRunDetail(run.dataset.projectRun);
+      if (artifact) await showScenarioArtifact(instance.id, Number(artifact.dataset.scenarioArtifact));
+      if (event.target.closest('[data-scenario-usage]')) {
+        const usage = await API(`/project-instances/${instance.id}/usage`);
+        endRunDetail();
+        const rows = usage.tasks.flatMap(task => Object.entries(task.roles).map(([role, value]) => `<tr><td>${escapeHTML(task.task_key)} · ${role === 'review' ? '评审' : '任务'}</td><td>${value.input_tokens ?? '未知'}</td><td>${value.output_tokens ?? '未知'}</td><td>${value.cache_read_input_tokens ?? '未知'} / ${value.cache_creation_input_tokens ?? '未知'}</td><td>${value.requests ?? '未知'}</td><td>${value.complete ? '完整' : '不完整'}</td></tr>`));
+        $('#modal-content').innerHTML = `<h3>任务与评审用量</h3><p class="hint">累计所有尝试与恢复的主会话记录；缓存读／写单列，未知不补零。</p><div class="table-frame project-table-scroll"><table class="data"><thead><tr><th>任务 / 角色</th><th>输入</th><th>输出</th><th>缓存读 / 写</th><th>请求</th><th>覆盖</th></tr></thead><tbody>${rows.join('') || '<tr><td colspan="6">尚无执行记录</td></tr>'}</tbody></table></div>`;
+        openModal('#modal');
+      }
+    } catch (error) { alert('读取场景证据失败：' + error.message); }
+  };
+}
+
+/**
+ * 按需读取固定回答，SSE不反复传输长报告。
+ * @param {number} instanceId 实例
+ * @param {number} taskId 任务
+ * @return {Promise<void>} 展示完成
+ */
+async function showScenarioArtifact(instanceId, taskId) {
+  const base = `/project-instances/${instanceId}/scenario-tasks/${taskId}`;
+  const result = await API(`${base}/artifacts`);
+  endRunDetail();
+  $('#modal-content').innerHTML = `<h3>回答与验收证据</h3><p>${escapeHTML(projectStatus(result.status))} · ${result.code_accepted ? '代码已接受' : '代码未产生新的已接受检查点'}</p><pre class="project-report">${escapeHTML(result.answer || '尚无完整回答')}</pre><details><summary>独立验收记录</summary><pre class="project-report">${escapeHTML(JSON.stringify(result.report, null, 2))}</pre></details><details><summary>该轮冻结文件</summary><div class="file-tree">${result.files.map(file => `<button type="button" class="btn btn-sm project-file" data-scenario-file="${escapeHTML(file.path)}">${escapeHTML(file.path)} · ${file.size} B</button>`).join('')}</div></details><pre class="project-report" id="project-file-preview"></pre>`;
+  $('#modal-content').onclick = async event => {
+    const button = event.target.closest('[data-scenario-file]');
+    if (!button) return;
+    try {
+      const query = new URLSearchParams({path: button.dataset.scenarioFile, evaluation_id: result.evaluation_id});
+      const file = await API(`${base}/file?${query}`);
+      $('#project-file-preview').textContent = file.text + (file.truncated ? '\n…内容已截断' : '');
+    } catch (error) { alert('读取冻结文件失败：' + error.message); }
   };
   openModal('#modal');
 }
@@ -2655,10 +2770,10 @@ function paintRuns(runs) {
   body.innerHTML = runs.map(r => {
     const task = taskMap[r.task_id];
     const runKind = r.run_kind || 'normal';
-    const tname = task ? `${runKind === 'project_iteration' ? '' : `#${task.topic_no} `}${escapeHTML(task.title)}` : `task#${r.task_id}`;
+    const tname = task ? `${['project_iteration', 'project_review'].includes(runKind) ? '' : `#${task.topic_no} `}${escapeHTML(task.title)}` : `task#${r.task_id}`;
     const kind = runKind === 'capture'
       ? ' <span class="pill pill-capture">抓包</span>'
-      : (runKind === 'warmup' ? ' <span class="pill pill-warmup">养号</span>' : runKind === 'project_iteration' ? ' <span class="pill">项目迭代</span>' : '');
+      : (runKind === 'warmup' ? ' <span class="pill pill-warmup">养号</span>' : runKind === 'project_review' ? ' <span class="pill">同模型独立评审</span>' : runKind === 'project_iteration' ? ' <span class="pill">项目任务</span>' : '');
     const dur = r.status === 'quota_wait' ? (r.quota_resume_at ? `恢复 ${formatWarmupTime(r.quota_resume_at)}` : '等待可信恢复时间') : (r.started_at && r.ended_at) ? `${(r.ended_at - r.started_at).toFixed(0)}s` :
                 (r.started_at ? `${(Date.now()/1000 - r.started_at).toFixed(0)}s` : '-');
     const terminal = ['success', 'failed', 'timeout', 'stopped', 'auth_failed'].includes(r.status);
@@ -2673,7 +2788,7 @@ function paintRuns(runs) {
         <td><div class="op-actions run-actions">
           <button class="btn btn-sm" data-detail="${r.id}">详情</button>
           ${['queued', 'running', 'quota_wait'].includes(r.status) ? `<button class="btn btn-sm btn-danger" data-stop="${r.id}">停止</button>` : ''}
-          ${terminal && runKind !== 'project_iteration' ? `<button class="btn btn-sm btn-primary" data-continue="${r.id}">继续</button>` : ''}
+          ${terminal && !['project_iteration', 'project_review'].includes(runKind) ? `<button class="btn btn-sm btn-primary" data-continue="${r.id}">继续</button>` : ''}
           ${terminal ? `<button class="btn btn-sm btn-danger" data-del-run="${r.id}">删除</button>` : ''}
         </div></td>
       </tr>

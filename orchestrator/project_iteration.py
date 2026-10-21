@@ -15,9 +15,12 @@ from typing import Callable
 from project_library import (ProjectLibrary, canonical_json, digest_json, materialize_snapshot,
     read_document, safe_relative, snapshot_tree, write_document)
 from project_plans import PLAN_DEFAULTS, ProjectPlans, initialize_plan_schema, normalized_policy
+from project_scenarios import ProjectScenarios, SCENARIO_DEFAULTS, normalized_scenario_policy
 
 
 PROJECT_RUN_KIND = 'project_iteration'
+PROJECT_REVIEW_KIND = 'project_review'
+PROJECT_RUN_KINDS = frozenset({PROJECT_RUN_KIND, PROJECT_REVIEW_KIND})
 PROJECT_SCHEMA = '''
 CREATE TABLE IF NOT EXISTS project_catalog_releases (
   id INTEGER PRIMARY KEY AUTOINCREMENT, version TEXT NOT NULL, digest TEXT NOT NULL UNIQUE,
@@ -78,7 +81,7 @@ class ProjectIterationManager:
     :param concurrency_limit: 实际账号 CLI 容量。
     """
 
-    def __init__(self, data: Path, library: ProjectLibrary, database: Callable, write_lock,
+    def __init__(self, data: Path, library: ProjectLibrary | None, database: Callable, write_lock,
                  submit: Callable, settings: Callable, identity: Callable, stop_run: Callable,
                  verifier, is_executing: Callable, admission: Callable | None = None,
                  execution_control: Callable | None = None, schedule_admission: Callable | None = None,
@@ -88,7 +91,9 @@ class ProjectIterationManager:
         self.submit, self.settings, self.identity, self.stop_run = submit, settings, identity, stop_run
         self.verifier, self.is_executing = verifier, is_executing
         self.admission = admission
-        self.library = library.install(data)
+        self.review_admission = None
+        self.review_refresh = None
+        self.library = library.install(data) if library is not None else None
         self.objects = data/'project-artifacts/objects'
         self.manifests = data/'project-artifacts/manifests'
         self._stop = threading.Event()
@@ -96,18 +101,22 @@ class ProjectIterationManager:
         self._thread = None
         self._libraries = {}
         now = time.time()
+        self.release_id = None
         with self.write_lock:
             connection = self.database()
             try:
                 with connection:
-                    connection.execute('INSERT OR IGNORE INTO project_catalog_releases(version,digest,relative_path,created_at) VALUES(?,?,?,?)',
-                        (self.library.version,self.library.digest,str(self.library.root.relative_to(data)),now))
-                    self.release_id = connection.execute('SELECT id FROM project_catalog_releases WHERE digest=?',
-                        (self.library.digest,)).fetchone()['id']
+                    if self.library is not None:
+                        connection.execute('INSERT OR IGNORE INTO project_catalog_releases(version,digest,relative_path,created_at) VALUES(?,?,?,?)',
+                            (self.library.version,self.library.digest,str(self.library.root.relative_to(data)),now))
+                        self.release_id = connection.execute('SELECT id FROM project_catalog_releases WHERE digest=?',
+                            (self.library.digest,)).fetchone()['id']
             finally:
                 connection.close()
-        self._libraries[self.release_id] = self.library
+        if self.library is not None:
+            self._libraries[self.release_id] = self.library
         self.plans = ProjectPlans(self,execution_control,schedule_admission,concurrency_limit)
+        self.scenarios = ProjectScenarios(self)
 
     def _rows(self, sql: str, parameters=()) -> list[dict]:
         connection = self.database()
@@ -125,31 +134,50 @@ class ProjectIterationManager:
 
         :return: 固定内容版本和项目列表，不包含私有参考实现。
         """
-        return {'version':self.library.version,'digest':self.library.digest,
-            'scheduling_defaults':{**PLAN_DEFAULTS,'concurrency':self.plans.limit},
+        if self.library is None:
+            raise ValueError('当前项目内容库不可用，历史批次仍可读取')
+        defaults = SCENARIO_DEFAULTS if self.library.schema == 2 else PLAN_DEFAULTS
+        return {'content_schema':self.library.schema,'version':self.library.version,'digest':self.library.digest,
+            'scheduling_defaults':{**defaults,'concurrency':self.plans.limit},
             'projects':[project.summary() for project in self.library.projects.values()]}
 
     def create_batch(self, account_id: int, name: str, project_keys: list[str] | None = None,
-                     policy: dict | None = None) -> dict:
+                     policy: dict | None = None, scenario_entries: dict[str,dict[str,str]] | None = None) -> dict:
         """建立暂停批次；这里只写记录，不创建项目工作目录。
 
         :param account_id: 可用账号 ID。
         :param name: 用户可见的批次名称。
         :param project_keys: 选中项目；None 表示完整项目库。
         :param policy: 新调度策略；内部历史调用省略时保留旧单步语义。
+        :param scenario_entries: 新内容的显式场景入口选择，省略使用各自默认值。
         :return: 新批次详情。
         """
+        if self.library is None:
+            raise ValueError('当前项目内容库不可用，不能新建批次')
         keys = list(self.library.projects) if project_keys is None else list(project_keys)
         if (not keys or len(keys)>100 or len(set(keys))!=len(keys)
                 or any(key not in self.library.projects for key in keys)):
             raise ValueError('项目选择为空、重复或不属于当前内容版本')
         if not isinstance(name,str) or not 1 <= len(name.strip()) <= 120:
             raise ValueError('项目批次名称须为 1～120 个字符')
+        if scenario_entries:
+            if self.library.schema != 2 or any(key not in keys for key in scenario_entries):
+                raise ValueError('场景入口只能引用本次选中的新内容项目')
+            for key,selections in scenario_entries.items():
+                scenarios = {item['id']:item for item in self.library.projects[key].manifest['scenarios']}
+                if not isinstance(selections,dict) or any(scene not in scenarios for scene in selections):
+                    raise ValueError('场景入口所属场景不存在')
+                for scene,entry in selections.items():
+                    if entry not in {item['id'] for item in scenarios[scene]['entries']}:
+                        raise ValueError('所选场景入口不存在')
         account = self._one('SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL',(account_id,))
         if account is None:
             raise ValueError('账号不存在或已停用')
         selected_policy = DEFAULT_POLICY
-        if policy is not None:
+        if self.library.schema == 2:
+            selected_policy = normalized_scenario_policy(policy or {}, len(keys), self.plans.limit)
+            random.shuffle(keys)
+        elif policy is not None:
             maximum = max(len(self.library.projects[key].manifest['steps']) for key in keys)
             selected_policy = normalized_policy(policy,len(keys),maximum,self.plans.limit)
             random.shuffle(keys)
@@ -165,9 +193,11 @@ class ProjectIterationManager:
                     batch_id = cursor.lastrowid
                     for order,key in enumerate(keys):
                         manifest = self.library.projects[key].manifest
-                        connection.execute('INSERT INTO project_instances(batch_id,project_key,manifest_json,seed_digest,roadmap_digest,checkpoint_digest,visit_order,initial_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
-                            (batch_id,key,canonical_json(manifest).decode(),manifest['seed_digest'],digest_json(manifest['steps']),
+                        cursor = connection.execute('INSERT INTO project_instances(batch_id,project_key,manifest_json,seed_digest,roadmap_digest,checkpoint_digest,visit_order,initial_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
+                            (batch_id,key,canonical_json(manifest).decode(),manifest['seed_digest'],digest_json(manifest.get('steps',manifest.get('scenarios'))),
                             manifest['seed_digest'],order,order,now,now))
+                        if self.library.schema == 2:
+                            self.scenarios.create_tasks(connection,cursor.lastrowid,manifest,now,(scenario_entries or {}).get(key))
             finally:
                 connection.close()
         return self.batch(batch_id)
@@ -185,6 +215,8 @@ class ProjectIterationManager:
                 'SELECT status,COUNT(*) AS count FROM project_instances WHERE batch_id=? GROUP BY status',(item['id'],))}
             if item['policy'].get('schema')==2:
                 item['scheduling'] = self.plans.batch_summary(item)
+            elif item['policy'].get('schema')==3:
+                item['scheduling'] = self.scenarios.batch_summary(item)
         return result
 
     def batch(self, batch_id: int) -> dict:
@@ -210,6 +242,8 @@ class ProjectIterationManager:
         if item is None:
             raise ValueError('项目实例不存在')
         result = self._public_instance(item,True)
+        if json.loads(item['manifest_json'])['schema'] == 2:
+            return self.scenarios.instance_detail(item,result)
         result['attempts'] = self._rows('SELECT a.id,a.step_id,a.attempt_no,a.run_id,a.plan_id,a.validation_status,a.execution_released_at,'
             'a.candidate_digest,a.accepted_checkpoint_digest,a.created_at,a.ended_at,r.status AS execution_status,'
             'r.error AS execution_error,r.window_wait_until FROM project_step_attempts a LEFT JOIN runs r ON r.id=a.run_id '
@@ -220,6 +254,14 @@ class ProjectIterationManager:
     def _public_instance(self, item: dict, include_steps: bool) -> dict:
         manifest = json.loads(item['manifest_json'])
         result = {key:value for key,value in item.items() if key not in ('manifest_json','workspace_relative')}
+        if manifest['schema'] == 2:
+            counts = {row['status']:row['count'] for row in self._rows('SELECT t.status,COUNT(*) AS count FROM project_scenario_tasks t '
+                'JOIN project_scenario_instances s ON s.id=t.scenario_instance_id WHERE s.instance_id=? AND t.selected=1 GROUP BY t.status',(item['id'],))}
+            result.update(content_schema=2,title=manifest['title'],scenario_count=len(manifest['scenarios']),
+                task_count=sum(len(scenario['tasks']) for scenario in manifest['scenarios']),workspace_path=None,
+                task_counts=counts,selected_task_count=sum(counts.values()))
+            return result
+        result['content_schema'] = 1
         result['title'],result['step_count'] = manifest['title'],len(manifest['steps'])
         result['workspace_path'] = '/home/node/projects/'+Path(item['workspace_relative']).name if item['workspace_relative'] else None
         if include_steps:
@@ -261,6 +303,8 @@ class ProjectIterationManager:
         if action=='stop':
             for run in self._rows("SELECT DISTINCT r.id FROM runs r JOIN project_step_attempts a ON a.run_id=r.id JOIN project_instances i ON i.id=a.instance_id WHERE i.batch_id=? AND r.status IN ('queued','running','stopping','quota_wait')",(batch_id,)):
                 self.stop_run(run['id'])
+            for run in self.scenarios._open_executions(batch_id):
+                self.stop_run(run['run_id'])
         return self.batch(batch_id)
 
     def run_context(self, run_id: str) -> dict | None:
@@ -269,6 +313,9 @@ class ProjectIterationManager:
         :param run_id: 原运行 ID。
         :return: 尝试、实例和批次的内部联合视图，普通运行返回 None。
         """
+        scenario = self.scenarios.context(run_id)
+        if scenario is not None:
+            return scenario
         planned = self.plans.context(run_id)
         if planned is not None:
             return planned
@@ -285,6 +332,10 @@ class ProjectIterationManager:
         :return: 本代是否仍有执行权限。
         """
         context = self.run_context(run_id)
+        if context and context.get('scenario_execution'):
+            execution = context['scenario_execution']
+            return bool(execution['ended_at'] is None and execution['generation'] == context['batch_generation']
+                and (context['batch_status'] == 'active' or started and context['batch_status'] == 'pausing'))
         if context and context.get('plan_id') and (context['not_before']>time.time()
                 or context['plan_status'] not in ('running','quota_wait')):
             return False
@@ -302,6 +353,8 @@ class ProjectIterationManager:
         context = self.run_context(run_id)
         if context is None:
             return None
+        if context.get('scenario_execution'):
+            return self.scenarios.prepare_workspace(row,run_id,environment_root)
         if row.get('account_id')!=context['account_id'] or not self.can_start(run_id):
             raise ValueError('项目实例账号、代次或启动状态不符')
         alias = 'project-'+hashlib.sha256(f"{row['environment_id']}:instance:{context['id']}".encode()).hexdigest()[:12]
@@ -399,6 +452,9 @@ class ProjectIterationManager:
         :param error: 严格清理失败原因。
         :return: None。
         """
+        if self.scenarios.context(run_id):
+            self.scenarios.execution_released(run_id,quota_attempt,error)
+            return
         if self.plans.context(run_id):
             self.plans.execution_released(run_id,quota_attempt,error)
             return
@@ -461,6 +517,11 @@ class ProjectIterationManager:
         :param boundaries: 单步骤自己的字节起止；省略时统计整个 Run。
         :return: 用量与可用性；证据缺失时不会回退为整个项目的历史。
         """
+        if boundaries is None and self.scenarios.context(run_id):
+            usage = self.scenarios.run_usage(run_id)
+            known = [usage[key] for key in ('input_tokens','cache_read_input_tokens','cache_creation_input_tokens') if usage[key] is not None]
+            return {**usage,'tokens_in':sum(known) if known else 0,'tokens_out':usage['output_tokens'] or 0,
+                'requests':usage['requests'] or 0,'usage_available':bool(known or usage['output_tokens'] is not None)}
         empty = {'tokens_in':0,'tokens_out':0,'requests':0,'usage_available':False}
         root = self.data/'project-artifacts/runs'/run_id
         try:
@@ -560,6 +621,7 @@ class ProjectIterationManager:
         :return: None。
         """
         self.plans.recover(cleanup)
+        self.scenarios.recover(cleanup)
         attempts = self._rows('SELECT a.run_id,r.status,r.started_at,r.worker_container,r.quota_attempt '
             'FROM project_step_attempts a JOIN runs r ON r.id=a.run_id WHERE a.ended_at IS NULL AND a.plan_id IS NULL')
         for item in attempts:
@@ -606,11 +668,16 @@ class ProjectIterationManager:
                 connection.close()
         for run in self._rows("SELECT DISTINCT r.id FROM runs r JOIN project_step_attempts a ON a.run_id=r.id JOIN project_instances i ON i.id=a.instance_id WHERE i.batch_id=? AND r.status IN ('queued','running','stopping','quota_wait')",(batch_id,)):
             self.stop_run(run['id'])
+        for execution in self.scenarios._open_executions(batch_id):
+            self.stop_run(execution['run_id'])
 
     def _drive_batch(self, batch: dict) -> None:
         account = self._one('SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL',(batch['account_id'],))
         if batch['status'] not in ('paused','stopping','blocked') and (account is None or self.identity(account)!=batch['account_identity']):
             self._batch_error(batch['id'],'账号已停用、删除或身份已改变')
+            return
+        if json.loads(batch['policy_json']).get('schema')==3:
+            self.scenarios.drive(batch,account)
             return
         if json.loads(batch['policy_json']).get('schema')==2:
             self.plans.drive(batch,account)

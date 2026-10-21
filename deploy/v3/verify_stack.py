@@ -8,6 +8,7 @@ import json
 import socket
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import time
 import uuid
@@ -86,6 +87,11 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="v3-stack-verify-") as temporary:
         root = Path(temporary)
         data = root / "v3-data"
+        fixture_library = root / 'project-fixture-library'
+        if args.project_iteration:
+            sys.path.insert(0,str(REPO/'orchestrator'))
+            from project_test_content import create_project_fixture
+            create_project_fixture(fixture_library)
         legacy = root / "legacy-data"
         legacy.mkdir()
         sentinel_file = legacy / "legacy.sqlite"
@@ -123,7 +129,18 @@ def main() -> None:
             for candidate in [ipaddress.ip_network(f'10.233.{index}.0/24')]
             if not any(candidate.overlaps(item) for item in used if item.version == 4))
         compose = root / 'compose.yml'
-        compose.write_text(COMPOSE.read_text() + f'    ipam:\n      config:\n        - subnet: {subnet}\n')
+        compose_text = COMPOSE.read_text()
+        if args.project_iteration:
+            # 仅本次项目页面验证挂载临时夹具，正式 Compose 不提供合成内容兜底。
+            environment_anchor = '      TOPICS_FILE: /repo/topics.md\n'
+            volume_anchor = '      - ${V3_DATA_ROOT}/bench:/data\n'
+            if compose_text.count(environment_anchor)!=1 or compose_text.count(volume_anchor)!=1:
+                raise ValueError('隔离项目夹具的 Compose 挂载位置不唯一')
+            compose_text = compose_text.replace(environment_anchor,
+                environment_anchor+'      PROJECT_LIBRARY_DIR: /test-project-library\n')
+            compose_text = compose_text.replace(volume_anchor,
+                volume_anchor+f'      - {fixture_library}:/test-project-library:ro\n')
+        compose.write_text(compose_text + f'    ipam:\n      config:\n        - subnet: {subnet}\n')
         wrapper = root / 'manage.py'
         wrapper.write_text(f'import sys\nfrom pathlib import Path\nsys.path.insert(0,{str(REPO / "deploy/v3")!r})\nimport manage\nmanage.COMPOSE=Path({str(compose)!r})\nmanage.main()\n')
         manager = ["python3", str(wrapper)]
@@ -194,7 +211,8 @@ def main() -> None:
                     with ExitStack() as fixtures:
                         if args.project_iteration:
                             from verify_project_browser import project_browser_fixture
-                            exercise = fixtures.enter_context(project_browser_fixture(client, deployment, data, browser, base))
+                            exercise = fixtures.enter_context(project_browser_fixture(client, deployment, data, browser, base,
+                                library_root=fixture_library))
                         if args.run_boundaries:
                             from verify_run_boundaries_browser import run_boundaries_browser_fixture
                             exercise = fixtures.enter_context(run_boundaries_browser_fixture(client, deployment, data, browser, base))

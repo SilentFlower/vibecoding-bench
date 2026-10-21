@@ -71,7 +71,7 @@
       <header class="view-head">
         <div>
           <h2 class="view-title"><span class="bracket">▌</span>projects <span class="muted">// continuous iteration</span></h2>
-          <p class="hint">多个项目并行迭代，同一次 CLI 计划逐步验收；每次执行同步记录到 Runs。</p>
+          <p class="hint">围绕真实项目理解、咨询、诊断、讨论方案与修改；任务结果、代码接受和执行记录分别保存。</p>
         </div>
         <div class="view-actions">
           <span id="project-library-count" class="hint">加载项目库</span>
@@ -95,6 +95,12 @@
             <label><span class="lbl">$ steps_per_plan · 每次 CLI 计划步数</span><input name="steps_per_plan" type="number" min="1" value="2" required></label>
             <label><span class="lbl">$ timeout_sec · 单次计划超时（秒）</span><input name="timeout_sec" type="number" min="60" max="86400" value="1800" required></label>
           </div>
+          <div class="row hidden" data-scenario-budgets>
+            <label><span class="lbl">任务累计工作预算（秒）</span><input name="task_budget_sec" type="number" min="60" max="86400" value="1800"></label>
+            <label><span class="lbl">单次评审预算（秒）</span><input name="review_timeout_sec" type="number" min="60" max="600" value="180"></label>
+            <label><span class="lbl">任务累计评审预算（秒）</span><input name="review_budget_sec" type="number" min="60" max="86400" value="720"></label>
+          </div>
+          <p class="hint hidden" data-scenario-budgets>同模型独立会话评审，复用当前账号及额度，用量单列。超时接续保留累计预算；首次执行后最多两次继续／修正。</p>
           <div class="row">
             <label><span class="lbl">$ interval_min_sec · 计划补位间隔下限（秒）</span><input name="interval_min_sec" type="number" min="0" max="86400" value="0" required></label>
             <label><span class="lbl">$ interval_max_sec · 计划补位间隔上限（秒）</span><input name="interval_max_sec" type="number" min="0" max="86400" value="0" required></label>

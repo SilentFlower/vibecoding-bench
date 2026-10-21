@@ -1,0 +1,290 @@
+{
+  "schema": 2,
+  "project_key": "python-frontmatter",
+  "title": "python-frontmatter 文档资料工作场景",
+  "category": "文档处理",
+  "description": "真实固定版本的接入、诊断、方案与兼容修复；4 场景、6 稳定任务。",
+  "seed_digest": "a9181e19224379b7c3593996869c4c80f4b8afa19a4126d25bd0e2115f84eca2",
+  "environment": "python-frontmatter-py312",
+  "source": {
+    "repository": "https://github.com/eyeseast/python-frontmatter",
+    "commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "FM-S01",
+      "title": "栏目周报接入",
+      "goal": "判断适用范围并取得最小接入用法",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FM-IN-01",
+            "FM-IN-02"
+          ]
+        },
+        {
+          "id": "consult_only",
+          "task_ids": [
+            "FM-IN-02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FM-IN-01",
+          "kind": "understand",
+          "goal": "判断文档资料提取的适用范围与数据边界",
+          "prompt": "我们要从这种 Markdown 周报里提取标题和标签，供资料整理脚本使用。这个项目适合吗？请简要说明数据怎么进出，以及它会不会把 Markdown 渲染成网页。",
+          "requires": [],
+          "materials": [
+            "materials/weekly.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "resolved"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FM-IN-01.rubric.json"
+          },
+          "branches": [
+            {
+              "id": "rendering-correction",
+              "when": "回答把元数据提取与网页渲染混为一谈，需要一次用户澄清。",
+              "materials": [
+                "disclosure/rendering-boundary.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "FM-IN-02",
+          "kind": "consult",
+          "goal": "用现有 API 完成周报读取、更新和另存往返",
+          "prompt": "请给一个最小 Python 用法：读取 weekly.md，打印标题和标签，增加 status 为“已校对”，写到 weekly-reviewed.md，再读回来确认字段和正文都对。不要覆盖原文件。",
+          "requires": [],
+          "materials": [
+            "materials/weekly.md",
+            "materials/weekly-usage.md"
+          ],
+          "allowed_paths": [
+            "app/example.py",
+            "app/tmp",
+            "app/weekly-reviewed.md"
+          ],
+          "outcomes": [
+            "resolved"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FM-IN-02.rubric.json",
+            "native": "verification/consult.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FM-S02",
+      "title": "部分文档读取报错",
+      "goal": "按材料诊断，并在明确的新请求下修复读取问题",
+      "default_entry": "diagnose_then_repair",
+      "entries": [
+        {
+          "id": "diagnose_then_repair",
+          "task_ids": [
+            "FM-DG-01",
+            "FM-FX-01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "FM-DG-01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "FM-DG-01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        },
+        {
+          "id": "repair_only",
+          "task_ids": [
+            "FM-FX-01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FM-DG-01",
+          "kind": "diagnose",
+          "goal": "先取得必要材料，再判断部分文档的 TypeError 原因",
+          "prompt": "有一部分 Markdown 用这个项目读不进去，报 TypeError。是不是库有 BUG？先帮我判断原因。",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [
+            "app/tmp"
+          ],
+          "outcomes": [
+            "diagnosed",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FM-DG-01.rubric.json"
+          },
+          "branches": [
+            {
+              "id": "minimal-reproducer",
+              "when": "当前入口不是 unavailable，且模型合理请求最小失败文档、调用方式或完整异常；当前尚未披露复现。",
+              "materials": [
+                "disclosure/reproducer.py",
+                "disclosure/reproducer-error.txt"
+              ]
+            },
+            {
+              "id": "challenge-certainty",
+              "when": "当前入口不是 unavailable，复现尚未披露，但模型已无依据确定根因；用户要求说明依据。",
+              "materials": [
+                "disclosure/request-evidence.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "FM-FX-01",
+          "kind": "modify",
+          "goal": "修复合法保留键元数据的读取冲突并保持兼容",
+          "prompt": "请修复这个读取问题。文档里的 content 是业务摘要字段，要和正文分别保留；handler 也可能是业务字段。现有 Post 构造方式和普通文档用法要继续兼容，请加必要回归验证。\n完整复现：import frontmatter；text = \"---\\ncontent: 备用摘要\\n---\\n正文\"；frontmatter.loads(text) 报 TypeError: Post.__init__() got multiple values for argument 'content'。\n允许修改 library/frontmatter、相关 tests 与说明；不改变 Post.to_dict 的既有扁平输出合同，不顺带扩展格式保真或深合并。",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [
+            "library/frontmatter",
+            "library/tests",
+            "library/README.md",
+            "library/docs",
+            "app/tmp"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FM-FX-01.rubric.json",
+            "native": "verification/repair.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FM-S03",
+      "title": "默认语言没有生效",
+      "goal": "排除浅覆盖的 BUG 误判并给调用方处理",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FM-DG-02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FM-DG-02",
+          "kind": "diagnose",
+          "goal": "解释默认 settings 的浅覆盖并给局部调用方处理",
+          "prompt": "我希望文档只覆盖 theme，默认的 lang 还能保留，但这段代码返回的 settings 里只有 theme。是不是解析漏字段了？请解释现在的行为，并给一个适合这两个固定字段的调用方处理方式，先别改库。",
+          "requires": [],
+          "materials": [
+            "materials/shallow-example.py"
+          ],
+          "allowed_paths": [
+            "app/tmp"
+          ],
+          "outcomes": [
+            "not_a_bug"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FM-DG-02.rubric.json",
+            "native": "verification/shallow.native.json"
+          },
+          "branches": [
+            {
+              "id": "keep-default-object",
+              "when": "模型提供的局部处理原地修改了仍要复用的默认对象。",
+              "materials": [
+                "disclosure/preserve-defaults.md"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-S04",
+      "title": "只改标题与排版保留",
+      "goal": "比较保真编辑路径和最小落地范围",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FM-PL-01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FM-PL-01",
+          "kind": "plan",
+          "goal": "评估只改标题且保留元数据样式与正文空白的最小方案",
+          "prompt": "编辑者只想改标题，但希望 YAML 注释和引号尽量不动，诗歌正文的缩进和末尾空行也要保留。请根据当前代码评估能做到多少，比较调用方处理和库扩展的办法，并推荐一个最小落地范围。这次先讨论，不写实现。",
+          "requires": [],
+          "materials": [
+            "materials/annotated.md",
+            "materials/poem.txt",
+            "materials/format-inputs.md"
+          ],
+          "allowed_paths": [
+            "app/tmp"
+          ],
+          "outcomes": [
+            "viable_plan"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FM-PL-01.rubric.json"
+          },
+          "branches": [
+            {
+              "id": "yaml-scope",
+              "when": "推荐依赖过宽格式范围且尚未给出只支持 YAML 的可行最小范围，用户收窄需求。",
+              "materials": [
+                "disclosure/yaml-only.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

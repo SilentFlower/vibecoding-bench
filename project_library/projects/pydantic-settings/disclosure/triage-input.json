@@ -1,0 +1,11 @@
+{
+  "file_name": "app.env",
+  "file_content": "APP_TITLE=商品工具\nAPP_QUANTITY=2\n",
+  "process_environment": {
+    "APP_QUANTITY": "invalid"
+  },
+  "initial_values": {},
+  "custom_sources": false,
+  "cli": false,
+  "call": "App()"
+}

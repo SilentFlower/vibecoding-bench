@@ -1,0 +1,818 @@
+"""
+Test pydantic_settings.YamlConfigSettingsSource.
+"""
+
+from pathlib import Path
+
+import pytest
+from pydantic import BaseModel
+
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+    YamlConfigSettingsSource,
+)
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
+
+def test_repr() -> None:
+    source = YamlConfigSettingsSource(BaseSettings, Path('config.yaml'))
+    assert repr(source) == 'YamlConfigSettingsSource(yaml_file=config.yaml)'
+
+
+@pytest.mark.skipif(yaml, reason='PyYAML is installed')
+def test_yaml_not_installed(tmp_path):
+    p = tmp_path / '.env'
+    p.write_text(
+        """
+    foobar: "Hello"
+    """
+    )
+
+    class Settings(BaseSettings):
+        foobar: str
+        model_config = SettingsConfigDict(yaml_file=p)
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    with pytest.raises(ImportError, match=r'^PyYAML is not installed, run `pip install pydantic-settings\[yaml\]`$'):
+        Settings()
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYaml is not installed')
+def test_yaml_file(tmp_path):
+    p = tmp_path / '.env'
+    p.write_text(
+        """
+    foobar: "Hello"
+    null_field:
+    nested:
+        nested_field: "world!"
+    """
+    )
+
+    class Nested(BaseModel):
+        nested_field: str
+
+    class Settings(BaseSettings):
+        foobar: str
+        nested: Nested
+        null_field: str | None
+        model_config = SettingsConfigDict(yaml_file=p)
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    s = Settings()
+    assert s.foobar == 'Hello'
+    assert s.nested.nested_field == 'world!'
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYaml is not installed')
+def test_yaml_no_file():
+    class Settings(BaseSettings):
+        model_config = SettingsConfigDict(yaml_file=None)
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    s = Settings()
+    assert s.model_dump() == {}
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYaml is not installed')
+def test_yaml_empty_file(tmp_path):
+    p = tmp_path / '.env'
+    p.write_text('')
+
+    class Settings(BaseSettings):
+        model_config = SettingsConfigDict(yaml_file=p)
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    s = Settings()
+    assert s.model_dump() == {}
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_multiple_file_yaml(tmp_path):
+    p3 = tmp_path / '.env.yaml3'
+    p4 = tmp_path / '.env.yaml4'
+    p3.write_text(
+        """
+    yaml3: 3
+    """
+    )
+    p4.write_text(
+        """
+    yaml4: 4
+    """
+    )
+
+    class Settings(BaseSettings):
+        yaml3: int
+        yaml4: int
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls, yaml_file=[p3, p4]),)
+
+    s = Settings()
+    assert s.model_dump() == {'yaml3': 3, 'yaml4': 4}
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+@pytest.mark.parametrize('deep_merge', [False, True])
+def test_multiple_file_yaml_deep_merge(tmp_path, deep_merge):
+    p3 = tmp_path / '.env.yaml3'
+    p4 = tmp_path / '.env.yaml4'
+    p3.write_text(
+        """
+    hello: world
+
+    nested:
+      foo: 1
+      bar: 2
+    """
+    )
+    p4.write_text(
+        """
+    nested:
+      foo: 3
+    """
+    )
+
+    class Nested(BaseModel):
+        foo: int
+        bar: int = 0
+
+    class Settings(BaseSettings):
+        hello: str
+        nested: Nested
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls, yaml_file=[p3, p4], deep_merge=deep_merge),)
+
+    s = Settings()
+    assert s.model_dump() == {'hello': 'world', 'nested': {'foo': 3, 'bar': 2 if deep_merge else 0}}
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_yaml_config_section(tmp_path):
+    p = tmp_path / '.env'
+    p.write_text(
+        """
+    foobar: "Hello"
+    nested:
+        nested_field: "world!"
+    """
+    )
+
+    class Settings(BaseSettings):
+        nested_field: str
+
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='nested')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    s = Settings()
+    assert s.nested_field == 'world!'
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_invalid_yaml_config_section(tmp_path):
+    p = tmp_path / '.env'
+    p.write_text(
+        """
+    foobar: "Hello"
+    nested:
+        nested_field: "world!"
+    """
+    )
+
+    class Settings(BaseSettings):
+        nested_field: str
+
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='invalid_key')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    with pytest.raises(KeyError, match=r'yaml_config_section key "invalid_key" not found in .+'):
+        Settings()
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_yaml_config_section_nested_path(tmp_path):
+    p = tmp_path / 'config.yaml'
+    p.write_text(
+        """
+    config:
+      app:
+        settings:
+          database_url: "postgresql://localhost/db"
+          api_key: "secret123"
+      logging:
+        level: "INFO"
+    """
+    )
+
+    class Settings(BaseSettings):
+        database_url: str
+        api_key: str
+
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='config.app.settings')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    s = Settings()
+    assert s.database_url == 'postgresql://localhost/db'
+    assert s.api_key == 'secret123'
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_yaml_config_section_nested_path_two_levels(tmp_path):
+    p = tmp_path / 'config.yaml'
+    p.write_text(
+        """
+    app:
+      settings:
+        host: "localhost"
+        port: 8000
+    """
+    )
+
+    class Settings(BaseSettings):
+        host: str
+        port: int
+
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='app.settings')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    s = Settings()
+    assert s.host == 'localhost'
+    assert s.port == 8000
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_invalid_yaml_config_section_nested_path(tmp_path):
+    p = tmp_path / 'config.yaml'
+    p.write_text(
+        """
+    config:
+      app:
+        settings:
+          database_url: "postgresql://localhost/db"
+    """
+    )
+
+    class Settings(BaseSettings):
+        database_url: str
+
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='config.app.invalid')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    with pytest.raises(KeyError, match=r'yaml_config_section key "config\.app\.invalid" not found in .+'):
+        Settings()
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_traverse_nested_section_defaults_original_path(tmp_path):
+    """`original_path` defaults to `section_path`, which is what error messages report."""
+    p = tmp_path / 'config.yaml'
+    p.write_text(
+        """
+    a:
+      b: 1
+    """
+    )
+
+    source = YamlConfigSettingsSource(BaseSettings, p)
+
+    assert source._traverse_nested_section({'a': {'b': 1}}, 'a.b') == 1
+    with pytest.raises(KeyError, match=r'yaml_config_section key "a\.missing" not found in .+'):
+        source._traverse_nested_section({'a': {'b': 1}}, 'a.missing')
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_invalid_yaml_config_section_no_matching_prefix(tmp_path):
+    """A dotted path whose first segment matches nothing exhausts every prefix candidate."""
+    p = tmp_path / 'config.yaml'
+    p.write_text(
+        """
+    zzz:
+      q: 1
+    """
+    )
+
+    class Settings(BaseSettings):
+        x: int = 0
+
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='a.b')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    with pytest.raises(KeyError, match=r'yaml_config_section key "a\.b" not found in .+'):
+        Settings()
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_yaml_config_section_with_literal_dots(tmp_path):
+    """Test that keys containing literal dots can be accessed using greedy matching."""
+    p = tmp_path / 'config.yaml'
+    p.write_text(
+        """
+    "app.settings":
+      database_url: "postgresql://localhost/db"
+      api_key: "secret123"
+    config:
+      "server.prod":
+        host: "prod.example.com"
+        port: 443
+    """
+    )
+
+    # Test accessing a top-level key with literal dots
+    class Settings1(BaseSettings):
+        database_url: str
+        api_key: str
+
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='app.settings')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    s1 = Settings1()
+    assert s1.database_url == 'postgresql://localhost/db'
+    assert s1.api_key == 'secret123'
+
+    # Test accessing a nested key where the child has literal dots
+    class Settings2(BaseSettings):
+        host: str
+        port: int
+
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='config.server.prod')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    s2 = Settings2()
+    assert s2.host == 'prod.example.com'
+    assert s2.port == 443
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_yaml_config_section_empty_path(tmp_path):
+    """Test that empty section path is rejected."""
+    p = tmp_path / 'config.yaml'
+    p.write_text(
+        """
+    app:
+      settings:
+        host: "localhost"
+    """
+    )
+
+    class Settings(BaseSettings):
+        host: str
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    with pytest.raises(ValueError, match='yaml_config_section cannot be empty'):
+        Settings()
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_yaml_config_section_empty_section(tmp_path):
+    """A present-but-empty section (`nested:` with no children) parses to None and must
+    fall back to defaults, like an empty whole file — not crash with AttributeError."""
+    p = tmp_path / 'config.yaml'
+    p.write_text('nested:\n')
+
+    class Settings(BaseSettings):
+        foo: str = 'default'
+
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='nested')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    assert Settings().foo == 'default'
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_yaml_config_section_scalar_section(tmp_path):
+    """A section that resolves to a scalar (not a mapping) is a user error and must raise a
+    clear TypeError, rather than an opaque AttributeError from deep in the init machinery."""
+    p = tmp_path / 'config.yaml'
+    p.write_text('nested: 42\n')
+
+    class Settings(BaseSettings):
+        foo: str = 'default'
+
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='nested')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    with pytest.raises(TypeError, match='must be a mapping, got int'):
+        Settings()
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_yaml_config_section_unusual_literal_keys(tmp_path):
+    """Test that keys with leading/trailing/consecutive dots can be accessed as literal keys."""
+    p = tmp_path / 'config.yaml'
+    p.write_text(
+        """
+    ".leading":
+      value: "has leading dot"
+    "trailing.":
+      value: "has trailing dot"
+    "double..dots":
+      value: "has consecutive dots"
+    "":
+      value: "empty key"
+    """
+    )
+
+    # Test leading dot key
+    class Settings1(BaseSettings):
+        value: str
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='.leading')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    s1 = Settings1()
+    assert s1.value == 'has leading dot'
+
+    # Test trailing dot key
+    class Settings2(BaseSettings):
+        value: str
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='trailing.')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    s2 = Settings2()
+    assert s2.value == 'has trailing dot'
+
+    # Test consecutive dots key
+    class Settings3(BaseSettings):
+        value: str
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='double..dots')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    s3 = Settings3()
+    assert s3.value == 'has consecutive dots'
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_yaml_config_section_complex_unusual_keys(tmp_path):
+    """Test complex scenario with multiple unusual characters in nested keys."""
+    p = tmp_path / 'config.yaml'
+    p.write_text(
+        """
+    "..leading..double.trailing..":
+      "value..double":
+        normal: "regular value"
+        number: 42
+    """
+    )
+
+    # Test accessing deeply nested path with unusual keys at each level
+    # Path: "..leading..double.trailing.." (literal key) -> "value..double" (literal key)
+    class Settings(BaseSettings):
+        normal: str
+        number: int
+
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='..leading..double.trailing...value..double')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    s = Settings()
+    assert s.normal == 'regular value'
+    assert s.number == 42
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_yaml_config_section_non_dict_intermediate(tmp_path):
+    """Test that traversing through non-dict intermediate values raises clear error."""
+    p = tmp_path / 'config.yaml'
+    p.write_text(
+        """
+    app:
+      name: "MyApp"
+      settings:
+        host: "localhost"
+    """
+    )
+
+    # Try to traverse through a string value (app.name.something)
+    class Settings(BaseSettings):
+        host: str
+        model_config = SettingsConfigDict(yaml_file=p, yaml_config_section='app.name.host')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    with pytest.raises(TypeError, match=r'yaml_config_section path.*cannot be traversed.*not a dictionary'):
+        Settings()
+
+
+@pytest.mark.skipif(yaml is None, reason='PyYAML is not installed')
+def test_yaml_file_traversable(tmp_path):
+    """A packaged resource passed as a non-Path ``Traversable`` (e.g. from inside a zip/wheel) should load. See #299."""
+    import importlib
+    import sys
+    import zipfile
+    from importlib.resources import files
+
+    zip_path = tmp_path / 'yaml_trav_pkg.zip'
+    with zipfile.ZipFile(zip_path, 'w') as zf:
+        zf.writestr('yaml_trav_pkg/__init__.py', '')
+        zf.writestr('yaml_trav_pkg/defaults.yaml', 'foobar: "Hello"\n')
+
+    sys.path.insert(0, str(zip_path))
+    importlib.invalidate_caches()
+    try:
+        trav = files('yaml_trav_pkg').joinpath('defaults.yaml')
+        # Sanity check: a zip-packaged resource is not a filesystem ``Path``.
+        assert not isinstance(trav, Path)
+
+        class Settings(BaseSettings):
+            foobar: str
+
+            @classmethod
+            def settings_customise_sources(
+                cls,
+                settings_cls: type[BaseSettings],
+                init_settings: PydanticBaseSettingsSource,
+                env_settings: PydanticBaseSettingsSource,
+                dotenv_settings: PydanticBaseSettingsSource,
+                file_secret_settings: PydanticBaseSettingsSource,
+            ) -> tuple[PydanticBaseSettingsSource, ...]:
+                return (YamlConfigSettingsSource(settings_cls, yaml_file=trav),)
+
+        assert Settings().model_dump() == {'foobar': 'Hello'}
+    finally:
+        sys.modules.pop('yaml_trav_pkg', None)
+        if str(zip_path) in sys.path:
+            sys.path.remove(str(zip_path))
+        importlib.invalidate_caches()
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_yaml_file_is_read_as_utf8_by_default(tmp_path: Path, non_utf8_default_encoding: str) -> None:
+    p = tmp_path / 'config.yaml'
+    p.write_text(
+        """
+        name: Álvaro
+        city: café
+        """,
+        encoding='utf-8',
+    )
+
+    class Settings(BaseSettings):
+        name: str
+        city: str
+
+        model_config = SettingsConfigDict(yaml_file=p)
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    s = Settings()
+    assert s.name == 'Álvaro'
+    assert s.city == 'café'
+
+
+@pytest.mark.skipif(yaml is None, reason='pyYAML is not installed')
+def test_yaml_file_encoding_overrides_the_utf8_default(tmp_path: Path) -> None:
+    p = tmp_path / 'config.yaml'
+    p.write_bytes(
+        """
+        city: café
+        """.encode('latin-1')
+    )
+
+    class Settings(BaseSettings):
+        city: str
+
+        model_config = SettingsConfigDict(yaml_file=p, yaml_file_encoding='latin-1')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (YamlConfigSettingsSource(settings_cls),)
+
+    assert Settings().city == 'café'

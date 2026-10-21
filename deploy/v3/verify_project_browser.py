@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 @contextmanager
-def project_browser_fixture(client, deployment: str, data: Path, browser, base: str):
+def project_browser_fixture(client, deployment: str, data: Path, browser, base: str, *, library_root: Path):
     """准备永不进入真实模型的窗口等待账号与页面场景。
 
     :param client: 本次 Docker 客户端。
@@ -19,6 +19,7 @@ def project_browser_fixture(client, deployment: str, data: Path, browser, base: 
     :param data: 本次独立数据根。
     :param browser: 已登录 HTTP 会话。
     :param base: 本地网关地址。
+    :param library_root: 本次隔离部署专用的合成调度夹具。
     :return: 供现有 Chrome 验证器调用的场景函数。
     """
     database = data/'bench/db.sqlite'
@@ -27,7 +28,6 @@ def project_browser_fixture(client, deployment: str, data: Path, browser, base: 
     with sqlite3.connect(database) as connection:
         aid = connection.execute('INSERT INTO accounts(name,profile_path,timezone,run_window_json) VALUES(?,?,?,?)',
             ('project-ui-fixture','profiles/project-ui-fixture','UTC',json.dumps(window))).lastrowid
-    root = Path(__file__).resolve().parents[2]
     unsafe_name = '自动项目 <img src=x onerror="window.__projectXss=1">'
 
     async def exercise(rpc,evaluate,wait_for,session_id):
@@ -76,7 +76,7 @@ def project_browser_fixture(client, deployment: str, data: Path, browser, base: 
         instance = details['instances'][0]
         relative = 'environments/project-ui-fixture/projects/project-ui-started'
         workspace = data/'bench'/relative
-        shutil.copytree(root/'project_library/projects'/instance['project_key']/'seed',workspace)
+        shutil.copytree(library_root/'projects'/instance['project_key']/'seed',workspace)
         with sqlite3.connect(database) as connection:
             connection.execute("UPDATE project_instances SET workspace_relative=?,started_at=?,status='ready',next_step_index=1,visit_completed=1,in_pool=1 WHERE id=?",
                 (relative,time.time(),instance['id']))

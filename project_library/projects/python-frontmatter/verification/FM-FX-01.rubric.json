@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "FM-FX-01",
+  "criteria": [
+    {
+      "id": "independent-behavior",
+      "requirement": "受控原生断言全部满足：content／handler 元数据与正文／实际处理器分开保留，读写往返正确，不按唯一补丁样式评分。",
+      "evidence": []
+    },
+    {
+      "id": "compatibility",
+      "requirement": "现有 Post 构造、显式 handler 身份、空头部、null 元数据、defaults 覆盖及 to_dict 扁平语义保持。",
+      "evidence": [
+        "library/frontmatter/__init__.py:176",
+        "library/frontmatter/__init__.py:306"
+      ]
+    },
+    {
+      "id": "scope-and-regression",
+      "requirement": "只修库读取冲突及必要测试／说明，不改业务字段或顺带做其他候选增强；适用严格原生回归通过才接受检查点。",
+      "evidence": []
+    }
+  ],
+  "comparison": "按事实、行为和约束，不按关键词、篇幅或参考答案相似度。",
+  "source_commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6"
+}

@@ -1,0 +1,28 @@
+{
+  "script": "verification/check_settings.py",
+  "args": [
+    "consult"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "defaults": {
+      "title": "商品工具",
+      "quantity": 2
+    },
+    "file_counterexample": {
+      "title": "门店目录",
+      "quantity": 7
+    },
+    "environment_override": {
+      "title": "门店目录",
+      "quantity": 5
+    },
+    "quantity_is_integer": true,
+    "input_file_unchanged": true
+  },
+  "resource_profile": "business",
+  "draft_status": "not_executed"
+}

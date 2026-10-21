@@ -56,15 +56,50 @@ def _native(config: dict) -> Path:
     return path
 
 
+def _work(config: dict, *, final: bool = False) -> dict:
+    if config.get('workflow_schema') != 3:
+        return {'exhausted': False}
+    path = Path(config['work_file'])
+    if path.exists():
+        work = _read(path)
+        if work.get('source') != config['source'] or work.get('segment_id') != config['segment_id']:
+            raise ValueError('工作片段与执行来源不符')
+        if work.get('settled'):
+            return work
+    else:
+        work = {'source': config['source'], 'segment_id': config['segment_id'],
+            'boot_id': config['segment_boot_id'], 'started_mono': None, 'elapsed_sec': 0, 'settled': False}
+    state_path = Path(config['state_file'])
+    if state_path.exists():
+        state = _read(state_path)
+        native = _native(config)
+        if native.is_file() and work['started_mono'] is None:
+            dialogue = read_dialogue(native, offset=state['offset'])
+            consumed = any(item['role'] == 'user' and item['normal'] and isinstance(item['text'], str)
+                and _matches_input(item['text'], state['prompt']) for item in dialogue)
+            if consumed:
+                # 以同一单调时钟保存首次实际消费观察，排队及CLI准备不会计入业务工作。
+                work['started_mono'] = time.monotonic()
+    if work['started_mono'] is not None:
+        elapsed = time.monotonic() - work['started_mono']
+        work['elapsed_sec'] = max(work['elapsed_sec'], elapsed)
+    work['exhausted'] = work['elapsed_sec'] >= config['work_limit_sec']
+    work['settled'] = final
+    _write(path, work)
+    return work
+
+
 def process(action: str, config: dict, wait_seconds: float = 90) -> dict:
     """初始化或交接一阶段，注入后确认与发送前意图分别持久化。
 
-    :param action: begin、advance 或 sent。
+    :param action: begin、advance、sent、tick 或 finish。
     :param config: 控制端冻结的执行归属与路径。
     :param wait_seconds: 等待独立验证的有界管理时间，不重置 CLI 工作预算。
     :return: waiting、send、complete 或 failed 以及实际管理等待秒数。
     """
     path = Path(config['state_file'])
+    if action in ('tick', 'finish'):
+        return _work(config, final=action == 'finish')
     identity = _identity(config)
     native = _native(config)
     if action=='begin':
@@ -73,6 +108,7 @@ def process(action: str, config: dict, wait_seconds: float = 90) -> dict:
         state = {**identity,'phase_seq':config['phase_seq'],'step_id':config['step_id'],
             'prompt':config['prompt'],'offset':native.stat().st_size if native.exists() else 0,'delivery':'sent'}
         _write(path,state)
+        _work(config)
         return {'action':'waiting','held_sec':0}
     state = _read(path)
     if any(state.get(key)!=value for key,value in identity.items()):
@@ -109,6 +145,7 @@ def process(action: str, config: dict, wait_seconds: float = 90) -> dict:
         raise ValueError('候选回复未连接到本阶段实际指令')
     request = {**identity,'phase_seq':state['phase_seq'],'step_id':state['step_id'],
         'input_key':user['key'],'response_key':last['key'],'response_end':last['end']}
+    _work(config, final=True)
     _write(Path(config['request_file']),request)
     started = time.monotonic()
     while True:
@@ -140,7 +177,7 @@ def process(action: str, config: dict, wait_seconds: float = 90) -> dict:
 def main() -> None:
     """执行单个阶段命令并输出有界 JSON。@return None；证据冲突返回非零。"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('action',choices=('begin','advance','sent'))
+    parser.add_argument('action',choices=('begin','advance','sent','tick','finish'))
     arguments = parser.parse_args()
     try:
         print(json.dumps(process(arguments.action,_configuration()),ensure_ascii=False))

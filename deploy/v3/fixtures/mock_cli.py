@@ -18,12 +18,97 @@ from urllib.parse import urlencode
 home = Path(os.environ["HOME"])
 
 
+def run_scenario_fixture(plan: dict) -> None:
+    """模拟场景回答与独立评审，仅写各自HOME和原生日志，不访问模型。
+
+    :param plan: 真实控制端生成的schema3交接配置。
+    :return: None；由原driver正常收口。
+    """
+    review = Path('/input/package.json').is_file()
+    configuration = {} if review else json.loads((home/'.synthetic-scenarios'/(plan['session_id']+'.json')).read_text())
+    directory=home/'.claude/projects'/str(Path.cwd()).replace('/','-')
+    directory.mkdir(parents=True,exist_ok=True)
+    session=directory/(plan['session_id']+'.jsonl')
+    previous=None
+    if session.exists():
+        for line in session.read_text().splitlines():
+            previous=json.loads(line).get('uuid',previous)
+    print('Synthetic task pane',flush=True)
+    tty.setraw(sys.stdin.fileno())
+    os.write(sys.stdout.fileno(),b'\x1b[?2004h')
+    buffer=bytearray()
+    pasted=False
+    count=0
+    while True:
+        byte=os.read(sys.stdin.fileno(),1)
+        if not byte:
+            return
+        buffer.extend(byte)
+        if buffer.endswith(b'\x1b[200~'):
+            del buffer[-6:]
+            pasted=True
+            continue
+        if buffer.endswith(b'\x1b[201~'):
+            del buffer[-6:]
+            pasted=False
+            continue
+        if byte!=b'\r' or pasted:
+            continue
+        prompt=bytes(buffer[:-1]).decode().replace('\r\n','\n').replace('\r','\n')
+        buffer.clear()
+        if not prompt.strip():
+            continue
+        count+=1
+        identity=f"{plan['session_id']}-{os.getpid()}-{count}"
+        user={'type':'user','uuid':identity+'-user','parentUuid':previous,'sessionId':plan['session_id'],
+            'timestamp':datetime.now(timezone.utc).isoformat(),'message':{'role':'user','content':prompt}}
+        with session.open('a') as output:
+            output.write(json.dumps(user)+'\n')
+        previous=user['uuid']
+        if review:
+            package=json.loads(Path('/input/package.json').read_text())
+            answer={key:package[key] for key in ('job_id','task_id','turn_no','response_digest','basis_digest')}
+            disclose='NEED_CONTEXT' in package['answer'] and bool(package['allowed_branches'])
+            answer.update(decision='disclose' if disclose else 'pass',outcome=None if disclose else package['outcomes'][0],
+                branch_id=package['allowed_branches'][0]['id'] if disclose else None,
+                criteria=[{'id':item['id'],'status':'unknown' if disclose else 'satisfied','reason':'固定合成事实对照',
+                    'evidence':item.get('evidence',[])[:1]} for item in package['rubric']['criteria']],feedback_codes=[])
+            text=json.dumps(answer,ensure_ascii=False)
+        else:
+            key=configuration['task_key']
+            state_file=home/'.synthetic-scenarios'/(plan['session_id']+'-state.json')
+            state=json.loads(state_file.read_text()) if state_file.exists() else {}
+            if key=='Q3' and not state.get('timeout_done'):
+                state['timeout_done']=True
+                state_file.write_text(json.dumps(state))
+                partial=Path.cwd()/'app/partial.txt'
+                partial.parent.mkdir(exist_ok=True)
+                partial.write_text('保留真实超时前的半成品')
+                while True:
+                    time.sleep(1)
+            if key=='Q4':
+                (Path.cwd()/'library/example.py').write_text('VALUE = 2\n')
+            text='NEED_CONTEXT：请提供调用示例。' if key=='Q2' and '冻结调用材料' not in prompt else '固定公开行为正确，当前任务已回答。'
+        time.sleep(configuration.get('delay_sec',0.5) if not review else 0.5)
+        response={'type':'assistant','uuid':identity+'-answer','parentUuid':previous,'sessionId':plan['session_id'],
+            'timestamp':datetime.now(timezone.utc).isoformat(),'message':{'role':'assistant','id':identity,'model':'offline-fixture',
+                'usage':{'input_tokens':7,'output_tokens':11,'cache_read_input_tokens':0,'cache_creation_input_tokens':0},
+                'stop_reason':'end_turn','content':[{'type':'text','text':text}]}}
+        with session.open('a') as output:
+            output.write(json.dumps(response,ensure_ascii=False)+'\n')
+        previous=response['uuid']
+        print('Fixture scenario response complete',flush=True)
+
+
 def run_followup_fixture() -> None:
     """消费真实 tmux 按键或粘贴，写入原生形状主会话证据，不进行推理。
 
     :return: None；由外部 driver 结束本测试进程。
     """
     plan = json.loads(os.environ['PROJECT_PLAN_JSON']) if os.environ.get('PROJECT_PLAN_JSON') else None
+    if plan and plan.get('workflow_schema')==3:
+        run_scenario_fixture(plan)
+        return
     config = (json.loads((home/'.synthetic-projects'/f"{plan['session_id']}.json").read_text()) if plan
         else json.loads((home / '.synthetic-followups.json').read_text()))
     if config.get('session_by_run'):

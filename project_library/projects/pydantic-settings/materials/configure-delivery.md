@@ -1,0 +1,1 @@
+请给出唯一、完整、可运行的 Python 主示例，定义 App(BaseSettings)，字段为 title: str 和 quantity: int；允许只在回答中给代码，或写到 app/settings_example.py。主示例不要混入立即执行的交互输入。默认标题“商品工具”、数量 2；使用 APP_ 前缀，dotenv 可配置，环境可覆盖。评测端会把唯一主示例放入临时目录，通过真实 _env_file 参数指定临时 UTF-8 文件。不得修改 library。

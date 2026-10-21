@@ -1,0 +1,23 @@
+{
+  "script": "verification/check_settings.py",
+  "args": [
+    "union-original"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "original_nested_value": {
+      "item": "[]"
+    },
+    "whole_object_workaround": {
+      "item": []
+    },
+    "plain_text": {
+      "item": "hello"
+    }
+  },
+  "resource_profile": "business",
+  "draft_status": "not_executed"
+}

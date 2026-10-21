@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "task_id": "PS-REFRESH-PLAN",
+  "version": 1,
+  "status": "draft_not_calibrated",
+  "criteria": [
+    {
+      "id": "existing-api",
+      "requirement": "准确识别 settings_cached 和 settings_clear_cache 已存在，settings_refresh 不存在；清缓存不等于先校验后发布，也不改变旧引用。",
+      "required": true
+    },
+    {
+      "id": "validate-before-publish",
+      "requirement": "普通构造建立候选，校验成功后显示差异并在受控入口切换，失败保留旧快照；现成方法与待写消费端逻辑分清。",
+      "required": true
+    },
+    {
+      "id": "reference-lifecycle",
+      "requirement": "旧批次持旧对象，新批次经统一入口取新对象；可用单进程串行方案，不强求未提出的并发／跨进程设计。",
+      "required": true
+    }
+  ],
+  "source_evidence": {
+    "main": [
+      "library/pydantic_settings/main.py:255",
+      "library/pydantic_settings/main.py:295",
+      "library/pydantic_settings/main.py:323",
+      "library/pydantic_settings/main.py:336"
+    ],
+    "env": [
+      "library/pydantic_settings/sources/providers/env.py:200",
+      "library/pydantic_settings/sources/providers/env.py:217",
+      "library/pydantic_settings/sources/providers/env.py:275"
+    ],
+    "decode": [
+      "library/pydantic_settings/sources/base.py:194",
+      "library/pydantic_settings/sources/utils.py:150",
+      "library/pydantic_settings/sources/utils.py:213"
+    ]
+  },
+  "accept_equivalent_answers": true,
+  "grade_length": false,
+  "uncertain_rule": "证据不足时返回 uncertain，不自动当候选失败；不得要求输出隐含推理过程。",
+  "feedback_policy": "仅返回已声明的公开业务规则和反馈码，不披露隐藏样例或完整rubric。"
+}

@@ -1,0 +1,30 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "consult"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "unique_program": true,
+    "returncode": 0,
+    "variant_preserved": true,
+    "input_unchanged": true,
+    "title_printed": true,
+    "tags_printed": true,
+    "metadata": {
+      "title": "资料整理周报",
+      "author": "小林",
+      "tags": [
+        "文档",
+        "图片"
+      ],
+      "status": "已校对"
+    },
+    "body": "本周完成归档，下一步核对目录。"
+  },
+  "resource_profile": "business"
+}

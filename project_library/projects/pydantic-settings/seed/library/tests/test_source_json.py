@@ -1,0 +1,340 @@
+"""
+Test pydantic_settings.JsonConfigSettingsSource.
+"""
+
+import importlib.resources
+import json
+from importlib.resources.abc import Traversable
+from pathlib import Path
+
+import pytest
+from pydantic import BaseModel, Field
+from pydantic.alias_generators import to_camel
+
+from pydantic_settings import (
+    BaseSettings,
+    JsonConfigSettingsSource,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
+
+
+def test_repr() -> None:
+    source = JsonConfigSettingsSource(BaseSettings, Path('config.json'))
+    assert repr(source) == 'JsonConfigSettingsSource(json_file=config.json)'
+
+
+def test_json_file(tmp_path):
+    p = tmp_path / '.env'
+    p.write_text(
+        """
+    {"foobar": "Hello", "nested": {"nested_field": "world!"}, "null_field": null}
+    """
+    )
+
+    class Nested(BaseModel):
+        nested_field: str
+
+    class Settings(BaseSettings):
+        model_config = SettingsConfigDict(json_file=p)
+        foobar: str
+        nested: Nested
+        null_field: str | None
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (JsonConfigSettingsSource(settings_cls),)
+
+    s = Settings()
+    assert s.foobar == 'Hello'
+    assert s.nested.nested_field == 'world!'
+
+
+def test_json_file_validation_alias_differs_from_alias(tmp_path):
+    p = tmp_path / 'config.json'
+    p.write_text('{"DATABASE_URL": "postgres://prod", "API_KEY": "secret"}')
+
+    class Settings(BaseSettings):
+        model_config = SettingsConfigDict(json_file=p, alias_generator=to_camel)
+
+        database_url: str = Field('sqlite://', validation_alias='DATABASE_URL')
+        api_key: str = Field('none', alias='apiKeyAlias', validation_alias='API_KEY')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (JsonConfigSettingsSource(settings_cls),)
+
+    s = Settings()
+    assert s.database_url == 'postgres://prod'
+    assert s.api_key == 'secret'
+
+
+def test_json_file_alias_ignored_when_validation_alias_set(tmp_path):
+    p = tmp_path / 'config.json'
+    p.write_text('{"dbAlias": "postgres://prod"}')
+
+    class Settings(BaseSettings):
+        model_config = SettingsConfigDict(json_file=p, extra='ignore')
+
+        database_url: str = Field('sqlite://', alias='dbAlias', validation_alias='DATABASE_URL')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (JsonConfigSettingsSource(settings_cls),)
+
+    # Same as pydantic: `alias` isn't an input name when `validation_alias` is set
+    assert Settings().database_url == 'sqlite://'
+    assert Settings.model_validate({'dbAlias': 'postgres://prod'}).database_url == 'sqlite://'
+
+
+def test_json_no_file():
+    class Settings(BaseSettings):
+        model_config = SettingsConfigDict(json_file=None)
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (JsonConfigSettingsSource(settings_cls),)
+
+    s = Settings()
+    assert s.model_dump() == {}
+
+
+@pytest.mark.parametrize('content', ['', '   \n\t'])
+def test_json_empty_file(tmp_path, content):
+    p = tmp_path / '.env'
+    p.write_text(content)
+
+    class Settings(BaseSettings):
+        model_config = SettingsConfigDict(json_file=p)
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (JsonConfigSettingsSource(settings_cls),)
+
+    s = Settings()
+    assert s.model_dump() == {}
+
+
+def test_multiple_file_json(tmp_path):
+    p5 = tmp_path / '.env.json5'
+    p6 = tmp_path / '.env.json6'
+
+    with open(p5, 'w') as f5:
+        json.dump({'json5': 5}, f5)
+    with open(p6, 'w') as f6:
+        json.dump({'json6': 6}, f6)
+
+    class Settings(BaseSettings):
+        json5: int
+        json6: int
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (JsonConfigSettingsSource(settings_cls, json_file=[p5, p6]),)
+
+    s = Settings()
+    assert s.model_dump() == {'json5': 5, 'json6': 6}
+
+
+@pytest.mark.parametrize('deep_merge', [False, True])
+def test_multiple_file_json_merge(tmp_path, deep_merge):
+    p5 = tmp_path / '.env.json5'
+    p6 = tmp_path / '.env.json6'
+
+    with open(p5, 'w') as f5:
+        json.dump({'hello': 'world', 'nested': {'foo': 1, 'bar': 2}}, f5)
+    with open(p6, 'w') as f6:
+        json.dump({'nested': {'foo': 3}}, f6)
+
+    class Nested(BaseModel):
+        foo: int
+        bar: int = 0
+
+    class Settings(BaseSettings):
+        hello: str
+        nested: Nested
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (JsonConfigSettingsSource(settings_cls, json_file=[p5, p6], deep_merge=deep_merge),)
+
+    s = Settings()
+    assert s.model_dump() == {'hello': 'world', 'nested': {'foo': 3, 'bar': 2 if deep_merge else 0}}
+
+
+class TestTraversableSupport:
+    FILENAME = 'example_test_config.json'
+
+    @pytest.fixture(params=['importlib_resources', 'custom', 'custom_with_path'])
+    def json_config_path(self, request, tmp_path):
+        tests_package_dir = importlib.resources.files('tests')
+
+        if request.param == 'importlib_resources':
+            # get Traversable object using importlib.resources
+            return tests_package_dir / self.FILENAME
+
+        # Create a custom Traversable implementation
+        class CustomTraversable(Traversable):
+            def __init__(self, path):
+                self._path = path
+
+            def __truediv__(self, child):
+                return CustomTraversable(self._path / child)
+
+            def is_file(self):
+                return self._path.is_file()
+
+            def is_dir(self):
+                return self._path.is_dir()
+
+            def iterdir(self):
+                raise NotImplementedError('iterdir not implemented for this test')
+
+            def open(self, mode='r', *args, **kwargs):
+                return self._path.open(mode, *args, **kwargs)
+
+            def read_bytes(self):
+                return self._path.read_bytes()
+
+            def read_text(self, encoding=None):
+                return self._path.read_text(encoding=encoding)
+
+            @property
+            def name(self):
+                return self._path.name
+
+            def joinpath(self, *descendants):
+                return CustomTraversable(self._path.joinpath(*descendants))
+
+        if request.param == 'custom':
+            custom_traversable = CustomTraversable(tests_package_dir)
+            return custom_traversable / self.FILENAME
+
+        filepath = tmp_path / self.FILENAME
+        with filepath.open('w') as f:
+            json.dump({'foobar': 'test'}, f)
+        return CustomTraversable(filepath)
+
+    def test_traversable_support(self, json_config_path: Traversable):
+        assert json_config_path.is_file()
+
+        class Settings(BaseSettings):
+            foobar: str
+
+            model_config = SettingsConfigDict(
+                # `Traversable` is part of the `json_file` type annotation and supported at runtime.
+                json_file=json_config_path,
+            )
+
+            @classmethod
+            def settings_customise_sources(
+                cls,
+                settings_cls: type[BaseSettings],
+                init_settings: PydanticBaseSettingsSource,
+                env_settings: PydanticBaseSettingsSource,
+                dotenv_settings: PydanticBaseSettingsSource,
+                file_secret_settings: PydanticBaseSettingsSource,
+            ) -> tuple[PydanticBaseSettingsSource, ...]:
+                return (JsonConfigSettingsSource(settings_cls),)
+
+        s = Settings()
+        # "test" value in file
+        assert s.foobar == 'test'
+
+
+def test_json_file_is_read_as_utf8_by_default(tmp_path: Path, non_utf8_default_encoding: str) -> None:
+    p = tmp_path / 'config.json'
+    p.write_text('{"name": "Álvaro", "city": "café"}', encoding='utf-8')
+
+    class Settings(BaseSettings):
+        name: str
+        city: str
+
+        model_config = SettingsConfigDict(json_file=p)
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (JsonConfigSettingsSource(settings_cls),)
+
+    s = Settings()
+    assert s.name == 'Álvaro'
+    assert s.city == 'café'
+
+
+def test_json_file_encoding_overrides_the_utf8_default(tmp_path: Path) -> None:
+    p = tmp_path / 'config.json'
+    p.write_bytes('{"city": "café"}'.encode('latin-1'))
+
+    class Settings(BaseSettings):
+        city: str
+
+        model_config = SettingsConfigDict(json_file=p, json_file_encoding='latin-1')
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (JsonConfigSettingsSource(settings_cls),)
+
+    assert Settings().city == 'café'

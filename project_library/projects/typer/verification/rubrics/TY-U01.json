@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "purpose",
+      "requirement": "说明 Typer 将有类型注解的 Python 函数构建为 CLI，不把它说成商品存储或数据库。",
+      "evidence": [
+        "library/typer/main.py:119",
+        "library/typer/main.py:753"
+      ]
+    },
+    {
+      "id": "registration",
+      "requirement": "说明 command 装饰器记录命令函数，get_command 再根据命令、callback 和子组构造单命令或命令组；可用等价描述，不要求穷举全部内部函数。",
+      "evidence": [
+        "library/typer/main.py:890",
+        "library/typer/main.py:1173"
+      ]
+    },
+    {
+      "id": "parameters",
+      "requirement": "说明类型注解及 Option/Argument 元数据经 get_click_param/get_click_type 变为参数解析与校验规则。",
+      "evidence": [
+        "library/typer/main.py:1530",
+        "library/typer/main.py:1632"
+      ]
+    },
+    {
+      "id": "boundaries",
+      "requirement": "商品持久化由用户应用实现；当前版本内置 vendored Click，不声称必须外装 Click 才能解析，不编造商品 API。",
+      "evidence": [
+        "library/pyproject.toml:40",
+        "library/typer/_click/LICENSE.txt:1"
+      ]
+    }
+  ],
+  "allowed_outcomes": [
+    "understood"
+  ],
+  "equivalent_answers": "短答有准确流程和业务边界即可，不按函数名数量或篇幅计分。",
+  "schema": 1,
+  "task_id": "TY-U01",
+  "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+  "result_version": 1
+}

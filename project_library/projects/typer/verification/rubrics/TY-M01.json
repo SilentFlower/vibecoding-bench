@@ -1,0 +1,51 @@
+{
+  "criteria": [
+    {
+      "id": "normal_export",
+      "requirement": "真实进程 export 输入清单 --output 文件；按顺序仅保留 sku/name/quantity，UTF-8中文实际保存，空数组可用，独立读取输出确认。",
+      "evidence": [
+        "verification/native_checks.py",
+        "materials/TY-M01/catalog.json"
+      ]
+    },
+    {
+      "id": "validation",
+      "requirement": "对象数组、非空字符串、非负整数且bool不算整数、唯一sku均强制；坏JSON或任意无效记录非零且说明原因，不留下部分输出。",
+      "evidence": [
+        "verification/native_checks.py"
+      ]
+    },
+    {
+      "id": "files",
+      "requirement": "已有输出拒绝覆盖；输入输出同路径拒绝；输入不变；缺输入明确失败。不能只打印JSON冒充写文件。",
+      "evidence": [
+        "verification/native_checks.py"
+      ]
+    },
+    {
+      "id": "regression",
+      "requirement": "product 子命令保持数量3/默认1/负数拒绝；root与export帮助不产生输出文件。",
+      "evidence": [
+        "materials/TY-M01/shop.py",
+        "verification/native_checks.py"
+      ]
+    },
+    {
+      "id": "delivery_scope",
+      "requirement": "只修改 app/shop.py、app/tests/和app/README.md，保留catalog.json、Typer库与环境；提供有真实业务断言的用户测试与短用法说明，不以自报通过替代独立验证。",
+      "evidence": [
+        "project.json",
+        "verification/native_checks.py"
+      ],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "allowed_outcomes": [
+    "application_enhancement"
+  ],
+  "baseline_expectation": "APP-R0没有export，该工程目标在原版应失败；控制端参考候选可用于证明目标可达到，不能投放参考实现。",
+  "schema": 1,
+  "task_id": "TY-M01",
+  "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+  "result_version": 1
+}

@@ -1,0 +1,239 @@
+{
+  "repository": "https://github.com/pydantic/pydantic-settings",
+  "commit": "8dc9e05ab07d91e21dd2a37d0b9c30f6d92b1930",
+  "files": {
+    ".github/FUNDING.yml": {
+      "sha256": "3708f4fd832aecb913f0dedcaa25eb50e17c0ac988007fd4966cb7b4a334ba25",
+      "size": 21
+    },
+    ".github/build-constraints.txt": {
+      "sha256": "ba24c25a798cb7f073d77aa41812dcb6fd14b741b8e8dea0a040c22e1d6ecfa7",
+      "size": 1323
+    },
+    ".github/dependabot.yml": {
+      "sha256": "2596ec4b264d3e08600d79f71b3d9f386788f399f2229025c2bea4b1ac0f0070",
+      "size": 447
+    },
+    ".github/workflows/ci.yml": {
+      "sha256": "05ca832423eaba81da1d9e17fa1428a94f56e48ed71346ea284ddfdeb7a869cc",
+      "size": 6424
+    },
+    ".gitignore": {
+      "sha256": "15bd6a71be2c51744233e084eb0232d6761ffa5a4da1a7b61db1b6ddd6a273be",
+      "size": 292
+    },
+    ".pre-commit-config.yaml": {
+      "sha256": "2320c7becc59d3aa847e9f997a9a186583080b60ba22bf44d0f8fe394d94dfdc",
+      "size": 733
+    },
+    ".yamlfmt.yaml": {
+      "sha256": "d3c8369ee880e546d4a54a3efe72635003b2630af9ddd4649aaa7ce784c6f01d",
+      "size": 118
+    },
+    "LICENSE": {
+      "sha256": "eb355a753e020346d33d83bf9769135b89fc610568ac531a01c295bcee7fd998",
+      "size": 1103
+    },
+    "Makefile": {
+      "sha256": "0351da5a753f43669d1982d0f69da99b1882e0eeee147e37ac948f4333b9a6f2",
+      "size": 981
+    },
+    "README.md": {
+      "sha256": "a1b2df6ed6bac62a822394e5eb0de60c802a6c2382a3a882f2798f8447601d67",
+      "size": 1557
+    },
+    "docs/extra/terminal.css": {
+      "sha256": "121e79e5804267776dc2ba5df2dad111195fb45a653dc536211628a20e627238",
+      "size": 531
+    },
+    "docs/extra/tweaks.css": {
+      "sha256": "7a86f437d71ed2a1dc61d147d7877c8b4076488b121e8a644d951ca3bef09967",
+      "size": 1089
+    },
+    "docs/favicon.png": {
+      "sha256": "18d85dc5c524e6d356b3d694c12709ffb789551c35e1de9826be072ac6f1391c",
+      "size": 891
+    },
+    "docs/index.md": {
+      "sha256": "893c27d1d16d04acddf9810c9edbcbf3138a68a5c1aeb768453aadb4cad68433",
+      "size": 125812
+    },
+    "docs/logo-white.svg": {
+      "sha256": "d130dbfa3d21176a741af4ea85943d6f938632c693bbddd5ac1a21248a5cf87f",
+      "size": 602
+    },
+    "docs/theme/main.html": {
+      "sha256": "acc6640a6778076b270b42ce0cb1a058fc7b3d6d741ca2203a8044502dcccbb4",
+      "size": 267
+    },
+    "mkdocs.yml": {
+      "sha256": "3da6484860362ac0d3a7892efae6d2f9a546c060229d4f7bbb53c3cbe30ef406",
+      "size": 1428
+    },
+    "pydantic_settings/__init__.py": {
+      "sha256": "b5388d6a1b097756282e567fefef4309ab94ab364a048e74535935a4a9e5f22a",
+      "size": 1899
+    },
+    "pydantic_settings/exceptions.py": {
+      "sha256": "a3d580a6957d9bff37df81cfd8bab1cdbad57cce161d5e7a0aa8ade7bb602f80",
+      "size": 426
+    },
+    "pydantic_settings/main.py": {
+      "sha256": "e6fcd21c2f126aebe077590b6163fc9aa3ae3284a83c892d73c644ef29d55cdf",
+      "size": 52988
+    },
+    "pydantic_settings/py.typed": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "pydantic_settings/sources/__init__.py": {
+      "sha256": "aa0c93d672a769f5eb2777006bae22c9bcdc18e96e1adac352305899d139c671",
+      "size": 2518
+    },
+    "pydantic_settings/sources/base.py": {
+      "sha256": "750cd1a4b010a930f705336f36378fff3963c7889791aa0d89b1e566ba6ccd1c",
+      "size": 34133
+    },
+    "pydantic_settings/sources/providers/__init__.py": {
+      "sha256": "03d96e9ebd20cd9a1d84956699bd60c4eb8bc81043541f2310c18d0c3d12c629",
+      "size": 1395
+    },
+    "pydantic_settings/sources/providers/aws.py": {
+      "sha256": "6d23e9b172729b36a4437309f885943c12c48f3ba2bd083c2c278c411da19d68",
+      "size": 5328
+    },
+    "pydantic_settings/sources/providers/azure.py": {
+      "sha256": "de754e882b82a734e4e9cdfbcbae265f7e8c4d9e2200faaa82f74fe915bd0130",
+      "size": 9847
+    },
+    "pydantic_settings/sources/providers/cli.py": {
+      "sha256": "3355ec996ca275091750586cc528ec892f412d45a9b1bed8bf044ec51bf4a0a9",
+      "size": 92093
+    },
+    "pydantic_settings/sources/providers/dotenv.py": {
+      "sha256": "d23065c51ec1e9c64cd8d6458c3c1b0b1c6cd2574ad8120a8d7a80c477a8f7c7",
+      "size": 9235
+    },
+    "pydantic_settings/sources/providers/env.py": {
+      "sha256": "f262103fe27dcbb22992579ba36aec9103c4df4cd413d4c35e7e51d2e854b3b3",
+      "size": 16914
+    },
+    "pydantic_settings/sources/providers/gcp.py": {
+      "sha256": "31701ec7038c2e440d81b8e9700aa05dd9656144013b943e0efdbe82b8f703ba",
+      "size": 15997
+    },
+    "pydantic_settings/sources/providers/json.py": {
+      "sha256": "b0ee4d6968086b6676c1c4762878f79986f1b51bce43de63d5e94fdda248e6ab",
+      "size": 2357
+    },
+    "pydantic_settings/sources/providers/nested_secrets.py": {
+      "sha256": "329561338459cf52c21b2b1b71e6dddf2222ced83f9c41ab1664fc377575f9f4",
+      "size": 9925
+    },
+    "pydantic_settings/sources/providers/pyproject.py": {
+      "sha256": "05c5b9e3bfb621e18ddce6fb3f137f6c89b460a1472e1c65007f996d1a952441",
+      "size": 2154
+    },
+    "pydantic_settings/sources/providers/secrets.py": {
+      "sha256": "411fae09d9b9f2f49bf8d305f7b628842b998b4f46b26f423fa2819ebcf85f42",
+      "size": 5465
+    },
+    "pydantic_settings/sources/providers/toml.py": {
+      "sha256": "d207fa16efca360fe7a0e063ebd05cf59c761ab91c92fb645b3ad5c7fcc01718",
+      "size": 2358
+    },
+    "pydantic_settings/sources/providers/yaml.py": {
+      "sha256": "75a5569b2af8f78867fd8e0f39251133e2b6ff1c1125d2e54550b68874603488",
+      "size": 5963
+    },
+    "pydantic_settings/sources/types.py": {
+      "sha256": "074b5c42acc64bd4a0bcf99f4cc1eb2d95c20599cfa02d97700569a74cdb194b",
+      "size": 2552
+    },
+    "pydantic_settings/sources/utils.py": {
+      "sha256": "212e13b3c59c93f2199b7b538db1f49bbc9dbcc2fd60ae3ad91b69459b621be6",
+      "size": 20894
+    },
+    "pydantic_settings/utils.py": {
+      "sha256": "a40850eb5740c531c66c9a83d09d318cfd8048e686af498aa88edc36c2c23291",
+      "size": 1347
+    },
+    "pydantic_settings/version.py": {
+      "sha256": "8a2903fefd1f58b30f5f745db12ca973ed75ca75c65bae5d5f087f5323fa0c76",
+      "size": 19
+    },
+    "pyproject.toml": {
+      "sha256": "7bea6054e0da3b48f9860d8a0eae22d40f35f94ca6f427fe9f2a78ac375cbd08",
+      "size": 6409
+    },
+    "tests/conftest.py": {
+      "sha256": "b1b23287b68a42649df7259af095dece01eca18954f2699dae213f48899b7e3b",
+      "size": 4253
+    },
+    "tests/example_test_config.json": {
+      "sha256": "c86bbdc1d6153785c70fc2549a6410abf1049501c1428baa6d493c3693caa3d3",
+      "size": 19
+    },
+    "tests/test_docs.py": {
+      "sha256": "07c1e6b7b533b0001769f74e8ff6bc3008766ea5214bc541a44e422c55e919bc",
+      "size": 4038
+    },
+    "tests/test_precedence_and_merging.py": {
+      "sha256": "2913c72302dd871480d304e8a66fae18b4f4bce6799f24c1c3dc80fa9f2b83e4",
+      "size": 6608
+    },
+    "tests/test_settings.py": {
+      "sha256": "6c304d5ae169db46db1b2c640e8cb10a4f5a8346961fb558c0fc0e41b8578c51",
+      "size": 179160
+    },
+    "tests/test_source_aws_secrets_manager.py": {
+      "sha256": "be0a18be87dc6428ba0ef430316672dd1ce00087f7c166ee21aa1f50583dcb99",
+      "size": 6298
+    },
+    "tests/test_source_aws_systems_manager.py": {
+      "sha256": "97c0bbc7a120a9b3fd78fec39a30d9fd135466b02c483e68b7b772b0e59ac398",
+      "size": 7793
+    },
+    "tests/test_source_azure_key_vault.py": {
+      "sha256": "ff61f5ed8b9b206ca8eb3286b8e25761e8ac2dc642a9af17c9f9da08c095fc62",
+      "size": 25720
+    },
+    "tests/test_source_cli.py": {
+      "sha256": "987ce6b773fa12d5c600ed356b5a94d72ce0dd1f6255df5c6bc1fbaf3c22fedd",
+      "size": 190012
+    },
+    "tests/test_source_gcp_secret_manager.py": {
+      "sha256": "128d892cf21f33af270cfbfeb3df28246d21f0594b4079c196f2f0b625abde58",
+      "size": 43059
+    },
+    "tests/test_source_json.py": {
+      "sha256": "ccd7c2639c1d07c3da95704ddbeef610e392cfb5be614033648a64330dbe4425",
+      "size": 11569
+    },
+    "tests/test_source_nested_secrets.py": {
+      "sha256": "f0da7d748a4b2f05f724e81cbb3b12cdfca46bb292e7c5a1b48ac8c69c9fa87a",
+      "size": 22068
+    },
+    "tests/test_source_pyproject_toml.py": {
+      "sha256": "6b024d3eeefc76ae26087282b86a76623cb4a8ad2d88c3e23c755237ffde239c",
+      "size": 9712
+    },
+    "tests/test_source_toml.py": {
+      "sha256": "a749598afe21f668e3a264ee1e88490b00fc89e300a0f9cbb2b17c3fbd92873c",
+      "size": 17780
+    },
+    "tests/test_source_yaml.py": {
+      "sha256": "c97a46f0dca811546fcf462533874a81cd2f2b4f6dd14bc5c2078023fe094007",
+      "size": 26587
+    },
+    "tests/test_utils.py": {
+      "sha256": "252c2fb52d2a93e27d9917643859bffcfe33711f9b69cb0120bac98a7ba5ea63",
+      "size": 11157
+    },
+    "uv.lock": {
+      "sha256": "a6c5b41872992fbdd21621bed21c3d3ca592bc02ab0765530d35697708136534",
+      "size": 350060
+    }
+  },
+  "note": "复制冻结源码并逐文件计算摘要；未运行Git或原生测试。"
+}

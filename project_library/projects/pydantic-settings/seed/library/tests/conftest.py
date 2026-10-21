@@ -1,0 +1,157 @@
+from __future__ import annotations
+
+import os
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from typing import IO, Any
+
+
+class SetEnv:
+    def __init__(self):
+        self.envars = set()
+
+    def set(self, name, value):
+        self.envars.add(name)
+        os.environ[name] = value
+
+    def pop(self, name):
+        self.envars.remove(name)
+        os.environ.pop(name)
+
+    def clear(self):
+        for n in self.envars:
+            os.environ.pop(n)
+
+
+class Dir:
+    def __init__(self, basedir: Path) -> None:
+        self.basedir = basedir
+
+    def write(self, files: dict[str, str]) -> None:
+        for path, content in files.items():
+            file_path = self.basedir / path
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(content)
+
+
+@pytest.fixture
+def tmp_files(tmp_path):
+    yield Dir(tmp_path)
+
+
+@pytest.fixture
+def cd_tmp_path(tmp_path: Path) -> Iterator[Path]:
+    """Change directory into the value of the ``tmp_path`` fixture.
+
+    .. rubric:: Example
+    .. code-block:: python
+
+        from typing import TYPE_CHECKING
+
+        if TYPE_CHECKING:
+            from pathlib import Path
+
+
+        def test_something(cd_tmp_path: Path) -> None:
+            ...
+
+    Returns:
+        Value of the :fixture:`tmp_path` fixture (a :class:`~pathlib.Path` object).
+
+    """
+    prev_dir = Path.cwd()
+    os.chdir(tmp_path)
+    try:
+        yield tmp_path
+    finally:
+        os.chdir(prev_dir)
+
+
+@pytest.fixture
+def non_utf8_default_encoding(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
+    """Make an encoding-less text read behave as it does on a non-UTF-8 locale.
+
+    The real lever is the platform locale, which a test cannot portably change: on
+    CPython the default encoding for ``open()`` is resolved in C and ignores a patched
+    ``locale.getpreferredencoding``. So instead this makes ``Path.read_text()`` and
+    ``Path.open()`` fall back to cp1252 (a stand-in for any non-UTF-8 Windows code page)
+    when the caller does not pass an encoding, which is exactly the bug's precondition.
+
+    Reads that pass an explicit encoding are untouched, so a source that names its
+    encoding is unaffected and one that relies on the default is caught on any platform.
+    """
+    fallback = 'cp1252'
+    real_read_text = Path.read_text
+    real_open = Path.open
+
+    def read_text(self: Path, encoding: str | None = None, *args: object, **kwargs: object) -> str:
+        return real_read_text(self, encoding or fallback, *args, **kwargs)
+
+    def open_(
+        self: Path, mode: str = 'r', buffering: int = -1, encoding: str | None = None, *args: object, **kwargs: object
+    ) -> IO[Any]:
+        if 'b' not in mode:
+            encoding = encoding or fallback
+        return real_open(self, mode, buffering, encoding, *args, **kwargs)
+
+    monkeypatch.setattr(Path, 'read_text', read_text)
+    monkeypatch.setattr(Path, 'open', open_)
+    yield fallback
+
+
+@pytest.fixture
+def env():
+    setenv = SetEnv()
+
+    yield setenv
+
+    setenv.clear()
+
+
+@pytest.fixture
+def docs_test_env():
+    setenv = SetEnv()
+
+    # envs for basic usage example
+    setenv.set('my_auth_key', 'xxx')
+    setenv.set('my_api_key', 'xxx')
+
+    # envs for parsing environment variable values example
+    setenv.set('V0', '0')
+    setenv.set('SUB_MODEL', '{"v1": "json-1", "v2": "json-2"}')
+    setenv.set('SUB_MODEL__V2', 'nested-2')
+    setenv.set('SUB_MODEL__V3', '3')
+    setenv.set('SUB_MODEL__DEEP__V4', 'v4')
+
+    # envs for parsing environment variable values example with env_nested_max_split=1
+    setenv.set('GENERATION_LLM_PROVIDER', 'anthropic')
+    setenv.set('GENERATION_LLM_API_KEY', 'your-api-key')
+    setenv.set('GENERATION_LLM_API_VERSION', '2024-03-15')
+
+    # Variables from index.md that need to be cleaned up
+    setenv.set('FooAlias', '')
+    setenv.set('BAR', '')
+    setenv.set('TARGET_BAR', '')
+    setenv.set('TARGET_ALL_FooAlias', '')
+    setenv.set('TARGET_ALIAS_FooAliase', '')
+
+    yield setenv
+
+    setenv.clear()
+
+
+@pytest.fixture
+def cli_test_env():
+    setenv = SetEnv()
+
+    # envs for reproducible cli tests
+    setenv.set('COLUMNS', '80')
+
+    yield setenv
+
+    setenv.clear()

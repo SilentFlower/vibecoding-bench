@@ -195,6 +195,22 @@ def preflight(values: dict) -> Path:
     return root
 
 
+def source_snapshot_ignore(directory: str, names: list[str]) -> set[str]:
+    """过滤构建快照，仅保留已校验摘要的上游公开测试环境文件。
+
+    :param directory: 当前源码目录。
+    :param names: shutil 提供的直接子项名称。
+    :return: 仍应排除的名称集合。
+    """
+    ignored = set(shutil.ignore_patterns('.git','target','node_modules','__pycache__','.env','.env.*','*.log')(directory,names))
+    public = REPO/'project_library/projects/typer/seed/library/.env'
+    if Path(directory).resolve()==public.parent and '.env' in ignored:
+        if public.is_symlink() or hashlib.sha256(public.read_bytes()).hexdigest()!='81b463a540ebc72b1d4afbc954d5247146344f986e7d842a82e032b7e08ecb2f':
+            raise ValueError('固定上游公开测试环境文件摘要不符')
+        ignored.remove('.env')
+    return ignored
+
+
 def build(release: str, manifest_path: Path) -> None:
     """构建两个最终镜像，完成后生成可核对的联合清单。
 
@@ -213,9 +229,8 @@ def build(release: str, manifest_path: Path) -> None:
         snapshot = Path(temporary)
         folders = ("cc2api/src", "cc2api/vendor", "cc2api/craftls", "cc2api/web", "images/account",
             "images/sidecar", "images/worker", "images/v3", "orchestrator", "webui", "project_library")
-        ignored = shutil.ignore_patterns(".git", "target", "node_modules", "__pycache__", ".env", ".env.*", "*.log")
         for relative in folders:
-            shutil.copytree(REPO / relative, snapshot / relative, ignore=ignored)
+            shutil.copytree(REPO / relative, snapshot / relative, ignore=source_snapshot_ignore)
         for relative in ("cc2api/Cargo.toml", "cc2api/Cargo.lock", "topics.md"):
             (snapshot / relative).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(REPO / relative, snapshot / relative)

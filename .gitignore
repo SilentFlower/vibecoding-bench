@@ -1,4 +1,5 @@
 .env
+!project_library/projects/typer/seed/library/.env
 data/
 !data/.gitkeep
 
@@ -17,6 +18,9 @@ venv/
 
 # Local AI tooling (Trellis / Codex / Claude Code stubs)
 AGENTS.md
+# 仅保留固定上游源码中的说明文件及本任务研究副本。
+!project_library/projects/python-frontmatter/seed/library/AGENTS.md
+!.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/python-frontmatter/seed/library/AGENTS.md
 # .trellis/ 整目录进 git(spec / scripts / config / workflow / tasks / workspace);
 # 哪些是本地状态(.developer/.runtime/*.tmp 等)由 .trellis/.gitignore 内层管。
 # 唯一额外排除:trellis update 留的 .bak 备份
