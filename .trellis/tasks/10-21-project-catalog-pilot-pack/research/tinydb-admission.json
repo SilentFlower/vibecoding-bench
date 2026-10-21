@@ -1,0 +1,488 @@
+{
+  "identity": {
+    "formal_tree_digest": "d20683a7a731a32fdd5f655d15cef15190e5b6c2363e9ca81f9fc174d6a95d2f",
+    "seed_digest": "d478acdf6f6cf1c05645ad6ec2ceadd0a83d76755a2df6c34689e4bcae52cac7",
+    "profile_sha256": "888bca72ddc932c645b6a919a85145222ac0b5f9ac9819cff5db716c427a4411",
+    "wrapper_sha256": "a8fdc4721655636c354fc94fedde09290924da01f618fbdabf53b53758a57bdb",
+    "contract_sha256": "94ec92e28eb970039c1ef617a47fd56d9e9944b7a5a952460de92267d535cd94",
+    "scenario_count": 4,
+    "task_count": 12,
+    "read_only_tasks": 10
+  },
+  "calibration": {
+    "collected": 228,
+    "collection_digest": "2d28d41ef81457396be96bc54a4fd2cc853020fad462982324b595ac17d9f329",
+    "collection_errors": [],
+    "collection_matches_contract": null,
+    "command": [
+      "/work/python/bin/python",
+      "-m",
+      "pytest",
+      "-p",
+      "_bench_native_regression_control",
+      "-p",
+      "pytest_cov.plugin",
+      "tests",
+      "-q",
+      "-ra",
+      "-p",
+      "no:cacheprovider",
+      "--junitxml=/evidence/run/junit.xml"
+    ],
+    "counts": {
+      "error": 0,
+      "failed": 0,
+      "passed": 228,
+      "skipped": 0,
+      "unexecuted": 0,
+      "xfailed": 0,
+      "xpassed": 0
+    },
+    "cwd": "/tmp/bench-native-regression-f11n3_k5/project",
+    "elapsed_sec": 2.478000080998754,
+    "execution_command": [
+      "/work/python/bin/python",
+      "-m",
+      "pytest",
+      "-p",
+      "_bench_native_regression_control",
+      "-p",
+      "pytest_cov.plugin",
+      "tests",
+      "-q",
+      "-ra",
+      "-p",
+      "no:cacheprovider",
+      "--junitxml=/evidence/run/junit.xml"
+    ],
+    "imports": {
+      "master": {
+        "tinydb": {
+          "path": "/tmp/bench-native-regression-f11n3_k5/project/tinydb/__init__.py",
+          "sha256": "7ac0bcffc741541c42692dc2f9a3c5d3b19528af4ae63d353e6b13a1b2c6f25e"
+        }
+      }
+    },
+    "overlay": {
+      "mode": "baseline-calibration",
+      "restored_controls": 0
+    },
+    "plugins": [
+      {
+        "distribution": "pytest",
+        "module": "pytest",
+        "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+        "version": "9.1.1"
+      },
+      {
+        "distribution": "pytest-cov",
+        "module": "pytest_cov.plugin",
+        "module_sha256": "7cc8a14b8cc8effa886c40fdfa058459d89686d62c53fea6721750e722a60f40",
+        "version": "7.1.0"
+      }
+    ],
+    "processes": {
+      "master": {
+        "parent_executable": "/usr/local/bin/python3.12",
+        "pid": 16,
+        "ppid": 15
+      }
+    },
+    "project": "tinydb",
+    "result_digest": "de22e95f022363555ec8168f8b1f0753cb0a82d559cd4758152c26e8c8b76dec",
+    "returncode": 0,
+    "scope": "冻结原生集合回归，不代表模型完成或独立业务目标已满足",
+    "skip_xfail": [],
+    "source_binding": {
+      "mode": "controlled-pythonpath"
+    },
+    "status": "passed",
+    "stderr": "",
+    "stdout_tail": "============================= test session starts ==============================\nplatform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.7.0\nrootdir: /tmp/bench-native-regression-f11n3_k5/project\nconfigfile: pytest.ini\ncollected 228 items\n\ntests/test_middlewares.py .........                                      [  3%]\ntests/test_operations.py ..............                                  [ 10%]\ntests/test_queries.py ..................................                 [ 25%]\ntests/test_storages.py ..............                                    [ 31%]\ntests/test_tables.py ...............................                     [ 44%]\ntests/test_tinydb.py ................................................... [ 67%]\n...............................................................          [ 94%]\ntests/test_utils.py ............                                         [100%]\n\n----------------- generated xml file: /evidence/run/junit.xml ------------------\n================================ tests coverage ================================\n_______________ coverage: platform linux, python 3.12.15-final-0 _______________\n\nName                    Stmts   Miss Branch BrPart  Cover\n---------------------------------------------------------\ntinydb/__init__.py          5      0      0      0   100%\ntinydb/database.py         53      0     10      0   100%\ntinydb/middlewares.py      44      3     14      3    90%\ntinydb/mypy_plugin.py      26     26      2      0     0%\ntinydb/operations.py       26      0      0      0   100%\ntinydb/queries.py         130      2     30      4    96%\ntinydb/storages.py         57      0      8      0   100%\ntinydb/table.py           241      1    104      8    97%\ntinydb/utils.py            78      1     18      1    98%\ntinydb/version.py           1      0      0      0   100%\n---------------------------------------------------------\nTOTAL                     661     33    186     16    94%\n============================= 228 passed in 1.82s ==============================\n",
+    "strict_doctest_count": 0,
+    "timed_out": false,
+    "worker_collections_consistent": true,
+    "xml_failures_and_errors": 0,
+    "xml_skipped": 0,
+    "xml_testcases": 228
+  },
+  "resources": {
+    "python": "3.12.15",
+    "prepare_elapsed_sec": 4.688698422003654,
+    "total_elapsed_sec": 7.460219770000549,
+    "children_peak_rss_kib": 72404,
+    "command": [
+      "/work/python/bin/python",
+      "-I",
+      "-B",
+      "/runner/native_regression.py",
+      "--project",
+      "tinydb",
+      "--baseline-root",
+      "/baseline",
+      "--freeze-baseline-contract",
+      "/evidence/native-contract.json",
+      "--evidence-dir",
+      "/evidence/run",
+      "--timeout-sec",
+      "60"
+    ],
+    "wrapper_returncode": 0
+  },
+  "native": [
+    {
+      "name": "TD-M01-original",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "scripts/validate-project-scenarios.py",
+        "--root",
+        ".deploy/project-catalog-pilot-pack/tinydb/test-library",
+        "--project",
+        "tinydb",
+        "--task",
+        "TD-M01",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--output",
+        ".deploy/project-catalog-pilot-pack/tinydb/native-results/TD-M01-original.json",
+        "--expect",
+        "failed"
+      ],
+      "exit_code": 0,
+      "status": "failed",
+      "expectation_met": true
+    },
+    {
+      "name": "TD-M02-original",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "scripts/validate-project-scenarios.py",
+        "--root",
+        ".deploy/project-catalog-pilot-pack/tinydb/test-library",
+        "--project",
+        "tinydb",
+        "--task",
+        "TD-M02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--output",
+        ".deploy/project-catalog-pilot-pack/tinydb/native-results/TD-M02-original.json",
+        "--expect",
+        "failed"
+      ],
+      "exit_code": 0,
+      "status": "failed",
+      "expectation_met": true
+    },
+    {
+      "name": "TD-D02-original",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "scripts/validate-project-scenarios.py",
+        "--root",
+        ".deploy/project-catalog-pilot-pack/tinydb/test-library",
+        "--project",
+        "tinydb",
+        "--task",
+        "TD-D02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--output",
+        ".deploy/project-catalog-pilot-pack/tinydb/native-results/TD-D02-original.json"
+      ],
+      "exit_code": 0,
+      "status": "passed",
+      "expectation_met": true
+    },
+    {
+      "name": "TD-D03-original",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "scripts/validate-project-scenarios.py",
+        "--root",
+        ".deploy/project-catalog-pilot-pack/tinydb/test-library",
+        "--project",
+        "tinydb",
+        "--task",
+        "TD-D03",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--output",
+        ".deploy/project-catalog-pilot-pack/tinydb/native-results/TD-D03-original.json"
+      ],
+      "exit_code": 0,
+      "status": "passed",
+      "expectation_met": true
+    },
+    {
+      "name": "TD-C02-example",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "scripts/validate-project-scenarios.py",
+        "--root",
+        ".deploy/project-catalog-pilot-pack/tinydb/test-library",
+        "--project",
+        "tinydb",
+        "--task",
+        "TD-C02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--output",
+        ".deploy/project-catalog-pilot-pack/tinydb/native-results/TD-C02-example.json",
+        "--answer",
+        ".deploy/project-catalog-pilot-pack/tinydb/answers/TD-C02.md"
+      ],
+      "exit_code": 0,
+      "status": "passed",
+      "expectation_met": true
+    },
+    {
+      "name": "TD-M01-reference",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "scripts/validate-project-scenarios.py",
+        "--root",
+        ".deploy/project-catalog-pilot-pack/tinydb/test-library",
+        "--project",
+        "tinydb",
+        "--task",
+        "TD-M01",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--output",
+        ".deploy/project-catalog-pilot-pack/tinydb/native-results/TD-M01-reference.json",
+        "--candidate",
+        ".deploy/project-catalog-pilot-pack/tinydb/references/TD-M01",
+        "--with-regression"
+      ],
+      "exit_code": 0,
+      "status": "passed",
+      "expectation_met": true
+    },
+    {
+      "name": "TD-M02-reference",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "scripts/validate-project-scenarios.py",
+        "--root",
+        ".deploy/project-catalog-pilot-pack/tinydb/test-library",
+        "--project",
+        "tinydb",
+        "--task",
+        "TD-M02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--output",
+        ".deploy/project-catalog-pilot-pack/tinydb/native-results/TD-M02-reference.json",
+        "--candidate",
+        ".deploy/project-catalog-pilot-pack/tinydb/references/TD-M02",
+        "--with-regression"
+      ],
+      "exit_code": 0,
+      "status": "passed",
+      "expectation_met": true
+    }
+  ],
+  "negative_corrected": [
+    {
+      "name": "TD-M02-deduplicate-ids-corrected",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "scripts/validate-project-scenarios.py",
+        "--root",
+        ".deploy/project-catalog-pilot-pack/tinydb/test-library",
+        "--project",
+        "tinydb",
+        "--task",
+        "TD-M02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "failed",
+        "--output",
+        ".deploy/project-catalog-pilot-pack/tinydb/native-results/TD-M02-deduplicate-ids-corrected.json",
+        "--candidate",
+        ".deploy/project-catalog-pilot-pack/tinydb/counterexamples/TD-M02-deduplicate-ids-corrected"
+      ],
+      "exit_code": 0,
+      "expectation_met": true
+    },
+    {
+      "name": "TD-C02-print-only",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "scripts/validate-project-scenarios.py",
+        "--root",
+        ".deploy/project-catalog-pilot-pack/tinydb/test-library",
+        "--project",
+        "tinydb",
+        "--task",
+        "TD-C02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "failed",
+        "--output",
+        ".deploy/project-catalog-pilot-pack/tinydb/native-results/TD-C02-print-only.json",
+        "--answer",
+        ".deploy/project-catalog-pilot-pack/tinydb/answers/TD-C02-print-only.md"
+      ],
+      "exit_code": 0,
+      "expectation_met": true
+    },
+    {
+      "name": "TD-C02-ambiguous",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "scripts/validate-project-scenarios.py",
+        "--root",
+        ".deploy/project-catalog-pilot-pack/tinydb/test-library",
+        "--project",
+        "tinydb",
+        "--task",
+        "TD-C02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "failed",
+        "--output",
+        ".deploy/project-catalog-pilot-pack/tinydb/native-results/TD-C02-ambiguous.json",
+        "--answer",
+        ".deploy/project-catalog-pilot-pack/tinydb/answers/TD-C02-ambiguous.md"
+      ],
+      "exit_code": 0,
+      "expectation_met": true
+    }
+  ],
+  "public_tests": [
+    {
+      "name": "TD-M01-original",
+      "returncode": 1,
+      "expected": 1,
+      "expectation_met": true,
+      "command": [
+        "/work/python/bin/python",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "tests/test_queries.py::test_fragment_distinct_complete_paths_and_cache_order",
+        "tests/test_queries.py::test_fragment_map_remains_dynamic",
+        "-q",
+        "-ra",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/evidence/TD-M01-original.xml"
+      ]
+    },
+    {
+      "name": "TD-M01-reference",
+      "returncode": 0,
+      "expected": 0,
+      "expectation_met": true,
+      "command": [
+        "/work/python/bin/python",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "tests/test_queries.py::test_fragment_distinct_complete_paths_and_cache_order",
+        "tests/test_queries.py::test_fragment_map_remains_dynamic",
+        "-q",
+        "-ra",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/evidence/TD-M01-reference.xml"
+      ]
+    },
+    {
+      "name": "TD-M02-original",
+      "returncode": 1,
+      "expected": 1,
+      "expectation_met": true,
+      "command": [
+        "/work/python/bin/python",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "tests/test_tinydb.py::test_update_multiple_finite_rule_iterables",
+        "tests/test_tinydb.py::test_update_multiple_rule_enumeration_failure_is_not_applied",
+        "-q",
+        "-ra",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/evidence/TD-M02-original.xml"
+      ]
+    },
+    {
+      "name": "TD-M02-reference",
+      "returncode": 0,
+      "expected": 0,
+      "expectation_met": true,
+      "command": [
+        "/work/python/bin/python",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "tests/test_tinydb.py::test_update_multiple_finite_rule_iterables",
+        "tests/test_tinydb.py::test_update_multiple_rule_enumeration_failure_is_not_applied",
+        "-q",
+        "-ra",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/evidence/TD-M02-reference.xml"
+      ]
+    }
+  ],
+  "business_facts": {
+    "status_code": 0,
+    "state": {
+      "Status": "exited",
+      "Running": false,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 0,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-10-21T14:35:38.566396627Z",
+      "FinishedAt": "2026-10-21T14:35:39.171186946Z"
+    },
+    "image": "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+    "network": "none",
+    "user": "1000:1000",
+    "read_only": true,
+    "memory_mb": 256,
+    "pids_limit": 64,
+    "real_model_calls": 0,
+    "facts": {
+      "observations": {
+        "default_named_separate_ids": true,
+        "reopen_tables": true,
+        "new_memory_empty": true,
+        "stale_snapshot_overwrites": true,
+        "tags_report_reproduced": true,
+        "outer_list_copy": true,
+        "update_persists_and_invalidates": true,
+        "list_rule_order_reproduced": true,
+        "buffer_observation_reproduced": true,
+        "buffer_flush_reopen": true,
+        "buffer_context_close_flushes": true,
+        "batch_reduces_writes": true,
+        "upsert_updates_all_matches": true,
+        "backup_tables_ids_preserved": true,
+        "backup_next_id": true,
+        "candidate_import": true
+      },
+      "all_true": true,
+      "python": "3.12.15",
+      "elapsed_sec": 0.24027178899996215,
+      "self_peak_rss_kib": 15572,
+      "children_peak_rss_kib": 15572,
+      "scope": "事实探针，不评分文字质量、不实现方案"
+    }
+  }
+}

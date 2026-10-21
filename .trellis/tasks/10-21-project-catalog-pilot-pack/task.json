@@ -1,0 +1,3367 @@
+{
+  "id": "project-catalog-pilot-pack",
+  "name": "project-catalog-pilot-pack",
+  "title": "首批三项目真实场景内容包",
+  "description": "为TinyDB、Jinja、schedule规划同一首批扩容内容包，复用既有schema2/python-native；逐仓固定源码与许可，英文模型输入与中文路线，原生冻结验收及隔离模拟，不动线上或真实账号。",
+  "status": "completed",
+  "dev_type": "backend",
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-21",
+  "completedAt": "2026-10-21",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-21T16:14:40Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "v3",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "10-21-project-catalog-expansion",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-21T14:08:14Z",
+      "contextKey": "codex_01a15c73-86e7-7951-b5f9-5016a38e2e68",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "654246b97645076e663f30d46a69f934d99b8d00",
+        "status": [
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-auto-loop/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-brainstorm/SKILL.md"
+          },
+          {
+            "status": "??",
+            "path": ".agents/skills/trellis-check-all/references/repair-and-recheck.md"
+          },
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-check-all/references/reporting-and-disposition.md"
+          },
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-meta/references/customize-local/change-workflow.md"
+          },
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-route/SKILL.md"
+          },
+          {
+            "status": "??",
+            "path": ".agents/skills/trellis-route/references/interaction.md"
+          },
+          {
+            "status": "??",
+            "path": ".agents/skills/trellis-route/references/recovery-and-errors.md"
+          },
+          {
+            "status": "??",
+            "path": ".agents/skills/trellis-route/references/subagent-dispatch.md"
+          },
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-task-brief/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-update-spec/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-auto-loop/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-brainstorm/SKILL.md"
+          },
+          {
+            "status": "??",
+            "path": ".claude/skills/trellis-check-all/references/repair-and-recheck.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-check-all/references/reporting-and-disposition.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-meta/references/customize-local/change-workflow.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-route/SKILL.md"
+          },
+          {
+            "status": "??",
+            "path": ".claude/skills/trellis-route/references/interaction.md"
+          },
+          {
+            "status": "??",
+            "path": ".claude/skills/trellis-route/references/recovery-and-errors.md"
+          },
+          {
+            "status": "??",
+            "path": ".claude/skills/trellis-route/references/subagent-dispatch.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-task-brief/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-update-spec/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".codex/config.toml"
+          },
+          {
+            "status": " M",
+            "path": ".flower/plugin-lock.json"
+          },
+          {
+            "status": " M",
+            "path": ".flower/plugins.json"
+          },
+          {
+            "status": " M",
+            "path": ".trellis/scripts/flower_session_start.py"
+          },
+          {
+            "status": " M",
+            "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/account-hold-comparison.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/recovery-contracts.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/telemetry-evidence.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/worker-contracts.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/research/current-evidence.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-14-v3-passive-quota-only/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-21-project-catalog-expansion/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-21-project-catalog-expansion/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-21-project-catalog-expansion/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-21-project-catalog-expansion/task.json"
+          },
+          {
+            "status": " M",
+            "path": ".trellis/workflow.md"
+          },
+          {
+            "status": " M",
+            "path": "deploy/v3/README.md"
+          },
+          {
+            "status": " M",
+            "path": "deploy/v3/compose.yml"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/AUDIT.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/README.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/agate-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/agate.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/alive-progress-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/alive-progress.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/anytree-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/anytree.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/argcomplete.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/arrow-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/arrow.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/attrs-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/attrs.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/babel-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/babel.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/backoff-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/backoff.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/bibtexparser-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/bibtexparser.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/bidict-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/bidict.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/blinker.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/boltons-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/boltons.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/bottle-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/bottle.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/cachetools-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/cachetools.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/cattrs-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/cattrs.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/cerberus-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/cerberus.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/chardet-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/chardet.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/charset-normalizer-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/charset-normalizer.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/cli-helpers-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/cli-helpers.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/click-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/click.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/collective-icalendar-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/collective-icalendar.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/colorama.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/configargparse-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/configargparse.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/configobj-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/configobj.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/confuse-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/confuse.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/cssselect-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/cssselect.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/csvkit-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/csvkit.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/dataset-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/dataset.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/decorator.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/deepdiff-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/deepdiff.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/diskcache.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/docutils-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/docutils.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/dpath-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/dpath.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/dynaconf-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/dynaconf.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/feedgen-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/feedgen.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/feedparser-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/feedparser.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/filelock.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/flask-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/flask.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/ftfy-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/ftfy.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/funcy-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/funcy.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/furl.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/glom.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/hjson.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/html2text-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/html2text.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/html5lib-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/html5lib.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/humanize-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/humanize.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/icecream-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/icecream.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/inflect-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/inflect.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/injector-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/injector.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/itsdangerous.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/jinja-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/jinja.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/jmespath-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/jmespath.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/jsonschema-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/jsonschema.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/loguru-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/loguru.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/markdown-it-py-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/markdown-it-py.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/markdownify-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/markdownify.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/marshmallow-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/marshmallow.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/mdit-py-plugins-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/mdit-py-plugins.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/mistletoe-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/mistletoe.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/mistune-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/mistune.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/more-itertools-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/more-itertools.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/natsort-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/natsort.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/normality.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/packaging-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/packaging.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/path-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/path.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pendulum-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pendulum.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/petl-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/petl.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/platformdirs.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pluggy-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pluggy.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/portion-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/portion.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/progress.json"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pydantic-settings-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pydantic-settings.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pydash-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pydash.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pygments.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pyparsing-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pyparsing.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pypika-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pypika.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pyrsistent-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pyrsistent.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-box-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-box.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-constraint-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-constraint.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-dateutil-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-dateutil.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-decouple-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-decouple.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-docx-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-docx.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-dotenv-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-dotenv.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-frontmatter-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-frontmatter.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-liquid-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-liquid.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-markdown-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-markdown.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-pptx-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-pptx.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-statemachine-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/python-statemachine.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pyyaml-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/pyyaml.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/rich-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/rich.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/schedule-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/schedule.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/simplejson-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/simplejson.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/sortedcontainers-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/sortedcontainers.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/sqlglot-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/sqlglot.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/sqlite-utils-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/sqlite-utils.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/sqlparse-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/sqlparse.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/structlog-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/structlog.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/tablib-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/tablib.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/tabulate-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/tabulate.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/tenacity-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/tenacity.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/textdistance-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/textdistance.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/thefuzz.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/tinydb-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/tinydb.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/tomli-w.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/tomlkit-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/tomlkit.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/toolz-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/toolz.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/tqdm-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/tqdm.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/transitions-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/transitions.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/treelib-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/treelib.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/typer-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/typer.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/webcolors-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/webcolors.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/werkzeug-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/werkzeug.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/wrapt-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/wrapt.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/wtforms-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/wtforms.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/xlsxwriter-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/xlsxwriter.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/xmltodict-roadmap-20.md"
+          },
+          {
+            "status": "??",
+            "path": "research/github-projects/xmltodict.md"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "654246b97645076e663f30d46a69f934d99b8d00",
+            "status": [
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-auto-loop/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-brainstorm/SKILL.md"
+              },
+              {
+                "status": "??",
+                "path": ".agents/skills/trellis-check-all/references/repair-and-recheck.md"
+              },
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-check-all/references/reporting-and-disposition.md"
+              },
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-meta/references/customize-local/change-workflow.md"
+              },
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-route/SKILL.md"
+              },
+              {
+                "status": "??",
+                "path": ".agents/skills/trellis-route/references/interaction.md"
+              },
+              {
+                "status": "??",
+                "path": ".agents/skills/trellis-route/references/recovery-and-errors.md"
+              },
+              {
+                "status": "??",
+                "path": ".agents/skills/trellis-route/references/subagent-dispatch.md"
+              },
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-task-brief/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-update-spec/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-auto-loop/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-brainstorm/SKILL.md"
+              },
+              {
+                "status": "??",
+                "path": ".claude/skills/trellis-check-all/references/repair-and-recheck.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-check-all/references/reporting-and-disposition.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-meta/references/customize-local/change-workflow.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-route/SKILL.md"
+              },
+              {
+                "status": "??",
+                "path": ".claude/skills/trellis-route/references/interaction.md"
+              },
+              {
+                "status": "??",
+                "path": ".claude/skills/trellis-route/references/recovery-and-errors.md"
+              },
+              {
+                "status": "??",
+                "path": ".claude/skills/trellis-route/references/subagent-dispatch.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-task-brief/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-update-spec/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".codex/config.toml"
+              },
+              {
+                "status": " M",
+                "path": ".flower/plugin-lock.json"
+              },
+              {
+                "status": " M",
+                "path": ".flower/plugins.json"
+              },
+              {
+                "status": " M",
+                "path": ".trellis/scripts/flower_session_start.py"
+              },
+              {
+                "status": " M",
+                "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/account-hold-comparison.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/recovery-contracts.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/telemetry-evidence.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/worker-contracts.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/research/current-evidence.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-21-project-catalog-expansion/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-21-project-catalog-expansion/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-21-project-catalog-expansion/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-21-project-catalog-expansion/task.json"
+              },
+              {
+                "status": " M",
+                "path": ".trellis/workflow.md"
+              },
+              {
+                "status": " M",
+                "path": "deploy/v3/README.md"
+              },
+              {
+                "status": " M",
+                "path": "deploy/v3/compose.yml"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/AUDIT.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/README.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/agate-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/agate.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/alive-progress-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/alive-progress.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/anytree-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/anytree.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/argcomplete.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/arrow-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/arrow.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/attrs-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/attrs.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/babel-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/babel.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/backoff-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/backoff.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/bibtexparser-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/bibtexparser.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/bidict-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/bidict.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/blinker.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/boltons-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/boltons.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/bottle-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/bottle.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/cachetools-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/cachetools.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/cattrs-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/cattrs.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/cerberus-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/cerberus.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/chardet-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/chardet.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/charset-normalizer-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/charset-normalizer.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/cli-helpers-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/cli-helpers.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/click-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/click.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/collective-icalendar-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/collective-icalendar.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/colorama.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/configargparse-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/configargparse.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/configobj-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/configobj.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/confuse-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/confuse.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/cssselect-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/cssselect.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/csvkit-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/csvkit.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/dataset-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/dataset.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/decorator.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/deepdiff-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/deepdiff.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/diskcache.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/docutils-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/docutils.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/dpath-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/dpath.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/dynaconf-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/dynaconf.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/feedgen-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/feedgen.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/feedparser-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/feedparser.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/filelock.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/flask-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/flask.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/ftfy-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/ftfy.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/funcy-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/funcy.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/furl.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/glom.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/hjson.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/html2text-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/html2text.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/html5lib-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/html5lib.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/humanize-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/humanize.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/icecream-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/icecream.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/inflect-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/inflect.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/injector-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/injector.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/itsdangerous.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/jinja-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/jinja.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/jmespath-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/jmespath.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/jsonschema-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/jsonschema.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/loguru-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/loguru.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/markdown-it-py-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/markdown-it-py.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/markdownify-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/markdownify.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/marshmallow-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/marshmallow.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/mdit-py-plugins-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/mdit-py-plugins.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/mistletoe-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/mistletoe.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/mistune-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/mistune.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/more-itertools-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/more-itertools.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/natsort-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/natsort.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/normality.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/packaging-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/packaging.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/path-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/path.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pendulum-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pendulum.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/petl-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/petl.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/platformdirs.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pluggy-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pluggy.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/portion-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/portion.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/progress.json"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pydantic-settings-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pydantic-settings.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pydash-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pydash.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pygments.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pyparsing-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pyparsing.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pypika-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pypika.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pyrsistent-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pyrsistent.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-box-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-box.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-constraint-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-constraint.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-dateutil-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-dateutil.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-decouple-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-decouple.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-docx-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-docx.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-dotenv-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-dotenv.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-frontmatter-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-frontmatter.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-liquid-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-liquid.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-markdown-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-markdown.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-pptx-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-pptx.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-statemachine-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/python-statemachine.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pyyaml-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/pyyaml.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/rich-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/rich.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/schedule-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/schedule.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/simplejson-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/simplejson.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/sortedcontainers-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/sortedcontainers.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/sqlglot-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/sqlglot.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/sqlite-utils-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/sqlite-utils.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/sqlparse-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/sqlparse.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/structlog-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/structlog.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/tablib-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/tablib.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/tabulate-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/tabulate.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/tenacity-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/tenacity.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/textdistance-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/textdistance.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/thefuzz.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/tinydb-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/tinydb.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/tomli-w.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/tomlkit-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/tomlkit.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/toolz-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/toolz.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/tqdm-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/tqdm.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/transitions-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/transitions.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/treelib-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/treelib.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/typer-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/typer.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/webcolors-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/webcolors.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/werkzeug-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/werkzeug.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/wrapt-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/wrapt.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/wtforms-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/wtforms.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/xlsxwriter-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/xlsxwriter.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/xmltodict-roadmap-20.md"
+              },
+              {
+                "status": "??",
+                "path": "research/github-projects/xmltodict.md"
+              }
+            ],
+            "worktreeDiffSha256": "88f7267d9ab48111a28aa8686844b5f6ba5ee4ee09ec6fbf4069ae05e841540e",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [
+              {
+                "path": ".agents/skills/trellis-check-all/references/repair-and-recheck.md",
+                "sha256": "a2c28f920d99cd0587c5150ee5ae49fe301537d06939f57b116432d9f766c88d"
+              },
+              {
+                "path": ".agents/skills/trellis-route/references/interaction.md",
+                "sha256": "b33bf8fe6ab7112b6b8b25a13b337e63e802d8be1a485eb7f533b5276c6a1aba"
+              },
+              {
+                "path": ".agents/skills/trellis-route/references/recovery-and-errors.md",
+                "sha256": "0ee8b43aaa3fa25252ae5b28d65db8296d4dbddb487469be09282b3118b8aa72"
+              },
+              {
+                "path": ".agents/skills/trellis-route/references/subagent-dispatch.md",
+                "sha256": "2c9b2f98c586fe9550f974f9ee9ffaecf5a65bd0f899d3b6308d3dd6b4029907"
+              },
+              {
+                "path": ".claude/skills/trellis-check-all/references/repair-and-recheck.md",
+                "sha256": "a2c28f920d99cd0587c5150ee5ae49fe301537d06939f57b116432d9f766c88d"
+              },
+              {
+                "path": ".claude/skills/trellis-route/references/interaction.md",
+                "sha256": "b33bf8fe6ab7112b6b8b25a13b337e63e802d8be1a485eb7f533b5276c6a1aba"
+              },
+              {
+                "path": ".claude/skills/trellis-route/references/recovery-and-errors.md",
+                "sha256": "0ee8b43aaa3fa25252ae5b28d65db8296d4dbddb487469be09282b3118b8aa72"
+              },
+              {
+                "path": ".claude/skills/trellis-route/references/subagent-dispatch.md",
+                "sha256": "2c9b2f98c586fe9550f974f9ee9ffaecf5a65bd0f899d3b6308d3dd6b4029907"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md",
+                "sha256": "8ba4e9f26af89b42e2ce20fe88bee62e3e03bbf35a9718e02c96b7c4c27b5745"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl",
+                "sha256": "91534c2dd15014470e9266e207fea31ca117537fb0f5c74e7880d9954b2c8399"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md",
+                "sha256": "0af15a1ee3eef2ad7d75bbfeee48ce78a7a5c47a977ab65e650f68ea3e85a50d"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl",
+                "sha256": "3f8050ff392e2bb0ed37ce8865bfe3b7c4e341c8fe89c01bd643386fc186c2e1"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md",
+                "sha256": "bd30f98dafc1b6726301d7d44183be17d2f1782d63cba44ec47bffd2c875c43f"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md",
+                "sha256": "34b4876aefc2ba9cb2c345839e614f18611050f2f429e4cbf69d52dc9fb79715"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md",
+                "sha256": "1e907d1a7f469f49b46a4a9644156c8af2379164e5064b88ef069acc74b5fbc0"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md",
+                "sha256": "3b96b5901fa58216e783fafaf84f7c5e370c70aba8c2de82b5ed42bf5b6513df"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md",
+                "sha256": "95db129ed16d1a85e3ef21361ec506332a4cec902f20ec91cafa76c49a681819"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json",
+                "sha256": "53a52a996c4db18c5b422746b488099f45c1dedc4d18b245d500e92a02edcdef"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/brief.md",
+                "sha256": "b96632b24c8289b8912f782b091022a148037914057f48a591925e82dd982143"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/check.jsonl",
+                "sha256": "6a334cbc38658f19938380b89767461ca59ab44677025b5654085f075cebbcd5"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/design.md",
+                "sha256": "a50397b8ef738d04bd160907a594f00969ce2aecdbbd59a0087d567d4b395580"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.jsonl",
+                "sha256": "d289c33e827e2e5a17529626199f34a5a5bbb411451a5491e4150776cecf7428"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/implement.md",
+                "sha256": "905c420bd2ff3d396634bd5cc2972b0504a0e0d9c28e12b1ceb53bddabef8691"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/prd.md",
+                "sha256": "17ef0f84dc4dbd14d6393b2bef47064184a7f6e2516129cce05e8a3fcc476347"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/account-hold-comparison.md",
+                "sha256": "76ba3752b38a4dc32ce8a4d2a9a6dc8f10f4bcbf5bfb6e642bb058bd16ce762c"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/recovery-contracts.md",
+                "sha256": "5b305441324f8f6c72568be289a1a7a07751f2eef77113916ac5063f6dbb002a"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/telemetry-evidence.md",
+                "sha256": "8cf11213eee1518660d1903b475964fca7710fb210865ec3fa7ab79decadf841"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/worker-contracts.md",
+                "sha256": "f89688bd7de8ff0a9eadfb4d97294660f0681ef6b97697627fe5b5eae419c649"
+              },
+              {
+                "path": ".trellis/tasks/10-12-claude-telemetry-shutdown/task.json",
+                "sha256": "cf64ee2d3af29224a9c79d6abbf27541482ca0e090ec218b51f660b0a7fa54f5"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/brief.md",
+                "sha256": "59fe498b7e300b0f8f39e3589eb696f62f5955d3be8a352020b784d91d460f08"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/check.jsonl",
+                "sha256": "1706622e8a35e707d89458d1461251dd98e688398bc25a4945cd0d50505b3f5f"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/design.md",
+                "sha256": "f4940a74480c7c2dcdea8f5b5ffbb517cdf00c01ddd9e5f1240f1569357d7129"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.jsonl",
+                "sha256": "1706622e8a35e707d89458d1461251dd98e688398bc25a4945cd0d50505b3f5f"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/implement.md",
+                "sha256": "07fcc5dce5dfd24802e161edbf3333aab4ab7f68a87b48dc72571560a34b7b57"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/prd.md",
+                "sha256": "2f44e4092380c3b2d0a417e5b93c6480749464ef8ac6e0cdb27a09e79ff72edf"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/research/current-evidence.md",
+                "sha256": "fe7eae8555792ab821aa320773548af89312dcfd45112bcdbc3f09f2c14b56b5"
+              },
+              {
+                "path": ".trellis/tasks/10-14-v3-passive-quota-only/task.json",
+                "sha256": "877d2412d6e23987cebe2eac73b928ad4dd47dce313f2cc4d4419e3477e12469"
+              },
+              {
+                "path": ".trellis/tasks/10-21-project-catalog-expansion/check.jsonl",
+                "sha256": "40dabff4b3e0949c79f6dbbbec55ba4d8eb31ab989ba5c77786bf2c951c88b92"
+              },
+              {
+                "path": ".trellis/tasks/10-21-project-catalog-expansion/implement.jsonl",
+                "sha256": "40dabff4b3e0949c79f6dbbbec55ba4d8eb31ab989ba5c77786bf2c951c88b92"
+              },
+              {
+                "path": ".trellis/tasks/10-21-project-catalog-expansion/prd.md",
+                "sha256": "5a80a63962680cc860d037751d734a892b2b5e07e623438c46b0b5db698726ef"
+              },
+              {
+                "path": ".trellis/tasks/10-21-project-catalog-expansion/task.json",
+                "sha256": "b94ad347c7961ba53daf1e6e1ce80b26e010cf986854dcecb5e03414b0a614cf"
+              },
+              {
+                "path": "research/github-projects/AUDIT.md",
+                "sha256": "fd4759be4e0c25636fe3a0bfc7a731a4d0a2fea8f8cd53e52315467ec5430be0"
+              },
+              {
+                "path": "research/github-projects/README.md",
+                "sha256": "91616c10f10bfce714702e2cbf2ca071ebcd5d7f079677be58e4551074b25ba0"
+              },
+              {
+                "path": "research/github-projects/agate-roadmap-20.md",
+                "sha256": "23b2057ee8ab07911a2e9e2a66e57332be24acb851f0543c295cafd3487649bd"
+              },
+              {
+                "path": "research/github-projects/agate.md",
+                "sha256": "715a30974fd863a005f231d67d648670454113c0d3a72c13fe316ca096250498"
+              },
+              {
+                "path": "research/github-projects/alive-progress-roadmap-20.md",
+                "sha256": "8d960e3c3fc4bea72d4508d64d5b703da90dee1df404fa4cbb0c4cedbd4f1857"
+              },
+              {
+                "path": "research/github-projects/alive-progress.md",
+                "sha256": "27085597b176fb96388f316f5d9e8d2f97c27740e14744a1de88c07868c78404"
+              },
+              {
+                "path": "research/github-projects/anytree-roadmap-20.md",
+                "sha256": "8e5afdfb603b0dec38010944e9a04f40ee34b7063a2baa6f70296206ba17376a"
+              },
+              {
+                "path": "research/github-projects/anytree.md",
+                "sha256": "2bd3fb6cf03638ca7d63661382bfcf3dbe53f01160d1acb90dadcc6a09411774"
+              },
+              {
+                "path": "research/github-projects/argcomplete.md",
+                "sha256": "dd03b6f5c3df6aba59c7919a31afb1e2c991bb33254cce928d40f1fd0173f751"
+              },
+              {
+                "path": "research/github-projects/arrow-roadmap-20.md",
+                "sha256": "a4429b1ffc8909ac29dce623dc4bd92871cfdea68b9359cebd9a0fce029866d9"
+              },
+              {
+                "path": "research/github-projects/arrow.md",
+                "sha256": "5cc6e2f5863fdc5deb59d81df0d3f3ef6e7c1ba52f81f67bd330a09fa220447c"
+              },
+              {
+                "path": "research/github-projects/attrs-roadmap-20.md",
+                "sha256": "e7c3f56446f8cf79617b1cd8d7204a3515622722549be1a5e7a213da3d191c14"
+              },
+              {
+                "path": "research/github-projects/attrs.md",
+                "sha256": "989fdb650235b8fdf57d95ed06bee3001429449930b3827f9cecd42d8e4d5002"
+              },
+              {
+                "path": "research/github-projects/babel-roadmap-20.md",
+                "sha256": "df8423ed6c83dbb9ca4b2c77bebb546c3af74b0eac7b63cb4b148cc947baa16f"
+              },
+              {
+                "path": "research/github-projects/babel.md",
+                "sha256": "205887beb97e55f7d3b712affc262d65941b41d05ca76ad3a4de808e718d2745"
+              },
+              {
+                "path": "research/github-projects/backoff-roadmap-20.md",
+                "sha256": "f992ab85d5252ebbad2631f9291f04d9333af59ae46ba7aba1bd98167063527b"
+              },
+              {
+                "path": "research/github-projects/backoff.md",
+                "sha256": "75e4622ecaf8c5d7fd48d74849938f577d39225c5f4512421be951ad4e4b747e"
+              },
+              {
+                "path": "research/github-projects/bibtexparser-roadmap-20.md",
+                "sha256": "154a47a4b10e3aff4e2c2abece419a4d9715e23f8327cb67a782e2f13b8e3ef0"
+              },
+              {
+                "path": "research/github-projects/bibtexparser.md",
+                "sha256": "9556759815a72a9cb12912ba9f1f2843f8a123435de19d2807c44f3d1c6f9b08"
+              },
+              {
+                "path": "research/github-projects/bidict-roadmap-20.md",
+                "sha256": "f20e94d66605ca6aa377d32f1fd4ca249af438c33a8b4d2d34e7a7f1f0c514a6"
+              },
+              {
+                "path": "research/github-projects/bidict.md",
+                "sha256": "f478cd4f43e433765027ba6c2239cb1e89a4b673b9dd9ee75dc4ae72226220c5"
+              },
+              {
+                "path": "research/github-projects/blinker.md",
+                "sha256": "8d028c77dbbce154e6a749c939737e7a8e4552b0a82fec548f15aedfe33ec6c5"
+              },
+              {
+                "path": "research/github-projects/boltons-roadmap-20.md",
+                "sha256": "4a2be61508f71181ef5ec69f3de7f4cde9d953e2f068e3ff94c5f626ee57a338"
+              },
+              {
+                "path": "research/github-projects/boltons.md",
+                "sha256": "5382a7cece66bf7f667f74becab4bd4b7c0f83678a17348e0ddc300bef05520a"
+              },
+              {
+                "path": "research/github-projects/bottle-roadmap-20.md",
+                "sha256": "c6696dda0beed5def5af85191621491ebb1f4c57b8795105aa77b65e900c4d8d"
+              },
+              {
+                "path": "research/github-projects/bottle.md",
+                "sha256": "65296cacdef006b66fcd187ca137d28815558f8ce6b237fd29a91af3197791df"
+              },
+              {
+                "path": "research/github-projects/cachetools-roadmap-20.md",
+                "sha256": "e6e95be4b3559dfdd65e48638bb1e0dc632affc445174ce588c62b3a5d412936"
+              },
+              {
+                "path": "research/github-projects/cachetools.md",
+                "sha256": "ddfda0e31be191dd84cb7396f0f735b05d173e595d4ca053c17e8233e0b391ca"
+              },
+              {
+                "path": "research/github-projects/cattrs-roadmap-20.md",
+                "sha256": "38d1b499e3a47db683dcabbf8fc52a1dbe80351d3362301c30cd4ab195b19f1c"
+              },
+              {
+                "path": "research/github-projects/cattrs.md",
+                "sha256": "15af64b0212eb1b95dd894b3005218dfc9175979f927bb487560110f62f76b60"
+              },
+              {
+                "path": "research/github-projects/cerberus-roadmap-20.md",
+                "sha256": "78f3e0052ac14d1deda3d4c42f33ca07b80d6b3e4505e795afb89983671448b5"
+              },
+              {
+                "path": "research/github-projects/cerberus.md",
+                "sha256": "aafb2f5b34b7eacd23cf7a94e64b9995731c8fa2bd0ba63f6f5d819868fd21fd"
+              },
+              {
+                "path": "research/github-projects/chardet-roadmap-20.md",
+                "sha256": "998af25a228cd2726c397fba98a3e2e27aaee9298ed2d3f2161d28483723e7e5"
+              },
+              {
+                "path": "research/github-projects/chardet.md",
+                "sha256": "14147c398b027c191e3c87b3126bb4670a26fc5c703b6637b611d8e94da5959b"
+              },
+              {
+                "path": "research/github-projects/charset-normalizer-roadmap-20.md",
+                "sha256": "a39903b058634affffeef458b5f8aeccf2df042f728437977b18bace29d7b31d"
+              },
+              {
+                "path": "research/github-projects/charset-normalizer.md",
+                "sha256": "ef6ab82e901685d1168e1e5b08e9398b468611f1b921f8b5cbd41a1c363ce49e"
+              },
+              {
+                "path": "research/github-projects/cli-helpers-roadmap-20.md",
+                "sha256": "46be27cc800e067c1777c0e49648ff6f57a15436f8b4d9e838e167029bd911bc"
+              },
+              {
+                "path": "research/github-projects/cli-helpers.md",
+                "sha256": "9f9a272991ee9f59396669793fdae3b89037cde9338127508952c1e0b1b38920"
+              },
+              {
+                "path": "research/github-projects/click-roadmap-20.md",
+                "sha256": "33369973b166e56b0340b092f9017e214edf8f5b80425245f91fb02156b38c34"
+              },
+              {
+                "path": "research/github-projects/click.md",
+                "sha256": "576fc9368aa5ced35cd045cd8df52b038dc47973be015b63705693e0661ab483"
+              },
+              {
+                "path": "research/github-projects/collective-icalendar-roadmap-20.md",
+                "sha256": "c81d5643bfeb7bba6aa1ef8b4423d41c9d285adcdaae3072e818716b807a5228"
+              },
+              {
+                "path": "research/github-projects/collective-icalendar.md",
+                "sha256": "3bb0d8ee3f917db7cc7c25a07301e64b695cc2a8c937fab857c332a0a95e4c92"
+              },
+              {
+                "path": "research/github-projects/colorama.md",
+                "sha256": "0823412f984a1fb044a54bcc6d8cc85b938d10bd44641c6555acaa2392736c36"
+              },
+              {
+                "path": "research/github-projects/configargparse-roadmap-20.md",
+                "sha256": "90d310727a7f11a9a43f6baef13ee8a3a4f3af905f73589ee0532b1173e4fcfe"
+              },
+              {
+                "path": "research/github-projects/configargparse.md",
+                "sha256": "01f0b01b4b0217e7d7b2a4e862e39c98018888f3232f8ca8d97410505a0d7091"
+              },
+              {
+                "path": "research/github-projects/configobj-roadmap-20.md",
+                "sha256": "15f2e4cd35611fb7330105763584b58967900ebe76625bf529352cd41d64a11c"
+              },
+              {
+                "path": "research/github-projects/configobj.md",
+                "sha256": "39ea31b81e1f39c271770d26eb982edcbaa944763c90ac3e4bc7315960736010"
+              },
+              {
+                "path": "research/github-projects/confuse-roadmap-20.md",
+                "sha256": "76a85079705b1554958f1b953655a7899ddaf15eebc761b512e35da53a2320c5"
+              },
+              {
+                "path": "research/github-projects/confuse.md",
+                "sha256": "331d9fb18a983d7c34069f57349758e775c9b4156c810e73de4b04b6e8fc6464"
+              },
+              {
+                "path": "research/github-projects/cssselect-roadmap-20.md",
+                "sha256": "b8e281149f5b91481fcbd083d9be7587c31c09be9322792189e22f43c32bbc20"
+              },
+              {
+                "path": "research/github-projects/cssselect.md",
+                "sha256": "10dc7b7c55fc7b1244a6c8ddbdf3cc79df1b11ef4ed34c34b532189250b8aef1"
+              },
+              {
+                "path": "research/github-projects/csvkit-roadmap-20.md",
+                "sha256": "5fefe9ec71a38e533021df1789ca2d8dab7273e8a8c764a68e88b1e21979ead7"
+              },
+              {
+                "path": "research/github-projects/csvkit.md",
+                "sha256": "92befb489fc3820ae2020712059fb0f72430ffb220f6c7563e451075b0b1a50c"
+              },
+              {
+                "path": "research/github-projects/dataset-roadmap-20.md",
+                "sha256": "6ca0fdd1da5899f7a3cbb42e88a6816e16d67b846f42992b1ad3d12806afb42d"
+              },
+              {
+                "path": "research/github-projects/dataset.md",
+                "sha256": "0e7fbc14aeb41e800027a3f534aed9d5b00b3aa632338c8e7edda0effb77af03"
+              },
+              {
+                "path": "research/github-projects/decorator.md",
+                "sha256": "7d3ca3b1f2d6e8191ee17c9db25db337509c5b64e70906ad3724b80820bbfeaa"
+              },
+              {
+                "path": "research/github-projects/deepdiff-roadmap-20.md",
+                "sha256": "e1fca636f8ae2a6267a4d7c4f3f1902e006ef4a9a86a062cd3e04b537bd12e10"
+              },
+              {
+                "path": "research/github-projects/deepdiff.md",
+                "sha256": "db5ae321841fd81b09ea5256a608ca2b51a20ac3367baad9e5fcb1ee46f5121b"
+              },
+              {
+                "path": "research/github-projects/diskcache.md",
+                "sha256": "839459a9ade4951bbf79e4092fb8c0535ba483f93ac98891182446299304c76c"
+              },
+              {
+                "path": "research/github-projects/docutils-roadmap-20.md",
+                "sha256": "77efa7abc1bd36aa8bff2ef3b40b03c83388e36016bdfb4e58dd722a8f575c15"
+              },
+              {
+                "path": "research/github-projects/docutils.md",
+                "sha256": "600f272c475941156688e315ea114bd5f7e45dce59d5f0f003c865ba9d488f4f"
+              },
+              {
+                "path": "research/github-projects/dpath-roadmap-20.md",
+                "sha256": "b9b34afa8257ace9c468b1aac6c7fd27b14a45d59b55a237ebf065ff89e8438d"
+              },
+              {
+                "path": "research/github-projects/dpath.md",
+                "sha256": "7ce5536619dcb1a90b89928313e2031b74b4c739dabdc2d2ab752e199436c3ce"
+              },
+              {
+                "path": "research/github-projects/dynaconf-roadmap-20.md",
+                "sha256": "0bb558a9bd8ceac86d5637ee0cabaf5a7218eef8a006b998ca86c773160d8534"
+              },
+              {
+                "path": "research/github-projects/dynaconf.md",
+                "sha256": "01219e424032845fc4c5725680702b2bb0e3232efb63fab8520102342271f0e6"
+              },
+              {
+                "path": "research/github-projects/feedgen-roadmap-20.md",
+                "sha256": "2fcc550bc52a7a1d2089608dcb63f5904960c7bed9af932db5201fdfb226cb87"
+              },
+              {
+                "path": "research/github-projects/feedgen.md",
+                "sha256": "9e704e859ea33509f8c8ec1deb1faa860004a199eb24e2dcdffe278a9cbe1dfd"
+              },
+              {
+                "path": "research/github-projects/feedparser-roadmap-20.md",
+                "sha256": "e07961f5b05de8c5ced7673048de952a8ff2d29ec778aeca2608c1f7911215aa"
+              },
+              {
+                "path": "research/github-projects/feedparser.md",
+                "sha256": "4561b1545c049d731d39166370fbac64348d13199fcd22f8394bfe6f2d0bddee"
+              },
+              {
+                "path": "research/github-projects/filelock.md",
+                "sha256": "2b0db79677bfb5e5dac9c2037975c13a92c576f24772e16d8878fddcc3ab846d"
+              },
+              {
+                "path": "research/github-projects/flask-roadmap-20.md",
+                "sha256": "5e256cf30ecc73ee6c034033dee5f958d390491348b9dedcbaa902db2ccf6ead"
+              },
+              {
+                "path": "research/github-projects/flask.md",
+                "sha256": "66fcb629c15d22528a211c95c6afcfb648b80346d1c3d82ac4e39ec054018faa"
+              },
+              {
+                "path": "research/github-projects/ftfy-roadmap-20.md",
+                "sha256": "4118d96473bee059c0c53f6cab7de59fdde5ef58fc024c17a6defdfee1f13f5a"
+              },
+              {
+                "path": "research/github-projects/ftfy.md",
+                "sha256": "1f4e192d73a0309d23bd76d99af28c43d611eaf16d4cb7a8bc6c79397fedb70c"
+              },
+              {
+                "path": "research/github-projects/funcy-roadmap-20.md",
+                "sha256": "26e58ff8b17c82d71a19dd5779bc4ab3dee6810c83ab8819d7d80cd7bd84cd99"
+              },
+              {
+                "path": "research/github-projects/funcy.md",
+                "sha256": "4b1efa3aed5501ba7e639c4708e95b1e9362301fba681eba8f3f0622794407af"
+              },
+              {
+                "path": "research/github-projects/furl.md",
+                "sha256": "7213f8c1b25811deefd493315788c4850162c16b4999a8ad1b071959159a4a1b"
+              },
+              {
+                "path": "research/github-projects/glom.md",
+                "sha256": "799f9530b76b5d0508a04a48e92d9b56eb71190c4d057cb0155a7728ba681ecd"
+              },
+              {
+                "path": "research/github-projects/hjson.md",
+                "sha256": "66de7b00ee00c6a7853651ebfd91cf2daf89b6e6b0ff8f577583178b0e5dd9fd"
+              },
+              {
+                "path": "research/github-projects/html2text-roadmap-20.md",
+                "sha256": "f0e05c547200f178e8f4722a6b634cf501a2d3dbef77003f23be8e4fcae9d15b"
+              },
+              {
+                "path": "research/github-projects/html2text.md",
+                "sha256": "5ce6a4b11c825c7fe25fd2fa2ed6b5e0dd25dfd04982a0fca8b6f7aceaebd1df"
+              },
+              {
+                "path": "research/github-projects/html5lib-roadmap-20.md",
+                "sha256": "31b99e3a51a05a797087ee1dda813224ba2c05670ead79239bfd77e71de45f8a"
+              },
+              {
+                "path": "research/github-projects/html5lib.md",
+                "sha256": "bfbca4383053c84ca9e51d409ecb957262ef3aae881cab9f9df05def1f8e58a8"
+              },
+              {
+                "path": "research/github-projects/humanize-roadmap-20.md",
+                "sha256": "ccc53cf2b124076e592ce3dcfac36dc75054bc4a0a8c70be19ed11e18c215bae"
+              },
+              {
+                "path": "research/github-projects/humanize.md",
+                "sha256": "9c17ae1e960fde144031b5680777c0cf06b3de50690a5942932b9bbd6d16c10d"
+              },
+              {
+                "path": "research/github-projects/icecream-roadmap-20.md",
+                "sha256": "04c4827bf16865905c269ab1e36aafab34ebbd211774def611d3ce70533dc4d2"
+              },
+              {
+                "path": "research/github-projects/icecream.md",
+                "sha256": "88087184a822d366a16dcc56eab31d6b20be8fe29423ca097070531767368040"
+              },
+              {
+                "path": "research/github-projects/inflect-roadmap-20.md",
+                "sha256": "4f1fc7e3cd481fa625e29952671d85d196a367bffc601b8a1e3d4d953526f2ad"
+              },
+              {
+                "path": "research/github-projects/inflect.md",
+                "sha256": "f65d5e03e050dd70d4ad188cc5279681186bfe2b93e3df641c1fffeb4366b6f7"
+              },
+              {
+                "path": "research/github-projects/injector-roadmap-20.md",
+                "sha256": "7bb520f6ef5d2fa03f8ee3d26db6550afc05554c9f822703d972c841abf00e7a"
+              },
+              {
+                "path": "research/github-projects/injector.md",
+                "sha256": "88de2c875b7faf70041831680d82ede1981756a4bbd81268a55e233e0cb68b1a"
+              },
+              {
+                "path": "research/github-projects/itsdangerous.md",
+                "sha256": "f16e5530e12366aa333222a1176ef4ffae6cc74a50e3a1cda63eb91e1fbd6cf4"
+              },
+              {
+                "path": "research/github-projects/jinja-roadmap-20.md",
+                "sha256": "cbdad92810d1d8e4c686488bc48f200b6de149b515c2456d5e897cea139bf846"
+              },
+              {
+                "path": "research/github-projects/jinja.md",
+                "sha256": "70586fa5398d0ac47967f4c98226f0e0f6849ced056f1b9a2962724db1567c23"
+              },
+              {
+                "path": "research/github-projects/jmespath-roadmap-20.md",
+                "sha256": "78223b2a57733e4abfa38ee830fe9ace988294b7c9cc3acab1b90969b17f5f4e"
+              },
+              {
+                "path": "research/github-projects/jmespath.md",
+                "sha256": "55bc7035c73de62597ca1a9eb45257406822415604e4af4186b6b1cab107fc41"
+              },
+              {
+                "path": "research/github-projects/jsonschema-roadmap-20.md",
+                "sha256": "762e83931d66e259045f785dca4d5109e85c9608512f5d7f42315e9f57eecded"
+              },
+              {
+                "path": "research/github-projects/jsonschema.md",
+                "sha256": "50dc70a8e5b64deffd8545921d9d842269b4f47d785a214abe60fcc19c88221c"
+              },
+              {
+                "path": "research/github-projects/loguru-roadmap-20.md",
+                "sha256": "722ccc4256a078f3476b66e583adfa458f435841b732bfa92058be29ff760c00"
+              },
+              {
+                "path": "research/github-projects/loguru.md",
+                "sha256": "673cd1e7b97952c01ba4938a92f41adfcfae4fef9eb6baedf0a6284c6927c8f1"
+              },
+              {
+                "path": "research/github-projects/markdown-it-py-roadmap-20.md",
+                "sha256": "ccb900755b11f424df42633f789a705354962c4e463d507af722847b39f30336"
+              },
+              {
+                "path": "research/github-projects/markdown-it-py.md",
+                "sha256": "4cc90708d4425ccf683874c40ac2092772defb85dd610d64c8240d8534e29fff"
+              },
+              {
+                "path": "research/github-projects/markdownify-roadmap-20.md",
+                "sha256": "34e5c0df94a8915bc179b3aa634e430c7c8d16517d0d3ce6d7e700a9139327f1"
+              },
+              {
+                "path": "research/github-projects/markdownify.md",
+                "sha256": "a660beb932c6bf66fd1897eeef089554827e379e638331257f1548faa70cfa62"
+              },
+              {
+                "path": "research/github-projects/marshmallow-roadmap-20.md",
+                "sha256": "9f80b831f0015630d17ef81cc7a2040b6a4d0fac014e314708001aca417f8c92"
+              },
+              {
+                "path": "research/github-projects/marshmallow.md",
+                "sha256": "fadd74ab24ad45cba75c394227b6ef3066b7c8e7ac0865db2a565ed8ed90ec4f"
+              },
+              {
+                "path": "research/github-projects/mdit-py-plugins-roadmap-20.md",
+                "sha256": "af811b2a083bdcf4722e296560b47012be185c268df0e5e293cf9a8e3cc9a326"
+              },
+              {
+                "path": "research/github-projects/mdit-py-plugins.md",
+                "sha256": "5daef0088cb68ca1d93173c3a50b44a85267aee6361906ee32cd1cc32ade7984"
+              },
+              {
+                "path": "research/github-projects/mistletoe-roadmap-20.md",
+                "sha256": "dd2b0db565a1e714cd3c84e232a0476afb06faa9f50867fea099d63fba9f1a5a"
+              },
+              {
+                "path": "research/github-projects/mistletoe.md",
+                "sha256": "b340f5693f238ee501ed14a08a27d254a36d0f0fce4d4cec699b0c52787be3b1"
+              },
+              {
+                "path": "research/github-projects/mistune-roadmap-20.md",
+                "sha256": "c8f8de8a271f5728fe218ea0c4d0e476416ef178972cc4d0de17ebb213c8d638"
+              },
+              {
+                "path": "research/github-projects/mistune.md",
+                "sha256": "454b693562e9830d6bbceaaed7f6373a24592dfe0aeeec7ab0fea8cf784354c5"
+              },
+              {
+                "path": "research/github-projects/more-itertools-roadmap-20.md",
+                "sha256": "01d64dfb7f9c4cad14b9f222abd867dbc4f2bc306b517a929c6918beb71d8287"
+              },
+              {
+                "path": "research/github-projects/more-itertools.md",
+                "sha256": "92251fc118fbb2eadc4f12a86c063f5df1ca01fb8e3b665ca465538233fe1333"
+              },
+              {
+                "path": "research/github-projects/natsort-roadmap-20.md",
+                "sha256": "b7557cc2eacbebcc90930b4216422d30b661dbd4d8ee8efc999a43be54962ab3"
+              },
+              {
+                "path": "research/github-projects/natsort.md",
+                "sha256": "f8916abe37db79b72c22aba9c89868381d0768111b3477bcfc0ba5fcbc92facf"
+              },
+              {
+                "path": "research/github-projects/normality.md",
+                "sha256": "0664197efb861d0662f1acee6f908bdab401231133a6c3198f8fb8631861a749"
+              },
+              {
+                "path": "research/github-projects/packaging-roadmap-20.md",
+                "sha256": "6a43f06b9eb3f625f4e4867dc50fd27db95dbc09089301386841c22e0ef3eddf"
+              },
+              {
+                "path": "research/github-projects/packaging.md",
+                "sha256": "4227a6149f5ab1c9b1e3bf5111fc9c603e99f09062547acca082f95a3c7188b3"
+              },
+              {
+                "path": "research/github-projects/path-roadmap-20.md",
+                "sha256": "391d363f3484ad90780d6b73e4a4d0325a8bfc5608863f6c7d3d140bef1f09c1"
+              },
+              {
+                "path": "research/github-projects/path.md",
+                "sha256": "4047f3056fdbc367e806ee412b940e8e460105580ef7d758077b896b36d9bdd9"
+              },
+              {
+                "path": "research/github-projects/pendulum-roadmap-20.md",
+                "sha256": "dc36b9bffb00e4e535ca690fef94b07caae2d2cc4877ca86575b10b4f45b920a"
+              },
+              {
+                "path": "research/github-projects/pendulum.md",
+                "sha256": "c369b484627888fa9213f0026d3aa675bf1192a7a1f71cde84112126a7a32193"
+              },
+              {
+                "path": "research/github-projects/petl-roadmap-20.md",
+                "sha256": "b30e388c17f8a0fc0469cc2532a9e9e8dc3d2f67072deb9130de12dcf8b1d472"
+              },
+              {
+                "path": "research/github-projects/petl.md",
+                "sha256": "433109a15402a2f33c575a2a6a59eaafbc46e06f80e0fb5ab5ec16c366d4cc9c"
+              },
+              {
+                "path": "research/github-projects/platformdirs.md",
+                "sha256": "d03f28e924330e37f60d23455d797bda818db9b4df8c5a945c570df4ca881977"
+              },
+              {
+                "path": "research/github-projects/pluggy-roadmap-20.md",
+                "sha256": "c6362e01dd326b73a62292b43226aacb971aa3d70cda11204212c9856761c3a9"
+              },
+              {
+                "path": "research/github-projects/pluggy.md",
+                "sha256": "10148dde2232875df03b080ac24ad0ac0b2bd450e30e69f96ad3ef5b8f0e2c5a"
+              },
+              {
+                "path": "research/github-projects/portion-roadmap-20.md",
+                "sha256": "58c7879b48a06848b59c0aa1770a8219b9c5a40632ec6f0c0f10276dd72abfa3"
+              },
+              {
+                "path": "research/github-projects/portion.md",
+                "sha256": "5b94c7eebf2c6e30d81cac04d9a5613db81dd685b3e6721e30dc793e54273bb1"
+              },
+              {
+                "path": "research/github-projects/progress.json",
+                "sha256": "667476588ee41c2d1e5b3fb8d6c696761562b5874ea99dd7330ebb82ea44a233"
+              },
+              {
+                "path": "research/github-projects/pydantic-settings-roadmap-20.md",
+                "sha256": "aa7aab911a8ef78361ddf60f943fa3953ef4ea6b728b23d4db7c6e41d5d4ffc8"
+              },
+              {
+                "path": "research/github-projects/pydantic-settings.md",
+                "sha256": "ea02df2d6c6b1f94cda58a267e05356b23fb3ab9d4f546cd88eec132308efce3"
+              },
+              {
+                "path": "research/github-projects/pydash-roadmap-20.md",
+                "sha256": "cb85eb0c46926e0a6b5c163a9c69831561c17dec2c7e45554aedc7558e36d94a"
+              },
+              {
+                "path": "research/github-projects/pydash.md",
+                "sha256": "088d9a347b74fa111c86b351cf18c5af8ddf95ed2f6d973cec6b84e216e080db"
+              },
+              {
+                "path": "research/github-projects/pygments.md",
+                "sha256": "af908a2a83de605e67e501fd7a2641125abf09b375e33183e9f506eb121ba47a"
+              },
+              {
+                "path": "research/github-projects/pyparsing-roadmap-20.md",
+                "sha256": "62e4bd54795da3e4fa6da2d5156fb41ee3b1671d2d02d1fe66c2aae4067533c4"
+              },
+              {
+                "path": "research/github-projects/pyparsing.md",
+                "sha256": "9bf01ba49cde66ccb7e35fed066ca85cd1fa8247bcb5895ffe6b15ccd22ac8e4"
+              },
+              {
+                "path": "research/github-projects/pypika-roadmap-20.md",
+                "sha256": "fda740fe1a9d2b65c2f061f779ba015451466cebd9da2141c691bd6e1dcfaf62"
+              },
+              {
+                "path": "research/github-projects/pypika.md",
+                "sha256": "62ea2ec38e613e979afb335fad1801239612380ce6e61da9b608b63f48371914"
+              },
+              {
+                "path": "research/github-projects/pyrsistent-roadmap-20.md",
+                "sha256": "345a83856cfbf58b2181dbad32d83d5943ac0d58507c9e279751238f2d29e784"
+              },
+              {
+                "path": "research/github-projects/pyrsistent.md",
+                "sha256": "00181607d7a4ac598366284cc9559882c56d6609ee297e0ec41012745c6be0cd"
+              },
+              {
+                "path": "research/github-projects/python-box-roadmap-20.md",
+                "sha256": "bbe7e8702e3cd0a17f6bd000cb4790d850a7b21d9edb4315d607695c8dd8fce3"
+              },
+              {
+                "path": "research/github-projects/python-box.md",
+                "sha256": "7586651ef75a1e1f09ece89f4fc638986159b347d7c572e69e9b6209a774475b"
+              },
+              {
+                "path": "research/github-projects/python-constraint-roadmap-20.md",
+                "sha256": "41a839115fa8a49223931667d81eb5831c7393df1752907ed266644c75814814"
+              },
+              {
+                "path": "research/github-projects/python-constraint.md",
+                "sha256": "06fea8ba3410fbd352e06987eacb674836df6ef79f78967519f4c42140bd3a5a"
+              },
+              {
+                "path": "research/github-projects/python-dateutil-roadmap-20.md",
+                "sha256": "8a3f2aba27acc8cad6224a31bac953f6d0184fbbeee2fa339fcb7800f62a3766"
+              },
+              {
+                "path": "research/github-projects/python-dateutil.md",
+                "sha256": "45e8cd6b56e6f6c317ff852f88183a92c4c19860545c72c8ad170b2add77b9ba"
+              },
+              {
+                "path": "research/github-projects/python-decouple-roadmap-20.md",
+                "sha256": "741cbdc29f6d491e53c9770804f9c7a8de95c15cc57dab2e3abc1fd0c62820fb"
+              },
+              {
+                "path": "research/github-projects/python-decouple.md",
+                "sha256": "aba0a8d2b66b411827e139b5dd79f4ad9333dbd1c0cd5a3dd72dff42197c92e4"
+              },
+              {
+                "path": "research/github-projects/python-docx-roadmap-20.md",
+                "sha256": "1ca89a49bc7c97949d0b509091cc2174c0db029e55d97d257a93369cc6080163"
+              },
+              {
+                "path": "research/github-projects/python-docx.md",
+                "sha256": "ce76348dd8b37a018b1330696e60ac56c39a232f852109cd6e3a8d95797e7aeb"
+              },
+              {
+                "path": "research/github-projects/python-dotenv-roadmap-20.md",
+                "sha256": "1698d729885a67899b1f6d2d2cf3baa3c0c7e7d12f0a234e58ee81049a4b8893"
+              },
+              {
+                "path": "research/github-projects/python-dotenv.md",
+                "sha256": "a13321aab596fcd361023741b6dc66b8ad9c685a6f994e95f13efaf1d727f2ac"
+              },
+              {
+                "path": "research/github-projects/python-frontmatter-roadmap-20.md",
+                "sha256": "4b855751aa3b8f89582631259c43ca23c6bd905b2ec49c4503f0eb92afa53b1d"
+              },
+              {
+                "path": "research/github-projects/python-frontmatter.md",
+                "sha256": "e06db117c8d6c1315b67416cf30508bc05aa8a568183eca8621b2af9a776ec93"
+              },
+              {
+                "path": "research/github-projects/python-liquid-roadmap-20.md",
+                "sha256": "a365873c9149f778c39056da5875419f96403b288ae147136c9a709b925f2396"
+              },
+              {
+                "path": "research/github-projects/python-liquid.md",
+                "sha256": "d394300622f10ef4269def3c5ec229b15062d70840ea131e113fb1336a846a50"
+              },
+              {
+                "path": "research/github-projects/python-markdown-roadmap-20.md",
+                "sha256": "1822a95cb209607b7c9892b23df31cf48cddf1586a23194d88b6a8f5fc2b6857"
+              },
+              {
+                "path": "research/github-projects/python-markdown.md",
+                "sha256": "3de9ce6ad526196d8965d643bbf495669edb4a041b4e41a9ac75af2ed0bf3cb3"
+              },
+              {
+                "path": "research/github-projects/python-pptx-roadmap-20.md",
+                "sha256": "12388b1689a650fde8041ce9bd851c1b47775da4512168ce33f25c2871096a6b"
+              },
+              {
+                "path": "research/github-projects/python-pptx.md",
+                "sha256": "bcfd867172641b5b7b36a547a35db3525fe26019c53189118b1c56da4a9e2f4d"
+              },
+              {
+                "path": "research/github-projects/python-statemachine-roadmap-20.md",
+                "sha256": "0c646af7ad8758513413111d54e8320bce3bc014bbf31acc7f34a5be76de61a4"
+              },
+              {
+                "path": "research/github-projects/python-statemachine.md",
+                "sha256": "fe2773379b0eab9c8b342e728d674ebbe2ecc663a0822bf6c0c12bb3bcbdbaa7"
+              },
+              {
+                "path": "research/github-projects/pyyaml-roadmap-20.md",
+                "sha256": "df037bf5e26bfde6d923620f225acb9c5977497e293990ed92e598a08409153b"
+              },
+              {
+                "path": "research/github-projects/pyyaml.md",
+                "sha256": "f131bcc65d70b74b2d13bad1e8cec9b9cbeb850175a7f11cf4c0760bd63abd99"
+              },
+              {
+                "path": "research/github-projects/rich-roadmap-20.md",
+                "sha256": "cdf15c887bb13de612aa99e6eda9b4fd88e6f41d9e461eef4fbe7bf6368bbce2"
+              },
+              {
+                "path": "research/github-projects/rich.md",
+                "sha256": "65eb584bda1d82e05af9fa1b63c192b5c2afb5e0f142d21dbac5937391987209"
+              },
+              {
+                "path": "research/github-projects/schedule-roadmap-20.md",
+                "sha256": "0c251a4a31b4c0fda789edcd88c53ea893782b723d0d458bd8956484269cbdbb"
+              },
+              {
+                "path": "research/github-projects/schedule.md",
+                "sha256": "d0f73bfaa2f62796eebe9b9061427f6b685aa14cd8b79de449381468a8cff6ee"
+              },
+              {
+                "path": "research/github-projects/simplejson-roadmap-20.md",
+                "sha256": "b1b111312467090587c96405f1e0b8e6c56c824d7713854e827beb1e83e840d9"
+              },
+              {
+                "path": "research/github-projects/simplejson.md",
+                "sha256": "06cdb4c0feb74fddbaac0c2c37a00b007e5341d19d23323c3f9c88d9ee73c602"
+              },
+              {
+                "path": "research/github-projects/sortedcontainers-roadmap-20.md",
+                "sha256": "44eafd2ab61ea5994c5956355aedf34da1c7b9ccd9621a3ec54a4ddd8a0cf2d5"
+              },
+              {
+                "path": "research/github-projects/sortedcontainers.md",
+                "sha256": "7a76357ebbdb98090894e28969c32985a805076a9ac8914cdcbe38bd41fe7d29"
+              },
+              {
+                "path": "research/github-projects/sqlglot-roadmap-20.md",
+                "sha256": "171855f77f3fcbdb0e8e2a4d280df1434b68324d1570130521f2770e70bdd2c7"
+              },
+              {
+                "path": "research/github-projects/sqlglot.md",
+                "sha256": "ef7d8bf44f1215449368d3f99fe1412349db6a8b5cb25e04739a5fc79a8e1718"
+              },
+              {
+                "path": "research/github-projects/sqlite-utils-roadmap-20.md",
+                "sha256": "e284ac9b1fc775aa162736f34a326fd9146461e7bbbcf926a68c78923bd1b8ac"
+              },
+              {
+                "path": "research/github-projects/sqlite-utils.md",
+                "sha256": "5faf0b1d2987e35777a78e5c9f28faa1cd3e4555115007436a55134cf65ad7d1"
+              },
+              {
+                "path": "research/github-projects/sqlparse-roadmap-20.md",
+                "sha256": "e06a24ae5564035f065d151f07c3c20ea0570fe8eb4554adedaf41629c7c890e"
+              },
+              {
+                "path": "research/github-projects/sqlparse.md",
+                "sha256": "610d966864e67e805640985da3b050ee452a87a0a12d9c4430f1d47b9b93f4e2"
+              },
+              {
+                "path": "research/github-projects/structlog-roadmap-20.md",
+                "sha256": "9321b2456b4a25090f205158126dbdd99c7cfe7c191411b9e7ee4332308c5819"
+              },
+              {
+                "path": "research/github-projects/structlog.md",
+                "sha256": "e1d01869a395a3db666595e0c0b8e3578ff2239dbf89ff673172c6833f40cca7"
+              },
+              {
+                "path": "research/github-projects/tablib-roadmap-20.md",
+                "sha256": "25b292cdc18955f23e382cc4cea1d9cf882b843a368cf636b45027b8567d87cb"
+              },
+              {
+                "path": "research/github-projects/tablib.md",
+                "sha256": "301ff9028a25a1d411b83d8f09baf9341834f200178983c28ddf13b25d435af6"
+              },
+              {
+                "path": "research/github-projects/tabulate-roadmap-20.md",
+                "sha256": "947ca3a94ac6f3291f3ce63b6e545bd63882f6642e6d8bf9998032f765e931a6"
+              },
+              {
+                "path": "research/github-projects/tabulate.md",
+                "sha256": "3acb6785eb7d3ce566ae9d2aaa7d79984febe76c296686e7a04b7a87f9a79943"
+              },
+              {
+                "path": "research/github-projects/tenacity-roadmap-20.md",
+                "sha256": "58441d81f09245b6613996929bdf9227f620f004c7bc97ee64ce4ddd07180aa5"
+              },
+              {
+                "path": "research/github-projects/tenacity.md",
+                "sha256": "65ba757990cc05cb7f0336703ad980dcb911173803a5cca4b79283d9a1678402"
+              },
+              {
+                "path": "research/github-projects/textdistance-roadmap-20.md",
+                "sha256": "bae80d88ebd48a28864184c8ef9bd5eb5de5f9293415dc391f1dc258687a61da"
+              },
+              {
+                "path": "research/github-projects/textdistance.md",
+                "sha256": "21006648ab36a6f6efc50a07a33593dd5e47a6adb530c5352a6610bb4a3654b1"
+              },
+              {
+                "path": "research/github-projects/thefuzz.md",
+                "sha256": "4b46b3944d8bc57c7bdb5885698ea4bf05ed6529ea9afcc621e87589814860c8"
+              },
+              {
+                "path": "research/github-projects/tinydb-roadmap-20.md",
+                "sha256": "6846fe012aff4d86afa5fca6698c4d38d6cf03af682a5932485e37008760be2c"
+              },
+              {
+                "path": "research/github-projects/tinydb.md",
+                "sha256": "b9a106b227ea49f63a4e53dee00848784c42870939e0a90b922948f0605c5f84"
+              },
+              {
+                "path": "research/github-projects/tomli-w.md",
+                "sha256": "605ce3e75b6594f8f6b3de5ced3925ae9da70c8827a7f4324abf286725463aa2"
+              },
+              {
+                "path": "research/github-projects/tomlkit-roadmap-20.md",
+                "sha256": "b1265ab6db10758e6d02090427b4140f181b11375548a11c5bdb5d125a28ce29"
+              },
+              {
+                "path": "research/github-projects/tomlkit.md",
+                "sha256": "acc3e6c3eeec5f5db067be9796d48e1c346549ad6b115fcfad4bfc86be3a1473"
+              },
+              {
+                "path": "research/github-projects/toolz-roadmap-20.md",
+                "sha256": "5ef4cf7d53f1a2119df8961586e6b040ed57517b532f9e1bca56f36466856015"
+              },
+              {
+                "path": "research/github-projects/toolz.md",
+                "sha256": "0d50aad4e9445e17a1e5bbcb3778dceec6e1f01f72d094dc8026ab316a5ef829"
+              },
+              {
+                "path": "research/github-projects/tqdm-roadmap-20.md",
+                "sha256": "1b51aea15004ce460a4e87c4e1ef710aa707a8c203c447f573518359bb62cc31"
+              },
+              {
+                "path": "research/github-projects/tqdm.md",
+                "sha256": "613b130ff5c9c95ee2e7d4defaba755f7fc6e1b3cbc9cdb186ee17ef371c4332"
+              },
+              {
+                "path": "research/github-projects/transitions-roadmap-20.md",
+                "sha256": "4747ca8bd4dc2fe4d6de008c766ac69af91b8f427ba2965efe365ec2e51dc921"
+              },
+              {
+                "path": "research/github-projects/transitions.md",
+                "sha256": "ae6a15cefccccaa6e57f55413ae4ef654fcbc1b3ac0c4fb36b757f2738df4747"
+              },
+              {
+                "path": "research/github-projects/treelib-roadmap-20.md",
+                "sha256": "2690159a1f80bb26945511dbb8382b599acdaaad2deb04db3b4d7f60eec185ed"
+              },
+              {
+                "path": "research/github-projects/treelib.md",
+                "sha256": "e834b493f568259a8f3440ddea3f400e62acb9cf0ba338ec48eb68ec7b077721"
+              },
+              {
+                "path": "research/github-projects/typer-roadmap-20.md",
+                "sha256": "edae1e223b5e49974d3d201d5a92c00fd574ea58d719d54a7d4b9f76bb5beaec"
+              },
+              {
+                "path": "research/github-projects/typer.md",
+                "sha256": "8d40b968ac19f73f63045edaf74ac26e2f4db3934dcbafd9bfc76891507253f5"
+              },
+              {
+                "path": "research/github-projects/webcolors-roadmap-20.md",
+                "sha256": "8aef586a39d99067f69957584483b46876665408733054dbd3d53f51c966e131"
+              },
+              {
+                "path": "research/github-projects/webcolors.md",
+                "sha256": "583ac1acfa7658f05652c126d1f482d8404a8be25132370d5b3d9ed02495bd9e"
+              },
+              {
+                "path": "research/github-projects/werkzeug-roadmap-20.md",
+                "sha256": "47595df123f1d9787618cd4000a852163db4e4296b4ad46df511a53aae2f67d8"
+              },
+              {
+                "path": "research/github-projects/werkzeug.md",
+                "sha256": "35f085bdca232a8bddbb4494f6f7e09263bd851097141195371cca68f6fbbde6"
+              },
+              {
+                "path": "research/github-projects/wrapt-roadmap-20.md",
+                "sha256": "6c72203b3e035dbf2a870794c3e9f4a8e6fd89a079833d87b3c57337a87c63ad"
+              },
+              {
+                "path": "research/github-projects/wrapt.md",
+                "sha256": "48987fba4a237444e2ddf92fc81807a4d2abf533319e318926317f2a81eebe31"
+              },
+              {
+                "path": "research/github-projects/wtforms-roadmap-20.md",
+                "sha256": "368c8a33484447aff3254fda95907df5dba0769f2b89af5250f3fb5bb8a0c3b7"
+              },
+              {
+                "path": "research/github-projects/wtforms.md",
+                "sha256": "171af02188d1424b8bc66395fbf9e202d1397c0bab36bc6a56c82b11acda9af3"
+              },
+              {
+                "path": "research/github-projects/xlsxwriter-roadmap-20.md",
+                "sha256": "5615da1af72a15ddb7a5b701a0f0ef0d4ff86ac15995f7ed8f3e69b4844bf999"
+              },
+              {
+                "path": "research/github-projects/xlsxwriter.md",
+                "sha256": "72cb2837828a4188a253aa5df9fc4f73efe085bf58fdb3297c8abf4302e45c21"
+              },
+              {
+                "path": "research/github-projects/xmltodict-roadmap-20.md",
+                "sha256": "892c41fc6242e740dde5f4ce001551a10556bff8912976a6e1afce319aa3034a"
+              },
+              {
+                "path": "research/github-projects/xmltodict.md",
+                "sha256": "9c0388d169478fa7eaa9044647d8795c10d4459b76a72b7d0fea6253f4927b42"
+              }
+            ],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "1b3d25304ff546c08737f5a5984e62cd8362d147167aa5959976cd7fa8b4f9e4"
+          },
+          {
+            "root": "cc2api",
+            "head": "541b9cb9add340c27ed8408fea9754e8280fc510",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "956b8c7455caf53cc7c2cac9580f0a5bf85af8038009e2ef2e01c50be1f2d66d"
+          }
+        ],
+        "fingerprint": "e723b24f31448fed07bfca35c02409eec2e1cd7e9a0f318e9dd9023dedeea4f2"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "接入 TinyDB、Jinja、schedule 三项目真实内容及离线环境，目录达到6项目／26场景／57任务",
+      "完成原生业务与冻结完整上游回归，47项定向及相关测试通过",
+      "完成66条模拟路径、1074项独立机制审计及790项页面检查",
+      "完成全面检查与项目准入规范同步",
+      "按确认范围完成业务内容提交与推送"
+    ],
+    "partialStep": null,
+    "nextStep": "由母任务继续规划后续项目扩容；实际部署和真实模型验证另按授权推进",
+    "notes": "本次仅完成首批三项目子任务；母任务十项目目标仍未完成。真实模型与OAuth调用为零，未部署；277个计划外文件保持原样。",
+    "updatedAt": "2026-10-21T16:14:40Z"
+  }
+}

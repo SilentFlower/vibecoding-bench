@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/project-iterations.md", "reason": "内容schema2、独立原生验收、英文指令中文投影、真实项目逐仓准入与计数契约"}
+{"file": ".trellis/tasks/10-21-project-catalog-pilot-pack/research/integration-contracts.md", "reason": "已核对的实际类/字段、Jinja src布局缺口、离线资源和不可混同的证据层次"}
+{"file": ".trellis/tasks/10-21-project-catalog-expansion/research/data-candidates.md", "reason": "TinyDB四场景十二任务、官方来源及两项原版缺陷与正常对照"}
+{"file": ".trellis/tasks/10-21-project-catalog-expansion/research/document-candidates.md", "reason": "Jinja四场景十二任务、src导入、两个过滤器目标与语义/程序边界"}
+{"file": ".trellis/tasks/10-21-project-catalog-expansion/research/operations-candidates.md", "reason": "schedule五场景十三任务、真实业务假时钟与独立场景依赖限制"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "显式导入、原缩进、中文注释、锁与IO及验证的基础规范；具体准入以项目场景契约为准"}
