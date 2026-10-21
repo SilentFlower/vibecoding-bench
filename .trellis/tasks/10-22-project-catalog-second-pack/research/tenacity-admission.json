@@ -1,0 +1,2271 @@
+{
+  "status": "native_admission_passed_integration_pending",
+  "project": "tenacity",
+  "source": {
+    "repository": "https://github.com/jd/tenacity",
+    "commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+    "files": [
+      {
+        "path": ".editorconfig",
+        "git_mode": "100644",
+        "git_blob": "ce78f355a6d67679c566af0bb8c626914e9626e4",
+        "sha256": "13468ca7f59876c373ddd0f0248c1aed25350536391c862fc349ad1c66ce4701",
+        "bytes": 294
+      },
+      {
+        "path": ".github/dependabot.yml",
+        "git_mode": "100644",
+        "git_blob": "33bd1883bf2dbbc5ef4e1e58e3b043fca36424eb",
+        "sha256": "5a1a844be1bfe960c7be72766891cfd97ac87bff10e3cd8b748b1ea8592abe76",
+        "bytes": 515
+      },
+      {
+        "path": ".github/workflows/ci.yaml",
+        "git_mode": "100644",
+        "git_blob": "f6b95d2a5f66005bbfb2f290e2866a158c582082",
+        "sha256": "78950d50f0a4929b334ed04db07a66a15164b9152f66617f91b2fb833eeb6d24",
+        "bytes": 2054
+      },
+      {
+        "path": ".github/workflows/release.yml",
+        "git_mode": "100644",
+        "git_blob": "f1fec3ca682fc1d5de47f431c0a996f968b5905f",
+        "sha256": "d56683dcdbe45e016e986d5de075bf100a0cbf43e3361bb10fba668cc434eabd",
+        "bytes": 520
+      },
+      {
+        "path": ".gitignore",
+        "git_mode": "100644",
+        "git_blob": "3c966caafcf1dd04ea45b40b07238d1c0785f02c",
+        "sha256": "69e265b2d81ce8c561acff456e4b4735ecafe5da1311316e23435a28b6c112e7",
+        "bytes": 115
+      },
+      {
+        "path": ".mergify.yml",
+        "git_mode": "100644",
+        "git_blob": "abc759d6e87ac0b03a2a8b02b420edbb3015f8ac",
+        "sha256": "6ee0b01179a1b0f511ee7ae9dc7315eb8d8a823e425efdf5626214dbee8032f8",
+        "bytes": 152
+      },
+      {
+        "path": ".readthedocs.yml",
+        "git_mode": "100644",
+        "git_blob": "1ab90f14c6b870b89196be89dd92e8347926d42c",
+        "sha256": "d93fc9a2a8196a7902dfe3ca0cf9b1ee813f377dd00d6c8ab141f89e1108f141",
+        "bytes": 156
+      },
+      {
+        "path": "LICENSE",
+        "git_mode": "100644",
+        "git_blob": "7a4a3ea2424c09fbe48d455aed1eaa94d9124835",
+        "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+        "bytes": 11357
+      },
+      {
+        "path": "README.rst",
+        "git_mode": "120000",
+        "git_blob": "c560c7886d9e6f283a4cb0d1d56acc242d85e3f7",
+        "sha256": "1e3ed06e90fe3bf5ecf311ac1bd22215144cfc8c0924f5e05e3394573d630ceb",
+        "bytes": 20,
+        "representation": "regular-git-link-blob",
+        "original_target": "doc/source/index.rst"
+      },
+      {
+        "path": "doc/source/api.rst",
+        "git_mode": "100644",
+        "git_blob": "7a80c4e7187860b081fe91c8b593f8a7f45f8580",
+        "sha256": "a223cb1023901ec66b094b12989b790d6f07cfc8eb690492995b8410f3458b19",
+        "bytes": 1543
+      },
+      {
+        "path": "doc/source/changelog.rst",
+        "git_mode": "100644",
+        "git_blob": "3c222360ec92b01ea02f38e09a34b5a6bd5ba49e",
+        "sha256": "17899cd8e06aeafb4249e43e1abe50009240e4319fd51803bd3dcc8cd9136a3d",
+        "bytes": 40
+      },
+      {
+        "path": "doc/source/conf.py",
+        "git_mode": "100644",
+        "git_blob": "a0de6991a7a9706aa56ecf00d3878b872fded456",
+        "sha256": "9024f66fdda54fa518f2825280eb104771b5a25790db8f7ccdacc38a1c458fc1",
+        "bytes": 937
+      },
+      {
+        "path": "doc/source/index.rst",
+        "git_mode": "100644",
+        "git_blob": "45e882b1406c7d29ed92a63bf8a8d453ddef1e65",
+        "sha256": "3ac09ac0699d02e9826f5d1efa6ef1d8d9e6017e4faa41d8bea1c081f0bfecf2",
+        "bytes": 21731
+      },
+      {
+        "path": "pyproject.toml",
+        "git_mode": "100644",
+        "git_blob": "35e5baab78b8fe625de6385dfc543c471d345137",
+        "sha256": "cf218fa7144ebaa4e1d69f7ffc1cbbbd6f28e136e0708908682717a9548ae941",
+        "bytes": 4126
+      },
+      {
+        "path": "releasenotes/notes/Fix-tests-for-typeguard-3.x-6eebfea546b6207e.yaml",
+        "git_mode": "100644",
+        "git_blob": "9688c3d494ab4dffd0a00286661f326f6dcb7f5f",
+        "sha256": "90a3b4d1c9d8e348a81eea6f7569a90279fc9aba1d51c63d77311e28f3269133",
+        "bytes": 56
+      },
+      {
+        "path": "releasenotes/notes/Use--for-formatting-and-validate-using-black-39ec9d57d4691778.yaml",
+        "git_mode": "100644",
+        "git_blob": "188dc8da3e7f3e8ae229975186225fff5523990f",
+        "sha256": "434fb6d1a6b7d5275b6c88e4c86ba351e7056bd70c949a25f466cdc15a098d74",
+        "bytes": 165
+      },
+      {
+        "path": "releasenotes/notes/add-async-actions-b249c527d99723bb.yaml",
+        "git_mode": "100644",
+        "git_blob": "096a24f260a15216b1f0807c5d2cdbb7b8f64d01",
+        "sha256": "d77ad484c3c9a67acad2704159d8e9512b8f8f3012aaac95305e1a9a34baa434",
+        "bytes": 158
+      },
+      {
+        "path": "releasenotes/notes/add-re-pattern-to-match-types-6a4c1d9e64e2a5e1.yaml",
+        "git_mode": "100644",
+        "git_blob": "c71ffd98459d0e99efdfbf3886f4a4f2a7c5f8e5",
+        "sha256": "995c192ed4d52ee28c1b0249267b697368ac5ecb78421add60e779b041c02422",
+        "bytes": 64
+      },
+      {
+        "path": "releasenotes/notes/add-reno-d1ab5710f272650a.yaml",
+        "git_mode": "100644",
+        "git_blob": "6d0d1ab8f01474d642e53d07adb4e5c17c9b2be9",
+        "sha256": "94303ff8c6ce5e3cab87db7d443c9f9f446ff04a0a76b8736cbe5213f369e82b",
+        "bytes": 46
+      },
+      {
+        "path": "releasenotes/notes/add-retry_except_exception_type-31b31da1924d55f4.yaml",
+        "git_mode": "100644",
+        "git_blob": "bd89f84dd5305821ef528d516a706fededddd693",
+        "sha256": "e38086a44543f0714f641b9d28f1576bf6b3cd37aa39613cf6fc615665059a86",
+        "bytes": 131
+      },
+      {
+        "path": "releasenotes/notes/add-stop-before-delay-a775f88ac872c923.yaml",
+        "git_mode": "100644",
+        "git_blob": "85df4c3d4d085ba7879119d0bd39bf8f0ec92848",
+        "sha256": "ad848f00849809fce27524d961f4960e547bbf83b81e9a16e99e72ae7ecef263",
+        "bytes": 364
+      },
+      {
+        "path": "releasenotes/notes/add-test-extra-55e869261b03e56d.yaml",
+        "git_mode": "100644",
+        "git_blob": "968da1f34d0305ed418385b6bb16159f99bb042a",
+        "sha256": "3aaa610839fe50f2b0db3db3c48d5317ec357a9fc466841251c4597ecb0902fd",
+        "bytes": 36
+      },
+      {
+        "path": "releasenotes/notes/add_omitted_modules_to_import_all-2ab282f20a2c22f7.yaml",
+        "git_mode": "100644",
+        "git_blob": "cfcae1f64291d80044ebe9b6b7b3565061f452de",
+        "sha256": "a91b70a3c25b995842f2646a31f26015cb8b24d3289eaa62eee326266de43d6d",
+        "bytes": 101
+      },
+      {
+        "path": "releasenotes/notes/add_retry_if_exception_cause_type-d16b918ace4ae0ad.yaml",
+        "git_mode": "100644",
+        "git_blob": "8b5a420fe8b4abcea5b5fd0a872048fd57ffe6cc",
+        "sha256": "7340d9a0477a4502509e7b4d3a4a406d05c142e1411fb4f9122e2fa99b94e8eb",
+        "bytes": 189
+      },
+      {
+        "path": "releasenotes/notes/added_a_link_to_documentation-eefaf8f074b539f8.yaml",
+        "git_mode": "100644",
+        "git_blob": "381ddc4a4d0e7b54ffe84837274d429f2a6f250c",
+        "sha256": "30620ef7d05043aeff114b40ad02dcf83b0f84ec112400ecf1b8347c54ec2f6e",
+        "bytes": 150
+      },
+      {
+        "path": "releasenotes/notes/after_log-50f4d73b24ce9203.yaml",
+        "git_mode": "100644",
+        "git_blob": "b8023e11d2535bf2df9ec4222141430cce48a954",
+        "sha256": "dd8e04d15e5f90a94c038c6be17faadc82c818fc10dec0d9af7e701327e8250e",
+        "bytes": 92
+      },
+      {
+        "path": "releasenotes/notes/allow-mocking-of-nap-sleep-6679c50e702446f1.yaml",
+        "git_mode": "100644",
+        "git_blob": "0a996e4f44898ea3dad1e4f990d1de96a9dca5aa",
+        "sha256": "cd9f23bac3fefde9e1349fa0f068c987a81975de538a0ce39db8fa0f96de3cb1",
+        "bytes": 95
+      },
+      {
+        "path": "releasenotes/notes/annotate_code-197b93130df14042.yaml",
+        "git_mode": "100644",
+        "git_blob": "faf41635ac667e625e570e25b72251f2f60a1695",
+        "sha256": "2b7837f69eeb7f1065fbc8d6aa1c1f0a02af4d24f942f29c171b6b5f912f9ca7",
+        "bytes": 61
+      },
+      {
+        "path": "releasenotes/notes/async-sleep-retrying-32de5866f5d041.yaml",
+        "git_mode": "100644",
+        "git_blob": "0ffe819f7af11aef68c0ec12e935481a3d90585f",
+        "sha256": "fb2692ec83302460e6c793209e801010bc865ac5b2c4d6f37b5b6173f212268b",
+        "bytes": 290
+      },
+      {
+        "path": "releasenotes/notes/before_sleep_log-improvements-d8149274dfb37d7c.yaml",
+        "git_mode": "100644",
+        "git_blob": "b8d16ee636d25b5953475083207504e672ea657a",
+        "sha256": "55ae14daa43b040879e16953a35f377ea76a8b83c621d203423067e97b95a38e",
+        "bytes": 84
+      },
+      {
+        "path": "releasenotes/notes/clarify-reraise-option-6829667eacf4f599.yaml",
+        "git_mode": "100644",
+        "git_blob": "31be83501e56d05dd358dc0d482e6afcddfd931f",
+        "sha256": "764b9da1eb752a612697b2bcff934773df34b51562f639db6b5feb8ec22cdecd",
+        "bytes": 63
+      },
+      {
+        "path": "releasenotes/notes/dependabot-for-github-actions-4d2464f3c0928463.yaml",
+        "git_mode": "100644",
+        "git_blob": "278df6caa16af26c8f1420db3edb6b5a481bd507",
+        "sha256": "5993db8f973108f383d4081db9c30c39b79c52bfa41c2ebd54cdf55bf9fde64d",
+        "bytes": 127
+      },
+      {
+        "path": "releasenotes/notes/deprecate-initial-for-multiplier-c7b4e2d9f1a83065.yaml",
+        "git_mode": "100644",
+        "git_blob": "e55885486484d83f59096608aa580fbbe811d860",
+        "sha256": "fe0f2e8e44420a6e69c153a4e056fffd61e207ee9e5626a3a53298ce3799bf69",
+        "bytes": 369
+      },
+      {
+        "path": "releasenotes/notes/do_not_package_tests-fe5ac61940b0a5ed.yaml",
+        "git_mode": "100644",
+        "git_blob": "ec8da2ca6cb806dd8504b55a778911bb64502e31",
+        "sha256": "8d7570c217f84b8753f93b88555741336a2b19b5aec1f656d153487a84c2346e",
+        "bytes": 51
+      },
+      {
+        "path": "releasenotes/notes/docs-asyncio-getaddrinfo-b8a1e40370dc.yaml",
+        "git_mode": "100644",
+        "git_blob": "f95db11e8f4bbff6a902d4946cfff0c8d515e32d",
+        "sha256": "f24ffa7d9e408a158160b332057912cfcc9c219e5240eb53cfbaf541ba519057",
+        "bytes": 148
+      },
+      {
+        "path": "releasenotes/notes/docs-retry-with-statistics-a713ed405a19.yaml",
+        "git_mode": "100644",
+        "git_blob": "cc6e85df00a2e3ce65ce315239cc89ca780e2f31",
+        "sha256": "4dbc704f065dda9e7d377b131f0732b4ec1910ebcf4a2ead146131732f767219",
+        "bytes": 120
+      },
+      {
+        "path": "releasenotes/notes/drop-deprecated-python-versions-69a05cb2e0f1034c.yaml",
+        "git_mode": "100644",
+        "git_blob": "ca370f069b8849ca161a19c802685403ea30c405",
+        "sha256": "17d37b043719c4b61b2044188784fa207dce910f8dd65c548ab5df275e25c21d",
+        "bytes": 79
+      },
+      {
+        "path": "releasenotes/notes/drop-python-3.9-ecfa2d7db9773e96.yaml",
+        "git_mode": "100644",
+        "git_blob": "ac2a8cfdadbfd7c7b8b24d756e95251efb5a1584",
+        "sha256": "14f547678fb73548b971428ff13a38d1ab95255b0b9bb008117e5e360ca0730f",
+        "bytes": 140
+      },
+      {
+        "path": "releasenotes/notes/drop_deprecated-7ea90b212509b082.yaml",
+        "git_mode": "100644",
+        "git_blob": "888233ce0cb12bf049cb872b8917796dc2ac4a25",
+        "sha256": "303167653efe0487d2b8909e0a2b203614101cf0d82174100bce19cd49072fe6",
+        "bytes": 274
+      },
+      {
+        "path": "releasenotes/notes/export-convenience-symbols-981d9611c8b754f3.yaml",
+        "git_mode": "100644",
+        "git_blob": "aa9909707a6e3716af2d545ebdd026b7ba172886",
+        "sha256": "0a3f1287e3b0379687f979c20473db9ae4c4d7954022f9e5b48b3a495df93686",
+        "bytes": 82
+      },
+      {
+        "path": "releasenotes/notes/falsy-callable-wait-3c1e7d2a9b5f4e60.yaml",
+        "git_mode": "100644",
+        "git_blob": "54899198380704cb7cad0f0a49990cf869ab72d8",
+        "sha256": "68116b05dc850cb00a6fe1af712af4509667046414bd852249dac74fb4c108a4",
+        "bytes": 214
+      },
+      {
+        "path": "releasenotes/notes/fix-async-loop-with-result-f68e913ccb425aca.yaml",
+        "git_mode": "100644",
+        "git_blob": "73a58aa820c4b4e98d75a2b9b2e1fc0da80747d5",
+        "sha256": "7bef0db99e0f782e2d16d4f0e0988ba08a5245884ca2419f6d5eea4090eb8930",
+        "bytes": 87
+      },
+      {
+        "path": "releasenotes/notes/fix-async-retry-type-overloads-27f3e0c239ed6b.yaml",
+        "git_mode": "100644",
+        "git_blob": "c5127669f609157347ddaa609fd91b0ac25fbbc8",
+        "sha256": "655d7cc66a8450b8d45be0ab7c763371813285fab1527527a00fabd505c710cb",
+        "bytes": 428
+      },
+      {
+        "path": "releasenotes/notes/fix-decorated-method-binding-729ace6e58a9fefa.yaml",
+        "git_mode": "100644",
+        "git_blob": "3ca08deeb78a2608650b472763c1bdfeebd26eee",
+        "sha256": "56e5c9201fabac2f3a763159e756b18f5ba424e59059e6c70dfa20c1ec04b00b",
+        "bytes": 559
+      },
+      {
+        "path": "releasenotes/notes/fix-exception-message-empty-string-7b1e9c4a2f6d0835.yaml",
+        "git_mode": "100644",
+        "git_blob": "38a6f3bb3b395f20f846fb59a1af08cc8ae0d3c6",
+        "sha256": "5643c99f6352197d557ff0457a1a0feb48cde70f49f29e7a9f95c07de37265f9",
+        "bytes": 428
+      },
+      {
+        "path": "releasenotes/notes/fix-exponential-max-computation-526.yaml",
+        "git_mode": "100644",
+        "git_blob": "7f2138b417c641d886e5111f4bd2bb137f843fd1",
+        "sha256": "e4754af72e67037598dcc0b8b9467b9fe262e3b256aabb66f53370461a7ebb0b",
+        "bytes": 137
+      },
+      {
+        "path": "releasenotes/notes/fix-exponential-multiplier-underflow-4fd1d6d6b9c8e2a1.yaml",
+        "git_mode": "100644",
+        "git_blob": "dc350cff9f01210d8a57e4e148e4b931373118cd",
+        "sha256": "79ce10c2de8ca620a0bb8a9d7ab217c1c3eb9cf30bc845e2a028e41cb6b9c867",
+        "bytes": 166
+      },
+      {
+        "path": "releasenotes/notes/fix-falsy-wait-regression-3b7e91c4a5d20f68.yaml",
+        "git_mode": "100644",
+        "git_blob": "fa480eef37ee390858c91958cb7752e17a86e402",
+        "sha256": "6233d015c39befc06819cb443f8ee8fb402ff6b3cf51511ce12e2d3add048dd6",
+        "bytes": 788
+      },
+      {
+        "path": "releasenotes/notes/fix-local-context-overwrite-94190ba06a481631.yaml",
+        "git_mode": "100644",
+        "git_blob": "ff2ba7ee1716facd8ba5cb9ab77f98f7ef1c5517",
+        "sha256": "f19120d42f4cbb1d904d781d1cb01cd37a746b9ef62c6670c19f24e991a07085",
+        "bytes": 89
+      },
+      {
+        "path": "releasenotes/notes/fix-reraise-tryagain-underlying-exc-e21a26ee95bad0b3.yaml",
+        "git_mode": "100644",
+        "git_blob": "ac8f239aaf55218454df171195e5f82062ec8cda",
+        "sha256": "1cf9b68e605d5ac7eb794addd3812c8115399b3759701440881521d70228d0a5",
+        "bytes": 354
+      },
+      {
+        "path": "releasenotes/notes/fix-retry-wrapper-attributes-f7a3a45b8e90f257.yaml",
+        "git_mode": "100644",
+        "git_blob": "967cd29e9ae1005abb0b80fb70764ce3840dae3c",
+        "sha256": "311d7627aae335318ae571aa27717ca82635b62cb57e4c907aa4219cf4806b23",
+        "bytes": 214
+      },
+      {
+        "path": "releasenotes/notes/fix-setuptools-config-3af71aa3592b6948.yaml",
+        "git_mode": "100644",
+        "git_blob": "b8bcc9afff74a40feb441c55ac7e0399d821312a",
+        "sha256": "f2778477a2c556ecf40d4cf6332ad4aa9a5804c617cdb176c37fd97041966c10",
+        "bytes": 99
+      },
+      {
+        "path": "releasenotes/notes/fix-statistics-through-outer-decorator-b8a6d6b9a6a70833.yaml",
+        "git_mode": "100644",
+        "git_blob": "55b34e0136e91f7a0b2567a091b2dbb083b8fdda",
+        "sha256": "09308e1f9009ad83ec47f7eb9e5ff8e328786f56e5c85641baefea1430bb5b4a",
+        "bytes": 387
+      },
+      {
+        "path": "releasenotes/notes/fix-tornado-global-desync-8c2d40fa71b9e35a.yaml",
+        "git_mode": "100644",
+        "git_blob": "c5a19e539f5e087f90dff3ad188d6f1e2071c973",
+        "sha256": "f5daca67bca80b2e9ab92300a89fee506d8bf14453a526d74a6de6049648b83a",
+        "bytes": 327
+      },
+      {
+        "path": "releasenotes/notes/fix-wait-chain-empty-strategies-d3a8f7c2b1e4f569.yaml",
+        "git_mode": "100644",
+        "git_blob": "2e61ba5ef178d58bee694895ec393c8be4d51eea",
+        "sha256": "93354538973cf527d70a6ee876ca8ffe7696ff5a13b2a4c4b7e464fa9c91287c",
+        "bytes": 316
+      },
+      {
+        "path": "releasenotes/notes/fix-wait-typing-b26eecdb6cc0a1de.yaml",
+        "git_mode": "100644",
+        "git_blob": "3b560c3b0f947ff337136068213c0b751305c05c",
+        "sha256": "2bd6bcaf1136af1c43c099574b32a4f383930f25137908bff4abeaac2f12fbea",
+        "bytes": 203
+      },
+      {
+        "path": "releasenotes/notes/fix_async-52b6594c8e75c4bc.yaml",
+        "git_mode": "100644",
+        "git_blob": "1ce0b71b81a2ac737abb9cce772680bd9290cf95",
+        "sha256": "f0bbdcea219a825d168981dbb71b4a65e1c11f50a2f3ee14d4dc2f449f153f67",
+        "bytes": 84
+      },
+      {
+        "path": "releasenotes/notes/logging-protocol-a4cf0f786f21e4ee.yaml",
+        "git_mode": "100644",
+        "git_blob": "ad8206dfc9a9cc14b9de940f64c5875b8ee3b35d",
+        "sha256": "edc846fec02963a6b56be9f156538a16179d2e62d49507307287a49e09b4d2d3",
+        "bytes": 105
+      },
+      {
+        "path": "releasenotes/notes/make-logger-more-compatible-5da1ddf1bab77047.yaml",
+        "git_mode": "100644",
+        "git_blob": "4e7c59c0945ba6a288ddbd6fd3085ea1523e5527",
+        "sha256": "d5e8606c2c46c9b6dc7d2daf9e0f2ea8d49e7371fc7d9d8de7ae8b5cc55a8a0f",
+        "bytes": 127
+      },
+      {
+        "path": "releasenotes/notes/no-async-iter-6132a42e52348a75.yaml",
+        "git_mode": "100644",
+        "git_blob": "7a92c1b510a7bbb0eec07bcab73a9747a32ce459",
+        "sha256": "2016e6c35673fc497409f1956670daa5720dd0e6683ce6539e6bb34a13169799",
+        "bytes": 264
+      },
+      {
+        "path": "releasenotes/notes/pr320-py3-only-wheel-tag.yaml",
+        "git_mode": "100644",
+        "git_blob": "e85f85f0ff26d0bbdbd533f6abb00f895dbc0869",
+        "sha256": "605da93d45f86f8485164680f6ba75cc132ccb5ca63c854a19a33d24831fc45f",
+        "bytes": 125
+      },
+      {
+        "path": "releasenotes/notes/py36_plus-c425fb3aa17c6682.yaml",
+        "git_mode": "100644",
+        "git_blob": "7e6f59480c7373ae5d80347da99801ad540b7334",
+        "sha256": "039ba88f2c0e0e30347867109f72ca1a69e59eb2e1aebadbb592b93a0a3d7730",
+        "bytes": 99
+      },
+      {
+        "path": "releasenotes/notes/pypi-description-6ec0eae827f64adc.yaml",
+        "git_mode": "100644",
+        "git_blob": "ddfc9b5f08e02a6407beaca8ea29cd0c7234f15e",
+        "sha256": "d1d5f282f60fe3406d419db25d1831b2e5242748381f559b0814fdc627307ca6",
+        "bytes": 168
+      },
+      {
+        "path": "releasenotes/notes/remove-py36-876c0416cf279d15.yaml",
+        "git_mode": "100644",
+        "git_blob": "bfb1164d0e82c3f37375724079d88d7a8d8d0019",
+        "sha256": "055a72b6a1b1623b4b67346fb7a0b49ea4b4e64caae2b5e693da23cc0995d711",
+        "bytes": 65
+      },
+      {
+        "path": "releasenotes/notes/retrycallstate-repr-94947f7b00ee15e1.yaml",
+        "git_mode": "100644",
+        "git_blob": "3f57bf23c5c52e2a49a134602fa4575b2785f1a0",
+        "sha256": "d7c0be0d79579ecb3fce308df3f7f04c5b8acfe8c805ad21a685464972c57ed0",
+        "bytes": 96
+      },
+      {
+        "path": "releasenotes/notes/some-slug-for-preserve-defaults-86682846dfa18005.yaml",
+        "git_mode": "100644",
+        "git_blob": "617953cfb6be727375eb998f69d7923f731ce14d",
+        "sha256": "98484ef387f04c69b1cd33cfa84792b3ab27c0dbe0525fc18cf8decb7bba8b63",
+        "bytes": 86
+      },
+      {
+        "path": "releasenotes/notes/sphinx_define_error-642c9cd5c165d39a.yaml",
+        "git_mode": "100644",
+        "git_blob": "ccef1c0a8837cb25428842b0527a05caeb734fd4",
+        "sha256": "51bea950f5fb6312c6c49695400cb28fb3afe1c5ca4014b63fb5d3a3305b4101",
+        "bytes": 79
+      },
+      {
+        "path": "releasenotes/notes/support-py3.14-14928188cab53b99.yaml",
+        "git_mode": "100644",
+        "git_blob": "3eec60a3a98049d6143c3abe456e131ca6a7a04a",
+        "sha256": "d1af6dfefa91fc2b37bb4273bb54d33fcd665baacf03c004b07d4fa338f5ec31",
+        "bytes": 54
+      },
+      {
+        "path": "releasenotes/notes/support-py3.15-a1ed09aae1bf19b0.yaml",
+        "git_mode": "100644",
+        "git_blob": "bfdc593e6eeb85f06cb8b64e9282416aa5ec31e7",
+        "sha256": "157b254e92b71697a359a5314edd9e235e555515c9c6c1ae5f1e4a8e61c841db",
+        "bytes": 54
+      },
+      {
+        "path": "releasenotes/notes/support-timedelta-wait-unit-type-5ba1e9fc0fe45523.yaml",
+        "git_mode": "100644",
+        "git_blob": "bc7e62dc0ef80d5b1af189ba5e5ccbdabe90d9a9",
+        "sha256": "0579d5f7d1b45c5b32db2aef1772d13fcc123fa76825a98e8f13fddd9c2b58d4",
+        "bytes": 73
+      },
+      {
+        "path": "releasenotes/notes/timedelta-for-stop-ef6bf71b88ce9988.yaml",
+        "git_mode": "100644",
+        "git_blob": "9f792f0a8cfcc012a9551d2e580e610e4da730e0",
+        "sha256": "6ca24f2799fd8e8a85be05ef8df3ba2d061a9496ff9c415901c8f9d59d7f07c7",
+        "bytes": 116
+      },
+      {
+        "path": "releasenotes/notes/trio-support-retry-22bd544800cd1f36.yaml",
+        "git_mode": "100644",
+        "git_blob": "b8e0c1490d5c641dd2cff64e1c530694e6db4672",
+        "sha256": "2cf4ba2e391801900e8e8c3d78aad73d72ecd02c5749b28ff1e42101ff874d66",
+        "bytes": 184
+      },
+      {
+        "path": "releasenotes/notes/wait-exponential-jitter-min-timedelta-a8e3c1f4b7d29e50.yaml",
+        "git_mode": "100644",
+        "git_blob": "38adcbc6ce5e643a683644fa096c8f5c607fd6de",
+        "sha256": "dfffb3ab46683c732c1e0ad17e25b8740364a2fd6c12566e47c338daa63ff6a8",
+        "bytes": 232
+      },
+      {
+        "path": "releasenotes/notes/wait-radd-int-6f1a3c9d84b2e057.yaml",
+        "git_mode": "100644",
+        "git_blob": "50adb97d194bb09c5707c73200a9af7662bc00e5",
+        "sha256": "3d3cb73a9f54cf064381c62a3688b9040395f96b7ae18c7d0d7b9b2fea04226d",
+        "bytes": 382
+      },
+      {
+        "path": "releasenotes/notes/wait-random-exponential-min-2a4b7eed9f002436.yaml",
+        "git_mode": "100644",
+        "git_blob": "34efd1c2cbd353ac445f6ff2f6d741d65320aecd",
+        "sha256": "a420fba71ee329892e9c2acec89c45d9a9cda450b9532672386eec0574897725",
+        "bytes": 70
+      },
+      {
+        "path": "releasenotes/notes/wait_exponential_jitter-6ffc81dddcbaa6d3.yaml",
+        "git_mode": "100644",
+        "git_blob": "870380ca0f5316e1c34163b5a58773e586a6b927",
+        "sha256": "5bd8afb15c6bbad999d827d1f35dd0810e443ebe85f92162d0260805da142503",
+        "bytes": 160
+      },
+      {
+        "path": "reno.yaml",
+        "git_mode": "100644",
+        "git_blob": "15cfd3cd9ac3c9b3ec6ab388a123c90508183102",
+        "sha256": "8eb34cb87752cbdb6d10e2ed24a3d2365651dd9a5c93385c582e4c62e51de5d6",
+        "bytes": 41
+      },
+      {
+        "path": "tenacity/__init__.py",
+        "git_mode": "100644",
+        "git_blob": "89eeca6e2bb8b0c36320e4b497e7e78d530aa64b",
+        "sha256": "9c050f8f59801a5bfb5a1738dd75d4ee544f368481e068268571c266e2b96577",
+        "bytes": 29653
+      },
+      {
+        "path": "tenacity/_utils.py",
+        "git_mode": "100644",
+        "git_blob": "96c9e99f250b27c9e4b2657584dc1ed2bb572d79",
+        "sha256": "6ecccb8012d314f5000d75a5a01a1e3257ab1a3d727a21b457e2c922fbe3e79e",
+        "bytes": 4094
+      },
+      {
+        "path": "tenacity/after.py",
+        "git_mode": "100644",
+        "git_blob": "8e380681801ee908f50ecc7f195c3aa63d0c62ec",
+        "sha256": "7ba2aec841d36f880c998f6f2030695db2f4d9bd0ec858273a7b3443a3b429fa",
+        "bytes": 1516
+      },
+      {
+        "path": "tenacity/asyncio/__init__.py",
+        "git_mode": "100644",
+        "git_blob": "27bd2f8efccbc9746ae268c14f56e1de296902a3",
+        "sha256": "40cfb868e1a035bb3c0d890502585b9f0265cf1c3d07dc62b9cd7007c2fc93cf",
+        "bytes": 9234
+      },
+      {
+        "path": "tenacity/asyncio/retry.py",
+        "git_mode": "100644",
+        "git_blob": "c248070610ca72d0d6a4c91a22645ad03d77edf0",
+        "sha256": "af1d7dc2e951639ad9981ca724b9e484a800d7546d0777edfc2787be6e27310a",
+        "bytes": 4835
+      },
+      {
+        "path": "tenacity/before.py",
+        "git_mode": "100644",
+        "git_blob": "89b867ee8e591bff02fd07138a1536880333e003",
+        "sha256": "7db2c269be3697181f9ed6267a5b58052d58f615fd18a61e02972cbb3dbcc32e",
+        "bytes": 1354
+      },
+      {
+        "path": "tenacity/before_sleep.py",
+        "git_mode": "100644",
+        "git_blob": "13d5656de4912e934385a4cba2aa2ce7b333500d",
+        "sha256": "4679592140a66a2692b2e070ac0e9076c6cc6093effe073bada55497ac1e2f5f",
+        "bytes": 2190
+      },
+      {
+        "path": "tenacity/nap.py",
+        "git_mode": "100644",
+        "git_blob": "44fd94ae359c1900928bb7fe3674571532294524",
+        "sha256": "3cf785c410dd6d4cbf5de5be03e8e9b2a61ef4bb7709c230afe4eff95629be6c",
+        "bytes": 1373
+      },
+      {
+        "path": "tenacity/py.typed",
+        "git_mode": "100644",
+        "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "path": "tenacity/retry.py",
+        "git_mode": "100644",
+        "git_blob": "dc7beab65cbedf62563c1d143cda64255929bf62",
+        "sha256": "04b41b9a78df02c9143a0199ac5437656f680f42a644edde1b7bfad471925e77",
+        "bytes": 10442
+      },
+      {
+        "path": "tenacity/stop.py",
+        "git_mode": "100644",
+        "git_blob": "c1f51ea98b6b02750e09ae2da411e6416e0d384b",
+        "sha256": "bd4b852e18e886fc271da51760c39fe49ff4174f916f07f3565c280f4f2d2c71",
+        "bytes": 4235
+      },
+      {
+        "path": "tenacity/tornadoweb.py",
+        "git_mode": "100644",
+        "git_blob": "717107be79ab967db48cbbc1a1e0e06b8dc4074a",
+        "sha256": "84e90c180d40ed1e96b29c7607bef40b9f9e840f823c3e883a4d32c8efdfa91d",
+        "bytes": 2142
+      },
+      {
+        "path": "tenacity/wait.py",
+        "git_mode": "100644",
+        "git_blob": "6607e4fd94f780a67f827a348e8b8c99c7229134",
+        "sha256": "fab8c53ae00dda64008a70c03654f22e059f3d697c3c8a6029513910fa7179fc",
+        "bytes": 11543
+      },
+      {
+        "path": "tests/__init__.py",
+        "git_mode": "100644",
+        "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "path": "tests/test_after.py",
+        "git_mode": "100644",
+        "git_blob": "86a6e408aac81871f3c32262da36372882d161c1",
+        "sha256": "082d08f27ffedae88e4ad1f294b832440b82fce7744b1f98886b8647bfe9e4b3",
+        "bytes": 3086
+      },
+      {
+        "path": "tests/test_asyncio.py",
+        "git_mode": "100644",
+        "git_blob": "21c4e9368a43979bc820ba5bf5a46427dbe154df",
+        "sha256": "d81e63c69f92a33868bac1e4393b7e30c14c11749ff8cc1c6e41c7ed8acfdb5c",
+        "bytes": 20847
+      },
+      {
+        "path": "tests/test_issue_478.py",
+        "git_mode": "100644",
+        "git_blob": "a85894365f97efbc6cd6fd4848ab8c42b44f09ae",
+        "sha256": "e210b722898a635d3f758fab25e7f9fa2fd6f0c6ef7b89a74320adea20a2ceba",
+        "bytes": 3217
+      },
+      {
+        "path": "tests/test_tenacity.py",
+        "git_mode": "100644",
+        "git_blob": "577720ec7cf0a48b9b2909e45ddde29235f460ac",
+        "sha256": "6db295bfd2cce3abea8d970e40450dff573a411e1b2b1bdfec272ed7cb20c0d7",
+        "bytes": 89337
+      },
+      {
+        "path": "tests/test_tornado.py",
+        "git_mode": "100644",
+        "git_blob": "f20a41b485ce300e1f079e31a84c811e0dcf347a",
+        "sha256": "2ba1ccfee8b8dc9ae89bf52a22d8f02a784696399d130fa7d7554aefd31e0762",
+        "bytes": 2812
+      },
+      {
+        "path": "tests/test_utils.py",
+        "git_mode": "100644",
+        "git_blob": "50a0e3dbe426a166363c0c004b854f09592348a7",
+        "sha256": "3032069682f3796aa2a66ea970de2f2901164422c9b67a557259bc82860ac856",
+        "bytes": 2039
+      }
+    ]
+  },
+  "source_files_match": true,
+  "source_blob_count": 97,
+  "seed_digest": "da47c91c3b8656616942cbe854ce3a1c833d1df34dde5cb59af7eac3616f206d",
+  "project_digest": "7f781574cb3f601685f4f517977f5b0e18dc016af3c4419720483493fa3743cc",
+  "environment_digest": "cd8d8187427acde90c01b3d009d4d435082132c950c097cd6cef144ed6194604",
+  "local_catalog_root": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+  "local_catalog_digest": "5175ad17f44e6fd7794edd5816f913fb345e373ca9a27da469a6635b504f5f59",
+  "scenario_count": 5,
+  "task_count": 13,
+  "task_kinds": {
+    "understand": 2,
+    "consult": 3,
+    "plan": 2,
+    "diagnose": 4,
+    "modify": 2
+  },
+  "task_ids": [
+    "TN-U01",
+    "TN-C01",
+    "TN-P01",
+    "TN-D01",
+    "TN-C02",
+    "TN-U02",
+    "TN-D02",
+    "TN-C03",
+    "TN-P02",
+    "TN-D03",
+    "TN-M01",
+    "TN-D04",
+    "TN-M02"
+  ],
+  "entries": {
+    "TN-S01": [
+      {
+        "id": "normal",
+        "task_ids": [
+          "TN-U01",
+          "TN-C01",
+          "TN-P01"
+        ]
+      }
+    ],
+    "TN-S02": [
+      {
+        "id": "normal",
+        "task_ids": [
+          "TN-D01",
+          "TN-C02",
+          "TN-U02",
+          "TN-D02"
+        ]
+      },
+      {
+        "id": "unavailable",
+        "task_ids": [
+          "TN-D01"
+        ],
+        "materials": [
+          "disclosure/unavailable.md"
+        ]
+      },
+      {
+        "id": "diagnose_only",
+        "task_ids": [
+          "TN-D01"
+        ]
+      }
+    ],
+    "TN-S03": [
+      {
+        "id": "normal",
+        "task_ids": [
+          "TN-C03",
+          "TN-P02"
+        ]
+      }
+    ],
+    "TN-S04": [
+      {
+        "id": "normal",
+        "task_ids": [
+          "TN-D03",
+          "TN-M01"
+        ]
+      },
+      {
+        "id": "diagnose_only",
+        "task_ids": [
+          "TN-D03"
+        ]
+      },
+      {
+        "id": "modify_direct",
+        "task_ids": [
+          "TN-M01"
+        ]
+      }
+    ],
+    "TN-S05": [
+      {
+        "id": "normal",
+        "task_ids": [
+          "TN-D04",
+          "TN-M02"
+        ]
+      },
+      {
+        "id": "diagnose_only",
+        "task_ids": [
+          "TN-D04"
+        ]
+      },
+      {
+        "id": "modify_direct",
+        "task_ids": [
+          "TN-M02"
+        ]
+      }
+    ]
+  },
+  "dependencies": {},
+  "rubric_source_evidence": {
+    "TN-U01": [
+      "library/tenacity/__init__.py:434-507"
+    ],
+    "TN-C01": [
+      "library/tenacity/__init__.py:434-507"
+    ],
+    "TN-P01": [
+      "library/tenacity/__init__.py:434-507"
+    ],
+    "TN-D01": [],
+    "TN-C02": [
+      "library/tenacity/__init__.py:434-507"
+    ],
+    "TN-U02": [
+      "library/tenacity/__init__.py:434-507"
+    ],
+    "TN-D02": [
+      "library/tenacity/__init__.py:381-422"
+    ],
+    "TN-C03": [
+      "library/tenacity/stop.py:100-138"
+    ],
+    "TN-P02": [
+      "library/tenacity/asyncio/__init__.py:110-177"
+    ],
+    "TN-D03": [
+      "library/tenacity/wait.py:227-341"
+    ],
+    "TN-M01": [],
+    "TN-D04": [
+      "library/tenacity/wait.py:95-108"
+    ],
+    "TN-M02": []
+  },
+  "profile": {
+    "schema": 1,
+    "id": "tenacity-py312",
+    "adapter": "python-native",
+    "platform": "linux-amd64",
+    "python": "3.12.15",
+    "requirements": [
+      "attrs==26.1.0",
+      "idna==3.20",
+      "iniconfig==2.3.1",
+      "outcome==1.3.0.post0",
+      "packaging==26.3",
+      "pluggy==1.7.0",
+      "Pygments==2.21.0",
+      "pytest==9.1.1",
+      "sniffio==1.3.1",
+      "sortedcontainers==2.4.0",
+      "tornado==6.5.10",
+      "trio==0.34.0"
+    ],
+    "business": {
+      "timeout_sec": 30,
+      "memory_mb": 256,
+      "pids_limit": 64
+    },
+    "regression": {
+      "timeout_sec": 90,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "artifacts": [
+      {
+        "path": "artifacts/attrs-26.1.0-py3-none-any.whl",
+        "digest": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+        "size": 67548
+      },
+      {
+        "path": "artifacts/idna-3.20-py3-none-any.whl",
+        "digest": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+        "size": 69583
+      },
+      {
+        "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+        "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+        "size": 7552
+      },
+      {
+        "path": "artifacts/outcome-1.3.0.post0-py2.py3-none-any.whl",
+        "digest": "e771c5ce06d1415e356078d3bdd68523f284b4ce5419828922b6871e65eda82b",
+        "size": 10692
+      },
+      {
+        "path": "artifacts/packaging-26.3-py3-none-any.whl",
+        "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+        "size": 129956
+      },
+      {
+        "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+        "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+        "size": 27082
+      },
+      {
+        "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+        "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+        "size": 1250147
+      },
+      {
+        "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+        "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+        "size": 386536
+      },
+      {
+        "path": "artifacts/sniffio-1.3.1-py3-none-any.whl",
+        "digest": "2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2",
+        "size": 10235
+      },
+      {
+        "path": "artifacts/sortedcontainers-2.4.0-py2.py3-none-any.whl",
+        "digest": "a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0",
+        "size": 29575
+      },
+      {
+        "path": "artifacts/tornado-6.5.10-cp39-abi3-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+        "digest": "bdf942448169e5336451d0494d7e3d81cfa726d5aa312affdc4682dd62a62f6d",
+        "size": 467096
+      },
+      {
+        "path": "artifacts/trio-0.34.0-py3-none-any.whl",
+        "digest": "6c7c9f49917694dcdcd5f67abd168df5599eca480d61f29854d17a61a75c2f05",
+        "size": 511840
+      }
+    ],
+    "source_commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+    "verification_status": "verified_target_runtime",
+    "notes": "当前固定account镜像Python3.12.15、UID1000/无网/只读来源下完成全部业务及两独立参考完整185主项＋15子测试回归。业务30秒/256MiB/PID64，回归独立90秒/512MiB/PID64，均实际通过。原版校准子进程峰值72756KiB只代表该测量口径，非所有角色总资源或真实模型成绩。README.rst上游link blob按原目标字节保存为普通文件，无实际链接。",
+    "tested_image": "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+    "tested_repository_digests": [
+      "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    ],
+    "tested_image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+  },
+  "original_calibration": {
+    "collected": 185,
+    "collection_digest": "5b00e14403d8474451f811272c01f118db4c62254bfcf9bad82bf8dd67fe5951",
+    "collection_errors": [],
+    "collection_matches_contract": null,
+    "command": [
+      "/work/python/bin/python",
+      "-m",
+      "pytest",
+      "-p",
+      "_bench_native_regression_control",
+      "tests",
+      "-q",
+      "-ra",
+      "-p",
+      "no:cacheprovider",
+      "--junitxml=/evidence/run/junit.xml"
+    ],
+    "counts": {
+      "error": 0,
+      "failed": 0,
+      "passed": 185,
+      "skipped": 0,
+      "unexecuted": 0,
+      "xfailed": 0,
+      "xpassed": 0
+    },
+    "cwd": "/tmp/bench-native-regression-99e1k3b5/project",
+    "elapsed_sec": 3.48858119599754,
+    "execution_command": [
+      "/work/python/bin/python",
+      "-m",
+      "pytest",
+      "-p",
+      "_bench_native_regression_control",
+      "tests",
+      "-q",
+      "-ra",
+      "-p",
+      "no:cacheprovider",
+      "--junitxml=/evidence/run/junit.xml"
+    ],
+    "imports": {
+      "master": {
+        "tenacity": {
+          "path": "/tmp/bench-native-regression-99e1k3b5/project/tenacity/__init__.py",
+          "sha256": "9c050f8f59801a5bfb5a1738dd75d4ee544f368481e068268571c266e2b96577"
+        }
+      }
+    },
+    "overlay": {
+      "mode": "baseline-calibration",
+      "restored_controls": 0
+    },
+    "plugins": [
+      {
+        "distribution": "pytest",
+        "module": "pytest",
+        "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+        "version": "9.1.1"
+      }
+    ],
+    "processes": {
+      "master": {
+        "parent_executable": "/usr/local/bin/python3.12",
+        "pid": 16,
+        "ppid": 15
+      }
+    },
+    "project": "tenacity",
+    "result_digest": "c5482244a5c6feb66590c614a793dce38029cb9fe3198d069844a0f7a8b9c36b",
+    "returncode": 0,
+    "scope": "冻结原生集合回归，不代表模型完成或独立业务目标已满足",
+    "skip_xfail": [],
+    "source_binding": {
+      "mode": "controlled-pythonpath"
+    },
+    "status": "passed",
+    "stderr": "",
+    "stdout_tail": "................................................................................................................................. [ 69%]\n........................................................                 [100%]\n185 passed, 15 subtests passed in 2.82s\n",
+    "strict_doctest_count": 0,
+    "subtest_count": 15,
+    "subtests": [
+      {
+        "context": {
+          "kwargs": {},
+          "msg": null
+        },
+        "ordinal": 1,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_after_delay",
+        "when": "call"
+      },
+      {
+        "context": {
+          "kwargs": {},
+          "msg": null
+        },
+        "ordinal": 2,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_after_delay",
+        "when": "call"
+      },
+      {
+        "context": {
+          "kwargs": {},
+          "msg": null
+        },
+        "ordinal": 1,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_before_delay",
+        "when": "call"
+      },
+      {
+        "context": {
+          "kwargs": {},
+          "msg": null
+        },
+        "ordinal": 2,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_before_delay",
+        "when": "call"
+      },
+      {
+        "context": {
+          "kwargs": {},
+          "msg": null
+        },
+        "ordinal": 1,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_exponential_with_min_wait_andmax__wait",
+        "when": "call"
+      },
+      {
+        "context": {
+          "kwargs": {},
+          "msg": null
+        },
+        "ordinal": 2,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_exponential_with_min_wait_andmax__wait",
+        "when": "call"
+      },
+      {
+        "context": {
+          "kwargs": {},
+          "msg": null
+        },
+        "ordinal": 1,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_fixed_sleep",
+        "when": "call"
+      },
+      {
+        "context": {
+          "kwargs": {},
+          "msg": null
+        },
+        "ordinal": 2,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_fixed_sleep",
+        "when": "call"
+      },
+      {
+        "context": {
+          "kwargs": {},
+          "msg": null
+        },
+        "ordinal": 1,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_incrementing_sleep",
+        "when": "call"
+      },
+      {
+        "context": {
+          "kwargs": {},
+          "msg": null
+        },
+        "ordinal": 2,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_incrementing_sleep",
+        "when": "call"
+      },
+      {
+        "context": {
+          "kwargs": {},
+          "msg": null
+        },
+        "ordinal": 1,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_random_sleep",
+        "when": "call"
+      },
+      {
+        "context": {
+          "kwargs": {},
+          "msg": null
+        },
+        "ordinal": 2,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_random_sleep",
+        "when": "call"
+      },
+      {
+        "context": {
+          "kwargs": {
+            "wait": "None"
+          },
+          "msg": null
+        },
+        "ordinal": 1,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_wait_falsy_values_mean_no_wait",
+        "when": "call"
+      },
+      {
+        "context": {
+          "kwargs": {
+            "wait": "0"
+          },
+          "msg": null
+        },
+        "ordinal": 2,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_wait_falsy_values_mean_no_wait",
+        "when": "call"
+      },
+      {
+        "context": {
+          "kwargs": {
+            "wait": "0"
+          },
+          "msg": null
+        },
+        "ordinal": 3,
+        "outcome": "passed",
+        "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_wait_falsy_values_mean_no_wait",
+        "when": "call"
+      }
+    ],
+    "subtests_match_contract": null,
+    "timed_out": false,
+    "worker_collections_consistent": true,
+    "xml_failures_and_errors": 0,
+    "xml_skipped": 0,
+    "xml_testcases": 185
+  },
+  "calibration_resources": {
+    "python": "3.12.15",
+    "prepare_elapsed_sec": 5.27513767000346,
+    "total_elapsed_sec": 8.928308975999244,
+    "children_peak_rss_kib": 72756,
+    "command": [
+      "/work/python/bin/python",
+      "-I",
+      "-B",
+      "/runner/native_regression.py",
+      "--project",
+      "tenacity",
+      "--baseline-root",
+      "/baseline",
+      "--freeze-baseline-contract",
+      "/evidence/native-contract.json",
+      "--evidence-dir",
+      "/evidence/run",
+      "--timeout-sec",
+      "60"
+    ],
+    "wrapper_returncode": 0
+  },
+  "validation_cases": [
+    {
+      "label": "baseline-TN-U01",
+      "task": "TN-U01",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-U01",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "passed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-U01.json"
+      ],
+      "exit_code": 0,
+      "expected_status": "passed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-U01.json"
+    },
+    {
+      "label": "baseline-TN-C01",
+      "task": "TN-C01",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-C01",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "passed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-C01.json"
+      ],
+      "exit_code": 0,
+      "expected_status": "passed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-C01.json"
+    },
+    {
+      "label": "baseline-TN-P01",
+      "task": "TN-P01",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-P01",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "passed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-P01.json"
+      ],
+      "exit_code": 0,
+      "expected_status": "passed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-P01.json"
+    },
+    {
+      "label": "baseline-TN-C02",
+      "task": "TN-C02",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-C02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "passed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-C02.json"
+      ],
+      "exit_code": 0,
+      "expected_status": "passed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-C02.json"
+    },
+    {
+      "label": "baseline-TN-U02",
+      "task": "TN-U02",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-U02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "passed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-U02.json"
+      ],
+      "exit_code": 0,
+      "expected_status": "passed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-U02.json"
+    },
+    {
+      "label": "baseline-TN-D02",
+      "task": "TN-D02",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-D02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "passed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-D02.json"
+      ],
+      "exit_code": 0,
+      "expected_status": "passed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-D02.json"
+    },
+    {
+      "label": "baseline-TN-C03",
+      "task": "TN-C03",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-C03",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "passed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-C03.json"
+      ],
+      "exit_code": 0,
+      "expected_status": "passed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-C03.json"
+    },
+    {
+      "label": "baseline-TN-P02",
+      "task": "TN-P02",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-P02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "passed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-P02.json"
+      ],
+      "exit_code": 0,
+      "expected_status": "passed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-P02.json"
+    },
+    {
+      "label": "baseline-TN-D03",
+      "task": "TN-D03",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-D03",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "passed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-D03.json"
+      ],
+      "exit_code": 0,
+      "expected_status": "passed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-D03.json"
+    },
+    {
+      "label": "baseline-TN-M01",
+      "task": "TN-M01",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-M01",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "failed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-M01.json"
+      ],
+      "exit_code": 0,
+      "expected_status": "failed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-M01.json"
+    },
+    {
+      "label": "reference-TN-M01",
+      "task": "TN-M01",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-M01",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "passed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/reference-TN-M01.json",
+        "--candidate",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/references/TN-M01",
+        "--with-regression"
+      ],
+      "exit_code": 0,
+      "expected_status": "passed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/reference-TN-M01.json"
+    },
+    {
+      "label": "baseline-TN-D04",
+      "task": "TN-D04",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-D04",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "passed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-D04.json"
+      ],
+      "exit_code": 0,
+      "expected_status": "passed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-D04.json"
+    },
+    {
+      "label": "baseline-TN-M02",
+      "task": "TN-M02",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-M02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "failed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-M02.json"
+      ],
+      "exit_code": 0,
+      "expected_status": "failed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/baseline-TN-M02.json"
+    },
+    {
+      "label": "reference-TN-M02",
+      "task": "TN-M02",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-M02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "passed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/reference-TN-M02.json",
+        "--candidate",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/references/TN-M02",
+        "--with-regression"
+      ],
+      "exit_code": 0,
+      "expected_status": "passed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/reference-TN-M02.json"
+    },
+    {
+      "label": "wrong-TN-M01",
+      "task": "TN-M01",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-M01",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "failed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/wrong-TN-M01.json",
+        "--candidate",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/wrong/TN-M01"
+      ],
+      "exit_code": 0,
+      "expected_status": "failed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/wrong-TN-M01.json"
+    },
+    {
+      "label": "wrong-TN-M02",
+      "task": "TN-M02",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-M02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "failed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/wrong-TN-M02.json",
+        "--candidate",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/wrong/TN-M02"
+      ],
+      "exit_code": 0,
+      "expected_status": "failed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/wrong-TN-M02.json"
+    },
+    {
+      "label": "wrong-flatten-TN-M02",
+      "task": "TN-M02",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+        "/root/project/vibecoding-bench/scripts/validate-project-scenarios.py",
+        "--root",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation-library",
+        "--project",
+        "tenacity",
+        "--task",
+        "TN-M02",
+        "--image",
+        "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+        "--expect",
+        "failed",
+        "--output",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/wrong-flatten-TN-M02.json",
+        "--candidate",
+        "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/wrong/TN-M02-flatten"
+      ],
+      "exit_code": 0,
+      "expected_status": "failed",
+      "output": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/validation/wrong-flatten-TN-M02.json"
+    }
+  ],
+  "validation_case_count": 17,
+  "references": {
+    "TN-M01": {
+      "status": "passed",
+      "business": {
+        "status": "passed",
+        "actual": {
+          "candidate_import": true,
+          "zero_clamp_jitter_matrix": true,
+          "random_exponential_bounds": true,
+          "positive_compatibility": true,
+          "irrelevant_power_skipped": true,
+          "real_controller": true
+        },
+        "suite_digest": "c68faa8e8bc90da425b228d4eb42fac246b04e8088219feae9690aee22bcc7d6",
+        "image": "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1"
+      },
+      "regression": {
+        "status": "passed",
+        "regression": {
+          "status": "passed",
+          "project": "tenacity",
+          "command": [
+            "/work/python/bin/python",
+            "-m",
+            "pytest",
+            "-p",
+            "_bench_native_regression_control",
+            "tests",
+            "-q",
+            "-ra",
+            "-p",
+            "no:cacheprovider",
+            "--junitxml=/work/regression-evidence/junit.xml"
+          ],
+          "execution_command": [
+            "/work/python/bin/python",
+            "-m",
+            "pytest",
+            "-p",
+            "_bench_native_regression_control",
+            "tests",
+            "-q",
+            "-ra",
+            "-p",
+            "no:cacheprovider",
+            "--junitxml=/work/regression-evidence/junit.xml"
+          ],
+          "processes": {
+            "master": {
+              "parent_executable": "/usr/local/bin/python3.12",
+              "pid": 16,
+              "ppid": 15
+            }
+          },
+          "cwd": "/tmp/bench-native-regression-sxlc75nb/project",
+          "returncode": 0,
+          "elapsed_sec": 3.0900911490025464,
+          "timed_out": false,
+          "counts": {
+            "passed": 185,
+            "failed": 0,
+            "error": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0,
+            "unexecuted": 0
+          },
+          "collected": 185,
+          "strict_doctest_count": 0,
+          "collection_digest": "5b00e14403d8474451f811272c01f118db4c62254bfcf9bad82bf8dd67fe5951",
+          "result_digest": "c5482244a5c6feb66590c614a793dce38029cb9fe3198d069844a0f7a8b9c36b",
+          "collection_matches_contract": true,
+          "worker_collections_consistent": true,
+          "collection_errors": [],
+          "xml_testcases": 185,
+          "xml_failures_and_errors": 0,
+          "xml_skipped": 0,
+          "overlay": {
+            "mode": "implementation-overlay",
+            "restored_controls": 1,
+            "implementation_digest": "cda4842ed1f3b895fca9bd2fc0f3bdb456a9124389a524ddf3f809b20708995f"
+          },
+          "source_binding": {
+            "mode": "controlled-pythonpath"
+          },
+          "imports": {
+            "master": {
+              "tenacity": {
+                "path": "/tmp/bench-native-regression-sxlc75nb/project/tenacity/__init__.py",
+                "sha256": "9c050f8f59801a5bfb5a1738dd75d4ee544f368481e068268571c266e2b96577"
+              }
+            }
+          },
+          "plugins": [
+            {
+              "distribution": "pytest",
+              "version": "9.1.1",
+              "module": "pytest",
+              "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d"
+            }
+          ],
+          "skip_xfail": [],
+          "stderr": "",
+          "stdout_tail": "................................................................................................................................. [ 69%]\n........................................................                 [100%]\n185 passed, 15 subtests passed in 2.63s\n",
+          "scope": "冻结原生集合回归，不代表模型完成或独立业务目标已满足",
+          "subtests": [
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_after_delay",
+              "ordinal": 1,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_after_delay",
+              "ordinal": 2,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_before_delay",
+              "ordinal": 1,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_before_delay",
+              "ordinal": 2,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_exponential_with_min_wait_andmax__wait",
+              "ordinal": 1,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_exponential_with_min_wait_andmax__wait",
+              "ordinal": 2,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_fixed_sleep",
+              "ordinal": 1,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_fixed_sleep",
+              "ordinal": 2,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_incrementing_sleep",
+              "ordinal": 1,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_incrementing_sleep",
+              "ordinal": 2,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_random_sleep",
+              "ordinal": 1,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_random_sleep",
+              "ordinal": 2,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_wait_falsy_values_mean_no_wait",
+              "ordinal": 1,
+              "when": "call",
+              "context": {
+                "kwargs": {
+                  "wait": "None"
+                },
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_wait_falsy_values_mean_no_wait",
+              "ordinal": 2,
+              "when": "call",
+              "context": {
+                "kwargs": {
+                  "wait": "0"
+                },
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_wait_falsy_values_mean_no_wait",
+              "ordinal": 3,
+              "when": "call",
+              "context": {
+                "kwargs": {
+                  "wait": "0"
+                },
+                "msg": null
+              },
+              "outcome": "passed"
+            }
+          ],
+          "subtest_count": 15,
+          "subtests_match_contract": true
+        },
+        "contract_digest": "066cd3ce78f8467e5aded70a55106ad5bc32dd6e9e1f58b3e4d99ce101518b0f",
+        "suite_digest": "d00e9dc20bda6406c186226b2ecd1649955ea474795d7f304ec495f5b1b89d8a",
+        "image": "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1"
+      }
+    },
+    "TN-M02": {
+      "status": "passed",
+      "business": {
+        "status": "passed",
+        "actual": {
+          "candidate_import": true,
+          "deep_trees": true,
+          "grouping_and_numbers": true,
+          "opaque_order_and_dag": true,
+          "dynamic_entry": true,
+          "exceptions_and_cycles": true,
+          "recursion_limit_unchanged": true
+        },
+        "suite_digest": "f20a933a6372c5e0457baea8aee7e35efccdb6720a07e7327b21122b3d9e1f6e",
+        "image": "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1"
+      },
+      "regression": {
+        "status": "passed",
+        "regression": {
+          "status": "passed",
+          "project": "tenacity",
+          "command": [
+            "/work/python/bin/python",
+            "-m",
+            "pytest",
+            "-p",
+            "_bench_native_regression_control",
+            "tests",
+            "-q",
+            "-ra",
+            "-p",
+            "no:cacheprovider",
+            "--junitxml=/work/regression-evidence/junit.xml"
+          ],
+          "execution_command": [
+            "/work/python/bin/python",
+            "-m",
+            "pytest",
+            "-p",
+            "_bench_native_regression_control",
+            "tests",
+            "-q",
+            "-ra",
+            "-p",
+            "no:cacheprovider",
+            "--junitxml=/work/regression-evidence/junit.xml"
+          ],
+          "processes": {
+            "master": {
+              "parent_executable": "/usr/local/bin/python3.12",
+              "pid": 16,
+              "ppid": 15
+            }
+          },
+          "cwd": "/tmp/bench-native-regression-2_k5tsz_/project",
+          "returncode": 0,
+          "elapsed_sec": 4.193747905002965,
+          "timed_out": false,
+          "counts": {
+            "passed": 185,
+            "failed": 0,
+            "error": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0,
+            "unexecuted": 0
+          },
+          "collected": 185,
+          "strict_doctest_count": 0,
+          "collection_digest": "5b00e14403d8474451f811272c01f118db4c62254bfcf9bad82bf8dd67fe5951",
+          "result_digest": "c5482244a5c6feb66590c614a793dce38029cb9fe3198d069844a0f7a8b9c36b",
+          "collection_matches_contract": true,
+          "worker_collections_consistent": true,
+          "collection_errors": [],
+          "xml_testcases": 185,
+          "xml_failures_and_errors": 0,
+          "xml_skipped": 0,
+          "overlay": {
+            "mode": "implementation-overlay",
+            "restored_controls": 1,
+            "implementation_digest": "bd56903334f9e5cb959cdf30736787cea84a4f895e106c74ae46bc6ca0959682"
+          },
+          "source_binding": {
+            "mode": "controlled-pythonpath"
+          },
+          "imports": {
+            "master": {
+              "tenacity": {
+                "path": "/tmp/bench-native-regression-2_k5tsz_/project/tenacity/__init__.py",
+                "sha256": "9c050f8f59801a5bfb5a1738dd75d4ee544f368481e068268571c266e2b96577"
+              }
+            }
+          },
+          "plugins": [
+            {
+              "distribution": "pytest",
+              "version": "9.1.1",
+              "module": "pytest",
+              "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d"
+            }
+          ],
+          "skip_xfail": [],
+          "stderr": "",
+          "stdout_tail": "................................................................................................................................. [ 69%]\n........................................................                 [100%]\n185 passed, 15 subtests passed in 3.47s\n",
+          "scope": "冻结原生集合回归，不代表模型完成或独立业务目标已满足",
+          "subtests": [
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_after_delay",
+              "ordinal": 1,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_after_delay",
+              "ordinal": 2,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_before_delay",
+              "ordinal": 1,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestStopConditions::test_stop_before_delay",
+              "ordinal": 2,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_exponential_with_min_wait_andmax__wait",
+              "ordinal": 1,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_exponential_with_min_wait_andmax__wait",
+              "ordinal": 2,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_fixed_sleep",
+              "ordinal": 1,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_fixed_sleep",
+              "ordinal": 2,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_incrementing_sleep",
+              "ordinal": 1,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_incrementing_sleep",
+              "ordinal": 2,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_random_sleep",
+              "ordinal": 1,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_random_sleep",
+              "ordinal": 2,
+              "when": "call",
+              "context": {
+                "kwargs": {},
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_wait_falsy_values_mean_no_wait",
+              "ordinal": 1,
+              "when": "call",
+              "context": {
+                "kwargs": {
+                  "wait": "None"
+                },
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_wait_falsy_values_mean_no_wait",
+              "ordinal": 2,
+              "when": "call",
+              "context": {
+                "kwargs": {
+                  "wait": "0"
+                },
+                "msg": null
+              },
+              "outcome": "passed"
+            },
+            {
+              "parent_nodeid": "tests/test_tenacity.py::TestWaitConditions::test_wait_falsy_values_mean_no_wait",
+              "ordinal": 3,
+              "when": "call",
+              "context": {
+                "kwargs": {
+                  "wait": "0"
+                },
+                "msg": null
+              },
+              "outcome": "passed"
+            }
+          ],
+          "subtest_count": 15,
+          "subtests_match_contract": true
+        },
+        "contract_digest": "066cd3ce78f8467e5aded70a55106ad5bc32dd6e9e1f58b3e4d99ce101518b0f",
+        "suite_digest": "d00e9dc20bda6406c186226b2ecd1649955ea474795d7f304ec495f5b1b89d8a",
+        "image": "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1"
+      }
+    }
+  },
+  "public_tests": {
+    "records": [
+      {
+        "task": "TN-M01",
+        "kind": "original",
+        "returncode": 1,
+        "expected": 1,
+        "command": [
+          "/work/python/bin/python",
+          "-B",
+          "-m",
+          "pytest",
+          "tests/test_tenacity.py",
+          "-q",
+          "-ra",
+          "-p",
+          "no:cacheprovider",
+          "-k",
+          "zero_exponential_contribution",
+          "--junitxml=/evidence/TN-M01-original.xml"
+        ]
+      },
+      {
+        "task": "TN-M01",
+        "kind": "reference",
+        "returncode": 0,
+        "expected": 0,
+        "command": [
+          "/work/python/bin/python",
+          "-B",
+          "-m",
+          "pytest",
+          "tests/test_tenacity.py",
+          "-q",
+          "-ra",
+          "-p",
+          "no:cacheprovider",
+          "-k",
+          "zero_exponential_contribution",
+          "--junitxml=/evidence/TN-M01-reference.xml"
+        ]
+      },
+      {
+        "task": "TN-M02",
+        "kind": "original",
+        "returncode": 1,
+        "expected": 1,
+        "command": [
+          "/work/python/bin/python",
+          "-B",
+          "-m",
+          "pytest",
+          "tests/test_tenacity.py",
+          "-q",
+          "-ra",
+          "-p",
+          "no:cacheprovider",
+          "-k",
+          "builtin_wait_combine",
+          "--junitxml=/evidence/TN-M02-original.xml"
+        ]
+      },
+      {
+        "task": "TN-M02",
+        "kind": "reference",
+        "returncode": 0,
+        "expected": 0,
+        "command": [
+          "/work/python/bin/python",
+          "-B",
+          "-m",
+          "pytest",
+          "tests/test_tenacity.py",
+          "-q",
+          "-ra",
+          "-p",
+          "no:cacheprovider",
+          "-k",
+          "builtin_wait_combine",
+          "--junitxml=/evidence/TN-M02-reference.xml"
+        ]
+      }
+    ],
+    "passed": true,
+    "elapsed_seconds": 11.46950680900045
+  },
+  "contract_sha256": "e65bc78e63d5e4e5047af48d23e5a89dacd01f1bf89599654e4dff84fd773089",
+  "runner_sha256": "b3e75e056b684fa6d5a6a4871bf8793b8422d373460562110207612c97ba65c3",
+  "mock_response_manifest": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/tenacity/mock-response-manifest.json",
+  "cleanup": {
+    "remaining_owned_named_containers": [],
+    "passed": true,
+    "production_touched": false,
+    "real_model_calls": 0,
+    "oauth_calls": 0
+  },
+  "remaining_verification": [
+    "root review-package/parse_review integration",
+    "whole-pack mock UI/API/SQLite, input/budget/usage audit",
+    "Git/Docker export parity and old-six unchanged proof",
+    "formal Check-All and delivery"
+  ],
+  "real_model_quality_verified": false,
+  "production_deployed": false
+}

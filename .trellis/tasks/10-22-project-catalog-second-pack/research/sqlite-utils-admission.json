@@ -1,0 +1,1235 @@
+{
+  "project": "sqlite-utils",
+  "status": "native_admitted_pending_integrated_mock",
+  "source": {
+    "repository": "https://github.com/simonw/sqlite-utils",
+    "commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+    "license": "Apache-2.0",
+    "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "git_blob_count": 107,
+    "files": [
+      {
+        "path": ".github/FUNDING.yml",
+        "git_blob": "f0bcdbe0c4a4ed2f260953e75d3daa6778b2d269",
+        "sha256": "8ed9d14fb77948dd60c2a8edb9aa635ac0f1c50b2b14ca2fc23dc4dbdfea716f",
+        "size": 17,
+        "mode": "100644"
+      },
+      {
+        "path": ".github/actions/setup-sqlite-version/action.yml",
+        "git_blob": "fdbc71c9a9864c94a8a010d17fe5204e49ad2d37",
+        "sha256": "f59f3eaea0f08c4e07d93ae1c7c9473a69abc41546e5eeb9e41127c9f99079fd",
+        "size": 1327,
+        "mode": "100644"
+      },
+      {
+        "path": ".github/actions/setup-sqlite-version/setup-sqlite-version.sh",
+        "git_blob": "0df72907ce741617b035e1770a239ab201a100c9",
+        "sha256": "fa35f2f44e4ff5d5fa0bad83d569db5cad421da54620e7af70dd02bb11ef55ea",
+        "size": 3843,
+        "mode": "100644"
+      },
+      {
+        "path": ".github/workflows/codeql-analysis.yml",
+        "git_blob": "713f81e70ff558ccbff498d71dfe9a5780027a03",
+        "sha256": "2e4d60bad9a8a2133d4b20f3d10098a46fa5f2274392f4500f7f95b2b3ae0ff8",
+        "size": 2239,
+        "mode": "100644"
+      },
+      {
+        "path": ".github/workflows/documentation-links.yml",
+        "git_blob": "1aab04e34e5d89abaedbd980604ee39a6d91e44e",
+        "sha256": "d1b5137a8194469955cb3e6d5bf7b7d8060e1969e10f86c0915069248141cdf4",
+        "size": 297,
+        "mode": "100644"
+      },
+      {
+        "path": ".github/workflows/publish.yml",
+        "git_blob": "23b23bdc968623c396d282e628b5bca6fbe5052b",
+        "sha256": "f8816aabe6fce412e9558f039ccf7defc0affd1bb80c152448a91e8754d6cccc",
+        "size": 1182,
+        "mode": "100644"
+      },
+      {
+        "path": ".github/workflows/spellcheck.yml",
+        "git_blob": "2afa7b730b4a7b3356b365f3eac4608e084e55a8",
+        "sha256": "5784867fe0859cc9f0974ae734bb0155a952fcec3623acb6b2050b16130455ab",
+        "size": 600,
+        "mode": "100644"
+      },
+      {
+        "path": ".github/workflows/test-coverage.yml",
+        "git_blob": "c7b05c480cae625ebc3d62e554fb6b9e5ac6628b",
+        "sha256": "db044499b82bea22ace54414fe734701967884bab0d60ef9fdee217c0ea58ebb",
+        "size": 997,
+        "mode": "100644"
+      },
+      {
+        "path": ".github/workflows/test-sqlite-support.yml",
+        "git_blob": "f195cba578509745af484f94e664dd7b996b13fa",
+        "sha256": "6a321748867c056f1b695c2900a37020b5b4aafbb90c6f0fd97284f09efda4a4",
+        "size": 1214,
+        "mode": "100644"
+      },
+      {
+        "path": ".github/workflows/test.yml",
+        "git_blob": "a1cb09b53e194aaba092865f7d3c75c532c1fd77",
+        "sha256": "9e12b777ea3d4b1664e5654443a61a89aece46b37154476159b58f654f418b32",
+        "size": 2070,
+        "mode": "100644"
+      },
+      {
+        "path": ".gitignore",
+        "git_blob": "5b5d2c65954d89bb38c30a402ddc12b5d463be38",
+        "sha256": "627070faa800c4b23ee1d22eaa5f46d14980186eee06c4179d805f0700b59361",
+        "size": 227,
+        "mode": "100644"
+      },
+      {
+        "path": ".readthedocs.yaml",
+        "git_blob": "08c2f81a1b0f37ba6fbdef850610c9976febc589",
+        "sha256": "0e2fadcdc100d26acb2e9ee8d8a1094ef406fe80776db3a50dda0e19d441961d",
+        "size": 214,
+        "mode": "100644"
+      },
+      {
+        "path": "Justfile",
+        "git_blob": "7347534356fac4c66356b0ba757ad2f7f1114c32",
+        "sha256": "b595e177b0595df648fb4127e2ba6be0398721944dbf74cc6a066942a23a2597",
+        "size": 955,
+        "mode": "100644"
+      },
+      {
+        "path": "LICENSE",
+        "git_blob": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "size": 11357,
+        "mode": "100644"
+      },
+      {
+        "path": "MANIFEST.in",
+        "git_blob": "e3c921266e4bf9da62b42c235c1f00c317ca1283",
+        "sha256": "301268b22315a9725f699c12b55060e43e36266be0d722f1ff5c520551dda67d",
+        "size": 92,
+        "mode": "100644"
+      },
+      {
+        "path": "README.md",
+        "git_blob": "c444c641a5122f5e3ee1ed2d32b956f013770541",
+        "sha256": "d734037db5c085ed786e12cbda089fe9bcdac7d785255af20e8c9553f25f7490",
+        "size": 5499,
+        "mode": "100644"
+      },
+      {
+        "path": "codecov.yml",
+        "git_blob": "bfdc9877d9acc165c0342befa33f2e8f769538cf",
+        "sha256": "a495413a7f79f67e0c25b9e117868a2ef7b47bccfc64da7a8fe48d2e1e74d1ff",
+        "size": 130,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/.gitignore",
+        "git_blob": "e35d8850c9688b1ce82711694692cc574a799396",
+        "sha256": "fde6e46547307ef7e718427de6b7e3d65c6804d77a104f59bed39cec5b1b7c51",
+        "size": 7,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/Makefile",
+        "git_blob": "5578ae3abb410e7f83a5a22b32c17cdc457dd82e",
+        "sha256": "a4be4b6885f712a88aab539c15689e5b916a32f7acea3fa464dcec1112b72d19",
+        "size": 722,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/_static/js/custom.js",
+        "git_blob": "87868650dd7d421a99d93936fb3e84ed309cb13a",
+        "sha256": "4b55631bc6b4ef3c2a8cb4e9682e53c448d936f937094ad7182584d4a5f28c5e",
+        "size": 842,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/_templates/base.html",
+        "git_blob": "a253a46bba59db2828f0a012569951bc4726e616",
+        "sha256": "9704e5d7528cd789e378aba31a6688b07583aa06be1af78620a98458966aa38e",
+        "size": 1307,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/changelog.rst",
+        "git_blob": "5d024e1a249c861bde0b7543093c202afcf2ec4c",
+        "sha256": "484d32b87b5910c8cae6945a6882e5ef48d7c7b92758429839ab5aefd95f2252",
+        "size": 111208,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/cli-reference.rst",
+        "git_blob": "c53d642223aa265d9dcac4032d91817177f2a681",
+        "sha256": "84faf624ba6739bea1b4a8ed93d2228bd3c44d4be02a80c62364cc2ffb1c27e1",
+        "size": 54542,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/cli.rst",
+        "git_blob": "78c33b8aee09c916308dd514fbe4df0348da4810",
+        "sha256": "a3c7dcca9dc9e2c9233e232676bafd8c8fd987ca144a9dc98fb4b0cea1ed5b42",
+        "size": 99783,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/codespell-ignore-words.txt",
+        "git_blob": "f8418c47f50c2ccee6ea86a7294e1dc29e6a0f20",
+        "sha256": "d154d34bcdb1f364ffe79005e2d2748f89587902fcac4a78e8e79a70569d040c",
+        "size": 5,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/conf.py",
+        "git_blob": "62d46421baf0bda54bd45f814bcd3ee776b2f223",
+        "sha256": "cafd99f484fdf2b9ba154da11ee238c87c05c4110b6c60759adc749829ae580f",
+        "size": 6637,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/contributing.rst",
+        "git_blob": "f10b02a9f73e5286146f5a22c8b51d0da709658b",
+        "sha256": "936262c1126c270718b0750e5292f7cd7bb45293b968241d104732b73bd88398",
+        "size": 4594,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/index.rst",
+        "git_blob": "f190d4745cd4409e529015a3bd7a1e6247441a0a",
+        "sha256": "d861ca0c6864dd79163140df21f2d0d6e1f09e452b10820fbb81522340581408",
+        "size": 1744,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/installation.rst",
+        "git_blob": "1333f5d9f89ee7f2a222da28b1127d6515e351b2",
+        "sha256": "683985f78cf90ddeba56658318625820c6dd56a6eaba60e97b0d152408f860c9",
+        "size": 2910,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/migrations.rst",
+        "git_blob": "23aa9d853b4823667ddca40498ff7fdf85b4a804",
+        "sha256": "b2b75d257a76935f9ce04b6149f66a0d37fb8ee73af11ddb440e30945da17366",
+        "size": 7816,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/plugins.rst",
+        "git_blob": "99588eec244c552323e5551e536fcdc91e266c71",
+        "sha256": "27986d8b4cda7e4b4c054f2e5e791e4c008eb65191ca6fb7488657bf6f3f34fc",
+        "size": 4608,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/python-api.rst",
+        "git_blob": "d515642a59bd6fd58dca25fc62ae57aa24f7895f",
+        "sha256": "447777bacd71d7d875e43796cb7737947577bc5a85953710682c887b9c7488df",
+        "size": 133356,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/reference.rst",
+        "git_blob": "a9fdf29d3c10cca3a2faa1a720e6aa03cd609bbd",
+        "sha256": "948589c8957d9be5c7f3b220d068d6d46ae761bc324ae3490477e9e884113119",
+        "size": 2443,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/tutorial.ipynb",
+        "git_blob": "bade68681891c754a0fcf61562efda6761714e16",
+        "sha256": "46198efa443943f772a1927b41818073ef2010219b393ac05a9d3efc9dc32d70",
+        "size": 31632,
+        "mode": "100644"
+      },
+      {
+        "path": "docs/upgrading.rst",
+        "git_blob": "92b582a4596fff16fe37860280e3088b6c1261ee",
+        "sha256": "2de50d3307053331cbb943d27acdeeba901ff62f8f3bdcaf817963d6f3e3bc09",
+        "size": 12320,
+        "mode": "100644"
+      },
+      {
+        "path": "mypy.ini",
+        "git_blob": "2f6a8757066456d124cf525aee81eb1df84c4434",
+        "sha256": "52793bfe60f7d317edcf09185ad3096aa50c48779ea59258d23da1bfae5a3fb5",
+        "size": 607,
+        "mode": "100644"
+      },
+      {
+        "path": "pyproject.toml",
+        "git_blob": "92650e23b6b8013ec72beea6539b0d16c19f3cf1",
+        "sha256": "ec133707085153fae34f663ec8934ec95a731575a2b3b7577347ec2de0ac432c",
+        "size": 2234,
+        "mode": "100644"
+      },
+      {
+        "path": "sqlite_utils/__init__.py",
+        "git_blob": "3f350e15be1394c04f5f50a85c001330d7ecaf3f",
+        "sha256": "c6820e8bdff2f648adac5bd29410b7541969f43fc7203931fb4264d6c36a89cf",
+        "size": 267,
+        "mode": "100644"
+      },
+      {
+        "path": "sqlite_utils/__main__.py",
+        "git_blob": "98dcca0c2836ae53d67260be8a5431b855e461bb",
+        "sha256": "f210ed5a568564adb82a17cdabf64a82d5ea607b034037adba4382325b1b5b44",
+        "size": 59,
+        "mode": "100644"
+      },
+      {
+        "path": "sqlite_utils/cli.py",
+        "git_blob": "c23090283b17569e5c81cbecff7fa2c082c3a323",
+        "sha256": "251464a94fab02624a649d69e1ee9c17d6203a5d63e77c874945dd1a60173826",
+        "size": 107389,
+        "mode": "100644"
+      },
+      {
+        "path": "sqlite_utils/create_table_parser.py",
+        "git_blob": "7377f4fd6c5c8dc8020e93af55ed6fe4c249e698",
+        "sha256": "810b3b0a39b8660e0aedc9d40d453703e755e9918c8bff871c62bd9f1e4c2f4b",
+        "size": 28549,
+        "mode": "100644"
+      },
+      {
+        "path": "sqlite_utils/db.py",
+        "git_blob": "c011d9bb0cb61883808f37d74c317a20644fc22b",
+        "sha256": "9fcf5430c0ad6ad3ebe25afc170b1e077a5fabd73353e0eb661b2c9e6c4ae715",
+        "size": 226411,
+        "mode": "100644"
+      },
+      {
+        "path": "sqlite_utils/hookspecs.py",
+        "git_blob": "73d1acc6662463171592f7143e8856d48a300c29",
+        "sha256": "a97f1cadce80f2d7264843dad5e6dc8a114b80492defd530a96764f470eb8a99",
+        "size": 455,
+        "mode": "100644"
+      },
+      {
+        "path": "sqlite_utils/migrations.py",
+        "git_blob": "69397baa23265251bf06bf9547b17cbe4eefa0c6",
+        "sha256": "054ee224a7aee68131ecd7ae3cb0809ff7403144db45c604cbd920c91fe4ea1f",
+        "size": 6757,
+        "mode": "100644"
+      },
+      {
+        "path": "sqlite_utils/plugins.py",
+        "git_blob": "10815b4048693314f88a95b33204de0d3826dcb3",
+        "sha256": "8907f645cf291055fe1bb5a39efe5a750e6fbfd9bcc17df19a8bfadb5186a530",
+        "size": 1066,
+        "mode": "100644"
+      },
+      {
+        "path": "sqlite_utils/py.typed",
+        "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0,
+        "mode": "100644"
+      },
+      {
+        "path": "sqlite_utils/recipes.py",
+        "git_blob": "d28a099b5b7160fbf5f8ab5aec68211e7cfb7ed8",
+        "sha256": "048c6656409d3df485e9bbbcafc478d2a3d90632ecadef721138ed16780f90db",
+        "size": 2049,
+        "mode": "100644"
+      },
+      {
+        "path": "sqlite_utils/utils.py",
+        "git_blob": "91fd24ddd215cfcf600c9aabda3e73c041823fa8",
+        "sha256": "9a44c65f15b8dd2bcaee9ce4b1111f4d46fe4115486070aaebf708d66d3feaf3",
+        "size": 21170,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/__init__.py",
+        "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/conftest.py",
+        "git_blob": "a4eb8600ed1af5fbb24c81cdb4307d289097dc81",
+        "sha256": "9868d9dfdc8b994e22773b0b85b0d02e9c87c898cdaf7d588b957ce16d5d9bf6",
+        "size": 2186,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/ext.c",
+        "git_blob": "f5b3276e94467a05b10522e9ba9f9bf3be1030af",
+        "sha256": "86d27831b0741c66058903505cb6a6b51d7d649920d69fc285f1ddc51ef50724",
+        "size": 1547,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/sniff/example1.csv",
+        "git_blob": "3daaaddb264fe6957654ba7fb6128305ce9cbb20",
+        "sha256": "a18a05773c74ed99875d61bdfea1db653466cd8a23a6aec2ce6118d80ac7925a",
+        "size": 98,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/sniff/example2.csv",
+        "git_blob": "0452e7f14da4e9deb20e70cbe050eb338c2874b4",
+        "sha256": "2d92578b91185eec3755303b46aef6558dd69b117f18d71d1384760e2c9ff61a",
+        "size": 98,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/sniff/example3.csv",
+        "git_blob": "172c3d31ce4aeb447384f6105dae2c7d98c02490",
+        "sha256": "531e0a52b3f9da5a4905db690e3378d91f24c0ebcd330343e0ebd3f21d2c7e5a",
+        "size": 98,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/sniff/example4.csv",
+        "git_blob": "71b671e09f4381b7cf813f49d8c810f2babc9dee",
+        "sha256": "8e67d4dba42a671c9517aa078166995801d34897f72bf8d98e6da9396783d097",
+        "size": 98,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_analyze.py",
+        "git_blob": "edd51745f42cc63f1371b51b2c0043ec90c86a3a",
+        "sha256": "55a08bfce5c322fa904ce7ea12c1e65261c95391b18939c9677c55615513c1ac",
+        "size": 1905,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_analyze_tables.py",
+        "git_blob": "9e4799cd9e5b8baf05ca253d9cff973259d08124",
+        "sha256": "5dc67eb42f1853e2ddbca71b5305c4a82afed4c9aecb49c52d88005b57c890b3",
+        "size": 7994,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_atomic.py",
+        "git_blob": "89a318adf9206e9ee3823e46859bc47c4bb4a24b",
+        "sha256": "3a8b9a3e55e8566c29f04991a8f5f8241b21170da54b35ceb5b51ce00f73deb8",
+        "size": 13916,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_attach.py",
+        "git_blob": "2b11e365931add69c89ef67589c55d330d195fe6",
+        "sha256": "6f9b7887e0689265c7e9c0800e31f74bf5214067294ad3c3a7d117ec98908672",
+        "size": 505,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_cli.py",
+        "git_blob": "064026a0b082e6fd5a4a9db708960d8f6ceb6792",
+        "sha256": "3c1547310e3d86db1ff09e310b94d390df4ad43c422aa3e9faffa0a17a2ac02a",
+        "size": 95416,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_cli_bulk.py",
+        "git_blob": "c5c9dcdb86562d51973dc1164ff179072a44e336",
+        "sha256": "0f450d9a58515432d5c532b5196e2d89bd98872a54bd1559a2bdc6560c258485",
+        "size": 3309,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_cli_convert.py",
+        "git_blob": "9f59d59e11f8b761556f880b564e26ca43ca9d10",
+        "sha256": "f9c588566cc95a2c22f19fb1c9fe185b6db1836c4021443fdd74c8a6d3f99145",
+        "size": 20552,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_cli_insert.py",
+        "git_blob": "0117862596326d7a5e72f5342e2c4d2ef77048fe",
+        "sha256": "973141c8a8d668c43a1ad59517cfbf40598311d852d45de82158ff343bf5d077",
+        "size": 28114,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_cli_memory.py",
+        "git_blob": "445f50b0f197c4862847f469127c14b835d8274b",
+        "sha256": "9ad5a2105ba51c900fb84a6cc9e686079714ad84cbfcc399312e264a3713fda1",
+        "size": 10575,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_cli_migrate.py",
+        "git_blob": "743988736426b45c8b6ef93f3fc9eb703b43c197",
+        "sha256": "0b780b93fbd8ffccb3bfe98462472d98fb95d29d3e941c3b5c5b56b0ea6b1bb1",
+        "size": 14456,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_column_affinity.py",
+        "git_blob": "2d7846e5afbe897956164a3e75c82553da1f9943",
+        "sha256": "b6de1380117a34cd32b7b9a5a50385f0fc20be334cd173950c7672080d88aad4",
+        "size": 1349,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_column_casing.py",
+        "git_blob": "b3f03c9a5806273258b595087fab69ce8de05567",
+        "sha256": "ad89e1d048d41ec2609f734c29ea92c13ef9e1bf3a56cf7d50583ca449a64cf4",
+        "size": 9549,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_constructor.py",
+        "git_blob": "412b66c2c5f1bdda58c0278cde559ba136d73a78",
+        "sha256": "64cb6c035c8d3b630218233b063ff45f0cf5c5714382ea5a78d9219f5656c7ea",
+        "size": 3581,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_conversions.py",
+        "git_blob": "bb58df42074f5f40a63e0151547b959452144838",
+        "sha256": "b588b9599c6aa4571cccd3bf358bfd15755a79e000fbaf6a67e9c4df02a80755",
+        "size": 1481,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_convert.py",
+        "git_blob": "1f9e9ed15d7125c8731461863d387790a452c9f9",
+        "sha256": "28fd78a742fb707714250a921d14276d717447fbe34f4c47edc533c1b3dc98a1",
+        "size": 4559,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_create.py",
+        "git_blob": "b738df952dfea9337dc0eee90377fc8b45a8b087",
+        "sha256": "cfa4847148579607fa54e216096eda0d8ee318373fca5fff581fb7610f421a5d",
+        "size": 60931,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_create_table_parser.py",
+        "git_blob": "74a089cc0fd7f715e7356df74286ab11dad15746",
+        "sha256": "d9a59f00009e81c4252b743364dc25a55d5acab2330a8d5831ed979fceb591ed",
+        "size": 7412,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_create_view.py",
+        "git_blob": "2b700990a105d2c74e83651602a8215d54141768",
+        "sha256": "e802d117d2d21178eafa6f93d1433f4d539c7507be6fd8bc5e420d36cfddd370",
+        "size": 1432,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_default_value.py",
+        "git_blob": "02b28c3da186862da52c34220272e55835e8347d",
+        "sha256": "e110c22e34f067288c61b7c2f04272829f8e4d746af391a4b9dddb4a7c62d633",
+        "size": 2269,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_delete.py",
+        "git_blob": "a9341b8754ba2e7d69140524c7a4c04e6748f57c",
+        "sha256": "7996d4570f28ed5e0905d73936f7943080a9e7806fc58b98f06afabd22d2f85a",
+        "size": 2045,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_docs.py",
+        "git_blob": "6bc06c8ff2471e8e2b0a5c9ec838827ffe0579e1",
+        "sha256": "5000b988e0df417f3027a05a433fa72402375bf8f95fd3aaf04cf9a65aa1f573",
+        "size": 1676,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_duplicate.py",
+        "git_blob": "c7a5612a2ef57567bba245f632b2e6179642345c",
+        "sha256": "e57faddb32b10fb5269b7a74b5ff457e8f83e29f1ffb807afeeec32822078801",
+        "size": 1280,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_enable_counts.py",
+        "git_blob": "1230b6c8fd6f8c537a81f39f33637a91da0f7393",
+        "sha256": "b65dded7e17dea27824917f4b41d5d362b6025208843daa19ac701fb7d912181",
+        "size": 6527,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_extract.py",
+        "git_blob": "f8550411a6ccbdfdb57e1dc1e13a2afeba946d08",
+        "sha256": "6c1b6412ca0ad1f6f4d6a7c324e8c1776178c4fa34ca78c3d77db8f4336d360f",
+        "size": 13096,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_extracts.py",
+        "git_blob": "4e7cf39b36c639b224669a80620ae01abbc98fe4",
+        "sha256": "6df556c3d4e7cd05efa92809154e6b2b9487429364531784591c7ab6306475e5",
+        "size": 3614,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_foreign_keys.py",
+        "git_blob": "f916c658d1e83c7b883d7d3a49c90ed5bced462d",
+        "sha256": "1037501bfb585280324f11faa22b2b5a71c648311a0aaf124ce020b06c2aba22",
+        "size": 25987,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_fts.py",
+        "git_blob": "04b5bc31f53c86bfd6483b2d81ba9bc3a074626e",
+        "sha256": "7d60edb0375ec1f21b77758af830805dfa49d0f01fbb63c58614e3aa5a19b430",
+        "size": 25228,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_get.py",
+        "git_blob": "5e29506b90faacce09c58d320cd14a27efd1fefb",
+        "sha256": "c245bde6ca3877cc056e7c81b62e0ef4487d07d0e4b44a0586e529e865dee5f0",
+        "size": 955,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_gis.py",
+        "git_blob": "592af4c3db0039dfc8697f7bb1a12b7500093b54",
+        "sha256": "4f8bc078eab250d19f117a27d8e3ee755efdda4d8fcfc7b06993eae5d37f6b8e",
+        "size": 6494,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_hypothesis.py",
+        "git_blob": "d017f1fc2d963fd83b8c4165dd7cd97580a31bb4",
+        "sha256": "9c8a4797ff5254713a6533bc06216ab909831738f9771ed0769b8706ec5a63ef",
+        "size": 1104,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_insert_files.py",
+        "git_blob": "93c4daf1b64aac6e0850202cff7d2e9efdb6fc53",
+        "sha256": "1a77ae778c5a7311ba2309aabfd08b87d11adb835d29e69caec5fa8bbb7be0dd",
+        "size": 5818,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_introspect.py",
+        "git_blob": "343424d0d783cca04f39a20533cc0c449e49c5be",
+        "sha256": "4548c3d2720c437437dc70e4a0f676006106f949ee8da6d000ecc273f027a7cc",
+        "size": 14327,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_list_mode.py",
+        "git_blob": "75f5a7613a4f8a5b67b4a45346d7a18251743066",
+        "sha256": "75c4ca9642613deff8765d728fe8c56abf5f69975bcd3c2c3980704d7483229c",
+        "size": 9042,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_lookup.py",
+        "git_blob": "f96cfefafba80c83a1310abe39fe50fe26a43222",
+        "sha256": "a87ebccea9736404bb1b131d7d91fca0cf0932be518692d5dcd0c3ed850d196a",
+        "size": 6209,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_m2m.py",
+        "git_blob": "4dde7e4c56ff26d6cc787c0ebc9344051dc5ae6c",
+        "sha256": "a3be1f3e3804d144ef074b2d4550fe9a5afdd8ac646ad28805f3513763014be5",
+        "size": 7719,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_migrations.py",
+        "git_blob": "fa419ecf7dbdeb552b3f994516b4bb5d0475d498",
+        "sha256": "10e173c8fae13af765c1e5203857f293ed1e6ba6a1ea48e17edfa6ba5ac0b270",
+        "size": 7542,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_mutator_transactions.py",
+        "git_blob": "3f13c6bcc2981ce7d974f124a5f983ab57fcb9c0",
+        "sha256": "3c8646b3c1420e25535715238c2f4b0bd836009b65be499870629642e6b8bf4c",
+        "size": 3679,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_plugins.py",
+        "git_blob": "ef202bee360fc1289216e57419e21bd4498d13d8",
+        "sha256": "9340f33dc9633bcceac107629bf7fc01596fa810e43d6aa566eefdc9aa809598",
+        "size": 3607,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_query.py",
+        "git_blob": "ac0d9249b6fee273d3f014bfac77ba525e618eb8",
+        "sha256": "ed29d86308bb9e61598a390d569a968ea2677558802494d490356137ce5eba01",
+        "size": 11166,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_recipes.py",
+        "git_blob": "c6a548c53143262ea7671ce86c655e5f8a528042",
+        "sha256": "bc42705dab979d1dbc8f4ae5bc97e097b21b0b16ec6a562aed5b5be60db60202",
+        "size": 4299,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_recreate.py",
+        "git_blob": "d8b846e7110778a6e892e58604ba8810045e2975",
+        "sha256": "f4fcd85ede5441217492d5e4e0e7098a5992b0ba499036dbb72894071ef46b92",
+        "size": 1130,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_register_function.py",
+        "git_blob": "63f0570b775adcb74f8d65538fc1f01fe8a71e0d",
+        "sha256": "f77f0f405294cd56af4ecf1645d2ed81dba14d9a8ba5dbe3e1b5c900c73234d2",
+        "size": 3271,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_rows.py",
+        "git_blob": "476569ed5882deefae5ed9b21848306d9d737f8c",
+        "sha256": "7b449ac2a8a35f5c76988246ab16984d9e4e5fdd7f6e920a189ed958adb48db9",
+        "size": 5147,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_rows_from_file.py",
+        "git_blob": "a8e7f9d76b74c1eba1af76021150169f74ff78cd",
+        "sha256": "c5cf7b0d78af05eb167729554e0d276a48317b4485b56a6576eef2b365eb7e73",
+        "size": 4046,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_sniff.py",
+        "git_blob": "029a7fc495bbcf4dc93503039a0d47b063bde2e0",
+        "sha256": "055565ed0059d4361a9d5a87006338eb65e5ad6b04a4e0711ed7bcce378035db",
+        "size": 925,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_suggest_column_types.py",
+        "git_blob": "d4f28d37e95c4b5ae57cc8ee4eb29d7b864de6d3",
+        "sha256": "8eb9b8581c75cc6665571d14c0d85b12a30d13929a160c91845c9ccdc8ae5cfa",
+        "size": 991,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_tracer.py",
+        "git_blob": "ec81f2f05817ed9ef89378a8fd1343d832797176",
+        "sha256": "7fabd5d3ca3ae0e91f9e1dfc50e3cfcd3fe22429e5cc38393065e09c659d034a",
+        "size": 3270,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_transform.py",
+        "git_blob": "873871308cfba8dee7170f88a54e377b2a6ad81a",
+        "sha256": "90d5f5f46d8224159ec8ab98fb1505b11cac4396e262fcf6d078bd846bea3cdd",
+        "size": 55439,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_update.py",
+        "git_blob": "44cc098af5e34c283f43fa8fdb19f579ae3ac078",
+        "sha256": "24f57c3a3cd242acb6f9238fedb908f15018850a3841a2e09f908a538301df3c",
+        "size": 3386,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_upsert.py",
+        "git_blob": "8274557faf0584075ed3666c291589ca459632f7",
+        "sha256": "8d2da1d00ce761415ca28c2c66f66e2ab3117a8a530f3798c339bda5b5656e6d",
+        "size": 6429,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_utils.py",
+        "git_blob": "360a4436a99fbaf93f5beb10144ce07cf4ab9cb8",
+        "sha256": "16824dbda34d375fefe1cd8993c3e94b1445326e79a12f6b981c970f64e2ce9f",
+        "size": 3102,
+        "mode": "100644"
+      },
+      {
+        "path": "tests/test_wal.py",
+        "git_blob": "0e8f332bcefc2bba48385feee030b502c07db625",
+        "sha256": "32c6c421a944a7dd824731a83d87727f4eb259f90971a9dccf84271fd3c9acbc",
+        "size": 3169,
+        "mode": "100644"
+      }
+    ]
+  },
+  "content": {
+    "scenarios": 4,
+    "tasks": 13,
+    "kinds": {
+      "understand": 2,
+      "consult": 3,
+      "diagnose": 4,
+      "plan": 2,
+      "modify": 2
+    },
+    "all_requires_empty": true,
+    "static": {
+      "content_schema": 2,
+      "projects": 1,
+      "scenarios": 4,
+      "tasks": 13,
+      "digest": "9a1a27017dce15534f81a3ca8f57ccc0674b7edbac1d2b46ce4b281a9696abff",
+      "evidence": "内容结构及离线制品摘要，不代表原生验收或模型完成"
+    }
+  },
+  "environment": {
+    "schema": 1,
+    "id": "sqlite-utils-py312",
+    "adapter": "python-native",
+    "python": "3.12.15",
+    "platform": "linux-amd64",
+    "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+    "requirements": [
+      "click==8.5.0",
+      "click-default-group==1.2.4",
+      "hypothesis==6.170.5",
+      "iniconfig==2.3.1",
+      "packaging==26.3",
+      "pluggy==1.7.0",
+      "Pygments==2.21.0",
+      "pytest==9.1.1",
+      "python-dateutil==2.9.0.post0",
+      "six==1.17.0",
+      "sortedcontainers==2.4.0",
+      "sqlite-fts4==1.0.3",
+      "tabulate==0.10.0",
+      "pip==24.0"
+    ],
+    "artifacts": [
+      {
+        "path": "artifacts/click-8.5.0-py3-none-any.whl",
+        "digest": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360",
+        "size": 125251
+      },
+      {
+        "path": "artifacts/click_default_group-1.2.4-py2.py3-none-any.whl",
+        "digest": "9b60486923720e7fc61731bdb32b617039aba820e22e1c88766b1125592eaa5f",
+        "size": 4123
+      },
+      {
+        "path": "artifacts/hypothesis-6.170.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+        "digest": "83a29bd457f5aad739bc22b15cc295545c9372a254d6be77f253eae2908e5e5a",
+        "size": 1163728
+      },
+      {
+        "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+        "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+        "size": 7552
+      },
+      {
+        "path": "artifacts/packaging-26.3-py3-none-any.whl",
+        "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+        "size": 129956
+      },
+      {
+        "path": "artifacts/pip-24.0-py3-none-any.whl",
+        "digest": "ba0d021a166865d2265246961bec0152ff124de910c5cc39f1156ce3fa7c69dc",
+        "size": 2110226
+      },
+      {
+        "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+        "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+        "size": 27082
+      },
+      {
+        "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+        "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+        "size": 1250147
+      },
+      {
+        "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+        "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+        "size": 386536
+      },
+      {
+        "path": "artifacts/python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+        "digest": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
+        "size": 229892
+      },
+      {
+        "path": "artifacts/six-1.17.0-py2.py3-none-any.whl",
+        "digest": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+        "size": 11050
+      },
+      {
+        "path": "artifacts/sortedcontainers-2.4.0-py2.py3-none-any.whl",
+        "digest": "a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0",
+        "size": 29575
+      },
+      {
+        "path": "artifacts/sqlite_fts4-1.0.3-py3-none-any.whl",
+        "digest": "0359edd8dea6fd73c848989e1e2b1f31a50fe5f9d7272299ff0e8dbaa62d035f",
+        "size": 9972
+      },
+      {
+        "path": "artifacts/tabulate-0.10.0-py3-none-any.whl",
+        "digest": "f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3",
+        "size": 39814
+      }
+    ],
+    "business": {
+      "memory_mb": 256,
+      "timeout_sec": 30,
+      "pids_limit": 64
+    },
+    "regression": {
+      "memory_mb": 512,
+      "timeout_sec": 180,
+      "pids_limit": 64
+    },
+    "verification_status": "verified_current_target_runtime",
+    "notes": "当前正式目标镜像已在 UID1000、network none、只读根验证，Python3.12.15／SQLite3.40.1；业务256MiB/PID64/30秒，原版与两独立参考完整回归512MiB/PID64/180秒。当前1513节点中1497通过、16按实际可选能力跳过（3缺compiled ext.c、1缺pandas/numpy、12缺SpatiaLite），无失败；逐节点合同和日志已冻结。校准pytest21.59秒、子进程峰值292300KiB，资源为已验证上限非最优值。真实模型质量／成本和生产部署未验证。",
+    "tested_image": "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+    "tested_repo_digest": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+  },
+  "native": {
+    "wrapper_sha256": "b3e75e056b684fa6d5a6a4871bf8793b8422d373460562110207612c97ba65c3",
+    "contract_sha256": "332ce04fde2e20454ca74ac6da7c68302d87dd2cbd3d4953355607f1c94f132b",
+    "collected": 1513,
+    "counts": {
+      "error": 0,
+      "failed": 0,
+      "passed": 1497,
+      "skipped": 16,
+      "unexecuted": 0,
+      "xfailed": 0,
+      "xpassed": 0
+    },
+    "skip_xfail": [
+      {
+        "id": "tests/test_cli.py::test_load_extension[None-should_pass0-should_fail0]",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_cli.py', 2850, 'Skipped: Requires compiled ext.c')"
+      },
+      {
+        "id": "tests/test_cli.py::test_load_extension[sqlite3_ext_b_init-b-should_fail1]",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_cli.py', 2850, 'Skipped: Requires compiled ext.c')"
+      },
+      {
+        "id": "tests/test_cli.py::test_load_extension[sqlite3_ext_c_init-c-should_fail2]",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_cli.py', 2850, 'Skipped: Requires compiled ext.c')"
+      },
+      {
+        "id": "tests/test_create.py::test_create_table_numpy",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_create.py', 1184, 'Skipped: pandas and numpy are not installed')"
+      },
+      {
+        "id": "tests/test_gis.py::test_add_geometry_column",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_gis.py', 34, 'Skipped: Could not find SpatiaLite extension')"
+      },
+      {
+        "id": "tests/test_gis.py::test_cli_add_geometry_column",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_gis.py', 130, 'Skipped: Could not find SpatiaLite extension')"
+      },
+      {
+        "id": "tests/test_gis.py::test_cli_add_geometry_column_invalid_type",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_gis.py', 199, 'Skipped: Could not find SpatiaLite extension')"
+      },
+      {
+        "id": "tests/test_gis.py::test_cli_add_geometry_column_options",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_gis.py', 162, 'Skipped: Could not find SpatiaLite extension')"
+      },
+      {
+        "id": "tests/test_gis.py::test_cli_create_spatial_index",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_gis.py', 222, 'Skipped: Could not find SpatiaLite extension')"
+      },
+      {
+        "id": "tests/test_gis.py::test_cli_create_spatialite",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_gis.py', 115, 'Skipped: Could not find SpatiaLite extension')"
+      },
+      {
+        "id": "tests/test_gis.py::test_create_spatial_index",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_gis.py', 58, 'Skipped: Could not find SpatiaLite extension')"
+      },
+      {
+        "id": "tests/test_gis.py::test_double_create_spatial_index",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_gis.py', 73, 'Skipped: Could not find SpatiaLite extension')"
+      },
+      {
+        "id": "tests/test_gis.py::test_find_spatialite",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_gis.py', 22, 'Skipped: Could not find SpatiaLite extension')"
+      },
+      {
+        "id": "tests/test_gis.py::test_init_spatialite",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_gis.py', 27, 'Skipped: Could not find SpatiaLite extension')"
+      },
+      {
+        "id": "tests/test_gis.py::test_query_load_extension[False]",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_gis.py', 92, 'Skipped: Could not find SpatiaLite extension')"
+      },
+      {
+        "id": "tests/test_gis.py::test_query_load_extension[True]",
+        "outcome": "skipped",
+        "reason": "('/tmp/bench-native-regression-x7an4h7d/project/tests/test_gis.py', 92, 'Skipped: Could not find SpatiaLite extension')"
+      }
+    ],
+    "resources": {
+      "python": "3.12.15",
+      "sqlite": "3.40.1",
+      "prepare_elapsed_sec": 10.005954965003184,
+      "elapsed_sec": 32.891871492000064,
+      "children_peak_rss_kib": 292300,
+      "command": [
+        "/work/python/bin/python",
+        "-I",
+        "-B",
+        "/runner/native_regression.py",
+        "--project",
+        "sqlite-utils",
+        "--baseline-root",
+        "/baseline",
+        "--freeze-baseline-contract",
+        "/evidence/native-contract.json",
+        "--evidence-dir",
+        "/evidence/run",
+        "--timeout-sec",
+        "150"
+      ],
+      "returncode": 0
+    },
+    "reference_results": [
+      {
+        "name": "P02-final",
+        "status": "passed",
+        "expectation_met": true,
+        "elapsed_sec": 7.283040211004845
+      },
+      {
+        "name": "M01-reference-full",
+        "status": "passed",
+        "expectation_met": true,
+        "elapsed_sec": 29.149965493998025
+      },
+      {
+        "name": "M02-reference-full",
+        "status": "passed",
+        "expectation_met": true,
+        "elapsed_sec": 25.599981833998754
+      },
+      {
+        "name": "M02-original-final",
+        "status": "failed",
+        "expectation_met": true,
+        "elapsed_sec": 6.323680461006006
+      },
+      {
+        "name": "M01-wrong-no-triggers",
+        "status": "failed",
+        "expectation_met": true,
+        "elapsed_sec": 6.256147165004222
+      },
+      {
+        "name": "M02-wrong-public-default",
+        "status": "failed",
+        "expectation_met": true,
+        "elapsed_sec": 6.232029295999382
+      },
+      {
+        "name": "C02-wrong-missing-option",
+        "status": "failed",
+        "expectation_met": true,
+        "elapsed_sec": 7.2525423760016565
+      }
+    ],
+    "public_probes": {
+      "results": {
+        "M01-original": {
+          "returncode": 1,
+          "expected": 1,
+          "passed": true,
+          "import": "/work/M01-original/sqlite_utils/__init__.py",
+          "candidate_import": true,
+          "command": [
+            "/work/python/bin/python",
+            "-m",
+            "pytest",
+            "tests/test_fts.py",
+            "-k",
+            "test_finite_one_shot_columns_preserve_fts",
+            "-q",
+            "-ra",
+            "-p",
+            "no:cacheprovider"
+          ]
+        },
+        "M01-reference": {
+          "returncode": 0,
+          "expected": 0,
+          "passed": true,
+          "import": "/work/M01-reference/sqlite_utils/__init__.py",
+          "candidate_import": true,
+          "command": [
+            "/work/python/bin/python",
+            "-m",
+            "pytest",
+            "tests/test_fts.py",
+            "-k",
+            "test_finite_one_shot_columns_preserve_fts",
+            "-q",
+            "-ra",
+            "-p",
+            "no:cacheprovider"
+          ]
+        },
+        "M02-original": {
+          "returncode": 1,
+          "expected": 1,
+          "passed": true,
+          "import": "/work/M02-original/sqlite_utils/__init__.py",
+          "candidate_import": true,
+          "command": [
+            "/work/python/bin/python",
+            "-m",
+            "pytest",
+            "tests/test_convert.py",
+            "tests/test_register_function.py",
+            "-k",
+            "test_consecutive_bound_callbacks_use_current_mapping or test_convert_does_not_change_public_default_replacement",
+            "-q",
+            "-ra",
+            "-p",
+            "no:cacheprovider"
+          ]
+        },
+        "M02-reference": {
+          "returncode": 0,
+          "expected": 0,
+          "passed": true,
+          "import": "/work/M02-reference/sqlite_utils/__init__.py",
+          "candidate_import": true,
+          "command": [
+            "/work/python/bin/python",
+            "-m",
+            "pytest",
+            "tests/test_convert.py",
+            "tests/test_register_function.py",
+            "-k",
+            "test_consecutive_bound_callbacks_use_current_mapping or test_convert_does_not_change_public_default_replacement",
+            "-q",
+            "-ra",
+            "-p",
+            "no:cacheprovider"
+          ]
+        },
+        "csv-as-json": {
+          "returncode": 1,
+          "expected": 1,
+          "passed": true,
+          "stderr": "Error: Invalid JSON - use --csv for CSV or --tsv for TSV files\n\nJSON error: Expecting value: line 1 column 1 (char 0)\n",
+          "stdout": "",
+          "command": [
+            "/work/python/bin/python",
+            "-I",
+            "-B",
+            "-m",
+            "sqlite_utils",
+            "insert",
+            "/work/incident/csv-as-json.db",
+            "orders",
+            "-"
+          ]
+        },
+        "csv-explicit": {
+          "returncode": 0,
+          "expected": 0,
+          "passed": true,
+          "stderr": "",
+          "stdout": "",
+          "command": [
+            "/work/python/bin/python",
+            "-I",
+            "-B",
+            "-m",
+            "sqlite_utils",
+            "insert",
+            "/work/incident/csv-explicit.db",
+            "orders",
+            "-",
+            "--csv"
+          ]
+        },
+        "json-default": {
+          "returncode": 0,
+          "expected": 0,
+          "passed": true,
+          "stderr": "",
+          "stdout": "",
+          "command": [
+            "/work/python/bin/python",
+            "-I",
+            "-B",
+            "-m",
+            "sqlite_utils",
+            "insert",
+            "/work/incident/json-default.db",
+            "orders",
+            "-"
+          ]
+        }
+      },
+      "elapsed_sec": 10.800732545998471,
+      "children_peak_rss_kib": 75396,
+      "real_model_calls": 0
+    }
+  },
+  "integration_handoff": {
+    "local_catalog": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/sqlite-utils/library",
+    "references": {
+      "SQ-M01": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/sqlite-utils/reference-M01",
+      "SQ-M02": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/sqlite-utils/reference-M02"
+    },
+    "mock_answers": "/root/project/vibecoding-bench/.deploy/project-catalog-second-pack/sqlite-utils/mock-answers.json",
+    "entries": {
+      "SQ-S02": [
+        "normal",
+        "unavailable"
+      ],
+      "SQ-S03": [
+        "normal",
+        "diagnose_only",
+        "modify_direct"
+      ],
+      "SQ-S04": [
+        "normal",
+        "diagnose_only",
+        "modify_direct"
+      ]
+    },
+    "disclosure": "SQ-D01 import-evidence; unavailable explicitly suppresses normal disclosure"
+  },
+  "cleanup": {
+    "remaining_owned_containers": [],
+    "temporary_native_input_directories": [],
+    "business_data_roots_cleaned": true,
+    "real_model_calls": 0,
+    "oauth_calls": 0,
+    "production_touched": false
+  },
+  "limitations": [
+    "No real model or OAuth calls; no Git write or deployment",
+    "Current-target optional tests skipped with actual per-node reasons",
+    "FTS4 existing UPDATE-trigger error is not a target of SQ-M01",
+    "Initial oracle mixed-column TEXT-affinity failure preserved in business-attempt-01; BLOB input isolates falsey convert semantics"
+  ]
+}

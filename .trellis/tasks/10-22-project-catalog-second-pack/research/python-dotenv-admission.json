@@ -1,0 +1,506 @@
+{
+  "project": "python-dotenv",
+  "status": "verified_content_and_native_only",
+  "source": {
+    "commit": "0b2880591780a426b0551436f47a17e7a76d954f",
+    "files": [
+      {
+        "path": ".bumpversion.cfg",
+        "git_blob": "aa28bcfd26fe65e27fa3e8a281e35757c3a6b459",
+        "sha256": "b4225c9bfd7c7dea85406541f85c2223c82255e3019547dbec49e7a542446dbe",
+        "size": 105,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": ".editorconfig",
+        "git_blob": "e27640434d3522dc6378dee0cea2c36f23e40550",
+        "sha256": "91ca4c8ad16309579982341930d568d2790cd5716e0193ad6e066764ff85d2cc",
+        "size": 243,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": ".github/SECURITY.md",
+        "git_blob": "00d4d5e46b05ea81837fc93b177f51d6eb028ed4",
+        "sha256": "d005085d41417a88e06a7e6036804aaf57163739886df74fecf280d7c077feba",
+        "size": 680,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": ".github/dependabot.yml",
+        "git_blob": "3137ade58ef87d7c53cc306812d8d969c3c08aa4",
+        "sha256": "ee0c9dad6c02cbac59c32cc70311fe93437c0b1e93b683c2ea62acbb1eb0fbce",
+        "size": 822,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": ".github/workflows/release.yml",
+        "git_blob": "369ebc8e64e3407cc5aaf894685249ced86399d0",
+        "sha256": "69d13192b2218b0d17e433b5f8af1d797fbe5ab03e6806c90119a899e0a26ee9",
+        "size": 1380,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": ".github/workflows/test.yml",
+        "git_blob": "e8e7fa81f01aff4bbe779a0a16690d187902f215",
+        "sha256": "082827a39a4fda006abc1807e2a07ab040d52e2a7e598df134634a4b38cf8c1c",
+        "size": 1286,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": ".gitignore",
+        "git_blob": "ba1234ce660ef062f926a443a5ec61f7a0c3c9b8",
+        "sha256": "92c064957359c2be81209629f6111dbf57f6b2826e72bfa808d76537fcecb5ec",
+        "size": 1566,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": ".pre-commit-config.yaml",
+        "git_blob": "60d0365c9ce5e30eda412669a55ded0b8332be88",
+        "sha256": "d01478603c4961aa40eb5e27d6991fec2c41934f7482218a2014a49e8ffb6979",
+        "size": 182,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "CHANGELOG.md",
+        "git_blob": "e5f25414c41ea4f4bff3204f4f1ec344211dcd81",
+        "sha256": "294cf6e970d269ec701104a322160be2d7ca3c790e48f50007965970d844e3a3",
+        "size": 22171,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "CONTRIBUTING.md",
+        "git_blob": "dd21ae761a86ee8d6afbae8eed2152c5936a6390",
+        "sha256": "986854ef7b3868b0f15758221cd999adf6ab50bbf40e3da1689b085088e3a96a",
+        "size": 700,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "LICENSE",
+        "git_blob": "3a97119010ac82e15e917a69b7b8f9f59b5a4601",
+        "sha256": "80619b7049f08c81683ad0e01f08f257a840652dd71ee83146d36658c7d2c2b9",
+        "size": 1556,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "MANIFEST.in",
+        "git_blob": "bf0d47e60d88426e5dbd23b2e0361c03911b755b",
+        "sha256": "7010f25e274a8127650b35a35a963cef33a1120f93c249cf8c64be4de271e74a",
+        "size": 283,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "Makefile",
+        "git_blob": "6706fe9444773c11d8e9585bbb9fb6d1079b8eee",
+        "sha256": "74d25e5e679cf6c217f1b6d142c7510311d472d4be93d7afc209cd6a874e64ea",
+        "size": 1352,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "README.md",
+        "git_blob": "3400e67cc5321f0e0dbe23a8eb39b5b8020e4ef9",
+        "sha256": "7d06cf7aa8278a4416873e141b5510d99bcc46bd14b440221ef46eba74009441",
+        "size": 7997,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "RELEASING.md",
+        "git_blob": "9d88c34383beb5a6c48ccfe01b49969ebf39f3fe",
+        "sha256": "df7efbaed1027a062d5bb5095d5bd6dc78b022437a0ad254ff453d411edc602a",
+        "size": 2803,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "docs/changelog.md",
+        "git_blob": "04c99a55caae5d51f17666f554c2c8cea0aadfc0",
+        "sha256": "5b1ace6cbf670b5d35b515086985890d889090026e075bb900834cea4945afba",
+        "size": 15,
+        "upstream_mode": "120000",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "docs/contributing.md",
+        "git_blob": "44fcc63439371c8c829df00eec6aedbdc4d0e4cd",
+        "sha256": "3b4a07b9c92d73f838166d1bc5907f6d4305d0661b13e4617d9820f4d21e7207",
+        "size": 18,
+        "upstream_mode": "120000",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "docs/index.md",
+        "git_blob": "32d46ee883b58d6a383eed06eb98f33aa6530ded",
+        "sha256": "dbcc210d7f4962499db6d4cfa18658e26d05ee700c962a811cac911f095e22fd",
+        "size": 12,
+        "upstream_mode": "120000",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "docs/license.md",
+        "git_blob": "ea5b60640b01f74e295037aa8a6b7d4ea278a739",
+        "sha256": "1e881ecf2862d01e6e5bc2b861e46886d2a6fb01499c0c508a209a7271b13cf2",
+        "size": 10,
+        "upstream_mode": "120000",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "docs/reference.md",
+        "git_blob": "8a3762ad4137717ed5f18719030bd7c32c3debaf",
+        "sha256": "acf20f0b6b9ee9f0af6b50e9ca0e67fe1f904c71f00b5c450bbdfaa121b3b2d4",
+        "size": 14,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "mkdocs.yml",
+        "git_blob": "3d55d8994ff5202572ab4223ba148413d20b934f",
+        "sha256": "83ab242553640d2cfaa0ce06cadee5f7e4352c7c24208d73158b4ba47f88fc9f",
+        "size": 630,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "pyproject.toml",
+        "git_blob": "1619e9d4b8198ebb7162d363836c2175aa5b4b14",
+        "sha256": "3e5cd6c31650889b33b57e1f4aa764695519ee95578eee7e8f76b3734aa8473d",
+        "size": 2120,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "requirements-docs.txt",
+        "git_blob": "76fa086e3c51adb18387d0b044b43b54de0d7dc4",
+        "sha256": "9bd719c05023386176dae93f187f1a3b46d457c18d10db5b424eead1fcb4b6e1",
+        "size": 130,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "requirements.txt",
+        "git_blob": "8b1177fe13d5354cd44eb8c8143f8ff0ada10910",
+        "sha256": "866b5215434fe1ac6e056fb4122a0a920a2fa5da0319caa90c2ae5d26add5b15",
+        "size": 83,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "ruff.toml",
+        "git_blob": "a2e0feca9caedca4a1d1dfba0c854a6f6eef1237",
+        "sha256": "18b8cd8f263b6fb7b3f562e0fedffdb74ab25d43fd03cd85e868d43c70dda41e",
+        "size": 178,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "src/dotenv/__init__.py",
+        "git_blob": "dde24a0138999bd3876dfdfad02d5d93014e481c",
+        "sha256": "6e163e88aeb0c0765a996208e9e482b820165d435d9f64d016610eb97494ed23",
+        "size": 1230,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "src/dotenv/__main__.py",
+        "git_blob": "3977f55a8b1e94e67bab364885e502e6c89e3bc5",
+        "sha256": "3744612c6ee71c8aad9491f0c1ea48a3ecdb24f371f6c7b0082446639dbc87fe",
+        "size": 129,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "src/dotenv/cli.py",
+        "git_blob": "c06c7068443bf373ad21fd7257c5a4534ce349b5",
+        "sha256": "fd9755edcd5e496b46f141bcfc76310f2f86b961f93e67980ea9c5305d278f8c",
+        "size": 7284,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "src/dotenv/ipython.py",
+        "git_blob": "4e7edbbfe9d0d4c08659f12c469991a3fcb16b04",
+        "sha256": "74740177d3dc7425298466faed7c32dc6914a8c49d7fd5d4522358c53677b585",
+        "size": 1326,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "src/dotenv/main.py",
+        "git_blob": "5faa7f0e40ef73fbb87e024915ad775db25d4ff7",
+        "sha256": "fcb89122cd8756c43209f9052bb3c552dbe440d45493c762295c771f0d1ceaa8",
+        "size": 16970,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "src/dotenv/parser.py",
+        "git_blob": "d9d475838282140d07d4bc1bfec4a8890bdfaf36",
+        "sha256": "0bc1350444eeff987f2c22924400ad0b7727563798118c641cd4c0de55bd30d0",
+        "size": 5806,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "src/dotenv/py.typed",
+        "git_blob": "7632ecf77545c5e5501cb3fc5719df0761104ca2",
+        "sha256": "f0f8f2675695a10a5156fb7bd66bafbaae6a13e8d315990af862c792175e6e67",
+        "size": 26,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "src/dotenv/variables.py",
+        "git_blob": "667f2f26ff2182ecdfc5b809ba97a6cf1d1be13a",
+        "sha256": "083d2a5cebefa41deae51a4140c0fda97eaf1d7ed2c96f92ba2c063054a5b74f",
+        "size": 2348,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "src/dotenv/version.py",
+        "git_blob": "b3f9ac7f1a3db1c3b67eb7be431b87759bd13ce4",
+        "sha256": "5c1287f04d4b983c6fd3a537f72a8c05b5d96a93844458080840d866cfe446ca",
+        "size": 22,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "tests/__init__.py",
+        "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "tests/conftest.py",
+        "git_blob": "cc6f0f0767334b816f307268f46662807e497c17",
+        "sha256": "1cc31c9f8e8b5e076780d7469c8f35ff8088e37a25be0bc7e07b68e593beb443",
+        "size": 279,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "tests/test_cli.py",
+        "git_blob": "8123c9dd5441ba35207627705050bc04fab36ba0",
+        "sha256": "b939dc4f92c3f857069b567fc3051a9e17b4a471e542874110a045cca756a969",
+        "size": 11789,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "tests/test_fifo_dotenv.py",
+        "git_blob": "2aa31779c6b25b958576a06ec81aabdb423d67a9",
+        "sha256": "b69ecca75f9eb3969aa2cc2d49f66006cccae02da472805a3b3ad4c9fca8f8de",
+        "size": 743,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "tests/test_ipython.py",
+        "git_blob": "93bffd66671bc35fd3fc9390f9c7be001fe681f5",
+        "sha256": "aaa10084bffa00032ff6fe9f61c4a1975c77d4f102b4c1e18b6eea0433d93933",
+        "size": 2257,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "tests/test_is_interactive.py",
+        "git_blob": "1c073471bbc0f0d8f66d99829f293a9fcaf935e7",
+        "sha256": "2d4a6a5a4501bbd6c2860b39abeb9d5201a2de3d110347f74236098aa72f2a18",
+        "size": 8921,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "tests/test_lib.py",
+        "git_blob": "eb9d52042116bd34df05fcf529dd1b1a45a95865",
+        "sha256": "f75073c7317f7cda985b94531774578056519bf8dcb91aa7f3c60a7cf8872199",
+        "size": 1122,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "tests/test_main.py",
+        "git_blob": "930ab17182533771c58ad32b240704c74321d6c1",
+        "sha256": "3b2f4bf1ca0d0a87bfac8c14c7236b42b39f444dcc148f751ef7b3f65c89342a",
+        "size": 27507,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "tests/test_parser.py",
+        "git_blob": "667eae1571093cede3a687468fefe427b34e8e66",
+        "sha256": "aa9bc882bba648147ec0cf02322360ed9cacffb435828008404a0563321191dd",
+        "size": 19179,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "tests/test_utils.py",
+        "git_blob": "93b8bae252d6620c5cca5dd7f5a35e93f5517177",
+        "sha256": "82e06b9819adbc846b84717f9cc47ffff2dc99c77ebb0a22d93026326eac78a3",
+        "size": 747,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "tests/test_variables.py",
+        "git_blob": "6f2b220323219450ef89f1031a36b10b0b81ace4",
+        "sha256": "facea37ceaca30b761c2128fa754ec32c1e50333f2ac1776f7f8063018aaa6fc",
+        "size": 884,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "tests/test_zip_imports.py",
+        "git_blob": "6a26350272f3c2a9811cf0408b10a4f9ba738a8c",
+        "sha256": "9224bd859309409c62848bac6564eec0793aa6dffa091c9965ec6c4644a8ef04",
+        "size": 2864,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      },
+      {
+        "path": "tox.ini",
+        "git_blob": "6d1f25f855c820f14f610383d5a3fd7b6685e4d7",
+        "sha256": "28610cc12be03b4adb7c0aa76ee94062c19d7dc63deebcc2c64f23b6d0c44aeb",
+        "size": 1212,
+        "upstream_mode": "100644",
+        "representation": "ordinary file containing unchanged Git blob"
+      }
+    ]
+  },
+  "link_blob_representations": [
+    {
+      "path": "docs/changelog.md",
+      "git_blob": "04c99a55caae5d51f17666f554c2c8cea0aadfc0",
+      "sha256": "5b1ace6cbf670b5d35b515086985890d889090026e075bb900834cea4945afba",
+      "size": 15,
+      "upstream_mode": "120000",
+      "representation": "ordinary file containing unchanged Git blob",
+      "target": "../CHANGELOG.md"
+    },
+    {
+      "path": "docs/contributing.md",
+      "git_blob": "44fcc63439371c8c829df00eec6aedbdc4d0e4cd",
+      "sha256": "3b4a07b9c92d73f838166d1bc5907f6d4305d0661b13e4617d9820f4d21e7207",
+      "size": 18,
+      "upstream_mode": "120000",
+      "representation": "ordinary file containing unchanged Git blob",
+      "target": "../CONTRIBUTING.md"
+    },
+    {
+      "path": "docs/index.md",
+      "git_blob": "32d46ee883b58d6a383eed06eb98f33aa6530ded",
+      "sha256": "dbcc210d7f4962499db6d4cfa18658e26d05ee700c962a811cac911f095e22fd",
+      "size": 12,
+      "upstream_mode": "120000",
+      "representation": "ordinary file containing unchanged Git blob",
+      "target": "../README.md"
+    },
+    {
+      "path": "docs/license.md",
+      "git_blob": "ea5b60640b01f74e295037aa8a6b7d4ea278a739",
+      "sha256": "1e881ecf2862d01e6e5bc2b861e46886d2a6fb01499c0c508a209a7271b13cf2",
+      "size": 10,
+      "upstream_mode": "120000",
+      "representation": "ordinary file containing unchanged Git blob",
+      "target": "../LICENSE"
+    }
+  ],
+  "seed_digest": "7adb719502909d3fd4bdfbec74b9445fb6c735dfd4df52bd559e5f37407439f7",
+  "project_tree_digest": "e87cfbf10435b0b5331917c43989a961c90814e2910940ba63235c83bc9967f7",
+  "environment_tree_digest": "d93dc9e74cc2591d1f7d7f34e687dd888a46500f3fb455b673d30efc8ba6af8f",
+  "handoff_catalog_digest": "966ab8b2576abf056b16aed72386d1c0e0c062f81d90a6f2fe5299811ce3618b",
+  "task_counts": {
+    "understand": 2,
+    "consult": 2,
+    "plan": 2,
+    "diagnose": 4,
+    "modify": 2
+  },
+  "scenario_count": 5,
+  "task_count": 12,
+  "independent_modify_count": 2,
+  "reference_roots": {
+    "DE-M01": ".deploy/project-catalog-second-pack/python-dotenv/references/DE-M01",
+    "DE-M02": ".deploy/project-catalog-second-pack/python-dotenv/references/DE-M02"
+  },
+  "runner": {
+    "calibration_sha256": "e36ec55b5bddb08c791fbb3bf376caa0dd250acb424f2597e782d1fd693d45e9",
+    "final_sha256": "b3e75e056b684fa6d5a6a4871bf8793b8422d373460562110207612c97ba65c3",
+    "calibration_counts": {
+      "passed": 288,
+      "skipped": 0,
+      "failed": 0
+    },
+    "references_each_passed": 288,
+    "source_cli": "dotenv.__main__:cli"
+  },
+  "resources": {
+    "business": {
+      "memory_mb": 256,
+      "timeout_sec": 30,
+      "pids_limit": 64
+    },
+    "regression": {
+      "memory_mb": 512,
+      "timeout_sec": 90,
+      "pids_limit": 64
+    },
+    "baseline": {
+      "elapsed_including_prep_sec": 9.163094550996902,
+      "memory_peak_bytes": 173281280,
+      "command": [
+        "/work/python/bin/python",
+        "-I",
+        "-B",
+        "/control/native_regression.py",
+        "--project",
+        "python-dotenv",
+        "--baseline-root",
+        "/baseline/library",
+        "--freeze-baseline-contract",
+        "/evidence/native-contract.json",
+        "--evidence-dir",
+        "/evidence/frozen",
+        "--timeout-sec",
+        "90"
+      ],
+      "returncode": 0
+    }
+  },
+  "evidence": {
+    "initial_business": ".deploy/project-catalog-second-pack/python-dotenv/results",
+    "corrected_final": ".deploy/project-catalog-second-pack/python-dotenv/final-results",
+    "frozen_regression": ".deploy/project-catalog-second-pack/python-dotenv/calibration/frozen",
+    "public_tests": ".deploy/project-catalog-second-pack/python-dotenv/public-tests",
+    "cleanup": ".deploy/project-catalog-second-pack/python-dotenv/cleanup-final.json"
+  },
+  "historical_failed_attempts_retained": true,
+  "notes": [
+    "首轮非目标空白oracle误将目标Binding前缀当成非目标记录，已更正并定向重验；未改上游seed或参考修复。",
+    "所有修改requires=[]，场景独立原版，无代码继承。",
+    "DE-D01初始无native；incident模式仅作材料实际披露后的准入事实见证，不提前进入通用rubric。",
+    "参考完整冻结回归恢复上游测试；新增公开测试另行真实执行，并换回原版证明失败。"
+  ],
+  "boundaries": {
+    "real_model_calls": 0,
+    "oauth_calls": 0,
+    "product_mock": "由root整包验证，本仓不单独宣称通过",
+    "git": "未add/commit/push",
+    "deployment": "未部署"
+  }
+}
