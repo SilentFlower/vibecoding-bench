@@ -9,5 +9,5 @@
       "input": "invalid"
     }
   ],
-  "rendering": "结构化关键字段；完整文本由冻结夹具实际采集，不手编 Pydantic 版本相关渲染。"
+  "rendering": "Structured key fields; the full text is captured by executing the frozen fixture, rather than manually inventing Pydantic-version-dependent rendering."
 }

@@ -1,22 +1,22 @@
 {
   "schema": 1,
   "task_id": "PS-PRECEDENCE",
-  "version": 1,
+  "version": 2,
   "status": "draft_not_calibrated",
   "criteria": [
     {
       "id": "no-bug",
-      "requirement": "明确本例是默认环境高于 dotenv 的正常行为，APP_QUANTITY=5 覆盖文件数量2，不把它称为库BUG。",
+      "requirement": "Clearly explain that this is normal default behavior: environment variables take precedence over dotenv, so APP_QUANTITY=5 overrides the file's quantity of 2. Do not call it a library bug.",
       "required": true
     },
     {
       "id": "fix-usage",
-      "requirement": "给出撤去当前进程变量的最小办法；若提文件优先则用真实 settings_customise_sources 并说明影响，不要求改库。",
+      "requirement": "Provide the minimal way to remove the current process variable. If file-first precedence is proposed, use the real settings_customise_sources API and explain its effects. Library changes are not required.",
       "required": true
     },
     {
       "id": "avoid-wrong-api",
-      "requirement": "不得建议 _env_file=None 来只读文件，因为该选项禁用 dotenv；结论需要源码与现有输入支持。",
+      "requirement": "Do not recommend _env_file=None as a way to read only the file, because that option disables dotenv. Support conclusions with source code and the provided inputs.",
       "required": true
     }
   ],
@@ -40,6 +40,6 @@
   },
   "accept_equivalent_answers": true,
   "grade_length": false,
-  "uncertain_rule": "证据不足时返回 uncertain，不自动当候选失败；不得要求输出隐含推理过程。",
-  "feedback_policy": "仅返回已声明的公开业务规则和反馈码，不披露隐藏样例或完整rubric。"
+  "uncertain_rule": "Return uncertain when evidence is insufficient; do not automatically treat the candidate as failed. Do not require disclosure of hidden reasoning.",
+  "feedback_policy": "Return only declared public business rules and feedback codes. Do not disclose hidden examples or the complete rubric."
 }

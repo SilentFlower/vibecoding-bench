@@ -1,1 +1,1 @@
-这是完整注册代码，我也附上同一代码的根命令和 `export` 帮助输出。请据此判断，并告诉我现在应怎么调用。
+Here is the complete registration code, together with the root command and `export` help output from that same code. Please use it to determine the cause and tell me how to invoke the command now.

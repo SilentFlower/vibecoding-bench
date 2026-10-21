@@ -4,7 +4,7 @@
   "criteria": [
     {
       "id": "normalization-facts",
-      "requirement": "说明 parse 的 strip、CRLF 规范化与 format 的 strip，以及默认 YAML 转普通值后导出不保注释／引号。",
+      "requirement": "Explain strip in parse, CRLF normalization, strip in format, and the fact that the default YAML path converts input to ordinary values and does not preserve comments or quotes on export.",
       "evidence": [
         "library/frontmatter/__init__.py:75",
         "library/frontmatter/util.py:23",
@@ -13,20 +13,20 @@
     },
     {
       "id": "irreversible-loss",
-      "requirement": "仅换导出 Dumper 无法恢复已丢原始空白和注释，自定义 handler 不等于现成完整无损编辑；区分语义值和原字节。",
+      "requirement": "Changing only the export Dumper cannot restore original whitespace and comments that have already been lost. A custom handler does not provide complete lossless editing out of the box. Distinguish semantic values from original bytes.",
       "evidence": []
     },
     {
       "id": "feasible-options",
-      "requirement": "比较调用方保留原文及限制编辑范围，与显式保真模式／往返节点等扩展；说明新增依赖或限制、失败拒改与兼容默认行为，允许多种合理选择。",
+      "requirement": "Compare caller-side preservation of the original text with restricted editing against extensions such as an explicit preservation mode or round-trip nodes. Explain added dependencies or limitations, refusal to modify on failure, and compatibility with default behavior. Accept multiple reasonable choices.",
       "evidence": []
     },
     {
       "id": "minimal-plan",
-      "requirement": "推荐能落地的最小范围及只改 title 的验证办法，说明未知语法／块标量／锚点／重复键等未承诺边界；不强制第三方库名，不写实现。",
+      "requirement": "Recommend a feasible minimal scope and a way to verify title-only changes. Explain unsupported or uncommitted boundaries such as unknown syntax, block scalars, anchors, and duplicate keys. Do not require a particular third-party library or write the implementation.",
       "evidence": []
     }
   ],
-  "comparison": "按事实、行为和约束，不按关键词、篇幅或参考答案相似度。",
+  "comparison": "Evaluate facts, behavior, and constraints rather than keywords, answer length, or similarity to a reference answer.",
   "source_commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6"
 }

@@ -4,7 +4,7 @@
   "criteria": [
     {
       "id": "not-a-bug",
-      "requirement": "明确这段调用是已存在的浅覆盖，不是解析器漏字段；文档整个 settings 取代默认 settings。",
+      "requirement": "Clearly explain that this call uses the existing shallow override behavior, rather than the parser dropping a field: the document's entire settings value replaces the default settings.",
       "evidence": [
         "library/frontmatter/__init__.py:78",
         "library/frontmatter/__init__.py:95"
@@ -12,15 +12,15 @@
     },
     {
       "id": "local-workaround",
-      "requirement": "给出可运行的两个固定字段调用方合并，文档 theme 优先为 dark，默认 lang 保留为 zh；原 defaults 对象不变，不要求通用递归 API。",
+      "requirement": "Provide a runnable caller-side merge for the two fixed fields: the document's theme takes precedence with dark, and the default lang remains zh. Leave the original defaults object unchanged. A general recursive API is not required.",
       "evidence": []
     },
     {
       "id": "existing-api-and-scope",
-      "requirement": "不把 merge_metadata／MetadataSchema 提案称既有 API，不改库，不交换优先级。",
+      "requirement": "Do not present the proposed merge_metadata or MetadataSchema as existing APIs, modify the library, or reverse the precedence.",
       "evidence": []
     }
   ],
-  "comparison": "按事实、行为和约束，不按关键词、篇幅或参考答案相似度。",
+  "comparison": "Evaluate facts, behavior, and constraints rather than keywords, answer length, or similarity to a reference answer.",
   "source_commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6"
 }

@@ -2,7 +2,7 @@
   "criteria": [
     {
       "id": "purpose",
-      "requirement": "说明 Typer 将有类型注解的 Python 函数构建为 CLI，不把它说成商品存储或数据库。",
+      "requirement": "Explain that Typer builds CLIs from Python functions with type annotations; do not describe it as product storage or a database.",
       "evidence": [
         "library/typer/main.py:119",
         "library/typer/main.py:753"
@@ -10,7 +10,7 @@
     },
     {
       "id": "registration",
-      "requirement": "说明 command 装饰器记录命令函数，get_command 再根据命令、callback 和子组构造单命令或命令组；可用等价描述，不要求穷举全部内部函数。",
+      "requirement": "Explain that the command decorator records command functions, then get_command constructs a single command or command group according to the commands, callback, and subgroups. Equivalent descriptions are allowed; listing every internal function is not required.",
       "evidence": [
         "library/typer/main.py:890",
         "library/typer/main.py:1173"
@@ -18,7 +18,7 @@
     },
     {
       "id": "parameters",
-      "requirement": "说明类型注解及 Option/Argument 元数据经 get_click_param/get_click_type 变为参数解析与校验规则。",
+      "requirement": "Explain that type annotations and Option/Argument metadata become parameter parsing and validation rules through get_click_param/get_click_type.",
       "evidence": [
         "library/typer/main.py:1530",
         "library/typer/main.py:1632"
@@ -26,7 +26,7 @@
     },
     {
       "id": "boundaries",
-      "requirement": "商品持久化由用户应用实现；当前版本内置 vendored Click，不声称必须外装 Click 才能解析，不编造商品 API。",
+      "requirement": "Product persistence is implemented by the user application. This version includes vendored Click; do not claim that a separate Click installation is required for parsing or invent product APIs.",
       "evidence": [
         "library/pyproject.toml:40",
         "library/typer/_click/LICENSE.txt:1"
@@ -36,9 +36,9 @@
   "allowed_outcomes": [
     "understood"
   ],
-  "equivalent_answers": "短答有准确流程和业务边界即可，不按函数名数量或篇幅计分。",
+  "equivalent_answers": "A short answer with an accurate workflow and business boundary is sufficient. Do not score by the number of function names or the length of the answer.",
   "schema": 1,
   "task_id": "TY-U01",
   "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
-  "result_version": 1
+  "result_version": 2
 }

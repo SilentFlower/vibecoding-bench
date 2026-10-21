@@ -1,1 +1,1 @@
-我只需要资料字段，网页由别的系统处理。请据当前代码说明边界。
+I only need the document fields; another system handles the web pages. Explain the boundary based on the current code.

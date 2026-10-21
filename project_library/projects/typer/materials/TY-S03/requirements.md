@@ -1,7 +1,7 @@
-本地商品工具的业务要求：
+Business requirements for the local product tool:
 
-- 商品品类只允许字符串 `coffee`、`tea`。
-- SKU 是 `SKU-` 加四个 ASCII 数字，例如 `SKU-0001`。
-- 查询和下架两个本地命令都要接收 SKU。
-- 错误输入只需告诉用户格式不对，暂时不需要复杂补全或第三方插件。
-- 本场景只咨询和讨论；不创建文件，不修改 Typer，也不修改依赖环境。
+- Product categories must be the strings `coffee` or `tea`.
+- An SKU is `SKU-` followed by four ASCII digits, for example `SKU-0001`.
+- Both local commands, “查询” and “下架”, must accept an SKU.
+- Invalid input only needs to tell the user that the format is invalid; complex completion and third-party plugins are not needed for now.
+- This scenario is for consultation and discussion only. Do not create files, modify Typer, or change the dependency environment.

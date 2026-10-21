@@ -1,1 +1,1 @@
-普通 hello 应继续作为字符串；合法 JSON 字符串列表才得到列表。请明确区分两者，临时绕行办法需要给出可验证用法。
+Ordinary hello text should remain a string; only a valid JSON list of strings should become a list. Clearly distinguish the two, and provide verifiable usage for the temporary workaround.

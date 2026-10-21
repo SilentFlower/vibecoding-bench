@@ -1,1 +1,1 @@
-本地脚本批量整理商品记录，当前工具标题和每批处理数量写死在业务代码里。希望把这些值移到本地配置，业务处理函数继续由调用方组织。
+A local script organizes product records in batches. The tool title and the number of items processed per batch are currently hardcoded in business code. We want to move these values into local configuration while keeping the caller responsible for organizing the business processing functions.

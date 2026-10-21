@@ -2,14 +2,14 @@
   "criteria": [
     {
       "id": "literal",
-      "requirement": "确认字符串 Literal[coffee, tea] 已映射为 TyperChoice，不需要为此改库。",
+      "requirement": "Confirm that the string Literal[coffee, tea] is already mapped to TyperChoice and does not require a library change.",
       "evidence": [
         "library/typer/main.py:1620"
       ]
     },
     {
       "id": "parser",
-      "requirement": "确认 parser 可把字符串解析为用户类，click_type 可提供自定义参数类型；已有能力不等于还需新增注册机制。",
+      "requirement": "Confirm that parser can parse strings into a user-defined class, and click_type can provide a custom parameter type. These existing capabilities do not imply that an additional registration mechanism is needed.",
       "evidence": [
         "library/typer/main.py:1533",
         "library/typer/main.py:1536",
@@ -18,7 +18,7 @@
     },
     {
       "id": "exclusive",
-      "requirement": "确认 parser 与 click_type 不能同时指定，ParameterInfo 会拒绝；不建议把两者组合在同一参数。",
+      "requirement": "Confirm that parser and click_type cannot be specified together: ParameterInfo rejects this combination. Do not recommend combining them on the same parameter.",
       "evidence": [
         "library/typer/models.py:336",
         "library/tests/test_others.py:35"
@@ -26,7 +26,7 @@
     },
     {
       "id": "scope",
-      "requirement": "依据当前版本和少量源码回答即可，不擅自实现上游增强或创建文件。",
+      "requirement": "Answer based on the current version and a small amount of source inspection. Do not implement an upstream enhancement or create files without being asked.",
       "evidence": [
         "materials/TY-S03/requirements.md"
       ]
@@ -38,5 +38,5 @@
   "schema": 1,
   "task_id": "TY-C02",
   "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
-  "result_version": 1
+  "result_version": 2
 }

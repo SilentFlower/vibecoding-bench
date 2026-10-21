@@ -1,1 +1,9 @@
-{"projects":["python-frontmatter","pydantic-settings","typer"],"schema":2,"version":"real-project-scenarios-v1"}
+{
+  "projects": [
+    "python-frontmatter",
+    "pydantic-settings",
+    "typer"
+  ],
+  "schema": 2,
+  "version": "real-project-scenarios-v2-en"
+}

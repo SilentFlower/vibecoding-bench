@@ -1,1 +1,1 @@
-这份默认值之后还要给别的文档用，能保留原对象内容吗？
+These defaults will also be used for other documents later. Can you preserve the original object's contents?

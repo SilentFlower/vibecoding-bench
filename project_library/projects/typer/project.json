@@ -50,7 +50,7 @@
           "id": "TY-U01",
           "kind": "understand",
           "goal": "解释Typer用途、函数到命令的流程与商品持久化边界",
-          "prompt": "我想把本地商品处理函数做成命令行工具。这个项目主要解决什么问题？请根据当前源码说明从函数到命令的关键流程，以及它是否会替我存储商品数据。简短说明即可。",
+          "prompt": "I want to turn my local product-processing functions into a command-line tool. What main problem does this project solve? Based on the current source code, briefly explain the key steps from a function to a command, and whether it will store product data for me.",
           "materials": [],
           "requires": [],
           "allowed_paths": [],
@@ -59,7 +59,7 @@
           ],
           "max_turns": 2,
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/rubrics/TY-U01.json"
           }
         },
@@ -67,7 +67,7 @@
           "id": "TY-C01",
           "kind": "consult",
           "goal": "在答复中提供满足数量边界的最小商品CLI接入示例",
-          "prompt": "上面是我的商品函数。希望运行 `python shop.py 咖啡 --quantity 3`，默认数量为 1，数量不能为负数。请给出最小可运行的接入示例和调用方式，解释错误输入怎么反馈；先不要替我创建文件。",
+          "prompt": "The product function above is mine. I want to run `python shop.py 咖啡 --quantity 3`, with a default quantity of 1 and no negative quantities allowed. Please provide a minimal runnable integration example and invocation instructions, and explain how invalid input is reported. Do not create files for me yet.",
           "materials": [
             "materials/TY-C01/product.py"
           ],
@@ -78,7 +78,7 @@
           ],
           "max_turns": 2,
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/rubrics/TY-C01.json",
             "native": "verification/native/consult.json"
           }
@@ -119,7 +119,7 @@
           "id": "TY-D01",
           "kind": "diagnose",
           "goal": "解释单命令调用并排除注册失效误判",
-          "prompt": "代码里注册的函数叫 `product`，但 `python shop.py 咖啡 --quantity 3` 可以直接执行。我以为必须写命令名。这是不是注册失效了？先帮我判断原因，不要改代码。",
+          "prompt": "The function registered in the code is called `product`, but `python shop.py 咖啡 --quantity 3` runs directly. I thought I had to include the command name. Does this mean registration has failed? First help me determine the cause; do not change the code.",
           "materials": [
             "materials/TY-D01/shop.py"
           ],
@@ -130,7 +130,7 @@
           ],
           "max_turns": 2,
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/rubrics/TY-D01.json",
             "native": "verification/native/single.json"
           }
@@ -139,7 +139,7 @@
           "id": "TY-D02",
           "kind": "diagnose",
           "goal": "先获取必要材料，再判断根选项位置报错与正确调用",
-          "prompt": "我给商品工具加了 `--verbose`。运行 `python shop.py export --verbose` 提示 `No such option: --verbose`，这是 Typer 的 BUG 吗？",
+          "prompt": "I added `--verbose` to the product tool. Running `python shop.py export --verbose` reports `No such option: --verbose`. Is this a Typer bug?",
           "materials": [],
           "requires": [],
           "allowed_paths": [],
@@ -148,14 +148,14 @@
           ],
           "max_turns": 4,
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/rubrics/TY-D02.json",
             "native": "verification/native/group.json"
           },
           "branches": [
             {
               "id": "TY-D02-registration",
-              "when": "请求完整注册代码或能确认根/子命令选项归属的帮助信息，或明确指出缺少声明并请求这项必要材料；不能仅武断猜测后直接通过。",
+              "when": "Requests the complete registration code or help output that establishes whether the option belongs to the root command or a subcommand, or explicitly identifies the missing declaration and requests that necessary material. Do not pass based only on an unsupported guess.",
               "materials": [
                 "disclosure/TY-D02/shop.py",
                 "disclosure/TY-D02/followup.md",
@@ -194,7 +194,7 @@
           "id": "TY-C02",
           "kind": "consult",
           "goal": "辨识已有Literal及两种自定义参数能力与互斥约束",
-          "prompt": "商品品类只允许 `coffee` 或 `tea`，SKU 要解析成我自己的类。这个版本必须改 Typer 才能支持吗？我看到 `Literal`、`parser` 和 `click_type`，请确认它们现在能做什么，以及能不能同时指定后两者。",
+          "prompt": "Product categories must be either `coffee` or `tea`, and SKU values need to be parsed into my own class. Does this version require changes to Typer to support that? I have seen `Literal`, `parser`, and `click_type`; please confirm what they currently support and whether the latter two can be specified together.",
           "materials": [
             "materials/TY-S03/requirements.md"
           ],
@@ -205,7 +205,7 @@
           ],
           "max_turns": 2,
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/rubrics/TY-C02.json",
             "native": "verification/native/types.json"
           }
@@ -214,7 +214,7 @@
           "id": "TY-P01",
           "kind": "plan",
           "goal": "为两个本地命令选择维护成本合理的SKU解析方案",
-          "prompt": "我的 SKU 只是 `SKU-` 加四个数字；只有“查询”和“下架”两个本地命令需要它，失败时告诉用户格式不对即可，暂时不需要复杂补全或第三方插件。请比较在应用中复用解析函数、使用自定义参数类型，以及扩展 Typer 注册机制这几种办法，推荐一个维护成本合理的方案。先不要实现。",
+          "prompt": "My SKU format is simply `SKU-` followed by four digits. Only two local commands, “查询” and “下架”, need it. On failure, telling the user that the format is invalid is sufficient; complex completion and third-party plugins are not needed for now. Please compare reusing a parsing function in the application, using a custom parameter type, and extending Typer’s registration mechanism, then recommend an approach with reasonable maintenance cost. Do not implement it yet.",
           "materials": [
             "materials/TY-S03/requirements.md"
           ],
@@ -230,7 +230,7 @@
           ],
           "max_turns": 2,
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/rubrics/TY-P01.json"
           }
         }
@@ -255,7 +255,7 @@
           "id": "TY-M01",
           "kind": "modify",
           "goal": "为用户商品应用增加完整JSON清单导出并保留既有行为",
-          "prompt": "现在请修改这个商品应用，增加 `export` 子命令。用 `python shop.py export catalog.json --output result.json` 把商品清单导出为 JSON：保留商品顺序及 sku、name、quantity，忽略其他字段，中文以实际字符保存；输入必须是对象数组，每项都有非空字符串 sku、name，以及非负整数 quantity（布尔值不算整数），重复 sku 拒绝，空数组允许。坏 JSON 或任意无效记录都要非零退出并说明原因，不能留下部分导出文件。已有输出文件拒绝覆盖，输入文件不能改。请同时保留现有 `product` 命令，并补充针对业务行为的测试与简短用法说明。只修改这个用户应用及其测试、文档，不改 Typer 和依赖环境。",
+          "prompt": "Now modify this product application to add an `export` subcommand. Use `python shop.py export catalog.json --output result.json` to export the product list as JSON: preserve product order and the sku, name, and quantity fields, ignore other fields, and save Chinese characters as actual characters. The input must be an array of objects, each with non-empty string sku and name fields and a non-negative integer quantity (booleans do not count as integers). Reject duplicate sku values; an empty array is allowed. Invalid JSON or any invalid record must result in a nonzero exit with an explanation, and must not leave a partial export file. Refuse to overwrite an existing output file, and do not modify the input file. Also preserve the existing `product` command, add tests of business behavior, and provide brief usage documentation. Modify only this user application and its tests and documentation; do not change Typer or the dependency environment.",
           "materials": [
             "materials/TY-M01/shop.py",
             "materials/TY-M01/catalog.json",
@@ -272,7 +272,7 @@
           ],
           "max_turns": 2,
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/rubrics/TY-M01.json",
             "native": "verification/native/export.json",
             "semantic": true

@@ -1,22 +1,22 @@
 {
   "schema": 1,
   "task_id": "PS-UNION-FIX",
-  "version": 1,
+  "version": 2,
   "status": "draft_not_calibrated",
   "criteria": [
     {
       "id": "scope",
-      "requirement": "修改库内分段环境解码并补回归，不以修改消费端、硬编码输入或仅改测试代替修复。",
+      "requirement": "Modify segmented environment decoding within the library and add regression tests. Do not substitute consumer-side changes, hardcoded inputs, or test-only changes for the fix.",
       "required": true
     },
     {
       "id": "behavior",
-      "requirement": "独立用例验证空列表、中文列表、普通文本、非法JSON字符串、多个键、非法列表元素和大小写边界。",
+      "requirement": "Use independent cases to verify empty lists, lists containing Chinese text, ordinary text, invalid JSON strings, multiple keys, invalid list elements, and case-sensitivity boundaries.",
       "required": true
     },
     {
       "id": "regression",
-      "requirement": "保留普通Union、NoDecode/ForceDecode/enable_decoding既有顶层行为，执行适用原生回归；工程检查点只在控制端验证成功后接受。",
+      "requirement": "Preserve existing top-level behavior for ordinary Union and NoDecode/ForceDecode/enable_decoding, and run the applicable native regression checks. Accept the engineering checkpoint only after controller-side verification succeeds.",
       "required": true
     }
   ],
@@ -40,6 +40,6 @@
   },
   "accept_equivalent_answers": true,
   "grade_length": false,
-  "uncertain_rule": "证据不足时返回 uncertain，不自动当候选失败；不得要求输出隐含推理过程。",
-  "feedback_policy": "仅返回已声明的公开业务规则和反馈码，不披露隐藏样例或完整rubric。"
+  "uncertain_rule": "Return uncertain when evidence is insufficient; do not automatically treat the candidate as failed. Do not require disclosure of hidden reasoning.",
+  "feedback_policy": "Return only declared public business rules and feedback codes. Do not disclose hidden examples or the complete rubric."
 }

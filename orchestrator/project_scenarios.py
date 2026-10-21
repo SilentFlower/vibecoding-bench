@@ -397,7 +397,7 @@ class ProjectScenarios:
                             or parent['generation'] != execution['generation'] or parent['status'] != 'active'):
                         raise ValueError('实际启动前父状态或额度代次已变化')
                     if quota_attempt > 0:
-                        prompt = '继续原会话当前尚未完成的任务，保留文件和已经完成的工作，完成后给出回答。'
+                        prompt = 'Continue the current unfinished task in the original session. Preserve the existing files and completed work, and provide your answer when finished.'
                         cursor = connection.execute('INSERT INTO project_task_deliveries(task_id,phase_key,prompt,input_digest,created_at) VALUES(?,?,?,?,?)',
                             (execution['task_id'], 'quota:' + source, prompt, digest_json(prompt), time.time()))
                         delivery = dict(connection.execute('SELECT * FROM project_task_deliveries WHERE id=?', (cursor.lastrowid,)).fetchone())
@@ -1095,7 +1095,7 @@ class ProjectScenarios:
             entry = next(item for item in json.loads(scenario['definition_json'])['entries'] if item['id']==task['entry_key'])
             for relative in [*entry.get('materials', []),*definition.get('materials', [])]:
                 content = (project.root / safe_relative(relative)).read_text(encoding='utf-8')
-                prompt += '\n业务材料 ' + Path(relative).name + '：\n' + content
+                prompt += '\nBusiness material ' + Path(relative).name + ':\n' + content
         if len(prompt.encode()) > 48 * 1024:
             self._task_status(task_id, 'blocked', '公开业务输入超过driver完整性上限')
             return False
@@ -1226,7 +1226,7 @@ class ProjectScenarios:
                 self._task_status(task['id'], 'exhausted', '超时后任务累计预算或继续次数已用尽')
             else:
                 self.owner.plans._write("UPDATE project_scenario_tasks SET status='ready',phase='timeout_resume',next_reason='timeout',next_prompt=?,updated_at=? WHERE id=?",
-                    ('继续原会话尚未完成的当前任务，保留已完成内容和现有文件，完成后给出回答。', time.time(), task['id']))
+                    ('Continue the current unfinished task in the original session. Preserve completed work and existing files, and provide your answer when finished.', time.time(), task['id']))
         else:
             if task['infra_recoveries'] >= 2:
                 self._task_status(task['id'], 'blocked', '执行基础设施恢复次数已用尽')
@@ -1234,7 +1234,7 @@ class ProjectScenarios:
                 self.owner.plans._write("UPDATE project_scenario_tasks SET status='ready',phase='infrastructure_resume',infra_recoveries=infra_recoveries+1,"
                     'next_reason=?,next_prompt=?,updated_at=? WHERE id=?',
                     ('continuation' if execution['attempt_id'] else task['next_reason'],
-                        '继续原会话当前未完成任务，保留文件和已有工作。' if execution['attempt_id'] else task['next_prompt'], time.time(), task['id']))
+                        'Continue the current unfinished task in the original session. Preserve the existing files and work.' if execution['attempt_id'] else task['next_prompt'], time.time(), task['id']))
         self.owner.plans._write('UPDATE project_task_executions SET ended_at=? WHERE id=? AND ended_at IS NULL', (time.time(), execution['id']))
         policy = json.loads(batch['policy_json'])
         self.owner.plans._write('UPDATE project_iteration_batches SET next_launch_at=COALESCE(next_launch_at,?),updated_at=? WHERE id=?',
@@ -1512,7 +1512,7 @@ class ProjectScenarios:
             if not branch:
                 raise ValueError('评审披露分支不属于冻结任务')
             project = self.owner._release(task['catalog_release_id']).projects[task['project_key']]
-            prompt = '以下为你请求的补充业务材料，请继续处理原任务：\n' + '\n'.join(
+            prompt = 'Here is the additional business material you requested. Continue working on the original task:\n' + '\n'.join(
                 (project.root / safe_relative(relative)).read_text(encoding='utf-8') for relative in branch['materials'])
         with self.owner.write_lock:
             connection = self.owner.database()
@@ -1557,7 +1557,7 @@ class ProjectScenarios:
                             status, phase, error = 'exhausted', 'turn_limit', '正常答复轮次已经用尽'
                         else:
                             status, phase = 'ready', 'correction_ready'
-                            prompt = '请继续原任务并根据独立验收反馈修正当前回答或授权代码：' + '、'.join(result.get('feedback_codes', []))
+                            prompt = 'Continue the original task and revise the current answer or authorized code according to this independent validation feedback: ' + ', '.join(result.get('feedback_codes', []))
                     else:
                         raise ValueError('不能接受未支持的评审动作')
                     public_result = {key: result.get(key) for key in ('decision', 'outcome', 'feedback_codes')}

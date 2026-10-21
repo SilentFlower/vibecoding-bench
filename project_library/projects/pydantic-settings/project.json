@@ -34,7 +34,7 @@
           "id": "PS-UNDERSTAND",
           "kind": "understand",
           "goal": "判断项目用途、适配理由与业务职责边界",
-          "prompt": "这个项目是干什么的？我们有个本地商品整理脚本，想把工具标题和每批处理数量移到配置里。用它合适吗？接入时哪些事情还需要我们自己做？",
+          "prompt": "What does this project do? We have a local product organization script and want to move the tool title and the number of items processed per batch into configuration. Is this project a good fit? What will we still need to handle ourselves when integrating it?",
           "materials": [
             "materials/business-goal.md"
           ],
@@ -45,13 +45,13 @@
             "answered"
           ],
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/rubrics/PS-UNDERSTAND.json"
           },
           "branches": [
             {
               "id": "PS-UNDERSTAND-BOUNDARY",
-              "when": "回答遗漏业务脚本仍承担什么，用户需要确认库是否代做商品整理。",
+              "when": "The answer omits the responsibilities that remain with the business script, and the user needs to confirm whether the library performs product organization for them.",
               "materials": [
                 "disclosure/understand-followup.md"
               ],
@@ -63,7 +63,7 @@
           "id": "PS-CONFIGURE",
           "kind": "consult",
           "goal": "给出真实可运行的标题／整数数量配置接入示例",
-          "prompt": "那给我一个最小用法：默认标题“商品工具”，数量为2；本地.env可以配置，运行时环境变量可以覆盖。数量要是整数，读取后让我能交给原来的业务函数。",
+          "prompt": "Then give me a minimal example: the default title is “商品工具” and the quantity is 2; a local .env file can configure them, and runtime environment variables can override them. The quantity must be an integer, and I need to pass the loaded values to the existing business function.",
           "materials": [
             "materials/configure-delivery.md",
             "materials/configure-fixture.py"
@@ -82,7 +82,7 @@
             "example_delivered"
           ],
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/rubrics/PS-CONFIGURE.json",
             "native": "verification/native/consult.json"
           }
@@ -108,7 +108,7 @@
           "id": "PS-PRECEDENCE",
           "kind": "diagnose",
           "goal": "以来源优先级解释正确行为并给出最小使用调整",
-          "prompt": "配置文件里数量是2，打印出来却是5。代码、文件、启动环境和输出都在样例里。帮我判断是不是库的BUG，并告诉我怎样只使用文件里的数量；先别改库。",
+          "prompt": "The quantity in the configuration file is 2, but the printed value is 5. The example includes the code, file, startup environment, and output. Determine whether this is a library bug and tell me how to use only the quantity from the file. Do not modify the library yet.",
           "materials": [
             "materials/precedence-model.py",
             "materials/precedence-input.json"
@@ -122,14 +122,14 @@
             "no_bug"
           ],
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/rubrics/PS-PRECEDENCE.json",
             "native": "verification/native/precedence.json"
           },
           "branches": [
             {
               "id": "PS-PRECEDENCE-CONTROL",
-              "when": "需要撤去环境变量的对照步骤来核验覆盖关系。",
+              "when": "A control step with the environment variable removed is needed to verify the override relationship.",
               "materials": [
                 "disclosure/precedence-control.md"
               ],
@@ -158,7 +158,7 @@
           "id": "PS-TRIAGE",
           "kind": "diagnose",
           "goal": "在信息不足时索取关键材料并完成非法输入定位",
-          "prompt": "商品工具启动时报配置错误，看起来与数量有关。是pydantic-settings的问题吗？",
+          "prompt": "The product tool reports a configuration error at startup, apparently related to the quantity. Is this a problem with pydantic-settings?",
           "materials": [],
           "requires": [],
           "max_turns": 4,
@@ -169,14 +169,14 @@
             "input_issue_identified"
           ],
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/rubrics/PS-TRIAGE.json",
             "native": "verification/native/precedence.json"
           },
           "branches": [
             {
               "id": "PS-TRIAGE-MODEL",
-              "when": "请求消费端配置类、字段类型或调用代码。",
+              "when": "The model requests the consumer's settings class, field types, or calling code.",
               "materials": [
                 "disclosure/triage-model.py"
               ],
@@ -184,7 +184,7 @@
             },
             {
               "id": "PS-TRIAGE-INPUTS",
-              "when": "请求配置文件、启动环境或实际输入来源。",
+              "when": "The model requests the configuration file, startup environment, or actual input sources.",
               "materials": [
                 "disclosure/triage-input.json"
               ],
@@ -192,7 +192,7 @@
             },
             {
               "id": "PS-TRIAGE-ERROR",
-              "when": "请求异常、错误位置或错误输入。",
+              "when": "The model requests the exception, error location, or invalid input.",
               "materials": [
                 "disclosure/triage-error.json"
               ],
@@ -200,7 +200,7 @@
             },
             {
               "id": "PS-TRIAGE-REPRO",
-              "when": "请求完整最小复现，或需要联合消费端代码、输入和异常判断。",
+              "when": "The model requests a complete minimal reproducer or needs the consumer code, inputs, and exception together to reach a conclusion.",
               "materials": [
                 "disclosure/triage-model.py",
                 "disclosure/triage-input.json",
@@ -247,7 +247,7 @@
           "id": "PS-UNION-DIAG",
           "kind": "diagnose",
           "goal": "定位字典联合值未解码原因并给出不改库的临时办法",
-          "prompt": "商品参数允许写一个字符串或一组字符串。我给APP_CONFIG__ITEM传了[]，结果拿到的是字符串。样例和输出在这里，请判断原因，指出有关代码，并给一个不改库的临时办法。",
+          "prompt": "A product parameter accepts either a string or a list of strings. I passed [] to APP_CONFIG__ITEM, but the result is a string. The example and output are provided here. Determine the cause, identify the relevant code, and give a temporary workaround that does not modify the library.",
           "materials": [
             "materials/union-model.py",
             "materials/union-input.json"
@@ -261,14 +261,14 @@
             "defect_identified"
           ],
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/rubrics/PS-UNION-DIAG.json",
             "native": "verification/native/union-original.json"
           },
           "branches": [
             {
               "id": "PS-UNION-TEXT",
-              "when": "需要确认普通hello文本的预期与列表解码边界。",
+              "when": "The expected behavior for ordinary hello text and the boundary of list decoding need clarification.",
               "materials": [
                 "disclosure/union-plain-text.md"
               ],
@@ -280,7 +280,7 @@
           "id": "PS-UNION-FIX",
           "kind": "modify",
           "goal": "修复库内字典Union分段环境解码并补回归",
-          "prompt": "请修复库里这个字典联合值的分段环境解码问题，并补回归。合法JSON字符串列表要得到列表，普通字符串继续保留，默认行为之外别扩需求。",
+          "prompt": "Fix this segmented environment decoding issue for dictionary union values in the library and add regression tests. Valid JSON lists of strings must produce lists, while ordinary strings must remain unchanged. Do not expand the requirements beyond the default behavior.",
           "materials": [
             "materials/union-model.py",
             "materials/union-input.json",
@@ -298,7 +298,7 @@
             "code_verified"
           ],
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/rubrics/PS-UNION-FIX.json",
             "native": "verification/native/union-fixed.json"
           }
@@ -324,7 +324,7 @@
           "id": "PS-REFRESH-PLAN",
           "kind": "plan",
           "goal": "给出校验成功后再发布且失败保留旧快照的配置刷新方案",
-          "prompt": "本地商品工具会运行很久，想让用户改配置后点一下“重新加载”，先看变化，格式错了继续用旧配置。请根据项目现有能力给一个实现方案，说明哪些现成可用、哪些要由我们补；这轮先不写代码。",
+          "prompt": "The local product tool runs for a long time. We want users to edit the configuration, click Reload, preview the changes, and keep using the old configuration if the new one has an invalid format. Propose an implementation plan based on the project's existing capabilities, distinguishing what is already available from what we must add. Do not write code in this round.",
           "materials": [
             "materials/refresh-requirements.md"
           ],
@@ -335,14 +335,14 @@
             "feasible_plan"
           ],
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/rubrics/PS-REFRESH-PLAN.json",
             "native": "verification/native/cache.json"
           },
           "branches": [
             {
               "id": "PS-REFRESH-LIFECYCLE",
-              "when": "询问旧配置引用、新批次取值或进程／并发边界。",
+              "when": "The model asks about references to the old configuration, how new batches obtain values, or process and concurrency boundaries.",
               "materials": [
                 "disclosure/refresh-lifecycle.md"
               ],

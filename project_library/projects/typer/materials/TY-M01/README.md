@@ -1,10 +1,10 @@
-# 本地商品工具
+# Local product tool
 
-在 `app/` 中运行应用；Typer 来自固定的 `library/` 源码及冻结依赖。
+Run the application from `app/`. Typer comes from the fixed `library/` source and frozen dependencies.
 
 ```bash
 python shop.py product 咖啡 --quantity 3
 python shop.py product 咖啡
 ```
 
-当前应用只提供 `product`，尚未提供清单导出。`catalog.json` 是用户业务输入，不能修改。
+The current application provides only `product`; list export is not yet available. `catalog.json` is user business input and must not be modified.

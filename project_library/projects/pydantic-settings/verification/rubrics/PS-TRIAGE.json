@@ -1,27 +1,27 @@
 {
   "schema": 1,
   "task_id": "PS-TRIAGE",
-  "version": 1,
+  "version": 2,
   "status": "draft_not_calibrated",
   "criteria": [
     {
       "id": "evidence-first",
-      "requirement": "首问不足以判因，先请求配置模型、实际来源／变量或最小复现等有决定意义的资料；允许一次索取完整复现。",
+      "requirement": "The initial question is insufficient to determine the cause. First request decisive materials such as the settings model, actual sources or variables, or a minimal reproducer. Requesting a complete reproducer in one turn is acceptable.",
       "required": true
     },
     {
       "id": "disclosed-only",
-      "requirement": "只依据已经披露的材料判断，不虚构自己已看到隐藏代码／日志或已运行对照。",
+      "requirement": "Base conclusions only on materials already disclosed. Do not invent claims of having seen hidden code or logs or having run a control experiment.",
       "required": true
     },
     {
       "id": "eventual-cause",
-      "requirement": "材料补齐后识别 APP_QUANTITY=invalid 的高优先级非法整数输入，loc quantity 是模型字段名，不等于物理变量名。",
+      "requirement": "After the materials are complete, identify APP_QUANTITY=invalid as the higher-priority invalid integer input. The quantity value in loc is the model field name, not the physical environment variable name.",
       "required": true
     },
     {
       "id": "minimum-verification",
-      "requirement": "给出撤去／修正变量后的最小对照；本入口资料全部可提供，不能仅说信息不足就结束或反复索要同物。",
+      "requirement": "Provide a minimal control check after removing or correcting the variable. All materials can be supplied in this entry, so do not end merely by saying information is insufficient or repeatedly request the same materials.",
       "required": true
     }
   ],
@@ -45,6 +45,6 @@
   },
   "accept_equivalent_answers": true,
   "grade_length": false,
-  "uncertain_rule": "证据不足时返回 uncertain，不自动当候选失败；不得要求输出隐含推理过程。",
-  "feedback_policy": "仅返回已声明的公开业务规则和反馈码，不披露隐藏样例或完整rubric。"
+  "uncertain_rule": "Return uncertain when evidence is insufficient; do not automatically treat the candidate as failed. Do not require disclosure of hidden reasoning.",
+  "feedback_policy": "Return only declared public business rules and feedback codes. Do not disclose hidden examples or the complete rubric."
 }

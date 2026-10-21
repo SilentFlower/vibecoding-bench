@@ -6,5 +6,5 @@
   "base_observation": {
     "item": "[]"
   },
-  "observation_provenance": "既有 01_union_dictionary_decode；本草案尚未执行新验收"
+  "observation_provenance": "The existing 01_union_dictionary_decode; no new acceptance check has been run for this draft yet."
 }

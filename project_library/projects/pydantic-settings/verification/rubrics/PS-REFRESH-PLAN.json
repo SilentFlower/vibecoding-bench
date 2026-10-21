@@ -1,22 +1,22 @@
 {
   "schema": 1,
   "task_id": "PS-REFRESH-PLAN",
-  "version": 1,
+  "version": 2,
   "status": "draft_not_calibrated",
   "criteria": [
     {
       "id": "existing-api",
-      "requirement": "准确识别 settings_cached 和 settings_clear_cache 已存在，settings_refresh 不存在；清缓存不等于先校验后发布，也不改变旧引用。",
+      "requirement": "Correctly identify that settings_cached and settings_clear_cache exist, while settings_refresh does not. Clearing the cache does not provide validation before publication or change existing references.",
       "required": true
     },
     {
       "id": "validate-before-publish",
-      "requirement": "普通构造建立候选，校验成功后显示差异并在受控入口切换，失败保留旧快照；现成方法与待写消费端逻辑分清。",
+      "requirement": "Build a candidate through ordinary construction, show differences after successful validation, and switch through a controlled access point; retain the old snapshot on failure. Clearly distinguish existing methods from consumer-side logic that must be implemented.",
       "required": true
     },
     {
       "id": "reference-lifecycle",
-      "requirement": "旧批次持旧对象，新批次经统一入口取新对象；可用单进程串行方案，不强求未提出的并发／跨进程设计。",
+      "requirement": "Existing batches retain the old object, while new batches obtain the new object through a common access point. A single-process serial design is acceptable; do not require unrequested concurrency or cross-process design.",
       "required": true
     }
   ],
@@ -40,6 +40,6 @@
   },
   "accept_equivalent_answers": true,
   "grade_length": false,
-  "uncertain_rule": "证据不足时返回 uncertain，不自动当候选失败；不得要求输出隐含推理过程。",
-  "feedback_policy": "仅返回已声明的公开业务规则和反馈码，不披露隐藏样例或完整rubric。"
+  "uncertain_rule": "Return uncertain when evidence is insufficient; do not automatically treat the candidate as failed. Do not require disclosure of hidden reasoning.",
+  "feedback_policy": "Return only declared public business rules and feedback codes. Do not disclose hidden examples or the complete rubric."
 }

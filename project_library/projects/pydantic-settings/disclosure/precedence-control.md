@@ -1,1 +1,1 @@
-请在隔离进程保持同一个 App 定义和文件，撤去 APP_QUANTITY 后再次调用 App()。这是需要实际运行的对照步骤，不把预期值伪装成本轮终端输出。
+In an isolated process, keep the same App definition and file, remove APP_QUANTITY, and call App() again. This control step must actually be run; do not present an expected value as terminal output from this round.

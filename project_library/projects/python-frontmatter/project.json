@@ -39,7 +39,7 @@
           "id": "FM-IN-01",
           "kind": "understand",
           "goal": "判断文档资料提取的适用范围与数据边界",
-          "prompt": "我们要从这种 Markdown 周报里提取标题和标签，供资料整理脚本使用。这个项目适合吗？请简要说明数据怎么进出，以及它会不会把 Markdown 渲染成网页。",
+          "prompt": "We want to extract titles and tags from Markdown weekly reports like this one for a document organization script. Is this project suitable? Briefly explain how data goes in and comes out, and whether it renders Markdown into web pages.",
           "requires": [],
           "materials": [
             "materials/weekly.md"
@@ -50,13 +50,13 @@
           ],
           "max_turns": 4,
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/FM-IN-01.rubric.json"
           },
           "branches": [
             {
               "id": "rendering-correction",
-              "when": "回答把元数据提取与网页渲染混为一谈，需要一次用户澄清。",
+              "when": "The answer conflates metadata extraction with web page rendering and needs one user clarification.",
               "materials": [
                 "disclosure/rendering-boundary.md"
               ]
@@ -67,7 +67,7 @@
           "id": "FM-IN-02",
           "kind": "consult",
           "goal": "用现有 API 完成周报读取、更新和另存往返",
-          "prompt": "请给一个最小 Python 用法：读取 weekly.md，打印标题和标签，增加 status 为“已校对”，写到 weekly-reviewed.md，再读回来确认字段和正文都对。不要覆盖原文件。",
+          "prompt": "Provide a minimal Python example: read weekly.md, print the title and tags, add status with the exact value “已校对” (proofread), write weekly-reviewed.md, then read it back to confirm that both the fields and body are correct. Do not overwrite the original file.",
           "requires": [],
           "materials": [
             "materials/weekly.md",
@@ -83,7 +83,7 @@
           ],
           "max_turns": 4,
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/FM-IN-02.rubric.json",
             "native": "verification/consult.native.json"
           },
@@ -131,7 +131,7 @@
           "id": "FM-DG-01",
           "kind": "diagnose",
           "goal": "先取得必要材料，再判断部分文档的 TypeError 原因",
-          "prompt": "有一部分 Markdown 用这个项目读不进去，报 TypeError。是不是库有 BUG？先帮我判断原因。",
+          "prompt": "Some Markdown documents cannot be read with this project and raise TypeError. Is there a bug in the library? Help me determine the cause first.",
           "requires": [],
           "materials": [],
           "allowed_paths": [
@@ -143,13 +143,13 @@
           ],
           "max_turns": 4,
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/FM-DG-01.rubric.json"
           },
           "branches": [
             {
               "id": "minimal-reproducer",
-              "when": "当前入口不是 unavailable，且模型合理请求最小失败文档、调用方式或完整异常；当前尚未披露复现。",
+              "when": "The current entry is not unavailable, the model reasonably requests a minimal failing document, the calling code, or the full exception, and the reproducer has not yet been disclosed.",
               "materials": [
                 "disclosure/reproducer.py",
                 "disclosure/reproducer-error.txt"
@@ -157,7 +157,7 @@
             },
             {
               "id": "challenge-certainty",
-              "when": "当前入口不是 unavailable，复现尚未披露，但模型已无依据确定根因；用户要求说明依据。",
+              "when": "The current entry is not unavailable and the reproducer has not yet been disclosed, but the model has already asserted a definite root cause without evidence; the user asks for its basis.",
               "materials": [
                 "disclosure/request-evidence.md"
               ]
@@ -168,7 +168,7 @@
           "id": "FM-FX-01",
           "kind": "modify",
           "goal": "修复合法保留键元数据的读取冲突并保持兼容",
-          "prompt": "请修复这个读取问题。文档里的 content 是业务摘要字段，要和正文分别保留；handler 也可能是业务字段。现有 Post 构造方式和普通文档用法要继续兼容，请加必要回归验证。\n完整复现：import frontmatter；text = \"---\\ncontent: 备用摘要\\n---\\n正文\"；frontmatter.loads(text) 报 TypeError: Post.__init__() got multiple values for argument 'content'。\n允许修改 library/frontmatter、相关 tests 与说明；不改变 Post.to_dict 的既有扁平输出合同，不顺带扩展格式保真或深合并。",
+          "prompt": "Fix this reading issue. The document's content is a business summary field and must be preserved separately from the body; handler may also be a business field. Keep existing Post construction and ordinary document usage compatible, and add the necessary regression checks.\nFull reproduction: import frontmatter; text = \"---\\ncontent: 备用摘要\\n---\\n正文\"; frontmatter.loads(text) raises TypeError: Post.__init__() got multiple values for argument 'content'.\nYou may modify library/frontmatter, the related tests, and documentation. Preserve the existing flat output contract of Post.to_dict, and do not expand the scope to formatting preservation or deep merging.",
           "requires": [],
           "materials": [],
           "allowed_paths": [
@@ -183,7 +183,7 @@
           ],
           "max_turns": 4,
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/FM-FX-01.rubric.json",
             "native": "verification/repair.native.json"
           },
@@ -209,7 +209,7 @@
           "id": "FM-DG-02",
           "kind": "diagnose",
           "goal": "解释默认 settings 的浅覆盖并给局部调用方处理",
-          "prompt": "我希望文档只覆盖 theme，默认的 lang 还能保留，但这段代码返回的 settings 里只有 theme。是不是解析漏字段了？请解释现在的行为，并给一个适合这两个固定字段的调用方处理方式，先别改库。",
+          "prompt": "I want the document to override only theme while keeping the default lang, but the settings returned by this code contains only theme. Did parsing drop a field? Explain the current behavior and provide a caller-side solution for these two fixed fields. Do not modify the library yet.",
           "requires": [],
           "materials": [
             "materials/shallow-example.py"
@@ -222,14 +222,14 @@
           ],
           "max_turns": 4,
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/FM-DG-02.rubric.json",
             "native": "verification/shallow.native.json"
           },
           "branches": [
             {
               "id": "keep-default-object",
-              "when": "模型提供的局部处理原地修改了仍要复用的默认对象。",
+              "when": "The model's local solution mutates the defaults object in place even though that object must be reused.",
               "materials": [
                 "disclosure/preserve-defaults.md"
               ]
@@ -256,7 +256,7 @@
           "id": "FM-PL-01",
           "kind": "plan",
           "goal": "评估只改标题且保留元数据样式与正文空白的最小方案",
-          "prompt": "编辑者只想改标题，但希望 YAML 注释和引号尽量不动，诗歌正文的缩进和末尾空行也要保留。请根据当前代码评估能做到多少，比较调用方处理和库扩展的办法，并推荐一个最小落地范围。这次先讨论，不写实现。",
+          "prompt": "An editor only wants to change the title while leaving YAML comments and quotes as unchanged as possible and preserving indentation and trailing blank lines in the poem body. Based on the current code, assess what is possible, compare caller-side approaches with library extensions, and recommend a minimal implementation scope. Discuss the plan only; do not implement it in this round.",
           "requires": [],
           "materials": [
             "materials/annotated.md",
@@ -271,13 +271,13 @@
           ],
           "max_turns": 4,
           "evaluation": {
-            "version": 1,
+            "version": 2,
             "rubric": "verification/FM-PL-01.rubric.json"
           },
           "branches": [
             {
               "id": "yaml-scope",
-              "when": "推荐依赖过宽格式范围且尚未给出只支持 YAML 的可行最小范围，用户收窄需求。",
+              "when": "The recommendation depends on supporting an overly broad set of formats and has not yet provided a feasible minimal YAML-only scope; the user narrows the requirements.",
               "materials": [
                 "disclosure/yaml-only.md"
               ]

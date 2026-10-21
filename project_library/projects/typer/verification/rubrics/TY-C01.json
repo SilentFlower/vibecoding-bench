@@ -2,7 +2,7 @@
   "criteria": [
     {
       "id": "runnable",
-      "requirement": "答复给出一份明确的最小可运行 Typer 示例，能以 python shop.py 咖啡 --quantity 3 调用并产生咖啡:3。控制端从冻结回答临时提取执行，不能要求模型先写文件。",
+      "requirement": "The answer provides one unambiguous, minimal runnable Typer example that can be invoked as python shop.py 咖啡 --quantity 3 and produces 咖啡:3. The controller temporarily extracts and executes it from the frozen answer; the model must not be required to write files first.",
       "evidence": [
         "library/typer/main.py:1173",
         "verification/native_checks.py"
@@ -10,7 +10,7 @@
     },
     {
       "id": "quantity_rules",
-      "requirement": "省略数量为 1；0 接受；负数和非法整数被拒绝，不得把负数钳制成 0。",
+      "requirement": "Omitting quantity gives 1; 0 is accepted; negative values and invalid integers are rejected. Negative values must not be clamped to 0.",
       "evidence": [
         "library/typer/main.py:1541",
         "verification/native_checks.py"
@@ -18,7 +18,7 @@
     },
     {
       "id": "help_and_call",
-      "requirement": "说明单命令直接调用，不额外添加 product；--help 只显示帮助，错误参数给出可理解的非零错误反馈。",
+      "requirement": "Explain that a single command is invoked directly, without adding product; --help only displays help, and invalid parameters produce an understandable error with a nonzero exit.",
       "evidence": [
         "library/typer/main.py:1188",
         "verification/native_checks.py"
@@ -26,7 +26,7 @@
     },
     {
       "id": "no_file_write",
-      "requirement": "遵守先不要创建文件，受评工作区 app 与 library 均不修改；验收端临时执行示例不构成代码检查点。",
+      "requirement": "Respect the instruction not to create files yet: neither app nor library in the evaluated workspace may be modified. Temporary execution of the example by the verifier does not constitute a code checkpoint.",
       "evidence": [
         "materials/TY-C01/product.py",
         "project.json"
@@ -40,11 +40,11 @@
     "maximum_answer_bytes": 131072,
     "maximum_program_bytes": 32768,
     "maximum_code_blocks": 8,
-    "rule": "优先识别完整 Python 主程序；仅碎片时合并；语法等价重复去重，多份不同完整主程序拒绝歧义。"
+    "rule": "Prefer a complete Python main program; combine fragments only when no complete program is present. Deduplicate syntactically equivalent repetitions, and reject ambiguity when multiple distinct complete main programs are provided."
   },
-  "equivalent_answers": "允许不同的合法 Typer 接入形式；以实际 CLI 行为及无文件写入判断，不要求照抄参考代码。",
+  "equivalent_answers": "Different valid Typer integration forms are allowed. Judge actual CLI behavior and the absence of file writes; copying the reference code is not required.",
   "schema": 1,
   "task_id": "TY-C01",
   "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
-  "result_version": 1
+  "result_version": 2
 }

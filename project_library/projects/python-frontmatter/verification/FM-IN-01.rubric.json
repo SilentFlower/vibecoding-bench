@@ -4,7 +4,7 @@
   "criteria": [
     {
       "id": "purpose",
-      "requirement": "说明适合分离、读取、编辑和序列化文档元数据与正文，不杜撰资料管理平台。",
+      "requirement": "Explain that the project is suitable for separating, reading, editing, and serializing document metadata and body content. Do not invent a document management platform.",
       "evidence": [
         "library/frontmatter/__init__.py:49",
         "library/frontmatter/__init__.py:176"
@@ -12,7 +12,7 @@
     },
     {
       "id": "data-boundary",
-      "requirement": "正确区分 Post 的 metadata 项访问与 post.content 正文；说明读取／导出路径，至少给出一个可定位源码依据。",
+      "requirement": "Correctly distinguish access to Post metadata items from the body in post.content. Explain the reading and export paths and provide at least one traceable source-code reference.",
       "evidence": [
         "library/frontmatter/__init__.py:145",
         "library/frontmatter/__init__.py:197",
@@ -21,10 +21,10 @@
     },
     {
       "id": "rendering",
-      "requirement": "明确现有调用链不把 Markdown 渲染成网页；不能编造渲染 API 或把候选增强称现成功能。",
+      "requirement": "Clearly state that the existing call chain does not render Markdown into web pages. Do not invent a rendering API or present a proposed enhancement as an existing feature.",
       "evidence": []
     }
   ],
-  "comparison": "按事实、行为和约束，不按关键词、篇幅或参考答案相似度。",
+  "comparison": "Evaluate facts, behavior, and constraints rather than keywords, answer length, or similarity to a reference answer.",
   "source_commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6"
 }

@@ -1,22 +1,22 @@
 {
   "schema": 1,
   "task_id": "PS-UNDERSTAND",
-  "version": 1,
+  "version": 2,
   "status": "draft_not_calibrated",
   "criteria": [
     {
       "id": "purpose",
-      "requirement": "准确说明 BaseSettings 负责来源读取与 Pydantic 类型校验，适合本地标题／数量配置。",
+      "requirement": "Accurately explain that BaseSettings handles reading configuration sources and Pydantic type validation, making it suitable for configuring the local title and quantity.",
       "required": true
     },
     {
       "id": "business-boundary",
-      "requirement": "明确商品整理业务、配置实例构建及刷新时机仍由消费端组织；不声称自动执行商品业务或自动监听文件。",
+      "requirement": "Clearly state that product organization logic, settings instance construction, and refresh timing remain the consumer's responsibilities. Do not claim automatic execution of product business logic or automatic file watching.",
       "required": true
     },
     {
       "id": "source-evidence",
-      "requirement": "给出 main.py 中 BaseSettings 初始化／来源收集等可核对源码依据，不要求列举全部来源。",
+      "requirement": "Provide verifiable source-code evidence from main.py, such as BaseSettings initialization or source collection. Listing every source is not required.",
       "required": true
     }
   ],
@@ -40,6 +40,6 @@
   },
   "accept_equivalent_answers": true,
   "grade_length": false,
-  "uncertain_rule": "证据不足时返回 uncertain，不自动当候选失败；不得要求输出隐含推理过程。",
-  "feedback_policy": "仅返回已声明的公开业务规则和反馈码，不披露隐藏样例或完整rubric。"
+  "uncertain_rule": "Return uncertain when evidence is insufficient; do not automatically treat the candidate as failed. Do not require disclosure of hidden reasoning.",
+  "feedback_policy": "Return only declared public business rules and feedback codes. Do not disclose hidden examples or the complete rubric."
 }

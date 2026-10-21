@@ -1,22 +1,22 @@
 {
   "schema": 1,
   "task_id": "PS-UNION-DIAG",
-  "version": 1,
+  "version": 2,
   "status": "draft_not_calibrated",
   "criteria": [
     {
       "id": "root-cause",
-      "requirement": "定位 env.py 的 next_field 原始字典值注解与 explode_env_vars 只做 _annotation_is_complex 的分支差异，对照已有 _field_is_complex Union路径。",
+      "requirement": "Identify the branch difference in env.py: next_field returns the raw dictionary value annotation, and explode_env_vars applies only _annotation_is_complex to it. Compare this with the existing Union path in _field_is_complex.",
       "required": true
     },
     {
       "id": "normal-vs-defect",
-      "requirement": "说明合法JSON列表应解码、普通 hello 应保留；不能误称 Pydantic 不支持 Union 或建议改掉业务类型。",
+      "requirement": "Explain that valid JSON lists should be decoded while ordinary hello text should remain unchanged. Do not incorrectly claim that Pydantic does not support Union or recommend changing the business type.",
       "required": true
     },
     {
       "id": "workaround",
-      "requirement": "给出整个 APP_CONFIG 使用JSON对象等不改库的真实临时办法；未执行时只称可验证方案。",
+      "requirement": "Provide a real temporary workaround that does not modify the library, such as supplying a JSON object for the entire APP_CONFIG. If it has not been executed, describe it only as a proposal that can be verified.",
       "required": true
     }
   ],
@@ -40,6 +40,6 @@
   },
   "accept_equivalent_answers": true,
   "grade_length": false,
-  "uncertain_rule": "证据不足时返回 uncertain，不自动当候选失败；不得要求输出隐含推理过程。",
-  "feedback_policy": "仅返回已声明的公开业务规则和反馈码，不披露隐藏样例或完整rubric。"
+  "uncertain_rule": "Return uncertain when evidence is insufficient; do not automatically treat the candidate as failed. Do not require disclosure of hidden reasoning.",
+  "feedback_policy": "Return only declared public business rules and feedback codes. Do not disclose hidden examples or the complete rubric."
 }

@@ -12,5 +12,5 @@
     "title": "商品工具",
     "quantity": 5
   },
-  "observation_provenance": "既有 observations-result.json 的 native_scenario；本草案未重新运行"
+  "observation_provenance": "The native_scenario in the existing observations-result.json; not rerun for this draft."
 }

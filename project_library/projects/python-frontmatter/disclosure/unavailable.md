@@ -1,1 +1,1 @@
-补充情况：我暂时拿不到失败文档、调用代码和完整异常。请先说明目前能判断到哪、还缺什么、之后怎样核实，不要猜定根因。
+Additional context: I currently cannot obtain the failing document, calling code, or full exception. Explain what can be determined now, what is still missing, and how to verify it later. Do not guess a definite root cause.

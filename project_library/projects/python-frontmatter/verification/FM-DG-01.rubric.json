@@ -4,12 +4,12 @@
   "criteria": [
     {
       "id": "initial-evidence",
-      "requirement": "首轮只有 TypeError，不能确定用户根因；有条件假设可以，但不得声称已复现。合理索取最小文档、调用或完整异常时可一次披露足够材料。",
+      "requirement": "The first turn provides only TypeError, which is insufficient to determine the user's root cause. Conditional hypotheses are acceptable, but the answer must not claim to have reproduced the issue. When the model reasonably requests a minimal document, the calling code, or the full exception, sufficient materials may be disclosed together.",
       "evidence": []
     },
     {
       "id": "diagnosis-after-disclosure",
-      "requirement": "unavailable 入口不要求定位根因，本项按该入口边界满足；diagnose_then_repair／diagnose_only 入口收到复现后，须准确指出合法 content 元数据与 Post 形参冲突，parse 返回字段而 loads 展开重复传参。仅提问不算材料可得分支完成。",
+      "requirement": "The unavailable entry does not require identifying the root cause; consider this criterion satisfied within that entry's boundary. After the reproducer is disclosed in the diagnose_then_repair or diagnose_only entry, the answer must correctly identify the collision between valid content metadata and a Post parameter: parse returns the field, and loads expands it into duplicate arguments. Merely asking questions does not complete a branch whose materials are available.",
       "evidence": [
         "library/frontmatter/__init__.py:176",
         "library/frontmatter/__init__.py:306"
@@ -17,20 +17,20 @@
     },
     {
       "id": "workaround-after-disclosure",
-      "requirement": "unavailable 入口不要求给未定根因的具体绕行，本项按该入口边界满足；材料已补齐时须给出不丢业务字段的可行临时处理，如 parse 分开取值，或先构造 Post 再更新 metadata，不得只建议删业务字段。",
+      "requirement": "The unavailable entry does not require a specific workaround for an undetermined root cause; consider this criterion satisfied within that entry's boundary. Once the materials are complete, provide a feasible temporary solution that preserves the business fields, such as retrieving values separately with parse or constructing Post before updating metadata. Merely suggesting deletion of business fields is insufficient.",
       "evidence": []
     },
     {
       "id": "unavailable-entry",
-      "requirement": "仅在 unavailable 入口材料明确无法提供时，说明不能定因、缺什么及怎样核实，可结束为 insufficient_information；该结果不能冒充已定位 BUG。",
+      "requirement": "Only when materials are explicitly unavailable in the unavailable entry may the task end as insufficient_information, after explaining that the cause cannot be determined, which materials are missing, and how to verify it. This outcome must not be presented as an identified bug.",
       "evidence": []
     },
     {
       "id": "read-only",
-      "requirement": "不自动修库，诊断／合法信息不足本身可以独立结束。",
+      "requirement": "Do not automatically modify the library. A diagnosis or a valid insufficient-information conclusion may independently complete the task.",
       "evidence": []
     }
   ],
-  "comparison": "按事实、行为和约束，不按关键词、篇幅或参考答案相似度。",
+  "comparison": "Evaluate facts, behavior, and constraints rather than keywords, answer length, or similarity to a reference answer.",
   "source_commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6"
 }

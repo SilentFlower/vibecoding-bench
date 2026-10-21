@@ -1,2 +1,2 @@
-annotated.md 与 poem.txt 是本任务可见业务文件，保留实际 UTF-8 字节。
-poem.txt 的明确表示为 "  缩进正文\n\n"；只讨论当前版本和最小方案，不改库。
+annotated.md and poem.txt are business files visible to this task; preserve their actual UTF-8 bytes.
+The explicit representation of poem.txt is "  缩进正文\n\n". Discuss only the current version and a minimal plan; do not modify the library.

@@ -1,1 +1,1 @@
-旧批次继续用旧快照，新批次经统一入口取新快照；不需要文件监听，也没有跨进程同步。
+Existing batches keep using the old snapshot, while new batches obtain the new snapshot through a common access point. File watching and cross-process synchronization are not needed.

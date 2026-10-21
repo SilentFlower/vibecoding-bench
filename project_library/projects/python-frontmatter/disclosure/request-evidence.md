@@ -1,1 +1,1 @@
-我还没给失败文件和异常详情，你根据什么确定？请先核实必要材料。
+I have not provided the failing file or exception details yet. What is your basis for being certain? Verify the necessary materials first.

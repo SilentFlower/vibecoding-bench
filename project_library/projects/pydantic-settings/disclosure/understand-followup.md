@@ -1,1 +1,1 @@
-它会替我执行商品整理吗？哪些工作仍应留在原业务脚本里？
+Will it perform product organization for me? Which responsibilities should remain in the original business script?

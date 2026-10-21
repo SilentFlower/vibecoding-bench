@@ -167,7 +167,7 @@ control 镜像的项目库、`images/v3/Dockerfile.dockerignore` 放行项、`de
 ### 1. Scope / Trigger
 
 - 修改 `project_scenario_content.py`、`project_scenarios.py`、`project_evaluation.py`、`project_scenario_usage.py`、`project_review_runtime.py`、`project_native_regression.py`、原生验证器、场景 API／页面或正式内容时适用。账号角色、租约、唯一凭据所有者仍遵守 account-runtime-v3；旧线性模式按前节版本读取。
-- 当前正式内容为 `real-project-scenarios-v1`，python-frontmatter 4场景／6任务、pydantic-settings 5／7、Typer 4／7，共17个非工程任务和3个工程任务。任务类型固定 `understand/consult/diagnose/plan/modify`，不要求每项目20步。内容就绪、本地模拟机制、真实模型完成及生产部署分别计数。
+- 当前正式内容为 `real-project-scenarios-v2-en`，python-frontmatter 4场景／6任务、pydantic-settings 5／7、Typer 4／7，共17个非工程任务和3个工程任务。任务类型固定 `understand/consult/diagnose/plan/modify`，不要求每项目20步。内容就绪、本地模拟机制、真实模型完成及生产部署分别计数。
 
 ### 2. Signatures
 
@@ -208,6 +208,8 @@ observed_model(directory, response, session_id) -> str
 ### 3. Contracts
 
 **内容与离线环境**：内容 schema 2 项目必须固定上游HTTPS GitHub URL、40位commit、seed内许可、seed_digest、environment及可变scenarios/tasks。entry列必要task_ids；branch只选固定披露材料／setup／同场景activate_tasks。requires精确声明answer或code依赖，首版仅同场景无环，code仅引用modify。公开materials与控制verification隔离；setup来源固定，目标仅app/。每项目源码对象上限128MiB／10000文件；环境wheel独立存放，逐制品hash、精确requirements及Python版本冻结，business/regression资源分开，不能把venv放进源码快照。
+
+**模型输入与页面语言**：正式内容的 `task.prompt`、`branches[].when`、rubric 的自然语言规则、业务材料中的指令与说明，以及候选的材料包装、quota／timeout／infra 接续、补充与修正、`review_prompt` 均使用英文。`title/category/description`、场景及任务 `goal` 是中文页面字段，`scenario_summary(..., include_tasks=True)` 的浏览项目与路线投影保持中文。固定业务字面、原始代码、报错、帮助与证据原文不翻译；例如英文首问要求 status 为 `已校对`，不能把该验收值替换成英文，也不能仅凭出现汉字拒绝原始资料。语言修正发布新内容版本与评审版本，由内容树重算摘要；不原地改写已冻结的问题、回答或历史发布。schema 2 的通用结构校验不自动推断语言，正式内容需另行逐项核对指令与业务数据边界。
 
 **发布与状态**：新批次paused且只写元数据，首次实际启动才物化场景独立工作区／候选session。同项目至多一个候选写入；逻辑计划默认2任务、通过5任务或局部收口轮换，活动池默认3，共享并发最多2并受账号真实容量约束。任务通过、代码接受、场景收口与批次运行完成分开；只读任务不会创建代码检查点，completed可包含明确失败／耗尽／受阻。
 
@@ -256,6 +258,7 @@ observed_model(directory, response, session_id) -> str
 ### 6. Tests Required
 
 - 内容／历史／DTO：`test_project_scenario_content.py` 覆盖可变任务、非紧邻DAG、入口可达、隐藏投影、wheel损坏／链接、注册复开摘要、坏catalog历史可读、新600／旧1800默认及显式值／非法null；旧schema夹具回归保留。
+- 语言修正：穷举正式首问、分支、材料说明、rubric 与运行时提示，核对英文语义及原授权／验收约束；比较修正前后的中文 `summary(include_steps=True)` 完全相等，新旧内容分别 install／复开仍按各自摘要读取。seed、固定业务输入、原生检查和 wheel 字节保持不变；Unicode 测试夹具与证据原文不作为必须翻译的正式指令。
 - 状态／恢复／父链：`test_project_scenarios.py` 覆盖实际消费认领、澄清不加attempt、3次上限、工作高水位／崩溃预留、review三层预算、候选与review严格释放、完整输出quota／重启只续验收、迟到结果、文件交付进review包、局部轮换／分支激活、代码依赖恢复与不兼容／相同字节回退分支、实际模型漂移不扣业务修正。
 - 协议／用量／私有运行：`test_project_evaluation.py` 覆盖严格单JSON／错误身份／重复项／未知证据／程序失败不能被pass覆盖、合法uncertain、显式candidate证据许可及缓存字段去重／未知；`test_project_review_runtime.py` 覆盖owner刷新身份、创建／停净／缺失／孤儿、清理失败保留holder及资源份额；`test_project_native_verifier.py` 覆盖准备阶段error、业务exit80为failed、清理前不放slot、合法等价程序提取。
 - 原生内容：`python3 scripts/validate-project-library.py` 仅静态摘要／3-13-20；`scripts/validate-project-scenarios.py --project <key> --task <key> --image <隔离账号镜像>` 真实业务，按需 `--candidate/--answer/--entry/--branch/--expect failed`；`--regression-only` 或 `--with-regression` 使用独立回归资源。保留三工程原版失败／参考通过、原生完整集合与skip/xfail证据，不用宿主旧基线替代。

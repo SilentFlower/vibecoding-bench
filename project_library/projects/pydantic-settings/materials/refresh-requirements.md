@@ -1,1 +1,1 @@
-单进程本地商品工具；用户主动点击重新加载，不做文件监听或跨进程同步。先看差异，候选格式错则继续使用旧配置。需要区分项目现成能力和消费端待实现部分；本轮只给方案，不写代码。
+This is a single-process local product tool. The user explicitly clicks Reload; file watching and cross-process synchronization are out of scope. Preview the differences and keep using the old configuration if the candidate has an invalid format. Distinguish the project's existing capabilities from consumer-side work that remains to be implemented. Provide a plan only in this round, without writing code.

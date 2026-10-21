@@ -1,1 +1,1 @@
-如果先只支持 YAML 文档呢？请收窄推荐范围，仍不实现。
+What if we support only YAML documents initially? Narrow the recommended scope, still without implementing it.

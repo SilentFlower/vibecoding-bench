@@ -1,24 +1,24 @@
 {
   "schema": 1,
   "task_id": "PS-CONFIGURE",
-  "version": 1,
+  "version": 2,
   "status": "draft_not_calibrated",
   "criteria": [
     {
       "id": "valid-api",
-      "requirement": "使用已存在的 BaseSettings、SettingsConfigDict 及 env_prefix/env_file 等真实用法；主示例 App 有 title:str 和 quantity:int。",
+      "requirement": "Use existing BaseSettings, SettingsConfigDict, and real env_prefix/env_file usage. The main example's App has title:str and quantity:int.",
       "required": true,
       "allow_candidate_evidence": true
     },
     {
       "id": "business-behavior",
-      "requirement": "默认商品工具／2，dotenv 对照门店目录／7，环境覆盖后数量为整数 5，且不改输入文件。",
+      "requirement": "The defaults are 商品工具 and 2; the dotenv control yields 门店目录 and 7; after the environment override, the quantity is the integer 5. Do not modify the input files.",
       "required": true,
       "allow_candidate_evidence": true
     },
     {
       "id": "delivery-boundary",
-      "requirement": "唯一完整主示例可从冻结回答提取或由允许的 app/settings_example.py 提供，不修改 library 或真实进程环境。",
+      "requirement": "The single complete main example may be extracted from the frozen answer or supplied in the permitted app/settings_example.py. Do not modify library or the real process environment.",
       "required": true,
       "allow_candidate_evidence": true
     }
@@ -43,6 +43,6 @@
   },
   "accept_equivalent_answers": true,
   "grade_length": false,
-  "uncertain_rule": "证据不足时返回 uncertain，不自动当候选失败；不得要求输出隐含推理过程。",
-  "feedback_policy": "仅返回已声明的公开业务规则和反馈码，不披露隐藏样例或完整rubric。"
+  "uncertain_rule": "Return uncertain when evidence is insufficient; do not automatically treat the candidate as failed. Do not require disclosure of hidden reasoning.",
+  "feedback_policy": "Return only declared public business rules and feedback codes. Do not disclose hidden examples or the complete rubric."
 }

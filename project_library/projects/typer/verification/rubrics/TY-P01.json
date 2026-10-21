@@ -2,14 +2,14 @@
   "criteria": [
     {
       "id": "constraints",
-      "requirement": "方案覆盖两个本地命令、SKU-加四个ASCII数字、可理解的格式错误，不强迫用户接受复杂补全或插件需求。",
+      "requirement": "The plan covers two local commands, SKU- followed by four ASCII digits, and understandable format errors. Do not force complex completion or plugin requirements on the user.",
       "evidence": [
         "materials/TY-S03/requirements.md"
       ]
     },
     {
       "id": "alternatives",
-      "requirement": "比较共享 parser、自定义参数类型、扩展 Typer 注册机制的复用位置及维护成本；不能编造 app.register_type_adapter 等已有 API。",
+      "requirement": "Compare the reuse boundaries and maintenance costs of a shared parser, a custom parameter type, and an extension to Typer’s registration mechanism. Do not invent existing APIs such as app.register_type_adapter.",
       "evidence": [
         "library/typer/main.py:1533",
         "library/typer/main.py:1536",
@@ -18,7 +18,7 @@
     },
     {
       "id": "recommendation",
-      "requirement": "推荐与当前规模相称的方案并说明取舍。共享 parse_sku 是可行答案；有明确约束依据的自定义类型也可通过，不把某一种措辞当唯一正确答案。",
+      "requirement": "Recommend an approach proportionate to the current scale and explain its tradeoffs. A shared parse_sku is a valid answer; a custom type supported by explicit constraints may also pass. Do not make one wording the only correct answer.",
       "evidence": [
         "library/tests/test_type_conversion.py:152",
         "library/tests/test_type_conversion.py:165"
@@ -26,7 +26,7 @@
     },
     {
       "id": "failure_behavior",
-      "requirement": "说明参数转换失败进入用户可读的参数错误路径，ValueError 受现有 FuncParamType 处理；先不实现，不发布代码检查点。",
+      "requirement": "Explain that failed parameter conversion follows a user-readable parameter-error path, with ValueError handled by the existing FuncParamType. Do not implement it yet or publish a code checkpoint.",
       "evidence": [
         "library/typer/_click/types.py:124",
         "library/tests/test_type_conversion.py:165"
@@ -36,9 +36,9 @@
   "allowed_outcomes": [
     "feasible_plan"
   ],
-  "equivalent_answers": "允许合理的 parser 或自定义参数类型方案；新增框架注册仅在额外目标充分且代价说明完整时讨论，不能声称满足当前需求必需。",
+  "equivalent_answers": "Reasonable parser or custom-parameter-type approaches are allowed. A new framework registration mechanism may be discussed only when additional goals are sufficiently justified and its costs are fully explained; do not claim it is required for the current requirements.",
   "schema": 1,
   "task_id": "TY-P01",
   "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
-  "result_version": 1
+  "result_version": 2
 }
