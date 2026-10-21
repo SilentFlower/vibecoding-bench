@@ -1,0 +1,21 @@
+{
+  "command": [
+    "/work/venv/bin/python",
+    "/input/legacy_observe.py"
+  ],
+  "cwd": "/work/base",
+  "exit_code": 0,
+  "timed_out": false,
+  "elapsed_sec": 0.1186462700006814,
+  "max_rss_kib": 14972,
+  "rss_scope": "本次新测量进程已退出子进程的 rusage 最大 RSS，不是容器总峰值",
+  "environment": {
+    "HOME": "/tmp/fm-home",
+    "PYTHONPATH": "/work/base/library:/work/base/app",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PIP_CONFIG_FILE": "/dev/null",
+    "PIP_NO_INDEX": "1",
+    "PROJECT_CANDIDATE_ROOT": "/work/base",
+    "PROJECT_ANSWER_FILE": "/input/consult_example.py"
+  }
+}

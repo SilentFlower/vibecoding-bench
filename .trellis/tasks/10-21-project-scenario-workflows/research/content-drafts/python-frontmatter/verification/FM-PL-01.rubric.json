@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "task_id": "FM-PL-01",
+  "criteria": [
+    {
+      "id": "normalization-facts",
+      "requirement": "说明 parse 的 strip、CRLF 规范化与 format 的 strip，以及默认 YAML 转普通值后导出不保注释／引号。",
+      "evidence": [
+        "library/frontmatter/__init__.py:75",
+        "library/frontmatter/util.py:23",
+        "library/frontmatter/default_handlers.py:226"
+      ]
+    },
+    {
+      "id": "irreversible-loss",
+      "requirement": "仅换导出 Dumper 无法恢复已丢原始空白和注释，自定义 handler 不等于现成完整无损编辑；区分语义值和原字节。",
+      "evidence": []
+    },
+    {
+      "id": "feasible-options",
+      "requirement": "比较调用方保留原文及限制编辑范围，与显式保真模式／往返节点等扩展；说明新增依赖或限制、失败拒改与兼容默认行为，允许多种合理选择。",
+      "evidence": []
+    },
+    {
+      "id": "minimal-plan",
+      "requirement": "推荐能落地的最小范围及只改 title 的验证办法，说明未知语法／块标量／锚点／重复键等未承诺边界；不强制第三方库名，不写实现。",
+      "evidence": []
+    }
+  ],
+  "comparison": "按事实、行为和约束，不按关键词、篇幅或参考答案相似度。",
+  "source_commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6"
+}

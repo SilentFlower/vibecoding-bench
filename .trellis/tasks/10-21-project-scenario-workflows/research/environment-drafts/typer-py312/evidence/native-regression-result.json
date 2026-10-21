@@ -1,0 +1,41 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "\"$@\" & child=$!; wait \"$child\"",
+    "typer-native",
+    "/work/venv/bin/python",
+    "-B",
+    "-m",
+    "pytest",
+    "--cov",
+    "--cov-report=term-missing",
+    "-o",
+    "console_output_style=progress",
+    "--showlocals",
+    "--numprocesses=2",
+    "-ra",
+    "--junitxml=/evidence/native-tests.xml"
+  ],
+  "cwd": "/work/project/library",
+  "exit_code": 0,
+  "elapsed_sec": 187.781728,
+  "counts": {
+    "total": 1505,
+    "passed": 1481,
+    "skipped": 22,
+    "xfailed": 2,
+    "failures": 0,
+    "errors": 0
+  },
+  "max_rss_children_kib": 102224,
+  "environment": {
+    "HOME": "/work/home",
+    "XDG_CONFIG_HOME": "/work/home/.config",
+    "PYTHONPATH": "/work/project/library",
+    "TERMINAL_WIDTH": "3000",
+    "_TYPER_FORCE_DISABLE_TERMINAL": "1",
+    "_TYPER_RUN_INSTALL_COMPLETION_TESTS": "1",
+    "CONTEXT": "typer-scenario-target-runtime"
+  }
+}

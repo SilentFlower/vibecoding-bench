@@ -1,0 +1,26 @@
+{
+  "step": "offline-install",
+  "command": [
+    "/work/venv/bin/python",
+    "-m",
+    "pip",
+    "install",
+    "--disable-pip-version-check",
+    "--no-cache-dir",
+    "--no-index",
+    "--find-links=/offline/artifacts",
+    "--no-deps",
+    "--report=/evidence/install-report.json",
+    "PyYAML==6.0.3",
+    "pytest==9.1.1",
+    "toml==0.10.2",
+    "pyaml==26.7.0",
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0"
+  ],
+  "cwd": "/work",
+  "exit_code": 0,
+  "elapsed_sec": 1.796038888000112
+}

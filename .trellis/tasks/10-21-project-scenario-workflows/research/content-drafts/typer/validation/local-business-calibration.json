@@ -1,0 +1,120 @@
+{
+  "runtime": "historical host venv Python 3.12.3",
+  "model_runs": 0,
+  "full_native_regression_rerun": false,
+  "records": [
+    {
+      "mode": "consult",
+      "candidate": "baseline",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/github-100-research/resume-app/typer/venv/bin/python",
+        "-B",
+        "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/typer/verification/native_checks.py",
+        "--mode",
+        "consult",
+        "--candidate-root",
+        "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/typer/validation/baseline",
+        "--answer-file",
+        "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/typer/verification/reference/consult_answer.md"
+      ],
+      "exit_code": 0,
+      "matches_expected": true,
+      "expected_baseline_failure": false,
+      "failed_checks": []
+    },
+    {
+      "mode": "single",
+      "candidate": "baseline",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/github-100-research/resume-app/typer/venv/bin/python",
+        "-B",
+        "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/typer/verification/native_checks.py",
+        "--mode",
+        "single",
+        "--candidate-root",
+        "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/typer/validation/baseline"
+      ],
+      "exit_code": 0,
+      "matches_expected": true,
+      "expected_baseline_failure": false,
+      "failed_checks": []
+    },
+    {
+      "mode": "group",
+      "candidate": "baseline",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/github-100-research/resume-app/typer/venv/bin/python",
+        "-B",
+        "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/typer/verification/native_checks.py",
+        "--mode",
+        "group",
+        "--candidate-root",
+        "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/typer/validation/baseline"
+      ],
+      "exit_code": 0,
+      "matches_expected": true,
+      "expected_baseline_failure": false,
+      "failed_checks": []
+    },
+    {
+      "mode": "types",
+      "candidate": "baseline",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/github-100-research/resume-app/typer/venv/bin/python",
+        "-B",
+        "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/typer/verification/native_checks.py",
+        "--mode",
+        "types",
+        "--candidate-root",
+        "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/typer/validation/baseline"
+      ],
+      "exit_code": 0,
+      "matches_expected": true,
+      "expected_baseline_failure": false,
+      "failed_checks": []
+    },
+    {
+      "mode": "export",
+      "candidate": "baseline",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/github-100-research/resume-app/typer/venv/bin/python",
+        "-B",
+        "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/typer/verification/native_checks.py",
+        "--mode",
+        "export",
+        "--candidate-root",
+        "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/typer/validation/baseline"
+      ],
+      "exit_code": 0,
+      "matches_expected": false,
+      "expected_baseline_failure": true,
+      "failed_checks": [
+        "business_tests_present",
+        "chinese_utf8",
+        "empty_array",
+        "help_without_output",
+        "normal_export",
+        "usage_documented"
+      ]
+    },
+    {
+      "mode": "export",
+      "candidate": "reference",
+      "command": [
+        "/root/project/vibecoding-bench/.deploy/github-100-research/resume-app/typer/venv/bin/python",
+        "-B",
+        "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/typer/verification/native_checks.py",
+        "--mode",
+        "export",
+        "--candidate-root",
+        "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/typer/validation/reference"
+      ],
+      "exit_code": 0,
+      "matches_expected": true,
+      "expected_baseline_failure": false,
+      "failed_checks": []
+    }
+  ],
+  "help_materials": "从同一固定group应用实际生成；未手编帮助输出",
+  "passed": true
+}

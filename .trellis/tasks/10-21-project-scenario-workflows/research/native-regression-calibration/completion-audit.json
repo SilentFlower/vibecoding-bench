@@ -1,0 +1,234 @@
+{
+  "status": "passed",
+  "wrapper_sha256": "3bbf34e44c67ae040ade28f601634f7ef61af9c8f38da6fad1cb4e6cf8cd6ec0",
+  "projects": {
+    "python-frontmatter": {
+      "audit": "python-frontmatter/run-f2f23dbd51/completion-audit.json",
+      "contract": "python-frontmatter/run-f2f23dbd51/evidence/contract.json",
+      "contract_sha256": "8fb5b413dc2b75483d16f8ad6b7be31026ed1ba805d6d549f1ddbbf69af3aa85",
+      "step_results": [
+        {
+          "name": "freeze-baseline",
+          "status": "passed",
+          "counts": {
+            "passed": 67,
+            "failed": 0,
+            "error": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0,
+            "unexecuted": 0
+          },
+          "collected": 67,
+          "doctests": 11
+        },
+        {
+          "name": "original-candidate",
+          "status": "passed",
+          "counts": {
+            "passed": 67,
+            "failed": 0,
+            "error": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0,
+            "unexecuted": 0
+          },
+          "collected": 67,
+          "doctests": 11
+        },
+        {
+          "name": "reference-candidate",
+          "status": "passed",
+          "counts": {
+            "passed": 67,
+            "failed": 0,
+            "error": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0,
+            "unexecuted": 0
+          },
+          "collected": 67,
+          "doctests": 11
+        },
+        {
+          "name": "deleted-tests-and-hooks",
+          "status": "passed",
+          "counts": {
+            "passed": 67,
+            "failed": 0,
+            "error": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0,
+            "unexecuted": 0
+          },
+          "collected": 67,
+          "doctests": 11
+        },
+        {
+          "name": "deleted-doctests",
+          "status": "passed",
+          "counts": {
+            "passed": 67,
+            "failed": 0,
+            "error": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0,
+            "unexecuted": 0
+          },
+          "collected": 67,
+          "doctests": 11
+        },
+        {
+          "name": "broken-source",
+          "status": "failed",
+          "counts": {
+            "passed": 39,
+            "failed": 28,
+            "error": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0,
+            "unexecuted": 0
+          },
+          "collected": 67,
+          "doctests": 11
+        }
+      ]
+    },
+    "pydantic-settings": {
+      "audit": "pydantic-settings/run-69ab631b83/completion-audit.json",
+      "contract": "pydantic-settings/run-69ab631b83/evidence/contract.json",
+      "contract_sha256": "56b502f4ce35b00b385a8983f26af91c379d69d2241b6933dd06b3819b8d0c4d",
+      "step_results": [
+        {
+          "name": "freeze-baseline",
+          "status": "passed",
+          "counts": {
+            "passed": 1256,
+            "failed": 0,
+            "error": 0,
+            "skipped": 5,
+            "xfailed": 0,
+            "xpassed": 0,
+            "unexecuted": 0
+          },
+          "collected": 1261,
+          "doctests": 0
+        },
+        {
+          "name": "original-candidate",
+          "status": "passed",
+          "counts": {
+            "passed": 1256,
+            "failed": 0,
+            "error": 0,
+            "skipped": 5,
+            "xfailed": 0,
+            "xpassed": 0,
+            "unexecuted": 0
+          },
+          "collected": 1261,
+          "doctests": 0
+        },
+        {
+          "name": "reference-candidate",
+          "status": "passed",
+          "counts": {
+            "passed": 1256,
+            "failed": 0,
+            "error": 0,
+            "skipped": 5,
+            "xfailed": 0,
+            "xpassed": 0,
+            "unexecuted": 0
+          },
+          "collected": 1261,
+          "doctests": 0
+        }
+      ]
+    },
+    "typer": {
+      "audit": "typer/run-e7fc1d0386/completion-audit.json",
+      "contract": "typer/run-e7fc1d0386/evidence/contract.json",
+      "contract_sha256": "fd859ebb49685cf72cfc51af347d9fa09340ea511312798fb089647af1d0b54f",
+      "step_results": [
+        {
+          "name": "freeze-baseline",
+          "status": "passed",
+          "counts": {
+            "passed": 1481,
+            "failed": 0,
+            "error": 0,
+            "skipped": 22,
+            "xfailed": 2,
+            "xpassed": 0,
+            "unexecuted": 0
+          },
+          "collected": 1505,
+          "doctests": 0
+        },
+        {
+          "name": "original-candidate",
+          "status": "passed",
+          "counts": {
+            "passed": 1481,
+            "failed": 0,
+            "error": 0,
+            "skipped": 22,
+            "xfailed": 2,
+            "xpassed": 0,
+            "unexecuted": 0
+          },
+          "collected": 1505,
+          "doctests": 0
+        }
+      ]
+    }
+  },
+  "containers": [
+    {
+      "name": "bench-scenario-research-reg-pydantic-settings-69ab631b83",
+      "container_id": "a0cfe36866db0b880b3061827f48da404f683d4e09acad1f83e5f676cc90ddfb",
+      "exit_code": 0,
+      "removed": true
+    },
+    {
+      "name": "bench-scenario-research-reg-pydantic-settings-da08538082",
+      "container_id": "723dfc1cfc765c3165074fb232083affaa0a791640cdc346de8522ce3de719b0",
+      "exit_code": 0,
+      "removed": true
+    },
+    {
+      "name": "bench-scenario-research-reg-python-frontmatter-058e116bf8",
+      "container_id": "6bd4f934d78ebd350939c899e07e44fe1e741b1fe56f5398e564ca1a85779143",
+      "exit_code": 0,
+      "removed": true
+    },
+    {
+      "name": "bench-scenario-research-reg-python-frontmatter-f2f23dbd51",
+      "container_id": "672f21327aa4e5a1e4a0d66a3775ca7fa45145728d183e275ff77633d7085ea5",
+      "exit_code": 0,
+      "removed": true
+    },
+    {
+      "name": "bench-scenario-research-reg-typer-e544516532",
+      "container_id": "dc0e56a3dab6c7b665171cce4bb972c36d3b120a6a2b09c39892339a74cd046e",
+      "exit_code": 1,
+      "removed": true
+    },
+    {
+      "name": "bench-scenario-research-reg-typer-e7fc1d0386",
+      "container_id": "9218ab47f17521667eba130642f6d782400eda5eaf6084f78089986073436ece",
+      "exit_code": 0,
+      "removed": true
+    }
+  ],
+  "docker_wait_max_sec": 1,
+  "model_executed": false,
+  "product_modified": false,
+  "scope": "统一wrapper校准，不是生产接入或模型能力成绩"
+}

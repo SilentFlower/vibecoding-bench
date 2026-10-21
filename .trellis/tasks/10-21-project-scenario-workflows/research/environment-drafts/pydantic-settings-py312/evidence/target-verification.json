@@ -1,0 +1,137 @@
+{
+  "status": "passed",
+  "scope": "only_environment_and_listed_native_suites",
+  "image": {
+    "reference": "vibebench-v3-account:v3-project-repairs-local-20261021-e",
+    "id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d",
+    "architecture": "amd64",
+    "os": "linux",
+    "labels": {
+      "org.opencontainers.image.revision": "2bb74b726ba03f241d6ff509f6a88ecfb04e4196",
+      "org.opencontainers.image.source": "https://github.com/SilentFlower/vibecoding-bench",
+      "vibebench.computer-profile-version": "1",
+      "vibebench.gateway-revision": "541b9cb9add340c27ed8408fea9754e8280fc510",
+      "vibebench.isolation-version": "2",
+      "vibebench.parent-revision": "f7b256466a4dcf673c022d1ae9f29c7763a4d3ff",
+      "vibebench.product": "v3",
+      "vibebench.release": "project-repairs-local-20261021-e",
+      "vibebench.role": "account",
+      "vibebench.system-profile-version": "1",
+      "vibebench.verification": "source-overlay"
+    },
+    "created": "2026-10-21T00:21:47.12042924+08:00"
+  },
+  "runs": {
+    "baseline": {
+      "evidence": "evidence/bench-scenario-research-ps-baseline-3e6a94fe",
+      "native": {
+        "testcases": 1261,
+        "passed": 1256,
+        "skipped": 5,
+        "failures": 0,
+        "errors": 0,
+        "skip_details": [
+          {
+            "class": "tests.test_settings",
+            "name": "test_case_sensitive_windows_env_fallback",
+            "message": "os.environ is only case-insensitive on Windows",
+            "detail": "/work/project/library/tests/test_settings.py:2184: os.environ is only case-insensitive on Windows"
+          },
+          {
+            "class": "tests.test_source_cli",
+            "name": "test_cli_metavar_format[True-value7-list]",
+            "message": "Skipped",
+            "detail": "/work/project/library/tests/test_source_cli.py:3650: Skipped"
+          },
+          {
+            "class": "tests.test_source_cli",
+            "name": "test_cli_metavar_format[True-value14-LoggedVar]",
+            "message": "Skipped",
+            "detail": "/work/project/library/tests/test_source_cli.py:3650: Skipped"
+          },
+          {
+            "class": "tests.test_source_cli",
+            "name": "test_cli_metavar_format[True-value15-Representation()]",
+            "message": "Skipped",
+            "detail": "/work/project/library/tests/test_source_cli.py:3650: Skipped"
+          },
+          {
+            "class": "tests.test_source_yaml",
+            "name": "test_yaml_not_installed",
+            "message": "PyYAML is installed",
+            "detail": "/work/project/library/tests/test_source_yaml.py:28: PyYAML is installed"
+          }
+        ]
+      },
+      "native_elapsed_sec": 13.104334,
+      "business_elapsed_sec": 0.468625,
+      "install_elapsed_sec": 10.629456,
+      "container_peak_bytes": 568463360,
+      "child_max_rss_kib": 335380,
+      "pids_peak": 27,
+      "container_id": "e0f1b12b4f3451b4a98d1002eccf567827ab9ab267dbe8cec5071ce3acfa102a",
+      "container_removed": true,
+      "business_matches": true
+    },
+    "reference": {
+      "evidence": "evidence/bench-scenario-research-ps-reference-b2d086cb",
+      "native": {
+        "testcases": 1261,
+        "passed": 1256,
+        "skipped": 5,
+        "failures": 0,
+        "errors": 0,
+        "skip_details": [
+          {
+            "class": "tests.test_settings",
+            "name": "test_case_sensitive_windows_env_fallback",
+            "message": "os.environ is only case-insensitive on Windows",
+            "detail": "/work/project/library/tests/test_settings.py:2184: os.environ is only case-insensitive on Windows"
+          },
+          {
+            "class": "tests.test_source_cli",
+            "name": "test_cli_metavar_format[True-value7-list]",
+            "message": "Skipped",
+            "detail": "/work/project/library/tests/test_source_cli.py:3650: Skipped"
+          },
+          {
+            "class": "tests.test_source_cli",
+            "name": "test_cli_metavar_format[True-value14-LoggedVar]",
+            "message": "Skipped",
+            "detail": "/work/project/library/tests/test_source_cli.py:3650: Skipped"
+          },
+          {
+            "class": "tests.test_source_cli",
+            "name": "test_cli_metavar_format[True-value15-Representation()]",
+            "message": "Skipped",
+            "detail": "/work/project/library/tests/test_source_cli.py:3650: Skipped"
+          },
+          {
+            "class": "tests.test_source_yaml",
+            "name": "test_yaml_not_installed",
+            "message": "PyYAML is installed",
+            "detail": "/work/project/library/tests/test_source_yaml.py:28: PyYAML is installed"
+          }
+        ]
+      },
+      "native_elapsed_sec": 11.49805,
+      "business_elapsed_sec": 0.419239,
+      "install_elapsed_sec": 9.816764,
+      "container_peak_bytes": 565690368,
+      "child_max_rss_kib": 335972,
+      "pids_peak": 25,
+      "container_id": "adbf6f0b1f87127b6f07698acfa03a2b67702a1c15b6bad122f3f7eac1c61ad7",
+      "container_removed": true,
+      "business_matches": true
+    }
+  },
+  "initial_environment_failure": "evidence/bench-scenario-research-ps-baseline-2b6c5ec7",
+  "initial_failure_note": "未显式exec的work tmpfs中本地扩展so映射失败；显式exec后原版和参考副本均通过。不属于候选产品BUG。",
+  "wheels": 64,
+  "artifact_bytes": 58386309,
+  "requirements": 64,
+  "source_files_unchanged": 58,
+  "seed_and_upstream_unchanged": true,
+  "leftover_research_containers": [],
+  "model_runs": 0
+}

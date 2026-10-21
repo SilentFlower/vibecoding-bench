@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "task_id": "PS-UNION-FIX",
+  "version": 1,
+  "status": "draft_not_calibrated",
+  "criteria": [
+    {
+      "id": "scope",
+      "requirement": "修改库内分段环境解码并补回归，不以修改消费端、硬编码输入或仅改测试代替修复。",
+      "required": true
+    },
+    {
+      "id": "behavior",
+      "requirement": "独立用例验证空列表、中文列表、普通文本、非法JSON字符串、多个键、非法列表元素和大小写边界。",
+      "required": true
+    },
+    {
+      "id": "regression",
+      "requirement": "保留普通Union、NoDecode/ForceDecode/enable_decoding既有顶层行为，执行适用原生回归；工程检查点只在控制端验证成功后接受。",
+      "required": true
+    }
+  ],
+  "source_evidence": {
+    "main": [
+      "library/pydantic_settings/main.py:255",
+      "library/pydantic_settings/main.py:295",
+      "library/pydantic_settings/main.py:323",
+      "library/pydantic_settings/main.py:336"
+    ],
+    "env": [
+      "library/pydantic_settings/sources/providers/env.py:200",
+      "library/pydantic_settings/sources/providers/env.py:217",
+      "library/pydantic_settings/sources/providers/env.py:275"
+    ],
+    "decode": [
+      "library/pydantic_settings/sources/base.py:194",
+      "library/pydantic_settings/sources/utils.py:150",
+      "library/pydantic_settings/sources/utils.py:213"
+    ]
+  },
+  "accept_equivalent_answers": true,
+  "grade_length": false,
+  "uncertain_rule": "证据不足时返回 uncertain，不自动当候选失败；不得要求输出隐含推理过程。",
+  "feedback_policy": "仅返回已声明的公开业务规则和反馈码，不披露隐藏样例或完整rubric。"
+}

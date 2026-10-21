@@ -1,0 +1,28 @@
+{
+  "name": "bench-scenario-research-reg-python-frontmatter-f2f23dbd51",
+  "container_id": "672f21327aa4e5a1e4a0d66a3775ca7fa45145728d183e275ff77633d7085ea5",
+  "project": "python-frontmatter",
+  "image_id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d",
+  "wrapper_sha256": "3bbf34e44c67ae040ade28f601634f7ef61af9c8f38da6fad1cb4e6cf8cd6ec0",
+  "resources": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "status": "exited",
+  "directory": "python-frontmatter/run-f2f23dbd51",
+  "exit_code": 0,
+  "oom_killed": false,
+  "config": {
+    "network_mode": "none",
+    "read_only_root": true,
+    "uid": "1000:1000",
+    "memory_bytes": 536870912,
+    "pids_limit": 64,
+    "tmpfs": {
+      "/tmp": "rw,nosuid,nodev,size=268435456,mode=1777",
+      "/work": "rw,exec,nosuid,nodev,size=1610612736,mode=1777"
+    }
+  },
+  "removed": true
+}

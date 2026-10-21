@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/work/venv/bin/python",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "/work/project/app/tests",
+    "-v"
+  ],
+  "cwd": "/work/project",
+  "exit_code": 0,
+  "elapsed_sec": 0.621093
+}

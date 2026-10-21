@@ -1,0 +1,6 @@
+{
+  "file": "library/pydantic_settings/sources/providers/env.py",
+  "before_sha256": "f262103fe27dcbb22992579ba36aec9103c4df4cd413d4c35e7e51d2e854b3b3",
+  "after_sha256": "10bb3bb596447014b4b1fb75ff60b0ad158e5ebf1856e0f8c2c988cfc978addb",
+  "patch_sha256": "761990bc0a8133cb6a729ab8d8efa07b8ba2480a2a4cab9c1a592eafac111227"
+}

@@ -1,0 +1,142 @@
+{
+  "project": "python-frontmatter",
+  "status": "passed",
+  "run_directory": "python-frontmatter/run-f2f23dbd51",
+  "wrapper_sha256": "3bbf34e44c67ae040ade28f601634f7ef61af9c8f38da6fad1cb4e6cf8cd6ec0",
+  "image_id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d",
+  "steps": [
+    {
+      "name": "freeze-baseline",
+      "status": "passed",
+      "counts": {
+        "passed": 67,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 67,
+      "doctests": 11,
+      "elapsed_sec": 0.6183232500006852,
+      "collection_digest": "cb1c87c04ce42eefc575647fc4ed1c73b5df4adcb8b37047fe8b5b5989ad0cf8",
+      "result_digest": "d6fa46c305e6b98a29b8028f40cc7f07796a87063fd0640b0462313f460a963a",
+      "bash_parent": "/usr/local/bin/python3.12"
+    },
+    {
+      "name": "original-candidate",
+      "status": "passed",
+      "counts": {
+        "passed": 67,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 67,
+      "doctests": 11,
+      "elapsed_sec": 0.5174577969992242,
+      "collection_digest": "cb1c87c04ce42eefc575647fc4ed1c73b5df4adcb8b37047fe8b5b5989ad0cf8",
+      "result_digest": "d6fa46c305e6b98a29b8028f40cc7f07796a87063fd0640b0462313f460a963a",
+      "bash_parent": "/usr/local/bin/python3.12"
+    },
+    {
+      "name": "reference-candidate",
+      "status": "passed",
+      "counts": {
+        "passed": 67,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 67,
+      "doctests": 11,
+      "elapsed_sec": 0.5767262200006371,
+      "collection_digest": "cb1c87c04ce42eefc575647fc4ed1c73b5df4adcb8b37047fe8b5b5989ad0cf8",
+      "result_digest": "d6fa46c305e6b98a29b8028f40cc7f07796a87063fd0640b0462313f460a963a",
+      "bash_parent": "/usr/local/bin/python3.12"
+    },
+    {
+      "name": "deleted-tests-and-hooks",
+      "status": "passed",
+      "counts": {
+        "passed": 67,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 67,
+      "doctests": 11,
+      "elapsed_sec": 0.7273882779991254,
+      "collection_digest": "cb1c87c04ce42eefc575647fc4ed1c73b5df4adcb8b37047fe8b5b5989ad0cf8",
+      "result_digest": "d6fa46c305e6b98a29b8028f40cc7f07796a87063fd0640b0462313f460a963a",
+      "bash_parent": "/usr/local/bin/python3.12"
+    },
+    {
+      "name": "deleted-doctests",
+      "status": "passed",
+      "counts": {
+        "passed": 67,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 67,
+      "doctests": 11,
+      "elapsed_sec": 0.6493039389988553,
+      "collection_digest": "cb1c87c04ce42eefc575647fc4ed1c73b5df4adcb8b37047fe8b5b5989ad0cf8",
+      "result_digest": "d6fa46c305e6b98a29b8028f40cc7f07796a87063fd0640b0462313f460a963a",
+      "bash_parent": "/usr/local/bin/python3.12"
+    },
+    {
+      "name": "broken-source",
+      "status": "failed",
+      "counts": {
+        "passed": 39,
+        "failed": 28,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 67,
+      "doctests": 11,
+      "elapsed_sec": 0.7465076200005569,
+      "collection_digest": "cb1c87c04ce42eefc575647fc4ed1c73b5df4adcb8b37047fe8b5b5989ad0cf8",
+      "result_digest": "8e3763e3879bc98d4206e5bfc8aae23680908b897ec5ec2cbad21f9e63521fa0",
+      "bash_parent": "/usr/local/bin/python3.12"
+    }
+  ],
+  "resources": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "cgroup": {
+    "memory.peak": "100786176",
+    "memory.max": "536870912",
+    "pids.peak": "6",
+    "pids.max": "64"
+  },
+  "container_removed": true,
+  "docker_wait_max_sec": 1,
+  "model_executed": false,
+  "deleted_doctest_reconstruction": {
+    "removed_docstrings": 8,
+    "reconstructed_digest_matches_actual_candidate": true,
+    "implementation_digest": "fd359eabc5949f44b9ce0dde644ece93cd623959b4daec540f24eb7233737395"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "repair"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "content_field": true,
+    "handler_field": true,
+    "combined_fields_roundtrip": true,
+    "explicit_handler_identity": true,
+    "old_constructors": true,
+    "empty_metadata": true,
+    "null_content_metadata": true,
+    "defaults_only": true,
+    "document_overrides_default": true,
+    "load_path_and_stream": true,
+    "to_dict_unchanged": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "cwd": "library",
+    "argv": [
+      "python",
+      "-m",
+      "pytest",
+      ".",
+      "--doctest-modules",
+      "--doctest-glob",
+      "README.md",
+      "-q",
+      "-ra",
+      "-p",
+      "no:cacheprovider"
+    ]
+  }
+}

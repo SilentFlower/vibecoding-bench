@@ -1,0 +1,61 @@
+{
+  "project": "typer",
+  "status": "passed",
+  "run_directory": "typer/run-e7fc1d0386",
+  "wrapper_sha256": "3bbf34e44c67ae040ade28f601634f7ef61af9c8f38da6fad1cb4e6cf8cd6ec0",
+  "image_id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d",
+  "steps": [
+    {
+      "name": "freeze-baseline",
+      "status": "passed",
+      "counts": {
+        "passed": 1481,
+        "failed": 0,
+        "error": 0,
+        "skipped": 22,
+        "xfailed": 2,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 1505,
+      "doctests": 0,
+      "elapsed_sec": 196.1721381719999,
+      "collection_digest": "cbca1ae866e636fc287522db3f45c54b7168bec3d94066b8f3e97efd197cd19b",
+      "result_digest": "b108a3662b2a1df899daa43e093712f6fc2dd70191ab2e171678dc3edd769245",
+      "bash_parent": "/usr/bin/bash"
+    },
+    {
+      "name": "original-candidate",
+      "status": "passed",
+      "counts": {
+        "passed": 1481,
+        "failed": 0,
+        "error": 0,
+        "skipped": 22,
+        "xfailed": 2,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 1505,
+      "doctests": 0,
+      "elapsed_sec": 198.9173032210001,
+      "collection_digest": "cbca1ae866e636fc287522db3f45c54b7168bec3d94066b8f3e97efd197cd19b",
+      "result_digest": "b108a3662b2a1df899daa43e093712f6fc2dd70191ab2e171678dc3edd769245",
+      "bash_parent": "/usr/bin/bash"
+    }
+  ],
+  "resources": {
+    "timeout_sec": 600,
+    "memory_mb": 1024,
+    "pids_limit": 128
+  },
+  "cgroup": {
+    "memory.peak": "350236672",
+    "memory.max": "1073741824",
+    "pids.peak": "13",
+    "pids.max": "128"
+  },
+  "container_removed": true,
+  "docker_wait_max_sec": 1,
+  "model_executed": false
+}

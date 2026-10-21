@@ -1,0 +1,142 @@
+{
+  "collected": 1261,
+  "collection_digest": "3ab4afb58ec08fd02a409a52c5c5b36d72d17cd43311c7a53b4d80b315184c97",
+  "collection_errors": [],
+  "collection_matches_contract": true,
+  "command": [
+    "/work/venv/bin/python",
+    "-m",
+    "pytest",
+    "-p",
+    "_bench_native_regression_control",
+    "-p",
+    "pytest_examples",
+    "-p",
+    "pytest_mock",
+    "-p",
+    "pytest_pretty",
+    "-q",
+    "-ra",
+    "-p",
+    "no:cacheprovider",
+    "--junitxml=/evidence/reference-candidate/junit.xml"
+  ],
+  "counts": {
+    "error": 0,
+    "failed": 0,
+    "passed": 1256,
+    "skipped": 5,
+    "unexecuted": 0,
+    "xfailed": 0,
+    "xpassed": 0
+  },
+  "cwd": "/work/tmp/bench-native-regression-2zkszzfj/project",
+  "elapsed_sec": 13.185469472999102,
+  "execution_command": [
+    "/work/venv/bin/python",
+    "-m",
+    "pytest",
+    "-p",
+    "_bench_native_regression_control",
+    "-p",
+    "pytest_examples",
+    "-p",
+    "pytest_mock",
+    "-p",
+    "pytest_pretty",
+    "-q",
+    "-ra",
+    "-p",
+    "no:cacheprovider",
+    "--junitxml=/evidence/reference-candidate/junit.xml"
+  ],
+  "imports": {
+    "master": {
+      "pydantic_settings": {
+        "path": "/work/tmp/bench-native-regression-2zkszzfj/project/pydantic_settings/__init__.py",
+        "sha256": "b5388d6a1b097756282e567fefef4309ab94ab364a048e74535935a4a9e5f22a"
+      }
+    }
+  },
+  "overlay": {
+    "implementation_digest": "84ba55781739eaf376135e39609ae090e446156e3320940491944f0c6308cbb1",
+    "mode": "implementation-overlay",
+    "restored_controls": 2
+  },
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "pytest-examples",
+      "module": "pytest_examples",
+      "module_sha256": "8f591d0c00eefd06d0bd83abf424a39e57610c017661ee062a3c996e637cdcf3",
+      "version": "0.0.18"
+    },
+    {
+      "distribution": "pytest-mock",
+      "module": "pytest_mock",
+      "module_sha256": "0e18d5ffa2c5575890b973e904eff231988a278b1357b8dd9af17d17963b6e79",
+      "version": "3.17.0"
+    },
+    {
+      "distribution": "pytest-pretty",
+      "module": "pytest_pretty",
+      "module_sha256": "f481b9d77e587d2152443b771d61ef02205a449861880b4e72620ecc53cad85e",
+      "version": "1.3.0"
+    }
+  ],
+  "processes": {
+    "master": {
+      "parent_executable": "/usr/local/bin/python3.12",
+      "pid": 413,
+      "ppid": 412
+    }
+  },
+  "project": "pydantic-settings",
+  "result_digest": "a38a9d9de2b9c12841eedd59cc3f091e8e6bc759b0ea9ab74650332a06a53d4c",
+  "returncode": 0,
+  "scope": "冻结原生集合回归，不代表模型完成或独立业务目标已满足",
+  "skip_xfail": [
+    {
+      "id": "tests/test_settings.py::test_case_sensitive_windows_env_fallback",
+      "outcome": "skipped",
+      "reason": "('/work/tmp/bench-native-regression-2zkszzfj/project/tests/test_settings.py', 2184, 'Skipped: os.environ is only case-insensitive on Windows')"
+    },
+    {
+      "id": "tests/test_source_cli.py::test_cli_metavar_format[True-value14-LoggedVar]",
+      "outcome": "skipped",
+      "reason": "('/work/tmp/bench-native-regression-2zkszzfj/project/tests/test_source_cli.py', 3650, 'Skipped')"
+    },
+    {
+      "id": "tests/test_source_cli.py::test_cli_metavar_format[True-value15-Representation()]",
+      "outcome": "skipped",
+      "reason": "('/work/tmp/bench-native-regression-2zkszzfj/project/tests/test_source_cli.py', 3650, 'Skipped')"
+    },
+    {
+      "id": "tests/test_source_cli.py::test_cli_metavar_format[True-value7-list]",
+      "outcome": "skipped",
+      "reason": "('/work/tmp/bench-native-regression-2zkszzfj/project/tests/test_source_cli.py', 3650, 'Skipped')"
+    },
+    {
+      "id": "tests/test_source_yaml.py::test_yaml_not_installed",
+      "outcome": "skipped",
+      "reason": "('/work/tmp/bench-native-regression-2zkszzfj/project/tests/test_source_yaml.py', 28, 'Skipped: PyYAML is installed')"
+    }
+  ],
+  "source_binding": {
+    "mode": "controlled-pythonpath"
+  },
+  "status": "passed",
+  "stderr": "",
+  "stdout_tail": "........................................................................ [  5%]\n........................................................................ [ 11%]\n........................................................................ [ 17%]\n........................................................................ [ 22%]\n.......................................................................s [ 28%]\n........................................................................ [ 34%]\n........................................................................ [ 39%]\n........................................................................ [ 45%]\n........................................................................ [ 51%]\n........................................................................ [ 57%]\n........................................................................ [ 62%]\n.....s......ss.......................................................... [ 68%]\n........................................................................ [ 74%]\n........................................................................ [ 79%]\n........................................................................ [ 85%]\n........................................................................ [ 91%]\n..............................................s......................... [ 97%]\n.....................................                                    [100%]\nResults (11.58s):\n      1256 passed\n         5 skipped\n",
+  "strict_doctest_count": 0,
+  "timed_out": false,
+  "worker_collections_consistent": true,
+  "xml_failures_and_errors": 0,
+  "xml_skipped": 5,
+  "xml_testcases": 1261
+}

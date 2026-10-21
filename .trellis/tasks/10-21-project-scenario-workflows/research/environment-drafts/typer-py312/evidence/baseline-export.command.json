@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/work/venv/bin/python",
+    "-B",
+    "/input/verification/native_checks.py",
+    "--candidate-root",
+    "/work/project",
+    "--mode",
+    "export"
+  ],
+  "cwd": "/work/project",
+  "exit_code": 0,
+  "elapsed_sec": 5.741634
+}

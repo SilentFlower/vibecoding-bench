@@ -1,0 +1,54 @@
+{
+  "records": [
+    {
+      "case": "negative_quantity_allowed",
+      "exit_code": 0,
+      "rejected": true,
+      "actual": {
+        "candidate_library": true,
+        "consult_sample_found": true,
+        "consult_unambiguous": true,
+        "help_no_business": true,
+        "invalid_integer_rejected": true,
+        "negative_rejected": false,
+        "quantity_default": true,
+        "quantity_three": true,
+        "quantity_zero": true
+      }
+    },
+    {
+      "case": "no_program",
+      "exit_code": 0,
+      "rejected": true,
+      "actual": {
+        "candidate_library": true,
+        "consult_sample_found": false,
+        "consult_unambiguous": false,
+        "help_no_business": false,
+        "invalid_integer_rejected": false,
+        "negative_rejected": false,
+        "quantity_default": false,
+        "quantity_three": false,
+        "quantity_zero": false
+      }
+    },
+    {
+      "case": "ambiguous_programs",
+      "exit_code": 0,
+      "rejected": true,
+      "actual": {
+        "candidate_library": true,
+        "consult_sample_found": true,
+        "consult_unambiguous": false,
+        "help_no_business": false,
+        "invalid_integer_rejected": false,
+        "negative_rejected": false,
+        "quantity_default": false,
+        "quantity_three": false,
+        "quantity_zero": false
+      }
+    }
+  ],
+  "all_rejected": true,
+  "model_runs": 0
+}

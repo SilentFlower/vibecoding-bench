@@ -1,0 +1,18 @@
+{
+  "command": [
+    "/usr/bin/python3",
+    "-m",
+    "pip",
+    "download",
+    "--disable-pip-version-check",
+    "--only-binary=:all:",
+    "--no-deps",
+    "--dest",
+    ".trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts",
+    "-r",
+    ".trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt"
+  ],
+  "exit_code": 0,
+  "elapsed_sec": 27.327,
+  "wheel_count": 64
+}

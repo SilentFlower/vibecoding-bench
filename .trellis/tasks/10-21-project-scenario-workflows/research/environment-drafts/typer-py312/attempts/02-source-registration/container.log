@@ -1,0 +1,15 @@
+prepare
+install-offline
+full-native-regression
+Traceback (most recent call last):
+  File "/environment/verify_target.py", line 151, in <module>
+    main()
+  File "/environment/verify_target.py", line 102, in main
+    raise RuntimeError("完整适用原生集合没有通过，保留实际日志")
+RuntimeError: 完整适用原生集合没有通过，保留实际日志
+Traceback (most recent call last):
+  File "/environment/verify_target.py", line 151, in <module>
+    main()
+  File "/environment/verify_target.py", line 102, in main
+    raise RuntimeError("完整适用原生集合没有通过，保留实际日志")
+RuntimeError: 完整适用原生集合没有通过，保留实际日志

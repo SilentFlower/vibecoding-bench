@@ -1,0 +1,24 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "shallow"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "metadata": {
+      "settings": {
+        "theme": "dark"
+      }
+    },
+    "body": "正文",
+    "defaults": {
+      "theme": "light",
+      "lang": "zh"
+    }
+  },
+  "resource_profile": "business"
+}

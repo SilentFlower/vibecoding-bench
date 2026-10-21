@@ -1,0 +1,28 @@
+{
+  "name": "bench-scenario-research-reg-pydantic-settings-69ab631b83",
+  "container_id": "a0cfe36866db0b880b3061827f48da404f683d4e09acad1f83e5f676cc90ddfb",
+  "project": "pydantic-settings",
+  "image_id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d",
+  "wrapper_sha256": "3bbf34e44c67ae040ade28f601634f7ef61af9c8f38da6fad1cb4e6cf8cd6ec0",
+  "resources": {
+    "timeout_sec": 300,
+    "memory_mb": 1024,
+    "pids_limit": 128
+  },
+  "status": "exited",
+  "directory": "pydantic-settings/run-69ab631b83",
+  "exit_code": 0,
+  "oom_killed": false,
+  "config": {
+    "network_mode": "none",
+    "read_only_root": true,
+    "uid": "1000:1000",
+    "memory_bytes": 1073741824,
+    "pids_limit": 128,
+    "tmpfs": {
+      "/tmp": "rw,nosuid,nodev,size=268435456,mode=1777",
+      "/work": "rw,exec,nosuid,nodev,size=1610612736,mode=1777"
+    }
+  },
+  "removed": true
+}

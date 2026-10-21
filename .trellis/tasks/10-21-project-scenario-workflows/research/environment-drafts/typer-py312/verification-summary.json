@@ -1,0 +1,58 @@
+{
+  "status": "passed",
+  "source_repository": "https://github.com/fastapi/typer",
+  "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+  "image_reference": "vibebench-v3-account:v3-project-repairs-local-20261021-e",
+  "image_id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d",
+  "observed_python": "3.12.15",
+  "native": {
+    "result": "evidence/native-regression-result.json",
+    "elapsed_sec": 187.781728,
+    "counts": {
+      "total": 1505,
+      "passed": 1481,
+      "skipped": 22,
+      "xfailed": 2,
+      "failures": 0,
+      "errors": 0
+    },
+    "max_rss_children_kib": 102224,
+    "container_resources": {
+      "uid": 1000,
+      "gid": 1000,
+      "cgroup_memory_peak_bytes": 315990016,
+      "max_rss_children_kib": 102224,
+      "max_rss_note": "子进程生命周期高水位，不是所有进程RSS之和；容器峰值另读cgroup。"
+    }
+  },
+  "business": {
+    "result": "business-evidence/business-calibration-result.json",
+    "modes": 6,
+    "negative_answers": 3,
+    "reference_user_tests_exit_code": 0,
+    "container_resources": {
+      "uid": 1000,
+      "gid": 1000,
+      "cgroup_memory_peak_bytes": 110215168,
+      "max_rss_children_kib": 72720
+    }
+  },
+  "native_not_repeated_after_pass": true,
+  "reuse_basis": "业务观察脚本仅固定终端宽度并加强help退出码核对；镜像、16制品、Typer源码字节和完整测试集合不变。",
+  "failures_retained": [
+    "attempts/01-noexec",
+    "attempts/02-source-registration",
+    "evidence/target-result.json"
+  ],
+  "cleanup_records": [
+    "attempts/01-noexec/cleanup.json",
+    "attempts/02-source-registration/cleanup.json",
+    "evidence/cleanup.json",
+    "business-evidence/cleanup.json"
+  ],
+  "model_runs": 0,
+  "model_completed": 0,
+  "production_integrated": false,
+  "profile_status_only_updated_after_execution": true,
+  "profile_sha256": "1944a05705622e0770d5fbf3174b3c42d7514fcd319208772be16430ce433dfd"
+}

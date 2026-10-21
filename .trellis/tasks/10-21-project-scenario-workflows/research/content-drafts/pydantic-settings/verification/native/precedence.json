@@ -1,0 +1,30 @@
+{
+  "script": "verification/check_settings.py",
+  "args": [
+    "precedence"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "environment_override": {
+      "title": "商品工具",
+      "quantity": 5
+    },
+    "without_environment": {
+      "title": "商品工具",
+      "quantity": 2
+    },
+    "invalid_quantity": {
+      "loc": [
+        "quantity"
+      ],
+      "type": "int_parsing",
+      "input": "invalid"
+    },
+    "input_file_unchanged": true
+  },
+  "resource_profile": "business",
+  "draft_status": "not_executed"
+}

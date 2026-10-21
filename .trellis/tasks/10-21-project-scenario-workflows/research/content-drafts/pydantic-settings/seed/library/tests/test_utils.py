@@ -1,0 +1,288 @@
+import sys
+from collections.abc import MutableSet
+from collections.abc import Set as AbstractSet
+from typing import Annotated, Any, Literal, TypeVar
+
+import pytest
+from pydantic import BaseModel, ConfigDict, Field, Json, RootModel, ValidationError
+from pydantic.fields import FieldInfo
+from typing_extensions import TypeAliasType
+
+from pydantic_settings.sources.base import _unwrap_optional_annotation
+from pydantic_settings.sources.types import SecretVersion
+from pydantic_settings.sources.utils import (
+    _annotation_contains_types,
+    _annotation_is_complex,
+    _get_field_annotation_and_metadata,
+    _get_union_members,
+    _resolve_type_alias,
+    _substitute_typevars,
+    _union_is_complex,
+    _validate_by_name_enabled,
+)
+from pydantic_settings.utils import path_type_label
+
+
+def test_path_type_label(tmp_path):
+    result = path_type_label(tmp_path)
+    assert result == 'directory'
+    file_path = tmp_path / 'file.txt'
+    file_path.write_text('content')
+    assert path_type_label(file_path) == 'file'
+
+
+T = TypeVar('T')
+
+
+def test_substitute_typevars_without_matching_typevars():
+    """An annotation with no substitutable TypeVars is returned unchanged."""
+    assert _substitute_typevars(list[int], {T: str}) == list[int]
+    # A bare (unparameterized) type has no args and is returned as-is.
+    assert _substitute_typevars(int, {T: str}) is int
+
+
+def test_substitute_typevars_union_reconstruction():
+    """`X | Y` is not subscriptable, so substitution rebuilds it with `|`."""
+    assert _substitute_typevars(T | None, {T: int}) == (int | None)
+
+
+def test_resolve_type_alias_parameterized_without_type_args():
+    """A parameterized alias used bare resolves to its underlying value."""
+    IntOrT = TypeAliasType('IntOrT', int | T, type_params=(T,))
+
+    assert _resolve_type_alias(IntOrT) == (int | T)
+    assert _resolve_type_alias(IntOrT[str]) == (int | str)
+
+
+def test_resolve_type_alias_nested():
+    """Aliases of aliases resolve all the way down, substituting type params at each level."""
+    Inner = TypeAliasType('Inner', list[int])
+    Outer = TypeAliasType('Outer', Inner)
+    InnerT = TypeAliasType('InnerT', list[T], type_params=(T,))
+    OuterT = TypeAliasType('OuterT', InnerT[T], type_params=(T,))
+
+    assert _resolve_type_alias(Outer) == list[int]
+    assert _resolve_type_alias(OuterT[int]) == list[int]
+
+
+def test_resolve_type_alias_passthrough():
+    """Non-alias annotations are returned unchanged."""
+    assert _resolve_type_alias(int) is int
+    assert _resolve_type_alias(list[int]) == list[int]
+
+
+def test_annotation_contains_types_collect_origin():
+    """`collect` gathers matching annotations instead of short-circuiting."""
+    tags: set[Any] = set()
+
+    assert _annotation_contains_types(Literal['a', 'b'], (Literal,), collect=tags) is False
+    assert tags == {Literal['a', 'b']}
+
+
+def test_annotation_contains_types_collect_nested_origin():
+    """Matches nested inside a union are collected too."""
+    tags: set[Any] = set()
+
+    assert _annotation_contains_types(Literal['a'] | None, (Literal,), collect=tags) is False
+    assert tags == {Literal['a']}
+
+
+def test_annotation_contains_types_collect_exact_match():
+    """An annotation that *is* one of `types` is collected and still returns True."""
+    tags: set[Any] = set()
+
+    assert _annotation_contains_types(int, (int,), collect=tags) is True
+    assert tags == {int}
+
+
+def test_annotation_contains_types_is_instance_collect():
+    """`is_instance` matches are collected rather than short-circuiting."""
+    tags: set[Any] = set()
+
+    assert _annotation_contains_types(Json, (type(Json),), is_instance=True, collect=tags) is False
+    assert tags == {Json}
+
+
+def test_annotation_contains_types_is_instance_origin_collect():
+    """`is_instance` matches on the *origin* are collected too.
+
+    `list[int]` has `list` as its origin, which is an instance of `type`. Avoid
+    `Annotated[...]` here: its origin is a class on Python 3.12 but a special form
+    from 3.13 on, so `isinstance(origin, type)` is version dependent.
+    """
+    tags: set[Any] = set()
+
+    assert _annotation_contains_types(list[int], (type,), is_instance=True, collect=tags) is False
+    assert list[int] in tags
+
+
+def test_annotation_contains_types_is_instance_origin_short_circuits():
+    """Without `collect`, an `is_instance` origin match returns True immediately."""
+    assert _annotation_contains_types(list[int], (type,), is_instance=True) is True
+
+
+def test_annotation_contains_types_alias_in_annotated():
+    """Aliases are resolved through `Annotated` on both sides of the alias."""
+    Values = TypeAliasType('Values', list[int])
+    Alias = TypeAliasType('Alias', Annotated[Values, 'metadata'])
+
+    assert _annotation_contains_types(Annotated[Alias, 'outer'], (list,), is_strip_annotated=True)
+
+
+def test_annotation_contains_types_alias_without_origin():
+    """`is_include_origin=False` still applies to the resolved value of an alias."""
+    Values = TypeAliasType('Values', list[int])
+
+    assert not _annotation_contains_types(Values, (list,), is_include_origin=False)
+
+
+def test_annotation_contains_types_alias_is_instance():
+    assert _annotation_contains_types(TypeAliasType('JsonAlias', Json), (type(Json),), is_instance=True)
+
+
+@pytest.mark.skipif(sys.version_info < (3, 12), reason='requires python 3.12 or higher')
+def test_annotation_contains_types_recursive_alias():
+    namespace = {}
+    exec('type Recursive = list[Recursive]', namespace)
+    Recursive = namespace['Recursive']
+
+    assert _annotation_contains_types(Recursive, (list,))
+    assert not _annotation_contains_types(Recursive, (dict,))
+    collected = set()
+    _annotation_contains_types(Recursive, (list,), collect=collected)
+    assert collected == {list[Recursive]}
+
+
+@pytest.mark.skipif(sys.version_info < (3, 12), reason='requires python 3.12 or higher')
+def test_annotation_contains_types_recursive_generic_alias():
+    namespace = {}
+    exec('type Recursive[T] = list[Recursive[T] | T]', namespace)
+    Recursive = namespace['Recursive']
+
+    collected = set()
+    _annotation_contains_types(Recursive[int] | Recursive[str], (int, str), collect=collected)
+    assert collected == {int, str}
+
+
+def test_get_union_members():
+    """Unions nested in aliases or `Annotated` are flattened, and a non-union is its only member."""
+    Values = TypeAliasType('Values', dict[str, int] | list[int])
+
+    assert _get_union_members(dict[str, int]) == (dict[str, int],)
+    assert _get_union_members(TypeAliasType('Mapping', dict[str, int])) == (dict[str, int],)
+    assert _get_union_members(Values | None) == (dict[str, int], list[int], type(None))
+    assert _get_union_members(Annotated[Values, 'metadata'] | str) == (dict[str, int], list[int], str)
+
+
+@pytest.mark.skipif(sys.version_info < (3, 12), reason='requires python 3.12 or higher')
+def test_get_union_members_recursive_alias():
+    """Only union members are flattened, so an alias recursing through a container terminates."""
+    namespace = {}
+    exec('type Recursive = dict[str, Recursive] | list[int]', namespace)
+    Recursive = namespace['Recursive']
+
+    assert _get_union_members(Recursive | None) == (dict[str, Recursive], list[int], type(None))
+
+
+def test_unwrap_optional_annotation():
+    """`T | None` unwraps to `T`, regardless of where `None` sits in the union."""
+    assert _unwrap_optional_annotation(int | None) is int
+    # `None` first still resolves to the non-None member.
+    assert _unwrap_optional_annotation(None | int) is int
+
+
+def test_unwrap_optional_annotation_passthrough():
+    """Non-optional annotations are returned unchanged."""
+    assert _unwrap_optional_annotation(int) is int
+    assert _unwrap_optional_annotation(int | str) == (int | str)
+    # A three-member union including None is not a plain `T | None`.
+    assert _unwrap_optional_annotation(int | str | None) == (int | str | None)
+
+
+def test_secret_version_repr():
+    assert repr(SecretVersion('3')) == "SecretVersion('3')"
+
+
+def test_annotation_is_complex_root_model_without_init_state():
+    """`init_state` is optional; omitting it skips the incomplete-field warning check."""
+
+    class MyRootModel(RootModel[list[int]]):
+        pass
+
+    assert _annotation_is_complex(MyRootModel, []) is True
+
+
+def test_annotation_is_complex_abstract_set():
+    """`collections.abc.Set` is complex, like `set` and `frozenset`."""
+    assert _annotation_is_complex(AbstractSet[str], []) is True
+    assert _annotation_is_complex(MutableSet[str], []) is True
+
+
+def test_get_field_annotation_and_metadata():
+    inner_metadata = object()
+    outer_metadata = object()
+    Value = TypeAliasType('Value', Annotated[list[int] | str, inner_metadata])
+    field = FieldInfo(annotation=Value)
+    field.metadata = [outer_metadata]
+
+    for _ in range(2):
+        annotation, metadata = _get_field_annotation_and_metadata(field)
+        assert annotation == list[int] | str
+        assert metadata == [outer_metadata, inner_metadata]
+        assert field.metadata == [outer_metadata]
+
+    assert _get_field_annotation_and_metadata(FieldInfo(annotation=int)) == (int, [])
+
+
+@pytest.mark.skipif(sys.version_info < (3, 12), reason='PEP 695 syntax requires Python 3.12+')
+@pytest.mark.parametrize('generic', [False, True])
+@pytest.mark.parametrize('member, expected', [('int', False), ('list[int]', True)])
+def test_union_is_complex_recursive_type_alias(generic, member, expected):
+    namespace = {}
+    if generic:
+        exec(f'type Recursive[T] = Recursive[T] | {member.replace("int", "T")}', namespace)
+        annotation = namespace['Recursive'][int]
+    else:
+        exec(f'type Recursive = Recursive | {member}', namespace)
+        annotation = namespace['Recursive']
+
+    assert _union_is_complex(annotation | None, []) is expected
+
+
+@pytest.mark.skipif(sys.version_info < (3, 12), reason='PEP 695 syntax requires Python 3.12+')
+def test_union_is_complex_recursive_alias_distinct_parameters():
+    namespace = {}
+    exec('type Recursive[T, U] = Recursive[U, T] | T', namespace)
+
+    assert _union_is_complex(namespace['Recursive'][int, list[int]] | None, []) is True
+
+
+@pytest.mark.parametrize(
+    'config, expected',
+    [
+        ({}, False),
+        ({'populate_by_name': True}, True),
+        ({'populate_by_name': False}, False),
+        ({'validate_by_name': True}, True),
+        ({'validate_by_alias': False}, True),
+        ({'validate_by_alias': False, 'validate_by_name': True}, True),
+        ({'validate_by_alias': False, 'populate_by_name': True}, True),
+        ({'validate_by_alias': False, 'populate_by_name': False}, False),
+        ({'validate_by_name': False, 'populate_by_name': True}, False),
+    ],
+)
+def test_validate_by_name_enabled_matches_pydantic(config: ConfigDict, expected: bool):
+    assert _validate_by_name_enabled(config) is expected
+
+    class Model(BaseModel):
+        model_config = ConfigDict(**config)
+
+        apple: str = Field(alias='pomo')
+
+    try:
+        Model.model_validate({'apple': 'honeycrisp'})
+    except ValidationError:
+        pydantic_validates_by_name = False
+    else:
+        pydantic_validates_by_name = True
+    assert pydantic_validates_by_name is expected

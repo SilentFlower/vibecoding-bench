@@ -1,0 +1,18 @@
+{
+  "script": "verification/native_checks.py",
+  "args": [
+    "--mode",
+    "group"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_library": true,
+    "root_option_before_works": true,
+    "root_option_after_rejected": true,
+    "option_belongs_to_root": true
+  },
+  "resource_profile": "business"
+}

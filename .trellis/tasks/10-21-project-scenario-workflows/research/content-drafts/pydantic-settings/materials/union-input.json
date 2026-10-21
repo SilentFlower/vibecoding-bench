@@ -1,0 +1,10 @@
+{
+  "process_environment": {
+    "APP_CONFIG__ITEM": "[]"
+  },
+  "call": "UnionValue().config",
+  "base_observation": {
+    "item": "[]"
+  },
+  "observation_provenance": "既有 01_union_dictionary_decode；本草案尚未执行新验收"
+}

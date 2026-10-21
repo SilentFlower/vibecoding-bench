@@ -1,0 +1,1 @@
+TypeError: Post.__init__() got multiple values for argument 'content'

@@ -1,0 +1,16 @@
+{
+  "status": "planning_ready_for_first_review",
+  "requirements": 10,
+  "acceptance_criteria": 9,
+  "source_sha256": {
+    "prd.md": "3b80719f425687692c2ab3d82b24aef143b17f2c7e3c5dda235dee48bae4fe90",
+    "design.md": "f9388d721bf4c99b3a325e925b90e292c6ea9a42e8667b5e14c30640b92c9fac",
+    "implement.md": "045f51c8c146d3e55636b2a20fd0255efe20ebc2d4d233fb93cbb84b0d134265",
+    "brief.md": "35a2305aa6c7f48e28b3c18b35445c46d0498de9189b9a1349da88a3923ce513"
+  },
+  "preserved_existing_untracked_files": 261,
+  "tracked_worktree_and_index_unchanged": true,
+  "implementation_started": false,
+  "product_tests_or_model_calls": "not_run",
+  "errors": []
+}

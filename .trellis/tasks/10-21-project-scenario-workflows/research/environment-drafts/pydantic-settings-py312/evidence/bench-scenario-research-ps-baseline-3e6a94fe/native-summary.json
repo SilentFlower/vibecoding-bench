@@ -1,0 +1,39 @@
+{
+  "testcases": 1261,
+  "passed": 1256,
+  "skipped": 5,
+  "failures": 0,
+  "errors": 0,
+  "skip_details": [
+    {
+      "class": "tests.test_settings",
+      "name": "test_case_sensitive_windows_env_fallback",
+      "message": "os.environ is only case-insensitive on Windows",
+      "detail": "/work/project/library/tests/test_settings.py:2184: os.environ is only case-insensitive on Windows"
+    },
+    {
+      "class": "tests.test_source_cli",
+      "name": "test_cli_metavar_format[True-value7-list]",
+      "message": "Skipped",
+      "detail": "/work/project/library/tests/test_source_cli.py:3650: Skipped"
+    },
+    {
+      "class": "tests.test_source_cli",
+      "name": "test_cli_metavar_format[True-value14-LoggedVar]",
+      "message": "Skipped",
+      "detail": "/work/project/library/tests/test_source_cli.py:3650: Skipped"
+    },
+    {
+      "class": "tests.test_source_cli",
+      "name": "test_cli_metavar_format[True-value15-Representation()]",
+      "message": "Skipped",
+      "detail": "/work/project/library/tests/test_source_cli.py:3650: Skipped"
+    },
+    {
+      "class": "tests.test_source_yaml",
+      "name": "test_yaml_not_installed",
+      "message": "PyYAML is installed",
+      "detail": "/work/project/library/tests/test_source_yaml.py:28: PyYAML is installed"
+    }
+  ]
+}

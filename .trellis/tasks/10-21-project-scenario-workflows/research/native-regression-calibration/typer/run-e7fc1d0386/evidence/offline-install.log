@@ -1,0 +1,19 @@
+Looking in links: /offline/artifacts
+Processing /offline/artifacts/annotated_doc-0.0.5-py3-none-any.whl
+Processing /offline/artifacts/coverage-7.16.2-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl
+Processing /offline/artifacts/execnet-2.1.2-py3-none-any.whl
+Processing /offline/artifacts/iniconfig-2.3.1-py3-none-any.whl
+Processing /offline/artifacts/markdown_it_py-4.2.0-py3-none-any.whl
+Processing /offline/artifacts/mdurl-0.1.2-py3-none-any.whl
+Processing /offline/artifacts/packaging-26.3-py3-none-any.whl
+Processing /offline/artifacts/pluggy-1.7.0-py3-none-any.whl
+Processing /offline/artifacts/pygments-2.21.0-py3-none-any.whl
+Processing /offline/artifacts/pytest-9.1.1-py3-none-any.whl
+Processing /offline/artifacts/pytest_cov-7.1.0-py3-none-any.whl
+Processing /offline/artifacts/pytest_sugar-1.1.1-py3-none-any.whl
+Processing /offline/artifacts/pytest_xdist-3.8.0-py3-none-any.whl
+Processing /offline/artifacts/rich-15.0.0-py3-none-any.whl
+Processing /offline/artifacts/shellingham-1.5.4-py2.py3-none-any.whl
+Processing /offline/artifacts/termcolor-3.3.0-py3-none-any.whl
+Installing collected packages: pytest-sugar, termcolor, shellingham, rich, pytest-xdist, pytest-cov, pytest, Pygments, pluggy, packaging, mdurl, markdown-it-py, iniconfig, execnet, coverage, annotated-doc
+Successfully installed Pygments-2.21.0 annotated-doc-0.0.5 coverage-7.16.2 execnet-2.1.2 iniconfig-2.3.1 markdown-it-py-4.2.0 mdurl-0.1.2 packaging-26.3 pluggy-1.7.0 pytest-9.1.1 pytest-cov-7.1.0 pytest-sugar-1.1.1 pytest-xdist-3.8.0 rich-15.0.0 shellingham-1.5.4 termcolor-3.3.0

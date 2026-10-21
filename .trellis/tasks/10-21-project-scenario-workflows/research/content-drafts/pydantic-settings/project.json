@@ -1,0 +1,356 @@
+{
+  "schema": 2,
+  "project_key": "pydantic-settings",
+  "title": "Pydantic Settings 商品工具配置场景",
+  "category": "configuration",
+  "description": "固定真实库上的理解、咨询、正常优先级诊断、信息不足、字典Union修复和刷新方案。",
+  "seed_digest": "f30d58a0c3d9bb34414581134720a29c375746e006f7e470c567bc15127c0f01",
+  "environment": "pydantic-settings-py312",
+  "source": {
+    "repository": "https://github.com/pydantic/pydantic-settings",
+    "commit": "8dc9e05ab07d91e21dd2a37d0b9c30f6d92b1930",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PS-S01",
+      "title": "商品配置接入",
+      "goal": "理解适配边界并得到本地配置示例",
+      "default_entry": "default",
+      "entries": [
+        {
+          "id": "default",
+          "task_ids": [
+            "PS-UNDERSTAND",
+            "PS-CONFIGURE"
+          ],
+          "materials": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PS-UNDERSTAND",
+          "kind": "understand",
+          "goal": "判断项目用途、适配理由与业务职责边界",
+          "prompt": "这个项目是干什么的？我们有个本地商品整理脚本，想把工具标题和每批处理数量移到配置里。用它合适吗？接入时哪些事情还需要我们自己做？",
+          "materials": [
+            "materials/business-goal.md"
+          ],
+          "requires": [],
+          "max_turns": 4,
+          "allowed_paths": [],
+          "outcomes": [
+            "answered"
+          ],
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/rubrics/PS-UNDERSTAND.json"
+          },
+          "branches": [
+            {
+              "id": "PS-UNDERSTAND-BOUNDARY",
+              "when": "回答遗漏业务脚本仍承担什么，用户需要确认库是否代做商品整理。",
+              "materials": [
+                "disclosure/understand-followup.md"
+              ],
+              "activate_tasks": []
+            }
+          ]
+        },
+        {
+          "id": "PS-CONFIGURE",
+          "kind": "consult",
+          "goal": "给出真实可运行的标题／整数数量配置接入示例",
+          "prompt": "那给我一个最小用法：默认标题“商品工具”，数量为2；本地.env可以配置，运行时环境变量可以覆盖。数量要是整数，读取后让我能交给原来的业务函数。",
+          "materials": [
+            "materials/configure-delivery.md",
+            "materials/configure-fixture.py"
+          ],
+          "requires": [
+            {
+              "task_id": "PS-UNDERSTAND",
+              "artifact": "answer"
+            }
+          ],
+          "max_turns": 4,
+          "allowed_paths": [
+            "app"
+          ],
+          "outcomes": [
+            "example_delivered"
+          ],
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/rubrics/PS-CONFIGURE.json",
+            "native": "verification/native/consult.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PS-S02",
+      "title": "数量来源优先级",
+      "goal": "排除正确来源覆盖行为被误报为BUG",
+      "default_entry": "default",
+      "entries": [
+        {
+          "id": "default",
+          "task_ids": [
+            "PS-PRECEDENCE"
+          ],
+          "materials": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PS-PRECEDENCE",
+          "kind": "diagnose",
+          "goal": "以来源优先级解释正确行为并给出最小使用调整",
+          "prompt": "配置文件里数量是2，打印出来却是5。代码、文件、启动环境和输出都在样例里。帮我判断是不是库的BUG，并告诉我怎样只使用文件里的数量；先别改库。",
+          "materials": [
+            "materials/precedence-model.py",
+            "materials/precedence-input.json"
+          ],
+          "requires": [],
+          "max_turns": 4,
+          "allowed_paths": [
+            "app"
+          ],
+          "outcomes": [
+            "no_bug"
+          ],
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/rubrics/PS-PRECEDENCE.json",
+            "native": "verification/native/precedence.json"
+          },
+          "branches": [
+            {
+              "id": "PS-PRECEDENCE-CONTROL",
+              "when": "需要撤去环境变量的对照步骤来核验覆盖关系。",
+              "materials": [
+                "disclosure/precedence-control.md"
+              ],
+              "activate_tasks": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PS-S03",
+      "title": "信息不足的数量报错",
+      "goal": "按需取得材料并定位高优先级非法输入",
+      "default_entry": "default",
+      "entries": [
+        {
+          "id": "default",
+          "task_ids": [
+            "PS-TRIAGE"
+          ],
+          "materials": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PS-TRIAGE",
+          "kind": "diagnose",
+          "goal": "在信息不足时索取关键材料并完成非法输入定位",
+          "prompt": "商品工具启动时报配置错误，看起来与数量有关。是pydantic-settings的问题吗？",
+          "materials": [],
+          "requires": [],
+          "max_turns": 4,
+          "allowed_paths": [
+            "app"
+          ],
+          "outcomes": [
+            "input_issue_identified"
+          ],
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/rubrics/PS-TRIAGE.json",
+            "native": "verification/native/precedence.json"
+          },
+          "branches": [
+            {
+              "id": "PS-TRIAGE-MODEL",
+              "when": "请求消费端配置类、字段类型或调用代码。",
+              "materials": [
+                "disclosure/triage-model.py"
+              ],
+              "activate_tasks": []
+            },
+            {
+              "id": "PS-TRIAGE-INPUTS",
+              "when": "请求配置文件、启动环境或实际输入来源。",
+              "materials": [
+                "disclosure/triage-input.json"
+              ],
+              "activate_tasks": []
+            },
+            {
+              "id": "PS-TRIAGE-ERROR",
+              "when": "请求异常、错误位置或错误输入。",
+              "materials": [
+                "disclosure/triage-error.json"
+              ],
+              "activate_tasks": []
+            },
+            {
+              "id": "PS-TRIAGE-REPRO",
+              "when": "请求完整最小复现，或需要联合消费端代码、输入和异常判断。",
+              "materials": [
+                "disclosure/triage-model.py",
+                "disclosure/triage-input.json",
+                "disclosure/triage-error.json",
+                "disclosure/triage-reproduce.md"
+              ],
+              "activate_tasks": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PS-S04",
+      "title": "字典联合值诊断与显式修复",
+      "goal": "诊断可独立结束；仅显式修复任务授权改库",
+      "default_entry": "default",
+      "entries": [
+        {
+          "id": "default",
+          "task_ids": [
+            "PS-UNION-DIAG",
+            "PS-UNION-FIX"
+          ],
+          "materials": []
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "PS-UNION-DIAG"
+          ],
+          "materials": []
+        },
+        {
+          "id": "fix_with_verified_context",
+          "task_ids": [
+            "PS-UNION-FIX"
+          ],
+          "materials": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PS-UNION-DIAG",
+          "kind": "diagnose",
+          "goal": "定位字典联合值未解码原因并给出不改库的临时办法",
+          "prompt": "商品参数允许写一个字符串或一组字符串。我给APP_CONFIG__ITEM传了[]，结果拿到的是字符串。样例和输出在这里，请判断原因，指出有关代码，并给一个不改库的临时办法。",
+          "materials": [
+            "materials/union-model.py",
+            "materials/union-input.json"
+          ],
+          "requires": [],
+          "max_turns": 4,
+          "allowed_paths": [
+            "app"
+          ],
+          "outcomes": [
+            "defect_identified"
+          ],
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/rubrics/PS-UNION-DIAG.json",
+            "native": "verification/native/union-original.json"
+          },
+          "branches": [
+            {
+              "id": "PS-UNION-TEXT",
+              "when": "需要确认普通hello文本的预期与列表解码边界。",
+              "materials": [
+                "disclosure/union-plain-text.md"
+              ],
+              "activate_tasks": []
+            }
+          ]
+        },
+        {
+          "id": "PS-UNION-FIX",
+          "kind": "modify",
+          "goal": "修复库内字典Union分段环境解码并补回归",
+          "prompt": "请修复库里这个字典联合值的分段环境解码问题，并补回归。合法JSON字符串列表要得到列表，普通字符串继续保留，默认行为之外别扩需求。",
+          "materials": [
+            "materials/union-model.py",
+            "materials/union-input.json",
+            "materials/union-diagnosis-context.md"
+          ],
+          "requires": [],
+          "max_turns": 4,
+          "allowed_paths": [
+            "library/pydantic_settings/sources/providers/env.py",
+            "library/pydantic_settings/sources/utils.py",
+            "library/pydantic_settings/sources/base.py",
+            "library/tests"
+          ],
+          "outcomes": [
+            "code_verified"
+          ],
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/rubrics/PS-UNION-FIX.json",
+            "native": "verification/native/union-fixed.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PS-S05",
+      "title": "配置刷新方案",
+      "goal": "讨论校验候选、变化预览和新旧引用语义",
+      "default_entry": "default",
+      "entries": [
+        {
+          "id": "default",
+          "task_ids": [
+            "PS-REFRESH-PLAN"
+          ],
+          "materials": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PS-REFRESH-PLAN",
+          "kind": "plan",
+          "goal": "给出校验成功后再发布且失败保留旧快照的配置刷新方案",
+          "prompt": "本地商品工具会运行很久，想让用户改配置后点一下“重新加载”，先看变化，格式错了继续用旧配置。请根据项目现有能力给一个实现方案，说明哪些现成可用、哪些要由我们补；这轮先不写代码。",
+          "materials": [
+            "materials/refresh-requirements.md"
+          ],
+          "requires": [],
+          "max_turns": 4,
+          "allowed_paths": [],
+          "outcomes": [
+            "feasible_plan"
+          ],
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/rubrics/PS-REFRESH-PLAN.json",
+            "native": "verification/native/cache.json"
+          },
+          "branches": [
+            {
+              "id": "PS-REFRESH-LIFECYCLE",
+              "when": "询问旧配置引用、新批次取值或进程／并发边界。",
+              "materials": [
+                "disclosure/refresh-lifecycle.md"
+              ],
+              "activate_tasks": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

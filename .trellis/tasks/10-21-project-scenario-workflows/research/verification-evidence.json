@@ -1,0 +1,433 @@
+{
+  "status": "passed",
+  "content_digest": "8f064f9d97fc199f9eebbbe760159d7b528b96dcaa7a73d92dfa60835375a6ee",
+  "formal_content": {
+    "projects": 3,
+    "scenarios": 13,
+    "tasks": 20,
+    "real_model_completed_tasks": 0
+  },
+  "unit": {
+    "command": "PYTHONPATH=orchestrator .deploy/project-iteration-repairs/venv/bin/python -m unittest test_project_iterations test_project_plans test_project_scenarios test_project_scenario_content test_project_evaluation test_project_review_runtime test_project_native_verifier test_account_runtime test_quota test_quota_completion test_run_windows test_run_window_scheduling",
+    "tests": 249,
+    "status": "passed",
+    "log": ".deploy/project-scenario-workflows/final-unit-tests-with-code-inputs.log",
+    "sha256": "a417ff4929df68901f0cfda0fa23fce2c1b56f93f1883d861f3c1573e9f47741"
+  },
+  "native": [
+    {
+      "project": "pydantic-settings",
+      "task": "PS-UNION-FIX",
+      "catalog_digest": "8a24eb421996c088d9a66d7a9ed10176d56b760462f8c80b3a57c154a33b838a",
+      "candidate_digest": "f30d58a0c3d9bb34414581134720a29c375746e006f7e470c567bc15127c0f01",
+      "expected_status": "failed",
+      "expectation_met": true,
+      "real_model_calls": 0,
+      "path": ".deploy/project-scenario-workflows/business-adapter-pydantic-settings-original.json",
+      "sha256": "e5994510af3207f2e80bdff4d51796cfab76c83209db132cd3fc924e39eb5a66",
+      "status": "failed"
+    },
+    {
+      "project": "pydantic-settings",
+      "task": "PS-UNION-FIX",
+      "catalog_digest": "8a24eb421996c088d9a66d7a9ed10176d56b760462f8c80b3a57c154a33b838a",
+      "candidate_digest": "046eb5564c9d1896de4bd4d46b3870aec5b271b5b1c6a3272edb89a3203f8817",
+      "expected_status": "passed",
+      "expectation_met": true,
+      "real_model_calls": 0,
+      "path": ".deploy/project-scenario-workflows/business-adapter-pydantic-settings-reference.json",
+      "sha256": "7c15e76b824ddc94e45927de26ec6b1270697eb2d57c3280669787d21a3af46b",
+      "status": "passed",
+      "regression": {
+        "status": "passed",
+        "counts": {
+          "passed": 1256,
+          "failed": 0,
+          "error": 0,
+          "skipped": 5,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "collected": 1261,
+        "collection_digest": "3ab4afb58ec08fd02a409a52c5c5b36d72d17cd43311c7a53b4d80b315184c97",
+        "collection_matches_contract": true
+      }
+    },
+    {
+      "project": "python-frontmatter",
+      "task": "FM-FX-01",
+      "catalog_digest": "8a24eb421996c088d9a66d7a9ed10176d56b760462f8c80b3a57c154a33b838a",
+      "candidate_digest": "a9181e19224379b7c3593996869c4c80f4b8afa19a4126d25bd0e2115f84eca2",
+      "expected_status": "failed",
+      "expectation_met": true,
+      "real_model_calls": 0,
+      "path": ".deploy/project-scenario-workflows/business-adapter-python-frontmatter-original.json",
+      "sha256": "34e45ec8617631ec1e7c09f462f29bbd198b73e386d676f5d450453a733e35f2",
+      "status": "failed"
+    },
+    {
+      "project": "python-frontmatter",
+      "task": "FM-FX-01",
+      "catalog_digest": "8a24eb421996c088d9a66d7a9ed10176d56b760462f8c80b3a57c154a33b838a",
+      "candidate_digest": "fc6fe9e11860bb7700a02187a905389dee5a1859217fa20ac65c7e2e225dc42b",
+      "expected_status": "passed",
+      "expectation_met": true,
+      "real_model_calls": 0,
+      "path": ".deploy/project-scenario-workflows/business-adapter-python-frontmatter-reference.json",
+      "sha256": "5c11cf6c0624cb29812340dfac82e51c8944e62d276082c158915bf3555ede03",
+      "status": "passed",
+      "regression": {
+        "status": "passed",
+        "counts": {
+          "passed": 67,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "collected": 67,
+        "collection_digest": "cb1c87c04ce42eefc575647fc4ed1c73b5df4adcb8b37047fe8b5b5989ad0cf8",
+        "collection_matches_contract": true
+      }
+    },
+    {
+      "project": "typer",
+      "task": "TY-M01",
+      "catalog_digest": "8a24eb421996c088d9a66d7a9ed10176d56b760462f8c80b3a57c154a33b838a",
+      "candidate_digest": "324ac97608d48aeed6bec66bb663c3c63d9d1cb7a3981969d63a0cc13f726bf9",
+      "expected_status": "failed",
+      "expectation_met": true,
+      "real_model_calls": 0,
+      "path": ".deploy/project-scenario-workflows/business-adapter-typer-original.json",
+      "sha256": "be2245a4663401141f0a5ffc57efe9b5919247353a0a4bc607b902748f82edda",
+      "status": "failed"
+    },
+    {
+      "project": "typer",
+      "task": "TY-M01",
+      "catalog_digest": "8a24eb421996c088d9a66d7a9ed10176d56b760462f8c80b3a57c154a33b838a",
+      "candidate_digest": "96741b1db08eb1b5f3aaeb23013d0efd32bd2a2fc6e663e8f07fe7b56ef35159",
+      "expected_status": "passed",
+      "expectation_met": true,
+      "real_model_calls": 0,
+      "path": ".deploy/project-scenario-workflows/business-adapter-typer-reference.json",
+      "sha256": "580f4e9e969736cedac647406b5e346bda08c4690a482099e87252e16539f184",
+      "status": "passed",
+      "regression": {
+        "status": "passed",
+        "counts": {
+          "passed": 1481,
+          "failed": 0,
+          "error": 0,
+          "skipped": 22,
+          "xfailed": 2,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "collected": 1505,
+        "collection_digest": "cbca1ae866e636fc287522db3f45c54b7168bec3d94066b8f3e97efd197cd19b",
+        "collection_matches_contract": true
+      }
+    },
+    {
+      "project": "python-frontmatter",
+      "task": "FM-FX-01",
+      "catalog_digest": "8a24eb421996c088d9a66d7a9ed10176d56b760462f8c80b3a57c154a33b838a",
+      "candidate_digest": "a9181e19224379b7c3593996869c4c80f4b8afa19a4126d25bd0e2115f84eca2",
+      "expected_status": "passed",
+      "expectation_met": true,
+      "real_model_calls": 0,
+      "path": ".deploy/project-scenario-workflows/native-adapter-fm.json",
+      "sha256": "34491ce0612cd24f9eb8fccb51256d04905448140c4d3637816d4ce9887e1b3f",
+      "status": "passed",
+      "regression": {
+        "status": "passed",
+        "counts": {
+          "passed": 67,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "collected": 67,
+        "collection_digest": "cb1c87c04ce42eefc575647fc4ed1c73b5df4adcb8b37047fe8b5b5989ad0cf8",
+        "collection_matches_contract": true
+      }
+    },
+    {
+      "project": "pydantic-settings",
+      "task": "PS-UNION-FIX",
+      "catalog_digest": "8a24eb421996c088d9a66d7a9ed10176d56b760462f8c80b3a57c154a33b838a",
+      "candidate_digest": "f30d58a0c3d9bb34414581134720a29c375746e006f7e470c567bc15127c0f01",
+      "expected_status": "passed",
+      "expectation_met": true,
+      "real_model_calls": 0,
+      "path": ".deploy/project-scenario-workflows/native-adapter-ps.json",
+      "sha256": "495409698972fcd04fd636b1e11045b05052994246a94f6d9bd22ef31168f9ef",
+      "status": "passed",
+      "regression": {
+        "status": "passed",
+        "counts": {
+          "passed": 1256,
+          "failed": 0,
+          "error": 0,
+          "skipped": 5,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "collected": 1261,
+        "collection_digest": "3ab4afb58ec08fd02a409a52c5c5b36d72d17cd43311c7a53b4d80b315184c97",
+        "collection_matches_contract": true
+      }
+    },
+    {
+      "project": "typer",
+      "task": "TY-M01",
+      "catalog_digest": "8a24eb421996c088d9a66d7a9ed10176d56b760462f8c80b3a57c154a33b838a",
+      "candidate_digest": "324ac97608d48aeed6bec66bb663c3c63d9d1cb7a3981969d63a0cc13f726bf9",
+      "expected_status": "passed",
+      "expectation_met": true,
+      "real_model_calls": 0,
+      "path": ".deploy/project-scenario-workflows/native-adapter-typer.json",
+      "sha256": "f1fd5c27219b5ef01f8c13192680ca9c0d2e7378a154b03c5d7a66902f678aa4",
+      "status": "passed",
+      "regression": {
+        "status": "passed",
+        "counts": {
+          "passed": 1481,
+          "failed": 0,
+          "error": 0,
+          "skipped": 22,
+          "xfailed": 2,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "collected": 1505,
+        "collection_digest": "cbca1ae866e636fc287522db3f45c54b7168bec3d94066b8f3e97efd197cd19b",
+        "collection_matches_contract": true
+      }
+    },
+    {
+      "project": "typer",
+      "task": "TY-C01",
+      "catalog_digest": "cc425f6d3d2ac023bdadd7284636e60d7fb06e4e633e50c37a81698a5e8472b9",
+      "candidate_digest": "fd8db542b38dd5da63cdbd625dc964acd6648da242cec842bd161b84c8fa852b",
+      "expected_status": "passed",
+      "expectation_met": true,
+      "real_model_calls": 0,
+      "path": ".deploy/project-scenario-workflows/native-typer-annotated-answer.json",
+      "sha256": "8fa73fb2c2a299572dcd6b74ffb163e1d2cf4a84a1427665f9fe9cbea42493a0",
+      "status": "passed"
+    },
+    {
+      "project": "typer",
+      "task": "TY-M01",
+      "catalog_digest": "cc425f6d3d2ac023bdadd7284636e60d7fb06e4e633e50c37a81698a5e8472b9",
+      "candidate_digest": "045d16db48efcd39131996bded77f0bbc20e1eff71d8849098dfdd75c9ed0d10",
+      "expected_status": "failed",
+      "expectation_met": true,
+      "real_model_calls": 0,
+      "path": ".deploy/project-scenario-workflows/native-typer-empty-tests.json",
+      "sha256": "ab8419c379fb5126e7cceaceaa81ba0528fe472c410a01d3c0dc066a2050753d",
+      "status": "failed"
+    },
+    {
+      "project": "typer",
+      "task": "TY-M01",
+      "catalog_digest": "cc425f6d3d2ac023bdadd7284636e60d7fb06e4e633e50c37a81698a5e8472b9",
+      "candidate_digest": "0addbd507c90831bf8731889ca246269fc09d8c545c7ff810eea756699fa2e84",
+      "expected_status": "failed",
+      "expectation_met": true,
+      "real_model_calls": 0,
+      "path": ".deploy/project-scenario-workflows/native-typer-failing-tests.json",
+      "sha256": "f9c1481611a2928a71c11fd1a9cece8557a62dfb4f2654fbdb3e8f1758e2abad",
+      "status": "failed"
+    },
+    {
+      "project": "typer",
+      "task": "TY-C01",
+      "catalog_digest": "2fa3c3ea6d243602b537117abe9ad41a9ada1e6e01756418d6924cc7b948efae",
+      "candidate_digest": "fd8db542b38dd5da63cdbd625dc964acd6648da242cec842bd161b84c8fa852b",
+      "expected_status": "passed",
+      "expectation_met": true,
+      "real_model_calls": 0,
+      "path": ".deploy/project-scenario-workflows/native-typer-run-alias.json",
+      "sha256": "ab9fd5504a2c9449b9e084655cb6b84f6aacaad255380d38b5e39c5b05bd83f9",
+      "status": "passed"
+    },
+    {
+      "project": "typer",
+      "task": "TY-M01",
+      "catalog_digest": "cc425f6d3d2ac023bdadd7284636e60d7fb06e4e633e50c37a81698a5e8472b9",
+      "candidate_digest": "96741b1db08eb1b5f3aaeb23013d0efd32bd2a2fc6e663e8f07fe7b56ef35159",
+      "expected_status": "passed",
+      "expectation_met": true,
+      "real_model_calls": 0,
+      "path": ".deploy/project-scenario-workflows/native-typer-user-tests-reference.json",
+      "sha256": "75be947bed36e235af4e4a60cb727a64288b9ca2fc21d16826409c46731063e9",
+      "status": "passed",
+      "regression": {
+        "status": "passed",
+        "counts": {
+          "passed": 1481,
+          "failed": 0,
+          "error": 0,
+          "skipped": 22,
+          "xfailed": 2,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "collected": 1505,
+        "collection_digest": "cbca1ae866e636fc287522db3f45c54b7168bec3d94066b8f3e97efd197cd19b",
+        "collection_matches_contract": true
+      }
+    }
+  ],
+  "browser": {
+    "status": "passed",
+    "validated": [
+      "真实页面创建policy3",
+      "默认600与显式预算",
+      "批次名称转义",
+      "真实SSE更新",
+      "场景展开与页面滚动保持",
+      "回答按需读取",
+      "真实API六任务通过",
+      "仅修改任务接受代码",
+      "真实timeout保留与接续",
+      "候选与评审角色分列",
+      "固定回答与文件按需读取",
+      "分类累计用量",
+      "切页关闭SSE",
+      "1280/390明暗主题",
+      "当前catalog503时历史API与页面仍可读"
+    ],
+    "not_run": [],
+    "elapsed_sec": 632.372,
+    "javascript_errors": []
+  },
+  "browser_raw": {
+    "path": ".deploy/project-scenario-workflows/browser-capacity-1-second/browser/scenario-browser.json",
+    "sha256": "1a96979676638bb120c6443e59ef0b86eab4b3315f4256b7e599b389cf04c5b7"
+  },
+  "limitations": [
+    "本地模拟CLI与固定测试，不代表真实模型通过率、评分质量或费用校准。",
+    "未发布镜像或部署；打包证据只校验源码快照过滤与Docker内容COPY，未将派生验证镜像冒充正式联合构建。"
+  ],
+  "legacy-project-iterations": {
+    "path": ".deploy/project-scenario-workflows/legacy-project-iterations/runner.log",
+    "sha256": "e5e6c39c4d56dc2ff744e99885086d4069ca2b5748c723d2e951ac92822c8e22",
+    "conclusions": [
+      "通过：真实系统画像、文件 API、Node/子进程及直接 syscall/CPUID 边界：{\"schema\": 1, \"kernel_template\": \"debian-6.1.0-31\", \"cpu_template\": \"amd-cezanne-5800h\", \"computer_template\": \"cezanne-legion-7-v1\", \"dynamic_files_threads_node_children\": \"passed\", \"dmi_content_metadata_access\": \"passed\", \"libc_statx_and_syscall_passthrough\": \"passed\", \"raw_syscall_static_cpuid\": \"\\u771f\\u5b9e\\u503c\\uff0c\\u672a\\u8986\\u76d6\", \"readonly\": true, \"elapsed_seconds\": 0.619}",
+      "通过：真实 Docker 三角色权限/只读根/秘密隔离/内置 DNS 拒绝/本地构建/非 root 收口：{\"cli\": {\"uid\": 1000, \"caps\": {\"CapInh\": \"0000000000000000\", \"CapPrm\": \"0000000000000000\", \"CapEff\": \"0000000000000000\", \"CapBnd\": \"0000000000000000\", \"CapAmb\": \"0000000000000000\", \"NoNewPrivs\": \"1\"}, \"hostname\": \"synthetic-fixed\", \"machine_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"memory\": 1207959552, \"memory_swap\": 3355443200, \"oom_killed\": false, \"memory_peak\": 504131584}, \"sender\": {\"uid\": 1001, \"caps\": {\"CapInh\": \"0000000000000000\", \"CapPrm\": \"0000000000000000\", \"CapEff\": \"0000000000000000\", \"CapBnd\": \"0000000000000000\", \"CapAmb\": \"0000000000000000\", \"NoNewPrivs\": \"1\"}, \"hostname\": \"synthetic-fixed\", \"machine_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"memory\": 134217728, \"memory_swap\": 134217728, \"oom_killed\": false, \"memory_peak\": 6545408}, \"network\": {\"mac_matches\": true, \"oom_killed\": false, \"memory_peak\": 43753472}, \"pressure\": {\"allocated\": 301989888, \"tmp_written\": 131571712, \"tmp_full_rejected\": true}}",
+      "通过：真实网关及共享 CLI 租约期间 API -> 短 DNS 账号发送器 -> 本地 TLS；错误绑定拒绝且无重放",
+      "通过：真实 CLI 只读物理采集、DMI/CPU/内核/时区一致、cgroup RAM 口径及身份/凭据保留",
+      "通过：真实 Scheduler→固定账号 driver/tmux→原生主会话→严格清理→独立 Docker 验收→两步累积；未启动项目无目录；合成 CLI，不代表真实模型推理"
+    ]
+  },
+  "legacy-project-scheduling-second": {
+    "path": ".deploy/project-scenario-workflows/legacy-project-scheduling-second/runner.log",
+    "sha256": "68ed3f7cb92dbaeab49d2eda8aca516b9631f275738d742e9a9ffcd16576e5c1",
+    "conclusions": [
+      "通过：真实系统画像、文件 API、Node/子进程及直接 syscall/CPUID 边界：{\"schema\": 1, \"kernel_template\": \"debian-6.1.0-31\", \"cpu_template\": \"amd-cezanne-5800h\", \"computer_template\": \"cezanne-rog-g513-v1\", \"dynamic_files_threads_node_children\": \"passed\", \"dmi_content_metadata_access\": \"passed\", \"libc_statx_and_syscall_passthrough\": \"passed\", \"raw_syscall_static_cpuid\": \"\\u771f\\u5b9e\\u503c\\uff0c\\u672a\\u8986\\u76d6\", \"readonly\": true, \"elapsed_seconds\": 0.528}",
+      "通过：真实 Docker 三角色权限/只读根/秘密隔离/内置 DNS 拒绝/本地构建/非 root 收口：{\"cli\": {\"uid\": 1000, \"caps\": {\"CapInh\": \"0000000000000000\", \"CapPrm\": \"0000000000000000\", \"CapEff\": \"0000000000000000\", \"CapBnd\": \"0000000000000000\", \"CapAmb\": \"0000000000000000\", \"NoNewPrivs\": \"1\"}, \"hostname\": \"synthetic-fixed\", \"machine_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"memory\": 1207959552, \"memory_swap\": 3355443200, \"oom_killed\": false, \"memory_peak\": 457326592}, \"sender\": {\"uid\": 1001, \"caps\": {\"CapInh\": \"0000000000000000\", \"CapPrm\": \"0000000000000000\", \"CapEff\": \"0000000000000000\", \"CapBnd\": \"0000000000000000\", \"CapAmb\": \"0000000000000000\", \"NoNewPrivs\": \"1\"}, \"hostname\": \"synthetic-fixed\", \"machine_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"memory\": 134217728, \"memory_swap\": 134217728, \"oom_killed\": false, \"memory_peak\": 6238208}, \"network\": {\"mac_matches\": true, \"oom_killed\": false, \"memory_peak\": 40230912}, \"pressure\": {\"allocated\": 301989888, \"tmp_written\": 131571712, \"tmp_full_rejected\": true}}",
+      "通过：真实网关及共享 CLI 租约期间 API -> 短 DNS 账号发送器 -> 本地 TLS；错误绑定拒绝且无重放",
+      "通过：真实 CLI 只读物理采集、DMI/CPU/内核/时区一致、cgroup RAM 口径及身份/凭据保留",
+      "通过：真实两 CLI 重叠运行；暂停 A 验收时 B 继续；同一 Run/session 两步；逐步用量 11/22；补位截止跨恢复不变",
+      "通过：实际停止故障CLI后保留局部blocked及原因；兄弟和原队列后续项目继续独立验收",
+      "通过：真实 driver 60 秒超时保留计划 1/2、半成品及旧 timeout Run；新 Run 恢复原 session 并只通过剩余一步；全部为合成 CLI",
+      "通过：Tasks 同账号两个真实 CLI 同时存在；全部执行共用容量 2；已建立透传长连接跨补位及清理继续，relay PID 与启动时刻保持"
+    ]
+  },
+  "packaging": {
+    "content_digest": "8f064f9d97fc199f9eebbbe760159d7b528b96dcaa7a73d92dfa60835375a6ee",
+    "projects": 3,
+    "source_filter": "deploy/v3/manage.py:source_snapshot_ignore",
+    "verification_only": true,
+    "build_log_sha256": "478376c3b37752eee0a421a3b1f3a11b476b7b93e976dd65c5995e03bcae2d6d"
+  },
+  "source_sha256": {
+    "orchestrator/project_scenarios.py": "a4b1a6551d221bf67e213ac0844743cd0a6b3d50fb2344a8a95e510f62c67af7",
+    "orchestrator/project_evaluation.py": "b32886906671e5600f0c0c4e43362c0250fed755c6256e1939da5664755425da",
+    "orchestrator/project_scenario_usage.py": "89c973a7cf07f13de9923aafcf8a50341a4694c10910a99360c8fd15936f74bb",
+    "orchestrator/project_scenario_content.py": "8ec2a41382c2a09bd4fd04411cbebd317b0b352cb6651e134f39a6e66b0b4660",
+    "orchestrator/project_review_runtime.py": "b0222a72eb757c79b9f1d3a83c17766aebd2e8825bc626f7ee6d0d27641c388f",
+    "orchestrator/project_verifier.py": "ca1a7792426b0031dc5fedf933661cc2e8bdec5d3b897b7751b3fc567c4f7c21",
+    "orchestrator/account_runtime.py": "3c850cda7979bc12d44ffef07e9b10c315a064836bbb73fad0cb3203c2c0f9d8",
+    "orchestrator/main.py": "23dcce860c5da6ecdc4e380844be7d15884890e0aecde5ec993507ba59ac46c0"
+  },
+  "focused_material_setup": {
+    "status": "passed",
+    "tests": 1,
+    "log": ".deploy/project-scenario-workflows/final-code-input-material-test.log",
+    "reason": "将入口恢复反例改为内容契约允许的 materials→app 路径，覆盖材料保留与当前任务半成品。"
+  },
+  "prior_docker_verification": {
+    "status": "failed",
+    "log": ".deploy/project-scenario-workflows/capacity-2-accepted-code.log",
+    "sha256": "ee9d52ffca7b8b2a54544ccbb0848fe31a90da7a9a1665bf23bfc7a131f2126f",
+    "reason": "6个任务的通过／尝试／预算断言已完成，最终断言仍在新任务活动目录查上一任务临时文件；已改为同时核对冻结候选与交接备份，再复跑。"
+  },
+  "current_source_sha256": {
+    "orchestrator/project_scenarios.py": "a4b1a6551d221bf67e213ac0844743cd0a6b3d50fb2344a8a95e510f62c67af7",
+    "orchestrator/project_evaluation.py": "b32886906671e5600f0c0c4e43362c0250fed755c6256e1939da5664755425da",
+    "orchestrator/project_scenario_usage.py": "89c973a7cf07f13de9923aafcf8a50341a4694c10910a99360c8fd15936f74bb",
+    "orchestrator/project_scenario_content.py": "8ec2a41382c2a09bd4fd04411cbebd317b0b352cb6651e134f39a6e66b0b4660",
+    "orchestrator/project_review_runtime.py": "b0222a72eb757c79b9f1d3a83c17766aebd2e8825bc626f7ee6d0d27641c388f",
+    "orchestrator/project_verifier.py": "ca1a7792426b0031dc5fedf933661cc2e8bdec5d3b897b7751b3fc567c4f7c21",
+    "orchestrator/account_runtime.py": "3c850cda7979bc12d44ffef07e9b10c315a064836bbb73fad0cb3203c2c0f9d8",
+    "orchestrator/main.py": "6c9e1b01e95382b207387a004f54e73586a6d3748d32a7c5c25e15b78b8b580b"
+  },
+  "source_note": "组合单元后的main改动仅为DTO中文docstring；测试入口材料改为合法materials→app路径后定向通过。最终Docker使用新的输入版本绑定与封存备份断言。",
+  "docker_capacity_2": {
+    "status": "passed",
+    "capacity": 2,
+    "tasks": 6,
+    "code_acceptances": 1,
+    "elapsed_sec": 462.2113441830006,
+    "maximum_holders": 2,
+    "actual_model_pinned": true,
+    "private_checked": true,
+    "candidate_review_overlap": true,
+    "lost_create_ack": true,
+    "orphan_pool_fenced": true,
+    "private_restart_recovered": [
+      "running",
+      "exited",
+      "missing"
+    ],
+    "public_roles_preserved": true,
+    "real_model_calls": 0,
+    "review_count": 8,
+    "path": ".deploy/project-scenario-workflows/capacity-2-accepted-code-final/scenario-capacity-2.json",
+    "sha256": "e4d57ed4f61bd4433263662be35972e880902f7a19f908850167cb33852e0eb6",
+    "command": "PYTHONPATH=orchestrator .deploy/project-iteration-repairs/venv/bin/python deploy/v3/run_local_verification.py --manifest .deploy/project-scenario-workflows/manifest.json --project-scenarios-only --scenario-capacity 2 --scenario-failures --evidence-dir .deploy/project-scenario-workflows/capacity-2-accepted-code-final",
+    "additional_assertions": [
+      "真实超时半成品在接续后的冻结候选与新任务交接备份均保留",
+      "新任务活动目录排除前任务未接受临时文件"
+    ]
+  },
+  "verification_source_sha256": "e7d6a8be1f2ca26b0a952db4833385d88b8085b7865bc5d5d6ff23430b973f15",
+  "git_delivery_fidelity": {
+    "status": "passed",
+    "content_digest": "8f064f9d97fc199f9eebbbe760159d7b528b96dcaa7a73d92dfa60835375a6ee",
+    "frozen_agent_sha256": "372cbf35e5ddb9f2cbd16991772ee73c22d79fa70c5aa26a514966a0c7fec776",
+    "prospective_export": "修订计划确认前已核对拟交付目录；确认后真实暂存目录再次验证通过，结果见confirmed_index_export。",
+    "line_endings": "正式内容与任务研究证据text=unset；正常代码保持unspecified。",
+    "local_agents_still_ignored": true,
+    "confirmed_index_export": {
+      "status": "passed",
+      "existing_files_verified": 1131,
+      "content_digest": "8f064f9d97fc199f9eebbbe760159d7b528b96dcaa7a73d92dfa60835375a6ee",
+      "business_commit": "2a04699a1346c3492ca2007665ebe6b4b28d6136",
+      "business_push": "complete",
+      "committed_objects_match_original_bytes": true
+    }
+  }
+}

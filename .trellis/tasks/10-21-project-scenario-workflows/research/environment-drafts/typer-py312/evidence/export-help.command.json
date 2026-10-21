@@ -1,0 +1,12 @@
+{
+  "command": [
+    "/work/venv/bin/python",
+    "-B",
+    "/input/disclosure/TY-D02/shop.py",
+    "export",
+    "--help"
+  ],
+  "cwd": "/work/project",
+  "exit_code": 0,
+  "elapsed_sec": 0.215526
+}

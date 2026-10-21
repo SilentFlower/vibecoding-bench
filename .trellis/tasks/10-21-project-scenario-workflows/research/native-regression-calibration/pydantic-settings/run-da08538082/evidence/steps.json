@@ -1,0 +1,111 @@
+[
+  {
+    "step": "freeze-baseline",
+    "command": [
+      "/work/venv/bin/python",
+      "/input/native_regression.py",
+      "--project",
+      "pydantic-settings",
+      "--baseline-root",
+      "/baseline/library",
+      "--evidence-dir",
+      "/evidence/freeze-baseline",
+      "--timeout-sec",
+      "300",
+      "--freeze-baseline-contract",
+      "/evidence/contract.json"
+    ],
+    "exit_code": 0,
+    "elapsed_sec": 13.411910834000082,
+    "expected_status": "passed",
+    "actual_status": "passed",
+    "counts": {
+      "passed": 1256,
+      "failed": 0,
+      "error": 0,
+      "skipped": 5,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "collected": 1261,
+    "strict_doctest_count": 0,
+    "collection_digest": "3ab4afb58ec08fd02a409a52c5c5b36d72d17cd43311c7a53b4d80b315184c97",
+    "result_digest": "a38a9d9de2b9c12841eedd59cc3f091e8e6bc759b0ea9ab74650332a06a53d4c",
+    "matches_expected": true
+  },
+  {
+    "step": "original-candidate",
+    "command": [
+      "/work/venv/bin/python",
+      "/input/native_regression.py",
+      "--project",
+      "pydantic-settings",
+      "--baseline-root",
+      "/baseline/library",
+      "--evidence-dir",
+      "/evidence/original-candidate",
+      "--timeout-sec",
+      "300",
+      "--candidate-root",
+      "/work/candidates/original",
+      "--contract",
+      "/evidence/contract.json"
+    ],
+    "exit_code": 0,
+    "elapsed_sec": 14.120590718999665,
+    "expected_status": "passed",
+    "actual_status": "passed",
+    "counts": {
+      "passed": 1256,
+      "failed": 0,
+      "error": 0,
+      "skipped": 5,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "collected": 1261,
+    "strict_doctest_count": 0,
+    "collection_digest": "3ab4afb58ec08fd02a409a52c5c5b36d72d17cd43311c7a53b4d80b315184c97",
+    "result_digest": "a38a9d9de2b9c12841eedd59cc3f091e8e6bc759b0ea9ab74650332a06a53d4c",
+    "matches_expected": true
+  },
+  {
+    "step": "reference-candidate",
+    "command": [
+      "/work/venv/bin/python",
+      "/input/native_regression.py",
+      "--project",
+      "pydantic-settings",
+      "--baseline-root",
+      "/baseline/library",
+      "--evidence-dir",
+      "/evidence/reference-candidate",
+      "--timeout-sec",
+      "300",
+      "--candidate-root",
+      "/work/candidates/reference",
+      "--contract",
+      "/evidence/contract.json"
+    ],
+    "exit_code": 0,
+    "elapsed_sec": 13.382054653000523,
+    "expected_status": "passed",
+    "actual_status": "passed",
+    "counts": {
+      "passed": 1256,
+      "failed": 0,
+      "error": 0,
+      "skipped": 5,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "collected": 1261,
+    "strict_doctest_count": 0,
+    "collection_digest": "3ab4afb58ec08fd02a409a52c5c5b36d72d17cd43311c7a53b4d80b315184c97",
+    "result_digest": "a38a9d9de2b9c12841eedd59cc3f091e8e6bc759b0ea9ab74650332a06a53d4c",
+    "matches_expected": true
+  }
+]

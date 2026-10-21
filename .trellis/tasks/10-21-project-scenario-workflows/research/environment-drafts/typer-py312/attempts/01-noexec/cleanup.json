@@ -1,0 +1,7 @@
+{
+  "container_id": "779127261c1b7881de0d1b3af26dfb752f4f8be17de421d466b73eadb8028559",
+  "name": "bench-scenario-research-ty-ebd87e9ede89",
+  "removed": true,
+  "scope": "仅已退出且name/owner/token精确匹配的本任务容器",
+  "reason": "/work tmpfs默认noexec使coverage C扩展无法映射，pytest收集前退出；未删除或修改测试集合。"
+}

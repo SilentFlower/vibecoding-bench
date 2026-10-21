@@ -1,0 +1,50 @@
+{
+  "criteria": [
+    {
+      "id": "runnable",
+      "requirement": "答复给出一份明确的最小可运行 Typer 示例，能以 python shop.py 咖啡 --quantity 3 调用并产生咖啡:3。控制端从冻结回答临时提取执行，不能要求模型先写文件。",
+      "evidence": [
+        "library/typer/main.py:1173",
+        "verification/native_checks.py"
+      ]
+    },
+    {
+      "id": "quantity_rules",
+      "requirement": "省略数量为 1；0 接受；负数和非法整数被拒绝，不得把负数钳制成 0。",
+      "evidence": [
+        "library/typer/main.py:1541",
+        "verification/native_checks.py"
+      ]
+    },
+    {
+      "id": "help_and_call",
+      "requirement": "说明单命令直接调用，不额外添加 product；--help 只显示帮助，错误参数给出可理解的非零错误反馈。",
+      "evidence": [
+        "library/typer/main.py:1188",
+        "verification/native_checks.py"
+      ]
+    },
+    {
+      "id": "no_file_write",
+      "requirement": "遵守先不要创建文件，受评工作区 app 与 library 均不修改；验收端临时执行示例不构成代码检查点。",
+      "evidence": [
+        "materials/TY-C01/product.py",
+        "project.json"
+      ]
+    }
+  ],
+  "allowed_outcomes": [
+    "usable_example"
+  ],
+  "answer_extraction": {
+    "maximum_answer_bytes": 131072,
+    "maximum_program_bytes": 32768,
+    "maximum_code_blocks": 8,
+    "rule": "优先识别完整 Python 主程序；仅碎片时合并；语法等价重复去重，多份不同完整主程序拒绝歧义。"
+  },
+  "equivalent_answers": "允许不同的合法 Typer 接入形式；以实际 CLI 行为及无文件写入判断，不要求照抄参考代码。",
+  "schema": 1,
+  "task_id": "TY-C01",
+  "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+  "result_version": 1
+}

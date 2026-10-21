@@ -1,0 +1,17 @@
+prepare
+install-offline
+affected-environment-preflight
+full-native-regression
+business-calibration
+Traceback (most recent call last):
+  File "/environment/verify_target.py", line 170, in <module>
+    main()
+  File "/environment/verify_target.py", line 162, in main
+    raise RuntimeError("业务原版/参考候选校准与冻结结果不符")
+RuntimeError: 业务原版/参考候选校准与冻结结果不符
+Traceback (most recent call last):
+  File "/environment/verify_target.py", line 170, in <module>
+    main()
+  File "/environment/verify_target.py", line 162, in main
+    raise RuntimeError("业务原版/参考候选校准与冻结结果不符")
+RuntimeError: 业务原版/参考候选校准与冻结结果不符

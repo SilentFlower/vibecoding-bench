@@ -1,0 +1,720 @@
+FFF..FF..FF..............FFFFFFFFF.......F.F..FFFF.F.FF.F...F...F..      [100%]
+=================================== FAILURES ===================================
+_____________________________ [doctest] README.md ______________________________
+069 # this works, too
+070 >>> print(post)
+071 Well, hello there, world.
+072 
+073 ```
+074 
+075 Use metadata (metadata gets proxied as post keys):
+076 
+077 ```python
+078 >>> print(post['title'])
+UNEXPECTED EXCEPTION: KeyError('title')
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/doctest.py", line 1368, in __run
+    exec(compile(example.source, filename, "single",
+  File "<doctest README.md[7]>", line 1, in <module>
+  File "/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/__init__.py", line 315, in __getitem__
+    return self.metadata[name]
+           ~~~~~~~~~~~~~^^^^^^
+KeyError: 'title'
+/work/tmp/bench-native-regression-j8bs3y4t/project/README.md:78: UnexpectedException
+___________________ [doctest] examples.pandoc.PandocHandler ____________________
+005 
+006     Pandoc format uses different start and end delimiters, which trips up parsing a bit.
+007     To make it work, we need a custom handler that deals with each part separately.
+008 
+009     >>> with open('examples/content/pandoc.txt') as f:
+010     ...     text = f.read()
+011     >>> post = frontmatter.loads(text, handler=PandocHandler())
+012     >>> post['title']
+UNEXPECTED EXCEPTION: KeyError('title')
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/doctest.py", line 1368, in __run
+    exec(compile(example.source, filename, "single",
+  File "<doctest examples.pandoc.PandocHandler[2]>", line 1, in <module>
+  File "/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/__init__.py", line 315, in __getitem__
+    return self.metadata[name]
+           ~~~~~~~~~~~~~^^^^^^
+KeyError: 'title'
+/work/tmp/bench-native-regression-j8bs3y4t/project/examples/pandoc.py:12: UnexpectedException
+________________ [doctest] examples.reversed.ReverseYAMLHandler ________________
+013 
+014     This is an example of using Handler.parse and Handler.format to move Frontmatter to the bottom
+015     of a file, both for parsing and output.
+016 
+017     >>> with open("examples/content/reversed.txt") as f:
+018     ...     text = f.read()
+019     >>> handler = ReverseYAMLHandler()
+020     >>> post = frontmatter.loads(text, handler=handler)
+021     >>> print(post['title'])
+UNEXPECTED EXCEPTION: KeyError('title')
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/doctest.py", line 1368, in __run
+    exec(compile(example.source, filename, "single",
+  File "<doctest examples.reversed.ReverseYAMLHandler[3]>", line 1, in <module>
+  File "/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/__init__.py", line 315, in __getitem__
+    return self.metadata[name]
+           ~~~~~~~~~~~~~^^^^^^
+KeyError: 'title'
+/work/tmp/bench-native-regression-j8bs3y4t/project/examples/reversed.py:21: UnexpectedException
+__________________________ [doctest] frontmatter.dump __________________________
+205     Serialize :py:class:`post <frontmatter.Post>` to a string and write to a file-like object.
+206     Text will be encoded on the way out (utf-8 by default).
+207 
+208     ::
+209 
+210         >>> from io import StringIO
+211         >>> post = frontmatter.load('tests/yaml/hello-world.txt')
+212         >>> f = StringIO()
+213         >>> frontmatter.dump(post, f)
+214         >>> print(f.getvalue())
+Differences (unified diff with -expected +actual):
+    @@ -1,5 +1,4 @@
+     ---
+    -layout: post
+    -title: Hello, world!
+    +{}
+     ---
+     <BLANKLINE>
+
+/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/__init__.py:214: DocTestFailure
+_________________________ [doctest] frontmatter.dumps __________________________
+257 
+258     Passing ``handler`` will change how metadata is turned into text. A handler
+259     passed as an argument will override ``post.handler``, with
+260     :py:class:`YAMLHandler <frontmatter.default_handlers.YAMLHandler>` used as
+261     a default.
+262 
+263     ::
+264 
+265         >>> post = frontmatter.load('tests/yaml/hello-world.txt')
+266         >>> print(frontmatter.dumps(post)) # doctest: +NORMALIZE_WHITESPACE
+Differences (unified diff with -expected +actual):
+    @@ -1,5 +1,4 @@
+     ---
+    -layout: post
+    -title: Hello, world!
+    +{}
+     ---
+     <BLANKLINE>
+
+/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/__init__.py:266: DocTestFailure
+_________________________ [doctest] frontmatter.parse __________________________
+061 
+062     .. testsetup:: *
+063 
+064         >>> import frontmatter
+065 
+066     .. doctest::
+067 
+068         >>> with open('tests/yaml/hello-world.txt') as f:
+069         ...     metadata, content = frontmatter.parse(f.read())
+070         >>> print(metadata['title'])
+UNEXPECTED EXCEPTION: KeyError('title')
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/doctest.py", line 1368, in __run
+    exec(compile(example.source, filename, "single",
+  File "<doctest frontmatter.parse[2]>", line 1, in <module>
+KeyError: 'title'
+/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/__init__.py:70: UnexpectedException
+____________________ [doctest] frontmatter.default_handlers ____________________
+066     ---
+067     <BLANKLINE>
+068     And this shouldn't break.
+069 
+070 Passing a new handler to :py:func:`frontmatter.dumps <frontmatter.dumps>`
+071 (or :py:func:`dump <frontmatter.dump>`) changes the export format:
+072 
+073 ::
+074 
+075     >>> print(frontmatter.dumps(post, handler=YAMLHandler())) # doctest: +NORMALIZE_WHITESPACE
+Differences (unified diff with -expected +actual):
+    @@ -1,6 +1,4 @@
+     ---
+    -author: bob
+    -something: else
+    -test: tester
+    +{}
+     ---
+     <BLANKLINE>
+
+/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/default_handlers.py:75: DocTestFailure
+_____________________________ test_file[filename0] _____________________________
+
+filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/yaml/hello-markdown.md')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+>       assert post.to_dict() == result
+E       assert {'content': "...ldn't break."} == {'test': 'tes...ldn't break."}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 3 more items:
+E         {'author': 'bob', 'something': 'else', 'test': 'tester'}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError
+_____________________________ test_file[filename1] _____________________________
+
+filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/yaml/unpretty.md')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+>       assert post.to_dict() == result
+E       AssertionError: assert {'content': '...ed in order.'} == {'destination...ed in order.'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 2 more items:
+E         {'destination': {'encoding': {'xz': {'enabled': True,
+E                                              'min_size': 5120,
+E                                              'options': None,
+E                                              'path_filter': None}},...
+E         
+E         ...Full output truncated (6 lines hidden), use '-vv' to show
+
+tests/test_files.py:47: AssertionError
+_____________________________ test_file[filename2] _____________________________
+
+filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/yaml/network-diagrams.md')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+>       assert post.to_dict() == result
+E       AssertionError: assert {'content': '...o play with.'} == {'title': 'TO...['todo'], ...}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 4 more items:
+E         {'layout': 'post',
+E          'published': True,
+E          'tags': ['todo'],
+E          'title': 'TODO: Understand Network Diagrams'}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError
+_____________________________ test_file[filename3] _____________________________
+
+filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/toml/hello-toml.md')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+>       assert post.to_dict() == result
+E       assert {'content': "...ldn't break."} == {'author': 'b...ldn't break."}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 3 more items:
+E         {'author': 'bob', 'something': 'else', 'test': 'tester'}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError
+_____________________________ test_file[filename4] _____________________________
+
+filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/json/hello-json.md')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+>       assert post.to_dict() == result
+E       AssertionError: assert {'content': '...might break.'} == {'test': 'tes...might break.'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 3 more items:
+E         {'author': 'bob', 'something': 'else', 'test': 'tester'}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError
+_____________________________ test_file[filename5] _____________________________
+
+filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/yaml/extra-dash.txt')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+>       assert post.to_dict() == result
+E       assert {'content': "...ome content."} == {'test': 'bob...ome content."}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 2 more items:
+E         {'else': 'kate', 'test': 'bob'}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError
+_____________________________ test_file[filename6] _____________________________
+
+filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/yaml/extra-space.txt')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+>       assert post.to_dict() == result
+E       AssertionError: assert {'content': '...frontmatter.'} == {'test': 'tes...frontmatter.'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 2 more items:
+E         {'something': 'else', 'test': 'tester'}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError
+_____________________________ test_file[filename7] _____________________________
+
+filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/yaml/chinese.txt')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+>       assert post.to_dict() == result
+E       assert {'content': '欢迎来到大连水产学院！'} == {'title': "Le...'欢迎来到大连水产学院！'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 2 more items:
+E         {'language': '中文', 'title': "Let's try unicode"}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError
+_____________________________ test_file[filename8] _____________________________
+
+filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/yaml/hello-world.txt')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+>       assert post.to_dict() == result
+E       AssertionError: assert {'content': '...here, world.'} == {'title': 'He...here, world.'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 2 more items:
+E         {'layout': 'post', 'title': 'Hello, world!'}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError
+_______________________ FrontmatterTest.test_extra_space _______________________
+
+self = <unit_test.FrontmatterTest testMethod=test_extra_space>
+
+    def test_extra_space(self):
+        "Extra space in frontmatter delimiter"
+        post = frontmatter.load("tests/yaml/extra-space.txt")
+        content = "This file has an extra space on the opening line of the frontmatter."
+    
+        self.assertEqual(post.content, content)
+        metadata = {"something": "else", "test": "tester"}
+        for k, v in metadata.items():
+>           self.assertEqual(post[k], v)
+                             ^^^^^^^
+
+tests/unit_test.py:89: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <frontmatter.Post object at 0x79970f97e5d0>, name = 'something'
+
+    def __getitem__(self, name: str) -> object:
+        "Get metadata key"
+>       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'something'
+
+frontmatter/__init__.py:315: KeyError
+_____________________ FrontmatterTest.test_pretty_dumping ______________________
+
+self = <unit_test.FrontmatterTest testMethod=test_pretty_dumping>
+
+    def test_pretty_dumping(self):
+        "Use pyaml to dump nicer"
+        if pyaml is not None:
+            with open("tests/yaml/unpretty.md", "r", encoding="utf-8") as f:
+                data = f.read()
+    
+            post = frontmatter.load("tests/yaml/unpretty.md")
+            yaml = pyaml.dump(post.metadata)
+    
+            # the unsafe dumper gives you nicer output, for times you want that
+            dump = frontmatter.dumps(post, Dumper=pyaml.PYAMLDumper)
+    
+            self.assertTrue(yaml in dump)
+>           self.assertEqual(dump, data)
+E           AssertionError: '---\n{}\n---\n\nThis is a test of both unicode[156 chars]der.' != '---\ndestination:\n  encoding:\n    xz:\n     [452 chars]der.'
+E             ---
+E           - {}
+E           + destination:
+E           +   encoding:
+E           +     xz:
+E           +       enabled: yes
+E           +       min_size: 5120
+E           +       options:
+E           +       path_filter:
+E           +   result:
+E           +     append_to_file:
+E           +     append_to_lafs_dir:
+E           +     print_to_stdout: yes
+E           +   url: http://localhost:3456/uri
+E           + filter:
+E           +   - Длинный стринг на русском
+E           +   - Еще одна длинная строка
+E             ---
+E             
+E             This is a test of both unicode and prettier dumping. The above metadata comes from the [pretty-yaml](https://github.com/mk-fg/pretty-yaml) readme file.
+E             
+E             Metadata should be dumped in order.
+
+tests/unit_test.py:123: AssertionError
+______________________ FrontmatterTest.test_unicode_post _______________________
+
+self = <unit_test.FrontmatterTest testMethod=test_unicode_post>
+
+    def test_unicode_post(self):
+        "Ensure unicode is parsed correctly"
+        chinese = frontmatter.load("tests/yaml/chinese.txt", "utf-8")
+        output = frontmatter.dumps(chinese)
+        zh = "中文"
+    
+        self.assertTrue(isinstance(chinese.content, str))
+    
+        # check that we're dumping out unicode metadata, too
+>       self.assertTrue(zh in output)
+E       AssertionError: False is not true
+
+tests/unit_test.py:47: AssertionError
+____________________ FrontmatterTest.test_with_crlf_string _____________________
+
+self = <unit_test.FrontmatterTest testMethod=test_with_crlf_string>
+
+    def test_with_crlf_string(self):
+        markdown_bytes = b'---\r\ntitle: "my title"\r\ncontent_type: "post"\r\npublished: no\r\n---\r\n\r\nwrite your content in markdown here'
+        loaded = frontmatter.loads(markdown_bytes, "utf-8")
+>       self.assertEqual(loaded["title"], "my title")
+                         ^^^^^^^^^^^^^^^
+
+tests/unit_test.py:128: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <frontmatter.Post object at 0x79970f8f6810>, name = 'title'
+
+    def __getitem__(self, name: str) -> object:
+        "Get metadata key"
+>       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'title'
+
+frontmatter/__init__.py:315: KeyError
+__________________ FrontmatterTest.test_with_markdown_content __________________
+
+self = <unit_test.FrontmatterTest testMethod=test_with_markdown_content>
+
+    def test_with_markdown_content(self):
+        "Parse frontmatter and only the frontmatter"
+        post = frontmatter.load("tests/yaml/hello-markdown.md")
+    
+        metadata = {"author": "bob", "something": "else", "test": "tester"}
+        for k, v in metadata.items():
+>           self.assertEqual(post[k], v)
+                             ^^^^^^^
+
+tests/unit_test.py:36: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <frontmatter.Post object at 0x79970f982570>, name = 'author'
+
+    def __getitem__(self, name: str) -> object:
+        "Get metadata key"
+>       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'author'
+
+frontmatter/__init__.py:315: KeyError
+_______________________ HandlerTest.test_custom_handler ________________________
+
+self = <unit_test.HandlerTest testMethod=test_custom_handler>
+
+    def test_custom_handler(self):
+        "allow caller to specify a custom delimiter/handler"
+    
+        # not including this in the regular test directory
+        # because it would/should be invalid per the defaults
+        custom = textwrap.dedent("""
+        ...
+        dummy frontmatter
+        ...
+        dummy content
+        """)
+    
+        # and a custom handler that really doesn't do anything
+        class DummyHandler(object):
+            def load(self, fm):
+                return {"value": fm}
+    
+            def split(self, text):
+                return "dummy frontmatter", "dummy content"
+    
+        # but we tell frontmatter that it is the appropriate handler
+        # for the '...' delimiter
+        # frontmatter.handlers['...'] = DummyHandler()
+        post = frontmatter.loads(custom, handler=DummyHandler())
+    
+>       self.assertEqual(post["value"], "dummy frontmatter")
+                         ^^^^^^^^^^^^^
+
+tests/unit_test.py:224: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <frontmatter.Post object at 0x79970f981430>, name = 'value'
+
+    def __getitem__(self, name: str) -> object:
+        "Get metadata key"
+>       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'value'
+
+frontmatter/__init__.py:315: KeyError
+____________________________ HandlerTest.test_json _____________________________
+
+self = <unit_test.HandlerTest testMethod=test_json>
+
+    def test_json(self):
+        "load raw JSON frontmatter"
+        post = frontmatter.load("tests/json/hello-json.md")
+        metadata = {"author": "bob", "something": "else", "test": "tester"}
+        for k, v in metadata.items():
+>           self.assertEqual(post[k], v)
+                             ^^^^^^^
+
+tests/unit_test.py:240: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <frontmatter.Post object at 0x79970f9820f0>, name = 'author'
+
+    def __getitem__(self, name: str) -> object:
+        "Get metadata key"
+>       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'author'
+
+frontmatter/__init__.py:315: KeyError
+_________________________ HandlerTest.test_sanity_all __________________________
+
+self = <unit_test.HandlerTest testMethod=test_sanity_all>
+
+    def test_sanity_all(self):
+        "Run sanity check on all handlers"
+        for filename, Handler in self.TEST_FILES.items():
+>           self.sanity_check(filename, Handler)
+
+tests/unit_test.py:187: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit_test.py:173: in sanity_check
+    self.assertEqual(post.content, repost.content)
+E   AssertionError: 'Title\n=====\n\ntitle2\n------\n\nHello.\[51 chars]eak.' != '{}\n\n\nTitle\n=====\n\ntitle2\n------\n\[59 chars]eak.'
+E   + {}
+E   + 
+E   + 
+E     Title
+E     =====
+E     
+E     title2
+E     ------
+E     
+E     Hello.
+E     
+E     Just need three dashes
+E     ---
+E     
+E     And this might break.
+____________________________ HandlerTest.test_toml _____________________________
+
+self = <unit_test.HandlerTest testMethod=test_toml>
+
+    def test_toml(self):
+        "load toml frontmatter"
+        if toml is None:
+            return
+        post = frontmatter.load("tests/toml/hello-toml.md")
+        metadata = {"author": "bob", "something": "else", "test": "tester"}
+        for k, v in metadata.items():
+>           self.assertEqual(post[k], v)
+                             ^^^^^^^
+
+tests/unit_test.py:233: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <frontmatter.Post object at 0x79970f8f79e0>, name = 'author'
+
+    def __getitem__(self, name: str) -> object:
+        "Get metadata key"
+>       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'author'
+
+frontmatter/__init__.py:315: KeyError
+________________________ YAMLHandlerTest.test_external _________________________
+
+self = <unit_test.YAMLHandlerTest testMethod=test_external>
+
+    def test_external(self):
+        filename = self.data["filename"]
+        content = self.data["content"]
+        metadata = self.data["metadata"]
+    
+        post = frontmatter.load(filename)
+    
+        self.assertEqual(post.content, content.strip())
+        for k, v in metadata.items():
+>           self.assertEqual(post[k], v)
+                             ^^^^^^^
+
+tests/unit_test.py:273: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <frontmatter.Post object at 0x79970f981550>, name = 'test'
+
+    def __getitem__(self, name: str) -> object:
+        "Get metadata key"
+>       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'test'
+
+frontmatter/__init__.py:315: KeyError
+________________________ JSONHandlerTest.test_external _________________________
+
+self = <unit_test.JSONHandlerTest testMethod=test_external>
+
+    def test_external(self):
+        filename = self.data["filename"]
+        content = self.data["content"]
+        metadata = self.data["metadata"]
+    
+        post = frontmatter.load(filename)
+    
+        self.assertEqual(post.content, content.strip())
+        for k, v in metadata.items():
+>           self.assertEqual(post[k], v)
+                             ^^^^^^^
+
+tests/unit_test.py:273: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <frontmatter.Post object at 0x79970f982780>, name = 'test'
+
+    def __getitem__(self, name: str) -> object:
+        "Get metadata key"
+>       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'test'
+
+frontmatter/__init__.py:315: KeyError
+________________________ TOMLHandlerTest.test_external _________________________
+
+self = <unit_test.TOMLHandlerTest testMethod=test_external>
+
+    def test_external(self):
+        filename = self.data["filename"]
+        content = self.data["content"]
+        metadata = self.data["metadata"]
+    
+        post = frontmatter.load(filename)
+    
+        self.assertEqual(post.content, content.strip())
+        for k, v in metadata.items():
+>           self.assertEqual(post[k], v)
+                             ^^^^^^^
+
+tests/unit_test.py:273: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <frontmatter.Post object at 0x79970fab6900>, name = 'test'
+
+    def __getitem__(self, name: str) -> object:
+        "Get metadata key"
+>       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'test'
+
+frontmatter/__init__.py:315: KeyError
+=========================== short test summary info ============================
+FAILED README.md::README.md
+FAILED examples/pandoc.py::examples.pandoc.PandocHandler
+FAILED examples/reversed.py::examples.reversed.ReverseYAMLHandler
+FAILED frontmatter/__init__.py::frontmatter.dump
+FAILED frontmatter/__init__.py::frontmatter.dumps
+FAILED frontmatter/__init__.py::frontmatter.parse
+FAILED frontmatter/default_handlers.py::frontmatter.default_handlers
+FAILED tests/test_files.py::test_file[filename0] - assert {'content': "...ldn...
+FAILED tests/test_files.py::test_file[filename1] - AssertionError: assert {'c...
+FAILED tests/test_files.py::test_file[filename2] - AssertionError: assert {'c...
+FAILED tests/test_files.py::test_file[filename3] - assert {'content': "...ldn...
+FAILED tests/test_files.py::test_file[filename4] - AssertionError: assert {'c...
+FAILED tests/test_files.py::test_file[filename5] - assert {'content': "...ome...
+FAILED tests/test_files.py::test_file[filename6] - AssertionError: assert {'c...
+FAILED tests/test_files.py::test_file[filename7] - assert {'content': '欢迎来...
+FAILED tests/test_files.py::test_file[filename8] - AssertionError: assert {'c...
+FAILED tests/unit_test.py::FrontmatterTest::test_extra_space - KeyError: 'som...
+FAILED tests/unit_test.py::FrontmatterTest::test_pretty_dumping - AssertionEr...
+FAILED tests/unit_test.py::FrontmatterTest::test_unicode_post - AssertionErro...
+FAILED tests/unit_test.py::FrontmatterTest::test_with_crlf_string - KeyError:...
+FAILED tests/unit_test.py::FrontmatterTest::test_with_markdown_content - KeyE...
+FAILED tests/unit_test.py::HandlerTest::test_custom_handler - KeyError: 'value'
+FAILED tests/unit_test.py::HandlerTest::test_json - KeyError: 'author'
+FAILED tests/unit_test.py::HandlerTest::test_sanity_all - AssertionError: 'Ti...
+FAILED tests/unit_test.py::HandlerTest::test_toml - KeyError: 'author'
+FAILED tests/unit_test.py::YAMLHandlerTest::test_external - KeyError: 'test'
+FAILED tests/unit_test.py::JSONHandlerTest::test_external - KeyError: 'test'
+FAILED tests/unit_test.py::TOMLHandlerTest::test_external - KeyError: 'test'
+28 failed, 39 passed in 0.32s

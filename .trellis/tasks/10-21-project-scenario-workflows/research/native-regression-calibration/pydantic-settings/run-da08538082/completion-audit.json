@@ -1,0 +1,80 @@
+{
+  "project": "pydantic-settings",
+  "status": "passed",
+  "run_directory": "pydantic-settings/run-da08538082",
+  "wrapper_sha256": "34dfd73332be977275dc51059c17adf28ce57340bfc5d40ae938928ecee33932",
+  "image_id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d",
+  "steps": [
+    {
+      "name": "freeze-baseline",
+      "status": "passed",
+      "counts": {
+        "passed": 1256,
+        "failed": 0,
+        "error": 0,
+        "skipped": 5,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 1261,
+      "doctests": 0,
+      "elapsed_sec": 13.231773470999542,
+      "collection_digest": "3ab4afb58ec08fd02a409a52c5c5b36d72d17cd43311c7a53b4d80b315184c97",
+      "result_digest": "a38a9d9de2b9c12841eedd59cc3f091e8e6bc759b0ea9ab74650332a06a53d4c",
+      "bash_parent": "/usr/local/bin/python3.12"
+    },
+    {
+      "name": "original-candidate",
+      "status": "passed",
+      "counts": {
+        "passed": 1256,
+        "failed": 0,
+        "error": 0,
+        "skipped": 5,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 1261,
+      "doctests": 0,
+      "elapsed_sec": 13.757202692000646,
+      "collection_digest": "3ab4afb58ec08fd02a409a52c5c5b36d72d17cd43311c7a53b4d80b315184c97",
+      "result_digest": "a38a9d9de2b9c12841eedd59cc3f091e8e6bc759b0ea9ab74650332a06a53d4c",
+      "bash_parent": "/usr/local/bin/python3.12"
+    },
+    {
+      "name": "reference-candidate",
+      "status": "passed",
+      "counts": {
+        "passed": 1256,
+        "failed": 0,
+        "error": 0,
+        "skipped": 5,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 1261,
+      "doctests": 0,
+      "elapsed_sec": 13.004264057999535,
+      "collection_digest": "3ab4afb58ec08fd02a409a52c5c5b36d72d17cd43311c7a53b4d80b315184c97",
+      "result_digest": "a38a9d9de2b9c12841eedd59cc3f091e8e6bc759b0ea9ab74650332a06a53d4c",
+      "bash_parent": "/usr/local/bin/python3.12"
+    }
+  ],
+  "resources": {
+    "timeout_sec": 300,
+    "memory_mb": 1024,
+    "pids_limit": 128
+  },
+  "cgroup": {
+    "memory.peak": "685228032",
+    "memory.max": "1073741824",
+    "pids.peak": "27",
+    "pids.max": "128"
+  },
+  "container_removed": true,
+  "docker_wait_max_sec": 1,
+  "model_executed": false
+}

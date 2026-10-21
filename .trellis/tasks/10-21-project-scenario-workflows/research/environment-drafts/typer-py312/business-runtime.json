@@ -1,0 +1,38 @@
+{
+  "container_id": "cc7a5d93bc044238eaeaa325e8be74d80fc77c007fc5284891de8168f8f2f667",
+  "name": "bench-scenario-research-ty-80f56051ff36",
+  "labels": {
+    "bench.scenario.owner": "typer-content-research",
+    "bench.scenario.token": "80f56051ff36"
+  },
+  "image_reference": "vibebench-v3-account:v3-project-repairs-local-20261021-e",
+  "image_id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d",
+  "command": [
+    "python3",
+    "-B",
+    "/environment/verify_business_target.py"
+  ],
+  "limits": {
+    "network_mode": "none",
+    "user": "1000:1000",
+    "read_only_root": true,
+    "memory_mb": 1024,
+    "pids_limit": 128,
+    "work_tmpfs_bytes": 1073741824,
+    "tmp_tmpfs_bytes": 134217728
+  },
+  "content_root": "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/typer",
+  "environment_root": "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/typer-py312",
+  "profile_sha256": "7667e308cff0cf2c7f6c18cfbfae46b3ff7c91d6cb4533f31bb001efb10104c6",
+  "driver_sha256": "3d9304bc98ba2eb53d95d0f7d726177dda933b2d32b556302353c8c08816b837",
+  "native_script_sha256": "2a4779d025e1d6757dd833213d44c6bd1a0bdfa697b4cbf7099f3eb6acec246d",
+  "cleanup": "仅此container_id且name/owner/token匹配后删除，不操作任何其他容器。",
+  "work_tmpfs_options": "rw,exec,nosuid,nodev,size=1073741824,mode=1777",
+  "previous_attempt": "attempts/02-source-registration",
+  "project_manifest_sha256": "36ead76947457b5248a2bb1a324e38079446a665cef7d8d29a70b33f088674e0",
+  "source_registration": "候选library通过独立venv .pth注册，仍从实际候选源码导入",
+  "test_shell": "保留真实Bash祖先，先针对性4项，再完整既有pytest集合",
+  "test_scope": "仅业务正反例和参考应用用户测试；复用同一镜像/相同候选library已通过的完整原生集合",
+  "terminal_width": 80,
+  "native_evidence": "evidence/native-regression-result.json"
+}

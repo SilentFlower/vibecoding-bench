@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "task_id": "PS-CONFIGURE",
+  "version": 1,
+  "status": "draft_not_calibrated",
+  "criteria": [
+    {
+      "id": "valid-api",
+      "requirement": "使用已存在的 BaseSettings、SettingsConfigDict 及 env_prefix/env_file 等真实用法；主示例 App 有 title:str 和 quantity:int。",
+      "required": true
+    },
+    {
+      "id": "business-behavior",
+      "requirement": "默认商品工具／2，dotenv 对照门店目录／7，环境覆盖后数量为整数 5，且不改输入文件。",
+      "required": true
+    },
+    {
+      "id": "delivery-boundary",
+      "requirement": "唯一完整主示例可从冻结回答提取或由允许的 app/settings_example.py 提供，不修改 library 或真实进程环境。",
+      "required": true
+    }
+  ],
+  "source_evidence": {
+    "main": [
+      "library/pydantic_settings/main.py:255",
+      "library/pydantic_settings/main.py:295",
+      "library/pydantic_settings/main.py:323",
+      "library/pydantic_settings/main.py:336"
+    ],
+    "env": [
+      "library/pydantic_settings/sources/providers/env.py:200",
+      "library/pydantic_settings/sources/providers/env.py:217",
+      "library/pydantic_settings/sources/providers/env.py:275"
+    ],
+    "decode": [
+      "library/pydantic_settings/sources/base.py:194",
+      "library/pydantic_settings/sources/utils.py:150",
+      "library/pydantic_settings/sources/utils.py:213"
+    ]
+  },
+  "accept_equivalent_answers": true,
+  "grade_length": false,
+  "uncertain_rule": "证据不足时返回 uncertain，不自动当候选失败；不得要求输出隐含推理过程。",
+  "feedback_policy": "仅返回已声明的公开业务规则和反馈码，不披露隐藏样例或完整rubric。"
+}

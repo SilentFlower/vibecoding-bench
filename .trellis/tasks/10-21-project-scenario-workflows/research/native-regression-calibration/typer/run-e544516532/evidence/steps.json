@@ -1,0 +1,37 @@
+[
+  {
+    "step": "freeze-baseline",
+    "command": [
+      "/work/venv/bin/python",
+      "/input/native_regression.py",
+      "--project",
+      "typer",
+      "--baseline-root",
+      "/baseline/library",
+      "--evidence-dir",
+      "/evidence/freeze-baseline",
+      "--timeout-sec",
+      "600",
+      "--freeze-baseline-contract",
+      "/evidence/contract.json"
+    ],
+    "exit_code": 0,
+    "elapsed_sec": 184.7016609300008,
+    "expected_status": "passed",
+    "actual_status": "error",
+    "counts": {
+      "passed": 1479,
+      "failed": 2,
+      "error": 0,
+      "skipped": 22,
+      "xfailed": 2,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "collected": 1505,
+    "strict_doctest_count": 0,
+    "collection_digest": "cbca1ae866e636fc287522db3f45c54b7168bec3d94066b8f3e97efd197cd19b",
+    "result_digest": "ca9026e208ba16d9cab1b60ab74c0a599f05ca3750b3e6ab25f11a0216d7a1d5",
+    "matches_expected": false
+  }
+]

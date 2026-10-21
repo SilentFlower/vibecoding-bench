@@ -1,0 +1,106 @@
+{
+  "ordinary_skips": [
+    {
+      "case": "tests.test_launch.test_open_url_macos",
+      "reason": "Test requires macOS"
+    },
+    {
+      "case": "tests.test_launch.test_launch_files_windows",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_launch.test_launch_file",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_termui.test_termui_impl_windows_raw_terminal",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_termui.test_termui_impl_windows_getchar",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_termui.test_echo_windows_color_none",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_type_conversion.test_argv_encoding[windows-None-utf-8]",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_types_file.test_app_dir_windows_fallback",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_types_file.test_app_dir_macos",
+      "reason": "Test requires macOS"
+    },
+    {
+      "case": "tests.test_win_console.test_winconsole_stdin",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_win_console.test_winconsole_stdout",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_win_console.test_winconsole_stderr",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_win_console.test_get_buffer[True-source0-1]",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_win_console.test_get_buffer[False-python-0]",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_win_console.test_isatty",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_win_console.test_console_stream",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_win_console.test_error_message[0-ERROR_SUCCESS]",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_win_console.test_error_message[8-ERROR_NOT_ENOUGH_MEMORY]",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_win_console.test_error_message[342-Windows error 342]",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_win_console.test_is_console",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_win_console.test_get_windows_console_stream_factory_and_buffer_paths",
+      "reason": "Test requires Windows"
+    },
+    {
+      "case": "tests.test_win_console.test_windows_console_reader",
+      "reason": "Test requires Windows"
+    }
+  ],
+  "xfails": [
+    {
+      "case": "tests.test_rich_markup_mode.test_markup_mode_bullets_single_newline[markdown-lines0]",
+      "reason": ""
+    },
+    {
+      "case": "tests.test_rich_markup_mode.test_markup_mode_bullets_double_newline[markdown-lines0]",
+      "reason": ""
+    }
+  ],
+  "reason_counts": {
+    "Test requires macOS": 2,
+    "Test requires Windows": 20
+  }
+}

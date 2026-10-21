@@ -1,0 +1,187 @@
+{
+  "passed": true,
+  "records": [
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--mode",
+        "consult",
+        "--candidate-root",
+        "/work/project",
+        "--answer-file",
+        "/input/verification/reference/consult_answer.md"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 1.276528,
+      "mode": "consult",
+      "candidate": "baseline",
+      "matches_expected": true,
+      "expected_baseline_failure": false
+    },
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--mode",
+        "single",
+        "--candidate-root",
+        "/work/project"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 0.565987,
+      "mode": "single",
+      "candidate": "baseline",
+      "matches_expected": true,
+      "expected_baseline_failure": false
+    },
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--mode",
+        "group",
+        "--candidate-root",
+        "/work/project"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 0.970221,
+      "mode": "group",
+      "candidate": "baseline",
+      "matches_expected": true,
+      "expected_baseline_failure": false
+    },
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--mode",
+        "types",
+        "--candidate-root",
+        "/work/project"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 0.422782,
+      "mode": "types",
+      "candidate": "baseline",
+      "matches_expected": true,
+      "expected_baseline_failure": false
+    },
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--mode",
+        "export",
+        "--candidate-root",
+        "/work/project"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 5.667354,
+      "mode": "export",
+      "candidate": "baseline",
+      "matches_expected": false,
+      "expected_baseline_failure": true
+    },
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--mode",
+        "export",
+        "--candidate-root",
+        "/work/project"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 3.624876,
+      "mode": "export",
+      "candidate": "reference",
+      "matches_expected": true,
+      "expected_baseline_failure": false
+    }
+  ],
+  "negative_results": [
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--mode",
+        "consult",
+        "--candidate-root",
+        "/work/project",
+        "--answer-file",
+        "/work/negative_quantity_allowed.md"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 1.176698,
+      "case": "negative_quantity_allowed",
+      "rejected": true
+    },
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--mode",
+        "consult",
+        "--candidate-root",
+        "/work/project",
+        "--answer-file",
+        "/work/no_program.md"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 0.217015,
+      "case": "no_program",
+      "rejected": true
+    },
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--mode",
+        "consult",
+        "--candidate-root",
+        "/work/project",
+        "--answer-file",
+        "/work/ambiguous_programs.md"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 0.218517,
+      "case": "ambiguous_programs",
+      "rejected": true
+    }
+  ],
+  "user_reference_tests": {
+    "command": [
+      "/work/venv/bin/python",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "/work/project/app/tests",
+      "-v"
+    ],
+    "cwd": "/work/project",
+    "exit_code": 0,
+    "elapsed_sec": 0.621093
+  },
+  "model_runs": 0
+}

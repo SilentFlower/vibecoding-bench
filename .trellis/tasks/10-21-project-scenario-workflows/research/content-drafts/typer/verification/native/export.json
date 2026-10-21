@@ -1,0 +1,64 @@
+{
+  "script": "verification/native_checks.py",
+  "args": [
+    "--mode",
+    "export"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_library": true,
+    "normal_export": true,
+    "chinese_utf8": true,
+    "input_unchanged": true,
+    "empty_array": true,
+    "reject_bad_json": true,
+    "reject_not_array": true,
+    "reject_non_object": true,
+    "reject_missing_sku": true,
+    "reject_missing_name": true,
+    "reject_missing_quantity": true,
+    "reject_empty_sku": true,
+    "reject_empty_name": true,
+    "reject_wrong_sku_type": true,
+    "reject_wrong_name_type": true,
+    "reject_negative_quantity": true,
+    "reject_float_quantity": true,
+    "reject_bool_quantity": true,
+    "reject_string_quantity": true,
+    "reject_duplicate_sku": true,
+    "reject_late_invalid_record": true,
+    "refuse_overwrite": true,
+    "refuse_input_as_output": true,
+    "missing_input": true,
+    "product_regression": true,
+    "help_without_output": true,
+    "business_tests_present": true,
+    "usage_documented": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "cwd": "library",
+    "argv": [
+      "python",
+      "-m",
+      "pytest",
+      "--cov",
+      "--cov-report=term-missing",
+      "-o",
+      "console_output_style=progress",
+      "--showlocals",
+      "--numprocesses=2",
+      "-ra"
+    ],
+    "resource_profile": "regression",
+    "environment": {
+      "TERMINAL_WIDTH": "3000",
+      "_TYPER_FORCE_DISABLE_TERMINAL": "1",
+      "_TYPER_RUN_INSTALL_COMPLETION_TESTS": "1",
+      "CONTEXT": "typer-scenario-frozen"
+    }
+  }
+}

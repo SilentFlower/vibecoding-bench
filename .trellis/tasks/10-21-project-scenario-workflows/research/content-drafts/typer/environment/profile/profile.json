@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "id": "typer-py312",
+  "adapter": "python-native",
+  "python": "3.12",
+  "platform": "Linux x86_64",
+  "status": "reference_only_use_sibling_environment_draft",
+  "requirements": [
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "pytest-sugar==1.1.1",
+    "pytest-xdist==3.8.0",
+    "annotated-doc==0.0.5",
+    "coverage==7.16.2",
+    "execnet==2.1.2",
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "rich==15.0.0",
+    "shellingham==1.5.4",
+    "termcolor==3.3.0",
+    "markdown-it-py==4.2.0",
+    "mdurl==0.1.2"
+  ],
+  "business": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 600,
+    "memory_mb": 1024,
+    "pids_limit": 128
+  },
+  "artifacts": [],
+  "verified_requirement_sources": [
+    "upstream pyproject.toml",
+    "historical installation.json",
+    "historical requirements-frozen.txt"
+  ],
+  "resource_status": "草案上限，尚未在目标镜像实测，不能据此声称就绪"
+}

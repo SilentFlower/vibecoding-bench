@@ -1,0 +1,40 @@
+{
+  "name": "bench-scenario-research-ps-baseline-2b6c5ec7",
+  "mode": "baseline",
+  "evidence": "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/evidence/bench-scenario-research-ps-baseline-2b6c5ec7",
+  "container_id": "27c1f512048a272287625ab6a9046a08faaf2ba94da39da20e2af9fa099e7606",
+  "attach_exit_code": 1,
+  "image_id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d",
+  "state": {
+    "Status": "exited",
+    "Running": false,
+    "Paused": false,
+    "Restarting": false,
+    "OOMKilled": false,
+    "Dead": false,
+    "Pid": 0,
+    "ExitCode": 1,
+    "Error": "",
+    "StartedAt": "2026-10-21T06:45:19.427911095Z",
+    "FinishedAt": "2026-10-21T06:45:29.155796866Z"
+  },
+  "constraints": {
+    "NetworkMode": "none",
+    "Memory": 1073741824,
+    "MemorySwap": 1073741824,
+    "PidsLimit": 128,
+    "ReadonlyRootfs": true,
+    "CapDrop": [
+      "ALL"
+    ],
+    "SecurityOpt": [
+      "no-new-privileges"
+    ],
+    "Tmpfs": {
+      "/tmp": "rw,nosuid,nodev,size=256m,mode=1777",
+      "/work": "rw,nosuid,nodev,size=1536m,mode=1777"
+    }
+  },
+  "elapsed_sec": 11.819758,
+  "remove_exit_code": 0
+}

@@ -1,0 +1,257 @@
+Collecting annotated-types==0.8.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 1))
+  Using cached annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+Collecting azure-core==1.41.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 2))
+  Using cached azure_core-1.41.0-py3-none-any.whl.metadata (49 kB)
+Collecting azure-identity==1.26.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 3))
+  Using cached azure_identity-1.26.0-py3-none-any.whl.metadata (93 kB)
+Collecting azure-keyvault-secrets==4.11.3 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 4))
+  Using cached azure_keyvault_secrets-4.11.3-py3-none-any.whl.metadata (31 kB)
+Collecting black==26.10.1 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 5))
+  Using cached black-26.10.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (108 kB)
+Collecting boto3==1.43.116 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 6))
+  Using cached boto3-1.43.116-py3-none-any.whl.metadata (6.6 kB)
+Collecting botocore==1.43.116 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 7))
+  Using cached botocore-1.43.116-py3-none-any.whl.metadata (5.6 kB)
+Collecting certifi==2026.10.19 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 8))
+  Using cached certifi-2026.10.19-py3-none-any.whl.metadata (2.5 kB)
+Collecting cffi==2.1.1 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 9))
+  Using cached cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.5 kB)
+Collecting chardet==5.2.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 10))
+  Using cached chardet-5.2.0-py3-none-any.whl.metadata (3.4 kB)
+Collecting charset-normalizer==3.5.2 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 11))
+  Using cached charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (46 kB)
+Collecting click==8.5.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 12))
+  Using cached click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+Collecting cryptography==50.0.2 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 13))
+  Using cached cryptography-50.0.2-cp311-abi3-manylinux_2_34_x86_64.whl.metadata (4.4 kB)
+Collecting google-api-core==2.42.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 14))
+  Using cached google_api_core-2.42.0-py3-none-any.whl.metadata (3.2 kB)
+Collecting google-auth==2.62.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 15))
+  Using cached google_auth-2.62.0-py3-none-any.whl.metadata (6.0 kB)
+Collecting google-cloud-secret-manager==2.31.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 16))
+  Using cached google_cloud_secret_manager-2.31.0-py3-none-any.whl.metadata (9.6 kB)
+Collecting googleapis-common-protos==1.75.5 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 17))
+  Using cached googleapis_common_protos-1.75.5-py3-none-any.whl.metadata (8.5 kB)
+Collecting grpc-google-iam-v1==0.14.5 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 18))
+  Using cached grpc_google_iam_v1-0.14.5-py3-none-any.whl.metadata (8.8 kB)
+Collecting grpcio==1.84.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 19))
+  Using cached grpcio-1.84.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (3.8 kB)
+Collecting grpcio-status==1.84.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 20))
+  Using cached grpcio_status-1.84.0-py3-none-any.whl.metadata (1.3 kB)
+Collecting idna==3.20 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 21))
+  Using cached idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+Collecting iniconfig==2.3.1 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 22))
+  Using cached iniconfig-2.3.1-py3-none-any.whl.metadata (2.8 kB)
+Collecting isodate==0.7.2 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 23))
+  Using cached isodate-0.7.2-py3-none-any.whl.metadata (11 kB)
+Collecting jmespath==1.1.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 24))
+  Using cached jmespath-1.1.0-py3-none-any.whl.metadata (7.6 kB)
+Collecting markdown-it-py==4.2.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 25))
+  Using cached markdown_it_py-4.2.0-py3-none-any.whl.metadata (7.4 kB)
+Collecting MarkupSafe==3.0.4 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 26))
+  Using cached markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+Collecting mdurl==0.1.2 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 27))
+  Using cached mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+Collecting moto==5.2.4 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 28))
+  Using cached moto-5.2.4-py3-none-any.whl.metadata (11 kB)
+Collecting msal==1.39.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 29))
+  Using cached msal-1.39.0-py3-none-any.whl.metadata (11 kB)
+Collecting msal-extensions==1.3.1 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 30))
+  Using cached msal_extensions-1.3.1-py3-none-any.whl.metadata (7.8 kB)
+Collecting mypy_extensions==1.1.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 31))
+  Using cached mypy_extensions-1.1.0-py3-none-any.whl.metadata (1.1 kB)
+Collecting opentelemetry-api==1.45.1 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 32))
+  Using cached opentelemetry_api-1.45.1-py3-none-any.whl.metadata (1.4 kB)
+Collecting packaging==26.3 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 33))
+  Using cached packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+Collecting pathspec==1.1.1 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 34))
+  Using cached pathspec-1.1.1-py3-none-any.whl.metadata (14 kB)
+Collecting platformdirs==4.13.5 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 35))
+  Using cached platformdirs-4.13.5-py3-none-any.whl.metadata (5.5 kB)
+Collecting pluggy==1.7.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 36))
+  Using cached pluggy-1.7.0-py3-none-any.whl.metadata (5.0 kB)
+Collecting proto-plus==1.29.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 37))
+  Using cached proto_plus-1.29.0-py3-none-any.whl.metadata (2.2 kB)
+Collecting protobuf==7.36.2 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 38))
+  Using cached protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl.metadata (595 bytes)
+Collecting pyasn1==0.6.4 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 39))
+  Using cached pyasn1-0.6.4-py3-none-any.whl.metadata (8.4 kB)
+Collecting pyasn1_modules==0.4.2 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 40))
+  Using cached pyasn1_modules-0.4.2-py3-none-any.whl.metadata (3.5 kB)
+Collecting pycparser==3.11 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 41))
+  Using cached pycparser-3.11-py3-none-any.whl.metadata (8.2 kB)
+Collecting pydantic==2.14.1 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 42))
+  Using cached pydantic-2.14.1-py3-none-any.whl.metadata (133 kB)
+Collecting pydantic_core==2.50.1 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 43))
+  Using cached pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.5 kB)
+Collecting Pygments==2.21.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 44))
+  Using cached pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+Collecting PyJWT==2.15.1 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 45))
+  Using cached pyjwt-2.15.1-py3-none-any.whl.metadata (3.5 kB)
+Collecting pytest==9.1.1 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 46))
+  Using cached pytest-9.1.1-py3-none-any.whl.metadata (7.6 kB)
+Collecting pytest-examples==0.0.18 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 47))
+  Using cached pytest_examples-0.0.18-py3-none-any.whl.metadata (4.4 kB)
+Collecting pytest-mock==3.17.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 48))
+  Using cached pytest_mock-3.17.0-py3-none-any.whl.metadata (3.9 kB)
+Collecting pytest-pretty==1.3.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 49))
+  Using cached pytest_pretty-1.3.0-py3-none-any.whl.metadata (3.6 kB)
+Collecting python-dateutil==2.9.0.post0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 50))
+  Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+Collecting python-dotenv==1.2.4 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 51))
+  Using cached python_dotenv-1.2.4-py3-none-any.whl.metadata (29 kB)
+Collecting pytokens==0.4.1 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 52))
+  Using cached pytokens-0.4.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (3.8 kB)
+Collecting PyYAML==6.0.3 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 53))
+  Using cached pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+Collecting requests==2.34.2 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 54))
+  Using cached requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+Collecting responses==0.26.3 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 55))
+  Using cached responses-0.26.3-py3-none-any.whl.metadata (48 kB)
+Collecting rich==15.0.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 56))
+  Using cached rich-15.0.0-py3-none-any.whl.metadata (18 kB)
+Collecting ruff==0.17.1 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 57))
+  Using cached ruff-0.17.1-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (20 kB)
+Collecting s3transfer==0.19.3 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 58))
+  Using cached s3transfer-0.19.3-py3-none-any.whl.metadata (1.7 kB)
+Collecting six==1.17.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 59))
+  Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+Collecting typing-inspection==0.4.4 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 60))
+  Using cached typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+Collecting typing_extensions==4.16.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 61))
+  Using cached typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting urllib3==2.8.0 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 62))
+  Using cached urllib3-2.8.0-py3-none-any.whl.metadata (7.4 kB)
+Collecting Werkzeug==3.1.9 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 63))
+  Using cached werkzeug-3.1.9-py3-none-any.whl.metadata (4.1 kB)
+Collecting xmltodict==1.0.4 (from -r .trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/profile/requirements.txt (line 64))
+  Using cached xmltodict-1.0.4-py3-none-any.whl.metadata (14 kB)
+Using cached annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Using cached azure_core-1.41.0-py3-none-any.whl (220 kB)
+Using cached azure_identity-1.26.0-py3-none-any.whl (195 kB)
+Using cached azure_keyvault_secrets-4.11.3-py3-none-any.whl (105 kB)
+Using cached black-26.10.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (2.1 MB)
+Using cached boto3-1.43.116-py3-none-any.whl (140 kB)
+Using cached botocore-1.43.116-py3-none-any.whl (16.1 MB)
+Using cached certifi-2026.10.19-py3-none-any.whl (136 kB)
+Using cached cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (221 kB)
+Using cached chardet-5.2.0-py3-none-any.whl (199 kB)
+Using cached charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (257 kB)
+Using cached click-8.5.0-py3-none-any.whl (125 kB)
+Using cached cryptography-50.0.2-cp311-abi3-manylinux_2_34_x86_64.whl (4.8 MB)
+Using cached google_api_core-2.42.0-py3-none-any.whl (221 kB)
+Using cached google_auth-2.62.0-py3-none-any.whl (267 kB)
+Using cached google_cloud_secret_manager-2.31.0-py3-none-any.whl (229 kB)
+Using cached googleapis_common_protos-1.75.5-py3-none-any.whl (307 kB)
+Using cached grpc_google_iam_v1-0.14.5-py3-none-any.whl (32 kB)
+Using cached grpcio-1.84.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (7.2 MB)
+Using cached grpcio_status-1.84.0-py3-none-any.whl (14 kB)
+Using cached idna-3.20-py3-none-any.whl (69 kB)
+Using cached iniconfig-2.3.1-py3-none-any.whl (7.6 kB)
+Using cached isodate-0.7.2-py3-none-any.whl (22 kB)
+Using cached jmespath-1.1.0-py3-none-any.whl (20 kB)
+Using cached markdown_it_py-4.2.0-py3-none-any.whl (91 kB)
+Using cached markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+Using cached mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+Using cached moto-5.2.4-py3-none-any.whl (7.2 MB)
+Using cached msal-1.39.0-py3-none-any.whl (131 kB)
+Using cached msal_extensions-1.3.1-py3-none-any.whl (20 kB)
+Using cached mypy_extensions-1.1.0-py3-none-any.whl (5.0 kB)
+Using cached opentelemetry_api-1.45.1-py3-none-any.whl (60 kB)
+Using cached packaging-26.3-py3-none-any.whl (129 kB)
+Using cached pathspec-1.1.1-py3-none-any.whl (57 kB)
+Using cached platformdirs-4.13.5-py3-none-any.whl (32 kB)
+Using cached pluggy-1.7.0-py3-none-any.whl (27 kB)
+Using cached proto_plus-1.29.0-py3-none-any.whl (50 kB)
+Using cached protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl (343 kB)
+Using cached pyasn1-0.6.4-py3-none-any.whl (84 kB)
+Using cached pyasn1_modules-0.4.2-py3-none-any.whl (181 kB)
+Using cached pycparser-3.11-py3-none-any.whl (51 kB)
+Using cached pydantic-2.14.1-py3-none-any.whl (488 kB)
+Using cached pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.2 MB)
+Using cached pygments-2.21.0-py3-none-any.whl (1.3 MB)
+Using cached pyjwt-2.15.1-py3-none-any.whl (33 kB)
+Using cached pytest-9.1.1-py3-none-any.whl (386 kB)
+Using cached pytest_examples-0.0.18-py3-none-any.whl (18 kB)
+Using cached pytest_mock-3.17.0-py3-none-any.whl (11 kB)
+Using cached pytest_pretty-1.3.0-py3-none-any.whl (5.6 kB)
+Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+Using cached python_dotenv-1.2.4-py3-none-any.whl (23 kB)
+Using cached pytokens-0.4.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (269 kB)
+Using cached pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (807 kB)
+Using cached requests-2.34.2-py3-none-any.whl (73 kB)
+Using cached responses-0.26.3-py3-none-any.whl (36 kB)
+Using cached rich-15.0.0-py3-none-any.whl (310 kB)
+Using cached ruff-0.17.1-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (10.4 MB)
+Using cached s3transfer-0.19.3-py3-none-any.whl (90 kB)
+Using cached six-1.17.0-py2.py3-none-any.whl (11 kB)
+Using cached typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Using cached typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Using cached urllib3-2.8.0-py3-none-any.whl (135 kB)
+Using cached werkzeug-3.1.9-py3-none-any.whl (228 kB)
+Using cached xmltodict-1.0.4-py3-none-any.whl (13 kB)
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/annotated_types-0.8.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/azure_core-1.41.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/azure_identity-1.26.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/azure_keyvault_secrets-4.11.3-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/black-26.10.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/boto3-1.43.116-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/botocore-1.43.116-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/certifi-2026.10.19-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/chardet-5.2.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/click-8.5.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/cryptography-50.0.2-cp311-abi3-manylinux_2_34_x86_64.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/google_api_core-2.42.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/google_auth-2.62.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/google_cloud_secret_manager-2.31.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/googleapis_common_protos-1.75.5-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/grpc_google_iam_v1-0.14.5-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/grpcio-1.84.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/grpcio_status-1.84.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/idna-3.20-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/iniconfig-2.3.1-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/isodate-0.7.2-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/jmespath-1.1.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/markdown_it_py-4.2.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/mdurl-0.1.2-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/moto-5.2.4-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/msal-1.39.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/msal_extensions-1.3.1-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/mypy_extensions-1.1.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/opentelemetry_api-1.45.1-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/packaging-26.3-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pathspec-1.1.1-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/platformdirs-4.13.5-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pluggy-1.7.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/proto_plus-1.29.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pyasn1-0.6.4-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pyasn1_modules-0.4.2-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pycparser-3.11-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pydantic-2.14.1-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pygments-2.21.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pyjwt-2.15.1-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pytest-9.1.1-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pytest_examples-0.0.18-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pytest_mock-3.17.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pytest_pretty-1.3.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/python_dateutil-2.9.0.post0-py2.py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/python_dotenv-1.2.4-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pytokens-0.4.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/requests-2.34.2-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/responses-0.26.3-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/rich-15.0.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/ruff-0.17.1-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/s3transfer-0.19.3-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/six-1.17.0-py2.py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/typing_inspection-0.4.4-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/typing_extensions-4.16.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/urllib3-2.8.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/werkzeug-3.1.9-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/pydantic-settings-py312/artifacts/xmltodict-1.0.4-py3-none-any.whl
+Successfully downloaded annotated-types azure-core azure-identity azure-keyvault-secrets black boto3 botocore certifi cffi chardet charset-normalizer click cryptography google-api-core google-auth google-cloud-secret-manager googleapis-common-protos grpc-google-iam-v1 grpcio grpcio-status idna iniconfig isodate jmespath markdown-it-py MarkupSafe mdurl moto msal msal-extensions mypy_extensions opentelemetry-api packaging pathspec platformdirs pluggy proto-plus protobuf pyasn1 pyasn1_modules pycparser pydantic pydantic_core Pygments PyJWT pytest pytest-examples pytest-mock pytest-pretty python-dateutil python-dotenv pytokens PyYAML requests responses rich ruff s3transfer six typing-inspection typing_extensions urllib3 Werkzeug xmltodict

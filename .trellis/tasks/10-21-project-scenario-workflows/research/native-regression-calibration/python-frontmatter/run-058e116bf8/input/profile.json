@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "id": "python-frontmatter-py312",
+  "adapter": "python-native",
+  "python": "3.12.15",
+  "platform": "linux-amd64",
+  "requirements": [
+    "PyYAML==6.0.3",
+    "pytest==9.1.1",
+    "toml==0.10.2",
+    "pyaml==26.7.0",
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0"
+  ],
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pyaml-26.7.0-py3-none-any.whl",
+      "digest": "cfa382780c43ae660669b87d394d550a41856ef175f5749f51f753e12d7077ac",
+      "size": 27226
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+      "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+      "size": 386536
+    },
+    {
+      "path": "artifacts/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc",
+      "size": 807870
+    },
+    {
+      "path": "artifacts/toml-0.10.2-py2.py3-none-any.whl",
+      "digest": "806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b",
+      "size": 16588
+    }
+  ],
+  "business": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "verification_status": "verified_target_runtime",
+  "source_commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6",
+  "notes": "既有完整测试环境已在指定镜像、无网络512MiB/PID64下验证；资源为保守运行上限，不是最优值，也不代表模型成绩。",
+  "verification_evidence": "evidence/completion-audit.json",
+  "tested_image_id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d"
+}

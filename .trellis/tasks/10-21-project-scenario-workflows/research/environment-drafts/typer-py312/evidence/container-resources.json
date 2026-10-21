@@ -1,0 +1,7 @@
+{
+  "uid": 1000,
+  "gid": 1000,
+  "cgroup_memory_peak_bytes": 315990016,
+  "max_rss_children_kib": 102224,
+  "max_rss_note": "子进程生命周期高水位，不是所有进程RSS之和；容器峰值另读cgroup。"
+}

@@ -1,0 +1,116 @@
+{
+  "passed": false,
+  "records": [
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--candidate-root",
+        "/work/project",
+        "--mode",
+        "consult",
+        "--answer-file",
+        "/input/verification/reference/consult_answer.md"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 1.433345,
+      "mode": "consult",
+      "candidate": "baseline",
+      "matches_expected": true,
+      "expected_baseline_failure": false
+    },
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--candidate-root",
+        "/work/project",
+        "--mode",
+        "single"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 0.568314,
+      "mode": "single",
+      "candidate": "baseline",
+      "matches_expected": true,
+      "expected_baseline_failure": false
+    },
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--candidate-root",
+        "/work/project",
+        "--mode",
+        "group"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 1.020231,
+      "mode": "group",
+      "candidate": "baseline",
+      "matches_expected": true,
+      "expected_baseline_failure": false
+    },
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--candidate-root",
+        "/work/project",
+        "--mode",
+        "types"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 0.415452,
+      "mode": "types",
+      "candidate": "baseline",
+      "matches_expected": true,
+      "expected_baseline_failure": false
+    },
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--candidate-root",
+        "/work/project",
+        "--mode",
+        "export"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 5.741634,
+      "mode": "export",
+      "candidate": "baseline",
+      "matches_expected": false,
+      "expected_baseline_failure": true
+    },
+    {
+      "command": [
+        "/work/venv/bin/python",
+        "-B",
+        "/input/verification/native_checks.py",
+        "--candidate-root",
+        "/work/project",
+        "--mode",
+        "export"
+      ],
+      "cwd": "/work/project",
+      "exit_code": 0,
+      "elapsed_sec": 4.048972,
+      "mode": "export",
+      "candidate": "reference",
+      "matches_expected": false,
+      "expected_baseline_failure": false
+    }
+  ],
+  "model_runs": 0
+}

@@ -1,0 +1,15 @@
+{
+  "kind": "static_content_validation",
+  "status": "passed",
+  "scenarios": 4,
+  "tasks": 6,
+  "source_files": 56,
+  "source_bytes": 285921,
+  "json_files_parsed": 24,
+  "python_authored_files_parsed": 3,
+  "source_hashes_match_existing_checkout": true,
+  "native_executed": false,
+  "model_executed": false,
+  "environment_admitted": false,
+  "seed_digest": "a9181e19224379b7c3593996869c4c80f4b8afa19a4126d25bd0e2115f84eca2"
+}

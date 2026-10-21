@@ -1,0 +1,52 @@
+{
+  "name": "bench-scenario-research-fm-aa59e2fd38dd",
+  "image_tag": "vibebench-v3-account:v3-project-repairs-local-20261021-e",
+  "image_id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d",
+  "labels": {
+    "vibebench.scenario-research": "fm",
+    "vibebench.task": "10-21-project-scenario-workflows",
+    "vibebench.research-container": "bench-scenario-research-fm-aa59e2fd38dd"
+  },
+  "created_by": ".trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/run_target.py",
+  "status": "exited",
+  "container_id": "082c97cef7ac7cbe0db4b3943b2f6d4aed63c5395ae2b7cbb062c35dcf5df75e",
+  "exit_code": 0,
+  "elapsed_sec": 6.8844871719993534,
+  "actual_config": {
+    "user": "1000:1000",
+    "image_id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d",
+    "network_mode": "none",
+    "read_only": true,
+    "memory_bytes": 536870912,
+    "memory_swap_bytes": 536870912,
+    "pids_limit": 64,
+    "cap_drop": [
+      "ALL"
+    ],
+    "security_opt": [
+      "no-new-privileges"
+    ],
+    "mounts": [
+      {
+        "source": "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312",
+        "destination": "/offline",
+        "rw": false
+      },
+      {
+        "source": "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/input",
+        "destination": "/input",
+        "rw": false
+      },
+      {
+        "source": "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/evidence",
+        "destination": "/evidence",
+        "rw": true
+      },
+      {
+        "source": "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/python-frontmatter/seed",
+        "destination": "/source",
+        "rw": false
+      }
+    ]
+  }
+}

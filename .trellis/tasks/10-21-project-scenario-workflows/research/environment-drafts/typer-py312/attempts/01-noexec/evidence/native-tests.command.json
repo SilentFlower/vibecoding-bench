@@ -1,0 +1,19 @@
+{
+  "command": [
+    "/work/venv/bin/python",
+    "-B",
+    "-m",
+    "pytest",
+    "--cov",
+    "--cov-report=term-missing",
+    "-o",
+    "console_output_style=progress",
+    "--showlocals",
+    "--numprocesses=2",
+    "-ra",
+    "--junitxml=/evidence/native-tests.xml"
+  ],
+  "cwd": "/work/project/library",
+  "exit_code": 1,
+  "elapsed_sec": 0.418808
+}

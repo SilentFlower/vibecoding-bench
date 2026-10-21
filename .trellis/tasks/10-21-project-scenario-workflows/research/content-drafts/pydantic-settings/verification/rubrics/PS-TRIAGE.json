@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "task_id": "PS-TRIAGE",
+  "version": 1,
+  "status": "draft_not_calibrated",
+  "criteria": [
+    {
+      "id": "evidence-first",
+      "requirement": "首问不足以判因，先请求配置模型、实际来源／变量或最小复现等有决定意义的资料；允许一次索取完整复现。",
+      "required": true
+    },
+    {
+      "id": "disclosed-only",
+      "requirement": "只依据已经披露的材料判断，不虚构自己已看到隐藏代码／日志或已运行对照。",
+      "required": true
+    },
+    {
+      "id": "eventual-cause",
+      "requirement": "材料补齐后识别 APP_QUANTITY=invalid 的高优先级非法整数输入，loc quantity 是模型字段名，不等于物理变量名。",
+      "required": true
+    },
+    {
+      "id": "minimum-verification",
+      "requirement": "给出撤去／修正变量后的最小对照；本入口资料全部可提供，不能仅说信息不足就结束或反复索要同物。",
+      "required": true
+    }
+  ],
+  "source_evidence": {
+    "main": [
+      "library/pydantic_settings/main.py:255",
+      "library/pydantic_settings/main.py:295",
+      "library/pydantic_settings/main.py:323",
+      "library/pydantic_settings/main.py:336"
+    ],
+    "env": [
+      "library/pydantic_settings/sources/providers/env.py:200",
+      "library/pydantic_settings/sources/providers/env.py:217",
+      "library/pydantic_settings/sources/providers/env.py:275"
+    ],
+    "decode": [
+      "library/pydantic_settings/sources/base.py:194",
+      "library/pydantic_settings/sources/utils.py:150",
+      "library/pydantic_settings/sources/utils.py:213"
+    ]
+  },
+  "accept_equivalent_answers": true,
+  "grade_length": false,
+  "uncertain_rule": "证据不足时返回 uncertain，不自动当候选失败；不得要求输出隐含推理过程。",
+  "feedback_policy": "仅返回已声明的公开业务规则和反馈码，不披露隐藏样例或完整rubric。"
+}

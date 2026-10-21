@@ -1,0 +1,8 @@
+{
+  "python": "3.12.15 (main, Oct  6 2026, 02:02:31) [GCC 12.2.0]",
+  "executable": "/usr/local/bin/python3",
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+  "machine": "x86_64",
+  "uid": 1000,
+  "gid": 1000
+}

@@ -1,0 +1,49 @@
+{
+  "criteria": [
+    {
+      "id": "necessary_clarification",
+      "requirement": "首轮缺少 callback/命令声明，必须先指出无法确定根因并请求能区分选项归属的注册代码或根/子命令帮助；可提出条件性假设但不能提前断言根因。",
+      "evidence": [
+        "project.json"
+      ],
+      "stage": "before_disclosure"
+    },
+    {
+      "id": "registration_ownership",
+      "requirement": "收到合法披露后确认 --verbose 属于 root callback，export 未声明此选项，不能再拒绝判断或反复索要同一材料。",
+      "evidence": [
+        "disclosure/TY-D02/shop.py"
+      ],
+      "stage": "after_disclosure"
+    },
+    {
+      "id": "correct_invocation",
+      "requirement": "给出 python shop.py --verbose export，并解释根参数先解析、子命令另建 context；据当前夹具结论为正常行为，不把全部同类报错都归为此原因。",
+      "evidence": [
+        "library/typer/core.py:1077",
+        "library/typer/core.py:1113"
+      ],
+      "stage": "after_disclosure"
+    },
+    {
+      "id": "no_fabrication",
+      "requirement": "不建议不存在的全局选项开关，不改应用或 Typer；仅首轮提问不能作为整个诊断任务完成。",
+      "evidence": [
+        "project.json"
+      ]
+    }
+  ],
+  "allowed_outcomes": [
+    "normal_behavior"
+  ],
+  "disclosure_rules": {
+    "required_branch": "TY-D02-registration",
+    "before_disclosure": "只允许判为 disclose 或有依据的未完成；不得直接 pass。",
+    "after_disclosure": "所有必要条件满足后方可 pass。",
+    "help_request": "请求根或子命令 help 也允许披露同一完整注册代码，满足确认选项归属的需要；不手编帮助输出。"
+  },
+  "schema": 1,
+  "task_id": "TY-D02",
+  "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+  "result_version": 1
+}

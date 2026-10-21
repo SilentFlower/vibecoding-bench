@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "id": "typer-py312",
+  "adapter": "python-native",
+  "python": "3.12",
+  "platform": "linux/amd64",
+  "requirements": [
+    "annotated-doc==0.0.5",
+    "coverage==7.16.2",
+    "execnet==2.1.2",
+    "iniconfig==2.3.1",
+    "markdown-it-py==4.2.0",
+    "mdurl==0.1.2",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "pytest-sugar==1.1.1",
+    "pytest-xdist==3.8.0",
+    "rich==15.0.0",
+    "shellingham==1.5.4",
+    "termcolor==3.3.0"
+  ],
+  "business": {
+    "timeout_sec": 180,
+    "memory_mb": 1024,
+    "pids_limit": 128
+  },
+  "regression": {
+    "timeout_sec": 600,
+    "memory_mb": 1024,
+    "pids_limit": 128
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/annotated_doc-0.0.5-py3-none-any.whl",
+      "digest": "117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101"
+    },
+    {
+      "path": "artifacts/coverage-7.16.2-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+      "digest": "5375ebd99038021b35e99dc88255022912c06565d316212f4a576e4b08d30f5d"
+    },
+    {
+      "path": "artifacts/execnet-2.1.2-py3-none-any.whl",
+      "digest": "67fba928dd5a544b783f6056f449e5e3931a5c378b128bc18501f7ea79e296ec"
+    },
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7"
+    },
+    {
+      "path": "artifacts/markdown_it_py-4.2.0-py3-none-any.whl",
+      "digest": "9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a"
+    },
+    {
+      "path": "artifacts/mdurl-0.1.2-py3-none-any.whl",
+      "digest": "84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec"
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9"
+    },
+    {
+      "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+      "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c"
+    },
+    {
+      "path": "artifacts/pytest_cov-7.1.0-py3-none-any.whl",
+      "digest": "a0461110b7865f9a271aa1b51e516c9a95de9d696734a2f71e3e78f46e1d4678"
+    },
+    {
+      "path": "artifacts/pytest_sugar-1.1.1-py3-none-any.whl",
+      "digest": "2f8319b907548d5b9d03a171515c1d43d2e38e32bd8182a1781eb20b43344cc8"
+    },
+    {
+      "path": "artifacts/pytest_xdist-3.8.0-py3-none-any.whl",
+      "digest": "202ca578cfeb7370784a8c33d6d05bc6e13b4f25b5053c30a152269fd10f0b88"
+    },
+    {
+      "path": "artifacts/rich-15.0.0-py3-none-any.whl",
+      "digest": "33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb"
+    },
+    {
+      "path": "artifacts/shellingham-1.5.4-py2.py3-none-any.whl",
+      "digest": "7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686"
+    },
+    {
+      "path": "artifacts/termcolor-3.3.0-py3-none-any.whl",
+      "digest": "cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5"
+    }
+  ],
+  "source_import": "library/typer,不安装外部typer或click发行包",
+  "validation_status": "downloaded_awaiting_target_runtime"
+}

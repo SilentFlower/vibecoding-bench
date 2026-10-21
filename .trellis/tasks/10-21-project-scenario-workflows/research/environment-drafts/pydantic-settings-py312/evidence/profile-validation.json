@@ -1,0 +1,8 @@
+{
+  "environment_loader": "valid",
+  "artifacts": 64,
+  "artifact_bytes": 58386309,
+  "python": "3.12.15",
+  "target_status": "passed",
+  "formal_content_ready": false
+}

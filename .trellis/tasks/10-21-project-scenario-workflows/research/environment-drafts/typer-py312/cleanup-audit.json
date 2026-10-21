@@ -1,0 +1,30 @@
+{
+  "owned_containers": [
+    {
+      "container_id": "779127261c1b7881de0d1b3af26dfb752f4f8be17de421d466b73eadb8028559",
+      "name": "bench-scenario-research-ty-ebd87e9ede89",
+      "removed": true,
+      "confirmed_absent": true
+    },
+    {
+      "container_id": "e47a93477a867b727af92c54bb8c5c9f1fea88a1d88e7b2df9b50722570f0bfe",
+      "name": "bench-scenario-research-ty-dccbff33f229",
+      "removed": true,
+      "confirmed_absent": true
+    },
+    {
+      "container_id": "5a14bf65bc90fba22fd7176c9d7d13442a33dd1a1bb25af374e3df5dddbe5d48",
+      "name": "bench-scenario-research-ty-d7236bd4f889",
+      "removed": true,
+      "confirmed_absent": true
+    },
+    {
+      "container_id": "cc7a5d93bc044238eaeaa325e8be74d80fc77c007fc5284891de8168f8f2f667",
+      "name": "bench-scenario-research-ty-80f56051ff36",
+      "removed": true,
+      "confirmed_absent": true
+    }
+  ],
+  "all_removed": true,
+  "other_containers_touched": false
+}

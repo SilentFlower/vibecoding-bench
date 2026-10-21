@@ -1,0 +1,10 @@
+{"step": "venv-create", "exit_code": 0, "elapsed_sec": 2.4388866819990653}
+{"step": "offline-install", "exit_code": 0, "elapsed_sec": 1.5722154800005228}
+{"step": "baseline-native", "exit_code": 0, "elapsed_sec": 0.5831329390002793}
+{"step": "original-business", "exit_code": 0, "elapsed_sec": 0.1186462700006814}
+{"step": "consult-business", "exit_code": 0, "elapsed_sec": 0.22189858699857723}
+{"step": "shallow-business", "exit_code": 0, "elapsed_sec": 0.11890179500005615}
+{"step": "original-repair-target", "exit_code": 0, "elapsed_sec": 0.11874097799955052}
+{"step": "reference-repair-target", "exit_code": 0, "elapsed_sec": 0.1195410880009149}
+{"step": "reference-native", "exit_code": 0, "elapsed_sec": 0.5800744399984978}
+所有实际执行阶段已退出；通过与否仍由控制端独立对照 XML、节点与业务 JSON。

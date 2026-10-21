@@ -1,0 +1,693 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.7.0
+rootdir: /work/tmp/bench-native-regression-7303q8wm/project
+configfile: pyproject.toml
+plugins: xdist-3.8.0
+created: 2/2 workers
+2 workers [1505 items]
+
+......................................................................ss [  4%]
+..s..................................................................... [  9%]
+..............................x..x...................................... [ 14%]
+........................................................................ [ 19%]
+....................ss..........s....................................... [ 23%]
+........................................................................ [ 28%]
+........................................................................ [ 33%]
+........................................................................ [ 38%]
+........................................................................ [ 43%]
+........................................................................ [ 47%]
+........................................................................ [ 52%]
+........................................................................ [ 57%]
+........................................................................ [ 62%]
+........................................................................ [ 66%]
+........................................................................ [ 71%]
+........................................................................ [ 76%]
+........................................................................ [ 81%]
+........................................................................ [ 86%]
+........................................................................ [ 90%]
+..........................................................s............. [ 95%]
+..................................s...s.....sssssssssssss........        [100%]
+----------- generated xml file: /evidence/freeze-baseline/junit.xml ------------
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.12.15-final-0 _______________
+
+Name                                                                                               Stmts   Miss  Cover   Missing
+--------------------------------------------------------------------------------------------------------------------------------
+docs_src/app_dir/__init__.py                                                                           0      0   100%
+docs_src/app_dir/tutorial001_py310.py                                                                 10      0   100%
+docs_src/arguments/__init__.py                                                                         0      0   100%
+docs_src/arguments/default/__init__.py                                                                 0      0   100%
+docs_src/arguments/default/tutorial001_an_py310.py                                                     6      0   100%
+docs_src/arguments/default/tutorial001_py310.py                                                        5      0   100%
+docs_src/arguments/default/tutorial002_an_py310.py                                                     9      0   100%
+docs_src/arguments/default/tutorial002_py310.py                                                        8      0   100%
+docs_src/arguments/envvar/__init__.py                                                                  0      0   100%
+docs_src/arguments/envvar/tutorial001_an_py310.py                                                      6      0   100%
+docs_src/arguments/envvar/tutorial001_py310.py                                                         5      0   100%
+docs_src/arguments/envvar/tutorial002_an_py310.py                                                      6      0   100%
+docs_src/arguments/envvar/tutorial002_py310.py                                                         5      0   100%
+docs_src/arguments/envvar/tutorial003_an_py310.py                                                      6      0   100%
+docs_src/arguments/envvar/tutorial003_py310.py                                                         5      0   100%
+docs_src/arguments/help/__init__.py                                                                    0      0   100%
+docs_src/arguments/help/tutorial001_an_py310.py                                                        6      0   100%
+docs_src/arguments/help/tutorial001_py310.py                                                           5      0   100%
+docs_src/arguments/help/tutorial002_an_py310.py                                                        6      0   100%
+docs_src/arguments/help/tutorial002_py310.py                                                           5      0   100%
+docs_src/arguments/help/tutorial003_an_py310.py                                                        6      0   100%
+docs_src/arguments/help/tutorial003_py310.py                                                           5      0   100%
+docs_src/arguments/help/tutorial004_an_py310.py                                                        6      0   100%
+docs_src/arguments/help/tutorial004_py310.py                                                           5      0   100%
+docs_src/arguments/help/tutorial005_an_py310.py                                                        6      0   100%
+docs_src/arguments/help/tutorial005_py310.py                                                           5      0   100%
+docs_src/arguments/help/tutorial006_an_py310.py                                                        6      0   100%
+docs_src/arguments/help/tutorial006_py310.py                                                           5      0   100%
+docs_src/arguments/help/tutorial007_an_py310.py                                                        6      0   100%
+docs_src/arguments/help/tutorial007_py310.py                                                           5      0   100%
+docs_src/arguments/help/tutorial008_an_py310.py                                                        6      0   100%
+docs_src/arguments/help/tutorial008_py310.py                                                           5      0   100%
+docs_src/arguments/optional/__init__.py                                                                0      0   100%
+docs_src/arguments/optional/tutorial000_an_py310.py                                                    4      0   100%
+docs_src/arguments/optional/tutorial000_py310.py                                                       3      0   100%
+docs_src/arguments/optional/tutorial001_an_py310.py                                                    6      0   100%
+docs_src/arguments/optional/tutorial001_py310.py                                                       5      0   100%
+docs_src/arguments/optional/tutorial002_an_py310.py                                                    6      0   100%
+docs_src/arguments/optional/tutorial002_py310.py                                                       5      0   100%
+docs_src/arguments/optional/tutorial003_py310.py                                                       5      0   100%
+docs_src/commands/__init__.py                                                                          0      0   100%
+docs_src/commands/arguments/__init__.py                                                                0      0   100%
+docs_src/commands/arguments/tutorial001_py310.py                                                       8      0   100%
+docs_src/commands/callback/__init__.py                                                                 0      0   100%
+docs_src/commands/callback/tutorial001_py310.py                                                       22      0   100%
+docs_src/commands/callback/tutorial002_py310.py                                                        7      0   100%
+docs_src/commands/callback/tutorial003_py310.py                                                       10      0   100%
+docs_src/commands/callback/tutorial004_py310.py                                                        7      0   100%
+docs_src/commands/context/__init__.py                                                                  0      0   100%
+docs_src/commands/context/tutorial001_py310.py                                                        11      0   100%
+docs_src/commands/context/tutorial002_py310.py                                                        11      0   100%
+docs_src/commands/context/tutorial003_py310.py                                                        12      0   100%
+docs_src/commands/context/tutorial004_py310.py                                                         6      0   100%
+docs_src/commands/help/__init__.py                                                                     0      0   100%
+docs_src/commands/help/tutorial001_an_py310.py                                                        19      0   100%
+docs_src/commands/help/tutorial001_py310.py                                                           18      0   100%
+docs_src/commands/help/tutorial002_py310.py                                                            8      0   100%
+docs_src/commands/help/tutorial003_py310.py                                                            8      0   100%
+docs_src/commands/help/tutorial004_an_py310.py                                                         9      0   100%
+docs_src/commands/help/tutorial004_py310.py                                                            8      0   100%
+docs_src/commands/help/tutorial005_an_py310.py                                                         9      0   100%
+docs_src/commands/help/tutorial005_py310.py                                                            8      0   100%
+docs_src/commands/help/tutorial006_py310.py                                                           20      0   100%
+docs_src/commands/help/tutorial007_an_py310.py                                                         9      0   100%
+docs_src/commands/help/tutorial007_py310.py                                                            8      0   100%
+docs_src/commands/help/tutorial008_py310.py                                                            5      0   100%
+docs_src/commands/index/__init__.py                                                                    0      0   100%
+docs_src/commands/index/tutorial002_py310.py                                                           8      0   100%
+docs_src/commands/index/tutorial003_py310.py                                                           8      0   100%
+docs_src/commands/index/tutorial004_py310.py                                                           8      0   100%
+docs_src/commands/index/tutorial005_py310.py                                                           8      0   100%
+docs_src/commands/name/__init__.py                                                                     0      0   100%
+docs_src/commands/name/tutorial001_py310.py                                                            8      0   100%
+docs_src/commands/one_or_multiple/__init__.py                                                          0      0   100%
+docs_src/commands/one_or_multiple/tutorial001_py310.py                                                 8      0   100%
+docs_src/commands/one_or_multiple/tutorial002_py310.py                                                 7      0   100%
+docs_src/commands/options/__init__.py                                                                  0      0   100%
+docs_src/commands/options/tutorial001_an_py310.py                                                     19      0   100%
+docs_src/commands/options/tutorial001_py310.py                                                        18      0   100%
+docs_src/exceptions/__init__.py                                                                        0      0   100%
+docs_src/exceptions/tutorial001_py310.py                                                               5      0   100%
+docs_src/exceptions/tutorial002_py310.py                                                               5      0   100%
+docs_src/exceptions/tutorial003_py310.py                                                               5      0   100%
+docs_src/exceptions/tutorial004_py310.py                                                               5      0   100%
+docs_src/first_steps/__init__.py                                                                       0      0   100%
+docs_src/first_steps/tutorial001_py310.py                                                              3      0   100%
+docs_src/first_steps/tutorial002_py310.py                                                              3      0   100%
+docs_src/first_steps/tutorial003_py310.py                                                              3      0   100%
+docs_src/first_steps/tutorial004_py310.py                                                              5      0   100%
+docs_src/first_steps/tutorial005_py310.py                                                              5      0   100%
+docs_src/first_steps/tutorial006_py310.py                                                              5      0   100%
+docs_src/launch/__init__.py                                                                            0      0   100%
+docs_src/launch/tutorial001_py310.py                                                                   6      0   100%
+docs_src/launch/tutorial002_py310.py                                                                  15      0   100%
+docs_src/multiple_values/__init__.py                                                                   0      0   100%
+docs_src/multiple_values/arguments_with_multiple_values/__init__.py                                    0      0   100%
+docs_src/multiple_values/arguments_with_multiple_values/tutorial001_py310.py                           9      0   100%
+docs_src/multiple_values/arguments_with_multiple_values/tutorial002_an_py310.py                        7      0   100%
+docs_src/multiple_values/arguments_with_multiple_values/tutorial002_py310.py                           6      0   100%
+docs_src/multiple_values/multiple_options/__init__.py                                                  0      0   100%
+docs_src/multiple_values/multiple_options/tutorial001_an_py310.py                                     10      0   100%
+docs_src/multiple_values/multiple_options/tutorial001_py310.py                                         9      0   100%
+docs_src/multiple_values/multiple_options/tutorial002_an_py310.py                                      6      0   100%
+docs_src/multiple_values/multiple_options/tutorial002_py310.py                                         5      0   100%
+docs_src/multiple_values/options_with_multiple_values/__init__.py                                      0      0   100%
+docs_src/multiple_values/options_with_multiple_values/tutorial001_an_py310.py                         12      0   100%
+docs_src/multiple_values/options_with_multiple_values/tutorial001_py310.py                            11      0   100%
+docs_src/one_file_per_command/__init__.py                                                              0      0   100%
+docs_src/one_file_per_command/app_py310/__init__.py                                                    0      0   100%
+docs_src/one_file_per_command/app_py310/main.py                                                        6      0   100%
+docs_src/one_file_per_command/app_py310/users/__init__.py                                              6      0   100%
+docs_src/one_file_per_command/app_py310/users/add.py                                                   5      0   100%
+docs_src/one_file_per_command/app_py310/users/delete.py                                                5      0   100%
+docs_src/one_file_per_command/app_py310/version.py                                                     5      0   100%
+docs_src/options/__init__.py                                                                           0      0   100%
+docs_src/options/callback/__init__.py                                                                  0      0   100%
+docs_src/options/callback/tutorial001_an_py310.py                                                     10      0   100%
+docs_src/options/callback/tutorial001_py310.py                                                         9      0   100%
+docs_src/options/callback/tutorial002_an_py310.py                                                     11      0   100%
+docs_src/options/callback/tutorial002_py310.py                                                        10      0   100%
+docs_src/options/callback/tutorial003_an_py310.py                                                     13      0   100%
+docs_src/options/callback/tutorial003_py310.py                                                        12      0   100%
+docs_src/options/callback/tutorial004_an_py310.py                                                     13      0   100%
+docs_src/options/callback/tutorial004_py310.py                                                        12      0   100%
+docs_src/options/help/__init__.py                                                                      0      0   100%
+docs_src/options/help/tutorial001_an_py310.py                                                          8      0   100%
+docs_src/options/help/tutorial001_py310.py                                                             7      0   100%
+docs_src/options/help/tutorial002_an_py310.py                                                          8      0   100%
+docs_src/options/help/tutorial002_py310.py                                                             7      0   100%
+docs_src/options/help/tutorial003_an_py310.py                                                          6      0   100%
+docs_src/options/help/tutorial003_py310.py                                                             5      0   100%
+docs_src/options/help/tutorial004_an_py310.py                                                          6      0   100%
+docs_src/options/help/tutorial004_py310.py                                                             5      0   100%
+docs_src/options/name/__init__.py                                                                      0      0   100%
+docs_src/options/name/tutorial001_an_py310.py                                                          6      0   100%
+docs_src/options/name/tutorial001_py310.py                                                             5      0   100%
+docs_src/options/name/tutorial002_an_py310.py                                                          6      0   100%
+docs_src/options/name/tutorial002_py310.py                                                             5      0   100%
+docs_src/options/name/tutorial003_an_py310.py                                                          6      0   100%
+docs_src/options/name/tutorial003_py310.py                                                             5      0   100%
+docs_src/options/name/tutorial004_an_py310.py                                                          6      0   100%
+docs_src/options/name/tutorial004_py310.py                                                             5      0   100%
+docs_src/options/name/tutorial005_an_py310.py                                                          8      0   100%
+docs_src/options/name/tutorial005_py310.py                                                             7      0   100%
+docs_src/options/password/__init__.py                                                                  0      0   100%
+docs_src/options/password/tutorial001_an_py310.py                                                      6      0   100%
+docs_src/options/password/tutorial001_py310.py                                                         5      0   100%
+docs_src/options/password/tutorial002_an_py310.py                                                      7      0   100%
+docs_src/options/password/tutorial002_py310.py                                                         6      0   100%
+docs_src/options/prompt/__init__.py                                                                    0      0   100%
+docs_src/options/prompt/tutorial001_an_py310.py                                                        6      0   100%
+docs_src/options/prompt/tutorial001_py310.py                                                           5      0   100%
+docs_src/options/prompt/tutorial002_an_py310.py                                                        6      0   100%
+docs_src/options/prompt/tutorial002_py310.py                                                           5      0   100%
+docs_src/options/prompt/tutorial003_an_py310.py                                                        6      0   100%
+docs_src/options/prompt/tutorial003_py310.py                                                           5      0   100%
+docs_src/options/required/__init__.py                                                                  0      0   100%
+docs_src/options/required/tutorial001_an_py310.py                                                      6      0   100%
+docs_src/options/required/tutorial001_py310.py                                                         5      0   100%
+docs_src/options/required/tutorial002_py310.py                                                         5      0   100%
+docs_src/options/version/__init__.py                                                                   0      0   100%
+docs_src/options/version/tutorial001_an_py310.py                                                      11      0   100%
+docs_src/options/version/tutorial001_py310.py                                                         10      0   100%
+docs_src/options/version/tutorial002_an_py310.py                                                      15      0   100%
+docs_src/options/version/tutorial002_py310.py                                                         14      0   100%
+docs_src/options/version/tutorial003_an_py310.py                                                      15      0   100%
+docs_src/options/version/tutorial003_py310.py                                                         14      0   100%
+docs_src/options_autocompletion/__init__.py                                                            0      0   100%
+docs_src/options_autocompletion/tutorial001_an_py310.py                                                6      0   100%
+docs_src/options_autocompletion/tutorial001_py310.py                                                   5      0   100%
+docs_src/options_autocompletion/tutorial002_an_py310.py                                                8      0   100%
+docs_src/options_autocompletion/tutorial002_py310.py                                                   7      0   100%
+docs_src/options_autocompletion/tutorial003_an_py310.py                                               13      0   100%
+docs_src/options_autocompletion/tutorial003_py310.py                                                  12      0   100%
+docs_src/options_autocompletion/tutorial004_an_py310.py                                               14      0   100%
+docs_src/options_autocompletion/tutorial004_py310.py                                                  13      0   100%
+docs_src/options_autocompletion/tutorial005_an_py310.py                                               11      0   100%
+docs_src/options_autocompletion/tutorial005_py310.py                                                  10      0   100%
+docs_src/options_autocompletion/tutorial006_an_py310.py                                                7      0   100%
+docs_src/options_autocompletion/tutorial006_py310.py                                                   6      0   100%
+docs_src/options_autocompletion/tutorial007_an_py310.py                                               13      0   100%
+docs_src/options_autocompletion/tutorial007_py310.py                                                  12      0   100%
+docs_src/options_autocompletion/tutorial008_an_py310.py                                               15      0   100%
+docs_src/options_autocompletion/tutorial008_py310.py                                                  14      0   100%
+docs_src/options_autocompletion/tutorial009_an_py310.py                                               16      0   100%
+docs_src/options_autocompletion/tutorial009_py310.py                                                  15      0   100%
+docs_src/parameter_types/__init__.py                                                                   0      0   100%
+docs_src/parameter_types/bool/__init__.py                                                              0      0   100%
+docs_src/parameter_types/bool/tutorial001_an_py310.py                                                  8      0   100%
+docs_src/parameter_types/bool/tutorial001_py310.py                                                     7      0   100%
+docs_src/parameter_types/bool/tutorial002_an_py310.py                                                 10      0   100%
+docs_src/parameter_types/bool/tutorial002_py310.py                                                     9      0   100%
+docs_src/parameter_types/bool/tutorial003_an_py310.py                                                  8      0   100%
+docs_src/parameter_types/bool/tutorial003_py310.py                                                     7      0   100%
+docs_src/parameter_types/bool/tutorial004_an_py310.py                                                  8      0   100%
+docs_src/parameter_types/bool/tutorial004_py310.py                                                     7      0   100%
+docs_src/parameter_types/custom_types/__init__.py                                                      0      0   100%
+docs_src/parameter_types/custom_types/tutorial001_an_py310.py                                         14      0   100%
+docs_src/parameter_types/custom_types/tutorial001_py310.py                                            13      0   100%
+docs_src/parameter_types/datetime/__init__.py                                                          0      0   100%
+docs_src/parameter_types/datetime/tutorial001_py310.py                                                 7      0   100%
+docs_src/parameter_types/datetime/tutorial002_an_py310.py                                              7      0   100%
+docs_src/parameter_types/datetime/tutorial002_py310.py                                                 6      0   100%
+docs_src/parameter_types/enum/__init__.py                                                              0      0   100%
+docs_src/parameter_types/enum/tutorial001_py310.py                                                    10      0   100%
+docs_src/parameter_types/enum/tutorial002_an_py310.py                                                 11      0   100%
+docs_src/parameter_types/enum/tutorial002_py310.py                                                    10      0   100%
+docs_src/parameter_types/enum/tutorial003_an_py310.py                                                 11      0   100%
+docs_src/parameter_types/enum/tutorial003_py310.py                                                    10      0   100%
+docs_src/parameter_types/enum/tutorial004_an_py310.py                                                  6      0   100%
+docs_src/parameter_types/enum/tutorial004_py310.py                                                     6      0   100%
+docs_src/parameter_types/file/__init__.py                                                              0      0   100%
+docs_src/parameter_types/file/tutorial001_an_py310.py                                                  7      0   100%
+docs_src/parameter_types/file/tutorial001_py310.py                                                     6      0   100%
+docs_src/parameter_types/file/tutorial002_an_py310.py                                                  7      0   100%
+docs_src/parameter_types/file/tutorial002_py310.py                                                     6      0   100%
+docs_src/parameter_types/file/tutorial003_an_py310.py                                                  9      0   100%
+docs_src/parameter_types/file/tutorial003_py310.py                                                     8      0   100%
+docs_src/parameter_types/file/tutorial004_an_py310.py                                                 11      0   100%
+docs_src/parameter_types/file/tutorial004_py310.py                                                    10      0   100%
+docs_src/parameter_types/file/tutorial005_an_py310.py                                                  7      0   100%
+docs_src/parameter_types/file/tutorial005_py310.py                                                     6      0   100%
+docs_src/parameter_types/index/__init__.py                                                             0      0   100%
+docs_src/parameter_types/index/tutorial001_py310.py                                                    8      0   100%
+docs_src/parameter_types/number/__init__.py                                                            0      0   100%
+docs_src/parameter_types/number/tutorial001_an_py310.py                                                8      0   100%
+docs_src/parameter_types/number/tutorial001_py310.py                                                   7      0   100%
+docs_src/parameter_types/number/tutorial002_an_py310.py                                                8      0   100%
+docs_src/parameter_types/number/tutorial002_py310.py                                                   7      0   100%
+docs_src/parameter_types/number/tutorial003_an_py310.py                                                6      0   100%
+docs_src/parameter_types/number/tutorial003_py310.py                                                   5      0   100%
+docs_src/parameter_types/path/__init__.py                                                              0      0   100%
+docs_src/parameter_types/path/tutorial001_an_py310.py                                                 16      0   100%
+docs_src/parameter_types/path/tutorial001_py310.py                                                    15      0   100%
+docs_src/parameter_types/path/tutorial002_an_py310.py                                                  8      0   100%
+docs_src/parameter_types/path/tutorial002_py310.py                                                     7      0   100%
+docs_src/parameter_types/uuid/__init__.py                                                              0      0   100%
+docs_src/parameter_types/uuid/tutorial001_py310.py                                                     7      0   100%
+docs_src/printing/__init__.py                                                                          0      0   100%
+docs_src/printing/tutorial001_py310.py                                                                 8      0   100%
+docs_src/printing/tutorial002_py310.py                                                                 6      0   100%
+docs_src/printing/tutorial003_py310.py                                                                11      0   100%
+docs_src/printing/tutorial004_py310.py                                                                 7      0   100%
+docs_src/printing/tutorial005_py310.py                                                                10      0   100%
+docs_src/printing/tutorial006_py310.py                                                                 5      0   100%
+docs_src/progressbar/__init__.py                                                                       0      0   100%
+docs_src/progressbar/tutorial001_py310.py                                                             11      0   100%
+docs_src/progressbar/tutorial002_py310.py                                                             11      0   100%
+docs_src/progressbar/tutorial003_py310.py                                                             11      0   100%
+docs_src/progressbar/tutorial004_py310.py                                                             14      0   100%
+docs_src/progressbar/tutorial005_py310.py                                                             11      0   100%
+docs_src/progressbar/tutorial006_py310.py                                                             11      0   100%
+docs_src/prompt/__init__.py                                                                            0      0   100%
+docs_src/prompt/tutorial001_py310.py                                                                   6      0   100%
+docs_src/prompt/tutorial002_py310.py                                                                   9      0   100%
+docs_src/prompt/tutorial003_py310.py                                                                   6      0   100%
+docs_src/prompt/tutorial004_py310.py                                                                   7      0   100%
+docs_src/subcommands/__init__.py                                                                       0      0   100%
+docs_src/subcommands/callback_override/__init__.py                                                     0      0   100%
+docs_src/subcommands/callback_override/tutorial001_py310.py                                           10      0   100%
+docs_src/subcommands/callback_override/tutorial002_py310.py                                            9      0   100%
+docs_src/subcommands/callback_override/tutorial003_py310.py                                           12      0   100%
+docs_src/subcommands/callback_override/tutorial004_py310.py                                           14      0   100%
+docs_src/subcommands/name_help/__init__.py                                                             0      0   100%
+docs_src/subcommands/name_help/tutorial001_py310.py                                                    7      0   100%
+docs_src/subcommands/name_help/tutorial002_py310.py                                                    9      0   100%
+docs_src/subcommands/name_help/tutorial003_py310.py                                                    8      0   100%
+docs_src/subcommands/name_help/tutorial004_py310.py                                                   10      0   100%
+docs_src/subcommands/name_help/tutorial005_py310.py                                                   11      0   100%
+docs_src/subcommands/name_help/tutorial006_py310.py                                                   11      0   100%
+docs_src/subcommands/name_help/tutorial007_py310.py                                                   11      0   100%
+docs_src/subcommands/name_help/tutorial008_py310.py                                                   11      0   100%
+docs_src/subcommands/tutorial001_py310/__init__.py                                                     0      0   100%
+docs_src/subcommands/tutorial001_py310/items.py                                                       11      0   100%
+docs_src/subcommands/tutorial001_py310/main.py                                                         6      0   100%
+docs_src/subcommands/tutorial001_py310/users.py                                                        8      0   100%
+docs_src/subcommands/tutorial002_py310/__init__.py                                                     0      0   100%
+docs_src/subcommands/tutorial002_py310/main.py                                                        21      0   100%
+docs_src/subcommands/tutorial003_py310/__init__.py                                                     0      0   100%
+docs_src/subcommands/tutorial003_py310/items.py                                                       11      0   100%
+docs_src/subcommands/tutorial003_py310/lands.py                                                        6      0   100%
+docs_src/subcommands/tutorial003_py310/main.py                                                         8      0   100%
+docs_src/subcommands/tutorial003_py310/reigns.py                                                       8      0   100%
+docs_src/subcommands/tutorial003_py310/towns.py                                                        8      0   100%
+docs_src/subcommands/tutorial003_py310/users.py                                                        8      0   100%
+docs_src/terminating/__init__.py                                                                       0      0   100%
+docs_src/terminating/tutorial001_py310.py                                                             14      0   100%
+docs_src/terminating/tutorial002_py310.py                                                              8      0   100%
+docs_src/terminating/tutorial003_py310.py                                                              8      0   100%
+docs_src/testing/__init__.py                                                                           0      0   100%
+docs_src/testing/app01_py310/__init__.py                                                               0      0   100%
+docs_src/testing/app01_py310/main.py                                                                   7      0   100%
+docs_src/testing/app01_py310/test_main.py                                                              8      0   100%
+docs_src/testing/app02_an_py310/__init__.py                                                            0      0   100%
+docs_src/testing/app02_an_py310/main.py                                                                6      0   100%
+docs_src/testing/app02_an_py310/test_main.py                                                           7      0   100%
+docs_src/testing/app02_py310/__init__.py                                                               0      0   100%
+docs_src/testing/app02_py310/main.py                                                                   5      0   100%
+docs_src/testing/app02_py310/test_main.py                                                              7      0   100%
+docs_src/testing/app03_py310/__init__.py                                                               0      0   100%
+docs_src/testing/app03_py310/main.py                                                                   3      0   100%
+docs_src/testing/app03_py310/test_main.py                                                             10      0   100%
+docs_src/typer_app/__init__.py                                                                         0      0   100%
+docs_src/typer_app/tutorial001_py310.py                                                                5      0   100%
+tests/__init__.py                                                                                      0      0   100%
+tests/assets/__init__.py                                                                               0      0   100%
+tests/assets/cli/__init__.py                                                                           0      0   100%
+tests/assets/cli/app_other_name.py                                                                     5      0   100%
+tests/assets/cli/empty_script.py                                                                       0      0   100%
+tests/assets/cli/extended_app_cli.py                                                                  18      0   100%
+tests/assets/cli/extended_empty_app_cli.py                                                            10      0   100%
+tests/assets/cli/func_other_name.py                                                                    2      0   100%
+tests/assets/cli/minimum_main.py                                                                       4      0   100%
+tests/assets/cli/multi_app.py                                                                         16      0   100%
+tests/assets/cli/multi_app_cli.py                                                                     13      0   100%
+tests/assets/cli/multi_app_norich.py                                                                  13      0   100%
+tests/assets/cli/multi_func.py                                                                         5      0   100%
+tests/assets/cli/rich_formatted_app.py                                                                 5      0   100%
+tests/assets/cli/sample.py                                                                            12      0   100%
+tests/assets/completion_argument.py                                                                   10      0   100%
+tests/assets/completion_no_types.py                                                                   10      0   100%
+tests/assets/completion_no_types_order.py                                                             10      0   100%
+tests/assets/hidden_commands.py                                                                       12      0   100%
+tests/assets/hidden_option.py                                                                          5      0   100%
+tests/assets/print_modules.py                                                                          7      0   100%
+tests/assets/prog_name.py                                                                              2      0   100%
+tests/assets/type_error_no_rich.py                                                                     7      0   100%
+tests/assets/type_error_no_rich_short_disable.py                                                       7      0   100%
+tests/assets/type_error_normal_traceback.py                                                            9      0   100%
+tests/assets/type_error_rich.py                                                                        6      0   100%
+tests/atomic_write_example.py                                                                         29      0   100%
+tests/conftest.py                                                                                      7      0   100%
+tests/test_ambiguous_params.py                                                                        71      0   100%
+tests/test_annotated.py                                                                               71      1    99%   89
+tests/test_atomic_file.py                                                                             40      0   100%
+tests/test_callback_warning.py                                                                        26      0   100%
+tests/test_cli/__init__.py                                                                             0      0   100%
+tests/test_cli/test_app_other_name.py                                                                  8      0   100%
+tests/test_cli/test_completion_run.py                                                                  6      0   100%
+tests/test_cli/test_doc.py                                                                            49      0   100%
+tests/test_cli/test_empty_script.py                                                                    5      0   100%
+tests/test_cli/test_extending_app.py                                                                  22      0   100%
+tests/test_cli/test_extending_empty_app.py                                                            11      0   100%
+tests/test_cli/test_func_other_name.py                                                                 5      0   100%
+tests/test_cli/test_help.py                                                                           67      0   100%
+tests/test_cli/test_multi_app.py                                                                      22      0   100%
+tests/test_cli/test_multi_app_cli.py                                                                  19      0   100%
+tests/test_cli/test_multi_app_sub.py                                                                  10      0   100%
+tests/test_cli/test_multi_func.py                                                                     18      0   100%
+tests/test_cli/test_not_python.py                                                                      5      0   100%
+tests/test_cli/test_parser.py                                                                         21      0   100%
+tests/test_cli/test_program_name.py                                                                    6      0   100%
+tests/test_cli/test_sub.py                                                                            23      0   100%
+tests/test_cli/test_sub_completion.py                                                                  6      0   100%
+tests/test_cli/test_sub_help.py                                                                        8      0   100%
+tests/test_cli/test_version.py                                                                         5      0   100%
+tests/test_completion/__init__.py                                                                      0      0   100%
+tests/test_completion/choice_case_insensitive_example.py                                               9      0   100%
+tests/test_completion/choice_example.py                                                                9      0   100%
+tests/test_completion/colon_example.py                                                                10      0   100%
+tests/test_completion/completion_option_then_argument.py                                               7      0   100%
+tests/test_completion/example_rich_tags.py                                                            11      0   100%
+tests/test_completion/file_example.py                                                                  5      0   100%
+tests/test_completion/path_example.py                                                                  6      0   100%
+tests/test_completion/test_completion.py                                                              60      0   100%
+tests/test_completion/test_completion_choice.py                                                       13      0   100%
+tests/test_completion/test_completion_choice_no_case.py                                               13      0   100%
+tests/test_completion/test_completion_complete.py                                                     53      0   100%
+tests/test_completion/test_completion_complete_no_help.py                                             17      0   100%
+tests/test_completion/test_completion_complete_rich.py                                                29      0   100%
+tests/test_completion/test_completion_file.py                                                         12      0   100%
+tests/test_completion/test_completion_install.py                                                      80      0   100%
+tests/test_completion/test_completion_option_colon.py                                                116      0   100%
+tests/test_completion/test_completion_path.py                                                         11      0   100%
+tests/test_completion/test_completion_show.py                                                         32      0   100%
+tests/test_completion/test_sanitization.py                                                             9      0   100%
+tests/test_core.py                                                                                   233      0   100%
+tests/test_deprecation.py                                                                              9      0   100%
+tests/test_exit_errors.py                                                                             36      0   100%
+tests/test_future_annotations.py                                                                      18      0   100%
+tests/test_hidden.py                                                                                  30      0   100%
+tests/test_launch.py                                                                                  94     31    67%   92-99, 104-118, 123-137, 174-183
+tests/test_others.py                                                                                 267      0   100%
+tests/test_param_meta_empty.py                                                                        26      0   100%
+tests/test_prepare_release.py                                                                         88      0   100%
+tests/test_prog_name.py                                                                                7      0   100%
+tests/test_progress_bar.py                                                                           244      1    99%   154
+tests/test_rich_import.py                                                                             10      0   100%
+tests/test_rich_markup_mode.py                                                                       146      0   100%
+tests/test_rich_utils.py                                                                             160      0   100%
+tests/test_suggest_commands.py                                                                        42      0   100%
+tests/test_terminal_control_characters.py                                                             55      0   100%
+tests/test_termui.py                                                                                 272     33    88%   136-139, 144-171, 360-367
+tests/test_tracebacks.py                                                                              36      0   100%
+tests/test_tutorial/__init__.py                                                                        0      0   100%
+tests/test_tutorial/test_app_dir/__init__.py                                                           0      0   100%
+tests/test_tutorial/test_app_dir/test_tutorial001.py                                                  18      0   100%
+tests/test_tutorial/test_arguments/__init__.py                                                         0      0   100%
+tests/test_tutorial/test_arguments/test_default/__init__.py                                            0      0   100%
+tests/test_tutorial/test_arguments/test_default/test_tutorial001.py                                   29      0   100%
+tests/test_tutorial/test_arguments/test_default/test_tutorial002.py                                   31      0   100%
+tests/test_tutorial/test_arguments/test_envvar/__init__.py                                             0      0   100%
+tests/test_tutorial/test_arguments/test_envvar/test_tutorial001.py                                    44      0   100%
+tests/test_tutorial/test_arguments/test_envvar/test_tutorial002.py                                    34      0   100%
+tests/test_tutorial/test_arguments/test_envvar/test_tutorial003.py                                    34      0   100%
+tests/test_tutorial/test_arguments/test_help/__init__.py                                               0      0   100%
+tests/test_tutorial/test_arguments/test_help/test_tutorial001.py                                      37      0   100%
+tests/test_tutorial/test_arguments/test_help/test_tutorial002.py                                      28      0   100%
+tests/test_tutorial/test_arguments/test_help/test_tutorial003.py                                      28      0   100%
+tests/test_tutorial/test_arguments/test_help/test_tutorial004.py                                      28      0   100%
+tests/test_tutorial/test_arguments/test_help/test_tutorial005.py                                      26      0   100%
+tests/test_tutorial/test_arguments/test_help/test_tutorial006.py                                      33      0   100%
+tests/test_tutorial/test_arguments/test_help/test_tutorial007.py                                      25      0   100%
+tests/test_tutorial/test_arguments/test_help/test_tutorial008.py                                      35      0   100%
+tests/test_tutorial/test_arguments/test_optional/__init__.py                                           0      0   100%
+tests/test_tutorial/test_arguments/test_optional/test_tutorial000.py                                  29      0   100%
+tests/test_tutorial/test_arguments/test_optional/test_tutorial001.py                                  32      0   100%
+tests/test_tutorial/test_arguments/test_optional/test_tutorial002.py                                  27      0   100%
+tests/test_tutorial/test_arguments/test_optional/test_tutorial003.py                                  28      0   100%
+tests/test_tutorial/test_commands/__init__.py                                                          0      0   100%
+tests/test_tutorial/test_commands/test_arguments/__init__.py                                           0      0   100%
+tests/test_tutorial/test_commands/test_arguments/test_tutorial001.py                                  25      0   100%
+tests/test_tutorial/test_commands/test_callback/__init__.py                                            0      0   100%
+tests/test_tutorial/test_commands/test_callback/test_tutorial001.py                                   50      0   100%
+tests/test_tutorial/test_commands/test_callback/test_tutorial002.py                                   14      0   100%
+tests/test_tutorial/test_commands/test_callback/test_tutorial003.py                                   17      0   100%
+tests/test_tutorial/test_commands/test_callback/test_tutorial004.py                                   19      0   100%
+tests/test_tutorial/test_commands/test_context/__init__.py                                             0      0   100%
+tests/test_tutorial/test_commands/test_context/test_tutorial001.py                                    19      0   100%
+tests/test_tutorial/test_commands/test_context/test_tutorial002.py                                    23      0   100%
+tests/test_tutorial/test_commands/test_context/test_tutorial003.py                                    23      0   100%
+tests/test_tutorial/test_commands/test_context/test_tutorial004.py                                    16      0   100%
+tests/test_tutorial/test_commands/test_help/__init__.py                                                0      0   100%
+tests/test_tutorial/test_commands/test_help/test_tutorial001.py                                       83      0   100%
+tests/test_tutorial/test_commands/test_help/test_tutorial002.py                                       36      0   100%
+tests/test_tutorial/test_commands/test_help/test_tutorial003.py                                       27      0   100%
+tests/test_tutorial/test_commands/test_help/test_tutorial004.py                                       46      0   100%
+tests/test_tutorial/test_commands/test_help/test_tutorial005.py                                       47      0   100%
+tests/test_tutorial/test_commands/test_help/test_tutorial006.py                                       37      0   100%
+tests/test_tutorial/test_commands/test_help/test_tutorial007.py                                       46      0   100%
+tests/test_tutorial/test_commands/test_help/test_tutorial008.py                                       17      0   100%
+tests/test_tutorial/test_commands/test_index/__init__.py                                               0      0   100%
+tests/test_tutorial/test_commands/test_index/test_tutorial002.py                                      24      0   100%
+tests/test_tutorial/test_commands/test_index/test_tutorial003.py                                      27      0   100%
+tests/test_tutorial/test_commands/test_index/test_tutorial004.py                                      28      0   100%
+tests/test_tutorial/test_commands/test_index/test_tutorial005.py                                      15      0   100%
+tests/test_tutorial/test_commands/test_name/__init__.py                                                0      0   100%
+tests/test_tutorial/test_commands/test_name/test_tutorial001.py                                       23      0   100%
+tests/test_tutorial/test_commands/test_one_or_multiple/__init__.py                                     0      0   100%
+tests/test_tutorial/test_commands/test_one_or_multiple/test_tutorial001.py                            18      0   100%
+tests/test_tutorial/test_commands/test_one_or_multiple/test_tutorial002.py                            20      0   100%
+tests/test_tutorial/test_commands/test_options/__init__.py                                             0      0   100%
+tests/test_tutorial/test_commands/test_options/test_tutorial001.py                                    56      0   100%
+tests/test_tutorial/test_exceptions/__init__.py                                                        0      0   100%
+tests/test_tutorial/test_exceptions/test_tutorial001.py                                               28      0   100%
+tests/test_tutorial/test_exceptions/test_tutorial002.py                                               28      0   100%
+tests/test_tutorial/test_exceptions/test_tutorial003.py                                               18      0   100%
+tests/test_tutorial/test_exceptions/test_tutorial004.py                                               17      0   100%
+tests/test_tutorial/test_first_steps/__init__.py                                                       0      0   100%
+tests/test_tutorial/test_first_steps/test_tutorial001.py                                              14      0   100%
+tests/test_tutorial/test_first_steps/test_tutorial002.py                                              19      0   100%
+tests/test_tutorial/test_first_steps/test_tutorial003.py                                              19      0   100%
+tests/test_tutorial/test_first_steps/test_tutorial004.py                                              37      0   100%
+tests/test_tutorial/test_first_steps/test_tutorial005.py                                              37      0   100%
+tests/test_tutorial/test_first_steps/test_tutorial006.py                                              32      0   100%
+tests/test_tutorial/test_launch/test_tutorial001.py                                                   15      0   100%
+tests/test_tutorial/test_launch/test_tutorial002.py                                                   16      0   100%
+tests/test_tutorial/test_multiple_values/__init__.py                                                   0      0   100%
+tests/test_tutorial/test_multiple_values/test_arguments_with_multiple_values/__init__.py               0      0   100%
+tests/test_tutorial/test_multiple_values/test_arguments_with_multiple_values/test_tutorial001.py      14      0   100%
+tests/test_tutorial/test_multiple_values/test_arguments_with_multiple_values/test_tutorial002.py      37      0   100%
+tests/test_tutorial/test_multiple_values/test_multiple_options/__init__.py                             0      0   100%
+tests/test_tutorial/test_multiple_values/test_multiple_options/test_tutorial001.py                    31      0   100%
+tests/test_tutorial/test_multiple_values/test_multiple_options/test_tutorial002.py                    27      0   100%
+tests/test_tutorial/test_multiple_values/test_options_with_multiple_values/__init__.py                 0      0   100%
+tests/test_tutorial/test_multiple_values/test_options_with_multiple_values/test_tutorial001.py        35      0   100%
+tests/test_tutorial/test_one_file_per_command/__init__.py                                              0      0   100%
+tests/test_tutorial/test_one_file_per_command/test_tutorial.py                                        25      0   100%
+tests/test_tutorial/test_options/__init__.py                                                           0      0   100%
+tests/test_tutorial/test_options/test_callback/__init__.py                                             0      0   100%
+tests/test_tutorial/test_options/test_callback/test_tutorial001.py                                    24      0   100%
+tests/test_tutorial/test_options/test_callback/test_tutorial002.py                                    26      0   100%
+tests/test_tutorial/test_options/test_callback/test_tutorial003.py                                    31      0   100%
+tests/test_tutorial/test_options/test_callback/test_tutorial004.py                                    31      0   100%
+tests/test_tutorial/test_options/test_help/__init__.py                                                 0      0   100%
+tests/test_tutorial/test_options/test_help/test_tutorial001.py                                        34      0   100%
+tests/test_tutorial/test_options/test_help/test_tutorial002.py                                        32      0   100%
+tests/test_tutorial/test_options/test_help/test_tutorial003.py                                        25      0   100%
+tests/test_tutorial/test_options/test_help/test_tutorial004.py                                        26      0   100%
+tests/test_tutorial/test_options/test_name/__init__.py                                                 0      0   100%
+tests/test_tutorial/test_options/test_name/test_tutorial001.py                                        29      0   100%
+tests/test_tutorial/test_options/test_name/test_tutorial002.py                                        30      0   100%
+tests/test_tutorial/test_options/test_name/test_tutorial003.py                                        26      0   100%
+tests/test_tutorial/test_options/test_name/test_tutorial004.py                                        30      0   100%
+tests/test_tutorial/test_options/test_name/test_tutorial005.py                                        38      0   100%
+tests/test_tutorial/test_options/test_password/__init__.py                                             0      0   100%
+tests/test_tutorial/test_options/test_password/test_tutorial001.py                                    31      0   100%
+tests/test_tutorial/test_options/test_password/test_tutorial002.py                                    35      0   100%
+tests/test_tutorial/test_options/test_prompt/__init__.py                                               0      0   100%
+tests/test_tutorial/test_options/test_prompt/test_tutorial001.py                                      30      0   100%
+tests/test_tutorial/test_options/test_prompt/test_tutorial002.py                                      30      0   100%
+tests/test_tutorial/test_options/test_prompt/test_tutorial003.py                                      35      0   100%
+tests/test_tutorial/test_options/test_required/__init__.py                                             0      0   100%
+tests/test_tutorial/test_options/test_required/test_tutorial001_tutorial002.py                        38      0   100%
+tests/test_tutorial/test_options/test_version/__init__.py                                              0      0   100%
+tests/test_tutorial/test_options/test_version/test_tutorial001.py                                     34      0   100%
+tests/test_tutorial/test_options/test_version/test_tutorial002.py                                     34      0   100%
+tests/test_tutorial/test_options/test_version/test_tutorial003.py                                     34      0   100%
+tests/test_tutorial/test_options_autocompletion/__init__.py                                            0      0   100%
+tests/test_tutorial/test_options_autocompletion/test_tutorial001.py                                   19      0   100%
+tests/test_tutorial/test_options_autocompletion/test_tutorial002.py                                   27      0   100%
+tests/test_tutorial/test_options_autocompletion/test_tutorial003.py                                   33      0   100%
+tests/test_tutorial/test_options_autocompletion/test_tutorial004_tutorial005.py                       27      0   100%
+tests/test_tutorial/test_options_autocompletion/test_tutorial006.py                                   24      0   100%
+tests/test_tutorial/test_options_autocompletion/test_tutorial007.py                                   28      0   100%
+tests/test_tutorial/test_options_autocompletion/test_tutorial008.py                                   29      0   100%
+tests/test_tutorial/test_options_autocompletion/test_tutorial009.py                                   29      0   100%
+tests/test_tutorial/test_parameter_types/__init__.py                                                   0      0   100%
+tests/test_tutorial/test_parameter_types/test_bool/__init__.py                                         0      0   100%
+tests/test_tutorial/test_parameter_types/test_bool/test_tutorial001.py                                37      0   100%
+tests/test_tutorial/test_parameter_types/test_bool/test_tutorial002.py                                45      0   100%
+tests/test_tutorial/test_parameter_types/test_bool/test_tutorial003.py                                30      0   100%
+tests/test_tutorial/test_parameter_types/test_bool/test_tutorial004.py                                32      0   100%
+tests/test_tutorial/test_parameter_types/test_custom_types/__init__.py                                 0      0   100%
+tests/test_tutorial/test_parameter_types/test_custom_types/test_tutorial001.py                        26      0   100%
+tests/test_tutorial/test_parameter_types/test_datetime/__init__.py                                     0      0   100%
+tests/test_tutorial/test_parameter_types/test_datetime/test_tutorial001.py                            37      0   100%
+tests/test_tutorial/test_parameter_types/test_datetime/test_tutorial002.py                            23      0   100%
+tests/test_tutorial/test_parameter_types/test_enum/__init__.py                                         0      0   100%
+tests/test_tutorial/test_parameter_types/test_enum/test_tutorial001.py                                39      0   100%
+tests/test_tutorial/test_parameter_types/test_enum/test_tutorial002.py                                23      0   100%
+tests/test_tutorial/test_parameter_types/test_enum/test_tutorial003.py                                33      0   100%
+tests/test_tutorial/test_parameter_types/test_enum/test_tutorial004.py                                31      0   100%
+tests/test_tutorial/test_parameter_types/test_file/__init__.py                                         0      0   100%
+tests/test_tutorial/test_parameter_types/test_file/test_tutorial001.py                                24      0   100%
+tests/test_tutorial/test_parameter_types/test_file/test_tutorial002.py                                24      0   100%
+tests/test_tutorial/test_parameter_types/test_file/test_tutorial003.py                                23      0   100%
+tests/test_tutorial/test_parameter_types/test_file/test_tutorial004.py                                25      0   100%
+tests/test_tutorial/test_parameter_types/test_file/test_tutorial005.py                                26      0   100%
+tests/test_tutorial/test_parameter_types/test_index/__init__.py                                        0      0   100%
+tests/test_tutorial/test_parameter_types/test_index/test_tutorial001.py                               35      0   100%
+tests/test_tutorial/test_parameter_types/test_number/__init__.py                                       0      0   100%
+tests/test_tutorial/test_parameter_types/test_number/test_tutorial001.py                              67      0   100%
+tests/test_tutorial/test_parameter_types/test_number/test_tutorial002.py                              25      0   100%
+tests/test_tutorial/test_parameter_types/test_number/test_tutorial003.py                              39      0   100%
+tests/test_tutorial/test_parameter_types/test_path/__init__.py                                         0      0   100%
+tests/test_tutorial/test_parameter_types/test_path/test_tutorial001.py                                38      0   100%
+tests/test_tutorial/test_parameter_types/test_path/test_tutorial002.py                                35      0   100%
+tests/test_tutorial/test_parameter_types/test_uuid/__init__.py                                         0      0   100%
+tests/test_tutorial/test_parameter_types/test_uuid/test_tutorial001.py                                31      0   100%
+tests/test_tutorial/test_printing/__init__.py                                                          0      0   100%
+tests/test_tutorial/test_printing/test_tutorial001.py                                                 19      0   100%
+tests/test_tutorial/test_printing/test_tutorial002.py                                                 23      0   100%
+tests/test_tutorial/test_printing/test_tutorial003.py                                                 15      0   100%
+tests/test_tutorial/test_printing/test_tutorial004.py                                                 14      0   100%
+tests/test_tutorial/test_printing/test_tutorial005.py                                                 20      0   100%
+tests/test_tutorial/test_printing/test_tutorial006.py                                                 15      0   100%
+tests/test_tutorial/test_progressbar/__init__.py                                                       0      0   100%
+tests/test_tutorial/test_progressbar/test_tutorial001.py                                              28      0   100%
+tests/test_tutorial/test_progressbar/test_tutorial002.py                                              18      0   100%
+tests/test_tutorial/test_progressbar/test_tutorial003.py                                              18      0   100%
+tests/test_tutorial/test_progressbar/test_tutorial004.py                                              31      0   100%
+tests/test_tutorial/test_progressbar/test_tutorial005.py                                              18      0   100%
+tests/test_tutorial/test_progressbar/test_tutorial006.py                                              18      0   100%
+tests/test_tutorial/test_prompt/__init__.py                                                            0      0   100%
+tests/test_tutorial/test_prompt/test_tutorial001.py                                                   14      0   100%
+tests/test_tutorial/test_prompt/test_tutorial002.py                                                   20      0   100%
+tests/test_tutorial/test_prompt/test_tutorial003.py                                                   19      0   100%
+tests/test_tutorial/test_prompt/test_tutorial004.py                                                   14      0   100%
+tests/test_tutorial/test_subcommands/__init__.py                                                       0      0   100%
+tests/test_tutorial/test_subcommands/test_callback_override/__init__.py                                0      0   100%
+tests/test_tutorial/test_subcommands/test_callback_override/test_tutorial001.py                       14      0   100%
+tests/test_tutorial/test_subcommands/test_callback_override/test_tutorial002.py                       14      0   100%
+tests/test_tutorial/test_subcommands/test_callback_override/test_tutorial003.py                       17      0   100%
+tests/test_tutorial/test_subcommands/test_callback_override/test_tutorial004.py                       19      0   100%
+tests/test_tutorial/test_subcommands/test_name_help/__init__.py                                        0      0   100%
+tests/test_tutorial/test_subcommands/test_name_help/test_tutorial001.py                               23      0   100%
+tests/test_tutorial/test_subcommands/test_name_help/test_tutorial002.py                               23      0   100%
+tests/test_tutorial/test_subcommands/test_name_help/test_tutorial003.py                               23      0   100%
+tests/test_tutorial/test_subcommands/test_name_help/test_tutorial004.py                               23      0   100%
+tests/test_tutorial/test_subcommands/test_name_help/test_tutorial005.py                               23      0   100%
+tests/test_tutorial/test_subcommands/test_name_help/test_tutorial006.py                               23      0   100%
+tests/test_tutorial/test_subcommands/test_name_help/test_tutorial007.py                               23      0   100%
+tests/test_tutorial/test_subcommands/test_name_help/test_tutorial008.py                               23      0   100%
+tests/test_tutorial/test_subcommands/test_tutorial001.py                                              66      0   100%
+tests/test_tutorial/test_subcommands/test_tutorial002.py                                              52      0   100%
+tests/test_tutorial/test_subcommands/test_tutorial003.py                                             120      0   100%
+tests/test_tutorial/test_terminating/__init__.py                                                       0      0   100%
+tests/test_tutorial/test_terminating/test_tutorial001.py                                              24      0   100%
+tests/test_tutorial/test_terminating/test_tutorial002.py                                              17      0   100%
+tests/test_tutorial/test_terminating/test_tutorial003.py                                              30      0   100%
+tests/test_tutorial/test_testing/__init__.py                                                           0      0   100%
+tests/test_tutorial/test_testing/test_app01.py                                                         9      0   100%
+tests/test_tutorial/test_testing/test_app02.py                                                        21      0   100%
+tests/test_tutorial/test_testing/test_app03.py                                                         9      0   100%
+tests/test_tutorial/test_typer_app/__init__.py                                                         0      0   100%
+tests/test_tutorial/test_typer_app/test_tutorial001.py                                                17      0   100%
+tests/test_type_conversion.py                                                                        233      2    99%   388-390
+tests/test_types.py                                                                                  109      0   100%
+tests/test_types_file.py                                                                             256      5    98%   292-295, 322-326
+tests/test_win_console.py                                                                            197    173    12%   20, 24, 28-37, 41-48, 52-87, 91-113, 117-139, 150-178, 182-184, 188-209, 221-222, 226, 230-262, 266-326
+tests/utils.py                                                                                        24      0   100%
+typer/__init__.py                                                                                     29      0   100%
+typer/__main__.py                                                                                      2      0   100%
+typer/_click/__init__.py                                                                               7      0   100%
+typer/_click/_compat.py                                                                              248     26    90%   95, 293, 300, 307, 463-505
+typer/_click/_termui_impl.py                                                                         289     40    86%   29-30, 352, 357-367, 369-382, 419, 425, 431-481
+typer/_click/_textwrap.py                                                                             29      0   100%
+typer/_click/_winconsole.py                                                                          145    145     0%   9-300
+typer/_click/core.py                                                                                 486      0   100%
+typer/_click/decorators.py                                                                            25      0   100%
+typer/_click/exceptions.py                                                                           119      0   100%
+typer/_click/formatting.py                                                                           134      0   100%
+typer/_click/globals.py                                                                               20      0   100%
+typer/_click/parser.py                                                                               213      0   100%
+typer/_click/shell_completion.py                                                                     119      0   100%
+typer/_click/termui.py                                                                               138      0   100%
+typer/_click/types.py                                                                                271      0   100%
+typer/_click/utils.py                                                                                190     23    88%   270-273, 361-365, 369, 456-477
+typer/_completion_classes.py                                                                         128      1    99%   83
+typer/_completion_shared.py                                                                          111      0   100%
+typer/_types.py                                                                                       49      0   100%
+typer/cli.py                                                                                         223      0   100%
+typer/colors.py                                                                                       17      0   100%
+typer/completion.py                                                                                   65      0   100%
+typer/core.py                                                                                        554      0   100%
+typer/exceptions.py                                                                                   14      0   100%
+typer/main.py                                                                                        502      0   100%
+typer/models.py                                                                                      181      0   100%
+typer/params.py                                                                                       11      0   100%
+typer/rich_utils.py                                                                                  315      0   100%
+typer/testing.py                                                                                     187      0   100%
+typer/utils.py                                                                                        99      0   100%
+--------------------------------------------------------------------------------------------------------------------------------
+TOTAL                                                                                              15106    481    97%
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_launch.py:102: Test requires macOS
+SKIPPED [1] tests/test_launch.py:121: Test requires Windows
+SKIPPED [1] tests/test_launch.py:172: Test requires Windows
+SKIPPED [1] tests/test_termui.py:134: Test requires Windows
+SKIPPED [1] tests/test_termui.py:142: Test requires Windows
+SKIPPED [1] tests/test_termui.py:356: Test requires Windows
+SKIPPED [1] tests/test_type_conversion.py:372: Test requires Windows
+SKIPPED [1] tests/test_types_file.py:288: Test requires Windows
+SKIPPED [1] tests/test_types_file.py:320: Test requires macOS
+SKIPPED [1] tests/test_win_console.py:51: Test requires Windows
+SKIPPED [1] tests/test_win_console.py:90: Test requires Windows
+SKIPPED [1] tests/test_win_console.py:116: Test requires Windows
+SKIPPED [2] tests/test_win_console.py:142: Test requires Windows
+SKIPPED [1] tests/test_win_console.py:181: Test requires Windows
+SKIPPED [1] tests/test_win_console.py:187: Test requires Windows
+SKIPPED [3] tests/test_win_console.py:212: Test requires Windows
+SKIPPED [1] tests/test_win_console.py:225: Test requires Windows
+SKIPPED [1] tests/test_win_console.py:229: Test requires Windows
+SKIPPED [1] tests/test_win_console.py:265: Test requires Windows
+XFAIL tests/test_rich_markup_mode.py::test_markup_mode_bullets_single_newline[markdown-lines0]
+XFAIL tests/test_rich_markup_mode.py::test_markup_mode_bullets_double_newline[markdown-lines0]
+=========== 1481 passed, 22 skipped, 2 xfailed in 195.37s (0:03:15) ============

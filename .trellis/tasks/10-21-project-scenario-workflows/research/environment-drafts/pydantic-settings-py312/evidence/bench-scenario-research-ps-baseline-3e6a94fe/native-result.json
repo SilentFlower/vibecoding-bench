@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/opt/mitm/bin/python3",
+    "-m",
+    "pytest",
+    "tests",
+    "-q",
+    "-ra",
+    "--junitxml=/evidence/native-tests.xml"
+  ],
+  "cwd": "/work/project/library",
+  "exit_code": 0,
+  "timed_out": false,
+  "elapsed_sec": 13.104334,
+  "resources_after": {
+    "child_max_rss_kib": 335380,
+    "memory.peak": 568463360,
+    "memory.current": 283594752,
+    "memory.max": 1073741824,
+    "pids.peak": 27,
+    "pids.max": 128
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "script": "verification/check_settings.py",
+  "args": [
+    "cache"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "values": [
+      2,
+      2,
+      8
+    ],
+    "cached_same_object": true,
+    "clear_creates_new_object": true,
+    "old_reference_unchanged": true,
+    "candidate_validation_rejects_invalid": true,
+    "settings_refresh_exists": false
+  },
+  "resource_profile": "business",
+  "draft_status": "not_executed"
+}

@@ -1,0 +1,16 @@
+{
+  "file_name": "app.env",
+  "file_content": "APP_TITLE=商品工具\nAPP_QUANTITY=2\n",
+  "process_environment": {
+    "APP_QUANTITY": "5"
+  },
+  "call": "App().model_dump()",
+  "initial_values": {},
+  "custom_sources": false,
+  "cli": false,
+  "observation": {
+    "title": "商品工具",
+    "quantity": 5
+  },
+  "observation_provenance": "既有 observations-result.json 的 native_scenario；本草案未重新运行"
+}

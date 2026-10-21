@@ -1,0 +1,351 @@
+{
+  "baseline_digest": "f9542c0bfb7679128ce0bc42ba745f73dd2656887626ea79f33b3940a7de07fb",
+  "nodes": [
+    {
+      "id": "README.md::README.md",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "examples/pandoc.py::examples.pandoc.PandocHandler",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "examples/reversed.py::examples.reversed.ReverseYAMLHandler",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.check",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.checks",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dump",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dumps",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.load",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.loads",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.parse",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "frontmatter/default_handlers.py::frontmatter.default_handlers",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_docs.py::test_api_docs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_docs.py::test_handler_docs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_docs.py::test_readme",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_empty_frontmatter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_no_frontmatter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dump_to_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dumping_with_custom_delimiters",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_empty_frontmatter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_extra_space",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_no_frontmatter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_pretty_dumping",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_unicode_post",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_crlf_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_markdown_content",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_custom_handler",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_detect_format",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_json",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_no_handler",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_sanity_all",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_toml",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_detect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_external",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_content",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_load",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_detect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_external",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_content",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_load",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_detect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_external",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_content",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_load",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "python-frontmatter",
+  "python": "3.12.15",
+  "schema": 1
+}

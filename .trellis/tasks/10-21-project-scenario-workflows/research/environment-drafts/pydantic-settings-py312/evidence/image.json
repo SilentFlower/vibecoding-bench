@@ -1,0 +1,20 @@
+{
+  "reference": "vibebench-v3-account:v3-project-repairs-local-20261021-e",
+  "id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d",
+  "architecture": "amd64",
+  "os": "linux",
+  "labels": {
+    "org.opencontainers.image.revision": "2bb74b726ba03f241d6ff509f6a88ecfb04e4196",
+    "org.opencontainers.image.source": "https://github.com/SilentFlower/vibecoding-bench",
+    "vibebench.computer-profile-version": "1",
+    "vibebench.gateway-revision": "541b9cb9add340c27ed8408fea9754e8280fc510",
+    "vibebench.isolation-version": "2",
+    "vibebench.parent-revision": "f7b256466a4dcf673c022d1ae9f29c7763a4d3ff",
+    "vibebench.product": "v3",
+    "vibebench.release": "project-repairs-local-20261021-e",
+    "vibebench.role": "account",
+    "vibebench.system-profile-version": "1",
+    "vibebench.verification": "source-overlay"
+  },
+  "created": "2026-10-21T00:21:47.12042924+08:00"
+}

@@ -1,0 +1,1053 @@
+{
+  "version": "1",
+  "pip_version": "25.0.1",
+  "install": [
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/annotated_doc-0.0.5-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101",
+          "hashes": {
+            "sha256": "117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.4",
+        "name": "annotated-doc",
+        "version": "0.0.5",
+        "summary": "Document parameters, class attributes, return types, and variables inline, with Annotated.",
+        "description": "# Annotated Doc\n\nDocument parameters, class attributes, return types, and variables inline, with `Annotated`.\n\n<a href=\"https://github.com/fastapi/annotated-doc/actions?query=workflow%3ATest+event%3Apush+branch%3Amain\" target=\"_blank\">\n    <img src=\"https://github.com/fastapi/annotated-doc/actions/workflows/test.yml/badge.svg?event=push&branch=main\" alt=\"Test\">\n</a>\n<a href=\"https://coverage-badge.samuelcolvin.workers.dev/redirect/fastapi/annotated-doc\" target=\"_blank\">\n    <img src=\"https://coverage-badge.samuelcolvin.workers.dev/fastapi/annotated-doc.svg\" alt=\"Coverage\">\n</a>\n<a href=\"https://pypi.org/project/annotated-doc\" target=\"_blank\">\n    <img src=\"https://img.shields.io/pypi/v/annotated-doc?color=%2334D058&label=pypi%20package\" alt=\"Package version\">\n</a>\n<a href=\"https://pypi.org/project/annotated-doc\" target=\"_blank\">\n    <img src=\"https://img.shields.io/pypi/pyversions/annotated-doc.svg?color=%2334D058\" alt=\"Supported Python versions\">\n</a>\n\n## Installation\n\n```bash\npip install annotated-doc\n```\n\nOr with `uv`:\n\n```Python\nuv add annotated-doc\n```\n\n## Usage\n\nImport `Doc` and pass a single literal string with the documentation for the specific parameter, class attribute, return type, or variable.\n\nFor example, to document a parameter `name` in a function `hi` you could do:\n\n```Python\nfrom typing import Annotated\n\nfrom annotated_doc import Doc\n\ndef hi(name: Annotated[str, Doc(\"Who to say hi to\")]) -> None:\n    print(f\"Hi, {name}!\")\n```\n\nYou can also use it to document class attributes:\n\n```Python\nfrom typing import Annotated\n\nfrom annotated_doc import Doc\n\nclass User:\n    name: Annotated[str, Doc(\"The user's name\")]\n    age: Annotated[int, Doc(\"The user's age\")]\n```\n\nThe same way, you could document return types and variables, or anything that could have a type annotation with `Annotated`.\n\n## Who Uses This\n\n`annotated-doc` was made for:\n\n* [FastAPI](https://fastapi.tiangolo.com/)\n* [Typer](https://typer.tiangolo.com/)\n* [SQLModel](https://sqlmodel.tiangolo.com/)\n* [Asyncer](https://asyncer.tiangolo.com/)\n\n`annotated-doc` is supported by [griffe-typingdoc](https://github.com/mkdocstrings/griffe-typingdoc), which powers reference documentation like the one in the [FastAPI Reference](https://fastapi.tiangolo.com/reference/).\n\n## Reasons not to use `annotated-doc`\n\nYou are already comfortable with one of the existing docstring formats, like:\n\n* Sphinx\n* numpydoc\n* Google\n* Keras\n\nYour team is already comfortable using them.\n\nYou prefer having the documentation about parameters all together in a docstring, separated from the code defining them.\n\nYou care about a specific set of users, using one specific editor, and that editor already has support for the specific docstring format you use.\n\n## Reasons to use `annotated-doc`\n\n* No micro-syntax to learn for newcomers, it’s **just Python** syntax.\n* **Editing** would be already fully supported by default by any editor (current or future) supporting Python syntax, including syntax errors, syntax highlighting, etc.\n* **Rendering** would be relatively straightforward to implement by static tools (tools that don't need runtime execution), as the information can be extracted from the AST they normally already create.\n* **Deduplication of information**: the name of a parameter would be defined in a single place, not duplicated inside of a docstring.\n* **Elimination** of the possibility of having **inconsistencies** when removing a parameter or class variable and **forgetting to remove** its documentation.\n* **Minimization** of the probability of adding a new parameter or class variable and **forgetting to add its documentation**.\n* **Elimination** of the possibility of having **inconsistencies** between the **name** of a parameter in the **signature** and the name in the docstring when it is renamed.\n* **Access** to the documentation string for each symbol at **runtime**, including existing (older) Python versions.\n* A more formalized way to document other symbols, like type aliases, that could use Annotated.\n* **Support** for apps using FastAPI, Typer and others.\n* **AI Accessibility**: AI tools will have an easier way understanding each parameter as the distance from documentation to parameter is much closer.\n\n## History\n\nI ([@tiangolo](https://github.com/tiangolo)) originally wanted for this to be part of the Python standard library (in [PEP 727](https://peps.python.org/pep-0727/)), but the proposal was withdrawn as there was a fair amount of negative feedback and opposition.\n\nThe conclusion was that this was better done as an external effort, in a third-party library.\n\nSo, here it is, with a simpler approach, as a third-party library, in a way that can be used by others, starting with FastAPI and friends.\n\n## License\n\nThis project is licensed under the terms of the MIT license.\n",
+        "description_content_type": "text/markdown",
+        "author_email": "=?utf-8?q?Sebasti=C3=A1n_Ram=C3=ADrez?= <tiangolo@gmail.com>",
+        "license_expression": "MIT",
+        "license_file": [
+          "LICENSE"
+        ],
+        "classifier": [
+          "Intended Audience :: Information Technology",
+          "Intended Audience :: System Administrators",
+          "Operating System :: OS Independent",
+          "Programming Language :: Python :: 3",
+          "Programming Language :: Python",
+          "Topic :: Internet",
+          "Topic :: Software Development :: Libraries :: Application Frameworks",
+          "Topic :: Software Development :: Libraries :: Python Modules",
+          "Topic :: Software Development :: Libraries",
+          "Topic :: Software Development",
+          "Typing :: Typed",
+          "Development Status :: 4 - Beta",
+          "Intended Audience :: Developers",
+          "Programming Language :: Python :: 3 :: Only",
+          "Programming Language :: Python :: 3.9",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Programming Language :: Python :: 3.14"
+        ],
+        "requires_python": ">=3.9",
+        "project_url": [
+          "Homepage, https://github.com/fastapi/annotated-doc",
+          "Documentation, https://github.com/fastapi/annotated-doc",
+          "Repository, https://github.com/fastapi/annotated-doc",
+          "Issues, https://github.com/fastapi/annotated-doc/issues",
+          "Changelog, https://github.com/fastapi/annotated-doc/release-notes.md"
+        ]
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/coverage-7.16.2-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+        "archive_info": {
+          "hash": "sha256=5375ebd99038021b35e99dc88255022912c06565d316212f4a576e4b08d30f5d",
+          "hashes": {
+            "sha256": "5375ebd99038021b35e99dc88255022912c06565d316212f4a576e4b08d30f5d"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.4",
+        "name": "coverage",
+        "version": "7.16.2",
+        "dynamic": [
+          "author",
+          "author-email",
+          "classifier",
+          "description",
+          "description-content-type",
+          "home-page",
+          "keywords",
+          "license",
+          "license-file",
+          "project-url",
+          "provides-extra",
+          "requires-python",
+          "summary"
+        ],
+        "summary": "Code coverage measurement for Python",
+        "description": ".. Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0\n.. For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt\n\n===========\nCoverage.py\n===========\n\nCode coverage measurement for Python.\n\n.. image:: https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner2-direct.svg\n    :target: https://vshymanskyy.github.io/StandWithUkraine\n    :alt: Stand with Ukraine\n\n-------------\n\n|  |kit| |license| |versions|\n|  |test-status| |quality-status| |docs| |metacov|\n|  |tidelift| |sponsor| |stars| |mastodon-coveragepy| |mastodon-nedbat|\n\nCoverage.py measures code coverage, typically during test execution. It uses\nthe code analysis tools and tracing hooks provided in the Python standard\nlibrary to determine which lines are executable, and which have been executed.\n\nCoverage.py runs on these versions of Python:\n\n.. PYVERSIONS\n\n* Python 3.10 through 3.15 rc2, including free-threading.\n* PyPy3 versions 3.10 and 3.11.\n\nDocumentation is on `Read the Docs`_.  Code repository and issue tracker are on\n`GitHub`_.\n\n.. _Read the Docs: https://coverage.readthedocs.io/en/7.16.2/\n.. _GitHub: https://github.com/coveragepy/coveragepy\n\n\nFor Enterprise\n--------------\n\n.. |tideliftlogo| image:: https://nedbatchelder.com/pix/Tidelift_Logo_small.png\n   :alt: Tidelift\n   :target: https://tidelift.com/subscription/pkg/pypi-coverage?utm_source=pypi-coverage&utm_medium=referral&utm_campaign=readme\n\n.. list-table::\n   :widths: 10 100\n\n   * - |tideliftlogo|\n     - `Available as part of the Tidelift Subscription. <https://tidelift.com/subscription/pkg/pypi-coverage?utm_source=pypi-coverage&utm_medium=referral&utm_campaign=readme>`_\n       Coverage and thousands of other packages are working with\n       Tidelift to deliver one enterprise subscription that covers all of the open\n       source you use.  If you want the flexibility of open source and the confidence\n       of commercial-grade software, this is for you.\n       `Learn more. <https://tidelift.com/subscription/pkg/pypi-coverage?utm_source=pypi-coverage&utm_medium=referral&utm_campaign=readme>`_\n\n\nGetting Started\n---------------\n\nLooking to run ``coverage`` on your test suite? See the `Quick Start section`_\nof the docs.\n\n.. _Quick Start section: https://coverage.readthedocs.io/en/7.16.2/#quick-start\n\n\nChange history\n--------------\n\nThe complete history of changes is on the `change history page`_.\n\n.. _change history page: https://coverage.readthedocs.io/en/7.16.2/changes.html\n\n\nCode of Conduct\n---------------\n\nEveryone participating in the coverage.py project is expected to treat other\npeople with respect and to follow the guidelines articulated in the `Python\nCommunity Code of Conduct`_.\n\n.. _Python Community Code of Conduct: https://www.python.org/psf/codeofconduct/\n\n\nContributing\n------------\n\nFound a bug? Want to help improve the code or documentation? See the\n`Contributing section`_ of the docs.\n\n.. _Contributing section: https://coverage.readthedocs.io/en/7.16.2/contributing.html\n\n\nSecurity\n--------\n\nTo report a security vulnerability, please use the `Tidelift security\ncontact`_.  Tidelift will coordinate the fix and disclosure.\n\n.. _Tidelift security contact: https://tidelift.com/security\n\n\nLicense\n-------\n\nLicensed under the `Apache 2.0 License`_.  For details, see `NOTICE.txt`_.\n\n.. _Apache 2.0 License: http://www.apache.org/licenses/LICENSE-2.0\n.. _NOTICE.txt: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt\n\n\n.. |test-status| image:: https://github.com/coveragepy/coveragepy/actions/workflows/testsuite.yml/badge.svg?branch=main&event=push\n    :target: https://github.com/coveragepy/coveragepy/actions/workflows/testsuite.yml\n    :alt: Test suite status\n.. |quality-status| image:: https://github.com/coveragepy/coveragepy/actions/workflows/quality.yml/badge.svg?branch=main&event=push\n    :target: https://github.com/coveragepy/coveragepy/actions/workflows/quality.yml\n    :alt: Quality check status\n.. |docs| image:: https://readthedocs.org/projects/coverage/badge/?version=latest&style=flat\n    :target: https://coverage.readthedocs.io/en/7.16.2/\n    :alt: Documentation\n.. |kit| image:: https://img.shields.io/pypi/v/coverage\n    :target: https://pypi.org/project/coverage/\n    :alt: PyPI status\n.. |versions| image:: https://img.shields.io/pypi/pyversions/coverage.svg?logo=python&logoColor=FBE072\n    :target: https://pypi.org/project/coverage/\n    :alt: Python versions supported\n.. |license| image:: https://img.shields.io/pypi/l/coverage.svg\n    :target: https://github.com/coveragepy/coveragepy/blob/main/LICENSE.txt\n    :alt: License\n.. |metacov| image:: https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/nedbat/8c6980f77988a327348f9b02bbaf67f5/raw/metacov.json\n    :target: https://coveragepy.github.io/metacov-reports/latest.html\n    :alt: Coverage reports\n.. |tidelift| image:: https://tidelift.com/badges/package/pypi/coverage\n    :target: https://tidelift.com/subscription/pkg/pypi-coverage?utm_source=pypi-coverage&utm_medium=referral&utm_campaign=readme\n    :alt: Tidelift\n.. |stars| image:: https://img.shields.io/github/stars/coveragepy/coveragepy.svg?logo=github&style=flat\n    :target: https://github.com/coveragepy/coveragepy/stargazers\n    :alt: GitHub stars\n.. |mastodon-nedbat| image:: https://img.shields.io/badge/dynamic/json?style=flat&labelColor=450657&logo=mastodon&logoColor=ffffff&label=@nedbat&query=followers_count&url=https%3A%2F%2Fhachyderm.io%2Fapi%2Fv1%2Faccounts%2Flookup%3Facct=nedbat\n    :target: https://hachyderm.io/@nedbat\n    :alt: nedbat on Mastodon\n.. |mastodon-coveragepy| image:: https://img.shields.io/badge/dynamic/json?style=flat&labelColor=450657&logo=mastodon&logoColor=ffffff&label=@coveragepy&query=followers_count&url=https%3A%2F%2Fhachyderm.io%2Fapi%2Fv1%2Faccounts%2Flookup%3Facct=coveragepy\n    :target: https://hachyderm.io/@coveragepy\n    :alt: coveragepy on Mastodon\n.. |sponsor| image:: https://img.shields.io/badge/%E2%9D%A4-Sponsor%20me-brightgreen?style=flat&logo=GitHub\n    :target: https://github.com/sponsors/nedbat\n    :alt: Sponsor me on GitHub\n",
+        "description_content_type": "text/x-rst",
+        "keywords": [
+          "code",
+          "coverage",
+          "testing"
+        ],
+        "home_page": "https://github.com/coveragepy/coveragepy",
+        "author": "Ned Batchelder and 263 others",
+        "author_email": "ned@nedbatchelder.com",
+        "license": "Apache-2.0",
+        "license_file": [
+          "LICENSE.txt",
+          "NOTICE.txt"
+        ],
+        "classifier": [
+          "Development Status :: 5 - Production/Stable",
+          "Environment :: Console",
+          "Intended Audience :: Developers",
+          "Operating System :: OS Independent",
+          "Programming Language :: Python",
+          "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Programming Language :: Python :: 3.14",
+          "Programming Language :: Python :: 3.15",
+          "Programming Language :: Python :: 3.16",
+          "Programming Language :: Python :: Free Threading :: 3 - Stable",
+          "Programming Language :: Python :: Implementation :: CPython",
+          "Programming Language :: Python :: Implementation :: PyPy",
+          "Topic :: Software Development :: Quality Assurance",
+          "Topic :: Software Development :: Testing"
+        ],
+        "requires_dist": [
+          "tomli; python_full_version <= \"3.11.0a6\" and extra == \"toml\""
+        ],
+        "requires_python": ">=3.10",
+        "project_url": [
+          "Documentation, https://coverage.readthedocs.io/en/7.16.2",
+          "Funding, https://tidelift.com/subscription/pkg/pypi-coverage?utm_source=pypi-coverage&utm_medium=referral&utm_campaign=pypi",
+          "Issues, https://github.com/coveragepy/coveragepy/issues",
+          "Mastodon, https://hachyderm.io/@coveragepy",
+          "Mastodon (nedbat), https://hachyderm.io/@nedbat"
+        ],
+        "provides_extra": [
+          "toml"
+        ]
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/execnet-2.1.2-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=67fba928dd5a544b783f6056f449e5e3931a5c378b128bc18501f7ea79e296ec",
+          "hashes": {
+            "sha256": "67fba928dd5a544b783f6056f449e5e3931a5c378b128bc18501f7ea79e296ec"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.4",
+        "name": "execnet",
+        "version": "2.1.2",
+        "summary": "execnet: rapid multi-Python deployment",
+        "description": "execnet: distributed Python deployment and communication\n========================================================\n\n.. image:: https://img.shields.io/pypi/v/execnet.svg\n    :target: https://pypi.org/project/execnet/\n\n.. image:: https://anaconda.org/conda-forge/execnet/badges/version.svg\n    :target: https://anaconda.org/conda-forge/execnet\n\n.. image:: https://img.shields.io/pypi/pyversions/execnet.svg\n    :target: https://pypi.org/project/execnet/\n\n.. image:: https://github.com/pytest-dev/execnet/workflows/test/badge.svg\n    :target: https://github.com/pytest-dev/execnet/actions?query=workflow%3Atest\n\n.. image:: https://img.shields.io/badge/code%20style-black-000000.svg\n    :target: https://github.com/python/black\n\n.. _execnet: https://execnet.readthedocs.io\n\nexecnet_ provides carefully tested means to ad-hoc interact with Python\ninterpreters across version, platform and network barriers.  It provides\na minimal and fast API targeting the following uses:\n\n* distribute tasks to local or remote processes\n* write and deploy hybrid multi-process applications\n* write scripts to administer multiple hosts\n\nFeatures\n--------\n\n* zero-install bootstrapping: no remote installation required!\n\n* flexible communication: send/receive as well as\n  callback/queue mechanisms supported\n\n* simple serialization of python builtin types (no pickling)\n\n* grouped creation and robust termination of processes\n\n* interoperable between Windows and Unix-ish systems.\n\n* integrates with different threading models, including standard\n  os threads, eventlet and gevent based systems.\n",
+        "description_content_type": "text/x-rst",
+        "author": "holger krekel and others",
+        "license_expression": "MIT",
+        "license_file": [
+          "LICENSE"
+        ],
+        "classifier": [
+          "Development Status :: 5 - Production/Stable",
+          "Intended Audience :: Developers",
+          "License :: OSI Approved :: MIT License",
+          "Operating System :: MacOS :: MacOS X",
+          "Operating System :: Microsoft :: Windows",
+          "Operating System :: POSIX",
+          "Programming Language :: Python :: 3.8",
+          "Programming Language :: Python :: 3.9",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: Implementation :: CPython",
+          "Programming Language :: Python :: Implementation :: PyPy",
+          "Topic :: Software Development :: Libraries",
+          "Topic :: System :: Distributed Computing",
+          "Topic :: System :: Networking"
+        ],
+        "requires_dist": [
+          "hatch; extra == 'testing'",
+          "pre-commit; extra == 'testing'",
+          "pytest; extra == 'testing'",
+          "tox; extra == 'testing'"
+        ],
+        "requires_python": ">=3.8",
+        "project_url": [
+          "Homepage, https://execnet.readthedocs.io/en/latest/"
+        ],
+        "provides_extra": [
+          "testing"
+        ]
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/iniconfig-2.3.1-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+          "hashes": {
+            "sha256": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.4",
+        "name": "iniconfig",
+        "version": "2.3.1",
+        "dynamic": [
+          "license-file"
+        ],
+        "summary": "brain-dead simple config-ini parsing",
+        "description": "iniconfig: brain-dead simple parsing of ini files\n=======================================================\n\niniconfig is a small and simple INI-file parser module\nhaving a unique set of features:\n\n* maintains order of sections and entries\n* supports multi-line values with or without line-continuations\n* supports \"#\" comments everywhere\n* raises errors with proper line-numbers\n* no bells and whistles like automatic substitutions\n* iniconfig raises an Error if two sections have the same name.\n\nIf you encounter issues or have feature wishes please report them to:\n\n    https://github.com/pytest-dev/iniconfig/issues\n\nBasic Example\n===================================\n\nIf you have an ini file like this:\n\n.. code-block:: ini\n\n    # content of example.ini\n    [section1] # comment\n    name1=value1  # comment\n    name1b=value1,value2  # comment\n\n    [section2]\n    name2=\n        line1\n        line2\n\nuse ``IniConfig.parse()`` to strip inline comments from values:\n\n.. code-block:: pycon\n\n    >>> import iniconfig\n    >>> ini = iniconfig.IniConfig.parse(\"example.ini\")\n    >>> ini['section1']['name1'] # raises KeyError if not exists\n    'value1'\n    >>> ini.get('section1', 'name1b', [], lambda x: x.split(\",\"))\n    ['value1', 'value2']\n    >>> ini.get('section1', 'notexist', [], lambda x: x.split(\",\"))\n    []\n    >>> [x.name for x in list(ini)]\n    ['section1', 'section2']\n    >>> list(list(ini)[0].items())\n    [('name1', 'value1'), ('name1b', 'value1,value2')]\n    >>> 'section1' in ini\n    True\n    >>> 'inexistendsection' in ini\n    False\n\nThe ``IniConfig()`` constructor preserves inline comments in values for backward\ncompatibility. Use ``IniConfig.parse(..., strip_inline_comments=False)`` to\npreserve them when using the parsing method.\n",
+        "description_content_type": "text/x-rst",
+        "author_email": "Ronny Pfannschmidt <opensource@ronnypfannschmidt.de>, Holger Krekel <holger.krekel@gmail.com>",
+        "license_expression": "MIT",
+        "license_file": [
+          "LICENSE"
+        ],
+        "classifier": [
+          "Development Status :: 4 - Beta",
+          "Intended Audience :: Developers",
+          "Operating System :: MacOS :: MacOS X",
+          "Operating System :: Microsoft :: Windows",
+          "Operating System :: POSIX",
+          "Programming Language :: Python :: 3 :: Only",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Programming Language :: Python :: 3.14",
+          "Programming Language :: Python :: 3.15",
+          "Topic :: Software Development :: Libraries",
+          "Topic :: Utilities"
+        ],
+        "requires_python": ">=3.10",
+        "project_url": [
+          "Homepage, https://github.com/pytest-dev/iniconfig"
+        ]
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/markdown_it_py-4.2.0-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a",
+          "hashes": {
+            "sha256": "9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.4",
+        "name": "markdown-it-py",
+        "version": "4.2.0",
+        "summary": "Python port of markdown-it. Markdown parsing, done right!",
+        "description": "# markdown-it-py\n\n[![Github-CI][github-ci]][github-link]\n[![Coverage Status][codecov-badge]][codecov-link]\n[![PyPI][pypi-badge]][pypi-link]\n[![Conda][conda-badge]][conda-link]\n[![PyPI - Downloads][install-badge]][install-link]\n\n<p align=\"center\">\n  <img alt=\"markdown-it-py icon\" src=\"https://raw.githubusercontent.com/executablebooks/markdown-it-py/master/docs/_static/markdown-it-py.svg\">\n</p>\n\n> Markdown parser done right.\n\n- Follows the __[CommonMark spec](http://spec.commonmark.org/)__ for baseline parsing\n- Configurable syntax: you can add new rules and even replace existing ones.\n- Pluggable: Adds syntax extensions to extend the parser (see the [plugin list][md-plugins]).\n- High speed (see our [benchmarking tests][md-performance])\n- Easy to configure for [security][md-security]\n- Member of [Google's Assured Open Source Software](https://cloud.google.com/assured-open-source-software/docs/supported-packages)\n\nThis is a Python port of [markdown-it], and some of its associated plugins.\nFor more details see: <https://markdown-it-py.readthedocs.io>.\n\nFor details on [markdown-it] itself, see:\n\n- The __[Live demo](https://markdown-it.github.io)__\n- [The markdown-it README][markdown-it-readme]\n\n**See also:** [markdown-it-pyrs](https://github.com/chrisjsewell/markdown-it-pyrs) for an experimental Rust binding,\nfor even more speed!\n\n## Installation\n\n### PIP\n\n```bash\npip install markdown-it-py[plugins]\n```\n\nor with extras\n\n```bash\npip install markdown-it-py[linkify,plugins]\n```\n\n### Conda\n\n```bash\nconda install -c conda-forge markdown-it-py\n```\n\nor with extras\n\n```bash\nconda install -c conda-forge markdown-it-py linkify-it-py mdit-py-plugins\n```\n\n## Usage\n\n### Python API Usage\n\nRender markdown to HTML with markdown-it-py and a custom configuration\nwith and without plugins and features:\n\n```python\nfrom markdown_it import MarkdownIt\nfrom mdit_py_plugins.front_matter import front_matter_plugin\nfrom mdit_py_plugins.footnote import footnote_plugin\n\nmd = (\n    MarkdownIt('commonmark', {'breaks':True,'html':True})\n    .use(front_matter_plugin)\n    .use(footnote_plugin)\n    .enable('table')\n)\ntext = (\"\"\"\n---\na: 1\n---\n\na | b\n- | -\n1 | 2\n\nA footnote [^1]\n\n[^1]: some details\n\"\"\")\ntokens = md.parse(text)\nhtml_text = md.render(text)\n\n## To export the html to a file, uncomment the lines below:\n# from pathlib import Path\n# Path(\"output.html\").write_text(html_text)\n```\n\n### Command-line Usage\n\nRender markdown to HTML with markdown-it-py from the\ncommand-line:\n\n```console\nusage: markdown-it [-h] [-v] [--stdin|filenames [filenames ...]]\n\nParse one or more markdown files, convert each to HTML, and print to stdout\n\npositional arguments:\n  --stdin        read source Markdown file from standard input\n  filenames      specify an optional list of files to convert\n\noptional arguments:\n  -h, --help     show this help message and exit\n  -v, --version  show program's version number and exit\n\nInteractive:\n\n  $ markdown-it\n  markdown-it-py [version 0.0.0] (interactive)\n  Type Ctrl-D to complete input, or Ctrl-C to exit.\n  >>> # Example\n  ... > markdown *input*\n  ...\n  <h1>Example</h1>\n  <blockquote>\n  <p>markdown <em>input</em></p>\n  </blockquote>\n\nBatch:\n\n  $ markdown-it README.md README.footer.md > index.html\n\n```\n\n## References / Thanks\n\nBig thanks to the authors of [markdown-it]:\n\n- Alex Kocharin [github/rlidwka](https://github.com/rlidwka)\n- Vitaly Puzrin [github/puzrin](https://github.com/puzrin)\n\nAlso [John MacFarlane](https://github.com/jgm) for his work on the CommonMark spec and reference implementations.\n\n[github-ci]: https://github.com/executablebooks/markdown-it-py/actions/workflows/tests.yml/badge.svg?branch=master\n[github-link]: https://github.com/executablebooks/markdown-it-py\n[pypi-badge]: https://img.shields.io/pypi/v/markdown-it-py.svg\n[pypi-link]: https://pypi.org/project/markdown-it-py\n[conda-badge]: https://anaconda.org/conda-forge/markdown-it-py/badges/version.svg\n[conda-link]: https://anaconda.org/conda-forge/markdown-it-py\n[codecov-badge]: https://codecov.io/gh/executablebooks/markdown-it-py/branch/master/graph/badge.svg\n[codecov-link]: https://codecov.io/gh/executablebooks/markdown-it-py\n[install-badge]: https://img.shields.io/pypi/dw/markdown-it-py?label=pypi%20installs\n[install-link]: https://pypistats.org/packages/markdown-it-py\n\n[CommonMark spec]: http://spec.commonmark.org/\n[markdown-it]: https://github.com/markdown-it/markdown-it\n[markdown-it-readme]: https://github.com/markdown-it/markdown-it/blob/master/README.md\n[md-security]: https://markdown-it-py.readthedocs.io/en/latest/security.html\n[md-performance]: https://markdown-it-py.readthedocs.io/en/latest/performance.html\n[md-plugins]: https://markdown-it-py.readthedocs.io/en/latest/plugins.html\n\n",
+        "description_content_type": "text/markdown",
+        "keywords": [
+          "markdown",
+          "lexer",
+          "parser",
+          "commonmark",
+          "markdown-it"
+        ],
+        "author_email": "Chris Sewell <chrisj_sewell@hotmail.com>",
+        "license_file": [
+          "LICENSE",
+          "LICENSE.markdown-it"
+        ],
+        "classifier": [
+          "Development Status :: 5 - Production/Stable",
+          "Intended Audience :: Developers",
+          "License :: OSI Approved :: MIT License",
+          "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Programming Language :: Python :: Implementation :: CPython",
+          "Programming Language :: Python :: Implementation :: PyPy",
+          "Topic :: Software Development :: Libraries :: Python Modules",
+          "Topic :: Text Processing :: Markup"
+        ],
+        "requires_dist": [
+          "mdurl~=0.1",
+          "psutil ; extra == \"benchmarking\"",
+          "pytest ; extra == \"benchmarking\"",
+          "pytest-benchmark ; extra == \"benchmarking\"",
+          "commonmark~=0.9 ; extra == \"compare\"",
+          "markdown~=3.4 ; extra == \"compare\"",
+          "mistletoe~=1.0 ; extra == \"compare\"",
+          "mistune~=3.0 ; extra == \"compare\"",
+          "panflute~=2.3 ; extra == \"compare\"",
+          "markdown-it-pyrs ; extra == \"compare\"",
+          "linkify-it-py>=1,<3 ; extra == \"linkify\"",
+          "mdit-py-plugins>=0.5.0 ; extra == \"plugins\"",
+          "gprof2dot ; extra == \"profiling\"",
+          "mdit-py-plugins>=0.5.0 ; extra == \"rtd\"",
+          "myst-parser ; extra == \"rtd\"",
+          "pyyaml ; extra == \"rtd\"",
+          "sphinx ; extra == \"rtd\"",
+          "sphinx-copybutton ; extra == \"rtd\"",
+          "sphinx-design ; extra == \"rtd\"",
+          "sphinx-book-theme~=1.0 ; extra == \"rtd\"",
+          "jupyter_sphinx ; extra == \"rtd\"",
+          "ipykernel ; extra == \"rtd\"",
+          "coverage ; extra == \"testing\"",
+          "pytest ; extra == \"testing\"",
+          "pytest-cov ; extra == \"testing\"",
+          "pytest-regressions ; extra == \"testing\"",
+          "pytest-timeout ; extra == \"testing\"",
+          "requests ; extra == \"testing\""
+        ],
+        "requires_python": ">=3.10",
+        "project_url": [
+          "Documentation, https://markdown-it-py.readthedocs.io",
+          "Homepage, https://github.com/executablebooks/markdown-it-py"
+        ],
+        "provides_extra": [
+          "benchmarking",
+          "compare",
+          "linkify",
+          "plugins",
+          "profiling",
+          "rtd",
+          "testing"
+        ]
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/mdurl-0.1.2-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8",
+          "hashes": {
+            "sha256": "84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.1",
+        "name": "mdurl",
+        "version": "0.1.2",
+        "summary": "Markdown URL utilities",
+        "description": "# mdurl\n\n[![Build Status](https://github.com/executablebooks/mdurl/workflows/Tests/badge.svg?branch=master)](https://github.com/executablebooks/mdurl/actions?query=workflow%3ATests+branch%3Amaster+event%3Apush)\n[![codecov.io](https://codecov.io/gh/executablebooks/mdurl/branch/master/graph/badge.svg)](https://codecov.io/gh/executablebooks/mdurl)\n[![PyPI version](https://img.shields.io/pypi/v/mdurl)](https://pypi.org/project/mdurl)\n\nThis is a Python port of the JavaScript [mdurl](https://www.npmjs.com/package/mdurl) package.\nSee the [upstream README.md file](https://github.com/markdown-it/mdurl/blob/master/README.md) for API documentation.\n\n",
+        "description_content_type": "text/markdown",
+        "keywords": [
+          "markdown",
+          "commonmark"
+        ],
+        "author_email": "Taneli Hukkinen <hukkin@users.noreply.github.com>",
+        "classifier": [
+          "License :: OSI Approved :: MIT License",
+          "Operating System :: MacOS",
+          "Operating System :: Microsoft :: Windows",
+          "Operating System :: POSIX :: Linux",
+          "Programming Language :: Python :: 3 :: Only",
+          "Programming Language :: Python :: 3.7",
+          "Programming Language :: Python :: 3.8",
+          "Programming Language :: Python :: 3.9",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: Implementation :: CPython",
+          "Programming Language :: Python :: Implementation :: PyPy",
+          "Topic :: Software Development :: Libraries :: Python Modules",
+          "Typing :: Typed"
+        ],
+        "requires_python": ">=3.7",
+        "project_url": [
+          "Homepage, https://github.com/executablebooks/mdurl"
+        ]
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/packaging-26.3-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+          "hashes": {
+            "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.4",
+        "name": "packaging",
+        "version": "26.3",
+        "summary": "Core utilities for Python packages",
+        "description": "packaging\n=========\n\n.. start-intro\n\nReusable core utilities for various Python Packaging\n`interoperability specifications <https://packaging.python.org/specifications/>`_.\n\nThis library provides utilities that implement the interoperability\nspecifications which have clearly one correct behaviour (eg: :pep:`440`)\nor benefit greatly from having a single shared implementation (eg: :pep:`425`).\n\n.. end-intro\n\nThe ``packaging`` project includes the following: version handling, specifiers,\nmarkers, requirements, tags, metadata, lockfiles, utilities.\n\nDocumentation\n-------------\n\nThe `documentation`_ provides information and the API for the following:\n\n- Version Handling\n- Specifiers\n- Markers\n- Licenses\n- Requirements\n- Metadata\n- Tags\n- Lockfiles (pylock)\n- Direct URL helpers\n- Dependency groups\n- Errors\n- Utilities\n\nInstallation\n------------\n\nUse ``pip`` to install these utilities::\n\n    pip install packaging\n\nThe ``packaging`` library uses calendar-based versioning (``YY.N``).\n\nDiscussion\n----------\n\nIf you run into bugs, you can file them in our `issue tracker`_.\n\nYou can also join discussions on `GitHub Discussions`_ to ask questions or get involved.\n\n.. _`documentation`: https://packaging.pypa.io/\n.. _`issue tracker`: https://github.com/pypa/packaging/issues\n.. _`GitHub Discussions`: https://github.com/pypa/packaging/discussions\n\n\nCode of Conduct\n---------------\n\nEveryone interacting in the packaging project's codebases, issue trackers, chat\nrooms, and mailing lists is expected to follow the `PSF Code of Conduct`_.\n\n.. _PSF Code of Conduct: https://github.com/pypa/.github/blob/main/CODE_OF_CONDUCT.md\n\nContributing\n------------\n\nThe ``CONTRIBUTING.rst`` file outlines how to contribute to this project as\nwell as how to report a potential security issue. The documentation for this\nproject also covers information about `project development`_ and `security`_.\n\n.. _`project development`: https://packaging.pypa.io/en/latest/development/\n.. _`security`: https://packaging.pypa.io/en/latest/security/\n\nProject History\n---------------\n\nPlease review the ``CHANGELOG.rst`` file or the `Changelog documentation`_ for\nrecent changes and project history.\n\n.. _`Changelog documentation`: https://packaging.pypa.io/en/latest/changelog/\n\n",
+        "description_content_type": "text/x-rst",
+        "author_email": "Donald Stufft <donald@stufft.io>",
+        "license_expression": "Apache-2.0 OR BSD-2-Clause",
+        "license_file": [
+          "LICENSE",
+          "LICENSE.APACHE",
+          "LICENSE.BSD"
+        ],
+        "classifier": [
+          "Development Status :: 5 - Production/Stable",
+          "Intended Audience :: Developers",
+          "Programming Language :: Python",
+          "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: 3 :: Only",
+          "Programming Language :: Python :: 3.9",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Programming Language :: Python :: 3.14",
+          "Programming Language :: Python :: 3.15",
+          "Programming Language :: Python :: Implementation :: CPython",
+          "Programming Language :: Python :: Implementation :: PyPy",
+          "Programming Language :: Python :: Free Threading :: 4 - Resilient",
+          "Typing :: Typed"
+        ],
+        "requires_python": ">=3.9",
+        "project_url": [
+          "Documentation, https://packaging.pypa.io/",
+          "Source, https://github.com/pypa/packaging"
+        ]
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/pluggy-1.7.0-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+          "hashes": {
+            "sha256": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.4",
+        "name": "pluggy",
+        "version": "1.7.0",
+        "dynamic": [
+          "license-file"
+        ],
+        "summary": "plugin and hook calling mechanisms for python",
+        "description": "====================================================\npluggy - A minimalist production ready plugin system\n====================================================\n\n|pypi| |conda-forge| |versions| |github-actions| |gitter| |black| |codecov|\n\nThis is the core framework used by the `pytest`_, `tox`_, and `devpi`_ projects.\n\nPlease `read the docs`_ to learn more!\n\nA definitive example\n====================\n.. code-block:: python\n\n    import pluggy\n\n    hookspec = pluggy.HookspecMarker(\"myproject\")\n    hookimpl = pluggy.HookimplMarker(\"myproject\")\n\n\n    class MySpec:\n        \"\"\"A hook specification namespace.\"\"\"\n\n        @hookspec\n        def myhook(self, arg1, arg2):\n            \"\"\"My special little hook that you can customize.\"\"\"\n\n\n    class Plugin_1:\n        \"\"\"A hook implementation namespace.\"\"\"\n\n        @hookimpl\n        def myhook(self, arg1, arg2):\n            print(\"inside Plugin_1.myhook()\")\n            return arg1 + arg2\n\n\n    class Plugin_2:\n        \"\"\"A 2nd hook implementation namespace.\"\"\"\n\n        @hookimpl\n        def myhook(self, arg1, arg2):\n            print(\"inside Plugin_2.myhook()\")\n            return arg1 - arg2\n\n\n    # create a manager and add the spec\n    pm = pluggy.PluginManager(\"myproject\")\n    pm.add_hookspecs(MySpec)\n\n    # register plugins\n    pm.register(Plugin_1())\n    pm.register(Plugin_2())\n\n    # call our ``myhook`` hook\n    results = pm.hook.myhook(arg1=1, arg2=2)\n    print(results)\n\n\nRunning this directly gets us::\n\n    $ python docs/examples/toy-example.py\n    inside Plugin_2.myhook()\n    inside Plugin_1.myhook()\n    [-1, 3]\n\n\n.. badges\n\n.. |pypi| image:: https://img.shields.io/pypi/v/pluggy.svg\n    :target: https://pypi.org/pypi/pluggy\n\n.. |versions| image:: https://img.shields.io/pypi/pyversions/pluggy.svg\n    :target: https://pypi.org/pypi/pluggy\n\n.. |github-actions| image:: https://github.com/pytest-dev/pluggy/workflows/test/badge.svg\n    :target: https://github.com/pytest-dev/pluggy/actions\n\n.. |conda-forge| image:: https://img.shields.io/conda/vn/conda-forge/pluggy.svg\n    :target: https://anaconda.org/conda-forge/pytest\n\n.. |gitter| image:: https://badges.gitter.im/pytest-dev/pluggy.svg\n    :alt: Join the chat at https://gitter.im/pytest-dev/pluggy\n    :target: https://gitter.im/pytest-dev/pluggy?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge\n\n.. |black| image:: https://img.shields.io/badge/code%20style-black-000000.svg\n    :target: https://github.com/psf/black\n\n.. |codecov| image:: https://codecov.io/gh/pytest-dev/pluggy/branch/main/graph/badge.svg\n    :target: https://codecov.io/gh/pytest-dev/pluggy\n    :alt: Code coverage Status\n\n.. links\n.. _pytest:\n    https://pytest.org\n.. _tox:\n    https://tox.wiki/\n.. _devpi:\n    https://doc.devpi.net\n.. _read the docs:\n   https://pluggy.readthedocs.io/en/latest/\n\n\nSupport pluggy\n--------------\n\n`Open Collective`_ is an online funding platform for open and transparent communities.\nIt provides tools to raise money and share your finances in full transparency.\n\nIt is the platform of choice for individuals and companies that want to make one-time or\nmonthly donations directly to the project.\n\n``pluggy`` is part of the ``pytest-dev`` project, see more details in the `pytest collective`_.\n\n.. _Open Collective: https://opencollective.com\n.. _pytest collective: https://opencollective.com/pytest\n",
+        "description_content_type": "text/x-rst",
+        "author": "Holger Krekel",
+        "maintainer_email": "pytest core team <core@pytest.org>",
+        "license": "MIT",
+        "license_file": [
+          "LICENSE"
+        ],
+        "classifier": [
+          "Development Status :: 6 - Mature",
+          "Intended Audience :: Developers",
+          "License :: OSI Approved :: MIT License",
+          "Operating System :: POSIX",
+          "Operating System :: Microsoft :: Windows",
+          "Operating System :: MacOS :: MacOS X",
+          "Topic :: Software Development :: Testing",
+          "Topic :: Software Development :: Libraries",
+          "Topic :: Utilities",
+          "Programming Language :: Python :: Implementation :: CPython",
+          "Programming Language :: Python :: Implementation :: PyPy",
+          "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: 3 :: Only",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Programming Language :: Python :: 3.14"
+        ],
+        "requires_python": ">=3.10",
+        "project_url": [
+          "Homepage, https://github.com/pytest-dev/pluggy",
+          "Documentation, https://pluggy.readthedocs.io/",
+          "Changelog, https://pluggy.readthedocs.io/en/latest/changelog.html",
+          "Repository, https://github.com/pytest-dev/pluggy",
+          "Issues, https://github.com/pytest-dev/pluggy/issues",
+          "Funding, https://tidelift.com/subscription/pkg/pypi-pluggy"
+        ]
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/pygments-2.21.0-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+          "hashes": {
+            "sha256": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.5",
+        "name": "Pygments",
+        "version": "2.21.0",
+        "summary": "Pygments is a syntax highlighting package written in Python.",
+        "description": "Pygments\n~~~~~~~~\n\nPygments is a syntax highlighting package written in Python.\n\nIt is a generic syntax highlighter suitable for use in code hosting, forums,\nwikis or other applications that need to prettify source code.  Highlights\nare:\n\n* a wide range of over 500 languages and other text formats is supported\n* special attention is paid to details, increasing quality by a fair amount\n* support for new languages and formats are added easily\n* a number of output formats, presently HTML, LaTeX, RTF, SVG, all image\n  formats that PIL supports and ANSI sequences\n* it is usable as a command-line tool and as a library\n\nCopyright 2006-present by the Pygments team, see ``AUTHORS``.\nLicensed under the BSD, see ``LICENSE`` for details.\n",
+        "description_content_type": "text/x-rst",
+        "keywords": [
+          "syntax",
+          "highlighting"
+        ],
+        "author_email": "Georg Brandl <georg@python.org>",
+        "maintainer": "Matthäus G. Chajdas",
+        "maintainer_email": "Georg Brandl <georg@python.org>, Jean Abou Samra <jean@abou-samra.fr>",
+        "license_expression": "BSD-2-Clause",
+        "license_file": [
+          "AUTHORS",
+          "LICENSE"
+        ],
+        "classifier": [
+          "Development Status :: 6 - Mature",
+          "Intended Audience :: Developers",
+          "Intended Audience :: End Users/Desktop",
+          "Intended Audience :: System Administrators",
+          "Operating System :: OS Independent",
+          "Programming Language :: Python",
+          "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: 3.9",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Programming Language :: Python :: 3.14",
+          "Programming Language :: Python :: 3.15",
+          "Programming Language :: Python :: Implementation :: CPython",
+          "Programming Language :: Python :: Implementation :: PyPy",
+          "Topic :: Text Processing :: Filters",
+          "Topic :: Utilities"
+        ],
+        "requires_dist": [
+          "colorama>=0.4.6; extra == 'windows-terminal'"
+        ],
+        "requires_python": ">=3.9",
+        "project_url": [
+          "Homepage, https://pygments.org",
+          "Documentation, https://pygments.org/docs",
+          "Source, https://github.com/pygments/pygments",
+          "Bug Tracker, https://github.com/pygments/pygments/issues",
+          "Changelog, https://github.com/pygments/pygments/blob/master/CHANGES"
+        ],
+        "provides_extra": [
+          "plugins",
+          "windows-terminal"
+        ]
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/pytest-9.1.1-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+          "hashes": {
+            "sha256": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.4",
+        "name": "pytest",
+        "version": "9.1.1",
+        "dynamic": [
+          "license-file"
+        ],
+        "summary": "pytest: simple powerful testing with Python",
+        "description": ".. image:: https://github.com/pytest-dev/pytest/raw/main/doc/en/img/pytest_logo_curves.svg\n   :target: https://docs.pytest.org/en/stable/\n   :align: center\n   :height: 200\n   :alt: pytest\n\n\n------\n\n.. image:: https://img.shields.io/pypi/v/pytest.svg\n    :target: https://pypi.org/project/pytest/\n\n.. image:: https://img.shields.io/conda/vn/conda-forge/pytest.svg\n    :target: https://anaconda.org/conda-forge/pytest\n\n.. image:: https://img.shields.io/pypi/pyversions/pytest.svg\n    :target: https://pypi.org/project/pytest/\n\n.. image:: https://codecov.io/gh/pytest-dev/pytest/branch/main/graph/badge.svg\n    :target: https://codecov.io/gh/pytest-dev/pytest\n    :alt: Code coverage Status\n\n.. image:: https://github.com/pytest-dev/pytest/actions/workflows/test.yml/badge.svg\n    :target: https://github.com/pytest-dev/pytest/actions?query=workflow%3Atest\n\n.. image:: https://results.pre-commit.ci/badge/github/pytest-dev/pytest/main.svg\n   :target: https://results.pre-commit.ci/latest/github/pytest-dev/pytest/main\n   :alt: pre-commit.ci status\n\n.. image:: https://www.codetriage.com/pytest-dev/pytest/badges/users.svg\n    :target: https://www.codetriage.com/pytest-dev/pytest\n\n.. image:: https://readthedocs.org/projects/pytest/badge/?version=latest\n    :target: https://pytest.readthedocs.io/en/latest/?badge=latest\n    :alt: Documentation Status\n\n.. image:: https://img.shields.io/badge/Discord-pytest--dev-blue\n    :target: https://discord.com/invite/pytest-dev\n    :alt: Discord\n\n.. image:: https://img.shields.io/badge/Libera%20chat-%23pytest-orange\n    :target: https://web.libera.chat/#pytest\n    :alt: Libera chat\n\n\nThe ``pytest`` framework makes it easy to write small tests, yet\nscales to support complex functional testing for applications and libraries.\n\nAn example of a simple test:\n\n.. code-block:: python\n\n    # content of test_sample.py\n    def inc(x):\n        return x + 1\n\n\n    def test_answer():\n        assert inc(3) == 5\n\n\nTo execute it::\n\n    $ pytest\n    ============================= test session starts =============================\n    collected 1 items\n\n    test_sample.py F\n\n    ================================== FAILURES ===================================\n    _________________________________ test_answer _________________________________\n\n        def test_answer():\n    >       assert inc(3) == 5\n    E       assert 4 == 5\n    E        +  where 4 = inc(3)\n\n    test_sample.py:5: AssertionError\n    ========================== 1 failed in 0.04 seconds ===========================\n\n\nThanks to ``pytest``'s detailed assertion introspection, you can simply use plain ``assert`` statements. See `getting-started <https://docs.pytest.org/en/stable/getting-started.html#our-first-test-run>`_ for more examples.\n\n\nFeatures\n--------\n\n- Detailed info on failing `assert statements <https://docs.pytest.org/en/stable/how-to/assert.html>`_ (no need to remember ``self.assert*`` names)\n\n- `Auto-discovery\n  <https://docs.pytest.org/en/stable/explanation/goodpractices.html#python-test-discovery>`_\n  of test modules and functions\n\n- `Modular fixtures <https://docs.pytest.org/en/stable/explanation/fixtures.html>`_ for\n  managing small or parametrized long-lived test resources\n\n- Can run `unittest <https://docs.pytest.org/en/stable/how-to/unittest.html>`_ (or trial)\n  test suites out of the box\n\n- Python 3.10+ or PyPy3\n\n- Rich plugin architecture, with over 1300+ `external plugins <https://docs.pytest.org/en/latest/reference/plugin_list.html>`_ and thriving community\n\n\nDocumentation\n-------------\n\nFor full documentation, including installation, tutorials and PDF documents, please see https://docs.pytest.org/en/stable/.\n\n\nBugs/Requests\n-------------\n\nPlease use the `GitHub issue tracker <https://github.com/pytest-dev/pytest/issues>`_ to submit bugs or request features.\n\n\nChangelog\n---------\n\nConsult the `Changelog <https://docs.pytest.org/en/stable/changelog.html>`__ page for fixes and enhancements of each version.\n\n\nSupport pytest\n--------------\n\n`Open Collective`_ is an online funding platform for open and transparent communities.\nIt provides tools to raise money and share your finances in full transparency.\n\nIt is the platform of choice for individuals and companies that want to make one-time or\nmonthly donations directly to the project.\n\nSee more details in the `pytest collective`_.\n\n.. _Open Collective: https://opencollective.com\n.. _pytest collective: https://opencollective.com/pytest\n\n\npytest for enterprise\n---------------------\n\nAvailable as part of the Tidelift Subscription.\n\nThe maintainers of pytest and thousands of other packages are working with Tidelift to deliver commercial support and\nmaintenance for the open source dependencies you use to build your applications.\nSave time, reduce risk, and improve code health, while paying the maintainers of the exact dependencies you use.\n\n`Learn more. <https://tidelift.com/subscription/pkg/pypi-pytest?utm_source=pypi-pytest&utm_medium=referral&utm_campaign=enterprise&utm_term=repo>`_\n\nSecurity\n^^^^^^^^\n\nIf you have found an issue that you believe is a security vulnerability, please do not create an issue -- instead, report it via a `new security advisory <https://github.com/pytest-dev/pytest/security/advisories/new>`__.\n\n\nLicense\n-------\n\nCopyright Holger Krekel and others, 2004.\n\nDistributed under the terms of the `MIT`_ license, pytest is free and open source software.\n\n.. _`MIT`: https://github.com/pytest-dev/pytest/blob/main/LICENSE\n",
+        "description_content_type": "text/x-rst",
+        "keywords": [
+          "test",
+          "unittest"
+        ],
+        "author": "Brianna Laugher, Bruno Oliveira, Floris Bruynooghe, Freya Bruhin, Holger Krekel, Others (See AUTHORS), Ronny Pfannschmidt",
+        "license_expression": "MIT",
+        "license_file": [
+          "LICENSE"
+        ],
+        "classifier": [
+          "Development Status :: 6 - Mature",
+          "Intended Audience :: Developers",
+          "Operating System :: MacOS",
+          "Operating System :: Microsoft :: Windows",
+          "Operating System :: POSIX",
+          "Operating System :: Unix",
+          "Programming Language :: Python :: 3 :: Only",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Programming Language :: Python :: 3.14",
+          "Programming Language :: Python :: 3.15",
+          "Topic :: Software Development :: Libraries",
+          "Topic :: Software Development :: Testing",
+          "Topic :: Utilities"
+        ],
+        "requires_dist": [
+          "colorama>=0.4; sys_platform == \"win32\"",
+          "exceptiongroup>=1; python_version < \"3.11\"",
+          "iniconfig>=1.0.1",
+          "packaging>=22",
+          "pluggy<2,>=1.5",
+          "pygments>=2.7.2",
+          "tomli>=1; python_version < \"3.11\"",
+          "argcomplete; extra == \"dev\"",
+          "attrs>=19.2; extra == \"dev\"",
+          "hypothesis>=3.56; extra == \"dev\"",
+          "mock; extra == \"dev\"",
+          "requests; extra == \"dev\"",
+          "setuptools; extra == \"dev\"",
+          "xmlschema; extra == \"dev\""
+        ],
+        "requires_python": ">=3.10",
+        "project_url": [
+          "Changelog, https://docs.pytest.org/en/stable/changelog.html",
+          "Contact, https://docs.pytest.org/en/stable/contact.html",
+          "Funding, https://docs.pytest.org/en/stable/sponsor.html",
+          "Homepage, https://docs.pytest.org/en/latest/",
+          "Source, https://github.com/pytest-dev/pytest",
+          "Tracker, https://github.com/pytest-dev/pytest/issues"
+        ],
+        "provides_extra": [
+          "dev"
+        ]
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/pytest_cov-7.1.0-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=a0461110b7865f9a271aa1b51e516c9a95de9d696734a2f71e3e78f46e1d4678",
+          "hashes": {
+            "sha256": "a0461110b7865f9a271aa1b51e516c9a95de9d696734a2f71e3e78f46e1d4678"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.4",
+        "name": "pytest-cov",
+        "version": "7.1.0",
+        "summary": "Pytest plugin for measuring coverage.",
+        "description": "========\nOverview\n========\n\n.. start-badges\n\n.. list-table::\n    :stub-columns: 1\n\n    * - docs\n      - |docs|\n    * - tests\n      - |github-actions|\n    * - package\n      - |version| |conda-forge| |wheel| |supported-versions| |supported-implementations| |commits-since|\n\n.. |docs| image:: https://readthedocs.org/projects/pytest-cov/badge/?style=flat\n    :target: https://readthedocs.org/projects/pytest-cov/\n    :alt: Documentation Status\n\n.. |github-actions| image:: https://github.com/pytest-dev/pytest-cov/actions/workflows/test.yml/badge.svg\n    :alt: GitHub Actions Status\n    :target: https://github.com/pytest-dev/pytest-cov/actions\n\n.. |version| image:: https://img.shields.io/pypi/v/pytest-cov.svg\n    :alt: PyPI Package latest release\n    :target: https://pypi.org/project/pytest-cov\n\n.. |conda-forge| image:: https://img.shields.io/conda/vn/conda-forge/pytest-cov.svg\n    :target: https://anaconda.org/conda-forge/pytest-cov\n.. |wheel| image:: https://img.shields.io/pypi/wheel/pytest-cov.svg\n    :alt: PyPI Wheel\n    :target: https://pypi.org/project/pytest-cov\n\n.. |supported-versions| image:: https://img.shields.io/pypi/pyversions/pytest-cov.svg\n    :alt: Supported versions\n    :target: https://pypi.org/project/pytest-cov\n\n.. |supported-implementations| image:: https://img.shields.io/pypi/implementation/pytest-cov.svg\n    :alt: Supported implementations\n    :target: https://pypi.org/project/pytest-cov\n\n.. |commits-since| image:: https://img.shields.io/github/commits-since/pytest-dev/pytest-cov/v7.1.0.svg\n    :alt: Commits since latest release\n    :target: https://github.com/pytest-dev/pytest-cov/compare/v7.1.0...master\n\n.. end-badges\n\nThis plugin provides coverage functionality as a pytest plugin. Compared to just using ``coverage run`` this plugin does some extras:\n\n* Automatic erasing and combination of .coverage files and default reporting.\n* Support for detailed coverage contexts (add ``--cov-context=test`` to have the full test name including parametrization as the context).\n* Xdist support: you can use all of pytest-xdist's features including remote interpreters and still get coverage.\n* Consistent pytest behavior. If you run ``coverage run -m pytest`` you will have slightly different ``sys.path`` (CWD will be\n  in it, unlike when running ``pytest``).\n\nAll features offered by the coverage package should work, either through pytest-cov's command line options or\nthrough coverage's config file.\n\n* Free software: MIT license\n\nInstallation\n============\n\nInstall with pip::\n\n    pip install pytest-cov\n\nFor distributed testing support install pytest-xdist::\n\n    pip install pytest-xdist\n\nUpgrading from pytest-cov 6.3\n-----------------------------\n\n`pytest-cov 6.3` and older were using a ``.pth`` file to enable coverage measurements in subprocesses. This was removed in `pytest-cov 7` - use `coverage's patch options <https://coverage.readthedocs.io/en/latest/config.html#run-patch>`_ to enable subprocess measurements.\n\nUninstalling\n------------\n\nUninstall with pip::\n\n    pip uninstall pytest-cov\n\nUnder certain scenarios a stray ``.pth`` file may be left around in site-packages.\n\n* `pytest-cov 2.0` may leave a ``pytest-cov.pth`` if you installed without wheels\n  (``easy_install``, ``setup.py install`` etc).\n* `pytest-cov 1.8 or older` will leave a ``init_cov_core.pth``.\n\nUsage\n=====\n\n::\n\n    pytest --cov=myproj tests/\n\nWould produce a report like::\n\n    -------------------- coverage: ... ---------------------\n    Name                 Stmts   Miss  Cover\n    ----------------------------------------\n    myproj/__init__          2      0   100%\n    myproj/myproj          257     13    94%\n    myproj/feature4286      94      7    92%\n    ----------------------------------------\n    TOTAL                  353     20    94%\n\nDocumentation\n=============\n\nhttps://pytest-cov.readthedocs.io/en/latest/\n\n\nCoverage Data File\n==================\n\nThe data file is erased at the beginning of testing to ensure clean data for each test run. If you\nneed to combine the coverage of several test runs you can use the ``--cov-append`` option to append\nthis coverage data to coverage data from previous test runs.\n\nThe data file is left at the end of testing so that it is possible to use normal coverage tools to\nexamine it.\n\nLimitations\n===========\n\nFor distributed testing the workers must have the pytest-cov package installed. This is needed since\nthe plugin must be registered through setuptools for pytest to start the plugin on the\nworker.\n\nSecurity\n========\n\nTo report a security vulnerability please use the `Tidelift security contact <https://tidelift.com/security>`_.\nTidelift will coordinate the fix and disclosure.\n\nAcknowledgements\n================\n\nWhilst this plugin has been built fresh from the ground up it has been influenced by the work done\non pytest-coverage (Ross Lawley, James Mills, Holger Krekel) and nose-cover (Jason Pellerin) which are\nother coverage plugins.\n\nNed Batchelder for coverage and its ability to combine the coverage results of parallel runs.\n\nHolger Krekel for pytest with its distributed testing support.\n\nJason Pellerin for nose.\n\nMichael Foord for unittest2.\n\nNo doubt others have contributed to these tools as well.\n\nChangelog\n=========\n\n7.1.0 (2026-03-21)\n------------------\n\n* Fixed total coverage computation to always be consistent, regardless of reporting settings.\n  Previously some reports could produce different total counts, and consequently can make --cov-fail-under behave different depending on\n  reporting options.\n  See `#641 <https://github.com/pytest-dev/pytest-cov/issues/641>`_.\n\n* Improve handling of ResourceWarning from sqlite3.\n\n  The plugin adds warning filter for sqlite3 ``ResourceWarning`` unclosed database (since 6.2.0).\n  It checks if there is already existing plugin for this message by comparing filter regular expression.\n  When filter is specified on command line the message is escaped and does not match an expected message.\n  A check for an escaped regular expression is added to handle this case.\n\n  With this fix one can suppress ``ResourceWarning`` from sqlite3 from command line::\n\n    pytest -W \"ignore:unclosed database in <sqlite3.Connection object at:ResourceWarning\" ...\n* Various improvements to documentation.\n  Contributed by Art Pelling in `#718 <https://github.com/pytest-dev/pytest-cov/pull/718>`_ and\n  \"vivodi\" in `#738 <https://github.com/pytest-dev/pytest-cov/pull/738>`_.\n  Also closed `#736 <https://github.com/pytest-dev/pytest-cov/issues/736>`_.\n* Fixed some assertions in tests.\n  Contributed by in Markéta Machová in `#722 <https://github.com/pytest-dev/pytest-cov/pull/722>`_.\n* Removed unnecessary coverage configuration copying (meant as a backup because reporting commands had configuration side-effects before coverage 5.0).\n\n7.0.0 (2025-09-09)\n------------------\n\n* Dropped support for subprocesses measurement.\n\n  It was a feature added long time ago when coverage lacked a nice way to measure subprocesses created in tests.\n  It relied on a ``.pth`` file, there was no way to opt-out and it created bad interations\n  with `coverage's new patch system <https://coverage.readthedocs.io/en/latest/config.html#run-patch>`_ added\n  in `7.10 <https://coverage.readthedocs.io/en/7.10.6/changes.html#version-7-10-0-2025-07-24>`_.\n\n  To migrate to this release you might need to enable the suprocess patch, example for ``.coveragerc``:\n\n  .. code-block:: ini\n\n    [run]\n    patch = subprocess\n\n  This release also requires at least coverage 7.10.6.\n* Switched packaging to have metadata completely in ``pyproject.toml`` and use `hatchling <https://pypi.org/project/hatchling/>`_ for\n  building.\n  Contributed by Ofek Lev in `#551 <https://github.com/pytest-dev/pytest-cov/pull/551>`_\n  with some extras in `#716 <https://github.com/pytest-dev/pytest-cov/pull/716>`_.\n* Removed some not really necessary testing deps like ``six``.\n\n6.3.0 (2025-09-06)\n------------------\n\n* Added support for markdown reports.\n  Contributed by Marcos Boger in `#712 <https://github.com/pytest-dev/pytest-cov/pull/712>`_\n  and `#714 <https://github.com/pytest-dev/pytest-cov/pull/714>`_.\n* Fixed some formatting issues in docs.\n  Anonymous contribution in `#706 <https://github.com/pytest-dev/pytest-cov/pull/706>`_.\n\n6.2.1 (2025-06-12)\n------------------\n\n* Added a version requirement for pytest's pluggy dependency (1.2.0, released 2023-06-21) that has the required new-style hookwrapper API.\n* Removed deprecated license classifier (packaging).\n* Disabled coverage warnings in two more situations where they have no value:\n\n  * \"module-not-measured\" in workers\n  * \"already-imported\" in subprocesses\n\n6.2.0 (2025-06-11)\n------------------\n\n* The plugin now adds 3 rules in the filter warnings configuration to prevent common coverage warnings being raised as obscure errors::\n\n    default:unclosed database in <sqlite3.Connection object at:ResourceWarning\n    once::PytestCovWarning\n    once::CoverageWarning\n\n  This fixes most of the bad interactions that are occurring on pytest 8.4 with ``filterwarnings=error``.\n\n  The plugin will check if there already matching rules for the 3 categories\n  (``ResourceWarning``, ``PytestCovWarning``, ``CoverageWarning``) and message (``unclosed database in <sqlite3.Connection object at``) before adding the filters.\n\n  This means you can have this in your pytest configuration for complete oblivion (not recommended, if that is not clear)::\n\n    filterwarnings = [\n        \"error\",\n        \"ignore:unclosed database in <sqlite3.Connection object at:ResourceWarning\",\n        \"ignore::PytestCovWarning\",\n        \"ignore::CoverageWarning\",\n    ]\n\n\n\n6.1.1 (2025-04-05)\n------------------\n\n* Fixed breakage that occurs when ``--cov-context`` and the ``no_cover`` marker are used together.\n\n6.1.0 (2025-04-01)\n------------------\n\n* Change terminal output to use full width lines for the coverage header.\n  Contributed by Tsvika Shapira in `#678 <https://github.com/pytest-dev/pytest-cov/pull/678>`_.\n* Removed unnecessary CovFailUnderWarning. Fixes `#675 <https://github.com/pytest-dev/pytest-cov/issues/675>`_.\n* Fixed the term report not using the precision specified via ``--cov-precision``.\n\n\n6.0.0 (2024-10-29)\n------------------\n\n* Updated various documentation inaccuracies, especially on subprocess handling.\n* Changed fail under checks to use the precision set in the coverage configuration.\n  Now it will perform the check just like ``coverage report`` would.\n* Added a ``--cov-precision`` cli option that can override the value set in your coverage configuration.\n* Dropped support for now EOL Python 3.8.\n\n5.0.0 (2024-03-24)\n------------------\n\n* Removed support for xdist rsync (now deprecated).\n  Contributed by Matthias Reichenbach in `#623 <https://github.com/pytest-dev/pytest-cov/pull/623>`_.\n* Switched docs theme to Furo.\n* Various legacy Python cleanup and CI improvements.\n  Contributed by Christian Clauss and Hugo van Kemenade in\n  `#630 <https://github.com/pytest-dev/pytest-cov/pull/630>`_,\n  `#631 <https://github.com/pytest-dev/pytest-cov/pull/631>`_,\n  `#632 <https://github.com/pytest-dev/pytest-cov/pull/632>`_ and\n  `#633 <https://github.com/pytest-dev/pytest-cov/pull/633>`_.\n* Added a ``pyproject.toml`` example in the docs.\n  Contributed by Dawn James in `#626 <https://github.com/pytest-dev/pytest-cov/pull/626>`_.\n* Modernized project's pre-commit hooks to use ruff. Initial POC contributed by\n  Christian Clauss in `#584 <https://github.com/pytest-dev/pytest-cov/pull/584>`_.\n* Dropped support for Python 3.7.\n\n4.1.0 (2023-05-24)\n------------------\n\n* Updated CI with new Pythons and dependencies.\n* Removed rsyncdir support. This makes pytest-cov compatible with xdist 3.0.\n  Contributed by Sorin Sbarnea in `#558 <https://github.com/pytest-dev/pytest-cov/pull/558>`_.\n* Optimized summary generation to not be performed if no reporting is active (for example,\n  when ``--cov-report=''`` is used without ``--cov-fail-under``).\n  Contributed by Jonathan Stewmon in `#589 <https://github.com/pytest-dev/pytest-cov/pull/589>`_.\n* Added support for JSON reporting.\n  Contributed by Matthew Gamble in `#582 <https://github.com/pytest-dev/pytest-cov/pull/582>`_.\n* Refactored code to use f-strings.\n  Contributed by Mark Mayo in `#572 <https://github.com/pytest-dev/pytest-cov/pull/572>`_.\n* Fixed a skip in the test suite for some old xdist.\n  Contributed by a bunch of people in `#565 <https://github.com/pytest-dev/pytest-cov/pull/565>`_.\n* Dropped support for Python 3.6.\n\n\n4.0.0 (2022-09-28)\n------------------\n\n**Note that this release drops support for multiprocessing.**\n\n\n* `--cov-fail-under` no longer causes `pytest --collect-only` to fail\n  Contributed by Zac Hatfield-Dodds in `#511 <https://github.com/pytest-dev/pytest-cov/pull/511>`_.\n* Dropped support for multiprocessing (mostly because `issue 82408 <https://github.com/python/cpython/issues/82408>`_). This feature was\n  mostly working but very broken in certain scenarios and made the test suite very flaky and slow.\n\n  There is builtin multiprocessing support in coverage and you can migrate to that. All you need is this in your\n  ``.coveragerc``::\n\n    [run]\n    concurrency = multiprocessing\n    parallel = true\n    sigterm = true\n* Fixed deprecation in ``setup.py`` by trying to import setuptools before distutils.\n  Contributed by Ben Greiner in `#545 <https://github.com/pytest-dev/pytest-cov/pull/545>`_.\n* Removed undesirable new lines that were displayed while reporting was disabled.\n  Contributed by Delgan in `#540 <https://github.com/pytest-dev/pytest-cov/pull/540>`_.\n* Documentation fixes.\n  Contributed by Andre Brisco in `#543 <https://github.com/pytest-dev/pytest-cov/pull/543>`_\n  and Colin O'Dell in `#525 <https://github.com/pytest-dev/pytest-cov/pull/525>`_.\n* Added support for LCOV output format via `--cov-report=lcov`. Only works with coverage 6.3+.\n  Contributed by Christian Fetzer in `#536 <https://github.com/pytest-dev/pytest-cov/pull/536>`_.\n* Modernized pytest hook implementation.\n  Contributed by Bruno Oliveira in `#549 <https://github.com/pytest-dev/pytest-cov/pull/549>`_\n  and Ronny Pfannschmidt in `#550 <https://github.com/pytest-dev/pytest-cov/pull/550>`_.\n\n\n3.0.0 (2021-10-04)\n-------------------\n\n**Note that this release drops support for Python 2.7 and Python 3.5.**\n\n* Added support for Python 3.10 and updated various test dependencies.\n  Contributed by Hugo van Kemenade in\n  `#500 <https://github.com/pytest-dev/pytest-cov/pull/500>`_.\n* Switched from Travis CI to GitHub Actions. Contributed by Hugo van Kemenade in\n  `#494 <https://github.com/pytest-dev/pytest-cov/pull/494>`_ and\n  `#495 <https://github.com/pytest-dev/pytest-cov/pull/495>`_.\n* Add a ``--cov-reset`` CLI option.\n  Contributed by Danilo Šegan in\n  `#459 <https://github.com/pytest-dev/pytest-cov/pull/459>`_.\n* Improved validation of ``--cov-fail-under`` CLI option.\n  Contributed by ... Ronny Pfannschmidt's desire for skark in\n  `#480 <https://github.com/pytest-dev/pytest-cov/pull/480>`_.\n* Dropped Python 2.7 support.\n  Contributed by Thomas Grainger in\n  `#488 <https://github.com/pytest-dev/pytest-cov/pull/488>`_.\n* Updated trove classifiers. Contributed by Michał Bielawski in\n  `#481 <https://github.com/pytest-dev/pytest-cov/pull/481>`_.\n* Reverted change for `toml` requirement.\n  Contributed by Thomas Grainger in\n  `#477 <https://github.com/pytest-dev/pytest-cov/pull/477>`_.\n\n2.12.1 (2021-06-01)\n-------------------\n\n* Changed the `toml` requirement to be always be directly required (instead of being required through a coverage extra).\n  This fixes issues with pip-compile (`pip-tools#1300 <https://github.com/jazzband/pip-tools/issues/1300>`_).\n  Contributed by Sorin Sbarnea in `#472 <https://github.com/pytest-dev/pytest-cov/pull/472>`_.\n* Documented ``show_contexts``.\n  Contributed by Brian Rutledge in `#473 <https://github.com/pytest-dev/pytest-cov/pull/473>`_.\n\n2.12.0 (2021-05-14)\n-------------------\n\n* Added coverage's `toml` extra to install requirements in setup.py.\n  Contributed by Christian Riedel in `#410 <https://github.com/pytest-dev/pytest-cov/pull/410>`_.\n* Fixed ``pytest_cov.__version__`` to have the right value (string with version instead of a string\n  including ``__version__ =``).\n* Fixed license classifier in ``setup.py``.\n  Contributed by Chris Sreesangkom in `#467 <https://github.com/pytest-dev/pytest-cov/pull/467>`_.\n* Fixed *commits since* badge.\n  Contributed by Terence Honles in `#470 <https://github.com/pytest-dev/pytest-cov/pull/470>`_.\n\n2.11.1 (2021-01-20)\n-------------------\n\n* Fixed support for newer setuptools (v42+).\n  Contributed by Michał Górny in `#451 <https://github.com/pytest-dev/pytest-cov/pull/451>`_.\n\n2.11.0 (2021-01-18)\n-------------------\n\n* Bumped minimum coverage requirement to 5.2.1. This prevents reporting issues.\n  Contributed by Mateus Berardo de Souza Terra in `#433 <https://github.com/pytest-dev/pytest-cov/pull/433>`_.\n* Improved sample projects (from the `examples <https://github.com/pytest-dev/pytest-cov/tree/master/examples>`_\n  directory) to support running `tox -e pyXY`. Now the example configures a suffixed coverage data file,\n  and that makes the cleanup environment unnecessary.\n  Contributed by Ganden Schaffner in `#435 <https://github.com/pytest-dev/pytest-cov/pull/435>`_.\n* Removed the empty `console_scripts` entrypoint that confused some Gentoo build script.\n  I didn't ask why it was so broken cause I didn't want to ruin my day.\n  Contributed by Michał Górny in `#434 <https://github.com/pytest-dev/pytest-cov/pull/434>`_.\n* Fixed the missing `coverage context <https://coverage.readthedocs.io/en/latest/contexts.html>`_\n  when using subprocesses.\n  Contributed by Bernát Gábor in `#443 <https://github.com/pytest-dev/pytest-cov/pull/443>`_.\n* Updated the config section in the docs.\n  Contributed by Pamela McA'Nulty in `#429 <https://github.com/pytest-dev/pytest-cov/pull/429>`_.\n* Migrated CI to travis-ci.com (from .org).\n\n2.10.1 (2020-08-14)\n-------------------\n\n* Support for ``pytest-xdist`` 2.0, which breaks compatibility with ``pytest-xdist`` before 1.22.3 (from 2017).\n  Contributed by Zac Hatfield-Dodds in `#412 <https://github.com/pytest-dev/pytest-cov/pull/412>`_.\n* Fixed the ``LocalPath has no attribute startswith`` failure that occurred when using the ``pytester`` plugin\n  in inline mode.\n\n2.10.0 (2020-06-12)\n-------------------\n\n* Improved the ``--no-cov`` warning. Now it's only shown if ``--no-cov`` is present before ``--cov``.\n* Removed legacy pytest support. Changed ``setup.py`` so that ``pytest>=4.6`` is required.\n\n2.9.0 (2020-05-22)\n------------------\n\n* Fixed ``RemovedInPytest4Warning`` when using Pytest 3.10.\n  Contributed by Michael Manganiello in `#354 <https://github.com/pytest-dev/pytest-cov/pull/354>`_.\n* Made pytest startup faster when plugin not active by lazy-importing.\n  Contributed by Anders Hovmöller in `#339 <https://github.com/pytest-dev/pytest-cov/pull/339>`_.\n* Various CI improvements.\n  Contributed by Daniel Hahler in `#363 <https://github.com/pytest-dev/pytest-cov/pull/363>`_ and\n  `#364 <https://github.com/pytest-dev/pytest-cov/pull/364>`_.\n* Various Python support updates (drop EOL 3.4, test against 3.8 final).\n  Contributed by Hugo van Kemenade in\n  `#336 <https://github.com/pytest-dev/pytest-cov/pull/336>`_ and\n  `#367 <https://github.com/pytest-dev/pytest-cov/pull/367>`_.\n* Changed ``--cov-append`` to always enable ``data_suffix`` (a coverage setting).\n  Contributed by Harm Geerts in\n  `#387 <https://github.com/pytest-dev/pytest-cov/pull/387>`_.\n* Changed ``--cov-append`` to handle loading previous data better\n  (fixes various path aliasing issues).\n* Various other testing improvements, github issue templates, example updates.\n* Fixed internal failures that are caused by tests that change the current working directory by\n  ensuring a consistent working directory when coverage is called.\n  See `#306 <https://github.com/pytest-dev/pytest-cov/issues/306>`_ and\n  `coveragepy#881 <https://github.com/nedbat/coveragepy/issues/881>`_\n\n2.8.1 (2019-10-05)\n------------------\n\n* Fixed `#348 <https://github.com/pytest-dev/pytest-cov/issues/348>`_ -\n  regression when only certain reports (html or xml) are used then ``--cov-fail-under`` always fails.\n\n2.8.0 (2019-10-04)\n------------------\n\n* Fixed ``RecursionError`` that can occur when using\n  `cleanup_on_signal <https://pytest-cov.readthedocs.io/en/v2.8.0/subprocess-support.html#if-you-got-custom-signal-handling>`__ or\n  `cleanup_on_sigterm <https://pytest-cov.readthedocs.io/en/v2.8.0/subprocess-support.html#if-you-got-custom-signal-handling>`__.\n  See: `#294 <https://github.com/pytest-dev/pytest-cov/issues/294>`_.\n  The 2.7.x releases of pytest-cov should be considered broken regarding aforementioned cleanup API.\n* Added compatibility with future xdist release that deprecates some internals\n  (match pytest-xdist master/worker terminology).\n  Contributed by Thomas Grainger in `#321 <https://github.com/pytest-dev/pytest-cov/pull/321>`_\n* Fixed breakage that occurs when multiple reporting options are used.\n  Contributed by Thomas Grainger in `#338 <https://github.com/pytest-dev/pytest-cov/pull/338>`_.\n* Changed internals to use a stub instead of ``os.devnull``.\n  Contributed by Thomas Grainger in `#332 <https://github.com/pytest-dev/pytest-cov/pull/332>`_.\n* Added support for Coverage 5.0.\n  Contributed by Ned Batchelder in `#319 <https://github.com/pytest-dev/pytest-cov/pull/319>`_.\n* Added support for float values in ``--cov-fail-under``.\n  Contributed by Martín Gaitán in `#311 <https://github.com/pytest-dev/pytest-cov/pull/311>`_.\n* Various documentation fixes. Contributed by\n  Juanjo Bazán,\n  Andrew Murray and\n  Albert Tugushev in\n  `#298 <https://github.com/pytest-dev/pytest-cov/pull/298>`_,\n  `#299 <https://github.com/pytest-dev/pytest-cov/pull/299>`_ and\n  `#307 <https://github.com/pytest-dev/pytest-cov/pull/307>`_.\n* Various testing improvements. Contributed by\n  Ned Batchelder,\n  Daniel Hahler,\n  Ionel Cristian Mărieș and\n  Hugo van Kemenade in\n  `#313 <https://github.com/pytest-dev/pytest-cov/pull/313>`_,\n  `#314 <https://github.com/pytest-dev/pytest-cov/pull/314>`_,\n  `#315 <https://github.com/pytest-dev/pytest-cov/pull/315>`_,\n  `#316 <https://github.com/pytest-dev/pytest-cov/pull/316>`_,\n  `#325 <https://github.com/pytest-dev/pytest-cov/pull/325>`_,\n  `#326 <https://github.com/pytest-dev/pytest-cov/pull/326>`_,\n  `#334 <https://github.com/pytest-dev/pytest-cov/pull/334>`_ and\n  `#335 <https://github.com/pytest-dev/pytest-cov/pull/335>`_.\n* Added the ``--cov-context`` CLI options that enables coverage contexts. Only works with coverage 5.0+.\n  Contributed by Ned Batchelder in `#345 <https://github.com/pytest-dev/pytest-cov/pull/345>`_.\n\n2.7.1 (2019-05-03)\n------------------\n\n* Fixed source distribution manifest so that garbage ain't included in the tarball.\n\n2.7.0 (2019-05-03)\n------------------\n\n* Fixed ``AttributeError: 'NoneType' object has no attribute 'configure_node'`` error when ``--no-cov`` is used.\n  Contributed by Alexander Shadchin in `#263 <https://github.com/pytest-dev/pytest-cov/pull/263>`_.\n* Various testing and CI improvements. Contributed by Daniel Hahler in\n  `#255 <https://github.com/pytest-dev/pytest-cov/pull/255>`_,\n  `#266 <https://github.com/pytest-dev/pytest-cov/pull/266>`_,\n  `#272 <https://github.com/pytest-dev/pytest-cov/pull/272>`_,\n  `#271 <https://github.com/pytest-dev/pytest-cov/pull/271>`_ and\n  `#269 <https://github.com/pytest-dev/pytest-cov/pull/269>`_.\n* Improved ``pytest_cov.embed.cleanup_on_sigterm`` to be reentrant (signal deliveries while signal handling is\n  running won't break stuff).\n* Added ``pytest_cov.embed.cleanup_on_signal`` for customized cleanup.\n* Improved cleanup code and fixed various issues with leftover data files. All contributed in\n  `#265 <https://github.com/pytest-dev/pytest-cov/pull/265>`_ or\n  `#262 <https://github.com/pytest-dev/pytest-cov/pull/262>`_.\n* Improved examples. Now there are two examples for the common project layouts, complete with working coverage\n  configuration. The examples have CI testing. Contributed in\n  `#267 <https://github.com/pytest-dev/pytest-cov/pull/267>`_.\n* Improved help text for CLI options.\n\n2.6.1 (2019-01-07)\n------------------\n\n* Added support for Pytest 4.1. Contributed by Daniel Hahler and Семён Марьясин in\n  `#253 <https://github.com/pytest-dev/pytest-cov/pull/253>`_ and\n  `#230 <https://github.com/pytest-dev/pytest-cov/pull/230>`_.\n* Various test and docs fixes. Contributed by Daniel Hahler in\n  `#224 <https://github.com/pytest-dev/pytest-cov/pull/224>`_ and\n  `#223 <https://github.com/pytest-dev/pytest-cov/pull/223>`_.\n* Fixed the \"Module already imported\" issue (`#211 <https://github.com/pytest-dev/pytest-cov/issues/211>`_).\n  Contributed by Daniel Hahler in `#228 <https://github.com/pytest-dev/pytest-cov/pull/228>`_.\n\n2.6.0 (2018-09-03)\n------------------\n\n* Dropped support for Python 3 < 3.4, Pytest < 3.5 and Coverage < 4.4.\n* Fixed some documentation formatting. Contributed by Jean Jordaan and Julian.\n* Added an example with ``addopts`` in documentation. Contributed by Samuel Giffard in\n  `#195 <https://github.com/pytest-dev/pytest-cov/pull/195>`_.\n* Fixed ``TypeError: 'NoneType' object is not iterable`` in certain xdist configurations. Contributed by Jeremy Bowman in\n  `#213 <https://github.com/pytest-dev/pytest-cov/pull/213>`_.\n* Added a ``no_cover`` marker and fixture. Fixes\n  `#78 <https://github.com/pytest-dev/pytest-cov/issues/78>`_.\n* Fixed broken ``no_cover`` check when running doctests. Contributed by Terence Honles in\n  `#200 <https://github.com/pytest-dev/pytest-cov/pull/200>`_.\n* Fixed various issues with path normalization in reports (when combining coverage data from parallel mode). Fixes\n  `#130 <https://github.com/pytest-dev/pytest-cov/issues/161>`_.\n  Contributed by Ryan Hiebert & Ionel Cristian Mărieș in\n  `#178 <https://github.com/pytest-dev/pytest-cov/pull/178>`_.\n* Report generation failures don't raise exceptions anymore. A warning will be logged instead. Fixes\n  `#161 <https://github.com/pytest-dev/pytest-cov/issues/161>`_.\n* Fixed multiprocessing issue on Windows (empty env vars are not passed). Fixes\n  `#165 <https://github.com/pytest-dev/pytest-cov/issues/165>`_.\n\n2.5.1 (2017-05-11)\n------------------\n\n* Fixed xdist breakage (regression in ``2.5.0``).\n  Fixes `#157 <https://github.com/pytest-dev/pytest-cov/issues/157>`_.\n* Allow setting custom ``data_file`` name in ``.coveragerc``.\n  Fixes `#145 <https://github.com/pytest-dev/pytest-cov/issues/145>`_.\n  Contributed by Jannis Leidel & Ionel Cristian Mărieș in\n  `#156 <https://github.com/pytest-dev/pytest-cov/pull/156>`_.\n\n2.5.0 (2017-05-09)\n------------------\n\n* Always show a summary when ``--cov-fail-under`` is used. Contributed by Francis Niu in `PR#141\n  <https://github.com/pytest-dev/pytest-cov/pull/141>`_.\n* Added ``--cov-branch`` option. Fixes `#85 <https://github.com/pytest-dev/pytest-cov/issues/85>`_.\n* Improve exception handling in subprocess setup. Fixes `#144 <https://github.com/pytest-dev/pytest-cov/issues/144>`_.\n* Fixed handling when ``--cov`` is used multiple times. Fixes `#151 <https://github.com/pytest-dev/pytest-cov/issues/151>`_.\n\n2.4.0 (2016-10-10)\n------------------\n\n* Added a \"disarm\" option: ``--no-cov``. It will disable coverage measurements. Contributed by Zoltan Kozma in\n  `PR#135 <https://github.com/pytest-dev/pytest-cov/pull/135>`_.\n\n  **WARNING: Do not put this in your configuration files, it's meant to be an one-off for situations where you want to\n  disable coverage from command line.**\n* Fixed broken exception handling on ``.pth`` file. See `#136 <https://github.com/pytest-dev/pytest-cov/issues/136>`_.\n\n2.3.1 (2016-08-07)\n------------------\n\n* Fixed regression causing spurious errors when xdist was used. See `#124\n  <https://github.com/pytest-dev/pytest-cov/issues/124>`_.\n* Fixed DeprecationWarning about incorrect `addoption` use. Contributed by Florian Bruhin in `PR#127\n  <https://github.com/pytest-dev/pytest-cov/pull/127>`_.\n* Fixed deprecated use of funcarg fixture API. Contributed by Daniel Hahler in `PR#125\n  <https://github.com/pytest-dev/pytest-cov/pull/125>`_.\n\n2.3.0 (2016-07-05)\n------------------\n\n* Add support for specifying output location for html, xml, and annotate report.\n  Contributed by Patrick Lannigan in `PR#113 <https://github.com/pytest-dev/pytest-cov/pull/113>`_.\n* Fix bug hiding test failure when cov-fail-under failed.\n* For coverage >= 4.0, match the default behaviour of `coverage report` and\n  error if coverage fails to find the source instead of just printing a warning.\n  Contributed by David Szotten in `PR#116 <https://github.com/pytest-dev/pytest-cov/pull/116>`_.\n* Fixed bug occurred when bare ``--cov`` parameter was used with xdist.\n  Contributed by Michael Elovskikh in `PR#120 <https://github.com/pytest-dev/pytest-cov/pull/120>`_.\n* Add support for ``skip_covered`` and added ``--cov-report=term-skip-covered`` command\n  line options. Contributed by Saurabh Kumar in `PR#115 <https://github.com/pytest-dev/pytest-cov/pull/115>`_.\n\n2.2.1 (2016-01-30)\n------------------\n\n* Fixed incorrect merging of coverage data when xdist was used and coverage was ``>= 4.0``.\n\n2.2.0 (2015-10-04)\n------------------\n\n* Added support for changing working directory in tests. Previously changing working\n  directory would disable coverage measurements in suprocesses.\n* Fixed broken handling for ``--cov-report=annotate``.\n\n2.1.0 (2015-08-23)\n------------------\n\n* Added support for `coverage 4.0b2`.\n* Added the ``--cov-append`` command line options. Contributed by Christian Ledermann\n  in `PR#80 <https://github.com/pytest-dev/pytest-cov/pull/80>`_.\n\n2.0.0 (2015-07-28)\n------------------\n\n* Added ``--cov-fail-under``, akin to the new ``fail_under`` option in `coverage-4.0`\n  (automatically activated if there's a ``[report] fail_under = ...`` in ``.coveragerc``).\n* Changed ``--cov-report=term`` to automatically upgrade to ``--cov-report=term-missing``\n  if there's ``[run] show_missing = True`` in ``.coveragerc``.\n* Changed ``--cov`` so it can be used with no path argument (in which case the source\n  settings from ``.coveragerc`` will be used instead).\n* Fixed `.pth` installation to work in all cases (install, easy_install, wheels, develop etc).\n* Fixed `.pth` uninstallation to work for wheel installs.\n* Support for coverage 4.0.\n* Data file suffixing changed to use coverage's ``data_suffix=True`` option (instead of the\n  custom suffixing).\n* Avoid warning about missing coverage data (just like ``coverage.control.process_startup``).\n* Fixed a race condition when running with xdist (all the workers tried to combine the files).\n  It's possible that this issue is not present in `pytest-cov 1.8.X`.\n\n1.8.2 (2014-11-06)\n------------------\n\n* N/A\n",
+        "description_content_type": "text/x-rst",
+        "keywords": [
+          "cover",
+          "coverage",
+          "distributed",
+          "parallel",
+          "py.test",
+          "pytest"
+        ],
+        "author_email": "Marc Schlaich <marc.schlaich@gmail.com>",
+        "maintainer_email": "Ionel Cristian Mărieș <contact@ionelmc.ro>",
+        "license_expression": "MIT",
+        "license_file": [
+          "AUTHORS.rst",
+          "LICENSE"
+        ],
+        "classifier": [
+          "Development Status :: 5 - Production/Stable",
+          "Framework :: Pytest",
+          "Intended Audience :: Developers",
+          "License :: OSI Approved :: MIT License",
+          "Operating System :: Microsoft :: Windows",
+          "Operating System :: POSIX",
+          "Operating System :: Unix",
+          "Programming Language :: Python",
+          "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: 3 :: Only",
+          "Programming Language :: Python :: 3.9",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Programming Language :: Python :: 3.14",
+          "Programming Language :: Python :: Implementation :: CPython",
+          "Programming Language :: Python :: Implementation :: PyPy",
+          "Topic :: Software Development :: Testing",
+          "Topic :: Utilities"
+        ],
+        "requires_dist": [
+          "coverage[toml]>=7.10.6",
+          "pluggy>=1.2",
+          "pytest>=7",
+          "process-tests; extra == 'testing'",
+          "pytest-xdist; extra == 'testing'",
+          "virtualenv; extra == 'testing'"
+        ],
+        "requires_python": ">=3.9",
+        "project_url": [
+          "Sources, https://github.com/pytest-dev/pytest-cov",
+          "Documentation, https://pytest-cov.readthedocs.io/",
+          "Changelog, https://pytest-cov.readthedocs.io/en/latest/changelog.html",
+          "Issue Tracker, https://github.com/pytest-dev/pytest-cov/issues"
+        ],
+        "provides_extra": [
+          "testing"
+        ]
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/pytest_sugar-1.1.1-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=2f8319b907548d5b9d03a171515c1d43d2e38e32bd8182a1781eb20b43344cc8",
+          "hashes": {
+            "sha256": "2f8319b907548d5b9d03a171515c1d43d2e38e32bd8182a1781eb20b43344cc8"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.1",
+        "name": "pytest-sugar",
+        "version": "1.1.1",
+        "platform": [
+          "any"
+        ],
+        "summary": "pytest-sugar is a plugin for pytest that changes the default look and feel of pytest (e.g. progressbar, show tests that fail instantly).",
+        "description": "# pytest-sugar ✨\n\n[![Build Status](https://img.shields.io/github/actions/workflow/status/Teemu/pytest-sugar/build-and-test.yaml?branch=main)](https://github.com/Teemu/pytest-sugar/actions)\n[![PyPI Version](https://img.shields.io/pypi/v/pytest-sugar.svg)](https://pypi.org/project/pytest-sugar/)\n[![Downloads](https://img.shields.io/pypi/dm/pytest-sugar)](https://pypi.org/project/pytest-sugar/)\n![License](https://img.shields.io/pypi/l/pytest-sugar?color=blue)\n\nThis plugin extends [pytest](http://pytest.org) by showing failures and errors instantly, adding a progress bar, improving the test results, and making the output look better.\n\n![render1667890332624-min](https://user-images.githubusercontent.com/53298/200600769-7b871b26-a36a-4ae6-ae24-945ee83fb74a.gif)\n\n## Installation\n\nTo install pytest-sugar:\n\n    python -m pip install pytest-sugar\n\nOnce installed, the plugin is activated automatically. Run your tests normally:\n\n    pytest\n\nIf you would like more detailed output (one test per line), then you may use the verbose option:\n\n    pytest --verbose\n\nIf you would like to run tests without pytest-sugar, use:\n\n    pytest -p no:sugar\n\n## Usage\npytest-sugar provides several command-line options to customize its output and behavior. These options enhance test reporting and Playwright trace integration:\n\n\nShow detailed test failures instead of one-line tracebacks.\nUse this if you want to see the full failure information instantly.\n\n    --old-summary\n\nForce pytest-sugar output even if pytest doesn’t detect a real terminal.\nUseful when running tests in CI systems or other non-interactive environments.\n\n    --force-sugar\n\n\nSpecify the directory where Playwright trace files are stored.\nDefaults to Playwright default: \"test-results\"\n\n    --sugar-trace-dir <directory>\n\nDisable Playwright trace file detection and output display.\nUse this if you want to turn off trace collection or display entirely.\n\n    --sugar-no-trace\n\n\n## How to contribute 👷‍♂️\n\n[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://github.com/codespaces/new?hide_repo_select=true&ref=master&repo=10950375)\n\nMake sure to read our [Code of Conduct](https://github.com/Teemu/pytest-sugar/blob/master/.github/CODE_OF_CONDUCT.md). You can get started modifying the codebase with the following commands. Alternatively, you can try Github Codespaces (click the badge above). Push the changes to your repository & create a pull request.\n\n````\ngit clone git@github.com:Teemu/pytest-sugar.git\ncd pytest-sugar\npython -m venv .venv\nsource .venv/bin/activate\necho \".venv\" >> .git/info/exclude\npip install -e \".[dev]\"\npre-commit install\n````\n\nThere are two ways of running tests. We have our proper tests:\n\n````\npytest .\n````\n\nThere are also fake tests that can be used to visualise the output:\n\n````\npytest faketests\n````\n\nWhen submitting a pull request, please add a `RELEASE.md` file in the root of the project that contains the release type (major, minor, patch) and a summary of the changes that will be used as the release changelog entry. For example:\n\n```markdown\nRelease type: patch\n\nFor long-running tests, display minutes and not only seconds.\n```\n\n## Requirements\n\nYou will need the following prerequisites in order to use pytest-sugar:\n\n- Python 3.8 or newer\n- pytest 6.2 or newer\n\n## Running on Windows\n\nIf you are seeing gibberish, you might want to try changing charset and fonts. See [this comment]( https://github.com/Teemu/pytest-sugar/pull/49#issuecomment-146567670) for more details.\n\n## Similar projects\n\n- [pytest-rich](https://github.com/nicoddemus/pytest-rich)\n- [pytest-pretty](https://github.com/samuelcolvin/pytest-pretty)\n\n\n",
+        "description_content_type": "text/markdown",
+        "home_page": "https://github.com/Teemu/pytest-sugar",
+        "author": "Teemu, Janne Vanhala and others",
+        "author_email": "orkkiolento@gmail.com, janne.vanhala@gmail.com",
+        "license": "BSD",
+        "license_file": [
+          "LICENSE"
+        ],
+        "classifier": [
+          "Development Status :: 4 - Beta",
+          "Intended Audience :: Developers",
+          "License :: OSI Approved :: BSD License",
+          "Operating System :: POSIX",
+          "Operating System :: Microsoft :: Windows",
+          "Operating System :: MacOS :: MacOS X",
+          "Topic :: Software Development :: Testing",
+          "Topic :: Software Development :: Libraries",
+          "Topic :: Utilities",
+          "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: 3.8",
+          "Programming Language :: Python :: 3.9",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Programming Language :: Python :: Implementation :: PyPy"
+        ],
+        "requires_dist": [
+          "pytest>=6.2.0",
+          "termcolor>=2.1.0",
+          "black; extra == \"dev\"",
+          "flake8; extra == \"dev\"",
+          "pre-commit; extra == \"dev\""
+        ],
+        "project_url": [
+          "Issue Tracker, https://github.com/Teemu/pytest-sugar/issues"
+        ],
+        "provides_extra": [
+          "dev"
+        ]
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/pytest_xdist-3.8.0-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=202ca578cfeb7370784a8c33d6d05bc6e13b4f25b5053c30a152269fd10f0b88",
+          "hashes": {
+            "sha256": "202ca578cfeb7370784a8c33d6d05bc6e13b4f25b5053c30a152269fd10f0b88"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.4",
+        "name": "pytest-xdist",
+        "version": "3.8.0",
+        "dynamic": [
+          "license-file"
+        ],
+        "summary": "pytest xdist plugin for distributed testing, most importantly across multiple CPUs",
+        "description": "============\npytest-xdist\n============\n\n.. image:: http://img.shields.io/pypi/v/pytest-xdist.svg\n    :alt: PyPI version\n    :target: https://pypi.python.org/pypi/pytest-xdist\n\n.. image:: https://img.shields.io/conda/vn/conda-forge/pytest-xdist.svg\n    :target: https://anaconda.org/conda-forge/pytest-xdist\n\n.. image:: https://img.shields.io/pypi/pyversions/pytest-xdist.svg\n    :alt: Python versions\n    :target: https://pypi.python.org/pypi/pytest-xdist\n\n.. image:: https://github.com/pytest-dev/pytest-xdist/workflows/test/badge.svg\n    :target: https://github.com/pytest-dev/pytest-xdist/actions\n\n.. image:: https://img.shields.io/badge/code%20style-black-000000.svg\n    :target: https://github.com/ambv/black\n\nThe `pytest-xdist`_ plugin extends pytest with new test execution modes, the most used being distributing\ntests across multiple CPUs to speed up test execution::\n\n    pytest -n auto\n\nWith this call, pytest will spawn a number of workers processes equal to the number of available CPUs, and distribute\nthe tests randomly across them.\n\nDocumentation\n=============\n\nDocumentation is available at `Read The Docs <https://pytest-xdist.readthedocs.io>`__.\n",
+        "description_content_type": "text/x-rst",
+        "author_email": "holger krekel and contributors <pytest-dev@python.org>, holger@merlinux.eu",
+        "license_expression": "MIT",
+        "license_file": [
+          "LICENSE"
+        ],
+        "classifier": [
+          "Development Status :: 5 - Production/Stable",
+          "Framework :: Pytest",
+          "Intended Audience :: Developers",
+          "Operating System :: POSIX",
+          "Operating System :: Microsoft :: Windows",
+          "Operating System :: MacOS :: MacOS X",
+          "Topic :: Software Development :: Testing",
+          "Topic :: Software Development :: Quality Assurance",
+          "Topic :: Utilities",
+          "Programming Language :: Python",
+          "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: 3 :: Only",
+          "Programming Language :: Python :: 3.9",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13"
+        ],
+        "requires_dist": [
+          "execnet>=2.1",
+          "pytest>=7.0.0",
+          "filelock; extra == \"testing\"",
+          "psutil>=3.0; extra == \"psutil\"",
+          "setproctitle; extra == \"setproctitle\""
+        ],
+        "requires_python": ">=3.9",
+        "project_url": [
+          "Homepage, https://github.com/pytest-dev/pytest-xdist",
+          "Documentation, https://pytest-xdist.readthedocs.io/en/latest",
+          "Changelog, https://pytest-xdist.readthedocs.io/en/latest/changelog.html",
+          "Source, https://github.com/pytest-dev/pytest-xdist",
+          "Tracker, https://github.com/pytest-dev/pytest-xdist/issues"
+        ],
+        "provides_extra": [
+          "testing",
+          "psutil",
+          "setproctitle"
+        ]
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/rich-15.0.0-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb",
+          "hashes": {
+            "sha256": "33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.4",
+        "name": "rich",
+        "version": "15.0.0",
+        "summary": "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal",
+        "description": "[![Supported Python Versions](https://img.shields.io/pypi/pyversions/rich)](https://pypi.org/project/rich/) [![PyPI version](https://badge.fury.io/py/rich.svg)](https://badge.fury.io/py/rich)\n\n[![Downloads](https://pepy.tech/badge/rich/month)](https://pepy.tech/project/rich)\n[![codecov](https://img.shields.io/codecov/c/github/Textualize/rich?label=codecov&logo=codecov)](https://codecov.io/gh/Textualize/rich)\n[![Rich blog](https://img.shields.io/badge/blog-rich%20news-yellowgreen)](https://www.willmcgugan.com/tag/rich/)\n[![Twitter Follow](https://img.shields.io/twitter/follow/willmcgugan.svg?style=social)](https://twitter.com/willmcgugan)\n\n![Logo](https://github.com/textualize/rich/raw/master/imgs/logo.svg)\n\n[English readme](https://github.com/textualize/rich/blob/master/README.md)\n • [简体中文 readme](https://github.com/textualize/rich/blob/master/README.cn.md)\n • [正體中文 readme](https://github.com/textualize/rich/blob/master/README.zh-tw.md)\n • [Lengua española readme](https://github.com/textualize/rich/blob/master/README.es.md)\n • [Deutsche readme](https://github.com/textualize/rich/blob/master/README.de.md)\n • [Läs på svenska](https://github.com/textualize/rich/blob/master/README.sv.md)\n • [日本語 readme](https://github.com/textualize/rich/blob/master/README.ja.md)\n • [한국어 readme](https://github.com/textualize/rich/blob/master/README.kr.md)\n • [Français readme](https://github.com/textualize/rich/blob/master/README.fr.md)\n • [Schwizerdütsch readme](https://github.com/textualize/rich/blob/master/README.de-ch.md)\n • [हिन्दी readme](https://github.com/textualize/rich/blob/master/README.hi.md)\n • [Português brasileiro readme](https://github.com/textualize/rich/blob/master/README.pt-br.md)\n • [Italian readme](https://github.com/textualize/rich/blob/master/README.it.md)\n • [Русский readme](https://github.com/textualize/rich/blob/master/README.ru.md)\n • [Indonesian readme](https://github.com/textualize/rich/blob/master/README.id.md)\n • [فارسی readme](https://github.com/textualize/rich/blob/master/README.fa.md)\n • [Türkçe readme](https://github.com/textualize/rich/blob/master/README.tr.md)\n • [Polskie readme](https://github.com/textualize/rich/blob/master/README.pl.md)\n\n\nRich is a Python library for _rich_ text and beautiful formatting in the terminal.\n\nThe [Rich API](https://rich.readthedocs.io/en/latest/) makes it easy to add color and style to terminal output. Rich can also render pretty tables, progress bars, markdown, syntax highlighted source code, tracebacks, and more — out of the box.\n\n![Features](https://github.com/textualize/rich/raw/master/imgs/features.png)\n\nFor a video introduction to Rich see [calmcode.io](https://calmcode.io/rich/introduction.html) by [@fishnets88](https://twitter.com/fishnets88).\n\nSee what [people are saying about Rich](https://www.willmcgugan.com/blog/pages/post/rich-tweets/).\n\n## Compatibility\n\nRich works with Linux, macOS and Windows. True color / emoji works with new Windows Terminal, classic terminal is limited to 16 colors. Rich requires Python 3.8 or later.\n\nRich works with [Jupyter notebooks](https://jupyter.org/) with no additional configuration required.\n\n## Installing\n\nInstall with `pip` or your favorite PyPI package manager.\n\n```sh\npython -m pip install rich\n```\n\nRun the following to test Rich output on your terminal:\n\n```sh\npython -m rich\n```\n\n## Rich Print\n\nTo effortlessly add rich output to your application, you can import the [rich print](https://rich.readthedocs.io/en/latest/introduction.html#quick-start) method, which has the same signature as the builtin Python function. Try this:\n\n```python\nfrom rich import print\n\nprint(\"Hello, [bold magenta]World[/bold magenta]!\", \":vampire:\", locals())\n```\n\n![Hello World](https://github.com/textualize/rich/raw/master/imgs/print.png)\n\n## Rich REPL\n\nRich can be installed in the Python REPL, so that any data structures will be pretty printed and highlighted.\n\n```python\n>>> from rich import pretty\n>>> pretty.install()\n```\n\n![REPL](https://github.com/textualize/rich/raw/master/imgs/repl.png)\n\n## Using the Console\n\nFor more control over rich terminal content, import and construct a [Console](https://rich.readthedocs.io/en/latest/reference/console.html#rich.console.Console) object.\n\n```python\nfrom rich.console import Console\n\nconsole = Console()\n```\n\nThe Console object has a `print` method which has an intentionally similar interface to the builtin `print` function. Here's an example of use:\n\n```python\nconsole.print(\"Hello\", \"World!\")\n```\n\nAs you might expect, this will print `\"Hello World!\"` to the terminal. Note that unlike the builtin `print` function, Rich will word-wrap your text to fit within the terminal width.\n\nThere are a few ways of adding color and style to your output. You can set a style for the entire output by adding a `style` keyword argument. Here's an example:\n\n```python\nconsole.print(\"Hello\", \"World!\", style=\"bold red\")\n```\n\nThe output will be something like the following:\n\n![Hello World](https://github.com/textualize/rich/raw/master/imgs/hello_world.png)\n\nThat's fine for styling a line of text at a time. For more finely grained styling, Rich renders a special markup which is similar in syntax to [bbcode](https://en.wikipedia.org/wiki/BBCode). Here's an example:\n\n```python\nconsole.print(\"Where there is a [bold cyan]Will[/bold cyan] there [u]is[/u] a [i]way[/i].\")\n```\n\n![Console Markup](https://github.com/textualize/rich/raw/master/imgs/where_there_is_a_will.png)\n\nYou can use a Console object to generate sophisticated output with minimal effort. See the [Console API](https://rich.readthedocs.io/en/latest/console.html) docs for details.\n\n## Rich Inspect\n\nRich has an [inspect](https://rich.readthedocs.io/en/latest/reference/init.html?highlight=inspect#rich.inspect) function which can produce a report on any Python object, such as class, instance, or builtin.\n\n```python\n>>> my_list = [\"foo\", \"bar\"]\n>>> from rich import inspect\n>>> inspect(my_list, methods=True)\n```\n\n![Log](https://github.com/textualize/rich/raw/master/imgs/inspect.png)\n\nSee the [inspect docs](https://rich.readthedocs.io/en/latest/reference/init.html#rich.inspect) for details.\n\n# Rich Library\n\nRich contains a number of builtin _renderables_ you can use to create elegant output in your CLI and help you debug your code.\n\nClick the following headings for details:\n\n<details>\n<summary>Log</summary>\n\nThe Console object has a `log()` method which has a similar interface to `print()`, but also renders a column for the current time and the file and line which made the call. By default Rich will do syntax highlighting for Python structures and for repr strings. If you log a collection (i.e. a dict or a list) Rich will pretty print it so that it fits in the available space. Here's an example of some of these features.\n\n```python\nfrom rich.console import Console\nconsole = Console()\n\ntest_data = [\n    {\"jsonrpc\": \"2.0\", \"method\": \"sum\", \"params\": [None, 1, 2, 4, False, True], \"id\": \"1\",},\n    {\"jsonrpc\": \"2.0\", \"method\": \"notify_hello\", \"params\": [7]},\n    {\"jsonrpc\": \"2.0\", \"method\": \"subtract\", \"params\": [42, 23], \"id\": \"2\"},\n]\n\ndef test_log():\n    enabled = False\n    context = {\n        \"foo\": \"bar\",\n    }\n    movies = [\"Deadpool\", \"Rise of the Skywalker\"]\n    console.log(\"Hello from\", console, \"!\")\n    console.log(test_data, log_locals=True)\n\n\ntest_log()\n```\n\nThe above produces the following output:\n\n![Log](https://github.com/textualize/rich/raw/master/imgs/log.png)\n\nNote the `log_locals` argument, which outputs a table containing the local variables where the log method was called.\n\nThe log method could be used for logging to the terminal for long running applications such as servers, but is also a very nice debugging aid.\n\n</details>\n<details>\n<summary>Logging Handler</summary>\n\nYou can also use the builtin [Handler class](https://rich.readthedocs.io/en/latest/logging.html) to format and colorize output from Python's logging module. Here's an example of the output:\n\n![Logging](https://github.com/textualize/rich/raw/master/imgs/logging.png)\n\n</details>\n\n<details>\n<summary>Emoji</summary>\n\nTo insert an emoji in to console output place the name between two colons. Here's an example:\n\n```python\n>>> console.print(\":smiley: :vampire: :pile_of_poo: :thumbs_up: :raccoon:\")\n😃 🧛 💩 👍 🦝\n```\n\nPlease use this feature wisely.\n\n</details>\n\n<details>\n<summary>Tables</summary>\n\nRich can render flexible [tables](https://rich.readthedocs.io/en/latest/tables.html) with unicode box characters. There is a large variety of formatting options for borders, styles, cell alignment etc.\n\n![table movie](https://github.com/textualize/rich/raw/master/imgs/table_movie.gif)\n\nThe animation above was generated with [table_movie.py](https://github.com/textualize/rich/blob/master/examples/table_movie.py) in the examples directory.\n\nHere's a simpler table example:\n\n```python\nfrom rich.console import Console\nfrom rich.table import Table\n\nconsole = Console()\n\ntable = Table(show_header=True, header_style=\"bold magenta\")\ntable.add_column(\"Date\", style=\"dim\", width=12)\ntable.add_column(\"Title\")\ntable.add_column(\"Production Budget\", justify=\"right\")\ntable.add_column(\"Box Office\", justify=\"right\")\ntable.add_row(\n    \"Dec 20, 2019\", \"Star Wars: The Rise of Skywalker\", \"$275,000,000\", \"$375,126,118\"\n)\ntable.add_row(\n    \"May 25, 2018\",\n    \"[red]Solo[/red]: A Star Wars Story\",\n    \"$275,000,000\",\n    \"$393,151,347\",\n)\ntable.add_row(\n    \"Dec 15, 2017\",\n    \"Star Wars Ep. VIII: The Last Jedi\",\n    \"$262,000,000\",\n    \"[bold]$1,332,539,889[/bold]\",\n)\n\nconsole.print(table)\n```\n\nThis produces the following output:\n\n![table](https://github.com/textualize/rich/raw/master/imgs/table.png)\n\nNote that console markup is rendered in the same way as `print()` and `log()`. In fact, anything that is renderable by Rich may be included in the headers / rows (even other tables).\n\nThe `Table` class is smart enough to resize columns to fit the available width of the terminal, wrapping text as required. Here's the same example, with the terminal made smaller than the table above:\n\n![table2](https://github.com/textualize/rich/raw/master/imgs/table2.png)\n\n</details>\n\n<details>\n<summary>Progress Bars</summary>\n\nRich can render multiple flicker-free [progress](https://rich.readthedocs.io/en/latest/progress.html) bars to track long-running tasks.\n\nFor basic usage, wrap any sequence in the `track` function and iterate over the result. Here's an example:\n\n```python\nfrom rich.progress import track\n\nfor step in track(range(100)):\n    do_step(step)\n```\n\nIt's not much harder to add multiple progress bars. Here's an example taken from the docs:\n\n![progress](https://github.com/textualize/rich/raw/master/imgs/progress.gif)\n\nThe columns may be configured to show any details you want. Built-in columns include percentage complete, file size, file speed, and time remaining. Here's another example showing a download in progress:\n\n![progress](https://github.com/textualize/rich/raw/master/imgs/downloader.gif)\n\nTo try this out yourself, see [examples/downloader.py](https://github.com/textualize/rich/blob/master/examples/downloader.py) which can download multiple URLs simultaneously while displaying progress.\n\n</details>\n\n<details>\n<summary>Status</summary>\n\nFor situations where it is hard to calculate progress, you can use the [status](https://rich.readthedocs.io/en/latest/reference/console.html#rich.console.Console.status) method which will display a 'spinner' animation and message. The animation won't prevent you from using the console as normal. Here's an example:\n\n```python\nfrom time import sleep\nfrom rich.console import Console\n\nconsole = Console()\ntasks = [f\"task {n}\" for n in range(1, 11)]\n\nwith console.status(\"[bold green]Working on tasks...\") as status:\n    while tasks:\n        task = tasks.pop(0)\n        sleep(1)\n        console.log(f\"{task} complete\")\n```\n\nThis generates the following output in the terminal.\n\n![status](https://github.com/textualize/rich/raw/master/imgs/status.gif)\n\nThe spinner animations were borrowed from [cli-spinners](https://www.npmjs.com/package/cli-spinners). You can select a spinner by specifying the `spinner` parameter. Run the following command to see the available values:\n\n```\npython -m rich.spinner\n```\n\nThe above command generates the following output in the terminal:\n\n![spinners](https://github.com/textualize/rich/raw/master/imgs/spinners.gif)\n\n</details>\n\n<details>\n<summary>Tree</summary>\n\nRich can render a [tree](https://rich.readthedocs.io/en/latest/tree.html) with guide lines. A tree is ideal for displaying a file structure, or any other hierarchical data.\n\nThe labels of the tree can be simple text or anything else Rich can render. Run the following for a demonstration:\n\n```\npython -m rich.tree\n```\n\nThis generates the following output:\n\n![markdown](https://github.com/textualize/rich/raw/master/imgs/tree.png)\n\nSee the [tree.py](https://github.com/textualize/rich/blob/master/examples/tree.py) example for a script that displays a tree view of any directory, similar to the linux `tree` command.\n\n</details>\n\n<details>\n<summary>Columns</summary>\n\nRich can render content in neat [columns](https://rich.readthedocs.io/en/latest/columns.html) with equal or optimal width. Here's a very basic clone of the (MacOS / Linux) `ls` command which displays a directory listing in columns:\n\n```python\nimport os\nimport sys\n\nfrom rich import print\nfrom rich.columns import Columns\n\ndirectory = os.listdir(sys.argv[1])\nprint(Columns(directory))\n```\n\nThe following screenshot is the output from the [columns example](https://github.com/textualize/rich/blob/master/examples/columns.py) which displays data pulled from an API in columns:\n\n![columns](https://github.com/textualize/rich/raw/master/imgs/columns.png)\n\n</details>\n\n<details>\n<summary>Markdown</summary>\n\nRich can render [markdown](https://rich.readthedocs.io/en/latest/markdown.html) and does a reasonable job of translating the formatting to the terminal.\n\nTo render markdown import the `Markdown` class and construct it with a string containing markdown code. Then print it to the console. Here's an example:\n\n```python\nfrom rich.console import Console\nfrom rich.markdown import Markdown\n\nconsole = Console()\nwith open(\"README.md\") as readme:\n    markdown = Markdown(readme.read())\nconsole.print(markdown)\n```\n\nThis will produce output something like the following:\n\n![markdown](https://github.com/textualize/rich/raw/master/imgs/markdown.png)\n\n</details>\n\n<details>\n<summary>Syntax Highlighting</summary>\n\nRich uses the [pygments](https://pygments.org/) library to implement [syntax highlighting](https://rich.readthedocs.io/en/latest/syntax.html). Usage is similar to rendering markdown; construct a `Syntax` object and print it to the console. Here's an example:\n\n```python\nfrom rich.console import Console\nfrom rich.syntax import Syntax\n\nmy_code = '''\ndef iter_first_last(values: Iterable[T]) -> Iterable[Tuple[bool, bool, T]]:\n    \"\"\"Iterate and generate a tuple with a flag for first and last value.\"\"\"\n    iter_values = iter(values)\n    try:\n        previous_value = next(iter_values)\n    except StopIteration:\n        return\n    first = True\n    for value in iter_values:\n        yield first, False, previous_value\n        first = False\n        previous_value = value\n    yield first, True, previous_value\n'''\nsyntax = Syntax(my_code, \"python\", theme=\"monokai\", line_numbers=True)\nconsole = Console()\nconsole.print(syntax)\n```\n\nThis will produce the following output:\n\n![syntax](https://github.com/textualize/rich/raw/master/imgs/syntax.png)\n\n</details>\n\n<details>\n<summary>Tracebacks</summary>\n\nRich can render [beautiful tracebacks](https://rich.readthedocs.io/en/latest/traceback.html) which are easier to read and show more code than standard Python tracebacks. You can set Rich as the default traceback handler so all uncaught exceptions will be rendered by Rich.\n\nHere's what it looks like on OSX (similar on Linux):\n\n![traceback](https://github.com/textualize/rich/raw/master/imgs/traceback.png)\n\n</details>\n\nAll Rich renderables make use of the [Console Protocol](https://rich.readthedocs.io/en/latest/protocol.html), which you can also use to implement your own Rich content.\n\n# Rich CLI\n\n\nSee also [Rich CLI](https://github.com/textualize/rich-cli) for a command line application powered by Rich. Syntax highlight code, render markdown, display CSVs in tables, and more, directly from the command prompt.\n\n\n![Rich CLI](https://raw.githubusercontent.com/Textualize/rich-cli/main/imgs/rich-cli-splash.jpg)\n\n# Textual\n\nSee also Rich's sister project, [Textual](https://github.com/Textualize/textual), which you can use to build sophisticated User Interfaces in the terminal.\n\n![textual-splash](https://github.com/user-attachments/assets/4caeb77e-48c0-4cf7-b14d-c53ded855ffd)\n\n# Toad\n\n[Toad](https://github.com/batrachianai/toad) is a unified interface for agentic coding. Built with Rich and Textual.\n\n![toad](https://github.com/user-attachments/assets/6678b707-1aeb-420f-99ad-abfcd4356771)\n\n",
+        "description_content_type": "text/markdown",
+        "author": "Will McGugan",
+        "author_email": "willmcgugan@gmail.com",
+        "license": "MIT",
+        "license_file": [
+          "LICENSE"
+        ],
+        "classifier": [
+          "Development Status :: 5 - Production/Stable",
+          "Environment :: Console",
+          "Framework :: IPython",
+          "Intended Audience :: Developers",
+          "License :: OSI Approved :: MIT License",
+          "Operating System :: MacOS",
+          "Operating System :: Microsoft :: Windows",
+          "Operating System :: POSIX :: Linux",
+          "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: 3.9",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Programming Language :: Python :: 3.14",
+          "Typing :: Typed"
+        ],
+        "requires_dist": [
+          "ipywidgets (>=7.5.1,<9) ; extra == \"jupyter\"",
+          "markdown-it-py (>=2.2.0)",
+          "pygments (>=2.13.0,<3.0.0)"
+        ],
+        "requires_python": ">=3.9.0",
+        "project_url": [
+          "Documentation, https://rich.readthedocs.io/en/latest/",
+          "Homepage, https://github.com/Textualize/rich"
+        ],
+        "provides_extra": [
+          "jupyter"
+        ]
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/shellingham-1.5.4-py2.py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686",
+          "hashes": {
+            "sha256": "7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.1",
+        "name": "shellingham",
+        "version": "1.5.4",
+        "summary": "Tool to Detect Surrounding Shell",
+        "description": "=============================================\nShellingham: Tool to Detect Surrounding Shell\n=============================================\n\n.. image:: https://img.shields.io/pypi/v/shellingham.svg\n    :target: https://pypi.org/project/shellingham/\n\nShellingham detects what shell the current Python executable is running in.\n\n\nUsage\n=====\n\n.. code-block:: python\n\n    >>> import shellingham\n    >>> shellingham.detect_shell()\n    ('bash', '/bin/bash')\n\n``detect_shell`` pokes around the process's running environment to determine\nwhat shell it is run in. It returns a 2-tuple:\n\n* The shell name, always lowercased.\n* The command used to run the shell.\n\n``ShellDetectionFailure`` is raised if ``detect_shell`` fails to detect the\nsurrounding shell.\n\n\nNotes\n=====\n\n* The shell name is always lowercased.\n* On Windows, the shell name is the name of the executable, minus the file\n  extension.\n\n\nNotes for Application Developers\n================================\n\nRemember, your application's user is not necessarily using a shell.\nShellingham raises ``ShellDetectionFailure`` if there is no shell to detect,\nbut *your application should almost never do this to your user*.\n\nA practical approach to this is to wrap ``detect_shell`` in a try block, and\nprovide a sane default on failure\n\n.. code-block:: python\n\n    try:\n        shell = shellingham.detect_shell()\n    except shellingham.ShellDetectionFailure:\n        shell = provide_default()\n\n\nThere are a few choices for you to choose from.\n\n* The POSIX standard mandates the environment variable ``SHELL`` to refer to\n  \"the user's preferred command language interpreter\". This is always available\n  (even if the user is not in an interactive session), and likely the correct\n  choice to launch an interactive sub-shell with.\n* A command ``sh`` is almost guaranteed to exist, likely at ``/bin/sh``, since\n  several POSIX tools rely on it. This should be suitable if you want to run a\n  (possibly non-interactive) script.\n* All versions of DOS and Windows have an environment variable ``COMSPEC``.\n  This can always be used to launch a usable command prompt (e.g. `cmd.exe` on\n  Windows).\n\nHere's a simple implementation to provide a default shell\n\n.. code-block:: python\n\n    import os\n\n    def provide_default():\n        if os.name == 'posix':\n            return os.environ['SHELL']\n        elif os.name == 'nt':\n            return os.environ['COMSPEC']\n        raise NotImplementedError(f'OS {os.name!r} support not available')\n",
+        "description_content_type": "text/x-rst",
+        "keywords": [
+          "shell"
+        ],
+        "home_page": "https://github.com/sarugaku/shellingham",
+        "author": "Tzu-ping Chung",
+        "author_email": "uranusjr@gmail.com",
+        "license": "ISC License",
+        "license_file": [
+          "LICENSE"
+        ],
+        "classifier": [
+          "Development Status :: 3 - Alpha",
+          "Environment :: Console",
+          "Intended Audience :: Developers",
+          "License :: OSI Approved :: ISC License (ISCL)",
+          "Operating System :: OS Independent",
+          "Programming Language :: Python :: 3 :: Only",
+          "Programming Language :: Python :: 3.7",
+          "Programming Language :: Python :: 3.8",
+          "Programming Language :: Python :: 3.9",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Topic :: Software Development :: Libraries :: Python Modules"
+        ],
+        "requires_python": ">=3.7"
+      }
+    },
+    {
+      "download_info": {
+        "url": "file:///offline/artifacts/termcolor-3.3.0-py3-none-any.whl",
+        "archive_info": {
+          "hash": "sha256=cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5",
+          "hashes": {
+            "sha256": "cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5"
+          }
+        }
+      },
+      "is_direct": false,
+      "is_yanked": false,
+      "requested": true,
+      "metadata": {
+        "metadata_version": "2.4",
+        "name": "termcolor",
+        "version": "3.3.0",
+        "summary": "ANSI color formatting for output in terminal",
+        "description": "# termcolor\n\n[![PyPI version](https://img.shields.io/pypi/v/termcolor.svg?logo=pypi&logoColor=FFE873)](https://pypi.org/project/termcolor)\n[![Supported Python versions](https://img.shields.io/pypi/pyversions/termcolor.svg?logo=python&logoColor=FFE873)](https://pypi.org/project/termcolor)\n[![PyPI downloads](https://img.shields.io/pypi/dm/termcolor.svg)](https://pypistats.org/packages/termcolor)\n[![GitHub Actions status](https://github.com/termcolor/termcolor/workflows/Test/badge.svg)](https://github.com/termcolor/termcolor/actions)\n[![Codecov](https://codecov.io/gh/termcolor/termcolor/branch/main/graph/badge.svg)](https://codecov.io/gh/termcolor/termcolor)\n[![Licence](https://img.shields.io/github/license/termcolor/termcolor.svg)](COPYING.txt)\n[![Code style: Black](https://img.shields.io/badge/code%20style-Black-000000.svg)](https://github.com/psf/black)\n[![Tidelift](https://tidelift.com/badges/package/pypi/termcolor)](https://tidelift.com/subscription/pkg/pypi-termcolor?utm_source=pypi-termcolor&utm_medium=referral&utm_campaign=readme)\n\n## Installation\n\n### From PyPI\n\n```bash\npython3 -m pip install --upgrade termcolor\n```\n\n### From source\n\n```bash\ngit clone https://github.com/termcolor/termcolor\ncd termcolor\npython3 -m pip install .\n```\n\n### Demo\n\nTo see demo output, run:\n\n```bash\npython3 -m termcolor\n```\n\n## Example\n\n```python\nimport sys\n\nfrom termcolor import colored, cprint\n\ntext = colored(\"Hello, World!\", \"red\", attrs=[\"reverse\", \"blink\"])\nprint(text)\ncprint(\"Hello, World!\", \"green\", \"on_red\")\n\nprint_red_on_cyan = lambda x: cprint(x, \"red\", \"on_cyan\")\nprint_red_on_cyan(\"Hello, World!\")\nprint_red_on_cyan(\"Hello, Universe!\")\n\nfor i in range(10):\n    cprint(i, \"magenta\", end=\" \")\n\ncprint(\"Attention!\", \"red\", attrs=[\"bold\"], file=sys.stderr)\n\n# You can also specify 0-255 RGB ints via a tuple\ncprint(\"Both foreground and background can use tuples\", (100, 150, 250), (50, 60, 70))\n```\n\n## Text properties\n\n| Text colors     | Text highlights    | Attributes  |\n| --------------- | ------------------ | ----------- |\n| `black`         | `on_black`         | `bold`      |\n| `red`           | `on_red`           | `dark`      |\n| `green`         | `on_green`         | `italic`    |\n| `yellow`        | `on_yellow`        | `underline` |\n| `blue`          | `on_blue`          | `blink`     |\n| `magenta`       | `on_magenta`       | `reverse`   |\n| `cyan`          | `on_cyan`          | `concealed` |\n| `white`         | `on_white`         | `strike`    |\n| `light_grey`    | `on_light_grey`    |             |\n| `dark_grey`     | `on_dark_grey`     |             |\n| `light_red`     | `on_light_red`     |             |\n| `light_green`   | `on_light_green`   |             |\n| `light_yellow`  | `on_light_yellow`  |             |\n| `light_blue`    | `on_light_blue`    |             |\n| `light_magenta` | `on_light_magenta` |             |\n| `light_cyan`    | `on_light_cyan`    |             |\n\nYou can also use any arbitrary RGB color specified as a tuple of 0-255 integers, for\nexample, `(100, 150, 250)`.\n\n## Terminal properties\n\n| Terminal     | bold    | dark | italic | underline | blink      | reverse | concealed |\n| ------------ | ------- | ---- | ------ | --------- | ---------- | ------- | --------- |\n| xterm        | yes     | no   | yes    | yes       | bold       | yes     | yes       |\n| linux        | yes     | yes  | color  | bold      | yes        | yes     | no        |\n| rxvt         | yes     | no   | yes    | yes       | bold/black | yes     | no        |\n| dtterm       | yes     | yes  | ?      | yes       | reverse    | yes     | yes       |\n| teraterm     | reverse | no   | ?      | yes       | rev/red    | yes     | no        |\n| aixterm      | normal  | no   | ?      | yes       | no         | yes     | yes       |\n| PuTTY        | color   | no   | no     | yes       | no         | yes     | no        |\n| Windows      | no      | no   | no     | no        | no         | yes     | no        |\n| Cygwin SSH   | yes     | no   | ?      | color     | color      | color   | yes       |\n| Mac Terminal | yes     | no   | yes    | yes       | yes        | yes     | yes       |\n\n## Overrides\n\nTerminal colour detection can be disabled or enabled in several ways.\n\nIn order of precedence:\n\n1. Calling `colored` or `cprint` with a truthy `no_color` disables colour.\n2. Calling `colored` or `cprint` with a truthy `force_color` forces colour.\n3. Setting the `ANSI_COLORS_DISABLED` environment variable to any non-empty value\n   disables colour.\n4. Setting the [`NO_COLOR`](https://no-color.org/) environment variable to any non-empty\n   value disables colour.\n5. Setting the [`FORCE_COLOR`](https://force-color.org/) environment variable to any\n   non-empty value forces colour.\n6. Setting the `TERM` environment variable to `dumb`, or using such a\n   [dumb terminal](https://en.wikipedia.org/wiki/Computer_terminal#Character-oriented_terminal),\n   disables colour.\n7. Finally, termcolor will attempt to detect whether the terminal supports colour.\n",
+        "description_content_type": "text/markdown",
+        "keywords": [
+          "ANSI",
+          "ANSI color",
+          "ANSI colour",
+          "color",
+          "colour",
+          "formatting",
+          "termcolor",
+          "terminal"
+        ],
+        "author_email": "Konstantin Lepa <konstantin.lepa@gmail.com>",
+        "maintainer": "Hugo van Kemenade",
+        "license_expression": "MIT",
+        "license_file": [
+          "COPYING.txt"
+        ],
+        "classifier": [
+          "Development Status :: 5 - Production/Stable",
+          "Environment :: Console",
+          "Intended Audience :: Developers",
+          "Operating System :: OS Independent",
+          "Programming Language :: Python",
+          "Programming Language :: Python :: 3 :: Only",
+          "Programming Language :: Python :: 3.10",
+          "Programming Language :: Python :: 3.11",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Programming Language :: Python :: 3.14",
+          "Programming Language :: Python :: 3.15",
+          "Programming Language :: Python :: Implementation :: CPython",
+          "Programming Language :: Python :: Implementation :: PyPy",
+          "Topic :: Terminals",
+          "Typing :: Typed"
+        ],
+        "requires_dist": [
+          "pytest; extra == 'tests'",
+          "pytest-cov; extra == 'tests'"
+        ],
+        "requires_python": ">=3.10",
+        "project_url": [
+          "Changelog, https://github.com/termcolor/termcolor/releases",
+          "Homepage, https://github.com/termcolor/termcolor",
+          "Source, https://github.com/termcolor/termcolor"
+        ],
+        "provides_extra": [
+          "tests"
+        ]
+      }
+    }
+  ],
+  "environment": {
+    "implementation_name": "cpython",
+    "implementation_version": "3.12.15",
+    "os_name": "posix",
+    "platform_machine": "x86_64",
+    "platform_release": "6.6.87.2-microsoft-standard-WSL2",
+    "platform_system": "Linux",
+    "platform_version": "#1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025",
+    "python_full_version": "3.12.15",
+    "platform_python_implementation": "CPython",
+    "python_version": "3.12",
+    "sys_platform": "linux"
+  }
+}

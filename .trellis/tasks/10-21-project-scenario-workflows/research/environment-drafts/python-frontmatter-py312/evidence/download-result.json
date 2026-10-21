@@ -1,0 +1,18 @@
+{
+  "command": [
+    "/usr/bin/python3",
+    "-m",
+    "pip",
+    "download",
+    "--disable-pip-version-check",
+    "--only-binary=:all:",
+    "--no-deps",
+    "--dest",
+    "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/artifacts",
+    "--requirement",
+    "/root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/requirements-frozen.txt"
+  ],
+  "exit_code": 0,
+  "elapsed_sec": 16.542637496999305,
+  "scope": "仅下载既有固定版本，不查询或选择最新版"
+}

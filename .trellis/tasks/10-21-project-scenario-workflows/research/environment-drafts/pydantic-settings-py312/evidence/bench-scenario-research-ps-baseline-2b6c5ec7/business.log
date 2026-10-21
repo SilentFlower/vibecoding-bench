@@ -1,0 +1,19 @@
+Traceback (most recent call last):
+  File "/control/check_settings.py", line 284, in <module>
+    main()
+  File "/control/check_settings.py", line 271, in main
+    api = _load_library(root)
+          ^^^^^^^^^^^^^^^^^^^
+  File "/control/check_settings.py", line 33, in _load_library
+    from pydantic import ValidationError
+  File "/work/dependencies/pydantic/__init__.py", line 5, in <module>
+    from ._migration import getattr_migration
+  File "/work/dependencies/pydantic/_migration.py", line 5, in <module>
+    from pydantic.warnings import PydanticDeprecatedSince20
+  File "/work/dependencies/pydantic/warnings.py", line 5, in <module>
+    from .version import version_short
+  File "/work/dependencies/pydantic/version.py", line 7, in <module>
+    from pydantic_core import __version__ as __pydantic_core_version__
+  File "/work/dependencies/pydantic_core/__init__.py", line 8, in <module>
+    from ._pydantic_core import (
+ImportError: /work/dependencies/pydantic_core/_pydantic_core.cpython-312-x86_64-linux-gnu.so: failed to map segment from shared object

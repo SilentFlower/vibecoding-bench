@@ -1,0 +1,14 @@
+{
+  "step": "apply-reference",
+  "command": [
+    "/usr/bin/patch",
+    "--batch",
+    "--forward",
+    "-p1",
+    "-i",
+    "/input/reference.patch"
+  ],
+  "cwd": "/work/candidates/reference",
+  "exit_code": 0,
+  "elapsed_sec": 0.0017510109992144862
+}

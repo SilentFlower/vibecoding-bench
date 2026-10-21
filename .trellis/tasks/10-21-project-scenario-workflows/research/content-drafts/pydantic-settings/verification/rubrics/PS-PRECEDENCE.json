@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "task_id": "PS-PRECEDENCE",
+  "version": 1,
+  "status": "draft_not_calibrated",
+  "criteria": [
+    {
+      "id": "no-bug",
+      "requirement": "明确本例是默认环境高于 dotenv 的正常行为，APP_QUANTITY=5 覆盖文件数量2，不把它称为库BUG。",
+      "required": true
+    },
+    {
+      "id": "fix-usage",
+      "requirement": "给出撤去当前进程变量的最小办法；若提文件优先则用真实 settings_customise_sources 并说明影响，不要求改库。",
+      "required": true
+    },
+    {
+      "id": "avoid-wrong-api",
+      "requirement": "不得建议 _env_file=None 来只读文件，因为该选项禁用 dotenv；结论需要源码与现有输入支持。",
+      "required": true
+    }
+  ],
+  "source_evidence": {
+    "main": [
+      "library/pydantic_settings/main.py:255",
+      "library/pydantic_settings/main.py:295",
+      "library/pydantic_settings/main.py:323",
+      "library/pydantic_settings/main.py:336"
+    ],
+    "env": [
+      "library/pydantic_settings/sources/providers/env.py:200",
+      "library/pydantic_settings/sources/providers/env.py:217",
+      "library/pydantic_settings/sources/providers/env.py:275"
+    ],
+    "decode": [
+      "library/pydantic_settings/sources/base.py:194",
+      "library/pydantic_settings/sources/utils.py:150",
+      "library/pydantic_settings/sources/utils.py:213"
+    ]
+  },
+  "accept_equivalent_answers": true,
+  "grade_length": false,
+  "uncertain_rule": "证据不足时返回 uncertain，不自动当候选失败；不得要求输出隐含推理过程。",
+  "feedback_policy": "仅返回已声明的公开业务规则和反馈码，不披露隐藏样例或完整rubric。"
+}

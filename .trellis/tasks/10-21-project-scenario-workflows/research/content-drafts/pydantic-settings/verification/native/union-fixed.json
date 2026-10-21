@@ -1,0 +1,62 @@
+{
+  "script": "verification/check_settings.py",
+  "args": [
+    "union-fixed"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "empty_list": {
+      "item": []
+    },
+    "unicode_list": {
+      "item": [
+        "咖啡",
+        "茶"
+      ]
+    },
+    "plain_text": {
+      "item": "hello"
+    },
+    "invalid_json_preserved": {
+      "item": "[bad"
+    },
+    "multiple_keys": {
+      "item": [],
+      "second": [
+        "茶"
+      ],
+      "label": "hello"
+    },
+    "invalid_list_element_rejected": true,
+    "existing_controls": {
+      "ordinary_union": [],
+      "no_decode": "[]",
+      "force_decode": [],
+      "disabled_decoding": "[]"
+    },
+    "case_mismatch_ignored": {},
+    "exact_case": {
+      "item": []
+    },
+    "whole_object_workaround": {
+      "item": []
+    }
+  },
+  "resource_profile": "business",
+  "draft_status": "not_executed",
+  "regression": {
+    "cwd": "library",
+    "argv": [
+      "python",
+      "-m",
+      "pytest",
+      "tests",
+      "-q"
+    ],
+    "resource_profile": "regression",
+    "status": "not_executed"
+  }
+}

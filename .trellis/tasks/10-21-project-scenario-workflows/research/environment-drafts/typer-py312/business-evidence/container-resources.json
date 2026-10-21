@@ -1,0 +1,6 @@
+{
+  "uid": 1000,
+  "gid": 1000,
+  "cgroup_memory_peak_bytes": 110215168,
+  "max_rss_children_kib": 72720
+}

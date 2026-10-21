@@ -1,0 +1,297 @@
+{
+  "schema": 2,
+  "project_key": "typer",
+  "title": "Typer 本地商品 CLI",
+  "category": "命令行工具",
+  "description": "固定真实Typer版本，覆盖理解、咨询、两种正常行为诊断、方案与用户应用导出增强；4场景7任务，全部保持库源码不变。",
+  "seed_digest": "fd8db542b38dd5da63cdbd625dc964acd6648da242cec842bd161b84c8fa852b",
+  "environment": "typer-py312",
+  "source": {
+    "repository": "https://github.com/fastapi/typer",
+    "commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/typer/_click/LICENSE.txt",
+      "seed/PYDANTIC-v1.9.2-LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TY-S01",
+      "title": "商品工具选型与接入",
+      "goal": "理解框架边界并取得不落盘的可运行示例",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TY-U01",
+            "TY-C01"
+          ],
+          "materials": []
+        },
+        {
+          "id": "understand-only",
+          "task_ids": [
+            "TY-U01"
+          ],
+          "materials": []
+        },
+        {
+          "id": "consult-only",
+          "task_ids": [
+            "TY-C01"
+          ],
+          "materials": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TY-U01",
+          "kind": "understand",
+          "goal": "解释Typer用途、函数到命令的流程与商品持久化边界",
+          "prompt": "我想把本地商品处理函数做成命令行工具。这个项目主要解决什么问题？请根据当前源码说明从函数到命令的关键流程，以及它是否会替我存储商品数据。简短说明即可。",
+          "materials": [],
+          "requires": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "understood"
+          ],
+          "max_turns": 2,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/rubrics/TY-U01.json"
+          }
+        },
+        {
+          "id": "TY-C01",
+          "kind": "consult",
+          "goal": "在答复中提供满足数量边界的最小商品CLI接入示例",
+          "prompt": "上面是我的商品函数。希望运行 `python shop.py 咖啡 --quantity 3`，默认数量为 1，数量不能为负数。请给出最小可运行的接入示例和调用方式，解释错误输入怎么反馈；先不要替我创建文件。",
+          "materials": [
+            "materials/TY-C01/product.py"
+          ],
+          "requires": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "usable_example"
+          ],
+          "max_turns": 2,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/rubrics/TY-C01.json",
+            "native": "verification/native/consult.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TY-S02",
+      "title": "命令模式与选项位置诊断",
+      "goal": "以独立应用材料排除两种正常行为的误判",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TY-D01",
+            "TY-D02"
+          ],
+          "materials": []
+        },
+        {
+          "id": "single-only",
+          "task_ids": [
+            "TY-D01"
+          ],
+          "materials": []
+        },
+        {
+          "id": "group-only",
+          "task_ids": [
+            "TY-D02"
+          ],
+          "materials": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TY-D01",
+          "kind": "diagnose",
+          "goal": "解释单命令调用并排除注册失效误判",
+          "prompt": "代码里注册的函数叫 `product`，但 `python shop.py 咖啡 --quantity 3` 可以直接执行。我以为必须写命令名。这是不是注册失效了？先帮我判断原因，不要改代码。",
+          "materials": [
+            "materials/TY-D01/shop.py"
+          ],
+          "requires": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "normal_behavior"
+          ],
+          "max_turns": 2,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/rubrics/TY-D01.json",
+            "native": "verification/native/single.json"
+          }
+        },
+        {
+          "id": "TY-D02",
+          "kind": "diagnose",
+          "goal": "先获取必要材料，再判断根选项位置报错与正确调用",
+          "prompt": "我给商品工具加了 `--verbose`。运行 `python shop.py export --verbose` 提示 `No such option: --verbose`，这是 Typer 的 BUG 吗？",
+          "materials": [],
+          "requires": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "normal_behavior"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/rubrics/TY-D02.json",
+            "native": "verification/native/group.json"
+          },
+          "branches": [
+            {
+              "id": "TY-D02-registration",
+              "when": "请求完整注册代码或能确认根/子命令选项归属的帮助信息，或明确指出缺少声明并请求这项必要材料；不能仅武断猜测后直接通过。",
+              "materials": [
+                "disclosure/TY-D02/shop.py",
+                "disclosure/TY-D02/followup.md",
+                "disclosure/TY-D02/root-help.txt",
+                "disclosure/TY-D02/export-help.txt"
+              ],
+              "setup": [
+                {
+                  "source": "disclosure/TY-D02/shop.py",
+                  "target": "app/shop.py"
+                }
+              ],
+              "activate_tasks": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TY-S03",
+      "title": "已有类型能力与SKU方案",
+      "goal": "先辨识已有能力，再为两个命令选择应用方案",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TY-C02",
+            "TY-P01"
+          ],
+          "materials": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TY-C02",
+          "kind": "consult",
+          "goal": "辨识已有Literal及两种自定义参数能力与互斥约束",
+          "prompt": "商品品类只允许 `coffee` 或 `tea`，SKU 要解析成我自己的类。这个版本必须改 Typer 才能支持吗？我看到 `Literal`、`parser` 和 `click_type`，请确认它们现在能做什么，以及能不能同时指定后两者。",
+          "materials": [
+            "materials/TY-S03/requirements.md"
+          ],
+          "requires": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "existing_capabilities_confirmed"
+          ],
+          "max_turns": 2,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/rubrics/TY-C02.json",
+            "native": "verification/native/types.json"
+          }
+        },
+        {
+          "id": "TY-P01",
+          "kind": "plan",
+          "goal": "为两个本地命令选择维护成本合理的SKU解析方案",
+          "prompt": "我的 SKU 只是 `SKU-` 加四个数字；只有“查询”和“下架”两个本地命令需要它，失败时告诉用户格式不对即可，暂时不需要复杂补全或第三方插件。请比较在应用中复用解析函数、使用自定义参数类型，以及扩展 Typer 注册机制这几种办法，推荐一个维护成本合理的方案。先不要实现。",
+          "materials": [
+            "materials/TY-S03/requirements.md"
+          ],
+          "requires": [
+            {
+              "task_id": "TY-C02",
+              "artifact": "answer"
+            }
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "feasible_plan"
+          ],
+          "max_turns": 2,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/rubrics/TY-P01.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TY-S04",
+      "title": "本地商品清单导出",
+      "goal": "显式修改用户应用并保持Typer库不变",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TY-M01"
+          ],
+          "materials": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TY-M01",
+          "kind": "modify",
+          "goal": "为用户商品应用增加完整JSON清单导出并保留既有行为",
+          "prompt": "现在请修改这个商品应用，增加 `export` 子命令。用 `python shop.py export catalog.json --output result.json` 把商品清单导出为 JSON：保留商品顺序及 sku、name、quantity，忽略其他字段，中文以实际字符保存；输入必须是对象数组，每项都有非空字符串 sku、name，以及非负整数 quantity（布尔值不算整数），重复 sku 拒绝，空数组允许。坏 JSON 或任意无效记录都要非零退出并说明原因，不能留下部分导出文件。已有输出文件拒绝覆盖，输入文件不能改。请同时保留现有 `product` 命令，并补充针对业务行为的测试与简短用法说明。只修改这个用户应用及其测试、文档，不改 Typer 和依赖环境。",
+          "materials": [
+            "materials/TY-M01/shop.py",
+            "materials/TY-M01/catalog.json",
+            "materials/TY-M01/README.md"
+          ],
+          "requires": [],
+          "allowed_paths": [
+            "app/shop.py",
+            "app/tests",
+            "app/README.md"
+          ],
+          "outcomes": [
+            "application_enhancement"
+          ],
+          "max_turns": 2,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/rubrics/TY-M01.json",
+            "native": "verification/native/export.json"
+          },
+          "setup": [
+            {
+              "source": "materials/TY-M01/shop.py",
+              "target": "app/shop.py"
+            },
+            {
+              "source": "materials/TY-M01/catalog.json",
+              "target": "app/catalog.json"
+            },
+            {
+              "source": "materials/TY-M01/README.md",
+              "target": "app/README.md"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

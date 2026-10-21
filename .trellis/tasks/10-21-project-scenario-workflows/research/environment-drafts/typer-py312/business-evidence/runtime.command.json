@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/work/venv/bin/python",
+    "-B",
+    "-c",
+    "import json,sys,typer;print(json.dumps({'python':sys.version,'typer':typer.__version__,'typer_file':typer.__file__}))"
+  ],
+  "cwd": "/work/project",
+  "exit_code": 0,
+  "elapsed_sec": 0.166006
+}

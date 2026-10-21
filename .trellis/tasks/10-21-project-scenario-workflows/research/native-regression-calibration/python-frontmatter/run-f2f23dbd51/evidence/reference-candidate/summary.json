@@ -1,0 +1,98 @@
+{
+  "collected": 67,
+  "collection_digest": "cb1c87c04ce42eefc575647fc4ed1c73b5df4adcb8b37047fe8b5b5989ad0cf8",
+  "collection_errors": [],
+  "collection_matches_contract": true,
+  "command": [
+    "/work/venv/bin/python",
+    "-m",
+    "pytest",
+    "-p",
+    "_bench_native_regression_control",
+    ".",
+    "--doctest-modules",
+    "--doctest-glob",
+    "README.md",
+    "-q",
+    "-ra",
+    "-p",
+    "no:cacheprovider",
+    "--junitxml=/evidence/reference-candidate/junit.xml"
+  ],
+  "counts": {
+    "error": 0,
+    "failed": 0,
+    "passed": 67,
+    "skipped": 0,
+    "unexecuted": 0,
+    "xfailed": 0,
+    "xpassed": 0
+  },
+  "cwd": "/work/tmp/bench-native-regression-m4l1imk1/project",
+  "elapsed_sec": 0.5767262200006371,
+  "execution_command": [
+    "/work/venv/bin/python",
+    "-m",
+    "pytest",
+    "-p",
+    "_bench_native_regression_control",
+    ".",
+    "--doctest-modules",
+    "--doctest-glob",
+    "README.md",
+    "-q",
+    "-ra",
+    "-p",
+    "no:cacheprovider",
+    "--junitxml=/evidence/reference-candidate/junit.xml"
+  ],
+  "imports": {
+    "master": {
+      "frontmatter": {
+        "path": "/work/tmp/bench-native-regression-m4l1imk1/project/frontmatter/__init__.py",
+        "sha256": "c58d106840b8683adb22c6e833b6e5a129d00daa65e6a109cb2458faff189ec0"
+      },
+      "frontmatter.default_handlers": {
+        "path": "/work/tmp/bench-native-regression-m4l1imk1/project/frontmatter/default_handlers.py",
+        "sha256": "78f0ae2959162eb07c0133417129a132d08a630e2d1ef7931b91909f061aa882"
+      }
+    }
+  },
+  "overlay": {
+    "implementation_digest": "adb56b6c1838cdaf2d683203dd9ecfe35183075b882e75c5555c8accbf0c9a52",
+    "mode": "implementation-overlay",
+    "restored_controls": 2
+  },
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "processes": {
+    "master": {
+      "parent_executable": "/usr/local/bin/python3.12",
+      "pid": 21,
+      "ppid": 20
+    }
+  },
+  "project": "python-frontmatter",
+  "result_digest": "d6fa46c305e6b98a29b8028f40cc7f07796a87063fd0640b0462313f460a963a",
+  "returncode": 0,
+  "scope": "冻结原生集合回归，不代表模型完成或独立业务目标已满足",
+  "skip_xfail": [],
+  "source_binding": {
+    "mode": "controlled-pythonpath"
+  },
+  "status": "passed",
+  "stderr": "",
+  "stdout_tail": "...................................................................      [100%]\n67 passed in 0.18s\n",
+  "strict_doctest_count": 11,
+  "timed_out": false,
+  "worker_collections_consistent": true,
+  "xml_failures_and_errors": 0,
+  "xml_skipped": 0,
+  "xml_testcases": 67
+}

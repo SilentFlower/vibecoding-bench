@@ -1,0 +1,20 @@
+{
+  "status": "draft",
+  "content_schema": 2,
+  "scenarios": 5,
+  "tasks": 7,
+  "upstream_copied_files": 58,
+  "seed_digest": "f30d58a0c3d9bb34414581134720a29c375746e006f7e470c567bc15127c0f01",
+  "model_runs": 0,
+  "native_validation": "union_original_and_reference_target_plus_full_regression_verified_other_suites_not_run",
+  "reference_patch_validation": "passed_in_research_tmp_copy_only",
+  "environment_artifacts": "prepared_in_environment-drafts/pydantic-settings-py312",
+  "formal_catalog_changed": false,
+  "known_integration_notes": [
+    "native.regression调度与完整原生回归待主会话接线",
+    "profile.artifacts为空故不能标环境ready",
+    "PS-UNION-FIX可用核验摘要独立进入，未强制依赖诊断模型任务",
+    "咨询完整代码从回答提取或使用明确交付文件，拒绝歧义"
+  ],
+  "target_evidence": "../../environment-drafts/pydantic-settings-py312/evidence/target-verification.json"
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "task_id": "PS-UNION-DIAG",
+  "version": 1,
+  "status": "draft_not_calibrated",
+  "criteria": [
+    {
+      "id": "root-cause",
+      "requirement": "定位 env.py 的 next_field 原始字典值注解与 explode_env_vars 只做 _annotation_is_complex 的分支差异，对照已有 _field_is_complex Union路径。",
+      "required": true
+    },
+    {
+      "id": "normal-vs-defect",
+      "requirement": "说明合法JSON列表应解码、普通 hello 应保留；不能误称 Pydantic 不支持 Union 或建议改掉业务类型。",
+      "required": true
+    },
+    {
+      "id": "workaround",
+      "requirement": "给出整个 APP_CONFIG 使用JSON对象等不改库的真实临时办法；未执行时只称可验证方案。",
+      "required": true
+    }
+  ],
+  "source_evidence": {
+    "main": [
+      "library/pydantic_settings/main.py:255",
+      "library/pydantic_settings/main.py:295",
+      "library/pydantic_settings/main.py:323",
+      "library/pydantic_settings/main.py:336"
+    ],
+    "env": [
+      "library/pydantic_settings/sources/providers/env.py:200",
+      "library/pydantic_settings/sources/providers/env.py:217",
+      "library/pydantic_settings/sources/providers/env.py:275"
+    ],
+    "decode": [
+      "library/pydantic_settings/sources/base.py:194",
+      "library/pydantic_settings/sources/utils.py:150",
+      "library/pydantic_settings/sources/utils.py:213"
+    ]
+  },
+  "accept_equivalent_answers": true,
+  "grade_length": false,
+  "uncertain_rule": "证据不足时返回 uncertain，不自动当候选失败；不得要求输出隐含推理过程。",
+  "feedback_policy": "仅返回已声明的公开业务规则和反馈码，不披露隐藏样例或完整rubric。"
+}

@@ -1,0 +1,163 @@
+{
+  "mode": "reference",
+  "installation": {
+    "command": [
+      "/opt/mitm/bin/python3",
+      "-m",
+      "pip",
+      "install",
+      "--disable-pip-version-check",
+      "--no-index",
+      "--no-deps",
+      "--target",
+      "/work/dependencies",
+      "--find-links",
+      "/offline/artifacts",
+      "-r",
+      "/offline/profile/requirements.txt"
+    ],
+    "cwd": "/work/project",
+    "exit_code": 0,
+    "timed_out": false,
+    "elapsed_sec": 9.816764,
+    "resources_after": {
+      "child_max_rss_kib": 96684,
+      "memory.peak": 363528192,
+      "memory.current": 241565696,
+      "memory.max": 1073741824,
+      "pids.peak": 6,
+      "pids.max": 128
+    }
+  },
+  "native": {
+    "command": [
+      "/opt/mitm/bin/python3",
+      "-m",
+      "pytest",
+      "tests",
+      "-q",
+      "-ra",
+      "--junitxml=/evidence/native-tests.xml"
+    ],
+    "cwd": "/work/project/library",
+    "exit_code": 0,
+    "timed_out": false,
+    "elapsed_sec": 11.49805,
+    "resources_after": {
+      "child_max_rss_kib": 335972,
+      "memory.peak": 565690368,
+      "memory.current": 277975040,
+      "memory.max": 1073741824,
+      "pids.peak": 25,
+      "pids.max": 128
+    }
+  },
+  "business": {
+    "command": [
+      "/opt/mitm/bin/python3",
+      "-B",
+      "/control/check_settings.py",
+      "union-fixed",
+      "--candidate-root",
+      "/work/project"
+    ],
+    "cwd": "/work/project",
+    "exit_code": 0,
+    "timed_out": false,
+    "elapsed_sec": 0.419239,
+    "resources_after": {
+      "child_max_rss_kib": 335972,
+      "memory.peak": 565690368,
+      "memory.current": 278290432,
+      "memory.max": 1073741824,
+      "pids.peak": 25,
+      "pids.max": 128
+    }
+  },
+  "business_actual": {
+    "case_mismatch_ignored": {},
+    "empty_list": {
+      "item": []
+    },
+    "exact_case": {
+      "item": []
+    },
+    "existing_controls": {
+      "disabled_decoding": "[]",
+      "force_decode": [],
+      "no_decode": "[]",
+      "ordinary_union": []
+    },
+    "invalid_json_preserved": {
+      "item": "[bad"
+    },
+    "invalid_list_element_rejected": true,
+    "multiple_keys": {
+      "item": [],
+      "label": "hello",
+      "second": [
+        "茶"
+      ]
+    },
+    "plain_text": {
+      "item": "hello"
+    },
+    "unicode_list": {
+      "item": [
+        "咖啡",
+        "茶"
+      ]
+    },
+    "whole_object_workaround": {
+      "item": []
+    }
+  },
+  "business_expected": {
+    "empty_list": {
+      "item": []
+    },
+    "unicode_list": {
+      "item": [
+        "咖啡",
+        "茶"
+      ]
+    },
+    "plain_text": {
+      "item": "hello"
+    },
+    "invalid_json_preserved": {
+      "item": "[bad"
+    },
+    "multiple_keys": {
+      "item": [],
+      "second": [
+        "茶"
+      ],
+      "label": "hello"
+    },
+    "invalid_list_element_rejected": true,
+    "existing_controls": {
+      "ordinary_union": [],
+      "no_decode": "[]",
+      "force_decode": [],
+      "disabled_decoding": "[]"
+    },
+    "case_mismatch_ignored": {},
+    "exact_case": {
+      "item": []
+    },
+    "whole_object_workaround": {
+      "item": []
+    }
+  },
+  "business_matches": true,
+  "elapsed_sec": 21.749068,
+  "resources_final": {
+    "child_max_rss_kib": 335972,
+    "memory.peak": 565690368,
+    "memory.current": 278290432,
+    "memory.max": 1073741824,
+    "pids.peak": 25,
+    "pids.max": 128
+  }
+}

@@ -1,0 +1,1700 @@
+{
+  "collection": [
+    {
+      "id": "README.md::README.md",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "examples/pandoc.py::examples.pandoc.PandocHandler",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "examples/reversed.py::examples.reversed.ReverseYAMLHandler",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.check",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.checks",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dump",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dumps",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.load",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.loads",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.parse",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/default_handlers.py::frontmatter.default_handlers",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "tests/test_docs.py::test_readme",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_docs.py::test_api_docs",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_docs.py::test_handler_docs",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename0]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename1]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename2]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename3]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename4]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename5]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename6]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename7]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename8]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename9]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename10]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename0]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename1]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename2]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename3]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename4]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename5]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename6]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename7]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename8]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename9]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename10]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_empty_frontmatter",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_no_frontmatter",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dump_to_file",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dumping_with_custom_delimiters",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_empty_frontmatter",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_extra_space",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_no_frontmatter",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_pretty_dumping",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_dict",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_string",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_unicode_post",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_crlf_string",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_markdown_content",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_custom_handler",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_detect_format",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_json",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_no_handler",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_sanity_all",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_toml",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_detect",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_external",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_content",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_load",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_detect",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_external",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_content",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_load",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_detect",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_external",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_content",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_load",
+      "kind": "TestCaseFunction"
+    }
+  ],
+  "errors": [],
+  "exit_code": 1,
+  "imports": {
+    "frontmatter": {
+      "path": "/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/__init__.py",
+      "sha256": "952bdcf5aaed6b8b4ae100416f5143aa98616a35fd568b6c0a57999a40b4acea"
+    },
+    "frontmatter.default_handlers": {
+      "path": "/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/default_handlers.py",
+      "sha256": "78f0ae2959162eb07c0133417129a132d08a630e2d1ef7931b91909f061aa882"
+    }
+  },
+  "process": {
+    "parent_executable": "/usr/local/bin/python3.12",
+    "pid": 27,
+    "ppid": 26
+  },
+  "removed": 0,
+  "reports": [
+    {
+      "id": "README.md::README.md",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "README.md::README.md",
+      "outcome": "failed",
+      "reason": "069 # this works, too\n070 >>> print(post)\n071 Well, hello there, world.\n072 \n073 ```\n074 \n075 Use metadata (metadata gets proxied as post keys):\n076 \n077 ```python\n078 >>> print(post['title'])\nUNEXPECTED EXCEPTION: KeyError('title')\nTraceback (most recent call last):\n  File \"/usr/local/lib/python3.12/doctest.py\", line 1368, in __run\n    exec(compile(example.source, filename, \"single\",\n  File \"<doctest README.md[7]>\", line 1, in <module>\n  File \"/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/__init__.py\", line 315, in __getitem__\n    return self.metadata[name]\n           ~~~~~~~~~~~~~^^^^^^\nKeyError: 'title'\n/work/tmp/bench-native-regression-j8bs3y4t/project/README.md:78: UnexpectedException",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "README.md::README.md",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "examples/pandoc.py::examples.pandoc.PandocHandler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "examples/pandoc.py::examples.pandoc.PandocHandler",
+      "outcome": "failed",
+      "reason": "005 \n006     Pandoc format uses different start and end delimiters, which trips up parsing a bit.\n007     To make it work, we need a custom handler that deals with each part separately.\n008 \n009     >>> with open('examples/content/pandoc.txt') as f:\n010     ...     text = f.read()\n011     >>> post = frontmatter.loads(text, handler=PandocHandler())\n012     >>> post['title']\nUNEXPECTED EXCEPTION: KeyError('title')\nTraceback (most recent call last):\n  File \"/usr/local/lib/python3.12/doctest.py\", line 1368, in __run\n    exec(compile(example.source, filename, \"single\",\n  File \"<doctest examples.pandoc.PandocHandler[2]>\", line 1, in <module>\n  File \"/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/__init__.py\", line 315, in __getitem__\n    return self.metadata[name]\n           ~~~~~~~~~~~~~^^^^^^\nKeyError: 'title'\n/work/tmp/bench-native-regression-j8bs3y4t/project/examples/pandoc.py:12: UnexpectedException",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "examples/pandoc.py::examples.pandoc.PandocHandler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "examples/reversed.py::examples.reversed.ReverseYAMLHandler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "examples/reversed.py::examples.reversed.ReverseYAMLHandler",
+      "outcome": "failed",
+      "reason": "013 \n014     This is an example of using Handler.parse and Handler.format to move Frontmatter to the bottom\n015     of a file, both for parsing and output.\n016 \n017     >>> with open(\"examples/content/reversed.txt\") as f:\n018     ...     text = f.read()\n019     >>> handler = ReverseYAMLHandler()\n020     >>> post = frontmatter.loads(text, handler=handler)\n021     >>> print(post['title'])\nUNEXPECTED EXCEPTION: KeyError('title')\nTraceback (most recent call last):\n  File \"/usr/local/lib/python3.12/doctest.py\", line 1368, in __run\n    exec(compile(example.source, filename, \"single\",\n  File \"<doctest examples.reversed.ReverseYAMLHandler[3]>\", line 1, in <module>\n  File \"/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/__init__.py\", line 315, in __getitem__\n    return self.metadata[name]\n           ~~~~~~~~~~~~~^^^^^^\nKeyError: 'title'\n/work/tmp/bench-native-regression-j8bs3y4t/project/examples/reversed.py:21: UnexpectedException",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "examples/reversed.py::examples.reversed.ReverseYAMLHandler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.check",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.check",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.check",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.checks",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.checks",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.checks",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dump",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dump",
+      "outcome": "failed",
+      "reason": "205     Serialize :py:class:`post <frontmatter.Post>` to a string and write to a file-like object.\n206     Text will be encoded on the way out (utf-8 by default).\n207 \n208     ::\n209 \n210         >>> from io import StringIO\n211         >>> post = frontmatter.load('tests/yaml/hello-world.txt')\n212         >>> f = StringIO()\n213         >>> frontmatter.dump(post, f)\n214         >>> print(f.getvalue())\nDifferences (unified diff with -expected +actual):\n    @@ -1,5 +1,4 @@\n     ---\n    -layout: post\n    -title: Hello, world!\n    +{}\n     ---\n     <BLANKLINE>\n\n/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/__init__.py:214: DocTestFailure",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dump",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dumps",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dumps",
+      "outcome": "failed",
+      "reason": "257 \n258     Passing ``handler`` will change how metadata is turned into text. A handler\n259     passed as an argument will override ``post.handler``, with\n260     :py:class:`YAMLHandler <frontmatter.default_handlers.YAMLHandler>` used as\n261     a default.\n262 \n263     ::\n264 \n265         >>> post = frontmatter.load('tests/yaml/hello-world.txt')\n266         >>> print(frontmatter.dumps(post)) # doctest: +NORMALIZE_WHITESPACE\nDifferences (unified diff with -expected +actual):\n    @@ -1,5 +1,4 @@\n     ---\n    -layout: post\n    -title: Hello, world!\n    +{}\n     ---\n     <BLANKLINE>\n\n/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/__init__.py:266: DocTestFailure",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dumps",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.loads",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.loads",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.loads",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.parse",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.parse",
+      "outcome": "failed",
+      "reason": "061 \n062     .. testsetup:: *\n063 \n064         >>> import frontmatter\n065 \n066     .. doctest::\n067 \n068         >>> with open('tests/yaml/hello-world.txt') as f:\n069         ...     metadata, content = frontmatter.parse(f.read())\n070         >>> print(metadata['title'])\nUNEXPECTED EXCEPTION: KeyError('title')\nTraceback (most recent call last):\n  File \"/usr/local/lib/python3.12/doctest.py\", line 1368, in __run\n    exec(compile(example.source, filename, \"single\",\n  File \"<doctest frontmatter.parse[2]>\", line 1, in <module>\nKeyError: 'title'\n/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/__init__.py:70: UnexpectedException",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.parse",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/default_handlers.py::frontmatter.default_handlers",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/default_handlers.py::frontmatter.default_handlers",
+      "outcome": "failed",
+      "reason": "066     ---\n067     <BLANKLINE>\n068     And this shouldn't break.\n069 \n070 Passing a new handler to :py:func:`frontmatter.dumps <frontmatter.dumps>`\n071 (or :py:func:`dump <frontmatter.dump>`) changes the export format:\n072 \n073 ::\n074 \n075     >>> print(frontmatter.dumps(post, handler=YAMLHandler())) # doctest: +NORMALIZE_WHITESPACE\nDifferences (unified diff with -expected +actual):\n    @@ -1,6 +1,4 @@\n     ---\n    -author: bob\n    -something: else\n    -test: tester\n    +{}\n     ---\n     <BLANKLINE>\n\n/work/tmp/bench-native-regression-j8bs3y4t/project/frontmatter/default_handlers.py:75: DocTestFailure",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/default_handlers.py::frontmatter.default_handlers",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_docs.py::test_readme",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_docs.py::test_readme",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_docs.py::test_readme",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_docs.py::test_api_docs",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_docs.py::test_api_docs",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_docs.py::test_api_docs",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_docs.py::test_handler_docs",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_docs.py::test_handler_docs",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_docs.py::test_handler_docs",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename0]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename0]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename0]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename1]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename1]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename1]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename2]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename2]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename2]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename3]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename3]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename3]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename4]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename4]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename4]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename5]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename5]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename5]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename6]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename6]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename6]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename7]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename7]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename7]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename8]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename8]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename8]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename9]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename9]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename9]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename10]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename10]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename10]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename0]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename0]",
+      "outcome": "failed",
+      "reason": "filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/yaml/hello-markdown.md')\n\n    @pytest.mark.parametrize(\"filename\", list(files()))\n    def test_file(filename):\n        result = Path(get_result_filename(filename))\n        if not result.exists():\n            pytest.fail(f\"{result.name} does not exist\")\n    \n        post = frontmatter.load(filename)\n        result = json.loads(result.read_text())\n    \n>       assert post.to_dict() == result\nE       assert {'content': \"...ldn't break.\"} == {'test': 'tes...ldn't break.\"}\nE         \nE         Omitting 1 identical items, use -vv to show\nE         Right contains 3 more items:\nE         {'author': 'bob', 'something': 'else', 'test': 'tester'}\nE         Use -v to get more diff\n\ntests/test_files.py:47: AssertionError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename0]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename1]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename1]",
+      "outcome": "failed",
+      "reason": "filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/yaml/unpretty.md')\n\n    @pytest.mark.parametrize(\"filename\", list(files()))\n    def test_file(filename):\n        result = Path(get_result_filename(filename))\n        if not result.exists():\n            pytest.fail(f\"{result.name} does not exist\")\n    \n        post = frontmatter.load(filename)\n        result = json.loads(result.read_text())\n    \n>       assert post.to_dict() == result\nE       AssertionError: assert {'content': '...ed in order.'} == {'destination...ed in order.'}\nE         \nE         Omitting 1 identical items, use -vv to show\nE         Right contains 2 more items:\nE         {'destination': {'encoding': {'xz': {'enabled': True,\nE                                              'min_size': 5120,\nE                                              'options': None,\nE                                              'path_filter': None}},...\nE         \nE         ...Full output truncated (6 lines hidden), use '-vv' to show\n\ntests/test_files.py:47: AssertionError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename1]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename2]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename2]",
+      "outcome": "failed",
+      "reason": "filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/yaml/network-diagrams.md')\n\n    @pytest.mark.parametrize(\"filename\", list(files()))\n    def test_file(filename):\n        result = Path(get_result_filename(filename))\n        if not result.exists():\n            pytest.fail(f\"{result.name} does not exist\")\n    \n        post = frontmatter.load(filename)\n        result = json.loads(result.read_text())\n    \n>       assert post.to_dict() == result\nE       AssertionError: assert {'content': '...o play with.'} == {'title': 'TO...['todo'], ...}\nE         \nE         Omitting 1 identical items, use -vv to show\nE         Right contains 4 more items:\nE         {'layout': 'post',\nE          'published': True,\nE          'tags': ['todo'],\nE          'title': 'TODO: Understand Network Diagrams'}\nE         Use -v to get more diff\n\ntests/test_files.py:47: AssertionError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename2]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename3]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename3]",
+      "outcome": "failed",
+      "reason": "filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/toml/hello-toml.md')\n\n    @pytest.mark.parametrize(\"filename\", list(files()))\n    def test_file(filename):\n        result = Path(get_result_filename(filename))\n        if not result.exists():\n            pytest.fail(f\"{result.name} does not exist\")\n    \n        post = frontmatter.load(filename)\n        result = json.loads(result.read_text())\n    \n>       assert post.to_dict() == result\nE       assert {'content': \"...ldn't break.\"} == {'author': 'b...ldn't break.\"}\nE         \nE         Omitting 1 identical items, use -vv to show\nE         Right contains 3 more items:\nE         {'author': 'bob', 'something': 'else', 'test': 'tester'}\nE         Use -v to get more diff\n\ntests/test_files.py:47: AssertionError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename3]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename4]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename4]",
+      "outcome": "failed",
+      "reason": "filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/json/hello-json.md')\n\n    @pytest.mark.parametrize(\"filename\", list(files()))\n    def test_file(filename):\n        result = Path(get_result_filename(filename))\n        if not result.exists():\n            pytest.fail(f\"{result.name} does not exist\")\n    \n        post = frontmatter.load(filename)\n        result = json.loads(result.read_text())\n    \n>       assert post.to_dict() == result\nE       AssertionError: assert {'content': '...might break.'} == {'test': 'tes...might break.'}\nE         \nE         Omitting 1 identical items, use -vv to show\nE         Right contains 3 more items:\nE         {'author': 'bob', 'something': 'else', 'test': 'tester'}\nE         Use -v to get more diff\n\ntests/test_files.py:47: AssertionError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename4]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename5]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename5]",
+      "outcome": "failed",
+      "reason": "filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/yaml/extra-dash.txt')\n\n    @pytest.mark.parametrize(\"filename\", list(files()))\n    def test_file(filename):\n        result = Path(get_result_filename(filename))\n        if not result.exists():\n            pytest.fail(f\"{result.name} does not exist\")\n    \n        post = frontmatter.load(filename)\n        result = json.loads(result.read_text())\n    \n>       assert post.to_dict() == result\nE       assert {'content': \"...ome content.\"} == {'test': 'bob...ome content.\"}\nE         \nE         Omitting 1 identical items, use -vv to show\nE         Right contains 2 more items:\nE         {'else': 'kate', 'test': 'bob'}\nE         Use -v to get more diff\n\ntests/test_files.py:47: AssertionError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename5]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename6]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename6]",
+      "outcome": "failed",
+      "reason": "filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/yaml/extra-space.txt')\n\n    @pytest.mark.parametrize(\"filename\", list(files()))\n    def test_file(filename):\n        result = Path(get_result_filename(filename))\n        if not result.exists():\n            pytest.fail(f\"{result.name} does not exist\")\n    \n        post = frontmatter.load(filename)\n        result = json.loads(result.read_text())\n    \n>       assert post.to_dict() == result\nE       AssertionError: assert {'content': '...frontmatter.'} == {'test': 'tes...frontmatter.'}\nE         \nE         Omitting 1 identical items, use -vv to show\nE         Right contains 2 more items:\nE         {'something': 'else', 'test': 'tester'}\nE         Use -v to get more diff\n\ntests/test_files.py:47: AssertionError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename6]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename7]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename7]",
+      "outcome": "failed",
+      "reason": "filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/yaml/chinese.txt')\n\n    @pytest.mark.parametrize(\"filename\", list(files()))\n    def test_file(filename):\n        result = Path(get_result_filename(filename))\n        if not result.exists():\n            pytest.fail(f\"{result.name} does not exist\")\n    \n        post = frontmatter.load(filename)\n        result = json.loads(result.read_text())\n    \n>       assert post.to_dict() == result\nE       assert {'content': '欢迎来到大连水产学院！'} == {'title': \"Le...'欢迎来到大连水产学院！'}\nE         \nE         Omitting 1 identical items, use -vv to show\nE         Right contains 2 more items:\nE         {'language': '中文', 'title': \"Let's try unicode\"}\nE         Use -v to get more diff\n\ntests/test_files.py:47: AssertionError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename7]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename8]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename8]",
+      "outcome": "failed",
+      "reason": "filename = PosixPath('/work/tmp/bench-native-regression-j8bs3y4t/project/tests/yaml/hello-world.txt')\n\n    @pytest.mark.parametrize(\"filename\", list(files()))\n    def test_file(filename):\n        result = Path(get_result_filename(filename))\n        if not result.exists():\n            pytest.fail(f\"{result.name} does not exist\")\n    \n        post = frontmatter.load(filename)\n        result = json.loads(result.read_text())\n    \n>       assert post.to_dict() == result\nE       AssertionError: assert {'content': '...here, world.'} == {'title': 'He...here, world.'}\nE         \nE         Omitting 1 identical items, use -vv to show\nE         Right contains 2 more items:\nE         {'layout': 'post', 'title': 'Hello, world!'}\nE         Use -v to get more diff\n\ntests/test_files.py:47: AssertionError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename8]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename9]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename9]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename9]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename10]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename10]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename10]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_empty_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_empty_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_empty_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_no_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_no_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_no_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dump_to_file",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dump_to_file",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dump_to_file",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dumping_with_custom_delimiters",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dumping_with_custom_delimiters",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dumping_with_custom_delimiters",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_empty_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_empty_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_empty_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_extra_space",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_extra_space",
+      "outcome": "failed",
+      "reason": "self = <unit_test.FrontmatterTest testMethod=test_extra_space>\n\n    def test_extra_space(self):\n        \"Extra space in frontmatter delimiter\"\n        post = frontmatter.load(\"tests/yaml/extra-space.txt\")\n        content = \"This file has an extra space on the opening line of the frontmatter.\"\n    \n        self.assertEqual(post.content, content)\n        metadata = {\"something\": \"else\", \"test\": \"tester\"}\n        for k, v in metadata.items():\n>           self.assertEqual(post[k], v)\n                             ^^^^^^^\n\ntests/unit_test.py:89: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nself = <frontmatter.Post object at 0x79970f97e5d0>, name = 'something'\n\n    def __getitem__(self, name: str) -> object:\n        \"Get metadata key\"\n>       return self.metadata[name]\n               ^^^^^^^^^^^^^^^^^^^\nE       KeyError: 'something'\n\nfrontmatter/__init__.py:315: KeyError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_extra_space",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_no_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_no_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_no_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_pretty_dumping",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_pretty_dumping",
+      "outcome": "failed",
+      "reason": "self = <unit_test.FrontmatterTest testMethod=test_pretty_dumping>\n\n    def test_pretty_dumping(self):\n        \"Use pyaml to dump nicer\"\n        if pyaml is not None:\n            with open(\"tests/yaml/unpretty.md\", \"r\", encoding=\"utf-8\") as f:\n                data = f.read()\n    \n            post = frontmatter.load(\"tests/yaml/unpretty.md\")\n            yaml = pyaml.dump(post.metadata)\n    \n            # the unsafe dumper gives you nicer output, for times you want that\n            dump = frontmatter.dumps(post, Dumper=pyaml.PYAMLDumper)\n    \n            self.assertTrue(yaml in dump)\n>           self.assertEqual(dump, data)\nE           AssertionError: '---\\n{}\\n---\\n\\nThis is a test of both unicode[156 chars]der.' != '---\\ndestination:\\n  encoding:\\n    xz:\\n     [452 chars]der.'\nE             ---\nE           - {}\nE           + destination:\nE           +   encoding:\nE           +     xz:\nE           +       enabled: yes\nE           +       min_size: 5120\nE           +       options:\nE           +       path_filter:\nE           +   result:\nE           +     append_to_file:\nE           +     append_to_lafs_dir:\nE           +     print_to_stdout: yes\nE           +   url: http://localhost:3456/uri\nE           + filter:\nE           +   - Длинный стринг на русском\nE           +   - Еще одна длинная строка\nE             ---\nE             \nE             This is a test of both unicode and prettier dumping. The above metadata comes from the [pretty-yaml](https://github.com/mk-fg/pretty-yaml) readme file.\nE             \nE             Metadata should be dumped in order.\n\ntests/unit_test.py:123: AssertionError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_pretty_dumping",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_dict",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_dict",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_dict",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_string",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_string",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_string",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_unicode_post",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_unicode_post",
+      "outcome": "failed",
+      "reason": "self = <unit_test.FrontmatterTest testMethod=test_unicode_post>\n\n    def test_unicode_post(self):\n        \"Ensure unicode is parsed correctly\"\n        chinese = frontmatter.load(\"tests/yaml/chinese.txt\", \"utf-8\")\n        output = frontmatter.dumps(chinese)\n        zh = \"中文\"\n    \n        self.assertTrue(isinstance(chinese.content, str))\n    \n        # check that we're dumping out unicode metadata, too\n>       self.assertTrue(zh in output)\nE       AssertionError: False is not true\n\ntests/unit_test.py:47: AssertionError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_unicode_post",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_crlf_string",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_crlf_string",
+      "outcome": "failed",
+      "reason": "self = <unit_test.FrontmatterTest testMethod=test_with_crlf_string>\n\n    def test_with_crlf_string(self):\n        markdown_bytes = b'---\\r\\ntitle: \"my title\"\\r\\ncontent_type: \"post\"\\r\\npublished: no\\r\\n---\\r\\n\\r\\nwrite your content in markdown here'\n        loaded = frontmatter.loads(markdown_bytes, \"utf-8\")\n>       self.assertEqual(loaded[\"title\"], \"my title\")\n                         ^^^^^^^^^^^^^^^\n\ntests/unit_test.py:128: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nself = <frontmatter.Post object at 0x79970f8f6810>, name = 'title'\n\n    def __getitem__(self, name: str) -> object:\n        \"Get metadata key\"\n>       return self.metadata[name]\n               ^^^^^^^^^^^^^^^^^^^\nE       KeyError: 'title'\n\nfrontmatter/__init__.py:315: KeyError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_crlf_string",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_markdown_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_markdown_content",
+      "outcome": "failed",
+      "reason": "self = <unit_test.FrontmatterTest testMethod=test_with_markdown_content>\n\n    def test_with_markdown_content(self):\n        \"Parse frontmatter and only the frontmatter\"\n        post = frontmatter.load(\"tests/yaml/hello-markdown.md\")\n    \n        metadata = {\"author\": \"bob\", \"something\": \"else\", \"test\": \"tester\"}\n        for k, v in metadata.items():\n>           self.assertEqual(post[k], v)\n                             ^^^^^^^\n\ntests/unit_test.py:36: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nself = <frontmatter.Post object at 0x79970f982570>, name = 'author'\n\n    def __getitem__(self, name: str) -> object:\n        \"Get metadata key\"\n>       return self.metadata[name]\n               ^^^^^^^^^^^^^^^^^^^\nE       KeyError: 'author'\n\nfrontmatter/__init__.py:315: KeyError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_markdown_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_custom_handler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_custom_handler",
+      "outcome": "failed",
+      "reason": "self = <unit_test.HandlerTest testMethod=test_custom_handler>\n\n    def test_custom_handler(self):\n        \"allow caller to specify a custom delimiter/handler\"\n    \n        # not including this in the regular test directory\n        # because it would/should be invalid per the defaults\n        custom = textwrap.dedent(\"\"\"\n        ...\n        dummy frontmatter\n        ...\n        dummy content\n        \"\"\")\n    \n        # and a custom handler that really doesn't do anything\n        class DummyHandler(object):\n            def load(self, fm):\n                return {\"value\": fm}\n    \n            def split(self, text):\n                return \"dummy frontmatter\", \"dummy content\"\n    \n        # but we tell frontmatter that it is the appropriate handler\n        # for the '...' delimiter\n        # frontmatter.handlers['...'] = DummyHandler()\n        post = frontmatter.loads(custom, handler=DummyHandler())\n    \n>       self.assertEqual(post[\"value\"], \"dummy frontmatter\")\n                         ^^^^^^^^^^^^^\n\ntests/unit_test.py:224: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nself = <frontmatter.Post object at 0x79970f981430>, name = 'value'\n\n    def __getitem__(self, name: str) -> object:\n        \"Get metadata key\"\n>       return self.metadata[name]\n               ^^^^^^^^^^^^^^^^^^^\nE       KeyError: 'value'\n\nfrontmatter/__init__.py:315: KeyError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_custom_handler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_detect_format",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_detect_format",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_detect_format",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_json",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_json",
+      "outcome": "failed",
+      "reason": "self = <unit_test.HandlerTest testMethod=test_json>\n\n    def test_json(self):\n        \"load raw JSON frontmatter\"\n        post = frontmatter.load(\"tests/json/hello-json.md\")\n        metadata = {\"author\": \"bob\", \"something\": \"else\", \"test\": \"tester\"}\n        for k, v in metadata.items():\n>           self.assertEqual(post[k], v)\n                             ^^^^^^^\n\ntests/unit_test.py:240: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nself = <frontmatter.Post object at 0x79970f9820f0>, name = 'author'\n\n    def __getitem__(self, name: str) -> object:\n        \"Get metadata key\"\n>       return self.metadata[name]\n               ^^^^^^^^^^^^^^^^^^^\nE       KeyError: 'author'\n\nfrontmatter/__init__.py:315: KeyError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_json",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_no_handler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_no_handler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_no_handler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_sanity_all",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_sanity_all",
+      "outcome": "failed",
+      "reason": "self = <unit_test.HandlerTest testMethod=test_sanity_all>\n\n    def test_sanity_all(self):\n        \"Run sanity check on all handlers\"\n        for filename, Handler in self.TEST_FILES.items():\n>           self.sanity_check(filename, Handler)\n\ntests/unit_test.py:187: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \ntests/unit_test.py:173: in sanity_check\n    self.assertEqual(post.content, repost.content)\nE   AssertionError: 'Title\\n=====\\n\\ntitle2\\n------\\n\\nHello.\\[51 chars]eak.' != '{}\\n\\n\\nTitle\\n=====\\n\\ntitle2\\n------\\n\\[59 chars]eak.'\nE   + {}\nE   + \nE   + \nE     Title\nE     =====\nE     \nE     title2\nE     ------\nE     \nE     Hello.\nE     \nE     Just need three dashes\nE     ---\nE     \nE     And this might break.",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_sanity_all",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_toml",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_toml",
+      "outcome": "failed",
+      "reason": "self = <unit_test.HandlerTest testMethod=test_toml>\n\n    def test_toml(self):\n        \"load toml frontmatter\"\n        if toml is None:\n            return\n        post = frontmatter.load(\"tests/toml/hello-toml.md\")\n        metadata = {\"author\": \"bob\", \"something\": \"else\", \"test\": \"tester\"}\n        for k, v in metadata.items():\n>           self.assertEqual(post[k], v)\n                             ^^^^^^^\n\ntests/unit_test.py:233: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nself = <frontmatter.Post object at 0x79970f8f79e0>, name = 'author'\n\n    def __getitem__(self, name: str) -> object:\n        \"Get metadata key\"\n>       return self.metadata[name]\n               ^^^^^^^^^^^^^^^^^^^\nE       KeyError: 'author'\n\nfrontmatter/__init__.py:315: KeyError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_toml",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_external",
+      "outcome": "failed",
+      "reason": "self = <unit_test.YAMLHandlerTest testMethod=test_external>\n\n    def test_external(self):\n        filename = self.data[\"filename\"]\n        content = self.data[\"content\"]\n        metadata = self.data[\"metadata\"]\n    \n        post = frontmatter.load(filename)\n    \n        self.assertEqual(post.content, content.strip())\n        for k, v in metadata.items():\n>           self.assertEqual(post[k], v)\n                             ^^^^^^^\n\ntests/unit_test.py:273: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nself = <frontmatter.Post object at 0x79970f981550>, name = 'test'\n\n    def __getitem__(self, name: str) -> object:\n        \"Get metadata key\"\n>       return self.metadata[name]\n               ^^^^^^^^^^^^^^^^^^^\nE       KeyError: 'test'\n\nfrontmatter/__init__.py:315: KeyError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_external",
+      "outcome": "failed",
+      "reason": "self = <unit_test.JSONHandlerTest testMethod=test_external>\n\n    def test_external(self):\n        filename = self.data[\"filename\"]\n        content = self.data[\"content\"]\n        metadata = self.data[\"metadata\"]\n    \n        post = frontmatter.load(filename)\n    \n        self.assertEqual(post.content, content.strip())\n        for k, v in metadata.items():\n>           self.assertEqual(post[k], v)\n                             ^^^^^^^\n\ntests/unit_test.py:273: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nself = <frontmatter.Post object at 0x79970f982780>, name = 'test'\n\n    def __getitem__(self, name: str) -> object:\n        \"Get metadata key\"\n>       return self.metadata[name]\n               ^^^^^^^^^^^^^^^^^^^\nE       KeyError: 'test'\n\nfrontmatter/__init__.py:315: KeyError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_external",
+      "outcome": "failed",
+      "reason": "self = <unit_test.TOMLHandlerTest testMethod=test_external>\n\n    def test_external(self):\n        filename = self.data[\"filename\"]\n        content = self.data[\"content\"]\n        metadata = self.data[\"metadata\"]\n    \n        post = frontmatter.load(filename)\n    \n        self.assertEqual(post.content, content.strip())\n        for k, v in metadata.items():\n>           self.assertEqual(post[k], v)\n                             ^^^^^^^\n\ntests/unit_test.py:273: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nself = <frontmatter.Post object at 0x79970fab6900>, name = 'test'\n\n    def __getitem__(self, name: str) -> object:\n        \"Get metadata key\"\n>       return self.metadata[name]\n               ^^^^^^^^^^^^^^^^^^^\nE       KeyError: 'test'\n\nfrontmatter/__init__.py:315: KeyError",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    }
+  ],
+  "worker": "master"
+}

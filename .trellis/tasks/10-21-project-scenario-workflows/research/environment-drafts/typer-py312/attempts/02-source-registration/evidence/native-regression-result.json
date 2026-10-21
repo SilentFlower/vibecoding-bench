@@ -1,0 +1,37 @@
+{
+  "command": [
+    "/work/venv/bin/python",
+    "-B",
+    "-m",
+    "pytest",
+    "--cov",
+    "--cov-report=term-missing",
+    "-o",
+    "console_output_style=progress",
+    "--showlocals",
+    "--numprocesses=2",
+    "-ra",
+    "--junitxml=/evidence/native-tests.xml"
+  ],
+  "cwd": "/work/project/library",
+  "exit_code": 1,
+  "elapsed_sec": 176.88515,
+  "counts": {
+    "total": 1505,
+    "passed": 1477,
+    "skipped": 24,
+    "xfailed": 2,
+    "failures": 2,
+    "errors": 0
+  },
+  "max_rss_children_kib": 102376,
+  "environment": {
+    "HOME": "/work/home",
+    "XDG_CONFIG_HOME": "/work/home/.config",
+    "PYTHONPATH": "/work/project/library",
+    "TERMINAL_WIDTH": "3000",
+    "_TYPER_FORCE_DISABLE_TERMINAL": "1",
+    "_TYPER_RUN_INSTALL_COMPLETION_TESTS": "1",
+    "CONTEXT": "typer-scenario-target-runtime"
+  }
+}

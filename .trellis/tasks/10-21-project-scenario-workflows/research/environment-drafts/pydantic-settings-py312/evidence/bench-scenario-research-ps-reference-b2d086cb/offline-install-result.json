@@ -1,0 +1,29 @@
+{
+  "command": [
+    "/opt/mitm/bin/python3",
+    "-m",
+    "pip",
+    "install",
+    "--disable-pip-version-check",
+    "--no-index",
+    "--no-deps",
+    "--target",
+    "/work/dependencies",
+    "--find-links",
+    "/offline/artifacts",
+    "-r",
+    "/offline/profile/requirements.txt"
+  ],
+  "cwd": "/work/project",
+  "exit_code": 0,
+  "timed_out": false,
+  "elapsed_sec": 9.816764,
+  "resources_after": {
+    "child_max_rss_kib": 96684,
+    "memory.peak": 363528192,
+    "memory.current": 241565696,
+    "memory.max": 1073741824,
+    "pids.peak": 6,
+    "pids.max": 128
+  }
+}

@@ -1,0 +1,183 @@
+{
+  "verification_status": "verified_target_runtime",
+  "image": "vibebench-v3-account:v3-project-repairs-local-20261021-e",
+  "image_id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d",
+  "source_commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6",
+  "runtime": {
+    "python": "3.12.15 (main, Oct  6 2026, 02:02:31) [GCC 12.2.0]",
+    "executable": "/usr/local/bin/python3",
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+    "machine": "x86_64",
+    "uid": 1000,
+    "gid": 1000
+  },
+  "native": {
+    "baseline": {
+      "passed": 67,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "strict_doctest_items": 11,
+      "ordinary_items": 56,
+      "matches_all_existing_native_nodes": true,
+      "module": "/work/base/library/frontmatter/__init__.py",
+      "elapsed_sec_including_python_startup": 0.5831329390002793,
+      "max_rss_kib": 33864
+    },
+    "reference": {
+      "passed": 67,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "strict_doctest_items": 11,
+      "ordinary_items": 56,
+      "matches_all_existing_native_nodes": true,
+      "module": "/work/repaired/library/frontmatter/__init__.py",
+      "elapsed_sec_including_python_startup": 0.5800744399984978,
+      "max_rss_kib": 33984
+    }
+  },
+  "business": {
+    "consult": {
+      "matched_frozen_expected": true,
+      "actual": {
+        "candidate_import": true,
+        "unique_program": true,
+        "returncode": 0,
+        "input_unchanged": true,
+        "title_printed": true,
+        "tags_printed": true,
+        "metadata": {
+          "author": "小林",
+          "status": "已校对",
+          "tags": [
+            "文档",
+            "图片"
+          ],
+          "title": "资料整理周报"
+        },
+        "body": "本周完成归档，下一步核对目录。",
+        "variant_preserved": true
+      }
+    },
+    "shallow": {
+      "matched_frozen_expected": true,
+      "actual": {
+        "candidate_import": true,
+        "metadata": {
+          "settings": {
+            "theme": "dark"
+          }
+        },
+        "body": "正文",
+        "defaults": {
+          "theme": "light",
+          "lang": "zh"
+        }
+      }
+    },
+    "repair_calibration": {
+      "original_target_satisfied": false,
+      "expected_original_failure": true,
+      "reference_target_satisfied": true,
+      "reference_case_count": 11,
+      "original_actual": {
+        "candidate_import": true,
+        "content_field": {
+          "error_type": "TypeError"
+        },
+        "handler_field": {
+          "error_type": "TypeError"
+        },
+        "combined_fields_roundtrip": {
+          "error_type": "TypeError"
+        },
+        "explicit_handler_identity": {
+          "error_type": "TypeError"
+        },
+        "old_constructors": true,
+        "empty_metadata": true,
+        "null_content_metadata": {
+          "error_type": "TypeError"
+        },
+        "defaults_only": {
+          "error_type": "TypeError"
+        },
+        "document_overrides_default": {
+          "error_type": "TypeError"
+        },
+        "load_path_and_stream": {
+          "error_type": "TypeError"
+        },
+        "to_dict_unchanged": true
+      },
+      "reference_actual": {
+        "candidate_import": true,
+        "content_field": true,
+        "handler_field": true,
+        "combined_fields_roundtrip": true,
+        "explicit_handler_identity": true,
+        "old_constructors": true,
+        "empty_metadata": true,
+        "null_content_metadata": true,
+        "defaults_only": true,
+        "document_overrides_default": true,
+        "load_path_and_stream": true,
+        "to_dict_unchanged": true
+      }
+    },
+    "original_business": {
+      "roundtrip_equal": true,
+      "observations": 20,
+      "module": "/work/base/library/frontmatter/__init__.py",
+      "exit_code": 0
+    }
+  },
+  "artifacts": {
+    "count": 8,
+    "total_bytes": 2652957,
+    "all_sha256_verified": true
+  },
+  "container_memory_peak_bytes_including_tmpfs": 110333952,
+  "container_pids_peak": 6,
+  "offline_install": {
+    "command": [
+      "/work/venv/bin/python",
+      "-m",
+      "pip",
+      "install",
+      "--disable-pip-version-check",
+      "--no-cache-dir",
+      "--no-index",
+      "--find-links=/offline/artifacts",
+      "--no-deps",
+      "--report=/evidence/install-report.json",
+      "PyYAML==6.0.3",
+      "pytest==9.1.1",
+      "toml==0.10.2",
+      "pyaml==26.7.0",
+      "iniconfig==2.3.1",
+      "packaging==26.3",
+      "pluggy==1.7.0",
+      "Pygments==2.21.0"
+    ],
+    "cwd": "/work",
+    "exit_code": 0,
+    "timed_out": false,
+    "elapsed_sec": 1.5722154800005228,
+    "max_rss_kib": 57952,
+    "rss_scope": "本次新测量进程已退出子进程的 rusage 最大 RSS，不是容器总峰值",
+    "environment": {
+      "HOME": "/tmp/fm-home",
+      "PYTHONPATH": null,
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "PIP_CONFIG_FILE": "/dev/null",
+      "PIP_NO_INDEX": "1",
+      "PROJECT_CANDIDATE_ROOT": null,
+      "PROJECT_ANSWER_FILE": "/input/consult_example.py"
+    }
+  },
+  "cleanup_confirmed": true,
+  "model_executed": false,
+  "scope": "环境与内容验收校准证据，不是待测模型成绩或生产部署"
+}

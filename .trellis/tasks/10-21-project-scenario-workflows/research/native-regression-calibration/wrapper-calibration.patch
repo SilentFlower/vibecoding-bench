@@ -1,0 +1,118 @@
+--- before/native_regression.py
++++ after/native_regression.py
+@@ -18,13 +18,14 @@
+ pytest 的完整 stdout／stderr 和逐节点证据保存在指定目录，返回 JSON 只带有界尾段。
+ contract 冻结原版节点、结果类型、pytest／Python／插件版本和 baseline 摘要；没有匹配
+ contract 的候选不能判通过。它是可信测试支架，不替代外层容器隔离和业务独立断言。
+-本草案仅做 AST 语法校验，尚未执行这份统一 wrapper 的三仓运行；既有环境实测不能
+-代替其本身的原版校准、候选删测试／删 doctest／新增 hook／超时及 xdist 验证。
++实际校准日志另存任务 research/native-regression-calibration；不能把既有普通环境实测
++代替本 wrapper 的原版校准、候选删测试／删 doctest／新增 hook／超时及 xdist 验证。
+ """
+ from __future__ import annotations
+ 
+ import argparse
+ import ast
++from contextlib import ExitStack
+ import hashlib
+ import importlib
+ import importlib.metadata
+@@ -36,8 +37,10 @@
+ import signal
+ import subprocess
+ import sys
++import sysconfig
+ import tempfile
+ import time
++import uuid
+ import xml.etree.ElementTree as ET
+ from pathlib import Path
+ 
+@@ -210,7 +213,13 @@
+         worker = os.environ.get('PYTEST_XDIST_WORKER', 'master')
+         if not re.fullmatch(r'(master|gw[0-9]+)', worker):
+             raise ValueError('未知原生测试 worker')
+-        _STATE.update(control=control, worker=worker, collection=[], reports=[], errors=[], imports={}, removed=0)
++        parent = os.getppid()
++        try:
++            parent_executable = os.readlink(f'/proc/{parent}/exe')
++        except OSError:
++            parent_executable = None
++        _STATE.update(control=control, worker=worker, collection=[], reports=[], errors=[], imports={}, removed=0,
++            process={'pid': os.getpid(), 'ppid': parent, 'parent_executable': parent_executable})
+     return _STATE
+ 
+ 
+@@ -325,7 +334,7 @@
+     if evidence.exists() and any(evidence.iterdir()):
+         raise ValueError('回归证据目录非空，拒绝覆盖原始当轮')
+     evidence.mkdir(parents=True, exist_ok=True)
+-    with tempfile.TemporaryDirectory(prefix='bench-native-regression-') as directory:
++    with tempfile.TemporaryDirectory(prefix='bench-native-regression-') as directory, ExitStack() as runtime_cleanup:
+         scratch = Path(directory)
+         project, control_root = scratch / 'project', scratch / 'control'
+         control_root.mkdir()
+@@ -343,6 +352,18 @@
+         shutil.copyfile(Path(__file__), control_root / '_bench_native_regression_control.py')
+         home = scratch / 'home'
+         home.mkdir()
++        source_binding = {'mode': 'controlled-pythonpath'}
++        if options.project == 'typer':
++            # 原生 test_scripts 会覆盖 PYTHONPATH；私有 venv 的纯路径文件保留子进程候选绑定。
++            private_venv = Path(sys.prefix).resolve()
++            purelib = Path(sysconfig.get_path('purelib')).resolve()
++            if sys.prefix == sys.base_prefix or not private_venv.is_relative_to(Path('/work')) or not purelib.is_relative_to(private_venv):
++                raise RuntimeError('Typer 原生回归需要 /work 下独占的验证 venv，拒绝修改共享解释器')
++            source_path = purelib / ('_bench_native_source_' + uuid.uuid4().hex + '.pth')
++            source_path.write_text(str(project) + '\n', encoding='utf-8')
++            runtime_cleanup.callback(source_path.unlink, missing_ok=True)
++            source_binding = {'mode': 'private-venv-pure-path', 'venv': str(private_venv),
++                'path_file': str(source_path), 'path_target': str(project), 'cleanup_on_exit_registered': True}
+         environment = dict(os.environ)
+         for key in ['PYTEST_ADDOPTS', 'PYTEST_PLUGINS', 'PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP']:
+             environment.pop(key, None)
+@@ -353,12 +374,15 @@
+         for _, module in suite['plugins']:
+             argv.extend(['-p', module])
+         argv.extend([*suite['args'], '--junitxml=' + str(evidence / 'junit.xml')])
++        # Typer completion 按真实父进程辨识 shell；后续命令确保 Bash 不以 exec 优化替换自身。
++        execution_argv = (['bash', '-c', '"$@"; result=$?; exit "$result"', 'bench-native', *argv]
++            if options.project == 'typer' else argv)
+         stdout, stderr = evidence / 'stdout.log', evidence / 'stderr.log'
+         started = time.monotonic()
+         timed_out = False
+         with stdout.open('wb') as out, stderr.open('wb') as err:
+             try:
+-                process = subprocess.Popen(argv, cwd=project, env=environment, stdout=out, stderr=err,
++                process = subprocess.Popen(execution_argv, cwd=project, env=environment, stdout=out, stderr=err,
+                     start_new_session=True)
+                 returncode = process.wait(timeout=options.timeout_sec)
+             except subprocess.TimeoutExpired:
+@@ -396,6 +420,9 @@
+             and len(doctests) == suite['doctests'] and all(outcomes[node] == 'passed' for node in doctests)
+             and not any(counts[key] for key in ['failed', 'error', 'xpassed', 'unexecuted'])
+             and all(counts[key] == value for key, value in expected_counts.items()))
++        if options.project == 'typer':
++            parent_executable = master['process']['parent_executable'] if master else None
++            valid = valid and parent_executable is not None and Path(parent_executable).name == 'bash'
+         if contract is not None:
+             valid = valid and nodes == contract['nodes']
+         frozen = {'schema': SCHEMA, 'project': options.project, 'baseline_digest': baseline_digest,
+@@ -405,13 +432,16 @@
+                 raise ValueError('冻结 contract 已存在，拒绝覆盖')
+             _save(options.freeze_baseline_contract, frozen)
+         report = {'status': 'passed' if valid else 'failed' if contract else 'error',
+-            'project': options.project, 'command': argv, 'cwd': str(project), 'returncode': returncode,
++            'project': options.project, 'command': argv, 'execution_command': execution_argv,
++            'processes': {state['worker']: state['process'] for state in states},
++            'cwd': str(project), 'returncode': returncode,
+             'elapsed_sec': time.monotonic() - started, 'timed_out': timed_out, 'counts': counts,
+             'collected': len(node_ids), 'strict_doctest_count': len(doctests),
+             'collection_digest': _digest(collection), 'result_digest': _digest(nodes),
+             'collection_matches_contract': nodes == contract['nodes'] if contract else None,
+             'worker_collections_consistent': consistent, 'collection_errors': collection_errors,
+             'xml_testcases': xml_cases, 'xml_failures_and_errors': xml_bad, 'xml_skipped': xml_skipped, 'overlay': overlay,
++            'source_binding': source_binding,
+             'imports': {state['worker']: state['imports'] for state in states}, 'plugins': plugins,
+             'skip_xfail': [{'id': node, 'outcome': result,
+                 'reason': next((item['reason'][-512:] for item in reports if item['id'] == node

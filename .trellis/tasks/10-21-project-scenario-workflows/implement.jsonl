@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/project-iterations.md", "reason": "现有项目内容、严格验收、恢复、数据与跨层兼容契约"}
+{"file": "research/project-scenarios/README.md", "reason": "用户已确认的多场景计数、任务状态、分类验收与三项目试点规则"}
+{"file": ".trellis/tasks/10-21-project-scenario-workflows/research/shared-recovery-contracts.md", "reason": "共享恢复契约的定向摘要与原规范读取行段，避免大文件注入截断"}
+{"file": ".trellis/tasks/10-21-project-scenario-workflows/research/implementation-research-index.md", "reason": "三份专题研究的职责索引与关键边界，按职责读取全文避免超限截断"}
+{"file": ".trellis/tasks/10-21-project-scenario-workflows/research/review-isolation-feasibility.md", "reason": "同账号评审私有HOME、子容器、凭据与生命周期的已核对可行边界"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "SQLite锁与IO、类型和中文注释等实现基线"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/index.md", "reason": "原生JS页面的状态与跨层规范入口"}

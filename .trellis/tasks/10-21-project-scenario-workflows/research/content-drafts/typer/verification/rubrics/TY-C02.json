@@ -1,0 +1,42 @@
+{
+  "criteria": [
+    {
+      "id": "literal",
+      "requirement": "确认字符串 Literal[coffee, tea] 已映射为 TyperChoice，不需要为此改库。",
+      "evidence": [
+        "library/typer/main.py:1620"
+      ]
+    },
+    {
+      "id": "parser",
+      "requirement": "确认 parser 可把字符串解析为用户类，click_type 可提供自定义参数类型；已有能力不等于还需新增注册机制。",
+      "evidence": [
+        "library/typer/main.py:1533",
+        "library/typer/main.py:1536",
+        "library/docs_src/parameter_types/custom_types/tutorial001_an_py310.py:1"
+      ]
+    },
+    {
+      "id": "exclusive",
+      "requirement": "确认 parser 与 click_type 不能同时指定，ParameterInfo 会拒绝；不建议把两者组合在同一参数。",
+      "evidence": [
+        "library/typer/models.py:336",
+        "library/tests/test_others.py:35"
+      ]
+    },
+    {
+      "id": "scope",
+      "requirement": "依据当前版本和少量源码回答即可，不擅自实现上游增强或创建文件。",
+      "evidence": [
+        "materials/TY-S03/requirements.md"
+      ]
+    }
+  ],
+  "allowed_outcomes": [
+    "existing_capabilities_confirmed"
+  ],
+  "schema": 1,
+  "task_id": "TY-C02",
+  "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+  "result_version": 1
+}

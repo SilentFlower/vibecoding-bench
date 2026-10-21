@@ -1,0 +1,11 @@
+{
+  "before_sha256": "4c0edf73573a3591dadb651900305912e990db07a5cb382c0d913b4399ab2482",
+  "after_sha256": "3bbf34e44c67ae040ade28f601634f7ef61af9c8f38da6fad1cb4e6cf8cd6ec0",
+  "changes": [
+    "Typer真实Bash父进程和防exec优化的固定数组命令",
+    "记录和核对pytest master真实父进程",
+    "Typer子coverage重置PYTHONPATH时，通过/work独占venv纯路径pth维持本次源码绑定",
+    "ExitStack确保纯路径文件在返回前删除；校准阶段独立检查无残留"
+  ],
+  "product_files_changed": false
+}

@@ -1,0 +1,4 @@
+{
+  "reason": "首轮错误地resolve()了venv/bin/python的符号链接，实际调用宿主解释器，缺shellingham；属于校准驱动环境问题，不是Typer或草案任务缺陷。",
+  "correction": "保留venv入口的绝对路径，不解引用解释器符号链接。"
+}

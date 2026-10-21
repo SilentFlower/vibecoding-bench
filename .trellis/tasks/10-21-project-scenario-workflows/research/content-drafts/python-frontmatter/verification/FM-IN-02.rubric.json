@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "task_id": "FM-IN-02",
+  "criteria": [
+    {
+      "id": "runnable-example",
+      "requirement": "使用当前存在的 API 给出一个完整主程序，读 weekly.md、打印标题和标签、设置 status、写另一路径后再读回；独立原生验证必须通过。",
+      "evidence": []
+    },
+    {
+      "id": "preservation",
+      "requirement": "保持 title／author／tags／正文，status 为已校对，原文件字节不变；不承诺 YAML 排版或文档字节保真。",
+      "evidence": []
+    },
+    {
+      "id": "source-permission",
+      "requirement": "仅交付咨询示例和业务输出，不改库源码，不把示例当工程能力检查点。",
+      "evidence": []
+    }
+  ],
+  "comparison": "按事实、行为和约束，不按关键词、篇幅或参考答案相似度。",
+  "source_commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6"
+}

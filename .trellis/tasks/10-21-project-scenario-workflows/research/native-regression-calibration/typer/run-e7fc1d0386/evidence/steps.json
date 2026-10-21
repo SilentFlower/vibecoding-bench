@@ -1,0 +1,76 @@
+[
+  {
+    "step": "freeze-baseline",
+    "command": [
+      "/work/venv/bin/python",
+      "/input/native_regression.py",
+      "--project",
+      "typer",
+      "--baseline-root",
+      "/baseline/library",
+      "--evidence-dir",
+      "/evidence/freeze-baseline",
+      "--timeout-sec",
+      "600",
+      "--freeze-baseline-contract",
+      "/evidence/contract.json"
+    ],
+    "exit_code": 0,
+    "elapsed_sec": 196.6503314370002,
+    "expected_status": "passed",
+    "actual_status": "passed",
+    "counts": {
+      "passed": 1481,
+      "failed": 0,
+      "error": 0,
+      "skipped": 22,
+      "xfailed": 2,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "collected": 1505,
+    "strict_doctest_count": 0,
+    "collection_digest": "cbca1ae866e636fc287522db3f45c54b7168bec3d94066b8f3e97efd197cd19b",
+    "result_digest": "b108a3662b2a1df899daa43e093712f6fc2dd70191ab2e171678dc3edd769245",
+    "temporary_source_paths_remaining": 0,
+    "matches_expected": true
+  },
+  {
+    "step": "original-candidate",
+    "command": [
+      "/work/venv/bin/python",
+      "/input/native_regression.py",
+      "--project",
+      "typer",
+      "--baseline-root",
+      "/baseline/library",
+      "--evidence-dir",
+      "/evidence/original-candidate",
+      "--timeout-sec",
+      "600",
+      "--candidate-root",
+      "/work/candidates/original",
+      "--contract",
+      "/evidence/contract.json"
+    ],
+    "exit_code": 0,
+    "elapsed_sec": 199.59398407700064,
+    "expected_status": "passed",
+    "actual_status": "passed",
+    "counts": {
+      "passed": 1481,
+      "failed": 0,
+      "error": 0,
+      "skipped": 22,
+      "xfailed": 2,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "collected": 1505,
+    "strict_doctest_count": 0,
+    "collection_digest": "cbca1ae866e636fc287522db3f45c54b7168bec3d94066b8f3e97efd197cd19b",
+    "result_digest": "b108a3662b2a1df899daa43e093712f6fc2dd70191ab2e171678dc3edd769245",
+    "temporary_source_paths_remaining": 0,
+    "matches_expected": true
+  }
+]

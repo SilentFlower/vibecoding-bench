@@ -1,0 +1,39 @@
+{
+  "status": "ready_for_main_review",
+  "scenarios": 4,
+  "tasks": 7,
+  "task_ids": [
+    "TY-U01",
+    "TY-C01",
+    "TY-D01",
+    "TY-D02",
+    "TY-C02",
+    "TY-P01",
+    "TY-M01"
+  ],
+  "content_validator": "passed",
+  "validator_sha256": "f533631c8eafefe459b2237b9471316d6f982e3bea7a5441c891298bc419e136",
+  "seed_digest_matches": true,
+  "upstream_files_byte_identical": 776,
+  "environment_id": "typer-py312",
+  "offline_artifact_count": 16,
+  "target_image_id": "sha256:d055c5f0035c8fb3f204ed97d6f774a38afdb3515f5503f7fa028adb6a5e908d",
+  "target_python": "3.12.15",
+  "native_counts": {
+    "total": 1505,
+    "passed": 1481,
+    "skipped": 22,
+    "xfailed": 2,
+    "failures": 0,
+    "errors": 0
+  },
+  "business_calibration_passed": true,
+  "consult_negative_answers_rejected": 3,
+  "reference_application_user_tests_passed": 2,
+  "owned_containers_all_removed": true,
+  "model_runs": 0,
+  "model_completed": 0,
+  "production_integrated": false,
+  "payload_files": 806,
+  "static_check_scope": "格式、素材引用、源码字节、环境制品及脚本语法；运行结果引用单独环境证据"
+}

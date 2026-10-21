@@ -1,0 +1,99 @@
+{
+  "mode": "baseline",
+  "installation": {
+    "command": [
+      "/opt/mitm/bin/python3",
+      "-m",
+      "pip",
+      "install",
+      "--disable-pip-version-check",
+      "--no-index",
+      "--no-deps",
+      "--target",
+      "/work/dependencies",
+      "--find-links",
+      "/offline/artifacts",
+      "-r",
+      "/offline/profile/requirements.txt"
+    ],
+    "cwd": "/work/project",
+    "exit_code": 0,
+    "timed_out": false,
+    "elapsed_sec": 10.134404,
+    "resources_after": {
+      "child_max_rss_kib": 96580,
+      "memory.peak": 400056320,
+      "memory.current": 276242432,
+      "memory.max": 1073741824,
+      "pids.peak": 6,
+      "pids.max": 128
+    }
+  },
+  "native": {
+    "command": [
+      "/opt/mitm/bin/python3",
+      "-m",
+      "pytest",
+      "tests",
+      "-q",
+      "-ra",
+      "--junitxml=/evidence/native-tests.xml"
+    ],
+    "cwd": "/work/project/library",
+    "exit_code": 1,
+    "timed_out": false,
+    "elapsed_sec": 0.476953,
+    "resources_after": {
+      "child_max_rss_kib": 96580,
+      "memory.peak": 400056320,
+      "memory.current": 277749760,
+      "memory.max": 1073741824,
+      "pids.peak": 6,
+      "pids.max": 128
+    }
+  },
+  "business": {
+    "command": [
+      "/opt/mitm/bin/python3",
+      "-B",
+      "/control/check_settings.py",
+      "union-original",
+      "--candidate-root",
+      "/work/project"
+    ],
+    "cwd": "/work/project",
+    "exit_code": 1,
+    "timed_out": false,
+    "elapsed_sec": 0.214765,
+    "resources_after": {
+      "child_max_rss_kib": 96580,
+      "memory.peak": 400056320,
+      "memory.current": 277860352,
+      "memory.max": 1073741824,
+      "pids.peak": 6,
+      "pids.max": 128
+    }
+  },
+  "business_actual": null,
+  "business_expected": {
+    "original_nested_value": {
+      "item": "[]"
+    },
+    "whole_object_workaround": {
+      "item": []
+    },
+    "plain_text": {
+      "item": "hello"
+    }
+  },
+  "business_matches": false,
+  "elapsed_sec": 10.85014,
+  "resources_final": {
+    "child_max_rss_kib": 96580,
+    "memory.peak": 400056320,
+    "memory.current": 277860352,
+    "memory.max": 1073741824,
+    "pids.peak": 6,
+    "pids.max": 128
+  }
+}

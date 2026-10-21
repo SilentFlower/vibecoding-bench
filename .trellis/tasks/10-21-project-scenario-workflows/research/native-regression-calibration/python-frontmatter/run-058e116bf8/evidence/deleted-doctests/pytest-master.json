@@ -1,0 +1,1700 @@
+{
+  "collection": [
+    {
+      "id": "README.md::README.md",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "examples/pandoc.py::examples.pandoc.PandocHandler",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "examples/reversed.py::examples.reversed.ReverseYAMLHandler",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.check",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.checks",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dump",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dumps",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.load",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.loads",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.parse",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "frontmatter/default_handlers.py::frontmatter.default_handlers",
+      "kind": "DoctestItem"
+    },
+    {
+      "id": "tests/test_docs.py::test_readme",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_docs.py::test_api_docs",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_docs.py::test_handler_docs",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename0]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename1]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename2]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename3]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename4]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename5]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename6]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename7]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename8]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename9]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename10]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename0]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename1]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename2]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename3]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename4]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename5]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename6]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename7]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename8]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename9]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename10]",
+      "kind": "Function"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_empty_frontmatter",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_no_frontmatter",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dump_to_file",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dumping_with_custom_delimiters",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_empty_frontmatter",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_extra_space",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_no_frontmatter",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_pretty_dumping",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_dict",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_string",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_unicode_post",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_crlf_string",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_markdown_content",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_custom_handler",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_detect_format",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_json",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_no_handler",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_sanity_all",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_toml",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_detect",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_external",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_content",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_load",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_detect",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_external",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_content",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_load",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_detect",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_external",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_content",
+      "kind": "TestCaseFunction"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_load",
+      "kind": "TestCaseFunction"
+    }
+  ],
+  "errors": [],
+  "exit_code": 0,
+  "imports": {
+    "frontmatter": {
+      "path": "/work/tmp/bench-native-regression-5rc1lk50/project/frontmatter/__init__.py",
+      "sha256": "160d2e5c786a08ff135b493a5552bf58384d068de72c7b29c8e0099cc82e27c5"
+    },
+    "frontmatter.default_handlers": {
+      "path": "/work/tmp/bench-native-regression-5rc1lk50/project/frontmatter/default_handlers.py",
+      "sha256": "de1614dd02f7c44966f69d3799dc1e246a066c0a4a396a8b1e29097baa326cd5"
+    }
+  },
+  "process": {
+    "parent_executable": "/usr/local/bin/python3.12",
+    "pid": 25,
+    "ppid": 24
+  },
+  "removed": 0,
+  "reports": [
+    {
+      "id": "README.md::README.md",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "README.md::README.md",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "README.md::README.md",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "examples/pandoc.py::examples.pandoc.PandocHandler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "examples/pandoc.py::examples.pandoc.PandocHandler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "examples/pandoc.py::examples.pandoc.PandocHandler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "examples/reversed.py::examples.reversed.ReverseYAMLHandler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "examples/reversed.py::examples.reversed.ReverseYAMLHandler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "examples/reversed.py::examples.reversed.ReverseYAMLHandler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.check",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.check",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.check",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.checks",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.checks",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.checks",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dump",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dump",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dump",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dumps",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dumps",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.dumps",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.loads",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.loads",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.loads",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.parse",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.parse",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/__init__.py::frontmatter.parse",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "frontmatter/default_handlers.py::frontmatter.default_handlers",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "frontmatter/default_handlers.py::frontmatter.default_handlers",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "frontmatter/default_handlers.py::frontmatter.default_handlers",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_docs.py::test_readme",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_docs.py::test_readme",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_docs.py::test_readme",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_docs.py::test_api_docs",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_docs.py::test_api_docs",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_docs.py::test_api_docs",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_docs.py::test_handler_docs",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_docs.py::test_handler_docs",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_docs.py::test_handler_docs",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename0]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename0]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename0]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename1]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename1]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename1]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename2]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename2]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename2]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename3]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename3]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename3]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename4]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename4]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename4]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename5]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename5]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename5]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename6]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename6]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename6]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename7]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename7]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename7]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename8]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename8]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename8]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename9]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename9]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename9]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename10]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename10]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_can_parse[filename10]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename0]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename0]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename0]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename1]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename1]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename1]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename2]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename2]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename2]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename3]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename3]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename3]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename4]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename4]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename4]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename5]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename5]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename5]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename6]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename6]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename6]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename7]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename7]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename7]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename8]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename8]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename8]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename9]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename9]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename9]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename10]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename10]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/test_files.py::test_file[filename10]",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_empty_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_empty_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_empty_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_no_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_no_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_check_no_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dump_to_file",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dump_to_file",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dump_to_file",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dumping_with_custom_delimiters",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dumping_with_custom_delimiters",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_dumping_with_custom_delimiters",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_empty_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_empty_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_empty_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_extra_space",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_extra_space",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_extra_space",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_no_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_no_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_no_frontmatter",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_pretty_dumping",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_pretty_dumping",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_pretty_dumping",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_dict",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_dict",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_dict",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_string",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_string",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_to_string",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_unicode_post",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_unicode_post",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_unicode_post",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_crlf_string",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_crlf_string",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_crlf_string",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_markdown_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_markdown_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::FrontmatterTest::test_with_markdown_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_custom_handler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_custom_handler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_custom_handler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_detect_format",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_detect_format",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_detect_format",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_json",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_json",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_json",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_no_handler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_no_handler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_no_handler",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_sanity_all",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_sanity_all",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_sanity_all",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_toml",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_toml",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::HandlerTest::test_toml",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::YAMLHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::JSONHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_detect",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_external",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_content",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "setup"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "call"
+    },
+    {
+      "id": "tests/unit_test.py::TOMLHandlerTest::test_split_load",
+      "outcome": "passed",
+      "reason": "",
+      "wasxfail": false,
+      "when": "teardown"
+    }
+  ],
+  "worker": "master"
+}

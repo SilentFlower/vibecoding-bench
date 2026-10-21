@@ -1,0 +1,7 @@
+{
+  "container_id": "5a14bf65bc90fba22fd7176c9d7d13442a33dd1a1bb25af374e3df5dddbe5d48",
+  "name": "bench-scenario-research-ty-d7236bd4f889",
+  "removed": true,
+  "scope": "仅精确匹配本任务name/owner/token的已退出容器",
+  "note": "完整原生1481/22skip/2xfail已通过；业务help受超宽终端影响，另建业务校准容器，原始失败不覆盖。"
+}

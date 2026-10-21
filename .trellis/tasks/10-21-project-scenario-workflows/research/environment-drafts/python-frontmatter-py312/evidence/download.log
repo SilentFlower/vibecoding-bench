@@ -1,0 +1,37 @@
+Collecting PyYAML==6.0.3 (from -r /root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/requirements-frozen.txt (line 1))
+  Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+Collecting pytest==9.1.1 (from -r /root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/requirements-frozen.txt (line 2))
+  Downloading pytest-9.1.1-py3-none-any.whl.metadata (7.6 kB)
+Collecting toml==0.10.2 (from -r /root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/requirements-frozen.txt (line 3))
+  Downloading toml-0.10.2-py2.py3-none-any.whl.metadata (7.1 kB)
+Collecting pyaml==26.7.0 (from -r /root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/requirements-frozen.txt (line 4))
+  Downloading pyaml-26.7.0-py3-none-any.whl.metadata (12 kB)
+Collecting iniconfig==2.3.1 (from -r /root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/requirements-frozen.txt (line 5))
+  Downloading iniconfig-2.3.1-py3-none-any.whl.metadata (2.8 kB)
+Collecting packaging==26.3 (from -r /root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/requirements-frozen.txt (line 6))
+  Downloading packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+Collecting pluggy==1.7.0 (from -r /root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/requirements-frozen.txt (line 7))
+  Downloading pluggy-1.7.0-py3-none-any.whl.metadata (5.0 kB)
+Collecting Pygments==2.21.0 (from -r /root/project/vibecoding-bench/.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/requirements-frozen.txt (line 8))
+  Downloading pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (807 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 807.9/807.9 kB 1.6 MB/s eta 0:00:00
+Downloading pytest-9.1.1-py3-none-any.whl (386 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 386.5/386.5 kB 13.4 MB/s eta 0:00:00
+Downloading toml-0.10.2-py2.py3-none-any.whl (16 kB)
+Downloading pyaml-26.7.0-py3-none-any.whl (27 kB)
+Downloading iniconfig-2.3.1-py3-none-any.whl (7.6 kB)
+Downloading packaging-26.3-py3-none-any.whl (129 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 130.0/130.0 kB 510.8 kB/s eta 0:00:00
+Downloading pluggy-1.7.0-py3-none-any.whl (27 kB)
+Downloading pygments-2.21.0-py3-none-any.whl (1.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 948.4 kB/s eta 0:00:00
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/artifacts/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/artifacts/pytest-9.1.1-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/artifacts/toml-0.10.2-py2.py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/artifacts/pyaml-26.7.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/artifacts/iniconfig-2.3.1-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/artifacts/packaging-26.3-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/artifacts/pluggy-1.7.0-py3-none-any.whl
+Saved ./.trellis/tasks/10-21-project-scenario-workflows/research/environment-drafts/python-frontmatter-py312/artifacts/pygments-2.21.0-py3-none-any.whl
+Successfully downloaded PyYAML pytest toml pyaml iniconfig packaging pluggy Pygments

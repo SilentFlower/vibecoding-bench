@@ -1,0 +1,32 @@
+{
+  "command": [
+    "/work/venv/bin/python",
+    "-B",
+    "-m",
+    "pip",
+    "install",
+    "--no-index",
+    "--no-deps",
+    "--find-links",
+    "/environment/artifacts",
+    "annotated-doc==0.0.5",
+    "coverage==7.16.2",
+    "execnet==2.1.2",
+    "iniconfig==2.3.1",
+    "markdown-it-py==4.2.0",
+    "mdurl==0.1.2",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "pytest-sugar==1.1.1",
+    "pytest-xdist==3.8.0",
+    "rich==15.0.0",
+    "shellingham==1.5.4",
+    "termcolor==3.3.0"
+  ],
+  "cwd": "/work/project",
+  "exit_code": 0,
+  "elapsed_sec": 1.77153
+}

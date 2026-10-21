@@ -1,0 +1,6 @@
+{
+  "kind": "venv-pth",
+  "path": "/work/venv/lib/python3.12/site-packages/typer_candidate_source.pth",
+  "source": "/work/project/library",
+  "upstream_source_modified": false
+}

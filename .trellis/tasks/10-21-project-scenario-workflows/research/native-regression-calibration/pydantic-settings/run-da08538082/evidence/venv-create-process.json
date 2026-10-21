@@ -1,0 +1,12 @@
+{
+  "step": "venv-create",
+  "command": [
+    "/usr/local/bin/python3",
+    "-m",
+    "venv",
+    "/work/venv"
+  ],
+  "cwd": "/work",
+  "exit_code": 0,
+  "elapsed_sec": 2.3517283689998294
+}

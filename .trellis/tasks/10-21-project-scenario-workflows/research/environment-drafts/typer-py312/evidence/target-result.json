@@ -1,0 +1,6 @@
+{
+  "status": "error",
+  "type": "RuntimeError",
+  "message": "业务原版/参考候选校准与冻结结果不符",
+  "model_runs": 0
+}

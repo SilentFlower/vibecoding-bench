@@ -1,0 +1,11 @@
+Looking in links: /offline/artifacts
+Processing /offline/artifacts/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+Processing /offline/artifacts/pytest-9.1.1-py3-none-any.whl
+Processing /offline/artifacts/toml-0.10.2-py2.py3-none-any.whl
+Processing /offline/artifacts/pyaml-26.7.0-py3-none-any.whl
+Processing /offline/artifacts/iniconfig-2.3.1-py3-none-any.whl
+Processing /offline/artifacts/packaging-26.3-py3-none-any.whl
+Processing /offline/artifacts/pluggy-1.7.0-py3-none-any.whl
+Processing /offline/artifacts/pygments-2.21.0-py3-none-any.whl
+Installing collected packages: toml, PyYAML, pytest, Pygments, pyaml, pluggy, packaging, iniconfig
+Successfully installed PyYAML-6.0.3 Pygments-2.21.0 iniconfig-2.3.1 packaging-26.3 pluggy-1.7.0 pyaml-26.7.0 pytest-9.1.1 toml-0.10.2

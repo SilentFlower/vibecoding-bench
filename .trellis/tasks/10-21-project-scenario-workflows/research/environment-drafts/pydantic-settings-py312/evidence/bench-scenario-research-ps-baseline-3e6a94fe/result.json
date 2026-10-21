@@ -1,0 +1,109 @@
+{
+  "mode": "baseline",
+  "installation": {
+    "command": [
+      "/opt/mitm/bin/python3",
+      "-m",
+      "pip",
+      "install",
+      "--disable-pip-version-check",
+      "--no-index",
+      "--no-deps",
+      "--target",
+      "/work/dependencies",
+      "--find-links",
+      "/offline/artifacts",
+      "-r",
+      "/offline/profile/requirements.txt"
+    ],
+    "cwd": "/work/project",
+    "exit_code": 0,
+    "timed_out": false,
+    "elapsed_sec": 10.629456,
+    "resources_after": {
+      "child_max_rss_kib": 96796,
+      "memory.peak": 363679744,
+      "memory.current": 241483776,
+      "memory.max": 1073741824,
+      "pids.peak": 6,
+      "pids.max": 128
+    }
+  },
+  "native": {
+    "command": [
+      "/opt/mitm/bin/python3",
+      "-m",
+      "pytest",
+      "tests",
+      "-q",
+      "-ra",
+      "--junitxml=/evidence/native-tests.xml"
+    ],
+    "cwd": "/work/project/library",
+    "exit_code": 0,
+    "timed_out": false,
+    "elapsed_sec": 13.104334,
+    "resources_after": {
+      "child_max_rss_kib": 335380,
+      "memory.peak": 568463360,
+      "memory.current": 283594752,
+      "memory.max": 1073741824,
+      "pids.peak": 27,
+      "pids.max": 128
+    }
+  },
+  "business": {
+    "command": [
+      "/opt/mitm/bin/python3",
+      "-B",
+      "/control/check_settings.py",
+      "union-original",
+      "--candidate-root",
+      "/work/project"
+    ],
+    "cwd": "/work/project",
+    "exit_code": 0,
+    "timed_out": false,
+    "elapsed_sec": 0.468625,
+    "resources_after": {
+      "child_max_rss_kib": 335380,
+      "memory.peak": 568463360,
+      "memory.current": 283725824,
+      "memory.max": 1073741824,
+      "pids.peak": 27,
+      "pids.max": 128
+    }
+  },
+  "business_actual": {
+    "original_nested_value": {
+      "item": "[]"
+    },
+    "plain_text": {
+      "item": "hello"
+    },
+    "whole_object_workaround": {
+      "item": []
+    }
+  },
+  "business_expected": {
+    "original_nested_value": {
+      "item": "[]"
+    },
+    "whole_object_workaround": {
+      "item": []
+    },
+    "plain_text": {
+      "item": "hello"
+    }
+  },
+  "business_matches": true,
+  "elapsed_sec": 24.222359,
+  "resources_final": {
+    "child_max_rss_kib": 335380,
+    "memory.peak": 568463360,
+    "memory.current": 283725824,
+    "memory.max": 1073741824,
+    "pids.peak": 27,
+    "pids.max": 128
+  }
+}

@@ -1,0 +1,14 @@
+--- a/frontmatter/__init__.py
++++ b/frontmatter/__init__.py
+@@ -191,7 +191,10 @@
+     text = u(text, encoding)
+     handler = handler or detect_format(text, handlers)
+     metadata, content = parse(text, encoding, handler, **defaults)
+-    return Post(content, handler, **metadata)
++    # 先传正文与实际处理器，再写元数据，避免合法业务键与构造形参冲突。
++    post = Post(content, handler)
++    post.metadata.update(metadata)
++    return post
+ 
+ 
+ def dump(

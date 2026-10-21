@@ -1,0 +1,17 @@
+{
+  "mode": "reference",
+  "python": "3.12.15 (main, Oct  6 2026, 02:02:31) [GCC 12.2.0]",
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+  "uid": 1000,
+  "gid": 1000,
+  "cgroup": "0::/\n",
+  "network_mode": "none",
+  "initial_resources": {
+    "child_max_rss_kib": 17920,
+    "memory.peak": 10739712,
+    "memory.current": 10354688,
+    "memory.max": 1073741824,
+    "pids.peak": 6,
+    "pids.max": 128
+  }
+}

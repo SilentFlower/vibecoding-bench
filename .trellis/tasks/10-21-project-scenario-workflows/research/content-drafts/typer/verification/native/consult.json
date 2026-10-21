@@ -1,0 +1,23 @@
+{
+  "script": "verification/native_checks.py",
+  "args": [
+    "--mode",
+    "consult"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_library": true,
+    "consult_sample_found": true,
+    "consult_unambiguous": true,
+    "quantity_three": true,
+    "quantity_default": true,
+    "quantity_zero": true,
+    "negative_rejected": true,
+    "invalid_integer_rejected": true,
+    "help_no_business": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,27 @@
+prepare
+install-offline
+full-native-regression
+Traceback (most recent call last):
+  File "/environment/verify_target.py", line 149, in <module>
+    main()
+  File "/environment/verify_target.py", line 83, in main
+    cases = list(ET.parse(_EVIDENCE / "native-tests.xml").getroot().iter("testcase"))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/xml/etree/ElementTree.py", line 1204, in parse
+    tree.parse(source, parser)
+  File "/usr/local/lib/python3.12/xml/etree/ElementTree.py", line 558, in parse
+    source = open(source, "rb")
+             ^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/evidence/native-tests.xml'
+Traceback (most recent call last):
+  File "/environment/verify_target.py", line 149, in <module>
+    main()
+  File "/environment/verify_target.py", line 83, in main
+    cases = list(ET.parse(_EVIDENCE / "native-tests.xml").getroot().iter("testcase"))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/xml/etree/ElementTree.py", line 1204, in parse
+    tree.parse(source, parser)
+  File "/usr/local/lib/python3.12/xml/etree/ElementTree.py", line 558, in parse
+    source = open(source, "rb")
+             ^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/evidence/native-tests.xml'

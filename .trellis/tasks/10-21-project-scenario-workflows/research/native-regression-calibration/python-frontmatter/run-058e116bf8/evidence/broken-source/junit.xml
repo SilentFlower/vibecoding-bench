@@ -1,0 +1,612 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="28" skipped="0" tests="67" time="0.277" timestamp="2026-10-21T07:05:46.556957+00:00" hostname="6bd4f934d78e"><testcase classname="README.md" name="README.md" time="0.002"><failure message="069 # this works, too&#10;070 &gt;&gt;&gt; print(post)&#10;071 Well, hello there, world.&#10;072 &#10;073 ```&#10;074 &#10;075 Use metadata (metadata gets proxied as post keys):&#10;076 &#10;077 ```python&#10;078 &gt;&gt;&gt; print(post['title'])&#10;UNEXPECTED EXCEPTION: KeyError('title')&#10;Traceback (most recent call last):&#10;  File &quot;/usr/local/lib/python3.12/doctest.py&quot;, line 1368, in __run&#10;    exec(compile(example.source, filename, &quot;single&quot;,&#10;  File &quot;&lt;doctest README.md[7]&gt;&quot;, line 1, in &lt;module&gt;&#10;  File &quot;/work/tmp/bench-native-regression-cm9b5cd0/project/frontmatter/__init__.py&quot;, line 315, in __getitem__&#10;    return self.metadata[name]&#10;           ~~~~~~~~~~~~~^^^^^^&#10;KeyError: 'title'&#10;/work/tmp/bench-native-regression-cm9b5cd0/project/README.md:78: UnexpectedException">069 # this works, too
+070 &gt;&gt;&gt; print(post)
+071 Well, hello there, world.
+072 
+073 ```
+074 
+075 Use metadata (metadata gets proxied as post keys):
+076 
+077 ```python
+078 &gt;&gt;&gt; print(post['title'])
+UNEXPECTED EXCEPTION: KeyError('title')
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/doctest.py", line 1368, in __run
+    exec(compile(example.source, filename, "single",
+  File "&lt;doctest README.md[7]&gt;", line 1, in &lt;module&gt;
+  File "/work/tmp/bench-native-regression-cm9b5cd0/project/frontmatter/__init__.py", line 315, in __getitem__
+    return self.metadata[name]
+           ~~~~~~~~~~~~~^^^^^^
+KeyError: 'title'
+/work/tmp/bench-native-regression-cm9b5cd0/project/README.md:78: UnexpectedException</failure></testcase><testcase classname="examples.pandoc" name="examples.pandoc.PandocHandler" time="0.001"><failure message="005 &#10;006     Pandoc format uses different start and end delimiters, which trips up parsing a bit.&#10;007     To make it work, we need a custom handler that deals with each part separately.&#10;008 &#10;009     &gt;&gt;&gt; with open('examples/content/pandoc.txt') as f:&#10;010     ...     text = f.read()&#10;011     &gt;&gt;&gt; post = frontmatter.loads(text, handler=PandocHandler())&#10;012     &gt;&gt;&gt; post['title']&#10;UNEXPECTED EXCEPTION: KeyError('title')&#10;Traceback (most recent call last):&#10;  File &quot;/usr/local/lib/python3.12/doctest.py&quot;, line 1368, in __run&#10;    exec(compile(example.source, filename, &quot;single&quot;,&#10;  File &quot;&lt;doctest examples.pandoc.PandocHandler[2]&gt;&quot;, line 1, in &lt;module&gt;&#10;  File &quot;/work/tmp/bench-native-regression-cm9b5cd0/project/frontmatter/__init__.py&quot;, line 315, in __getitem__&#10;    return self.metadata[name]&#10;           ~~~~~~~~~~~~~^^^^^^&#10;KeyError: 'title'&#10;/work/tmp/bench-native-regression-cm9b5cd0/project/examples/pandoc.py:12: UnexpectedException">005 
+006     Pandoc format uses different start and end delimiters, which trips up parsing a bit.
+007     To make it work, we need a custom handler that deals with each part separately.
+008 
+009     &gt;&gt;&gt; with open('examples/content/pandoc.txt') as f:
+010     ...     text = f.read()
+011     &gt;&gt;&gt; post = frontmatter.loads(text, handler=PandocHandler())
+012     &gt;&gt;&gt; post['title']
+UNEXPECTED EXCEPTION: KeyError('title')
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/doctest.py", line 1368, in __run
+    exec(compile(example.source, filename, "single",
+  File "&lt;doctest examples.pandoc.PandocHandler[2]&gt;", line 1, in &lt;module&gt;
+  File "/work/tmp/bench-native-regression-cm9b5cd0/project/frontmatter/__init__.py", line 315, in __getitem__
+    return self.metadata[name]
+           ~~~~~~~~~~~~~^^^^^^
+KeyError: 'title'
+/work/tmp/bench-native-regression-cm9b5cd0/project/examples/pandoc.py:12: UnexpectedException</failure></testcase><testcase classname="examples.reversed" name="examples.reversed.ReverseYAMLHandler" time="0.001"><failure message="013 &#10;014     This is an example of using Handler.parse and Handler.format to move Frontmatter to the bottom&#10;015     of a file, both for parsing and output.&#10;016 &#10;017     &gt;&gt;&gt; with open(&quot;examples/content/reversed.txt&quot;) as f:&#10;018     ...     text = f.read()&#10;019     &gt;&gt;&gt; handler = ReverseYAMLHandler()&#10;020     &gt;&gt;&gt; post = frontmatter.loads(text, handler=handler)&#10;021     &gt;&gt;&gt; print(post['title'])&#10;UNEXPECTED EXCEPTION: KeyError('title')&#10;Traceback (most recent call last):&#10;  File &quot;/usr/local/lib/python3.12/doctest.py&quot;, line 1368, in __run&#10;    exec(compile(example.source, filename, &quot;single&quot;,&#10;  File &quot;&lt;doctest examples.reversed.ReverseYAMLHandler[3]&gt;&quot;, line 1, in &lt;module&gt;&#10;  File &quot;/work/tmp/bench-native-regression-cm9b5cd0/project/frontmatter/__init__.py&quot;, line 315, in __getitem__&#10;    return self.metadata[name]&#10;           ~~~~~~~~~~~~~^^^^^^&#10;KeyError: 'title'&#10;/work/tmp/bench-native-regression-cm9b5cd0/project/examples/reversed.py:21: UnexpectedException">013 
+014     This is an example of using Handler.parse and Handler.format to move Frontmatter to the bottom
+015     of a file, both for parsing and output.
+016 
+017     &gt;&gt;&gt; with open("examples/content/reversed.txt") as f:
+018     ...     text = f.read()
+019     &gt;&gt;&gt; handler = ReverseYAMLHandler()
+020     &gt;&gt;&gt; post = frontmatter.loads(text, handler=handler)
+021     &gt;&gt;&gt; print(post['title'])
+UNEXPECTED EXCEPTION: KeyError('title')
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/doctest.py", line 1368, in __run
+    exec(compile(example.source, filename, "single",
+  File "&lt;doctest examples.reversed.ReverseYAMLHandler[3]&gt;", line 1, in &lt;module&gt;
+  File "/work/tmp/bench-native-regression-cm9b5cd0/project/frontmatter/__init__.py", line 315, in __getitem__
+    return self.metadata[name]
+           ~~~~~~~~~~~~~^^^^^^
+KeyError: 'title'
+/work/tmp/bench-native-regression-cm9b5cd0/project/examples/reversed.py:21: UnexpectedException</failure></testcase><testcase classname="frontmatter.__init__" name="frontmatter.check" time="0.001" /><testcase classname="frontmatter.__init__" name="frontmatter.checks" time="0.001" /><testcase classname="frontmatter.__init__" name="frontmatter.dump" time="0.001"><failure message="205     Serialize :py:class:`post &lt;frontmatter.Post&gt;` to a string and write to a file-like object.&#10;206     Text will be encoded on the way out (utf-8 by default).&#10;207 &#10;208     ::&#10;209 &#10;210         &gt;&gt;&gt; from io import StringIO&#10;211         &gt;&gt;&gt; post = frontmatter.load('tests/yaml/hello-world.txt')&#10;212         &gt;&gt;&gt; f = StringIO()&#10;213         &gt;&gt;&gt; frontmatter.dump(post, f)&#10;214         &gt;&gt;&gt; print(f.getvalue())&#10;Differences (unified diff with -expected +actual):&#10;    @@ -1,5 +1,4 @@&#10;     ---&#10;    -layout: post&#10;    -title: Hello, world!&#10;    +{}&#10;     ---&#10;     &lt;BLANKLINE&gt;&#10;&#10;/work/tmp/bench-native-regression-cm9b5cd0/project/frontmatter/__init__.py:214: DocTestFailure">205     Serialize :py:class:`post &lt;frontmatter.Post&gt;` to a string and write to a file-like object.
+206     Text will be encoded on the way out (utf-8 by default).
+207 
+208     ::
+209 
+210         &gt;&gt;&gt; from io import StringIO
+211         &gt;&gt;&gt; post = frontmatter.load('tests/yaml/hello-world.txt')
+212         &gt;&gt;&gt; f = StringIO()
+213         &gt;&gt;&gt; frontmatter.dump(post, f)
+214         &gt;&gt;&gt; print(f.getvalue())
+Differences (unified diff with -expected +actual):
+    @@ -1,5 +1,4 @@
+     ---
+    -layout: post
+    -title: Hello, world!
+    +{}
+     ---
+     &lt;BLANKLINE&gt;
+
+/work/tmp/bench-native-regression-cm9b5cd0/project/frontmatter/__init__.py:214: DocTestFailure</failure></testcase><testcase classname="frontmatter.__init__" name="frontmatter.dumps" time="0.001"><failure message="257 &#10;258     Passing ``handler`` will change how metadata is turned into text. A handler&#10;259     passed as an argument will override ``post.handler``, with&#10;260     :py:class:`YAMLHandler &lt;frontmatter.default_handlers.YAMLHandler&gt;` used as&#10;261     a default.&#10;262 &#10;263     ::&#10;264 &#10;265         &gt;&gt;&gt; post = frontmatter.load('tests/yaml/hello-world.txt')&#10;266         &gt;&gt;&gt; print(frontmatter.dumps(post)) # doctest: +NORMALIZE_WHITESPACE&#10;Differences (unified diff with -expected +actual):&#10;    @@ -1,5 +1,4 @@&#10;     ---&#10;    -layout: post&#10;    -title: Hello, world!&#10;    +{}&#10;     ---&#10;     &lt;BLANKLINE&gt;&#10;&#10;/work/tmp/bench-native-regression-cm9b5cd0/project/frontmatter/__init__.py:266: DocTestFailure">257 
+258     Passing ``handler`` will change how metadata is turned into text. A handler
+259     passed as an argument will override ``post.handler``, with
+260     :py:class:`YAMLHandler &lt;frontmatter.default_handlers.YAMLHandler&gt;` used as
+261     a default.
+262 
+263     ::
+264 
+265         &gt;&gt;&gt; post = frontmatter.load('tests/yaml/hello-world.txt')
+266         &gt;&gt;&gt; print(frontmatter.dumps(post)) # doctest: +NORMALIZE_WHITESPACE
+Differences (unified diff with -expected +actual):
+    @@ -1,5 +1,4 @@
+     ---
+    -layout: post
+    -title: Hello, world!
+    +{}
+     ---
+     &lt;BLANKLINE&gt;
+
+/work/tmp/bench-native-regression-cm9b5cd0/project/frontmatter/__init__.py:266: DocTestFailure</failure></testcase><testcase classname="frontmatter.__init__" name="frontmatter.load" time="0.001" /><testcase classname="frontmatter.__init__" name="frontmatter.loads" time="0.001" /><testcase classname="frontmatter.__init__" name="frontmatter.parse" time="0.001"><failure message="061 &#10;062     .. testsetup:: *&#10;063 &#10;064         &gt;&gt;&gt; import frontmatter&#10;065 &#10;066     .. doctest::&#10;067 &#10;068         &gt;&gt;&gt; with open('tests/yaml/hello-world.txt') as f:&#10;069         ...     metadata, content = frontmatter.parse(f.read())&#10;070         &gt;&gt;&gt; print(metadata['title'])&#10;UNEXPECTED EXCEPTION: KeyError('title')&#10;Traceback (most recent call last):&#10;  File &quot;/usr/local/lib/python3.12/doctest.py&quot;, line 1368, in __run&#10;    exec(compile(example.source, filename, &quot;single&quot;,&#10;  File &quot;&lt;doctest frontmatter.parse[2]&gt;&quot;, line 1, in &lt;module&gt;&#10;KeyError: 'title'&#10;/work/tmp/bench-native-regression-cm9b5cd0/project/frontmatter/__init__.py:70: UnexpectedException">061 
+062     .. testsetup:: *
+063 
+064         &gt;&gt;&gt; import frontmatter
+065 
+066     .. doctest::
+067 
+068         &gt;&gt;&gt; with open('tests/yaml/hello-world.txt') as f:
+069         ...     metadata, content = frontmatter.parse(f.read())
+070         &gt;&gt;&gt; print(metadata['title'])
+UNEXPECTED EXCEPTION: KeyError('title')
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/doctest.py", line 1368, in __run
+    exec(compile(example.source, filename, "single",
+  File "&lt;doctest frontmatter.parse[2]&gt;", line 1, in &lt;module&gt;
+KeyError: 'title'
+/work/tmp/bench-native-regression-cm9b5cd0/project/frontmatter/__init__.py:70: UnexpectedException</failure></testcase><testcase classname="frontmatter.default_handlers" name="frontmatter.default_handlers" time="0.001"><failure message="066     ---&#10;067     &lt;BLANKLINE&gt;&#10;068     And this shouldn't break.&#10;069 &#10;070 Passing a new handler to :py:func:`frontmatter.dumps &lt;frontmatter.dumps&gt;`&#10;071 (or :py:func:`dump &lt;frontmatter.dump&gt;`) changes the export format:&#10;072 &#10;073 ::&#10;074 &#10;075     &gt;&gt;&gt; print(frontmatter.dumps(post, handler=YAMLHandler())) # doctest: +NORMALIZE_WHITESPACE&#10;Differences (unified diff with -expected +actual):&#10;    @@ -1,6 +1,4 @@&#10;     ---&#10;    -author: bob&#10;    -something: else&#10;    -test: tester&#10;    +{}&#10;     ---&#10;     &lt;BLANKLINE&gt;&#10;&#10;/work/tmp/bench-native-regression-cm9b5cd0/project/frontmatter/default_handlers.py:75: DocTestFailure">066     ---
+067     &lt;BLANKLINE&gt;
+068     And this shouldn't break.
+069 
+070 Passing a new handler to :py:func:`frontmatter.dumps &lt;frontmatter.dumps&gt;`
+071 (or :py:func:`dump &lt;frontmatter.dump&gt;`) changes the export format:
+072 
+073 ::
+074 
+075     &gt;&gt;&gt; print(frontmatter.dumps(post, handler=YAMLHandler())) # doctest: +NORMALIZE_WHITESPACE
+Differences (unified diff with -expected +actual):
+    @@ -1,6 +1,4 @@
+     ---
+    -author: bob
+    -something: else
+    -test: tester
+    +{}
+     ---
+     &lt;BLANKLINE&gt;
+
+/work/tmp/bench-native-regression-cm9b5cd0/project/frontmatter/default_handlers.py:75: DocTestFailure</failure></testcase><testcase classname="tests.test_docs" name="test_readme" time="0.003" /><testcase classname="tests.test_docs" name="test_api_docs" time="0.005" /><testcase classname="tests.test_docs" name="test_handler_docs" time="0.004" /><testcase classname="tests.test_files" name="test_can_parse[filename0]" time="0.002" /><testcase classname="tests.test_files" name="test_can_parse[filename1]" time="0.002" /><testcase classname="tests.test_files" name="test_can_parse[filename2]" time="0.002" /><testcase classname="tests.test_files" name="test_can_parse[filename3]" time="0.002" /><testcase classname="tests.test_files" name="test_can_parse[filename4]" time="0.002" /><testcase classname="tests.test_files" name="test_can_parse[filename5]" time="0.002" /><testcase classname="tests.test_files" name="test_can_parse[filename6]" time="0.002" /><testcase classname="tests.test_files" name="test_can_parse[filename7]" time="0.002" /><testcase classname="tests.test_files" name="test_can_parse[filename8]" time="0.002" /><testcase classname="tests.test_files" name="test_can_parse[filename9]" time="0.002" /><testcase classname="tests.test_files" name="test_can_parse[filename10]" time="0.002" /><testcase classname="tests.test_files" name="test_file[filename0]" time="0.001"><failure message="assert {'content': &quot;...ldn't break.&quot;} == {'test': 'tes...ldn't break.&quot;}&#10;  &#10;  Omitting 1 identical items, use -vv to show&#10;  Right contains 3 more items:&#10;  {'author': 'bob', 'something': 'else', 'test': 'tester'}&#10;  Use -v to get more diff">filename = PosixPath('/work/tmp/bench-native-regression-cm9b5cd0/project/tests/yaml/hello-markdown.md')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+&gt;       assert post.to_dict() == result
+E       assert {'content': "...ldn't break."} == {'test': 'tes...ldn't break."}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 3 more items:
+E         {'author': 'bob', 'something': 'else', 'test': 'tester'}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError</failure></testcase><testcase classname="tests.test_files" name="test_file[filename1]" time="0.001"><failure message="AssertionError: assert {'content': '...ed in order.'} == {'destination...ed in order.'}&#10;  &#10;  Omitting 1 identical items, use -vv to show&#10;  Right contains 2 more items:&#10;  {'destination': {'encoding': {'xz': {'enabled': True,&#10;                                       'min_size': 5120,&#10;                                       'options': None,&#10;                                       'path_filter': None}},...&#10;  &#10;  ...Full output truncated (6 lines hidden), use '-vv' to show">filename = PosixPath('/work/tmp/bench-native-regression-cm9b5cd0/project/tests/yaml/unpretty.md')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+&gt;       assert post.to_dict() == result
+E       AssertionError: assert {'content': '...ed in order.'} == {'destination...ed in order.'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 2 more items:
+E         {'destination': {'encoding': {'xz': {'enabled': True,
+E                                              'min_size': 5120,
+E                                              'options': None,
+E                                              'path_filter': None}},...
+E         
+E         ...Full output truncated (6 lines hidden), use '-vv' to show
+
+tests/test_files.py:47: AssertionError</failure></testcase><testcase classname="tests.test_files" name="test_file[filename2]" time="0.001"><failure message="AssertionError: assert {'content': '...o play with.'} == {'title': 'TO...['todo'], ...}&#10;  &#10;  Omitting 1 identical items, use -vv to show&#10;  Right contains 4 more items:&#10;  {'layout': 'post',&#10;   'published': True,&#10;   'tags': ['todo'],&#10;   'title': 'TODO: Understand Network Diagrams'}&#10;  Use -v to get more diff">filename = PosixPath('/work/tmp/bench-native-regression-cm9b5cd0/project/tests/yaml/network-diagrams.md')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+&gt;       assert post.to_dict() == result
+E       AssertionError: assert {'content': '...o play with.'} == {'title': 'TO...['todo'], ...}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 4 more items:
+E         {'layout': 'post',
+E          'published': True,
+E          'tags': ['todo'],
+E          'title': 'TODO: Understand Network Diagrams'}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError</failure></testcase><testcase classname="tests.test_files" name="test_file[filename3]" time="0.001"><failure message="assert {'content': &quot;...ldn't break.&quot;} == {'author': 'b...ldn't break.&quot;}&#10;  &#10;  Omitting 1 identical items, use -vv to show&#10;  Right contains 3 more items:&#10;  {'author': 'bob', 'something': 'else', 'test': 'tester'}&#10;  Use -v to get more diff">filename = PosixPath('/work/tmp/bench-native-regression-cm9b5cd0/project/tests/toml/hello-toml.md')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+&gt;       assert post.to_dict() == result
+E       assert {'content': "...ldn't break."} == {'author': 'b...ldn't break."}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 3 more items:
+E         {'author': 'bob', 'something': 'else', 'test': 'tester'}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError</failure></testcase><testcase classname="tests.test_files" name="test_file[filename4]" time="0.001"><failure message="AssertionError: assert {'content': '...might break.'} == {'test': 'tes...might break.'}&#10;  &#10;  Omitting 1 identical items, use -vv to show&#10;  Right contains 3 more items:&#10;  {'author': 'bob', 'something': 'else', 'test': 'tester'}&#10;  Use -v to get more diff">filename = PosixPath('/work/tmp/bench-native-regression-cm9b5cd0/project/tests/json/hello-json.md')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+&gt;       assert post.to_dict() == result
+E       AssertionError: assert {'content': '...might break.'} == {'test': 'tes...might break.'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 3 more items:
+E         {'author': 'bob', 'something': 'else', 'test': 'tester'}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError</failure></testcase><testcase classname="tests.test_files" name="test_file[filename5]" time="0.001"><failure message="assert {'content': &quot;...ome content.&quot;} == {'test': 'bob...ome content.&quot;}&#10;  &#10;  Omitting 1 identical items, use -vv to show&#10;  Right contains 2 more items:&#10;  {'else': 'kate', 'test': 'bob'}&#10;  Use -v to get more diff">filename = PosixPath('/work/tmp/bench-native-regression-cm9b5cd0/project/tests/yaml/extra-dash.txt')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+&gt;       assert post.to_dict() == result
+E       assert {'content': "...ome content."} == {'test': 'bob...ome content."}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 2 more items:
+E         {'else': 'kate', 'test': 'bob'}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError</failure></testcase><testcase classname="tests.test_files" name="test_file[filename6]" time="0.001"><failure message="AssertionError: assert {'content': '...frontmatter.'} == {'test': 'tes...frontmatter.'}&#10;  &#10;  Omitting 1 identical items, use -vv to show&#10;  Right contains 2 more items:&#10;  {'something': 'else', 'test': 'tester'}&#10;  Use -v to get more diff">filename = PosixPath('/work/tmp/bench-native-regression-cm9b5cd0/project/tests/yaml/extra-space.txt')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+&gt;       assert post.to_dict() == result
+E       AssertionError: assert {'content': '...frontmatter.'} == {'test': 'tes...frontmatter.'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 2 more items:
+E         {'something': 'else', 'test': 'tester'}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError</failure></testcase><testcase classname="tests.test_files" name="test_file[filename7]" time="0.001"><failure message="assert {'content': '欢迎来到大连水产学院！'} == {'title': &quot;Le...'欢迎来到大连水产学院！'}&#10;  &#10;  Omitting 1 identical items, use -vv to show&#10;  Right contains 2 more items:&#10;  {'language': '中文', 'title': &quot;Let's try unicode&quot;}&#10;  Use -v to get more diff">filename = PosixPath('/work/tmp/bench-native-regression-cm9b5cd0/project/tests/yaml/chinese.txt')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+&gt;       assert post.to_dict() == result
+E       assert {'content': '欢迎来到大连水产学院！'} == {'title': "Le...'欢迎来到大连水产学院！'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 2 more items:
+E         {'language': '中文', 'title': "Let's try unicode"}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError</failure></testcase><testcase classname="tests.test_files" name="test_file[filename8]" time="0.001"><failure message="AssertionError: assert {'content': '...here, world.'} == {'title': 'He...here, world.'}&#10;  &#10;  Omitting 1 identical items, use -vv to show&#10;  Right contains 2 more items:&#10;  {'layout': 'post', 'title': 'Hello, world!'}&#10;  Use -v to get more diff">filename = PosixPath('/work/tmp/bench-native-regression-cm9b5cd0/project/tests/yaml/hello-world.txt')
+
+    @pytest.mark.parametrize("filename", list(files()))
+    def test_file(filename):
+        result = Path(get_result_filename(filename))
+        if not result.exists():
+            pytest.fail(f"{result.name} does not exist")
+    
+        post = frontmatter.load(filename)
+        result = json.loads(result.read_text())
+    
+&gt;       assert post.to_dict() == result
+E       AssertionError: assert {'content': '...here, world.'} == {'title': 'He...here, world.'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Right contains 2 more items:
+E         {'layout': 'post', 'title': 'Hello, world!'}
+E         Use -v to get more diff
+
+tests/test_files.py:47: AssertionError</failure></testcase><testcase classname="tests.test_files" name="test_file[filename9]" time="0.001" /><testcase classname="tests.test_files" name="test_file[filename10]" time="0.001" /><testcase classname="tests.unit_test.FrontmatterTest" name="test_check_empty_frontmatter" time="0.000" /><testcase classname="tests.unit_test.FrontmatterTest" name="test_check_no_frontmatter" time="0.000" /><testcase classname="tests.unit_test.FrontmatterTest" name="test_dump_to_file" time="0.001" /><testcase classname="tests.unit_test.FrontmatterTest" name="test_dumping_with_custom_delimiters" time="0.000" /><testcase classname="tests.unit_test.FrontmatterTest" name="test_empty_frontmatter" time="0.000" /><testcase classname="tests.unit_test.FrontmatterTest" name="test_extra_space" time="0.001"><failure message="KeyError: 'something'">self = &lt;unit_test.FrontmatterTest testMethod=test_extra_space&gt;
+
+    def test_extra_space(self):
+        "Extra space in frontmatter delimiter"
+        post = frontmatter.load("tests/yaml/extra-space.txt")
+        content = "This file has an extra space on the opening line of the frontmatter."
+    
+        self.assertEqual(post.content, content)
+        metadata = {"something": "else", "test": "tester"}
+        for k, v in metadata.items():
+&gt;           self.assertEqual(post[k], v)
+                             ^^^^^^^
+
+tests/unit_test.py:89: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;frontmatter.Post object at 0x72e83dbeee70&gt;, name = 'something'
+
+    def __getitem__(self, name: str) -&gt; object:
+        "Get metadata key"
+&gt;       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'something'
+
+frontmatter/__init__.py:315: KeyError</failure></testcase><testcase classname="tests.unit_test.FrontmatterTest" name="test_no_frontmatter" time="0.001" /><testcase classname="tests.unit_test.FrontmatterTest" name="test_pretty_dumping" time="0.001"><failure message="AssertionError: '---\n{}\n---\n\nThis is a test of both unicode[156 chars]der.' != '---\ndestination:\n  encoding:\n    xz:\n     [452 chars]der.'&#10;  ---&#10;- {}&#10;+ destination:&#10;+   encoding:&#10;+     xz:&#10;+       enabled: yes&#10;+       min_size: 5120&#10;+       options:&#10;+       path_filter:&#10;+   result:&#10;+     append_to_file:&#10;+     append_to_lafs_dir:&#10;+     print_to_stdout: yes&#10;+   url: http://localhost:3456/uri&#10;+ filter:&#10;+   - Длинный стринг на русском&#10;+   - Еще одна длинная строка&#10;  ---&#10;  &#10;  This is a test of both unicode and prettier dumping. The above metadata comes from the [pretty-yaml](https://github.com/mk-fg/pretty-yaml) readme file.&#10;  &#10;  Metadata should be dumped in order.">self = &lt;unit_test.FrontmatterTest testMethod=test_pretty_dumping&gt;
+
+    def test_pretty_dumping(self):
+        "Use pyaml to dump nicer"
+        if pyaml is not None:
+            with open("tests/yaml/unpretty.md", "r", encoding="utf-8") as f:
+                data = f.read()
+    
+            post = frontmatter.load("tests/yaml/unpretty.md")
+            yaml = pyaml.dump(post.metadata)
+    
+            # the unsafe dumper gives you nicer output, for times you want that
+            dump = frontmatter.dumps(post, Dumper=pyaml.PYAMLDumper)
+    
+            self.assertTrue(yaml in dump)
+&gt;           self.assertEqual(dump, data)
+E           AssertionError: '---\n{}\n---\n\nThis is a test of both unicode[156 chars]der.' != '---\ndestination:\n  encoding:\n    xz:\n     [452 chars]der.'
+E             ---
+E           - {}
+E           + destination:
+E           +   encoding:
+E           +     xz:
+E           +       enabled: yes
+E           +       min_size: 5120
+E           +       options:
+E           +       path_filter:
+E           +   result:
+E           +     append_to_file:
+E           +     append_to_lafs_dir:
+E           +     print_to_stdout: yes
+E           +   url: http://localhost:3456/uri
+E           + filter:
+E           +   - Длинный стринг на русском
+E           +   - Еще одна длинная строка
+E             ---
+E             
+E             This is a test of both unicode and prettier dumping. The above metadata comes from the [pretty-yaml](https://github.com/mk-fg/pretty-yaml) readme file.
+E             
+E             Metadata should be dumped in order.
+
+tests/unit_test.py:123: AssertionError</failure></testcase><testcase classname="tests.unit_test.FrontmatterTest" name="test_to_dict" time="0.001" /><testcase classname="tests.unit_test.FrontmatterTest" name="test_to_string" time="0.000" /><testcase classname="tests.unit_test.FrontmatterTest" name="test_unicode_post" time="0.001"><failure message="AssertionError: False is not true">self = &lt;unit_test.FrontmatterTest testMethod=test_unicode_post&gt;
+
+    def test_unicode_post(self):
+        "Ensure unicode is parsed correctly"
+        chinese = frontmatter.load("tests/yaml/chinese.txt", "utf-8")
+        output = frontmatter.dumps(chinese)
+        zh = "中文"
+    
+        self.assertTrue(isinstance(chinese.content, str))
+    
+        # check that we're dumping out unicode metadata, too
+&gt;       self.assertTrue(zh in output)
+E       AssertionError: False is not true
+
+tests/unit_test.py:47: AssertionError</failure></testcase><testcase classname="tests.unit_test.FrontmatterTest" name="test_with_crlf_string" time="0.000"><failure message="KeyError: 'title'">self = &lt;unit_test.FrontmatterTest testMethod=test_with_crlf_string&gt;
+
+    def test_with_crlf_string(self):
+        markdown_bytes = b'---\r\ntitle: "my title"\r\ncontent_type: "post"\r\npublished: no\r\n---\r\n\r\nwrite your content in markdown here'
+        loaded = frontmatter.loads(markdown_bytes, "utf-8")
+&gt;       self.assertEqual(loaded["title"], "my title")
+                         ^^^^^^^^^^^^^^^
+
+tests/unit_test.py:128: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;frontmatter.Post object at 0x72e83dc96540&gt;, name = 'title'
+
+    def __getitem__(self, name: str) -&gt; object:
+        "Get metadata key"
+&gt;       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'title'
+
+frontmatter/__init__.py:315: KeyError</failure></testcase><testcase classname="tests.unit_test.FrontmatterTest" name="test_with_markdown_content" time="0.001"><failure message="KeyError: 'author'">self = &lt;unit_test.FrontmatterTest testMethod=test_with_markdown_content&gt;
+
+    def test_with_markdown_content(self):
+        "Parse frontmatter and only the frontmatter"
+        post = frontmatter.load("tests/yaml/hello-markdown.md")
+    
+        metadata = {"author": "bob", "something": "else", "test": "tester"}
+        for k, v in metadata.items():
+&gt;           self.assertEqual(post[k], v)
+                             ^^^^^^^
+
+tests/unit_test.py:36: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;frontmatter.Post object at 0x72e83db5dc70&gt;, name = 'author'
+
+    def __getitem__(self, name: str) -&gt; object:
+        "Get metadata key"
+&gt;       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'author'
+
+frontmatter/__init__.py:315: KeyError</failure></testcase><testcase classname="tests.unit_test.HandlerTest" name="test_custom_handler" time="0.001"><failure message="KeyError: 'value'">self = &lt;unit_test.HandlerTest testMethod=test_custom_handler&gt;
+
+    def test_custom_handler(self):
+        "allow caller to specify a custom delimiter/handler"
+    
+        # not including this in the regular test directory
+        # because it would/should be invalid per the defaults
+        custom = textwrap.dedent("""
+        ...
+        dummy frontmatter
+        ...
+        dummy content
+        """)
+    
+        # and a custom handler that really doesn't do anything
+        class DummyHandler(object):
+            def load(self, fm):
+                return {"value": fm}
+    
+            def split(self, text):
+                return "dummy frontmatter", "dummy content"
+    
+        # but we tell frontmatter that it is the appropriate handler
+        # for the '...' delimiter
+        # frontmatter.handlers['...'] = DummyHandler()
+        post = frontmatter.loads(custom, handler=DummyHandler())
+    
+&gt;       self.assertEqual(post["value"], "dummy frontmatter")
+                         ^^^^^^^^^^^^^
+
+tests/unit_test.py:224: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;frontmatter.Post object at 0x72e83dbf18e0&gt;, name = 'value'
+
+    def __getitem__(self, name: str) -&gt; object:
+        "Get metadata key"
+&gt;       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'value'
+
+frontmatter/__init__.py:315: KeyError</failure></testcase><testcase classname="tests.unit_test.HandlerTest" name="test_detect_format" time="0.001" /><testcase classname="tests.unit_test.HandlerTest" name="test_json" time="0.000"><failure message="KeyError: 'author'">self = &lt;unit_test.HandlerTest testMethod=test_json&gt;
+
+    def test_json(self):
+        "load raw JSON frontmatter"
+        post = frontmatter.load("tests/json/hello-json.md")
+        metadata = {"author": "bob", "something": "else", "test": "tester"}
+        for k, v in metadata.items():
+&gt;           self.assertEqual(post[k], v)
+                             ^^^^^^^
+
+tests/unit_test.py:240: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;frontmatter.Post object at 0x72e83dbf0c50&gt;, name = 'author'
+
+    def __getitem__(self, name: str) -&gt; object:
+        "Get metadata key"
+&gt;       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'author'
+
+frontmatter/__init__.py:315: KeyError</failure></testcase><testcase classname="tests.unit_test.HandlerTest" name="test_no_handler" time="0.001" /><testcase classname="tests.unit_test.HandlerTest" name="test_sanity_all" time="0.001"><failure message="AssertionError: 'Title\n=====\n\ntitle2\n------\n\nHello.\[51 chars]eak.' != '{}\n\n\nTitle\n=====\n\ntitle2\n------\n\[59 chars]eak.'&#10;+ {}&#10;+ &#10;+ &#10;  Title&#10;  =====&#10;  &#10;  title2&#10;  ------&#10;  &#10;  Hello.&#10;  &#10;  Just need three dashes&#10;  ---&#10;  &#10;  And this might break.">self = &lt;unit_test.HandlerTest testMethod=test_sanity_all&gt;
+
+    def test_sanity_all(self):
+        "Run sanity check on all handlers"
+        for filename, Handler in self.TEST_FILES.items():
+&gt;           self.sanity_check(filename, Handler)
+
+tests/unit_test.py:187: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit_test.py:173: in sanity_check
+    self.assertEqual(post.content, repost.content)
+E   AssertionError: 'Title\n=====\n\ntitle2\n------\n\nHello.\[51 chars]eak.' != '{}\n\n\nTitle\n=====\n\ntitle2\n------\n\[59 chars]eak.'
+E   + {}
+E   + 
+E   + 
+E     Title
+E     =====
+E     
+E     title2
+E     ------
+E     
+E     Hello.
+E     
+E     Just need three dashes
+E     ---
+E     
+E     And this might break.</failure></testcase><testcase classname="tests.unit_test.HandlerTest" name="test_toml" time="0.001"><failure message="KeyError: 'author'">self = &lt;unit_test.HandlerTest testMethod=test_toml&gt;
+
+    def test_toml(self):
+        "load toml frontmatter"
+        if toml is None:
+            return
+        post = frontmatter.load("tests/toml/hello-toml.md")
+        metadata = {"author": "bob", "something": "else", "test": "tester"}
+        for k, v in metadata.items():
+&gt;           self.assertEqual(post[k], v)
+                             ^^^^^^^
+
+tests/unit_test.py:233: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;frontmatter.Post object at 0x72e83dbef020&gt;, name = 'author'
+
+    def __getitem__(self, name: str) -&gt; object:
+        "Get metadata key"
+&gt;       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'author'
+
+frontmatter/__init__.py:315: KeyError</failure></testcase><testcase classname="tests.unit_test.YAMLHandlerTest" name="test_detect" time="0.000" /><testcase classname="tests.unit_test.YAMLHandlerTest" name="test_external" time="0.001"><failure message="KeyError: 'test'">self = &lt;unit_test.YAMLHandlerTest testMethod=test_external&gt;
+
+    def test_external(self):
+        filename = self.data["filename"]
+        content = self.data["content"]
+        metadata = self.data["metadata"]
+    
+        post = frontmatter.load(filename)
+    
+        self.assertEqual(post.content, content.strip())
+        for k, v in metadata.items():
+&gt;           self.assertEqual(post[k], v)
+                             ^^^^^^^
+
+tests/unit_test.py:273: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;frontmatter.Post object at 0x72e83dbf0860&gt;, name = 'test'
+
+    def __getitem__(self, name: str) -&gt; object:
+        "Get metadata key"
+&gt;       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'test'
+
+frontmatter/__init__.py:315: KeyError</failure></testcase><testcase classname="tests.unit_test.YAMLHandlerTest" name="test_split_content" time="0.000" /><testcase classname="tests.unit_test.YAMLHandlerTest" name="test_split_load" time="0.000" /><testcase classname="tests.unit_test.JSONHandlerTest" name="test_detect" time="0.001" /><testcase classname="tests.unit_test.JSONHandlerTest" name="test_external" time="0.000"><failure message="KeyError: 'test'">self = &lt;unit_test.JSONHandlerTest testMethod=test_external&gt;
+
+    def test_external(self):
+        filename = self.data["filename"]
+        content = self.data["content"]
+        metadata = self.data["metadata"]
+    
+        post = frontmatter.load(filename)
+    
+        self.assertEqual(post.content, content.strip())
+        for k, v in metadata.items():
+&gt;           self.assertEqual(post[k], v)
+                             ^^^^^^^
+
+tests/unit_test.py:273: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;frontmatter.Post object at 0x72e83dbf2a80&gt;, name = 'test'
+
+    def __getitem__(self, name: str) -&gt; object:
+        "Get metadata key"
+&gt;       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'test'
+
+frontmatter/__init__.py:315: KeyError</failure></testcase><testcase classname="tests.unit_test.JSONHandlerTest" name="test_split_content" time="0.001" /><testcase classname="tests.unit_test.JSONHandlerTest" name="test_split_load" time="0.000" /><testcase classname="tests.unit_test.TOMLHandlerTest" name="test_detect" time="0.000" /><testcase classname="tests.unit_test.TOMLHandlerTest" name="test_external" time="0.000"><failure message="KeyError: 'test'">self = &lt;unit_test.TOMLHandlerTest testMethod=test_external&gt;
+
+    def test_external(self):
+        filename = self.data["filename"]
+        content = self.data["content"]
+        metadata = self.data["metadata"]
+    
+        post = frontmatter.load(filename)
+    
+        self.assertEqual(post.content, content.strip())
+        for k, v in metadata.items():
+&gt;           self.assertEqual(post[k], v)
+                             ^^^^^^^
+
+tests/unit_test.py:273: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;frontmatter.Post object at 0x72e83dbf1df0&gt;, name = 'test'
+
+    def __getitem__(self, name: str) -&gt; object:
+        "Get metadata key"
+&gt;       return self.metadata[name]
+               ^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'test'
+
+frontmatter/__init__.py:315: KeyError</failure></testcase><testcase classname="tests.unit_test.TOMLHandlerTest" name="test_split_content" time="0.000" /><testcase classname="tests.unit_test.TOMLHandlerTest" name="test_split_load" time="0.000" /></testsuite></testsuites>

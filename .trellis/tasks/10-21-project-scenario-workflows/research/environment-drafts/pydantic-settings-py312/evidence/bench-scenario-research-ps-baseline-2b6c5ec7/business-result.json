@@ -1,0 +1,22 @@
+{
+  "command": [
+    "/opt/mitm/bin/python3",
+    "-B",
+    "/control/check_settings.py",
+    "union-original",
+    "--candidate-root",
+    "/work/project"
+  ],
+  "cwd": "/work/project",
+  "exit_code": 1,
+  "timed_out": false,
+  "elapsed_sec": 0.214765,
+  "resources_after": {
+    "child_max_rss_kib": 96580,
+    "memory.peak": 400056320,
+    "memory.current": 277860352,
+    "memory.max": 1073741824,
+    "pids.peak": 6,
+    "pids.max": 128
+  }
+}

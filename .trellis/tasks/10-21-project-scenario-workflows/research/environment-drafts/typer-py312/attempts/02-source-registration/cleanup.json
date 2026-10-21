@@ -1,0 +1,7 @@
+{
+  "container_id": "e47a93477a867b727af92c54bb8c5c9f1fea88a1d88e7b2df9b50722570f0bfe",
+  "name": "bench-scenario-research-ty-dccbff33f229",
+  "removed": true,
+  "scope": "仅已退出且name/owner/token精确匹配的本任务容器",
+  "reason": "1477通过/24skip/2xfail/2失败。上游子进程重写PYTHONPATH后无法导入未注册的Typer；真实Bash祖先缺失导致额外2skip。未改库或测试。"
+}

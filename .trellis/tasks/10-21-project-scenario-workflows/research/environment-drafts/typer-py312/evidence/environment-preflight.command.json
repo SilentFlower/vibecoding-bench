@@ -1,0 +1,27 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "\"$@\" & child=$!; wait \"$child\"",
+    "typer-native",
+    "/work/venv/bin/python",
+    "-B",
+    "-m",
+    "pytest",
+    "--cov",
+    "--cov-report=term-missing",
+    "-o",
+    "console_output_style=progress",
+    "--showlocals",
+    "--numprocesses=2",
+    "-ra",
+    "tests/test_tutorial/test_subcommands/test_tutorial001.py::test_scripts",
+    "tests/test_tutorial/test_subcommands/test_tutorial003.py::test_scripts",
+    "tests/test_completion/test_completion.py::test_show_completion",
+    "tests/test_completion/test_completion.py::test_install_completion",
+    "--junitxml=/evidence/environment-preflight.xml"
+  ],
+  "cwd": "/work/project/library",
+  "exit_code": 0,
+  "elapsed_sec": 13.041089
+}

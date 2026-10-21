@@ -1,0 +1,12 @@
+{
+  "command": [
+    "/opt/mitm/bin/python3",
+    "-B",
+    "-m",
+    "venv",
+    "/work/venv"
+  ],
+  "cwd": "/work/project",
+  "exit_code": 0,
+  "elapsed_sec": 2.382563
+}

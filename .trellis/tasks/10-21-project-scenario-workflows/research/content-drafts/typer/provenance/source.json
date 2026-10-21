@@ -1,0 +1,19 @@
+{
+  "repository": "https://github.com/fastapi/typer",
+  "commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+  "version": "0.27.3",
+  "source_files": 776,
+  "source_bytes": 2084485,
+  "source_copy": "seed/library",
+  "copy_policy": "保留源码字节及权限；剔除.git/.pdm-build/.pytest_cache/__pycache__/coverage等生成目录，无符号链接。",
+  "historical_evidence": ".deploy/github-100-research/resume-app/typer",
+  "baseline_reused_as_historical_only": {
+    "passed": 1481,
+    "skipped": 22,
+    "xfailed": 2,
+    "elapsed_sec": 181.272,
+    "python": "3.12.3"
+  },
+  "this_draft_model_runs": 0,
+  "target_runtime_verified": false
+}
