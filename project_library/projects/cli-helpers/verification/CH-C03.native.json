@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CH-C03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "one_shot_rows_are_consumed": true,
+    "bounded_row_materialization_works": true
+  },
+  "resource_profile": "business"
+}

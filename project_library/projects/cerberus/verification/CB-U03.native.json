@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CB-U03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "update_skips_required_but_keeps_dependencies_of_present_fields": true
+  },
+  "resource_profile": "business"
+}

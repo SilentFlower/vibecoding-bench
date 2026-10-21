@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DC-U03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "shlex_comment_and_escape_observed": true,
+    "csv_helper_drops_empty_fields": true,
+    "quoted_comma_and_postprocess": true
+  },
+  "resource_profile": "business"
+}

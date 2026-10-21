@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BT-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "explicit_apps_keep_route_registries_separate_and_requests_rebind": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "JV-C02",
+  "source_commit": "c497561ea0a95f5aac09cd63d15eb1420eb7bbec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Create a specific FormatChecker, register via its checks(format,raises=ValueError), and pass it to the validator. BIN-12 succeeds and rack-A produces a format error with ValueError cause. New unrelated checkers remain unchanged. Unknown/typo format names are ignored, so required-format names need application schema/catalog validation rather than presumed rejection.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

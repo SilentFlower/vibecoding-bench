@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BF-U02",
+  "source_commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The falsey result triggers the default predicate; after three total calls exhaustion returns the final[] without raising. The caller must distinguish successful nonempty data from exhausted empty polling rather than treat every normal return as success.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BT-C03",
+  "source_commit": "8ec5fe29420d14998c0d86885083983eaea8b839",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default interpolation emits &lt;b&gt;A&amp;B&lt;/b&gt;, while the leading! expression emits the raw<b>A&B</b>. Use default escaping for the specified HTML text context and keep template source trusted because SimpleTemplate executes template code. This is not sanitization for arbitrary HTML/JS/CSS/URL contexts and raw output requires a separate explicit trusted-data policy.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

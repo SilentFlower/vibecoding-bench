@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CO-C02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "comments_and_unicode_survive_value_edit": true,
+    "explicit_encoding_returns_byte_lines": true
+  },
+  "resource_profile": "business"
+}

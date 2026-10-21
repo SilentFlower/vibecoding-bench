@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IC-C02",
+  "source_commit": "05af3e95b0080162813bb017de90966bc75f3b91",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The payload-variable call displays its label and<redacted> without the synthetic token. The str(\"synthetic-token\") call still includes the token in the expression-source label although its resulting value is<redacted>. argToStringFunction formats values, not the whole expression,prefix orcontext. Keep sensitive literals/source expressions out of such traces and use deliberately allowed structured summaries/redaction at the whole-output boundary; no generic sanitizer has been implemented or tested.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

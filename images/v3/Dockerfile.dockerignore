@@ -35,3 +35,9 @@
 **/.env
 **/.env.*
 !project_library/projects/typer/seed/library/.env
+!project_library/projects/python-decouple/seed/library/tests/autoconfig/env/.env
+!project_library/projects/python-decouple/seed/library/tests/autoconfig/env/custom-path/.env
+!project_library/projects/docutils/seed/library/sandbox/odf2docutils/tests/presentationSimple/target
+!project_library/projects/docutils/seed/library/sandbox/odf2docutils/tests/presentationSimple/target/**
+!project_library/projects/docutils/seed/library/sandbox/odf2docutils/tests/textSimple/target
+!project_library/projects/docutils/seed/library/sandbox/odf2docutils/tests/textSimple/target/**

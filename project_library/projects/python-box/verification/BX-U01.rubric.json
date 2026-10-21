@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BX-U01",
+  "source_commit": "a4c10e977b574114613431394b30412b50aaacce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "items remains the dictionary method, while [\"items\"] returns the payload list. first_name accesses original first name through a converted alias, and original keys remain items/first name. Attribute convenience is not a guarantee that arbitrary external keys are safe or renamed uniquely.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

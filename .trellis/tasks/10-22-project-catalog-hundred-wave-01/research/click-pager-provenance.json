@@ -1,0 +1,32 @@
+{
+  "package_version": "590-2.1~deb12u2",
+  "target": "Debian 12 amd64",
+  "official_package_page": "https://packages.debian.org/bookworm/less",
+  "official_binary_sha256_page": "https://packages.debian.org/bookworm/amd64/less/download",
+  "downloads": {
+    "less_590-2.1~deb12u2_amd64.deb": {
+      "url": "https://deb.debian.org/debian/pool/main/l/less/less_590-2.1~deb12u2_amd64.deb",
+      "sha256": "3c4ee8ce5e0f625e1169da9584e309c375a8a68e22de5821461d14446825cc1a",
+      "size": 132044
+    },
+    "less_590-2.1~deb12u2.dsc": {
+      "url": "https://deb.debian.org/debian/pool/main/l/less/less_590-2.1~deb12u2.dsc",
+      "sha256": "1a4219f8ec9342851805089d9ee5ec7c0150287d5722ecc914c50790673ad9a6",
+      "size": 2228
+    },
+    "less_590.orig.tar.gz": {
+      "url": "https://deb.debian.org/debian/pool/main/l/less/less_590.orig.tar.gz",
+      "sha256": "6aadf54be8bf57d0e2999a3c5d67b1de63808bb90deb8f77b028eafae3a08e10",
+      "size": 352574
+    },
+    "less_590-2.1~deb12u2.debian.tar.xz": {
+      "url": "https://deb.debian.org/debian/pool/main/l/less/less_590-2.1~deb12u2.debian.tar.xz",
+      "sha256": "4a54c48a25cabb5408af6d7bc174cad96614e540b47d2b8962b3e13819fd9b30",
+      "size": 23852
+    }
+  },
+  "extracted_binary_sha256": "411d7dabb7fb71fc65a0ad4bc0349d543c36b4df8d2f875e192dbee934b2b13f",
+  "copyright_sha256": "e769e64d04abc3d772e5f397d2848d193c1e2015ff4ca92d7b73dfec8ca791a5",
+  "system_installation": false,
+  "sandbox_permissions_changed": false
+}

@@ -1,0 +1,1 @@
+An invoice description must display the exact customer string [red]urgent[/red], including brackets. Compare default Console.print, print(markup=False) and escape(customer_text) inside a trusted bold Item: prefix. Use synthetic StringIO, disable highlighting/emoji for the complete comparison, and preserve the original value. No project changes are authorized.

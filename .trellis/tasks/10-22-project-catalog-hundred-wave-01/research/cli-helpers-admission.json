@@ -1,0 +1,187 @@
+{
+  "project": "cli-helpers",
+  "stage": "formal_registered_local_verified",
+  "cases": 13,
+  "all_expectations_met": true,
+  "reference_changed_paths": [
+    "library/cli_helpers/tabular_output/output_formatter.py",
+    "library/tests/tabular_output/test_output_formatter.py"
+  ],
+  "regression": {
+    "collected": 96,
+    "counts": {
+      "passed": 92,
+      "failed": 0,
+      "error": 0,
+      "skipped": 4,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "doctests": 0,
+    "subtests": null,
+    "collection_matches_contract": true,
+    "subtests_match_contract": null
+  },
+  "public_tests": {
+    "original": {
+      "candidate_import": true,
+      "public_tests_passed": false,
+      "counts": {
+        "tests": 2,
+        "failed": 2,
+        "errors": 0,
+        "skipped": 0
+      },
+      "failures": [
+        {
+          "test": "test_export_call_options_do_not_leak_between_instances",
+          "message": "AssertionError: assert ('<null>' in 'value\\n---------\\nCALL_ONLY')"
+        },
+        {
+          "test": "test_registered_export_defaults_and_caller_mapping_stay_unchanged",
+          "message": "AssertionError: assert ['CUSTOM'] == ['BASE']\n  \n  At index 0 diff: 'CUSTOM' != 'BASE'\n  Use -v to get more diff"
+        }
+      ]
+    },
+    "reference": {
+      "candidate_import": true,
+      "public_tests_passed": true,
+      "counts": {
+        "tests": 2,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "failures": []
+    }
+  },
+  "wrong_candidate_actual": {
+    "candidate_import": true,
+    "builtin_defaults_isolated": true,
+    "custom_defaults_isolated": false,
+    "caller_default_mapping_unchanged": false
+  },
+  "formal_catalog_modified": true,
+  "real_model_calls": 0,
+  "pending": [],
+  "evidence": [
+    {
+      "case": "original-CH-C01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/cli-helpers/attempt-001/original-CH-C01.json",
+      "sha256": "ce7722979874c5f8c33f6bd23ca060755534402b399ce67f6291295ced58011d"
+    },
+    {
+      "case": "original-CH-C02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/cli-helpers/attempt-001/original-CH-C02.json",
+      "sha256": "ddf3d0caeabdada5a0d210744dea61915f61b76c5918951478845fc656a89e4c"
+    },
+    {
+      "case": "original-CH-C03",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/cli-helpers/attempt-001/original-CH-C03.json",
+      "sha256": "c02ab934a814247893887d0a90a1ae23d482c41ce7e6d3d476a3144c2058592b"
+    },
+    {
+      "case": "original-CH-D01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/cli-helpers/attempt-001/original-CH-D01.json",
+      "sha256": "3af6b388d5eb113c20ee3fda0401901e6df5432c67136af0e0b6889f97e79d17"
+    },
+    {
+      "case": "original-CH-D02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/cli-helpers/attempt-001/original-CH-D02.json",
+      "sha256": "7bb1d9285fca7f9ad4f6b7a7c0fa47e38352e8be4d7fbe8a8c1ecffc3b6af221"
+    },
+    {
+      "case": "original-CH-M01",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/cli-helpers/attempt-001/original-CH-M01.json",
+      "sha256": "c12c40b4713369aaff3a93b88e17049a9d16a0bc7e2573cba86221094fee64d0"
+    },
+    {
+      "case": "original-CH-P01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/cli-helpers/attempt-001/original-CH-P01.json",
+      "sha256": "aa80f7ef6173ca864bc9d1e92aa3b524652bce62b4fda213e8d8370ef786b78d"
+    },
+    {
+      "case": "original-CH-U01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/cli-helpers/attempt-001/original-CH-U01.json",
+      "sha256": "721a1e901007c084026f7c478065d1c41e49ce69dcf78e08bf9dc0535b57002c"
+    },
+    {
+      "case": "public-tests-original",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/cli-helpers/attempt-001/public-tests-original.json",
+      "sha256": "2ff07d56f695dcecae61a71443f3f751cf86f9d886c5c4d53765d9c1031e5ea0"
+    },
+    {
+      "case": "public-tests-reference",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/cli-helpers/attempt-001/public-tests-reference.json",
+      "sha256": "c29f89a232502adcd664ce39fecf7b622956134d5836a3cd82700dee47fcf646"
+    },
+    {
+      "case": "reference-CH-M01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/cli-helpers/attempt-001/reference-CH-M01.json",
+      "sha256": "c1fda4995cb0ef316a04bf6f30059a18e0ad3b890e09fc3da6db1bcb91647a24"
+    },
+    {
+      "case": "reference-full-regression",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/cli-helpers/attempt-001/reference-full-regression.json",
+      "sha256": "ba3582f28fba5ce2b85d52eb801d8d35fa40f8e6e496d489884a2eae8dcc459e"
+    },
+    {
+      "case": "wrong-cli-helpers-builtins-only",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/cli-helpers/attempt-001/wrong-cli-helpers-builtins-only.json",
+      "sha256": "62f6782856f770fb17b69960103f3bf9cfbd423186444550bd49a50469c674a6"
+    }
+  ],
+  "mock_status": "passed",
+  "formal_version": "real-project-scenarios-v6-en",
+  "formal_digest": "93c4087afd28ae9315a7ac6975767974c720b8e4f10b5e5ad7de0d41252bb56a",
+  "full_delivery_files": 4018,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-003/run-001/evidence/result.json",
+      "sha256": "26eadb958684c2630e2c4d5b5238277e3b4566603a5964bea6c1f570a5f61aa2"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-003/run-001/cleanup.json",
+      "sha256": "eda663aca54359fbd7713f175869f25f61c1800da2399ae3acedc37e76f386be"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-003/audit-attempt-001.json",
+      "sha256": "b4a7589391e34a775aa83504011b4cb986390c76e455c30c7da4b67ec5c6f0a8"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-003/browser/run-001/diagnostics/result.json",
+      "sha256": "78dd3f09f1f8ffef3540b52b5a07c5f693f34596c0832048d57dd6a30927fb30"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/delivery-first-eight.json",
+      "sha256": "a4f1da5d4141757840ca5f40fa9bbaa0e65e5901a39889f61f33aeb3a8b18e7e"
+    }
+  ]
+}

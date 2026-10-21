@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CB-C02",
+  "source_commit": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default strict validation rejects extra as unknown. purgeUnknown alone returns{name:A} while original retainsextra1. With allowUnknownTrue as well, extra is retained because purging runs only when unknowns are not allowed. Choose explicit rejection/drop/retention according to the business contract; none is a universal equivalent or automatic schema migration.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

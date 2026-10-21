@@ -1,0 +1,1 @@
+A synthetic synchronous target sleeps0.02seconds and returnsok without failure. Decorate with max_time=0.001,max_tries=2,interval=0,jitter=None. Does max_time interrupt this in-flight call? Explain retry scheduling versus an actual request deadline; no real network calls are authorized.

@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "IT-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "render_callback_requires_real_token_type": true,
+    "existing_render_token_preserves_link_and_encodes_attrs": true
+  },
+  "resource_profile": "business"
+}

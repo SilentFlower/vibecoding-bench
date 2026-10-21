@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IC-U01",
+  "source_commit": "05af3e95b0080162813bb017de90966bc75f3b91",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "One argument returns that same object by identity; multiple arguments return a tuple containing the same supplied objects; no arguments returnsNone. All three enabled calls emit. This preserves value flow but does not create an independent deep copy or remove later mutations.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

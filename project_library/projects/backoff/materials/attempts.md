@@ -1,0 +1,1 @@
+A synthetic target always raises ValueError. Decorate using on_exception(constant,ValueError,interval=0,jitter=None,max_tries=3,logger=None). Record target calls and on_backoff/on_giveup tries. Compare a fresh max_tries=2 wrapper with raise_on_giveup=False. Count all target calls, not only retries. No external service or file changes are involved.

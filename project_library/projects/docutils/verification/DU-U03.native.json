@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DU-U03"
+  ],
+  "python_paths": [
+    "library/docutils",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "csv_table_keeps_quoted_cells_and_unicode": true
+  },
+  "resource_profile": "business"
+}

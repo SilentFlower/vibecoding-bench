@@ -1,0 +1,3717 @@
+{
+  "baseline_digest": "0fdb4aad31699615860602555733b99c7a10403c26aa3d63e8a0424ceb44b25c",
+  "nodes": [
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testAddArgsErrors",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testAutoEnvVarPrefix",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testBasicCase1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testBasicCase2",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testBasicCase2_WithGroups",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testBooleanValuesCanBeExpressedAsNumbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testConfigFileSyntax",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testConfigOrEnvValueErrors",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testCounterCommandLine",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testCounterConfigFile",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testCustomActionWithNargsAndConfigVarList",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testCustomActionWithoutNargsAndConfigVarList",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testCustomOpenFunction",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testEnvVarLists",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testIgnoreHelpArgs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testMutuallyExclusiveArgs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testMutuallyExclusiveArgsOverriddenByOtherSources",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testMutuallyExclusiveBoolArgsOverriddenByCommandLine",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testPositionalAndConfigVarLists",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testPositionalAndEnvVarLists",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testPriorityKnown",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testPriorityUnknown",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testQuotedArgumentValues",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testQuotedConfigFileValues",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testSubParserEnvVar",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testSubParsers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestBasicUseCases::testValuesStartingWithDash",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testCallableInvokedEachParse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testCallableRaisingIsWrapped",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testCallableRaisingMultiArgException",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testCallableReturningNoneRaises",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testCallableReturningStringIO",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testCallableStreamIsClosed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testCallableStreamNameAssignmentFailsRaises",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testCallableStreamNameMatchingGeneratedFormatDoesNotCollide",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testCallableWithRealFile",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testDefaultStreamsClosedWhenUserConfigPhaseRaises",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testEarlierStreamsClosedWhenLaterEntryFails",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testEarlierStreamsClosedWhenParserRaisesUnexpectedException",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testFormatHelpHandlesBytesReturningPathLike",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testFormatHelpHandlesMalformedPathLike",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testFormatHelpRendersCallableName",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testFormatHelpShowsPathForPathLikeAndCallable",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testFormatValuesHandlesPipeInCallableName",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testInvalidEntryType",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testMixedStringsAndCallables",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testPathLikeAndCallableEntryTreatedAsPath",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testPathLikeEntryAccepted",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testStreamClosedExactlyOnceOnSuccess",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testTwoCallableStreamsWithSameNameDoNotCollide",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCallableDefaultConfigFiles::testTwoLambdasGetDistinctSourceKeys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCompositeConfigParser::test_composite_serialize_delegates_to_first_parser",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCompositeConfigParser::test_composite_serialize_empty_parsers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCompositeConfigParser::test_composite_warns_if_missing_dependency",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCompositeConfigParser::test_composite_warns_if_wrong_order",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCompositeConfigParser::test_missing_primary_config",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCompositeConfigParser::test_override_primary_config",
+      "kind": "TestCaseFunction",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCompositeConfigParser::test_plain",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCompositeConfigParser::test_toml",
+      "kind": "TestCaseFunction",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCompositeConfigParser::test_toml_extra",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCompositeConfigParser::test_with_all_configs",
+      "kind": "TestCaseFunction",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestCompositeConfigParser::test_with_all_configs_override",
+      "kind": "TestCaseFunction",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_All",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_Basic",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BlankValues",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_NegativeValues",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_SerializeRejectsNewlines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_SerializeRendersValuesAsBefore",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_UnspecifiedValues",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testYAMLConfigFileParser_All",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testYAMLConfigFileParser_Basic",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigFileParsers::testYAMLConfigFileParser_w_ArgumentParser_parsed_values",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigparserDefaultSection::test_default_only_values",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigparserDefaultSection::test_empty_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigparserDefaultSection::test_named_sections_keep_default_overrides",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigparserDefaultSection::test_saved_config_round_trip",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestConfigparserDefaultSection::test_serialization_round_trip",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestIniConfigParserSerialize::test_serialize_basic",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestIniConfigParserSerialize::test_serialize_default_section",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestIniConfigParserSerialize::test_serialize_list_as_python_syntax",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestIniConfigParserSerialize::test_serialize_list_multiline",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testAddArguments_ArgValidation",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testAddArguments_IsConfigFilePathArg",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testConfigArgOrderNoOptsOnCli",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testConfigArgOrderWithOptsOnCli",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testConfigOpenFuncError",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testConstructor_ConfigFileArgs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testConstructor_WriteOutConfigFileArgs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testConstructor_WriteOutConfigFileArgs2",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testConstructor_WriteOutConfigFileArgsLong",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testDoubleDashSeparator",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testEmptyValuesIgnored",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testEnvVarArgOrderNoOptsOnCli",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testEnvVarArgOrderWithOptsOnCli",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testGlobalInstances",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testGlobalInstances_WithName",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testKwrgsArePassedToArgParse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testMethodAliases",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testRemainderWithConfigFile",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testSubcommandsDispatchedByAPlainChoicesDictStillParse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_ASubparserArgSharingItsDestCantChooseThePath",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_ActionBuiltByACallable",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_AnArgSharingItsDestCantChooseThePath",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_AnyPlainStoreActionSpellingWorks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_ArgSharingItsPrefixStillWorks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_ArgsFileCharsOnlyMatterWhereTheyCanReachOne",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CantBePositional",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CantBeSetAfterAMultiLetterFlagAndAnEquals",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CantBeSetByAFlagWithMoreOptionsAfterIt",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CantBeSetFromAConfigFile",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CantBeSetFromAConfigFileByAbbreviation",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CantBeSetFromAConfigFileByPrefixAlone",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CantBeSetFromAConfigFileByPrefixCharAlone",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CantBeSetFromAConfigFileOnASubparser",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CantBeSetFromAConfigFileValue",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CantBeSetFromAConfigFileValueInAnyForm",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CantBeSetFromAnEnvVarValue",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CantBeSetOnASubparserBehindAPlainArgparseOne",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CantBeSetWhenAnArgsFileCouldPickTheSubcommand",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CantHaveAnEnvVar",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_CommandLineFormsAllStillWork",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_ConfigFileCantReadArgsFromAFile",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_ConfigFileCantReadArgsFromASubparsersFile",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_ConfigFileCantRedirectTheUsersOwnPath",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_ConfigFileKeysThatArentStringsStillWork",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_ConfigValuesThatLookLikeOptionsStillWork",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_EmptyConfigValueIsntAnArgsFile",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_EmptyPathIsStillReported",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_FromfilePrefixChars",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_IgnoreUnknownConfigFileKeys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_OnASubcommandReachedByACustomDispatcher",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_OnASubcommandRestrictsTheWholeParser",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_OnASubparserStillWorks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_OutputFileIsntTruncatedOnFailure",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_PathIsForgottenBetweenParses",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionDoesntRelyOnErrorStopping",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_StoreActionRegisteredUnderAName",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_SubcommandsAreTakenTogether",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_UnknownConfigKeyStillReachesExtras",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_UnrelatedArgsDontMakeItReachable",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_UsesThePathTheActionStored",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::test_AbbrevConfigFileArgs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::test_FormatHelp",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::test_FormatHelpProg",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestMisc::test_FormatHelpProgLib",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_non_boolean_store_false_default_round_trip",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_other_boolean_actions_round_trip",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_const_round_trip",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_command_line_round_trip",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_config_round_trip",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_defaults_are_not_added",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_environment_round_trip",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestTomlConfigParser::test_advanced",
+      "kind": "TestCaseFunction",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestTomlConfigParser::test_binary_read_works",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestTomlConfigParser::test_empty_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestTomlConfigParser::test_empty_section",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestTomlConfigParser::test_no_sections",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestTomlConfigParser::test_read_without_toml_packages",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestTomlConfigParser::test_section",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestTomlConfigParser::test_serialize_nested_section",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestTomlConfigParser::test_serialize_no_sections",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestTomlConfigParser::test_serialize_with_section",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_configargparse.py::TestTomlConfigParser::test_serialize_without_toml_package",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "configargparse",
+  "python": "3.12.15",
+  "schema": 1,
+  "subtests": [
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key = value # comment # comment', 'expected': ('key', 'value', 'comment # comment')}"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key=value#comment ', 'expected': ('key', 'value#comment', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key=value', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key =value', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key= value', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key = value', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 6,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  =  value', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 7,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  =  value ', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 8,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key:value', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 9,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key :value', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 10,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key: value', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 11,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key : value', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 12,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  :  value', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 13,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  :  value ', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 14,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key value', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 15,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  value', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 16,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key    value ', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 17,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BasicValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key=', 'expected': ('key', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BlankValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key =', 'expected': ('key', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BlankValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key= ', 'expected': ('key', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BlankValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key = ', 'expected': ('key', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BlankValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  =  ', 'expected': ('key', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BlankValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  =   ', 'expected': ('key', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 6,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BlankValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key:', 'expected': ('key', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 7,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BlankValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key :', 'expected': ('key', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 8,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BlankValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key: ', 'expected': ('key', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 9,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BlankValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key : ', 'expected': ('key', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 10,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BlankValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  :  ', 'expected': ('key', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 11,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BlankValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  :   ', 'expected': ('key', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 12,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_BlankValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key=:', 'expected': ('key', ':', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key =:', 'expected': ('key', ':', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key= :', 'expected': ('key', ':', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key = :', 'expected': ('key', ':', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  =  :', 'expected': ('key', ':', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  =  : ', 'expected': ('key', ':', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 6,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key:=', 'expected': ('key', '=', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 7,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key :=', 'expected': ('key', '=', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 8,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key: =', 'expected': ('key', '=', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 9,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key : =', 'expected': ('key', '=', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 10,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  :  =', 'expected': ('key', '=', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 11,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  :  = ', 'expected': ('key', '=', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 12,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key==', 'expected': ('key', '=', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 13,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key ==', 'expected': ('key', '=', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 14,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key= =', 'expected': ('key', '=', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 15,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key = =', 'expected': ('key', '=', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 16,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  =  =', 'expected': ('key', '=', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 17,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  =  = ', 'expected': ('key', '=', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 18,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key::', 'expected': ('key', ':', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 19,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key ::', 'expected': ('key', ':', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 20,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key: :', 'expected': ('key', ':', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 21,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key : :', 'expected': ('key', ':', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 22,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  :  :', 'expected': ('key', ':', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 23,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  :  : ', 'expected': ('key', ':', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 24,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ColonEqualSignValue",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key_underscore = value', 'expected': ('key_underscore', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key_underscore=', 'expected': ('key_underscore', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key_underscore', 'expected': ('key_underscore', 'true', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': '_key_underscore = value', 'expected': ('_key_underscore', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': '_key_underscore=', 'expected': ('_key_underscore', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': '_key_underscore', 'expected': ('_key_underscore', 'true', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 6,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key_underscore_ = value', 'expected': ('key_underscore_', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 7,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key_underscore_=', 'expected': ('key_underscore_', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 8,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key_underscore_', 'expected': ('key_underscore_', 'true', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 9,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key-dash = value', 'expected': ('key-dash', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 10,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key-dash=', 'expected': ('key-dash', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 11,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key-dash', 'expected': ('key-dash', 'true', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 12,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key@word = value', 'expected': ('key@word', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 13,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key@word=', 'expected': ('key@word', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 14,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key@word', 'expected': ('key@word', 'true', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 15,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key$word = value', 'expected': ('key$word', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 16,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key$word=', 'expected': ('key$word', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 17,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key$word', 'expected': ('key$word', 'true', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 18,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key.word = value', 'expected': ('key.word', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 19,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key.word=', 'expected': ('key.word', '', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 20,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key.word', 'expected': ('key.word', 'true', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 21,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_KeySyntax",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key = -10', 'expected': ('key', '-10', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_NegativeValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key : -10', 'expected': ('key', '-10', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_NegativeValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key -10', 'expected': ('key', '-10', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_NegativeValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key = \"-10\"', 'expected': ('key', '-10', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_NegativeValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': \"key  =  '-10'\", 'expected': ('key', '-10', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_NegativeValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key=-10', 'expected': ('key', '-10', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 6,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_NegativeValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key=\"value\"', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  =  \"value\"', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  =  \"value\" ', 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key=\" value \"', 'expected': ('key', ' value ', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  =  \" value \"', 'expected': ('key', ' value ', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  =  \" value \" ', 'expected': ('key', ' value ', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 6,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': \"key='value'\", 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 7,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': \"key  =  'value'\", 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 8,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': \" key  =  'value' \", 'expected': ('key', 'value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 9,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': \"key=' value '\", 'expected': ('key', ' value ', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 10,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': \"key  =  ' value '\", 'expected': ('key', ' value ', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 11,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': \" key  =  ' value ' \", 'expected': ('key', ' value ', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 12,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key=\"', 'expected': ('key', '\"', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 13,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  =  \"', 'expected': ('key', '\"', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 14,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  =  \" ', 'expected': ('key', '\"', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 15,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key = \\'\"value\"\\'', 'expected': ('key', '\"value\"', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 16,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key = \"\\'value\\'\"', 'expected': ('key', \"'value'\", None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 17,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key = \"\"value\"\"', 'expected': ('key', '\"value\"', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 18,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': \"key = ''value''\", 'expected': ('key', \"'value'\", None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 19,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key=\"value', 'expected': ('key', '\"value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 20,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  =  \"value', 'expected': ('key', '\"value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 21,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  =  \"value ', 'expected': ('key', '\"value', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 22,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key=value\"', 'expected': ('key', 'value\"', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 23,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  =  value\"', 'expected': ('key', 'value\"', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 24,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  =  value \" ', 'expected': ('key', 'value \"', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 25,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': \"key='value\", 'expected': ('key', \"'value\", None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 26,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': \"key  =  'value\", 'expected': ('key', \"'value\", None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 27,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': \" key  =  'value \", 'expected': ('key', \"'value\", None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 28,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': \"key=value'\", 'expected': ('key', \"value'\", None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 29,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': \"key  =  value'\", 'expected': ('key', \"value'\", None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 30,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': \" key  =  value ' \", 'expected': ('key', \"value '\", None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 31,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_QuotedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key ', 'expected': ('key', 'true', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_UnspecifiedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key', 'expected': ('key', 'true', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_UnspecifiedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key  ', 'expected': ('key', 'true', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_UnspecifiedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key     ', 'expected': ('key', 'true', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_UnspecifiedValues",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key=value#comment ', 'expected': ('key', 'value#comment', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key=value #comment', 'expected': ('key', 'value', 'comment')}"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  =  value  #  comment', 'expected': ('key', 'value', 'comment')}"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key:value#comment', 'expected': ('key', 'value#comment', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key:value #comment', 'expected': ('key', 'value', 'comment')}"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  :  value  #  comment', 'expected': ('key', 'value', 'comment')}"
+        },
+        "msg": null
+      },
+      "ordinal": 6,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key=value;comment ', 'expected': ('key', 'value;comment', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 7,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key=value ;comment', 'expected': ('key', 'value', 'comment')}"
+        },
+        "msg": null
+      },
+      "ordinal": 8,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  =  value  ;  comment', 'expected': ('key', 'value', 'comment')}"
+        },
+        "msg": null
+      },
+      "ordinal": 9,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key:value;comment', 'expected': ('key', 'value;comment', None)}"
+        },
+        "msg": null
+      },
+      "ordinal": 10,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key:value ;comment', 'expected': ('key', 'value', 'comment')}"
+        },
+        "msg": null
+      },
+      "ordinal": 11,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': ' key  :  value  ;  comment', 'expected': ('key', 'value', 'comment')}"
+        },
+        "msg": null
+      },
+      "ordinal": 12,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key = value # comment # comment', 'expected': ('key', 'value', 'comment # comment')}"
+        },
+        "msg": null
+      },
+      "ordinal": 13,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key = \"value # comment\" # comment', 'expected': ('key', 'value # comment', 'comment')}"
+        },
+        "msg": null
+      },
+      "ordinal": 14,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key = \"#\" ; comment', 'expected': ('key', '#', 'comment')}"
+        },
+        "msg": null
+      },
+      "ordinal": 15,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "test": "{'line': 'key = \";\" # comment', 'expected': ('key', ';', 'comment')}"
+        },
+        "msg": null
+      },
+      "ordinal": 16,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigFileParsers::testDefaultConfigFileParser_ValuesWithComments",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "contents": "''"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigparserDefaultSection::test_empty_file",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "contents": "'[DEFAULT]\\n'"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestConfigparserDefaultSection::test_empty_file",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-w'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-wPATH'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-w=PATH'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-vw'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-vwPATH'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-xvw'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 6,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-xvwPATH'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 7,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'--write-config'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 8,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'--write-config=PATH'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 9,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'--write-conf'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 10,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-write-config'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 11,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-write-config=PATH'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 12,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-write-conf'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 13,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-wr'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 14,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-wr=PATH'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 15,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'--write-config'",
+          "write_out": "['--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 16,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'--write-config=PATH'",
+          "write_out": "['--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 17,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'--write-conf'",
+          "write_out": "['--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 18,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-w'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 19,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-wPATH'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 20,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-w=PATH'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 21,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-vw'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 22,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-vwPATH'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 23,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-xvw'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 24,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-xvwPATH'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 25,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-write-config'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 26,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-write-config=PATH'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 27,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-write-conf'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 28,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-wr'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 29,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-wr=PATH'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 30,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-w'",
+          "write_out": "['-write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 31,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-w=PATH'",
+          "write_out": "['-write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 32,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-write-config'",
+          "write_out": "['-write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 33,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-write-config=PATH'",
+          "write_out": "['-write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 34,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-write-conf'",
+          "write_out": "['-write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 35,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-wr'",
+          "write_out": "['-write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 36,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "True",
+          "arg_string": "'-wr=PATH'",
+          "write_out": "['-write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 37,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-w'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 38,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-wPATH'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 39,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-w=PATH'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 40,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-vw'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 41,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-vwPATH'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 42,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-xvw'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 43,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-xvwPATH'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 44,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'--write-config'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 45,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'--write-config=PATH'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 46,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-write-config'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 47,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-write-config=PATH'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 48,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-write-conf'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 49,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-wr'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 50,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-wr=PATH'",
+          "write_out": "['-w', '--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 51,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'--write-config'",
+          "write_out": "['--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 52,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'--write-config=PATH'",
+          "write_out": "['--write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 53,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-w'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 54,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-wPATH'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 55,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-w=PATH'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 56,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-vw'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 57,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-vwPATH'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 58,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-xvw'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 59,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-xvwPATH'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 60,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-write-config'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 61,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-write-config=PATH'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 62,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-write-conf'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 63,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-wr'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 64,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-wr=PATH'",
+          "write_out": "['-w']"
+        },
+        "msg": null
+      },
+      "ordinal": 65,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-write-config'",
+          "write_out": "['-write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 66,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "allow_abbrev": "False",
+          "arg_string": "'-write-config=PATH'",
+          "write_out": "['-write-config']"
+        },
+        "msg": null
+      },
+      "ordinal": 67,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestMisc::testWriteOutConfigFileArg_RejectionCoversEveryFormArgparseAccepts",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "0"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_non_boolean_store_false_default_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "1"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_non_boolean_store_false_default_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "'yes'"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_non_boolean_store_false_default_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "action": "'store_true'",
+          "default": "False"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_other_boolean_actions_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "action": "<class 'argparse.BooleanOptionalAction'>",
+          "default": "True"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_other_boolean_actions_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "action": "<class 'argparse.BooleanOptionalAction'>",
+          "default": "False"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_other_boolean_actions_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['--fast']",
+          "env_vars": "{}"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_const_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "[]",
+          "env_vars": "{'CONFIGARGPARSE_TEST_FAST': 'true', 'CONFIGARGPARSE_TEST_LABEL': 'x'}"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_const_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "[]",
+          "env_vars": "{'CONFIGARGPARSE_TEST_FAST': 'false', 'CONFIGARGPARSE_TEST_LABEL': 'x'}"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_const_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "True",
+          "option": "'-n'"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_command_line_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "True",
+          "option": "'--no-feature'"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_command_line_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "True",
+          "option": "'--disable-feature'"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_command_line_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "False",
+          "option": "'-n'"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_command_line_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "False",
+          "option": "'--no-feature'"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_command_line_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "False",
+          "option": "'--disable-feature'"
+        },
+        "msg": null
+      },
+      "ordinal": 6,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_command_line_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "True",
+          "value": "'true'"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_config_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "True",
+          "value": "'false'"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_config_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "False",
+          "value": "'true'"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_config_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "False",
+          "value": "'false'"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_config_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "True"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_defaults_are_not_added",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "False"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_defaults_are_not_added",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "True",
+          "value": "'true'"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_environment_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "True",
+          "value": "'false'"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_environment_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "False",
+          "value": "'true'"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_environment_round_trip",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "default": "False",
+          "value": "'false'"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_configargparse.py::TestStoreFalseConfigOutput::test_store_false_environment_round_trip",
+      "when": "call"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CB-C01",
+  "source_commit": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "normalized(n:\"1\") produces{n:1} with no normalization error, but does not enforce the min2 validation rule. validated for the same input returnsNone and records a min error. Use actual validate/validated success before publication and retain errors; a nonNone normalized result is not evidence that business validation passed.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

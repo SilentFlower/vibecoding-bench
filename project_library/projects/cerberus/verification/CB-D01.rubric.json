@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CB-D01",
+  "source_commit": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Initial symptom cannot establish purgeUnknown, mutation or transport loss. Request sufficient actual processing and ownership evidence, then relate disclosed behavior to the intended unknown-field policy only; insufficient_information is valid without evidence.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

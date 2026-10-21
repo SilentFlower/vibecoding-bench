@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IT-C01",
+  "source_commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use existing half-open line ranges for block-level positioning; child tokens and transformations do not supply complete original character/byte offsets. Define document revision, normalization, Unicode indexing and desired selection granularity before proposing an exact mapping layer. Do not claim arbitrary HTML can be losslessly reversed or a nonexistent offset field already solves it.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

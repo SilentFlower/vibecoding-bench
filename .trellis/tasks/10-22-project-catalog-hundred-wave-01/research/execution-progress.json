@@ -1,0 +1,482 @@
+{
+  "purpose": "阶段内进度快照，auto-loop权威状态仍由runner维护",
+  "updated_at": "2026-10-21T22:54:51.534974+00:00",
+  "run_id": "auto-20261021191233",
+  "outstanding_action": "run_implement",
+  "stage_required_projects": 30,
+  "completed_current_stage_projects": 30,
+  "completed_project_keys": [
+    "agate",
+    "backoff",
+    "boltons",
+    "bottle",
+    "cachetools",
+    "cerberus",
+    "cli-helpers",
+    "click",
+    "configargparse",
+    "configobj",
+    "csvkit",
+    "dataset",
+    "deepdiff",
+    "docutils",
+    "dpath",
+    "icecream",
+    "jsonschema",
+    "markdown-it-py",
+    "mistune",
+    "more-itertools",
+    "path",
+    "petl",
+    "pydash",
+    "python-box",
+    "python-decouple",
+    "python-markdown",
+    "rich",
+    "tabulate",
+    "toolz",
+    "xmltodict"
+  ],
+  "remaining_current_stage_projects": 0,
+  "remaining_without_draft_projects": 0,
+  "formal_totals": {
+    "projects": 40,
+    "scenarios": 171,
+    "tasks": 351,
+    "digest": "7a04cc49ca91c40fcff5f512da6bfaa2e3d557d75c6465e0aad4c71c07ce53f4",
+    "version": "real-project-scenarios-v13-en"
+  },
+  "draft_totals": {
+    "projects": 30,
+    "scenarios": 126,
+    "tasks": 244
+  },
+  "draft_projects": [
+    {
+      "project": "cachetools",
+      "scenarios": 4,
+      "tasks": 9,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/cachetools-admission.json",
+      "admission_sha256": "05677d8239ac5cb36bb89fac400e0e7e863635a6deb05dc5a380ae41dae2580f",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "xmltodict",
+      "scenarios": 5,
+      "tasks": 11,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/xmltodict-admission.json",
+      "admission_sha256": "c50265409cfd7ec29e25231d956c864bf1bddcf020e3b4640a71fb9fe6d0a061",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "tabulate",
+      "scenarios": 5,
+      "tasks": 9,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/tabulate-admission.json",
+      "admission_sha256": "120b328ad3aab5eef7fd2e0cf2c537ff614d3412506272bf17a39e605a9f0631",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "python-decouple",
+      "scenarios": 4,
+      "tasks": 9,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/python-decouple-admission.json",
+      "admission_sha256": "862ba8a2faa9b2b85d7060d88fc66346335d6127e0cfbfab1ed9349fefb8f43e",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "click",
+      "scenarios": 4,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/click-admission.json",
+      "admission_sha256": "4642cfacb62044e4e7aa5ddab0a1aae3e3037e28fc0c5dc0e106cb8f457a4d13",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "cli-helpers",
+      "scenarios": 4,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/cli-helpers-admission.json",
+      "admission_sha256": "5609df6f6c2094486f784b7256dc346b5afb8e05f77e823f3308b9c9d7ff586b",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "mistune",
+      "scenarios": 4,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/mistune-admission.json",
+      "admission_sha256": "3fd70ad51dd678010235fb4f9322be88c543d8767f7dcaf729497f0c1abbc4c0",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "boltons",
+      "scenarios": 4,
+      "tasks": 10,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/boltons-admission.json",
+      "admission_sha256": "8875890276d1252138fadc3fb56732f276a92e44dae1b9d0760984570ab79fbd",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "more-itertools",
+      "scenarios": 4,
+      "tasks": 9,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/more-itertools-admission.json",
+      "admission_sha256": "2700d74540c14b5f327586e6800d1e1597d06e1d70e179aad6dbd8fecffbb6c6",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "dataset",
+      "scenarios": 4,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/dataset-admission.json",
+      "admission_sha256": "b745dc7faddb17be3d2c4f706560723b7d1dc2c20e88b32fc9dc90f3f6277d72",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "configobj",
+      "scenarios": 4,
+      "tasks": 9,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/configobj-admission.json",
+      "admission_sha256": "75d0417bbbb147a5a526d8a2e0820ace49d69e28fd2d2bafc5cadd1bb9552283",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "python-markdown",
+      "scenarios": 4,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/python-markdown-admission.json",
+      "admission_sha256": "d94d9d5a2b8291e328bfae53099c6d77d38d81226542dcd51811de463b751e7a",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "path",
+      "scenarios": 4,
+      "tasks": 9,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/path-admission.json",
+      "admission_sha256": "f5c1255c72ac5cada2acd8f3087915cac2a38dd096a2f9344cbda9a630e88b97",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "markdown-it-py",
+      "scenarios": 4,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/markdown-it-py-admission.json",
+      "admission_sha256": "3bd012b02378b38a07121736c85d1358e9babdcdecf80567d31f2405939d2dca",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "petl",
+      "scenarios": 4,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/petl-admission.json",
+      "admission_sha256": "fae905b2389b5912c294087ecca92bf646caf1aef68608b2b08ef9cbf714cb14",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "toolz",
+      "scenarios": 4,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/toolz-admission.json",
+      "admission_sha256": "ee075eb9faf183af18d6516557d62640460c5c0e40d39be35d8f10e95136ba05",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "jsonschema",
+      "scenarios": 5,
+      "tasks": 9,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/jsonschema-admission.json",
+      "admission_sha256": "eaec9c254b2d34b95d4e6d32873d88d3a10783e070f8ac15dc7edf2bfba12515",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "agate",
+      "scenarios": 4,
+      "tasks": 9,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/agate-admission.json",
+      "admission_sha256": "cdab8b5f52043c5f787fb9f7d49ffeae0f2473b3f2efb1eee69f07215c930fe0",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "docutils",
+      "scenarios": 5,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/docutils-admission.json",
+      "admission_sha256": "3e3de50efb6c0094a288794e45988a52c91281039b5858cd3e77c5ce70c78c58",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "csvkit",
+      "scenarios": 4,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/csvkit-admission.json",
+      "admission_sha256": "f4db5985dc46e67f7be345a7929af65142ee59edc90c1bf927a0fda263aeef49",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "rich",
+      "scenarios": 4,
+      "tasks": 7,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/rich-admission.json",
+      "admission_sha256": "0623e42970101172eed3cdae054fccfac206c0b7b677a9aabe25bcd7385a1957",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "python-box",
+      "scenarios": 5,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/python-box-admission.json",
+      "admission_sha256": "f712d8f15844074b8d8a6800c18dade29482940052e23d3d01d6398c00a68274",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "pydash",
+      "scenarios": 4,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/pydash-admission.json",
+      "admission_sha256": "ccc5876acaf937ebd599c5e7ec217275b1180dc553eed5b286dd2204204ebfa5",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "configargparse",
+      "scenarios": 5,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/configargparse-admission.json",
+      "admission_sha256": "e62702bf06f9e11f477d63c1565b15c87aa92bd0254cf023dd7873225a0d569a",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "backoff",
+      "scenarios": 4,
+      "tasks": 7,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/backoff-admission.json",
+      "admission_sha256": "8e65a51199937997dcad8f34148ec7e89fef97a5dd531e6f7df7cc4055974153",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "bottle",
+      "scenarios": 5,
+      "tasks": 7,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/bottle-admission.json",
+      "admission_sha256": "244e301c0408d2fb6feb14e4e0ecc35917c273cbfe2919e3a5769ffe59073600",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "cerberus",
+      "scenarios": 4,
+      "tasks": 7,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/cerberus-admission.json",
+      "admission_sha256": "b83851952e3c2066ac3f18d52ca07b35b2f5f2d8489e36e0c59a9be1c5c369b9",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "icecream",
+      "scenarios": 3,
+      "tasks": 5,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/icecream-admission.json",
+      "admission_sha256": "a950a65cca176b7a6cdcc6a9b2c101c25b9d933059071d7dc5272c6b00062f3e",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "dpath",
+      "scenarios": 4,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/dpath-admission.json",
+      "admission_sha256": "2ca2ed5730edde5b9db5133cffc40de6f9ae1b7280966625877860ef6cdddd4b",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "deepdiff",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_report": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/deepdiff-admission.json",
+      "admission_sha256": "8d6a9f436386a95f194159cd4a6152b1a3b52acfd02ba9bd5a3dbe7c5b6e01d2",
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    }
+  ],
+  "product_mock_batches": [
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-001",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-001/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-002",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-002/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-003",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-003/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-004",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-004/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-005",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-005/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-006",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-006/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-007",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-007/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-008",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-008/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-009",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-009/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-010",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-010/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-011",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-011/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-012",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-012/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-013",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-013/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-014",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-014/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-015",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-015/run-001",
+      "status": "passed",
+      "browser_watch_started": true,
+      "browser_status": "passed",
+      "cleanup_status": "passed"
+    }
+  ],
+  "next_internal_batch": [],
+  "real_model_calls": 0,
+  "production_touched": false,
+  "push_performed": false
+}

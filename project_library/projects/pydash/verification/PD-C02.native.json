@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PD-C02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "custom_merge_uses_none_as_delegate_and_keeps_falsey_results": true
+  },
+  "resource_profile": "business"
+}

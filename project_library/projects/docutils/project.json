@@ -1,0 +1,306 @@
+{
+  "schema": 2,
+  "project_key": "docutils",
+  "title": "Docutils文档发布工作场景",
+  "category": "文档解析与发布",
+  "description": "固定完整源码上的文档树、引用取证、失败阈值、投稿设置、稳定锚点和库存表格八项独立只读任务。",
+  "seed_digest": "d282c87718b8f05b5f1a7583c45112a75edf7770e630bdef7f8220bafac4b4b0",
+  "environment": "docutils-py312",
+  "source": {
+    "repository": "https://github.com/live-clones/docutils",
+    "commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+    "license_files": [
+      "seed/library/docutils/COPYING.rst",
+      "seed/library/docutils/licenses/BSD-0-Clause.rst",
+      "seed/library/docutils/licenses/BSD-2-Clause.rst",
+      "seed/library/docutils/licenses/gpl-3-0.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "DU-S01",
+      "title": "文档树与网页片段",
+      "goal": "明确标题转换、整页和片段的输出责任",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DU-U01",
+            "DU-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DU-U01",
+          "kind": "understand",
+          "goal": "解释首节标题为何进入文档标题",
+          "prompt": "Trace the supplied document tree with default transforms and doctitle_xform=False. Explain the resulting title/section structure and whether the source was lost. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/page.rst",
+            "materials/publishing.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DU-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/DU-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DU-C01",
+          "kind": "consult",
+          "goal": "选择网页片段和最终编码的责任边界",
+          "prompt": "Recommend existing publishing APIs for the supplied embedded-page requirement. Compare actual fragment/whole-document and bytes/str results, including original Unicode. Do not implement or double-wrap/double-encode content.",
+          "requires": [],
+          "materials": [
+            "materials/page.rst",
+            "materials/publishing.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DU-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/DU-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DU-S02",
+      "title": "引用取证与构建门禁",
+      "goal": "根据真实文档和阈值决定失败策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DU-D01",
+            "DU-C02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "DU-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "DU-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DU-D01",
+          "kind": "diagnose",
+          "goal": "先取文档与发布设置再定位失效引用",
+          "prompt": "Investigate the supplied broken-reference symptom. Request the complete relevant reStructuredText, publish invocation/source path and reporter/exit settings. Diagnose only disclosed evidence or finish with an evidence plan if unavailable. No file changes are authorized.",
+          "requires": [],
+          "materials": [
+            "materials/reference-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DU-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "publish-evidence",
+              "when": "The original source, publish invocation and reporter/exit settings have not been supplied or declared unavailable, and the answer reasonably requests sufficient evidence.",
+              "materials": [
+                "disclosure/reference.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "DU-C02",
+          "kind": "consult",
+          "goal": "区分诊断输出阈值和构建失败阈值",
+          "prompt": "Meet the supplied ERROR-rejection build policy with existing programmatic APIs. Explain both complete threshold controls, captured evidence and actual exception behavior. Do not implement or invent a CLI status for a programmatic call.",
+          "requires": [],
+          "materials": [
+            "materials/build-gate.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DU-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/DU-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DU-S03",
+      "title": "投稿指令与展示政策",
+      "goal": "限制文件插入和raw并明确应用层责任",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DU-C03",
+            "DU-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DU-C03",
+          "kind": "consult",
+          "goal": "限定raw与include开关各自保证的行为",
+          "prompt": "Explain the complete permitted synthetic directive comparisons using current settings. Give allowed and blocked controls, diagnostic behavior and the limits of the guarantee. Do not inspect real external files or modify the project.",
+          "requires": [],
+          "materials": [
+            "materials/directives.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DU-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/DU-C03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DU-P01",
+          "kind": "plan",
+          "goal": "规划投稿文档的指令和展示策略",
+          "prompt": "Plan the supplied public-sidebar acceptance policy using the existing publisher. Keep approved ordinary links/tables useful, identify what switches prove and what the application must decide, and propose normal/negative controls. No implementation, deployment or URL access is authorized.",
+          "requires": [],
+          "materials": [
+            "materials/submission-policy.md",
+            "materials/directives.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DU-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/DU-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DU-S04",
+      "title": "公开文档稳定锚点",
+      "goal": "区分显式目标和随标题变化的自动ID",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DU-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DU-U02",
+          "kind": "understand",
+          "goal": "用显式目标保持改名后的外部锚点",
+          "prompt": "Trace both complete heading/explicit-target examples and compare actual node IDs. Explain which agreed external anchor survives and which automatic ID changes. Do not edit documents or promise every generated ID is stable.",
+          "requires": [],
+          "materials": [
+            "materials/anchors.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DU-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/DU-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DU-S05",
+      "title": "结构化库存表格",
+      "goal": "保留引用逗号字段和Unicode表格内容",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DU-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DU-U03",
+          "kind": "understand",
+          "goal": "核对CSV指令的真实单元格和Unicode内容",
+          "prompt": "Trace the supplied complete csv-table document into table/row/entry nodes. Count header/data rows and identify the exact comma-containing and Unicode cell values. Do not split the CSV naively or modify files.",
+          "requires": [],
+          "materials": [
+            "materials/stock.rst"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DU-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/DU-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

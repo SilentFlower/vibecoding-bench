@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TZ-C04"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "merge_with_aggregates_all_same_key_values": true
+  },
+  "resource_profile": "business"
+}

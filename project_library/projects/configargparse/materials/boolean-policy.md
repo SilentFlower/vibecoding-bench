@@ -1,0 +1,1 @@
+An opt-in --enabled flag must interpret explicit environment strings true and false, reject unknown maybe, and let an explicit CLI --enabled override a false environment value. Compare current action=store_true with type=bool using separate synthetic parsers and explicit env_vars; no project changes are authorized.

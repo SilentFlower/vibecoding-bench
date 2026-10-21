@@ -1,0 +1,1 @@
+Fresh Bottle instance with GET /orders/<identifier:int> returning {id:identifier}. Compare GET /orders/7,GET /orders/nope and POST /orders/7 through the real in-process WSGI callable. Trace status, converted id and automatic dict serialization. No server, socket or file changes are authorized.

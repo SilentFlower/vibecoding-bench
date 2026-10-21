@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "RH-P01",
+  "source_commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Enable record=True and use clear=False for each export that must leave content for later exports, then deliberately clear at the chosen ownership boundary. Default export_text clears; a following HTML export then lacks that content. HTML escapes literal angle brackets. Test both artifact contents and final empty state; capture is separate and rendered cropping is not reversible.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

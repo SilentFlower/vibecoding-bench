@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DC-C01",
+  "source_commit": "0573e6f96637f08fb4cb85e0552f0622d36827d4",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use decouple boolean word parsing rather than Python bool(nonempty_text), distinguish defaults on absence from cast failures, and handle ValueError for invalid int/choice explicitly without claiming automatic fallback.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

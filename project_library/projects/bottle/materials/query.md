@@ -1,0 +1,1 @@
+A complete GET request has QUERY_STRING tag=A&tag=B&limit=nope. In a fresh Bottle route inspect request.query["tag"],getall("tag"),missing attribute,get("missing"),and get("limit",default=10,type=int). The filter contract may allow many tags, while invalid numeric input must not silently be accepted as a validated limit. No files may be changed.

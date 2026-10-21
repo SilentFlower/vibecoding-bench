@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DC-C03",
+  "source_commit": "0573e6f96637f08fb4cb85e0552f0622d36827d4",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Ground the answer in split-on-first-equals and outer-quote removal: export remains part of the key, while unquoted # and later equals remain value text. Do not claim shell execution, variable interpolation or universal dotenv syntax.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

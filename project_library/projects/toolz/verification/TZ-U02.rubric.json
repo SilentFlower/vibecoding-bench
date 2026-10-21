@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TZ-U02",
+  "source_commit": "451af60dec590a6010e2babdbf391ea8f815122f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default memoization rejects an unhashable list before executing price. The key callback receives (args,kwargs), not price arguments splatted directly. Normalize items to a tuple and include discount consistently for positional/keyword forms: repeated discount1 yields5 once, distinct discount2 yields4 via a second calculation. Do not drop a price-relevant input or confuse callback signatures.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

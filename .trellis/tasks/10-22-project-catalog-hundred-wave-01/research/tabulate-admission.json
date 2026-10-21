@@ -1,0 +1,132 @@
+{
+  "project": "tabulate",
+  "stage": "formal_registered_local_verified",
+  "cases": 13,
+  "all_expectations_met": true,
+  "reference_changed_paths": [
+    "library/tabulate/__init__.py",
+    "library/test/test_api.py"
+  ],
+  "formal_catalog_modified": true,
+  "real_model_calls": 0,
+  "pending": [],
+  "evidence": [
+    {
+      "case": "original-TB-C01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/tabulate/attempt-001/original-TB-C01.json",
+      "sha256": "6770dc165053be93037bee2e25406d5d0ef9724c07c427bcd89bf11a07612f2e"
+    },
+    {
+      "case": "original-TB-C02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/tabulate/attempt-001/original-TB-C02.json",
+      "sha256": "ab4d3061a6bcf3a284253b1fed8ad43bed11fb1c592901a760d1c310fb65cf50"
+    },
+    {
+      "case": "original-TB-D02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/tabulate/attempt-001/original-TB-D02.json",
+      "sha256": "a2eb6fe820cfee231c528fbb9b444e889919972fb2066ebda7692ae001740353"
+    },
+    {
+      "case": "original-TB-M01",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/tabulate/attempt-001/original-TB-M01.json",
+      "sha256": "b31fd0c32413c6a41d8e64dca3d30580d70c2cbafa88b248d56f709195e77bc5"
+    },
+    {
+      "case": "original-TB-P01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/tabulate/attempt-001/original-TB-P01.json",
+      "sha256": "f7ad2fe1caef68dc1e93553c4a81f766712a6269bf2f2e33017588cedc5a8a75"
+    },
+    {
+      "case": "original-TB-U01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/tabulate/attempt-001/original-TB-U01.json",
+      "sha256": "d57c9eb20030b45d22d5a0f37231989e68acc98a76fde2b776f8873081ec8cb8"
+    },
+    {
+      "case": "original-TB-U02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/tabulate/attempt-001/original-TB-U02.json",
+      "sha256": "795fce13183ab3ee499139e21ceac2dc831c0c991d1be98913b3d9be6d333081"
+    },
+    {
+      "case": "original-TB-U03",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/tabulate/attempt-001/original-TB-U03.json",
+      "sha256": "49d7872c3f65a2b06594a16a2d9b98434f42c740c1d746989a3ad255795a6fad"
+    },
+    {
+      "case": "public-tests-original",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/tabulate/attempt-001/public-tests-original.json",
+      "sha256": "d74785e23c0557441bb948f480fbf926bf452b43cd5ef6414f650e161e4a6276"
+    },
+    {
+      "case": "public-tests-reference",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/tabulate/attempt-001/public-tests-reference.json",
+      "sha256": "f94d2f50ea7d9c23d62196d0e35a6d0657b185f5f2e08980ddb775103e5386b6"
+    },
+    {
+      "case": "reference-TB-M01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/tabulate/attempt-001/reference-TB-M01.json",
+      "sha256": "63aec1f0c6d8aec0b092b0c65e76ae5063ecc688f347515410e6096bcab249f9"
+    },
+    {
+      "case": "reference-full-regression",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/tabulate/attempt-001/reference-full-regression.json",
+      "sha256": "b25b2921b2ba6d4b3424cd9eb25e511af2fa16e379db19b4e4612e181e82d39b"
+    },
+    {
+      "case": "wrong-tabulate-rowalign-only",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/tabulate/attempt-001/wrong-tabulate-rowalign-only.json",
+      "sha256": "3ee420a83e3777f4940e8247853b08d1ef82a1d28bcb20578360b053092a7929"
+    }
+  ],
+  "mock_status": "passed",
+  "formal_version": "real-project-scenarios-v5-en",
+  "formal_digest": "e85aea945cffdfe2924a2f745a61f6d44e7d4597ac41bb0902500880cce61161",
+  "full_delivery_files": 3362,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-002/run-001/evidence/result.json",
+      "sha256": "7ee63a068fd359bc7f77f5d29b2de09579b1dab6f2884f8c601286f60143b913"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-002/run-001/cleanup.json",
+      "sha256": "f2e7711f3b0c83ca2d96c394306b4763683185ecf79b5fd4bbf0cf11df7cb29d"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-002/audit-attempt-001.json",
+      "sha256": "75b6700f41d8eb921a9db844d233d0c73b3a939f2cbc40cda248460c3412ba5a"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-002/browser/run-001/diagnostics/result.json",
+      "sha256": "ca92ff5e307042efffa7d903da6a34f20ce085d86d34e34668bbb9329df728ec"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/delivery-first-four.json",
+      "sha256": "f485abc48e0ae6418b1dcbfcbbfb7447758f4a565b4ea5f7834bb5cc0082b5d1"
+    }
+  ]
+}

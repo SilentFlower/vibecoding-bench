@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AG-C03",
+  "source_commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both all-null and all-zero Number columns sum to0, but Count(amount) is0 versus2. Report sum together with present/row counts and an explicit no-measurements status or nullable business result. Do not change Sum globally or claim an all-null sum proves two measured zero values.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

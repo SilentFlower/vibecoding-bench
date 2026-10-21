@@ -1,0 +1,23 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PA-M01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "all_user_block_interruptions_restore_bytes": true,
+    "same_exception_objects_propagate": true,
+    "interrupted_streams_close": true,
+    "backup_and_permissions_preserved": true,
+    "normal_success_and_backup_cleanup": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

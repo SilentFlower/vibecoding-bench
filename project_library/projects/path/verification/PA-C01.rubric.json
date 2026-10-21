@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PA-C01",
+  "source_commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use existing bytes/write_bytes or binary chunks with a binary writer to preserve every byte, including NUL/FF and mixed newlines. Use chunked reads when whole-file memory is unsuitable. Do not decode arbitrary bytes as text or claim text conversion automatically preserves all bytes.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

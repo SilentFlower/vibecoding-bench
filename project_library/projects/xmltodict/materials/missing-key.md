@@ -1,0 +1,1 @@
+An order import raises KeyError while reading a field. The actual XML, parse options and failing dictionary access have not been provided. Do not assume an empty element, spelling error or namespace cause from this symptom alone.

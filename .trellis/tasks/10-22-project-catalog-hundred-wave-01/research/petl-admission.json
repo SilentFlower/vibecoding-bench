@@ -1,0 +1,175 @@
+{
+  "project": "petl",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+  "source_file_count": 239,
+  "license_files": [
+    "seed/library/LICENSE.txt"
+  ],
+  "scenarios": 4,
+  "unique_tasks": 8,
+  "modify_tasks": 0,
+  "non_modify_tasks": 8,
+  "native_baseline": {
+    "project": "petl",
+    "attempt": 2,
+    "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/petl/result.json",
+    "result_sha256": "6c6e94d9d8d96736b54009234027e9324294e231705ade0f52818566d631e663",
+    "main_collected": 923,
+    "counts": {
+      "passed": 912,
+      "failed": 0,
+      "error": 0,
+      "skipped": 11,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "collection_skip_count": 12,
+    "xml_testcases": 935,
+    "xml_skipped": 23,
+    "runner_sha256": "8ba56caabd5d6bc736c7cef3f6f888680a86c825684ca5f2ebc90cbe3b873e10",
+    "contract_sha256": "d26d0fa53fef214e7381fe67bb0f7159f8e6e1fe063856e5c3de0d0f9723264b",
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "原生基线而非业务完成；模块收集跳过和已收集用例跳过分别计数"
+  },
+  "verified_unique_native_cases": 8,
+  "native_evidence": [
+    {
+      "case": "original-PE-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/petl/attempt-003/original-PE-C01.json",
+      "sha256": "2abab30e468ab55d410792f7b269e35974722bbc2ee336c2cd0b733a6e2fe325",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PE-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/petl/attempt-001/original-PE-C02.json",
+      "sha256": "98c941fbef0ca5e3d3a3413c1bbe1ec0d244272caf6dc8956c89377dcbe581a2",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PE-C03",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/petl/attempt-001/original-PE-C03.json",
+      "sha256": "91115e3cf9e674ac55b6ad8f1136f824c6a1f8abe4d7ccb897e1b608e103300b",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PE-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/petl/attempt-001/original-PE-P01.json",
+      "sha256": "58df8989a5bf09377b8484b59ede8d8524853d2c40ce6e94c8d8a7398e49258c",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PE-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/petl/attempt-002/original-PE-U01.json",
+      "sha256": "b5bac8fab60932f338a6df313102df01544b847d4b64136dfc1a7d73c2dd3f85",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PE-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/petl/attempt-001/original-PE-U02.json",
+      "sha256": "3165fa13a7990834953b886a34cac836870eef2fc321dc6044a498faf687a49e",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PE-U03",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/petl/attempt-001/original-PE-U03.json",
+      "sha256": "f89475d9c145b30abc79445d11e8e807f55cf65a3d8494f38caddf2d1815df33",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PE-U04",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/petl/attempt-001/original-PE-U04.json",
+      "sha256": "eb90c5fe9a597a6d11a06148cc5995151c4cdaa65b9439a4e3060f1edabd2b0b",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-01/business/petl/attempt-001/summary.json",
+      "sha256": "6206c0ca1716890805c0ecd31a638d6e7be0c9d2a54e192445d6ed9eae256d8d",
+      "passed": false
+    },
+    {
+      "attempt": 2,
+      "summary": ".deploy/project-catalog-hundred/stage-01/business/petl/attempt-002/summary.json",
+      "sha256": "90cab01bf568a25c966d314771592b8f3b29f2b56a9c62ed59b068dc53b9a1c4",
+      "passed": true
+    },
+    {
+      "attempt": 3,
+      "summary": ".deploy/project-catalog-hundred/stage-01/business/petl/attempt-003/summary.json",
+      "sha256": "90cab01bf568a25c966d314771592b8f3b29f2b56a9c62ed59b068dc53b9a1c4",
+      "passed": true
+    }
+  ],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "observation_repair": {
+    "failed_attempt": 1,
+    "reason": "原观察脚本错误假定内置list(view)只遍历一次；实际继承__len__会枚举源，已按原生定义修正并补入业务任务",
+    "rerun_attempts": [
+      2,
+      3
+    ],
+    "rerun_cases": [
+      "original-PE-U01",
+      "original-PE-C01"
+    ],
+    "other_six_passes_reused": true
+  },
+  "mock_bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-008",
+  "formal_version": "real-project-scenarios-v9-en",
+  "formal_digest": "921df8fef9c2ea5f68ec3e0b5c9509338555cc32d861f0ecf416ab6d52308036",
+  "full_delivery_files": 5463,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-008/run-001/evidence/result.json",
+      "sha256": "7e4705a4f899247bdbd7c2be37766c0102949f6b8d6b97de971ea5599803b1c8"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-008/run-001/cleanup.json",
+      "sha256": "a8890fc733e7e20c6dde9a2a5546852e265099bba471191ab68d10868412135c"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/mock-batch-008-audit.json",
+      "sha256": "b8742198ec90cfc283cfac9c6c5359a759297c2c97938a09932719a1b679daad"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-008/browser/run-001/diagnostics/result.json",
+      "sha256": "1c51af36d8a27aec11b3ff3cb6cafb3532d9ad4266c5ebc0e800ff9de53f4055"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/delivery-first-sixteen.json",
+      "sha256": "2161533c81048f5e55afccae028b05c1ea55038f66bf4a2823c75c4a977354c2"
+    }
+  ]
+}

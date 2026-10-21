@@ -1,0 +1,1 @@
+Compare --tag coffee --tag tea --mode PROD --copies 2, --tag coffee,tea, no tag options, and --copies 0. A separate batch command wants multiple positional file names; distinguish a repeated option from Argument(nargs=-1). No external service or actual file access is needed for these parameter examples.

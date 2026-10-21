@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DS-U02",
+  "source_commit": "db592cc041014762bba55fd544e982170831f227",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The escaping error reaches Database.__exit__ and rolls back outside. The error caught inside leaves the context normally, so inside is committed. Explain the error boundary rather than treating the presence of an error log as rollback evidence; all schema is prebuilt.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DC-C04",
+  "source_commit": "0573e6f96637f08fb4cb85e0552f0622d36827d4",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Provide a valid callable such as a standard csv.reader-based cast for this one-record value, preserving all literal fields with an explicit malformed-quote policy. Keep existing Csv semantics for other callers; a custom cast avoids a required library change.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

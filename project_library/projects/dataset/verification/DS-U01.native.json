@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DS-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "heterogeneous_columns_union": true,
+    "input_dictionaries_unchanged": true
+  },
+  "resource_profile": "business"
+}

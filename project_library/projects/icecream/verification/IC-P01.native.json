@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "IC-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "callable_prefix_is_per_emission_and_instances_keep_configuration": true
+  },
+  "resource_profile": "business"
+}

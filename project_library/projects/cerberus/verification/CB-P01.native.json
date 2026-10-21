@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CB-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "validator_state_is_per_latest_call_and_saved_results_need_ownership": true
+  },
+  "resource_profile": "business"
+}

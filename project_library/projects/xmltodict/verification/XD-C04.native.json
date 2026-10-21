@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "XD-C04"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "item_callbacks_observed": true,
+    "callback_stops_source": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,262 @@
+{
+  "schema": 2,
+  "project_key": "backoff",
+  "title": "Backoff重试工作场景",
+  "category": "重试与异步调用",
+  "description": "固定源码上的尝试计数、轮询结果、响应等待、期限、取证、遥测和异步责任七项任务。",
+  "seed_digest": "793e155f3a3ef75f177ca1a4e92b25544ff113e1c9f1e4381fd6441ee4cbcd8f",
+  "environment": "backoff-py312",
+  "source": {
+    "repository": "https://github.com/litl/backoff",
+    "commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "BF-S01",
+      "title": "尝试和结果合同",
+      "goal": "区分重试次数、轮询结果和异常耗尽",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BF-U01",
+            "BF-U02",
+            "BF-D01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "BF-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "BF-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BF-U01",
+          "kind": "understand",
+          "goal": "核算首次调用、重试和耗尽结果",
+          "prompt": "Trace the complete exception controls, target-call count, callback tries and both giveup outcomes. Explain max_tries precisely; do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/attempts.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BF-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/BF-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BF-U02",
+          "kind": "understand",
+          "goal": "判断轮询耗尽后的业务成功条件",
+          "prompt": "Trace the complete empty polling control and explain what the caller must validate on return. No implementation is authorized.",
+          "requires": [],
+          "materials": [
+            "materials/polling.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BF-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/BF-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BF-D01",
+          "kind": "diagnose",
+          "goal": "先取目标和耗尽配置再定位空结果",
+          "prompt": "Investigate the supplied missing-result symptom. Ask for target behavior, full decorator options and event/caller evidence before selecting a cause. Diagnose disclosed evidence or close with an evidence plan if unavailable. Do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/missing-result.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BF-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "result-evidence",
+              "when": "The target, decorator options and actual caller/event evidence have not been supplied or declared unavailable, and the answer reasonably requests sufficient evidence.",
+              "materials": [
+                "disclosure/result.md"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "BF-S02",
+      "title": "等待和期限",
+      "goal": "落实响应驱动的等待并明确调用超时边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BF-C01",
+            "BF-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BF-C01",
+          "kind": "consult",
+          "goal": "按响应等待协议选择已有runtime生成器",
+          "prompt": "Meet the exact synthetic Retry-After wait requirement using current APIs. Explain observed requested sleep, default-jitter implications and input/deadline limits without making network calls or editing files.",
+          "requires": [],
+          "materials": [
+            "materials/retry-after.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BF-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/BF-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BF-U03",
+          "kind": "understand",
+          "goal": "区分重试时间预算与中止调用的期限",
+          "prompt": "Trace the complete slow-success control and determine whether max_time is an interrupting deadline. Give an application boundary using actual behavior; do not invoke a real service.",
+          "requires": [],
+          "materials": [
+            "materials/time-budget.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BF-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/BF-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BF-S03",
+      "title": "遥测字段政策",
+      "goal": "保留诊断指标而限制原参数传播",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BF-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BF-C02",
+          "kind": "consult",
+          "goal": "定义回调遥测的可公开字段",
+          "prompt": "Meet the complete support-metric requirement using current callback details and explicit application-owned filtering. Explain which supplied values are present without publishing raw callback data or editing files.",
+          "requires": [],
+          "materials": [
+            "materials/telemetry.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BF-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/BF-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BF-S04",
+      "title": "异步重试接入",
+      "goal": "明确协程与回调的await及业务责任",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BF-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BF-P01",
+          "kind": "plan",
+          "goal": "规划原生协程的重试和回调责任",
+          "prompt": "Plan the complete native-coroutine retry flow and observed await order. Separate existing async support from service timeout, cancellation and idempotency decisions; no implementation is authorized.",
+          "requires": [],
+          "materials": [
+            "materials/async.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BF-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/BF-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

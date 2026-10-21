@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "originals": [
+    {
+      "path": "project_library/projects/typer/seed/library/.env",
+      "public_original_retained": true
+    },
+    {
+      "path": "project_library/projects/python-decouple/seed/library/tests/autoconfig/env/.env",
+      "public_original_retained": true
+    },
+    {
+      "path": "project_library/projects/python-decouple/seed/library/tests/autoconfig/env/custom-path/.env",
+      "public_original_retained": true
+    }
+  ],
+  "unknown_env_still_ignored": true,
+  "changed_known_fixture_rejected": true,
+  "linked_fixture_rejected": true,
+  "real_model_calls": 0
+}

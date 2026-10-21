@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DU-D01",
+  "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The initial browser symptom cannot establish reference syntax, missing targets or failure policy. Request sufficient actual source and publishing settings, then explain only the disclosed messages/return behavior. insufficient_information is valid if unavailable; do not assume the hidden source or confuse a returned output with absence of diagnostics.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

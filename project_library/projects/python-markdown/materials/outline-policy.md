@@ -1,0 +1,1 @@
+Use an explicit TocExtension(toc_depth="1-2") instance, inspect HTML and Markdown.toc_tokens. Report hierarchy and generated duplicate ids. Separately use TocExtension(slugify=slugify_unicode) for # 咖啡 followed by two ## 菜单 headings. The application wants Chinese characters kept in anchors and understands article identity must be explicit when combining multiple documents.

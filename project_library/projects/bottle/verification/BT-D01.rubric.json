@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BT-D01",
+  "source_commit": "8ec5fe29420d14998c0d86885083983eaea8b839",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Do not assume a proxy, parser loss or scalar accessor from the initial symptom. Request sufficient actual request and access evidence, then relate only disclosed behavior to the intended multiple-value contract; insufficient_information is valid without reproduction.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

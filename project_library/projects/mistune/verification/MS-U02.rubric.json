@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MS-U02",
+  "source_commit": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain the actual list of structured tokens from renderer=ast (or renderer=None) and explicit json.dumps conversion. Distinguish Python objects, JSON text and rendered HTML without inventing source-position fields absent from the actual tokens.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

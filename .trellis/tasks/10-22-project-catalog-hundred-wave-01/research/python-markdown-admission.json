@@ -1,0 +1,124 @@
+{
+  "project": "python-markdown",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "b41e0aaf1181f1a8cb200cf5a815aad7c0020d23",
+  "scenarios": 4,
+  "unique_tasks": 8,
+  "non_modify_tasks": 8,
+  "modify_tasks": 0,
+  "source_file_count": 473,
+  "native_baseline_main_nodes": 1129,
+  "native_baseline_subtests": 0,
+  "native_baseline_supplementary_examples": 0,
+  "verified_unique_native_cases": 7,
+  "native_evidence": [
+    {
+      "case": "original-PM-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/python-markdown/attempt-001/original-PM-C01.json",
+      "sha256": "c7a53f483c9cb4e5a55bf6cbc6719ffa4afc6993446e4d04001338350bb65583",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PM-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/python-markdown/attempt-001/original-PM-C02.json",
+      "sha256": "c431e853e2710fa42d9facbc5089a256f87ed7b4707bf48ceda7b39f3bb017fb",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PM-C03",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/python-markdown/attempt-001/original-PM-C03.json",
+      "sha256": "1a4a594d0e4ec353a42f1c84aa3369beaf0db4abf69008e86267f471ca36d0d5",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PM-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/python-markdown/attempt-001/original-PM-P01.json",
+      "sha256": "55b062c3952983888b4787e5daacecffed5c3a24ca21e1c702bffe2cd0e670c9",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PM-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/python-markdown/attempt-001/original-PM-U01.json",
+      "sha256": "62e143a77ddc5bcb34946bf2be9937ed39e993da5aab1f8a588f1b2bebeb42d5",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PM-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/python-markdown/attempt-001/original-PM-U02.json",
+      "sha256": "b714658390b3e61f360c78fed21209ed4571eaa8a734d96c63f92ce7f515a09b",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PM-U03",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/python-markdown/attempt-001/original-PM-U03.json",
+      "sha256": "6f27b625987aa2b4d4a0c188dc57534358e8f257ae4ec57ca42a381dc41433d1",
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_baseline": {
+    "project": "python-markdown",
+    "attempt": 2,
+    "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/python-markdown/result.json",
+    "result_sha256": "ef10672663511993c782fd2394e16203ca9a501db499b4f4597e0bd1e7f94f7c",
+    "main_collected": 1129,
+    "counts": {
+      "passed": 1019,
+      "failed": 0,
+      "error": 0,
+      "skipped": 110,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "subtests": 0,
+    "supplementary_examples": 0,
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "runner_sha256": "41ef9fd27615a74832029e37716758d0627cb44046f662f93adcc759cd6ffb22",
+    "contract_sha256": "65e0b86b4512adaa1b4618bed2cd0fe17f99707f93917df0c6382eae9981e202",
+    "scope": "原生基线校准通过，业务内容和正式准入单独验证"
+  },
+  "formal_catalog_modified": false,
+  "mock_status": "passed",
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "notes": "仅只读业务任务，未伪造修复参考、公开修复测试或接受代码。诊断rubric只按实际披露材料判断，不预填隐藏原因；完整基线与业务分开验证。",
+  "pending": [],
+  "formal_version": "real-project-scenarios-v7-en",
+  "formal_digest": "ebfc5c0be00348f837e30bd6d0c9c548f6a172666e8c69595af2f7e73c37cb08",
+  "full_delivery_files": 4761,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-006/run-001/evidence/result.json",
+      "sha256": "ec5ecb001beee8b5ed9abb51b9cc6496d252815291e6dd5011f399e514bcbba0"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-006/run-001/cleanup.json",
+      "sha256": "f16f25e3b9e882ac7cf88d7f090a62e59a8417950a7b8b555b47cedda65e3d6d"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/mock-batch-006-audit.json",
+      "sha256": "761a1a2889239a37e536eba4d97f860ca39d115416ccd7d0f403ba79d4642aa7"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-006/browser/run-002/diagnostics/result.json",
+      "sha256": "3cd4342599ffda1b075ad3f18175de02b463cc41dcb8b10b853fc44cf1b966e9"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/delivery-first-twelve.json",
+      "sha256": "ffdd0f0caf1fcc457a4e9e5f621dbcdfbce6bb8347d4c0e55d1054cde0e73762"
+    }
+  ],
+  "formal_registered": true
+}

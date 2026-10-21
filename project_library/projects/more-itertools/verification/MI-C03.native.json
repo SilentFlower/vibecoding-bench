@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MI-C03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "bounded_seek_zero_uses_current_cache": true,
+    "zero_cache_peek_preserves_next": true
+  },
+  "resource_profile": "business"
+}

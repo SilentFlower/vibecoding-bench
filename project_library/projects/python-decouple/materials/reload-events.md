@@ -1,0 +1,1 @@
+The synthetic key is absent from the environment for the file comparison. Separately, the same Config can be called with process VB_CASE_LABEL=environment-one and again after changing that environment value to environment-two. Do not inspect real application or ancestor configuration.

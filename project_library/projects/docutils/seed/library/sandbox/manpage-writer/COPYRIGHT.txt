@@ -1,0 +1,8 @@
+The `manpage-writer`_ project for `Docutils`_ was originated by
+Engelbert Gruber <grubert@users.sourceforge.net> and contributed to by
+others.
+
+Except as otherwise noted, all works in the manpage-writer project are
+hereby placed in the public domain by their authors.
+
+..  _Docutils: http://docutils.sourceforge.io/

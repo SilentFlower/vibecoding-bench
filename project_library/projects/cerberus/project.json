@@ -1,0 +1,262 @@
+{
+  "schema": 2,
+  "project_key": "cerberus",
+  "title": "Cerberus数据验证工作场景",
+  "category": "文档验证与规范化",
+  "description": "固定ISC许可源码上的规范化、可空默认、未知字段取证、局部更新和结果所有权七项任务。",
+  "seed_digest": "3fef7505bfd392da56ae639aed7f1bd86c18255f11d185258c1ffa7b812b8d81",
+  "environment": "cerberus-py312",
+  "source": {
+    "repository": "https://github.com/pyeve/cerberus",
+    "commit": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CB-S01",
+      "title": "规范化和验证入口",
+      "goal": "区分复制转换与业务规则验收",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CB-U01",
+            "CB-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CB-U01",
+          "kind": "understand",
+          "goal": "追踪规范化副本和显式禁用转换",
+          "prompt": "Trace the complete validate controls and object ownership. Explain typed document versus returned bool and normalize=False; do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/normalization.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CB-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/CB-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CB-C01",
+          "kind": "consult",
+          "goal": "选择包含业务规则验证的导入返回接口",
+          "prompt": "Meet the supplied import publication requirement with current APIs. Compare the low-minimum normalized and validated controls, including errors and rejection, without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/normalization.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CB-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/CB-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CB-S02",
+      "title": "字段存在性和未知政策",
+      "goal": "明确None默认及未知字段处理",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CB-U02",
+            "CB-C02",
+            "CB-D01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "CB-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "CB-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CB-U02",
+          "kind": "understand",
+          "goal": "区分缺失、可空字段和零值默认行为",
+          "prompt": "Trace all complete null/default and required controls exactly. Explain the independent presence and nullability policies without changing files.",
+          "requires": [],
+          "materials": [
+            "materials/nulls.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CB-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/CB-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CB-C02",
+          "kind": "consult",
+          "goal": "明确未知字段应拒绝、清除还是保留",
+          "prompt": "Compare the complete unknown-field policy controls and recommend how to express the versioned API decision with existing options. Preserve original-input observations; do not implement changes.",
+          "requires": [],
+          "materials": [
+            "materials/unknown.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CB-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/CB-C02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CB-D01",
+          "kind": "diagnose",
+          "goal": "先取schema和处理选项再定位字段消失",
+          "prompt": "Investigate the supplied missing-field symptom. Request schema,options,actual call,result and original object before choosing a cause. Diagnose only disclosed evidence or close with an evidence plan if unavailable. Do not modify files.",
+          "requires": [],
+          "materials": [
+            "materials/missing-field.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CB-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "field-evidence",
+              "when": "The schema,options,actual call,result and source object have not been supplied or declared unavailable, and the answer reasonably requests sufficient evidence.",
+              "materials": [
+                "disclosure/field.md"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CB-S03",
+      "title": "局部更新校验",
+      "goal": "限定update与依赖规则边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CB-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CB-U03",
+          "kind": "understand",
+          "goal": "解释局部更新仍需满足已给字段的依赖",
+          "prompt": "Trace the complete update controls and explain the scope of the update option. Do not assume a stored record or change files.",
+          "requires": [],
+          "materials": [
+            "materials/update.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CB-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/CB-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CB-S04",
+      "title": "批量导入结果",
+      "goal": "保存逐行身份和独立错误状态",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CB-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CB-P01",
+          "kind": "plan",
+          "goal": "规划逐行验证结果和可变实例的所有权",
+          "prompt": "Plan stable per-row import results using the complete sequential control. State result capture and concurrency ownership, without implementing a worker or claiming tested concurrent safety.",
+          "requires": [],
+          "materials": [
+            "materials/results.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CB-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/CB-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

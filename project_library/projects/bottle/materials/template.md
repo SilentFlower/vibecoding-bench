@@ -1,0 +1,1 @@
+Using trusted literal SimpleTemplate sources, render value="<b>A&B</b>" with {{value}} and {{!value}}. A product display must show an untrusted user value as text. Template source is maintained by developers; no untrusted template code may be executed. Explain HTML escaping limits for other contexts without claiming universal sanitization.

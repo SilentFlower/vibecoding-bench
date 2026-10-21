@@ -1,0 +1,1 @@
+Complete synthetic data: left(key:Text,qty:Number)=(A,2),(A,3),(B,1); right(key:Text,zone:Text)=(A,east),(A,west). Call left.join(right,"key") without inner/full_outer/require_match options. No deduplication or transaction is present. Compare with inner=True and with require_match=True; separately test require_match on only matched A rows.

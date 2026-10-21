@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CH-P01",
+  "source_commit": "e2538b1d338ead4ed803ec0017017bf6779a380b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Give a feasible application export plan, explicit serializer/field/null policy and deliberate staging or partial-output handling. Current format_output may materialize rows; do not promise constant-memory streaming, automatic validation of every business schema or transactions.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

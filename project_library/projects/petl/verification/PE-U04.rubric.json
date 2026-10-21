@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PE-U04",
+  "source_commit": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "fromcsv produces string data, so SKU001 and qty text2 remain strings until qty is explicitly converted. Quoting preserves 茶,hot as one field, and UTF-8 roundtrip preserves the original string rows. Converting qty must leave the SKU string/leading zeros unchanged; no automatic numeric inference is promised.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

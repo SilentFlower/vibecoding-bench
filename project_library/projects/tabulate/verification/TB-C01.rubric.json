@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TB-C01",
+  "source_commit": "268615a5c27dc40e5c22454c07b44d5c50410da0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use the real per-column disable_numparse=[0] with floatfmt=.2f or a correct equivalent, preserving SKU text and numeric price formatting without requiring a library repair.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PA-U01",
+  "source_commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The default normalizes standard newlines to Linux LF; linesep=None preserves the original mixed CRLF/CR/LF, and explicit CRLF normalizes them all to CRLF. UTF-8 handles 茶. Use existing linesep rather than a required library patch and do not generalize Linux byte output to every platform.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

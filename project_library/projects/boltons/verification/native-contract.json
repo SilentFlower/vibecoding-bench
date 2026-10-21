@@ -1,0 +1,3560 @@
+{
+  "baseline_digest": "5aff453f254f17ae2df71c7eb649a74d8fd1bf4487ff8904757b1bf3e1d320a3",
+  "nodes": [
+    {
+      "id": "boltons/cacheutils.py::boltons.cacheutils.LRI",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/cacheutils.py::boltons.cacheutils.LRU",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/cacheutils.py::boltons.cacheutils.ThresholdCounter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/cacheutils.py::boltons.cacheutils.cached",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/cacheutils.py::boltons.cacheutils.cachedmethod",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/cacheutils.py::boltons.cacheutils.make_cache_key",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/dictutils.py::boltons.dictutils.OneToOne",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/dictutils.py::boltons.dictutils.OneToOne.unique",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/dictutils.py::boltons.dictutils.OrderedMultiDict",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/dictutils.py::boltons.dictutils.OrderedMultiDict.addlist",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/dictutils.py::boltons.dictutils.OrderedMultiDict.inverted",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/dictutils.py::boltons.dictutils.OrderedMultiDict.sorted",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/dictutils.py::boltons.dictutils.OrderedMultiDict.sortedvalues",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/dictutils.py::boltons.dictutils.subdict",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/fileutils.py::boltons.fileutils.FilePerms",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/fileutils.py::boltons.fileutils.FilePerms.from_int",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/fileutils.py::boltons.fileutils.FilePerms.from_path",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/fileutils.py::boltons.fileutils.atomic_save",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/fileutils.py::boltons.fileutils.iter_find_files",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/formatutils.py::boltons.formatutils.DeferredValue",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/formatutils.py::boltons.formatutils.get_format_args",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/funcutils.py::boltons.funcutils.FunctionBuilder",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/funcutils.py::boltons.funcutils.copy_function",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/funcutils.py::boltons.funcutils.format_exp_repr",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/funcutils.py::boltons.funcutils.format_invocation",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/funcutils.py::boltons.funcutils.format_nonexp_repr",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/funcutils.py::boltons.funcutils.mro_items",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/funcutils.py::boltons.funcutils.once",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/funcutils.py::boltons.funcutils.partial_ordering",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/funcutils.py::boltons.funcutils.update_wrapper",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/funcutils.py::boltons.funcutils.wraps",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/gcutils.py::boltons.gcutils.GCToggler",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/gcutils.py::boltons.gcutils.get_all",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/ioutils.py::boltons.ioutils.MultiFileReader",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/ioutils.py::boltons.ioutils.SpooledBytesIO",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/ioutils.py::boltons.ioutils.SpooledStringIO",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.backoff",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.backoff_iter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.bucketize",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.chunk_ranges",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.chunked",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.chunked_iter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.first",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.flatten",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.flatten_iter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.frange",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.get_path",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.is_collection",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.is_iterable",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.is_scalar",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.lstrip",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.lstrip_iter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.one",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.pairwise",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.pairwise_iter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.partition",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.redundant",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.remap",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.research",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.rstrip",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.rstrip_iter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.same",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.soft_sorted",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.split",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.split_iter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.strip",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.strip_iter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.unique",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.unique_iter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.untyped_sorted",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.windowed_iter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/iterutils.py::boltons.iterutils.xfrange",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/listutils.py::boltons.listutils.BarrelList",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/mathutils.py::boltons.mathutils.ceil",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/mathutils.py::boltons.mathutils.clamp",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/mathutils.py::boltons.mathutils.floor",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/namedutils.py::boltons.namedutils.namedlist",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/namedutils.py::boltons.namedutils.namedtuple",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/pathutils.py::boltons.pathutils.augpath",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/pathutils.py::boltons.pathutils.expandpath",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/pathutils.py::boltons.pathutils.shrinkuser",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/queueutils.py::boltons.queueutils",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/setutils.py::boltons.setutils.IndexedSet",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/setutils.py::boltons.setutils.complement",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.Stats._calc_count",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.Stats._calc_max",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.Stats._calc_min",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.Stats.describe",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.Stats.format_histogram",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.Stats.get_quantile",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.describe",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.iqr",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.kurtosis",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.mean",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.median",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.median_abs_dev",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.mode",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.rel_std_dev",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.skewness",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.std_dev",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.trimean",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/statsutils.py::boltons.statsutils.variance",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.MultiReplace",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.a10n",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.args2cmd",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.args2sh",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.asciify",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.bytes2human",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.camel2under",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.cardinalize",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.complement_int_list",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.ellipsize",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.find_hashtags",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.format_int_list",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.gunzip_bytes",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.gzip_bytes",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.html2text",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.int_ranges_from_int_list",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.is_ascii",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.is_uuid",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.iter_splitlines",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.ordinalize",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.parse_int_list",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.pluralize",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.singularize",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.slugify",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.split_punct_ws",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.strip_ansi",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.under2camel",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.unit_len",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/strutils.py::boltons.strutils.unwrap_text",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/timeutils.py::boltons.timeutils.daterange",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/timeutils.py::boltons.timeutils.decimal_relative_time",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/timeutils.py::boltons.timeutils.dt_to_timestamp",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/timeutils.py::boltons.timeutils.isoparse",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/timeutils.py::boltons.timeutils.parse_timedelta",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/timeutils.py::boltons.timeutils.relative_time",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/timeutils.py::boltons.timeutils.strpdate",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/typeutils.py::boltons.typeutils.get_all_subclasses",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/typeutils.py::boltons.typeutils.issubclass",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/typeutils.py::boltons.typeutils.make_sentinel",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/urlutils.py::boltons.urlutils.QueryParamDict",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/urlutils.py::boltons.urlutils.URL",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/urlutils.py::boltons.urlutils.URL.get_authority",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/urlutils.py::boltons.urlutils.URL.navigate",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/urlutils.py::boltons.urlutils.URL.query_params",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/urlutils.py::boltons.urlutils.URL.to_text",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/urlutils.py::boltons.urlutils.URL.uses_netloc",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/urlutils.py::boltons.urlutils.find_all_links",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/urlutils.py::boltons.urlutils.parse_host",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/urlutils.py::boltons.urlutils.parse_url",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "boltons/urlutils.py::boltons.urlutils.unquote",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_cache_sizes_on_repeat_insertions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_cache_update_optional_source[LRI]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_cache_update_optional_source[LRU]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_cached_dec",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_cachedmethod",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_cachedmethod_maintains_func_abstraction",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_cachedproperty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_cachedproperty_maintains_func_abstraction",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_callable_cached_dec",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_lri",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_lri_cache_eviction",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_lru_add",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_lru_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_lru_dict_replacement[LRI]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_lru_dict_replacement[LRU]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_lru_with_dupes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_lru_with_dupes_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_min_id_map",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_threshold_counter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_threshold_counter_update_keyword_counts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_threshold_counter_update_mapping_compaction",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_threshold_counter_update_mapping_counts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cacheutils.py::test_unscoped_cached_dec",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debugutils_trace.py::test_trace_bytes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debugutils_trace.py::test_trace_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debugutils_trace.py::test_trace_exc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debugutils_trace.py::test_trace_namedtuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debugutils_trace.py::test_trace_oldstyle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debugutils_trace.py::test_trace_which",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_addlist",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_addlist_iterator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_clear",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_dict_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_eq",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_eq_with_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_frozendict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_frozendict_api",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_frozendict_ior",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_invert",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_ior",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_kv_consistency",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_many_to_many",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_multi_correctness",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_omd_copy_module",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_omd_pickle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_one_to_one",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_pop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_pop_all",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_poplast",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_reversed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_setdefault",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_subdict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_subdict_keep_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_todict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_update_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictutils.py::test_update_extend",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ecoutils.py::test_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ecoutils.py::test_scrub",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ecoutils.py::test_scrub_does_not_read_the_cwd",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ecoutils.py::test_scrub_does_not_resolve_the_host",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_fileutils.py::test_atomicsaver_pathlike",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_fileutils.py::test_fileperms",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_fileutils.py::test_iter_find_files",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_fileutils.py::test_iter_find_files_pathlike",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_fileutils.py::test_rotate_file_full_rotation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_fileutils.py::test_rotate_file_full_rotation_no_ext",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_fileutils.py::test_rotate_file_no_rotation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_fileutils.py::test_rotate_file_one_rotation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_formatutils.py::test_deferredvalue",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_formatutils.py::test_get_fstr_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_formatutils.py::test_pos_infer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_formatutils.py::test_split_fstr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_formatutils.py::test_tokenize_format_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils.py::test_copy_function",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils.py::test_format_invocation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils.py::test_noop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils.py::test_once_caches_result",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils.py::test_once_executes_only_once",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils.py::test_once_thread_safety",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils.py::test_partials",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils.py::test_total_ordering",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_FunctionBuilder_add_arg",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_FunctionBuilder_invalid_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_FunctionBuilder_invalid_body",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_FunctionBuilder_modify",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_defaults_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_get_arg_names",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_get_invocation_sig_str[None-args-kwargs-None-*args, **kwargs-(*args, **kwargs)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_get_invocation_sig_str[a-None-None-defaults2-a=a-(a)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_get_invocation_sig_str[args0-None-None-None-a, b-(a, b)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_wraps_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_wraps_expected",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_wraps_injected",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_wraps_unknown_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_wraps_update_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb.py::test_wraps_wrappers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_FunctionBuilder_add_arg_kwonly",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_copy_function_kw_defaults_py3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_defaults_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_get_arg_names",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_get_invocation_sig_str[None-args-kwargs-None-a-kwonlydefaults0-*args, a=a, **kwargs-(*args, a, **kwargs)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_remove_kwonly_arg",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_update_wrapper_partial[boltons.funcutils]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_update_wrapper_partial[functools]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_wraps_async",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_wraps_defaulted_arg_before_varargs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_wraps_defaulted_arg_keyword_forwarding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_wraps_hide_wrapped",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_wraps_inner_kwarg_only",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_wraps_posonly_defaulted_arg",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_wraps_py3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_wraps_target_kwonly_arg",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_wraps_target_kwonly_arg_no_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_wraps_target_kwonly_arg_with_varargs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcutils_fb_py3.py::test_wraps_uninspectable_target",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gcutils.py::test_get_all",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gcutils.py::test_toggle_gc_postcollect",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestMultiFileReader::test_no_mixed_bytes_and_text",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestMultiFileReader::test_open",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestMultiFileReader::test_read_seek_bytes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestMultiFileReader::test_read_seek_text",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_auto_rollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_buf_property",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_buffer_write_rollover_uses_byte_count",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_buffered_writer_flush",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_closed_file_method_valueerrors",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_closed_property",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_compare_different_instances",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_compare_err",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_compare_not_equal_instances",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_compare_two_equal_instances",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_compare_unequal_instances",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_flush_after_rollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_getvalue_norollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_getvalue_rollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_instance_check",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_invalid_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_io_error_negative_truncate",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_isatty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_iter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_len_no_rollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_len_rollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_next",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_pos_property",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_readline",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_readlines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_rollover_custom_directory",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_set_softspace_attribute",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_set_softspace_attribute_rolled",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_truncate_noargs_norollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_truncate_noargs_rollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_truncate_with_args_norollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_truncate_with_args_rollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_truthy",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_type_error_too_many_args",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_use_as_context_mgr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_write_returns_byte_count",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_writelines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledBytesIO::test_zip_compat",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_auto_rollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_buf_property",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_closed_file_method_valueerrors",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_closed_property",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_codepoints_all_enc",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_compare_different_instances",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_compare_err",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_compare_not_equal_instances",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_compare_two_equal_instances",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_compare_unequal_instances",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_getvalue_norollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_getvalue_rollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_instance_check",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_invalid_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_io_error_negative_truncate",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_isatty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_iter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_len_no_rollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_len_rollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_negative_destination_rejected_without_moving",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_next",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_pos_property",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_readline",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_readlines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_relative_backwards_seek_uses_character_position",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_rollover_custom_directory",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_seek_codepoints_SEEK_CUR",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_seek_codepoints_SEEK_END",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_seek_codepoints_SEEK_SET",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_seek_codepoints_large_SEEK_CUR",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_seek_codepoints_large_SEEK_END",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_seek_codepoints_large_SEEK_SET",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_seek_encoded",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_set_softspace_attribute",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_set_softspace_attribute_rolled",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_tell_codepoints",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_truncate_noargs_norollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_truncate_noargs_rollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_truncate_with_args_norollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_truncate_with_args_rollover",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_truthy",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_type_error_too_many_args",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_use_as_context_mgr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_write_returns_character_count",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_writelines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_ioutils.py::TestSpooledStringIO::test_x80_codepoint",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestFirst::test_default_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestFirst::test_empty_iterables",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestFirst::test_selection",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestGetPath::test_depth_one",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestGetPath::test_depth_two",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_add_length",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_basic_clone",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_basic_upper",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_collector_pattern",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_dict_to_omd",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_drop_nones",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_duperef",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_item_drop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_namedtuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_noncallables",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_path",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_prepop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_remap_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_remap_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_reraise_visit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_root_selfref",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_sort_all_lists",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_sub_selfref",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestRemap::test_unremappable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::TestSplit::test_maxsplit_zero_returns_unsplit_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_backoff_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_backoff_constant_factor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_backoff_jitter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_backoff_repeat",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_backoff_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_backoff_zero_start",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_chunk_ranges",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_chunked_bytes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_frange_inexact_boundary_counts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_frange_xfrange_zero_step",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_guiderator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_lstrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_pairwise_filled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_partition_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_partition_multiple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_research",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_research_custom_enter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_rstrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_seqguiderator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_strip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_windowed_filled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_xfrange_descending",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_xfrange_matches_frange",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterutils.py::test_xfrange_wrong_direction",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_jsonutils.py::test_jsonl_explicit_end_seek",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_jsonutils.py::test_jsonl_iterator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_jsonutils.py::test_jsonl_iterator_mid_last_line_seek_terminates",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_jsonutils.py::test_jsonl_iterator_rel_seek_negative",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_jsonutils.py::test_jsonl_relative_seek_binary_matches_text",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_jsonutils.py::test_reverse_iter_lines",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_jsonutils.py::test_reverse_iter_lines_keeps_text_stream_attached",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_jsonutils.py::test_reverse_iter_lines_uses_explicit_binary_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_jsonutils.py::test_reverse_iter_lines_uses_file_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_listutils.py::test_barrel_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_listutils.py::test_barrel_list_delete_to_end",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_listutils.py::test_barrel_list_getitem_past_end",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_listutils.py::test_barrel_list_insert_at_end",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_listutils.py::test_barrel_list_insert_before_start_matches_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_listutils.py::test_barrel_list_matches_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_listutils.py::test_barrel_list_pop_after_tail_drained",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_listutils.py::test_barrellist_delete_across_multiple_barrels",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_listutils.py::test_barrellist_slicing_matches_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_listutils.py::test_sort_barrel_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_listutils.py::test_splay_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mathutils.py::test_bits",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mathutils.py::test_bits_len_bound",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mathutils.py::test_ceil_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mathutils.py::test_ceil_oor_lower",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mathutils.py::test_ceil_oor_upper",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mathutils.py::test_ceil_sorted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mathutils.py::test_clamp_examples",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mathutils.py::test_clamp_transparent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mathutils.py::test_empty_bits_conversions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mathutils.py::test_empty_bits_rejects_non_hex_inputs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mathutils.py::test_floor_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mathutils.py::test_floor_oor_lower",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mathutils.py::test_floor_oor_upper",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mathutils.py::test_floor_sorted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_namedutils.py::test_empty_field_name_raises_value_error[namedlist]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_namedutils.py::test_empty_field_name_raises_value_error[namedtuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_namedutils.py::test_empty_type_name_raises_value_error[namedlist]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_namedutils.py::test_empty_type_name_raises_value_error[namedtuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_namedutils.py::test_invalid_character_still_raises_value_error[namedlist]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_namedutils.py::test_invalid_character_still_raises_value_error[namedtuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_namedutils.py::test_namedlist",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_namedutils.py::test_namedlist_pickle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_namedutils.py::test_namedtuple_pickle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_pathutils.py::test_augpath",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_pathutils.py::test_augpath_multidot",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_pathutils.py::test_expandpath",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_pathutils.py::test_shrinkuser",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queueutils.py::test_heap_queue",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_queueutils.py::test_sorted_queue",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_bulk_difference_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_bulk_intersection_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_complement_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_indexed_set_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_indexed_set_mutate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_indexed_set_rsub",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_indexed_set_update_multiple_iterables[iter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_indexed_set_update_multiple_iterables[list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_indexed_set_update_multiple_iterables[tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_indexed_set_update_multiple_iterables_with_tuple_items",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_iset_index_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_iset_scalar_index_bounds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_iset_scalar_index_multiple_dead_intervals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_iset_slice_after_removal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_iset_slice_agreement",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_setutils.py::test_small_difference_update_unchanged",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_socketutils.py::test_basic_nonblocking",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_socketutils.py::test_buffers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_socketutils.py::test_client_disconnecting",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_socketutils.py::test_multibyte_delim",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_socketutils.py::test_props",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_socketutils.py::test_short_lines",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_socketutils.py::test_simple_buffered_socket_passthroughs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_socketutils.py::test_socketutils_netstring",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_socketutils.py::test_socketutils_netstring_timeout",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_socketutils.py::test_split_delim",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_socketutils.py::test_timeout_setters_getters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_statsutils.py::test_histogram_zero_interquartile_range",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_statsutils.py::test_mode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_statsutils.py::test_pearson_type_covers_kappa_ge_zero",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_statsutils.py::test_pearson_type_zero_denominator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_statsutils.py::test_stats_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_statsutils_histogram.py::test_check_sum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_statsutils_histogram.py::test_norm_regression",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::TestMultiReplace::test_shortcut_function",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::TestMultiReplace::test_simple_substitutions",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::TestMultiReplace::test_sub_with_compiled_regex",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::TestMultiReplace::test_sub_with_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::TestMultiReplace::test_sub_with_regex",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::TestMultiReplace::test_substitutions_in_word",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::TestMultiReplace::test_substitutions_with_regex_chars",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_args2cmd_sep",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_args2sh_sep",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_asciify",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_bytes2human",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_ellipsize",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_format_int_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_human_readable_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_human_readable_list_type_annotations",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_indent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_indent_unicode_line_endings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_is_uuid",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_iter_splitlines_preserves_numbers_after_spaces",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_iter_splitlines_unicode_line_endings[\\u2028]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_iter_splitlines_unicode_line_endings[\\u2029]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_multi_replace_empty_mapping",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_parse_int_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_pluralize_x",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_roundzip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_singularize_double_s",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strutils.py::test_strip_ansi",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableutils.py::test_table_dicts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableutils.py::test_table_lists",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableutils.py::test_table_obj",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableutils.py::test_to_text_empty_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableutils.py::test_to_text_no_headers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableutils.py::test_to_text_none_headers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableutils.py::test_to_text_short_headers_padded",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tbutils.py::test_contextual",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tbutils.py::test_exception_info",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tbutils_parsed_exc.py::test_parsed_exc_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tbutils_parsed_exc.py::test_parsed_exc_nosrcline",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tbutils_parsed_exc.py::test_parsed_exc_truncated",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tbutils_parsed_exc.py::test_parsed_exc_with_anchor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tbutils_parsed_exc.py::test_parsed_exc_with_anchor_indented",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_timeutils.py::test_daterange_datetime_hourly",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_timeutils.py::test_daterange_infinite",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_timeutils.py::test_daterange_step_does_not_advance",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_timeutils.py::test_daterange_with_same_start_stop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_timeutils.py::test_daterange_wrong_direction",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_timeutils.py::test_daterange_years",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_timeutils.py::test_daterange_years_step",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_timeutils.py::test_isoparse_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_timeutils.py::test_isoparse_fraction_overprecise",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_timeutils.py::test_isoparse_fractional_seconds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_timeutils.py::test_relative_time_defaults_to_matching_timezone",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_timeutils.py::test_us_timezone_dst_fold",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_timeutils.py::test_us_timezone_fromutc_sets_fold",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeutils.py::test_sentinel_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeutils.py::test_sentinel_falsiness",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeutils.py::test_sentinel_pickle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_chained_navigate[https://host/a/b-https://host-paths2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_chained_navigate[https://host/a/b-https://host/a/-paths4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_chained_navigate[https://host/b-https://host-paths0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_chained_navigate[https://host/b-https://host-paths1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_chained_navigate[https://host/b-https://host-paths3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_chained_navigate[https://host/b-https://host/a-paths5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_equal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_find_all_links",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_find_all_links_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_identical_equal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_idna",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_invalid_ipv6",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_invalid_port",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_iri_path",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_iri_query",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_mailto",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_navigate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_netloc_slashes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_normalize_with_case",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_not_equal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_parse_equals_in_qp_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_parse_qsl_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_parse_url",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_password_without_username",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_param_dict_eq_with_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[ftp://ftp.rfc-editor.org/in-notes/tar/RFCs0001-0500.tar.gz]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://(%2525)/(%2525)?(%2525)&(%2525)=(%2525)#(%2525)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://(%C3%A9)/(%C3%A9)?(%C3%A9)&(%C3%A9)=(%C3%A9)#(%C3%A9)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://[1080:0:0:0:8:800:200C:417A]/index.html]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://example.com/foo!@$bar?b!@z=123]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://example.com:8080/search?q=123&business=Nothing%20Special]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://googlewebsite.com/e-shops.aspx]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://hatnote.com:9000?arg=1&arg=2&arg=3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://localhost/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://localhost/asd?a=asd%20sdf/345]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://localhost/foo!!bar/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://localhost/foo%20bar/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://localhost/foo%2Fbar/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://localhost/foo/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://localhost/foo?n=/a/b]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://localhost/foo?n=v]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://localhost/foo?n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://localhost/foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://localhost]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://tools.ietf.org/html/rfc3986#section-3.4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://wiki:pedia@hatnote.com]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[http://xn--ggbla1c4e.xn--ngbc5azd/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[https://[::101.45.75.219]:80/?hi=bye]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[https://xn--bcher-kva.ch]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[ldap://[::192.9.5.5]/dc=example,dc=com??sub?(sn=Jensen)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[magnet:?xt=urn:btih:1a42b9e04e122b97a5254e3df77ab3c4b7da725f&dn=Puppy%20Linux%20precise-5.7.1.iso&tr=udp://tracker.openbittorrent.com:80&tr=udp://tracker.publicbt.com:80&tr=udp://tracker.istole.it:6969&tr=udp://tracker.ccc.de:80&tr=udp://open.demonii.com:1337]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[mailto:me@example.com?to=me@example.com&body=hi%20http://wikipedia.org]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[news:alt.rec.motorcycle]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[ssh://192.0.2.16:2222/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[tel:+1-800-867-5309]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_query_params[urn:oasis:member:A00024:x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_quoted_userinfo",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[ftp://ftp.rfc-editor.org/in-notes/tar/RFCs0001-0500.tar.gz]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://(%2525)/(%2525)?(%2525)&(%2525)=(%2525)#(%2525)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://(%C3%A9)/(%C3%A9)?(%C3%A9)&(%C3%A9)=(%C3%A9)#(%C3%A9)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://[1080:0:0:0:8:800:200C:417A]/index.html]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://example.com/foo!@$bar?b!@z=123]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://example.com:8080/search?q=123&business=Nothing%20Special]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://googlewebsite.com/e-shops.aspx]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://hatnote.com:9000?arg=1&arg=2&arg=3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://localhost/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://localhost/asd?a=asd%20sdf/345]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://localhost/foo!!bar/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://localhost/foo%20bar/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://localhost/foo%2Fbar/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://localhost/foo/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://localhost/foo?n=/a/b]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://localhost/foo?n=v]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://localhost/foo?n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://localhost/foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://localhost]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://tools.ietf.org/html/rfc3986#section-3.4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://wiki:pedia@hatnote.com]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[http://xn--ggbla1c4e.xn--ngbc5azd/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[https://[::101.45.75.219]:80/?hi=bye]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[https://xn--bcher-kva.ch]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[ldap://[::192.9.5.5]/dc=example,dc=com??sub?(sn=Jensen)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[magnet:?xt=urn:btih:1a42b9e04e122b97a5254e3df77ab3c4b7da725f&dn=Puppy%20Linux%20precise-5.7.1.iso&tr=udp://tracker.openbittorrent.com:80&tr=udp://tracker.publicbt.com:80&tr=udp://tracker.istole.it:6969&tr=udp://tracker.ccc.de:80&tr=udp://open.demonii.com:1337]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[mailto:me@example.com?to=me@example.com&body=hi%20http://wikipedia.org]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[news:alt.rec.motorcycle]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[ssh://192.0.2.16:2222/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[tel:+1-800-867-5309]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_regex[urn:oasis:member:A00024:x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_rel_navigate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[ftp://ftp.rfc-editor.org/in-notes/tar/RFCs0001-0500.tar.gz]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://(%2525)/(%2525)?(%2525)&(%2525)=(%2525)#(%2525)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://(%C3%A9)/(%C3%A9)?(%C3%A9)&(%C3%A9)=(%C3%A9)#(%C3%A9)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://[1080:0:0:0:8:800:200C:417A]/index.html]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://example.com/foo!@$bar?b!@z=123]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://example.com:8080/search?q=123&business=Nothing%20Special]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://googlewebsite.com/e-shops.aspx]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://hatnote.com:9000?arg=1&arg=2&arg=3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://localhost/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://localhost/asd?a=asd%20sdf/345]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://localhost/foo!!bar/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://localhost/foo%20bar/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://localhost/foo%2Fbar/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://localhost/foo/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://localhost/foo?n=/a/b]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://localhost/foo?n=v]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://localhost/foo?n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://localhost/foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://localhost]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://tools.ietf.org/html/rfc3986#section-3.4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://wiki:pedia@hatnote.com]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[http://xn--ggbla1c4e.xn--ngbc5azd/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[https://[::101.45.75.219]:80/?hi=bye]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[https://xn--bcher-kva.ch]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[ldap://[::192.9.5.5]/dc=example,dc=com??sub?(sn=Jensen)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[magnet:?xt=urn:btih:1a42b9e04e122b97a5254e3df77ab3c4b7da725f&dn=Puppy%20Linux%20precise-5.7.1.iso&tr=udp://tracker.openbittorrent.com:80&tr=udp://tracker.publicbt.com:80&tr=udp://tracker.istole.it:6969&tr=udp://tracker.ccc.de:80&tr=udp://open.demonii.com:1337]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[mailto:me@example.com?to=me@example.com&body=hi%20http://wikipedia.org]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[news:alt.rec.motorcycle]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[ssh://192.0.2.16:2222/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[tel:+1-800-867-5309]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_roundtrip[urn:oasis:member:A00024:x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_self_normalize",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_str_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_unicodey",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_url_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_userinfo",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_urlutils.py::test_utf8_url",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "boltons",
+  "python": "3.12.15",
+  "schema": 1,
+  "subtests": [
+    {
+      "context": {
+        "kwargs": {
+          "rolled": "False"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_ioutils.py::TestSpooledBytesIO::test_buffered_writer_flush",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "rolled": "True"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_ioutils.py::TestSpooledBytesIO::test_buffered_writer_flush",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "rolled": "False"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_ioutils.py::TestSpooledBytesIO::test_write_returns_byte_count",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "rolled": "True"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_ioutils.py::TestSpooledBytesIO::test_write_returns_byte_count",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "offset": "-1",
+          "rolled": "False",
+          "whence": "0"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_ioutils.py::TestSpooledStringIO::test_negative_destination_rejected_without_moving",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "offset": "-3",
+          "rolled": "False",
+          "whence": "1"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_ioutils.py::TestSpooledStringIO::test_negative_destination_rejected_without_moving",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "offset": "-1",
+          "rolled": "True",
+          "whence": "0"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_ioutils.py::TestSpooledStringIO::test_negative_destination_rejected_without_moving",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "offset": "-3",
+          "rolled": "True",
+          "whence": "1"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_ioutils.py::TestSpooledStringIO::test_negative_destination_rejected_without_moving",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "rolled": "False"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_ioutils.py::TestSpooledStringIO::test_relative_backwards_seek_uses_character_position",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "rolled": "True"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_ioutils.py::TestSpooledStringIO::test_relative_backwards_seek_uses_character_position",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "rolled": "False"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_ioutils.py::TestSpooledStringIO::test_write_returns_character_count",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "rolled": "True"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_ioutils.py::TestSpooledStringIO::test_write_returns_character_count",
+      "when": "call"
+    }
+  ]
+}

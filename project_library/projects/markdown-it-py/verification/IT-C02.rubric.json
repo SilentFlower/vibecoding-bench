@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IT-C02",
+  "source_commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The linkify option and enabled rule are separate conditions. commonmark initially excludes the core linkify rule even with the option True. Existing enable(\"linkify\") activates it and produces the supplied HTTPS link when linkify-it-py is available. Do not claim the option alone activates every rule or that a patch is necessary.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

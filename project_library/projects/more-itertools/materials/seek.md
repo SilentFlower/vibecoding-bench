@@ -1,0 +1,1 @@
+Use seekable("ABCD", maxlen=2), retain view = stream.elements(), consume A,B,C, inspect view, seek(0), consume three more items, inspect the original view again. Separately use seekable("AB", maxlen=0), peek(), next(), and inspect elements(). The consumer also asks whether this in-memory object alone can resume after process restart.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CA-P01",
+  "source_commit": "3ab2f323abcdd321b6c423f9eb6304ce35681307",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The provider is invoked for each parse and must return a fresh open readable stream. Two supplied parses yield2 then3 and the parser closes both streams; reusing a closed stream is not valid. Validate the full new configuration before an explicit application-owned publication/recovery boundary and define provider errors/reload serialization. The parser does not itself atomically publish live application state or fetch an unspecified secret service.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

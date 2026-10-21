@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BX-C03",
+  "source_commit": "a4c10e977b574114613431394b30412b50aaacce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "bool(false) isFalse, but spaced FALSE and unknown maybe areTrue under approximate casting; int5 is5 and intfive raisesValueError. Conversions return values without replacing original string count. Normalize whitespace/case deliberately, validate an explicit accepted vocabulary/type and reject unknown values before using the business switch. Do not claim ConfigBox.bool is already a strict schema or silently change its global semantics.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

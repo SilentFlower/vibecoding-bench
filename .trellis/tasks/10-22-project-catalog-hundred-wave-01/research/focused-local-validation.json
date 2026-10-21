@@ -1,0 +1,47 @@
+{
+  "purpose": "阶段实施期间实际本地定向验证工具输出，不代替正式Check-All或最终内容静态校验",
+  "adapter_command": "PYTHONPATH=orchestrator .deploy/project-catalog-hundred/stage-01/native-adapter-test-venv/bin/python -m unittest orchestrator.test_project_native_regression",
+  "project_command": "PYTHONPATH=orchestrator .deploy/project-iteration-repairs/venv/bin/python -m unittest discover -s orchestrator -p 'test_project_*.py'",
+  "records": {
+    "adapter-current": {
+      "chunk_id": "d878a8",
+      "wall_time_seconds": 0.000016162,
+      "exit_code": 0,
+      "original_token_count": 33,
+      "output": "...............................\n----------------------------------------------------------------------\nRan 31 tests in 5.298s\n\nOK\n"
+    },
+    "project-tests-current": {
+      "chunk_id": "de002a",
+      "wall_time_seconds": 0.000006496,
+      "exit_code": 1,
+      "original_token_count": 584,
+      "output": "....................F.......E............s..............................................................................................\n======================================================================\nERROR: test_collection_skips_are_separate_from_collected_tests_and_frozen (test_project_native_regression.NativeRegressionTests.test_collection_skips_are_separate_from_collected_tests_and_frozen)\n真实pytest的模块收集跳过与主项分别冻结，XML总数保留两者。@return None。\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/root/project/vibecoding-bench/orchestrator/test_project_native_regression.py\", line 423, in test_collection_skips_are_separate_from_collected_tests_and_frozen\n    result = regression._run(options)\n             ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/project/vibecoding-bench/orchestrator/project_native_regression.py\", line 1007, in _run\n    plugins = _plugins(suite)\n              ^^^^^^^^^^^^^^^\n  File \"/root/project/vibecoding-bench/orchestrator/project_native_regression.py\", line 414, in _plugins\n    raise RuntimeError('冻结环境缺少可信插件：' + module)\nRuntimeError: 冻结环境缺少可信插件：pytest\n\n======================================================================\nFAIL: test_retired_generated_content_is_not_a_production_catalog (test_project_iterations.ProjectIterationTests.test_retired_generated_content_is_not_a_production_catalog)\n正式库只接入就绪真实内容，临时调度夹具不计真实项目。@return None。\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/root/project/vibecoding-bench/orchestrator/test_project_iterations.py\", line 463, in test_retired_generated_content_is_not_a_production_catalog\n    self.assertEqual({'python-frontmatter','pydantic-settings','typer'},set(catalog['projects']))\nAssertionError: Items in the second set but not the first:\n'jsonschema'\n'tenacity'\n'xmltodict'\n'agate'\n'schedule'\n'csvkit'\n'more-itertools'\n'python-dotenv'\n'jinja'\n'sqlite-utils'\n'configobj'\n'click'\n'dataset'\n'tinydb'\n'tomlkit'\n'docutils'\n'tabulate'\n'markdown-it-py'\n'cli-helpers'\n'cachetools'\n'path'\n'toolz'\n'boltons'\n'python-markdown'\n'python-decouple'\n'mistune'\n'petl'\n\n----------------------------------------------------------------------\nRan 136 tests in 141.002s\n\nFAILED (failures=1, errors=1, skipped=1)\n"
+    },
+    "project-tests-recheck": {
+      "chunk_id": "5d6494",
+      "wall_time_seconds": 0.000010054,
+      "exit_code": 0,
+      "original_token_count": 35,
+      "output": "........................................................................................................................................\n----------------------------------------------------------------------\nRan 136 tests in 125.680s\n\nOK\n"
+    },
+    "static-library-current": {
+      "chunk_id": "c977fe",
+      "wall_time_seconds": 0.000006231,
+      "exit_code": 0,
+      "original_token_count": 59,
+      "output": "{\"content_schema\": 2, \"projects\": 30, \"scenarios\": 129, \"tasks\": 280, \"digest\": \"9931064d6dfa5abb4b4856ab104b64bf49d948deab7c8480477d71854fa5bbf9\", \"evidence\": \"内容结构及离线制品摘要，不代表原生验收或模型完成\"}\n"
+    }
+  },
+  "repairs": [
+    "旧正式库断言由固定三项目改为保留旧项目且来源、许可、稳定ID及唯一仓库有效",
+    "Docker SDK验证venv按已冻结离线wheel补齐pytest与nose2；未改应用requirements"
+  ],
+  "final_project_test_status": "passed",
+  "project_tests": 136,
+  "adapter_tests": 31,
+  "skipped_in_successful_runs": 0,
+  "management_tests": 28,
+  "management_command": "python3 -m unittest discover -s deploy/v3 -p test_manage.py",
+  "management_status": "passed",
+  "real_model_calls": 0
+}

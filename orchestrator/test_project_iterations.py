@@ -460,11 +460,23 @@ class ProjectIterationTests(ProjectIterationFixture):
         root = ROOT/'project_library'
         catalog = json.loads((root/'catalog.json').read_text())
         self.assertEqual(2,catalog['schema'])
-        self.assertEqual({'python-frontmatter','pydantic-settings','typer'},set(catalog['projects']))
+        self.assertTrue({'python-frontmatter','pydantic-settings','typer'}.issubset(catalog['projects']))
+        self.assertEqual(len(catalog['projects']),len(set(catalog['projects'])))
         self.assertFalse(any((root/'projects'/f'project-{number:03d}').exists() for number in range(1,101)))
         self.assertFalse((root/'build_catalog.py').exists())
         self.assertFalse((root/'reference_runtime.py').exists())
-        self.assertEqual(3,len(ProjectLibrary(root).projects))
+        # 准入内容可以追加；约束真实来源与旧内容保留，不能把首版三个项目写成永久容量。
+        ready = ProjectLibrary(root)
+        self.assertEqual(set(catalog['projects']),set(ready.projects))
+        repositories = set()
+        for project in ready.projects.values():
+            self.assertEqual(2,project.manifest['schema'])
+            source = project.manifest['source']
+            self.assertRegex(source['repository'],r'^https://github\.com/[^/]+/[^/]+/?$')
+            self.assertRegex(source['commit'],r'^[0-9a-f]{40}$')
+            self.assertTrue(source['license_files'])
+            repositories.add(source['repository'].rstrip('/').lower())
+        self.assertEqual(len(ready.projects),len(repositories))
         with patch.multiple(main,project_iterations=None,project_iteration_error='项目内容库不可用',_AUTH_ENABLED=False):
             client = TestClient(main.app)
             try:

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "JV-C03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "unevaluated_properties_closes_successfully_evaluated_composition": true
+  },
+  "resource_profile": "business"
+}

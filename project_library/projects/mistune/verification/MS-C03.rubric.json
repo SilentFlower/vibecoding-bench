@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MS-C03",
+  "source_commit": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain the actual __beans__ to **beans** normalization with equal rendered HTML, distinguishing useful reformatting from original-byte preservation. Do not claim all plugin/renderers preserve every semantic extension or promise lexical source fidelity.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

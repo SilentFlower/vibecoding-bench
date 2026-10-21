@@ -1,0 +1,1 @@
+For the complete synthetic source See missing_. followed by newline, the build must reject ERROR-level unresolved targets. Compare report_level=5,halt_level=6 with halt_level=3. Use programmatic publishing, not an assumed CLI exit code. Preserve useful captured diagnostics and distinguish raising from visual message suppression. No implementation is requested.

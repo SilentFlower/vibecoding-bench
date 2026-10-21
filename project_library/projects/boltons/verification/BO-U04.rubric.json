@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BO-U04",
+  "source_commit": "4e5faa3d7e4008d89e0d8bf1ea87b6d9a061a16d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain first id=1 then a JSON decode error in strict mode, valid ids 1/2 when skipping, and 2/1 in reverse. Blank lines are skipped. Do not claim per-error audit callbacks, business-schema validation or that every JSON value is necessarily an object.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

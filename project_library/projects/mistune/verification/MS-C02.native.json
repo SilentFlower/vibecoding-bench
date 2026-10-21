@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MS-C02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "structured_ast_is_json_serializable": true,
+    "cli_ast_not_serialized_original": true
+  },
+  "resource_profile": "business"
+}

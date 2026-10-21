@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CK-C01",
+  "source_commit": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use existing multiple=True for repeated option tokens and nargs=-1 for a variadic positional argument, without changing Option arity rules or inventing implicit comma parsing. A library modification is unnecessary for these needs.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

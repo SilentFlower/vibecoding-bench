@@ -1,0 +1,1 @@
+A synthetic finite order stream yields 0..4. Compare chunked(source, 2) with strict=True. For the strict version, append each yielded batch to a local committed list before requesting the next batch; record every input pull. This list represents already completed external work only for this synthetic example.

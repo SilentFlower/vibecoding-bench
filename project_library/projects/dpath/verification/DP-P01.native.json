@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DP-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "typesafe_failure_does_not_roll_back_prior_mutation": true
+  },
+  "resource_profile": "business"
+}

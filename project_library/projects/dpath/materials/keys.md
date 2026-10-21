@@ -1,0 +1,1 @@
+Object={"a/b":{"x":1},"a":{"b":{"x":2}}}. Compare string path a/b/x and segment sequence["a/b","x"]. An imported field name contains the separator literally; choose a declared path protocol without silently splitting it. The sequence still uses glob matching where its segments contain glob patterns; do not claim all patterns become literal.

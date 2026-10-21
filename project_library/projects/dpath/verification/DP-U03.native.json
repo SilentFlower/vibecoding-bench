@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DP-U03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "list_delete_keeps_non_tail_holes_and_missing_raises": true
+  },
+  "resource_profile": "business"
+}

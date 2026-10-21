@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BF-U01",
+  "source_commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "max_tries3 permits three total calls: backoff tries1,2 then giveup3; default reraisesValueError. With max_tries2/raise_on_giveupFalse, two failures returnNone. A retry count excludes the first call; a total attempt count includes it.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

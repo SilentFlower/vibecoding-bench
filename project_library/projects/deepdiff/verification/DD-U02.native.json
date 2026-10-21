@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DD-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "ignore_numeric_type_changes_preserves_real_value_differences": true
+  },
+  "resource_profile": "business"
+}

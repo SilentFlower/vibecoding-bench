@@ -1,0 +1,328 @@
+{
+  "schema": 2,
+  "project_key": "cachetools",
+  "title": "Cachetools缓存工作场景",
+  "category": "应用缓存与调用语义",
+  "description": "固定真实源码上的配置缓存、键诊断、类调用修复和容量咨询；四场景九项独立任务。",
+  "seed_digest": "caadeaebc6646c6f997983054c2f3e8d3dfedcbb44c28f451bc6b3f597bfc3b8",
+  "environment": "cachetools-py312",
+  "source": {
+    "repository": "https://github.com/tkem/cachetools",
+    "commit": "6f23e2a7b75a42d30cb9d890ab3ca4059ee01bfd",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CT-S01",
+      "title": "本地配置文件的缓存与发布",
+      "goal": "区分缓存命中、过期、发布和实际文件读取",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CT-U01",
+            "CT-C01",
+            "CT-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CT-U01",
+          "kind": "understand",
+          "goal": "解释配置文件的命中与TTL精确边界",
+          "prompt": "Trace the supplied file loader and controlled-clock events. Give the returned prices and actual file-read count before and exactly at the five-second TTL boundary. Explain why expiry uses the timer rather than file contents. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/config-loader.py",
+            "materials/config-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CT-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/CT-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CT-C01",
+          "kind": "consult",
+          "goal": "区分TTL过期与文件变化通知",
+          "prompt": "A configuration file changed but the same path still returns the earlier object before TTL expiry. Is this a library defect? Compare explicit invalidation, shorter TTL and versioned keys using existing APIs. State the consistency tradeoff without changing the library.",
+          "requires": [],
+          "materials": [
+            "materials/config-loader.py",
+            "materials/config-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CT-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/CT-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CT-P01",
+          "kind": "plan",
+          "goal": "规划本地配置发布与缓存一致性",
+          "prompt": "Plan a bounded local configuration publication and cache-read workflow for the supplied requirements. Cover atomic publication, validation, invalidation/versioning, mutable returned data and parse errors on misses. Use existing APIs; distinguish guarantees from tradeoffs. Do not implement changes.",
+          "requires": [],
+          "materials": [
+            "materials/config-loader.py",
+            "materials/publish-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan_no_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CT-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/CT-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CT-S02",
+      "title": "商品价格的共享缓存与键",
+      "goal": "先取真实证据再隔离业务缓存键",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CT-D01",
+            "CT-C02",
+            "CT-U02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "CT-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "CT-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CT-D01",
+          "kind": "diagnose",
+          "goal": "先取实际缓存证据再判断价格串值",
+          "prompt": "Investigate the supplied intermittent price symptom. Request the minimal actual functions, cache/key configuration and call sequence before assigning a definite cause. Use any subsequently supplied reproduction to diagnose it; if evidence cannot be provided, state the limits and a concrete evidence plan. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/price-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CT-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "price-evidence",
+              "when": "The complete actual functions, cache/key configuration and call sequence have not been disclosed, and the conversation does not say they are unavailable. The answer reasonably requests those inputs or an equivalently sufficient minimal reproduction. Supply all incident evidence together.",
+              "materials": [
+                "disclosure/prices.py",
+                "disclosure/price-events.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "CT-C02",
+          "kind": "consult",
+          "goal": "用已有key参数隔离共享缓存的方法",
+          "prompt": "The complete supplied price methods intentionally share one cache. Recommend a correct existing key policy that keeps retail and wholesale results separate for the same SKU. Explain methodkey and instance versus method namespaces, preserve normal business arguments, and decide whether a library modification is needed.",
+          "requires": [],
+          "materials": [
+            "materials/shared-prices.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CT-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/CT-C02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CT-U02",
+          "kind": "understand",
+          "goal": "区分调用形式归一化和类型敏感缓存键",
+          "prompt": "Explain the actual calls and miss count for quote(), quote(1) and quote(quantity=1). Would typedkey normalize them? Contrast type-sensitive keys with an explicit argument-normalizing key using existing APIs. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/call-forms.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CT-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/CT-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CT-S03",
+      "title": "类入口的关键字实例绑定",
+      "goal": "定位并独立修复调用绑定不一致",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CT-D02",
+            "CT-M01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "CT-D02"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "CT-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CT-D02",
+          "kind": "diagnose",
+          "goal": "定位类访问的关键字receiver绑定差异",
+          "prompt": "Run or trace the complete cachedmethod reproducer. Explain why bound and positional class calls work but class access with the receiver keyword raises TypeError in the pinned source. Locate the descriptor boundary and distinguish it from cache-key behavior. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/receiver-reproducer.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CT-D02.rubric.json",
+            "semantic": true,
+            "native": "verification/CT-D02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CT-M01",
+          "kind": "modify",
+          "goal": "修复类访问关键字receiver并保护原调用合同",
+          "prompt": "Repair the supplied cachedmethod class-access inconsistency under the complete public receiver contract. Support the original receiver parameter name without hardcoding self. Preserve valid bound/positional calls, info and independent instances; keep positional-only, missing and duplicate receiver rejection. Modify only the authorized implementation and public test file, and deliver meaningful original-failing public regression tests.",
+          "requires": [],
+          "materials": [
+            "materials/receiver-reproducer.py",
+            "materials/receiver-contract.md"
+          ],
+          "allowed_paths": [
+            "library/src/cachetools/_descriptor.py",
+            "library/tests/test_cachedmethod.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CT-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/CT-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CT-S04",
+      "title": "可变记录的缓存容量",
+      "goal": "解释真实插入时记账与应用预算",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CT-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CT-C03",
+          "kind": "consult",
+          "goal": "解释可变值的插入时容量记账",
+          "prompt": "Explain the actual currsize values in the supplied mutable-list example. Does getsizeof continuously track mutations? Recommend a safe application policy for a hard size budget, including explicit reinsertion and oversized values, without promising an existing automatic reweigh API.",
+          "requires": [],
+          "materials": [
+            "materials/mutable-size.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CT-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/CT-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PM-C02",
+  "source_commit": "b41e0aaf1181f1a8cb200cf5a815aad7c0020d23",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Configure the existing slugify_unicode callback rather than modifying the default slugifier. The supplied tokens use 咖啡 with children 菜单 and 菜单_1. Generated uniqueness is scoped to a rendered document, so a combined publication still needs a stable article/anchor convention; no global cross-document id registry is provided.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

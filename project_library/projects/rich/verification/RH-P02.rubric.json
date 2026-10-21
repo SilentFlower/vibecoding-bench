@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "RH-P02",
+  "source_commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The synthetic exception message still appears with show_locals=False. That setting avoids deliberate locals display but does not redact exception messages, paths or code context. Define application-owned allowed fields/redaction or an explicit safe summary, preserve useful type/context and test markers across message/locals/path sources. Do not equate truncation, frame suppression or hidden locals with complete secret removal.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

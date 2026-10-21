@@ -1,0 +1,1 @@
+Before={order:{qty:1},updated_at:old};after={order:{qty:2},updated_at:new}. A report must suppress only the declared updated_at field and keep the qty change. Use current exclude_paths with the actual exact path. Inputs must remain intact; do not infer a raw-input redactor or authorization mechanism.

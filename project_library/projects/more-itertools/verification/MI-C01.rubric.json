@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MI-C01",
+  "source_commit": "4aeb4338ae1407d8da9723e86da99efeb446f719",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "bool and peek may pull and cache the first source item without removing it from the wrapper; index -1 consumes and caches the remaining finite source. Avoid negative indexing on an unbounded stream and choose an explicit bounded lookahead/cache policy.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

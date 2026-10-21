@@ -1,0 +1,23 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TB-M01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "rowalign_tuple_equivalent": true,
+    "headerwidth_tuple_equivalent": true,
+    "caller_sequences_unchanged": true,
+    "empty_tuple_defaults_preserved": true,
+    "ordinary_default_preserved": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

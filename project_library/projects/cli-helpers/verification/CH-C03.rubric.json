@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CH-C03",
+  "source_commit": "e2538b1d338ead4ed803ec0017017bf6779a380b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain outer list materialization without stabilizing each row, followed by type scanning consuming row iterators. Materialize each row for the finite input or use a correctly bounded compatible boundary. Do not promise end-to-end constant memory, support for infinite data, or a delivered library fix.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

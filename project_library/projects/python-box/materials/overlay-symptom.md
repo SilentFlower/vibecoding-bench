@@ -1,0 +1,1 @@
+After applying an environment override, a database connection setting disappeared. The complete base/override objects, exact update method, flags and observed before/after values are not supplied. Investigate before deciding why.

@@ -1,0 +1,2165 @@
+{
+  "baseline_digest": "8b7618a28523c2b70c170b1711217ba1557094cc37a386ecf26de79e3e5f2e33",
+  "nodes": [
+    {
+      "id": "tests/test_cleanup.py::TestCleanup::test_fix_rows",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cleanup.py::TestCleanup::test_real_world_join_fail",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCli::test_exclude_ignores_unknown_names_but_reports_invalid_ranges",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCli::test_exclude_open_ended_range",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCli::test_ignore_unknown_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCli::test_match_column_identifier_numeric",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCli::test_match_column_identifier_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCli::test_match_column_which_could_be_integer_name_is_treated_as_positional_id",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCli::test_parse_column_identifiers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCli::test_range_notation",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCli::test_range_notation_open_ended",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_convert.py::TestConvert::test_guess_csv",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_convert.py::TestConvert::test_guess_dbf",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_convert.py::TestConvert::test_guess_fixed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_convert.py::TestConvert::test_guess_invalid",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_convert.py::TestConvert::test_guess_json",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_convert.py::TestConvert::test_guess_ndjson",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_convert.py::TestConvert::test_guess_xls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_convert.py::TestConvert::test_guess_xls_uppercase",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_convert.py::TestConvert::test_guess_xlsx",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_fixed.py::TestFixed::test_fixed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_fixed.py::TestFixed::test_fixed_no_inference",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_fixed.py::TestFixed::test_fixed_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_fixed.py::TestFixed::test_fixed_streaming",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_fixed.py::TestFixed::test_one_based_row_decoder",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_fixed.py::TestFixed::test_schema_decoder_in_action",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_fixed.py::TestFixed::test_schema_decoder_init",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_convert/test_fixed.py::TestFixed::test_schematic_line_parser",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grep.py::TestGrep::test_any_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grep.py::TestGrep::test_any_match_and_inverse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grep.py::TestGrep::test_column_names_in_patterns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grep.py::TestGrep::test_duplicate_column_ids_in_patterns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grep.py::TestGrep::test_index_out_of_range",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grep.py::TestGrep::test_inverse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grep.py::TestGrep::test_mixed_indices_and_column_names_in_patterns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grep.py::TestGrep::test_multiline",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grep.py::TestGrep::test_no_header",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grep.py::TestGrep::test_pattern",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grep.py::TestGrep::test_regex",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_changes_character_encoding",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_changes_line_endings",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_empty_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_empty_columns_long_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_empty_columns_short_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_empty_columns_zero",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_enable_all_checks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_fill_short_rows",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_fill_short_rows_separator",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_header_normalize_space",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_join_short_rows",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_join_short_rows_separator",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_label",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_label_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_label_default_stdin",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_no_header_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_remove_empty_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_remove_empty_columns_counts_omitted_rows",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_remove_empty_columns_no_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_remove_empty_columns_short_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_removes_bom",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_removes_optional_quote_characters",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_simple",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_delete_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_exclude",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_exclude_unknown_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_ignore_unknown_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_include_and_exclude",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_invalid_column",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_invalid_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_linenumbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_names_with_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_no_header_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_null_byte",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_ragged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_simple",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_truncate",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_unicode",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_with_bzip2",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvcut.py::TestCSVCut::test_with_gzip",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormat::test_asv",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormat::test_delimiter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormat::test_doublequote",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormat::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormat::test_escapechar",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormat::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormat::test_linenumbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormat::test_lineterminator",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormat::test_no_header_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormat::test_quotechar",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormat::test_skip_header",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormat::test_skip_header_no_header_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormat::test_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormat::test_tabs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_asv",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_delimiter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_doublequote",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_escapechar",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_linenumbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_lineterminator",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_locale",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_no_header_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_quotechar",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_skip_header",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_skip_header_no_header_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvformat.py::TestCSVFormatQuoteNonNumeric::test_tabs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_any_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_invalid_column",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_invalid_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_invert_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_kwargs_with_line_numbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_match_utf8",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_match_utf8_bom",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_match_with_line_numbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_no_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_re_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_re_match_utf8",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_string_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_blanks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_glob",
+      "kind": "TestCaseFunction",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_inner",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_join_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_left",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_left_short_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_no_blanks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_no_header_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_no_inference",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_outer",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_right",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_right_indices",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_sequential",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_single",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_sniff_limit_no_limit",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_sniff_limit_zero_limit",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_blanks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_duplicate_keys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_geojson_point",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_geojson_shape",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_geojson_with_crs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_geojson_with_id",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_geojson_with_no_bbox",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_indentation",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_keying",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_latlon_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_ndgeojson",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_ndgeojson_streaming",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_ndjson",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_ndjson_streaming",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_no_blanks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_no_header_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_no_inference",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_simple",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_sniff_limit",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_tsv",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_tsv_streaming",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_blanks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_encoding",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_linenumbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_max_column_width",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_max_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_max_precision",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_max_precision_no_number_ellipsis",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_max_rows",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_no_blanks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_no_header_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_no_inference",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_no_number_ellipsis",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_runs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_simple",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_sniff_limit_no_limit",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_sniff_limit_zero_limit",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_stdin",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_unicode",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvlook.py::TestCSVLook::test_unicode_bom",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_blanks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_encoding",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_ignore_case",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_invalid_column",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_invalid_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_no_blanks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_no_header_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_no_inference",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_runs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_sort_date",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_sort_string_reverse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_sort_t_and_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsort.py::TestCSVSort::test_stdin",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_before_after_insert",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_blanks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_create_if_not_exists",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_create_table",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_glob",
+      "kind": "TestCaseFunction",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_insert_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_linenumbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_no_blanks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_no_create_if_not_exists",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_no_header_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_no_inference",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_no_prefix_unique_constraint",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_prefix_unique_constraint",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_query",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_query_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_query_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_query_text",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_query_update",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_stdin",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_stdin_and_filename",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestCSVStack::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestCSVStack::test_explicit_grouping",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestCSVStack::test_filenames_grouping",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestCSVStack::test_glob",
+      "kind": "TestCaseFunction",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestCSVStack::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestCSVStack::test_multiple_file_stack",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestCSVStack::test_multiple_file_stack_col",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestCSVStack::test_multiple_file_stack_col_ragged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestCSVStack::test_multiple_file_stack_col_ragged_stdin",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestCSVStack::test_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestCSVStack::test_single_file_stack",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestCSVStack::test_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestCSVStack::test_skip_lines_stdin",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_explicit_grouping",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_filenames_grouping",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_glob",
+      "kind": "TestCaseFunction",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_grouped_filenames",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_grouped_filenames_and_named_column",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_grouped_manual_and_named_column",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_multiple_file_stack",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_multiple_file_stack_col",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_multiple_file_stack_col_ragged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_multiple_file_stack_col_ragged_stdin",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_no_header_row_basic",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_no_header_row_basic_stdin",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_single_file_stack",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstack.py::TestNoHeaderRow::test_skip_lines_stdin",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_count_only",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_csv",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_csv_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_decimal_format",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_encoding",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_format_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_freq",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_freq_count",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_freq_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_invalid_column",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_invalid_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_json",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_json_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_linenumbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_max_length",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_no_header_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_runs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_unique",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_add_bom",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_args",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_blanks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_csv",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_csv_with_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_dbf",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_geojson",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_json",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_ndjson",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_nested_json",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_tsv",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_tsv_streaming",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_xls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_xls_with_sheet",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_xls_with_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_xls_with_unicode_sheet",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_xls_with_write_sheets",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_xls_with_write_sheets_with_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_xlsx",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_xlsx_with_sheet",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_xlsx_with_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_xlsx_with_unicode_sheet",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_xlsx_with_write_sheets",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_convert_xlsx_with_write_sheets_with_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_csv_datetime_inference",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_csv_no_headers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_csv_no_headers_streaming",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_csv_no_inference",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_date_format",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_date_format_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_date_like_number",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_geojson_no_inference",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_json_no_inference",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_locale",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_names_xls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_names_xlsx",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_ndjson_no_inference",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_no_blanks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_no_leading_zeroes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_null_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_null_value_blanks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_numeric_date_format",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_numeric_date_format_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_version",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_xls_no_inference",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_xlsx_no_inference",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_sql2csv.py::TestSQL2CSV::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_sql2csv.py::TestSQL2CSV::test_encoding",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_sql2csv.py::TestSQL2CSV::test_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_sql2csv.py::TestSQL2CSV::test_file_with_query",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_sql2csv.py::TestSQL2CSV::test_launch_new_instance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_sql2csv.py::TestSQL2CSV::test_linenumbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_sql2csv.py::TestSQL2CSV::test_no_header_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_sql2csv.py::TestSQL2CSV::test_query",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_sql2csv.py::TestSQL2CSV::test_stdin",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_sql2csv.py::TestSQL2CSV::test_stdin_with_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_sql2csv.py::TestSQL2CSV::test_stdin_with_file_and_query",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_sql2csv.py::TestSQL2CSV::test_stdin_with_query",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_sql2csv.py::TestSQL2CSV::test_unicode",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utilities/test_sql2csv.py::TestSQL2CSV::test_wildcard_on_sqlite",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "csvkit",
+  "python": "3.12.15",
+  "schema": 1,
+  "subtests": [
+    {
+      "context": {
+        "kwargs": {
+          "args": "[]"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['--join-short-rows', '--fill-short-rows']"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvclean.py::TestCSVClean::test_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "[]"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['-c', '1']"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvgrep.py::TestCSVGrep::test_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "option": "'--left'"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_join_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "option": "'--right'"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_join_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "option": "'--outer'"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_join_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['-c1,2']"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['-c', '1', '--left', '--right']"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvjoin.py::TestCSVJoin::test_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "option": "'lat'"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_latlon_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "option": "'lon'"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_latlon_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "option": "'crs'"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_latlon_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "option": "'type'"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_latlon_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "option": "'geometry'"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvjson.py::TestCSVJSON::test_latlon_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['--no-create']"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_insert_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['--create-if-not-exists']"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_insert_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['--overwrite']"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_insert_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['--before-insert']"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_insert_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['--after-insert']"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_insert_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['--chunk-size', '1']"
+        },
+        "msg": null
+      },
+      "ordinal": 6,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_insert_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['--db', 'sqlite:///:memory:', '--dialect', 'sqlite']"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['--insert']"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['--db', 'sqlite:///:memory:', '--insert', '--no-create', '--overwrite']"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['--db', 'sqlite:///:memory:', '--insert', '--no-create', '--create-if-not-exists']"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvsql.py::TestCSVSQL::test_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "option": "'csv'"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_format_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "option": "'json'"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_format_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "option": "'count'"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_csvstat.py::TestCSVStat::test_format_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "[]"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_args",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['-']"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_args",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['dummy.unknown']"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_options",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "args": "['-n', 'dummy.csv']"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_utilities/test_in2csv.py::TestIn2CSV::test_options",
+      "when": "call"
+    }
+  ]
+}

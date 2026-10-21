@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "RH-U01",
+  "source_commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Forced nonterminal and color_system=None yield plain ready newline. A forced terminal with no_color=True removes color but can retain bold ANSI styling, so it does not guarantee no ANSI sequences. Explicit plain output must disable the color/style emission path rather than treating no_color as a universal plain-text switch.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,1 @@
+../deepdiff/docstrings/deephash_doc.rst

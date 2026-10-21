@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DC-U03",
+  "source_commit": "0573e6f96637f08fb4cb85e0552f0622d36827d4",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain shlex comment/escape rules and dropped empty fields, retain the quoted comma as one value, and describe per-item cast then post_process. Do not call the default helper a lossless standard CSV parser.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,245 @@
+==============
+Input Encoding
+==============
+
+:Author: Günter Milde
+:Discussions-To: docutils-develop@lists.sf.net
+:Status: Draft
+:Type: API
+:Created: 2022-07-02
+:Docutils-Version: 0.21, 0.22, 1.0 (see `open issues`_)
+:Replaces: undocumented behaviour in 0.19
+:Resolution: accepted (https://sourceforge.net/p/docutils/patches/194/)
+
+
+Abstract
+========
+
+When the `input_encoding`_ setting is not specified, Docutils uses
+a heuristic to determine or guess the source's encoding.
+
+The actual behaviour is not documented and depends on the Python version.
+
+
+Motivation
+==========
+
+  | Errors should never pass silently.
+  | Unless explicitly silenced.
+
+  -- ``import this``
+
+The behaviour of Docutils when the `input_encoding`_ configuration
+setting is kept at its default value ``None`` is currently suboptimal
+and underdocumented.
+
+If the source encoding cannot be determined from the source and
+decoding with UTF-8 fails, the source is decoded with the
+locale encoding or 'latin1' (hard-coded 2nd fallback),
+even in `UTF-8 mode`_.
+
+This leads to a character mix up (`mojibake`), if the file is actually
+corrupt UTF-8 or in another encoding (UTF-16 or a different legacy encoding)
+without reporting an error.
+
+
+Rationale
+=========
+
+The "hard coded" second fallback encoding "latin1" may have been
+practical in times where "latin1" was the most commonly used
+encoding for text files. It is far from optimal in times where using
+legacy 8-bit encodings without specifying them (via `input_encoding`_ or
+in the document) can be considered an error.
+
+The same holds for using a non-UTF-8 locale encoding as fallback when
+Python's `UTF-8 mode`_ is active.
+
+
+Specification
+=============
+
+.. Describe the syntax and semantics of any new feature.
+
+The encoding of a reStructuredText source is determined from the
+`input_encoding`_ setting or an `explicit encoding declaration`_
+(BOM or special comment).
+
+The default input encoding is UTF-8 (codec 'utf-8-sig').
+
+If the encoding is unspecified and decoding with UTF-8 fails,
+the `preferred encoding`_ is used as a fallback
+(if it maps to a valid codec and differs from UTF-8).
+
+
+Differences to the default behaviour of Python's `open()`:
+
+- The UTF-8 encoding is always tried first.
+  (This is almost sure to fail if the actual source encoding differs.)
+
+- An `explicit encoding declaration`_ takes precedence over
+  the `preferred encoding`_.
+
+- An optional BOM_ is removed from UTF-8 encoded sources.
+
+.. _preferred encoding:
+   https://docs.python.org/3/library/locale.html#locale.getpreferredencoding
+
+
+Explicit encoding declaration
+-----------------------------
+
+A `Unicode byte order mark` (BOM_) in the source is interpreted as
+encoding declaration.
+
+The encoding of a reStructuredText source file can also be given by a
+"magic comment" similar to :PEP:`263`.
+This makes the input encoding both *visible* and *changeable*
+on a per-source file basis.
+
+To declare the input encoding, a comment like ::
+
+  .. text encoding: <encoding name>
+
+must be placed into the source file either as first or second line.
+
+Examples: (using formats recognized by popular editors) ::
+
+  .. -*- mode: rst -*-
+     -*- coding: latin1 -*-
+
+or::
+
+  .. vim: set fileencoding=cp737 :
+
+More precisely, the first and second line are searched for the following
+regular expression::
+
+  coding[:=]\s*([-\w.]+)
+
+The first group of this expression is then interpreted as encoding name.
+If the first line matches the second line is ignored.
+
+
+Backwards Compatibility
+=======================
+
+.. Describe potential impact and severity on pre-existing code.
+
+The following incompatible changes are expected:
+
+- Only remove BOM (U+FEFF ZWNBSP at start of data), no other ZWNBSPs.
+
+  This is the behaviour known from the "utf-8-sig" and "utf-16" codecs_.
+
+- Raise UnicodeError (instead of decoding with 'latin1') if decoding the
+  source with UTF-8 fails and the locale encoding is None or "UTF-8".
+
+- Raise UnicodeError (instead of decoding with the locale encoding)
+  if Python is started in `UTF-8 mode`_.
+
+- Change the default input encoding from ``None`` (auto-detect) to
+  "utf-8" in Docutils 0.22.
+
+- Remove the input encoding auto-detection code in Docutils 1.0 or later.
+
+Announced in the RELEASE-NOTES_ in [r9326] 2023-02-06.
+
+
+Security Implications
+=====================
+
+No security implications are expected.
+
+
+How to Teach This
+=================
+
+* Document the specification_. ✓
+
+* Document the `special comment`. ✓
+
+
+Reference Implementation
+========================
+
+.. Link to any existing implementation and details about its state, e.g.
+   proof-of-concept.
+
+
+Rejected Ideas
+==============
+
+.. Why certain ideas that were brought while discussing this proposal
+   were not ultimately pursued.
+
+* Keep the auto-detection (as opt-in or as default)?
+
+  +1  convenient for users with differently encoded sources
+  +1  keep "source code encoding both visible and
+      changeable on a per-source file basis". [:PEP:`263`]
+  -1  complicates code
+
+  → "Outsourced" to the "`inspecting codecs`_" package.
+
+
+Open Issues
+===========
+
+Better feedback
+
+* Warning or Error, when `input_encoding` value differs from the
+  encoding declared in the source (BOM or special comment).
+
+* More helpful report of UnicodeDecodeError
+
+  - Hint at "input_encoding_error_handler"?
+
+  - Report the line number of the undecodable character.
+
+  - Print context around the undecodable character
+    (decode with "replace" error handler, print slice around error)?
+
+
+References
+==========
+
+`<input-encoding-tests.py>`_
+  Script for the exploration of the handling of input encoding
+  in Python and Docutils.
+
+Patches #194 Deprecate PEP 263 coding slugs support
+  https://sourceforge.net/p/docutils/patches/194/
+
+_`Inspecting codecs`:
+  | Codecs that determine the encoding by looking for a BOM
+    or encoding declaration.
+  | https://codeberg.org/milde/inspecting-codecs
+
+.. _input_encoding:
+    https://docutils.sourceforge.io/docs/user/config.html#input-encoding
+.. _RELEASE-NOTES:
+    https://docutils.sourceforge.io/RELEASE-NOTES.html
+
+.. _UTF-8 mode: https://docs.python.org/3/library/os.html#utf8-mode
+.. _codecs:
+    https://docs.python.org/3/library/codecs.html#encodings-and-unicode
+.. _BOM: https://docs.python.org/3/library/codecs.html#codecs.BOM
+
+
+Copyright
+=========
+
+This document is placed in the public domain or under the
+CC0-1.0-Universal license, whichever is more permissive.
+
+
+
+..
+    Local Variables:
+    mode: indented-text
+    indent-tabs-mode: nil
+    sentence-end-double-space: t
+    fill-column: 70
+    coding: utf-8
+    End:

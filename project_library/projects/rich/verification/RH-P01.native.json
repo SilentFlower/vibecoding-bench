@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "RH-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "default_text_export_clears_later_artifact_content": true,
+    "multiple_exports_can_share_an_explicit_record_lifetime": true
+  },
+  "resource_profile": "business"
+}

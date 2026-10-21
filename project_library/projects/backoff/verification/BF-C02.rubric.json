@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BF-C02",
+  "source_commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The giveup detail dict includes original kwargs with the synthetic password plus actual exception/tries/target. loggerNone disables the default logger but does not remove fields from a user callback. Emit an explicit allowlist of coarse fields; avoid raw args/kwargs and arbitrary exception text. No real secret or automatic redaction guarantee is established.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

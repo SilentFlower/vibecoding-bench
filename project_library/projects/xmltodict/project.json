@@ -1,0 +1,393 @@
+{
+  "schema": 2,
+  "project_key": "xmltodict",
+  "title": "XML订单交换工作场景",
+  "category": "结构化数据与流式导入",
+  "description": "固定真实XML源码上的订单结构、取证、命名空间、输出保真和分块读取；五场景十一任务。",
+  "seed_digest": "ef3fbb39effc4a84d89f2a7410f56b66c9b03725279d8ecf442a4936b0a1f59b",
+  "environment": "xmltodict-py312",
+  "source": {
+    "repository": "https://github.com/martinblech/xmltodict",
+    "commit": "6e29fba282e68631034dd2722a413b4e35276584",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "XD-S01",
+      "title": "订单数据的结构与业务校验",
+      "goal": "识别真实解析形状和业务验证边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "XD-U01",
+            "XD-C01",
+            "XD-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XD-U01",
+          "kind": "understand",
+          "goal": "解释订单属性、文本及单多结构",
+          "prompt": "Trace both supplied order XML documents through the pinned default parser. Explain attribute names, text and quantity types, and why a single order and repeated orders have different Python shapes. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/order-single.xml",
+            "materials/order-many.xml"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XD-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "XD-C01",
+          "kind": "consult",
+          "goal": "用已有force_list统一订单集合",
+          "prompt": "Recommend an existing API policy that exposes orders as a list for both supplied documents. Compare force_list names and a path-aware callable without making every XML node a list. Decide whether a library modification is needed.",
+          "requires": [],
+          "materials": [
+            "materials/order-single.xml",
+            "materials/order-many.xml"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XD-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "XD-P01",
+          "kind": "plan",
+          "goal": "规划订单解析与业务验证边界",
+          "prompt": "Plan an order-import validation workflow for the supplied business requirements. Separate XML syntax, shape normalization, required IDs, positive integral quantities, duplicate handling and commit policy. Use existing parsing APIs; do not implement a library change.",
+          "requires": [],
+          "materials": [
+            "materials/order-single.xml",
+            "materials/import-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan_no_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XD-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "XD-S02",
+      "title": "缺字段诊断与命名空间映射",
+      "goal": "先取实际证据再选择已有命名空间能力",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "XD-D01",
+            "XD-C02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "XD-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "XD-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XD-D01",
+          "kind": "diagnose",
+          "goal": "先取完整解析证据再判断缺字段",
+          "prompt": "Investigate the supplied KeyError symptom. Request the actual XML, parse options and failing access or an equivalent minimal reproduction before assigning a cause. Diagnose only evidence actually supplied later. If it cannot be supplied, state the limit and a concrete evidence plan. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/missing-key.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XD-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "parse-evidence",
+              "when": "The actual XML, parse options and failing access have not been disclosed, the conversation does not say they are unavailable, and the answer reasonably requests them or an equivalent sufficient reproduction. Supply the complete reproduction together.",
+              "materials": [
+                "disclosure/order-namespaced.xml",
+                "disclosure/namespace-call.py",
+                "disclosure/namespace-error.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "XD-C02",
+          "kind": "consult",
+          "goal": "用URI映射稳定命名空间业务键",
+          "prompt": "Using the complete supplied namespace reproduction, explain the actual dictionary keys with process_namespaces enabled. Recommend a valid existing URI mapping to a short namespace or to no namespace, explain collision tradeoffs, and decide whether the library needs modification.",
+          "requires": [],
+          "materials": [
+            "materials/order-namespaced.xml",
+            "materials/namespace-call.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XD-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "XD-S03",
+      "title": "空元素输出与XML保真",
+      "goal": "区分数据模型和词法文档需求",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "XD-U02",
+            "XD-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XD-U02",
+          "kind": "understand",
+          "goal": "区分空列表省略与显式空元素",
+          "prompt": "Explain which XML elements the supplied unparse call actually writes for [], None, [None] and [\"\"]. Distinguish an omitted element from an explicit empty element. Do not edit the library.",
+          "requires": [],
+          "materials": [
+            "materials/empty-output.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XD-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "XD-C03",
+          "kind": "consult",
+          "goal": "判断混合内容与词法保真需求",
+          "prompt": "Assess the supplied publishing roundtrip requirement and mixed-content document. Compare actual parse/unparse behavior with byte-for-byte preservation of order, whitespace and prefixes. Explain whether existing xmltodict guarantees suffice and recommend an appropriate application/tool boundary.",
+          "requires": [],
+          "materials": [
+            "materials/mixed.xml",
+            "materials/roundtrip-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XD-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "XD-S04",
+      "title": "同步分块输入与消费控制",
+      "goal": "独立诊断和增强普通分块Iterator",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "XD-D02",
+            "XD-M01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "XD-D02"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "XD-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XD-D02",
+          "kind": "diagnose",
+          "goal": "定位普通分块迭代器的输入分派差异",
+          "prompt": "Trace the complete chunk-input reproduction. Explain why the generator succeeds and the ordinary list_iterator raises TypeError in the pinned parse implementation. Locate the dispatch boundary and describe the requested behavior as an input enhancement, preserving the successful input path. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/chunk-input.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XD-D02.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-D02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "XD-M01",
+          "kind": "modify",
+          "goal": "支持同步分块Iterator并保留消费边界",
+          "prompt": "Implement the complete public synchronous Iterator enhancement. Preserve the exact existing input, error, callback and namespace contracts, and avoid whole-source buffering. Modify only the authorized implementation and public test file; add meaningful public original-failing tests.",
+          "requires": [],
+          "materials": [
+            "materials/chunk-input.py",
+            "materials/iterator-contract.md"
+          ],
+          "allowed_paths": [
+            "library/xmltodict.py",
+            "library/tests/test_xmltodict.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XD-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "XD-S05",
+      "title": "逐条订单回调与导入策略",
+      "goal": "明确流式消费、停止和提交边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "XD-C04",
+            "XD-P02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XD-C04",
+          "kind": "consult",
+          "goal": "区分分块输入、逐项回调与返回值",
+          "prompt": "Explain the supplied streamed order call: which items reach the callback, what parse returns, how item_depth chooses the item boundary, and how a false callback stops parsing. Does chunked input by itself make parse return a lazy order iterator? Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/stream-orders.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XD-C04.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-C04.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "XD-P02",
+          "kind": "plan",
+          "goal": "规划有界逐项验证与中止策略",
+          "prompt": "Plan the local bounded order-processing workflow described in the supplied materials. Cover item_depth/callback, per-item validation, source stopping, memory limits and partial versus atomic commit. Use existing APIs without implementing a library change.",
+          "requires": [],
+          "materials": [
+            "materials/stream-orders.py",
+            "materials/stream-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan_no_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XD-P02.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-P02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

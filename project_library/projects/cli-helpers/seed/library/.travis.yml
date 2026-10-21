@@ -1,0 +1,30 @@
+sudo: false
+language: python
+cache: pip
+install: ./.travis/install.sh
+script:
+  - source ~/.venv/bin/activate
+  - tox
+  - if [[ "$TOXENV" == "py37" ]]; then black --check cli_helpers tests ; else echo "Skipping black for $TOXENV"; fi
+matrix:
+  include:
+    - os: linux
+      python: 3.6
+      env: TOXENV=py36
+    - os: linux
+      python: 3.6
+      env: TOXENV=noextras
+    - os: linux
+      python: 3.6
+      env: TOXENV=docs
+    - os: linux
+      python: 3.6
+      env: TOXENV=packaging
+    - os: osx
+      language: generic
+      env: TOXENV=py36
+    - os: linux
+      python: 3.7
+      env: TOXENV=py37
+      dist: xenial
+      sudo: true

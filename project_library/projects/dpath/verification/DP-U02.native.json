@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DP-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "set_updates_existing_matches_while_new_creates_literal_structure": true
+  },
+  "resource_profile": "business"
+}

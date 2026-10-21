@@ -1,0 +1,1 @@
+A report no longer displays some product identifiers exactly as stored. The original values, tabulate call and output are not available yet. Do not assume coercion, corruption or a formatting defect from this symptom alone.

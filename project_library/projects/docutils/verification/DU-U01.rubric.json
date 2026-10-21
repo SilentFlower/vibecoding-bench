@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DU-U01",
+  "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The lone first top-level section is promoted to the document title by default, so no section node remains for that heading. Disabling doctitle_xform retains a section and its title. This is a configured transform, not missing text or a parser corruption.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

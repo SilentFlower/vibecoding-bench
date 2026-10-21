@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DU-C03",
+  "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Trusted raw produces a raw node; raw_enabled=False rejects that directive. A normal synthetic include reads its fragment, while file_insertion_enabled=False prevents that include and emits a disabled-directive warning. Disable both for the stated restriction; neither switch alone establishes a full OS sandbox, arbitrary plugin safety or output sanitization.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

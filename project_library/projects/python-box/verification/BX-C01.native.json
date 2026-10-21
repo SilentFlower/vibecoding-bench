@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BX-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "conversion_collisions_can_be_rejected_or_bypassed_explicitly": true
+  },
+  "resource_profile": "business"
+}

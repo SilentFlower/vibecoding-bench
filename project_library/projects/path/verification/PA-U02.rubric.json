@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PA-U02",
+  "source_commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "This Path.glob delegates without recursive=True; ** is not recursive here. It matches the one-level level/b.txt and skip/secret.txt, while walkfiles recursively includes a.txt, those two and level/deep/c.txt. Do not attribute pathlib recursive-glob behavior to this API.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TZ-U01",
+  "source_commit": "451af60dec590a6010e2babdbf391ea8f815122f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "compose(double,increment)(3) applies increment then double and yields8; pipe(3,double,increment) applies double then increment and yields7. compose is right-to-left function composition, while pipe passes its data through listed functions left-to-right.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

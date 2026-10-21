@@ -1,0 +1,1 @@
+Use the supplied invalid configuration and configspec with preserve_errors=True, then flatten_errors. Inspect bool(result), result is True, section paths, missing required values and actual exception types. Separately add extra=spare to the valid configuration and compare get_extra_values before and after validate. Do not read real configuration or environment files.

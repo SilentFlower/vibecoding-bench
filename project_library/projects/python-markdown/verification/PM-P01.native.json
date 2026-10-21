@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PM-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "inert_raw_html_is_preserved": true,
+    "reset_separates_document_state": true
+  },
+  "resource_profile": "business"
+}

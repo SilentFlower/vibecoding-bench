@@ -1,0 +1,1 @@
+Construct separate ConfigObj instances from the supplied line lists and configspec, then validate each with Validator(). Compare ordinary validate with validate(copy=True). Inspect actual port/enabled/workers Python values, section.defaults and write() output without a filename. The application wants the default workers=2 to appear in the generated output, using existing APIs.

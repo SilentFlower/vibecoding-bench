@@ -1,0 +1,1 @@
+A batch import ended with an error, but some orders were already visible. The source iterator, chunk size/strict setting, loop, side-effect ordering and transaction boundaries have not been supplied. Investigate before deciding the cause.

@@ -1,0 +1,150 @@
+{
+  "project": "agate",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+  "source_file_count": 250,
+  "license_files": [
+    "seed/library/COPYING"
+  ],
+  "scenarios": 4,
+  "unique_tasks": 9,
+  "modify_tasks": 0,
+  "non_modify_tasks": 9,
+  "native_baseline": {
+    "project": "agate",
+    "attempt": 1,
+    "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/agate/result.json",
+    "result_sha256": "686dd1cf18c93d2112c995ba7b46c4b4c107ddefe328d95ee3e603b4cc70c94a",
+    "main_collected": 396,
+    "counts": {
+      "passed": 396,
+      "failed": 0,
+      "error": 0,
+      "skipped": 0,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "subtest_count": 0,
+    "xml_testcases": 396,
+    "xml_skipped": 0,
+    "runner_sha256": "234856de282a61843bd58d1f8e7eb21ce4a07fcf8ca26a5eb903f891287fd988",
+    "contract_sha256": "28597d92d2c9d69a414b972251211a46d909d069f97dc3bee8f1977fa244a8b8",
+    "fixture_aliases": [],
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "当前目标镜像的原生基线，业务及产品链另验；原失败留存"
+  },
+  "verified_unique_native_cases": 8,
+  "native_evidence": [
+    {
+      "case": "original-AG-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/agate/attempt-001/original-AG-C01.json",
+      "sha256": "3646daecc8edee2a9aa08fc553b86275cefcb3852f0652200c90bc8fdd7fc6fd",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-AG-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/agate/attempt-001/original-AG-C02.json",
+      "sha256": "e2b3882bf0f87ed73c7532b2d0a0f0763dd1058c1d19e984f410ef5b27ecc7a4",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-AG-C03",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/agate/attempt-001/original-AG-C03.json",
+      "sha256": "697a15bf6e5a0dbcff7d7ff64a718d0e5fc49f432cf0751582c846fc3a20f077",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-AG-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/agate/attempt-001/original-AG-P01.json",
+      "sha256": "745f1d048af400f91eac1b15962454278cadd099615cf1c038ebc92dc685c970",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-AG-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/agate/attempt-001/original-AG-U01.json",
+      "sha256": "55168f036f8a62992bec28dbcc98f0cb418d40950686683cd83f611a21c0a380",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-AG-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/agate/attempt-001/original-AG-U02.json",
+      "sha256": "8210bdc044902a64582c7d79080a55b87036c1471fc98580a72bae49f6b3214d",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-AG-U03",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/agate/attempt-001/original-AG-U03.json",
+      "sha256": "d45deb6fc5c642476b796582b3c18918c475c608c7c4bdbc9b81daaee735239c",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-AG-U04",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/agate/attempt-001/original-AG-U04.json",
+      "sha256": "9775cb1e7dac3d1c5e3875150d8c9ef11af96549786c616bb5734d93deb36857",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-01/business/agate/attempt-001/summary.json",
+      "sha256": "a925cd351b469a9de9cbd589af6795f1f54ffe97f889584201113963e7eeeba4",
+      "passed": true
+    }
+  ],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v10-en",
+  "formal_digest": "9931064d6dfa5abb4b4856ab104b64bf49d948deab7c8480477d71854fa5bbf9",
+  "full_delivery_files": 9729,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-009/run-001/evidence/result.json",
+      "sha256": "2f6f0ab8872ea86a790b61e23c0604b1b87c2feee3f33f131e13f76d155fb9ba"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-009/run-001/cleanup.json",
+      "sha256": "f23e8bafe7da9b2718c628406086fa8739b498f0ffe74eb2b955934ed70d6462"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/mock-batch-009-audit.json",
+      "sha256": "3a71435afbe35542316c3a2dc9dbc64f3be5351fba46c20d4b8b293cc1f5996c"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-009/browser/run-001/diagnostics/result.json",
+      "sha256": "ccb1be792e15afd387256f3b83dc22febf6151ed9ce0e573debedb6028e8ef81"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/delivery-first-twenty.json",
+      "sha256": "acad167eb1c39a82082183e6d8b1bdf6ee317e2a9290f95cfd1da837f91b42cd"
+    }
+  ]
+}

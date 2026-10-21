@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "XD-C03",
+  "source_commit": "6e29fba282e68631034dd2722a413b4e35276584",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Demonstrate or correctly explain the mixed-content order limitation and distinguish data-oriented mappings from lexical XML editing. Do not claim byte-perfect preservation, silently strip meaningful mixed text, or label an unpromised guarantee a defect requiring a patch.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use actual supplied materials and pinned source, respect authorization and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

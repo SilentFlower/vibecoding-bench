@@ -1,0 +1,327 @@
+{
+  "schema": 2,
+  "project_key": "boltons",
+  "title": "Boltons批处理与数据清理工作场景",
+  "category": "记录处理与迭代工具",
+  "description": "固定真实源码上的重复报告、falsey key修复、分批、嵌套记录和JSONL导入方案；四场景十任务。",
+  "seed_digest": "8b27857287b3a2ff35a5474654e914ce7c033627d0e521f076c92ef0f3ed9e9b",
+  "environment": "boltons-py312",
+  "source": {
+    "repository": "https://github.com/mahmoud/boltons",
+    "commit": "4e5faa3d7e4008d89e0d8bf1ea87b6d9a061a16d",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "BO-S01",
+      "title": "业务重复项报告与归一化",
+      "goal": "解释报告语义并独立修复falsey key",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BO-U01",
+            "BO-C01",
+            "BO-D01",
+            "BO-M01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "BO-D01"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "BO-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BO-U01",
+          "kind": "understand",
+          "goal": "解释唯一项与首个重复项报告",
+          "prompt": "Trace the supplied unique/redundant calls with str.lower. Explain which original values are returned, how groups=True includes the first member, and the actual ordering of redundant groups. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/redundancy.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BO-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BO-C01",
+          "kind": "consult",
+          "goal": "用已有key选择业务重复规则",
+          "prompt": "Recommend an existing API policy for a case-insensitive duplicate report that retains original business values and input order. Compare unique and redundant report needs and state retained-state limits without implementing a library change.",
+          "requires": [],
+          "materials": [
+            "materials/redundancy.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BO-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BO-D01",
+          "kind": "diagnose",
+          "goal": "定位falsey归一化函数被忽略",
+          "prompt": "Use the complete supplied CaseKey reproduction. Explain why a callable accepted by validation still produces a different duplicate report when its own truth value is false. Locate the exact execution boundary and preserve normal callable behavior. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/redundancy.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BO-D01.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-D01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BO-M01",
+          "kind": "modify",
+          "goal": "修复falsey key并保护分组和错误语义",
+          "prompt": "Implement the complete public falsey-key contract for redundant, including grouped output and zero-length callables over unhashable records. Preserve original values/order, None/default and errors. Modify only the authorized implementation/test files with meaningful original-failing public tests.",
+          "requires": [],
+          "materials": [
+            "materials/redundancy.py",
+            "materials/key-contract.md"
+          ],
+          "allowed_paths": [
+            "library/boltons/iterutils.py",
+            "library/tests/test_iterutils.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BO-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BO-S02",
+      "title": "有限源的批次消费",
+      "goal": "明确惰性、尾批与提交策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BO-U02",
+            "BO-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BO-U02",
+          "kind": "understand",
+          "goal": "解释惰性分批和显式尾批填充",
+          "prompt": "Trace the supplied controlled finite source. Explain when chunked_iter consumes records, the first batch, the final short batch and the difference between omitted fill and explicit fill=None. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/batches.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BO-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BO-P01",
+          "kind": "plan",
+          "goal": "规划本地批处理的消费与提交边界",
+          "prompt": "Plan the supplied finite batch-processing workflow with batch size, final-batch policy, validation, source/downstream errors and explicit commit/staging semantics. State memory limits and use current helpers without implementing changes.",
+          "requires": [],
+          "materials": [
+            "materials/batches.py",
+            "materials/batch-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan_no_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BO-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BO-S03",
+      "title": "嵌套记录的清理和访问",
+      "goal": "保留实际业务空值并区分路径缺失",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BO-U03",
+            "BO-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BO-U03",
+          "kind": "understand",
+          "goal": "解释递归清理时None与其他空值",
+          "prompt": "Trace the supplied remap call. Explain which nested values are removed, what happens to 0/False/empty text and whether the original record is mutated. Describe the visit return shorthand accurately. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/nested-record.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BO-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BO-C02",
+          "kind": "consult",
+          "goal": "用路径默认哨兵区分缺失和None",
+          "prompt": "Recommend an existing get_path policy that distinguishes an existing None value from a missing nested path and reports an actual missing-path error when required. Explain a unique sentinel versus default=None without changing files.",
+          "requires": [],
+          "materials": [
+            "materials/nested-record.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BO-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BO-S04",
+      "title": "本地JSONL的读取与审计",
+      "goal": "按真实错误和顺序选择导入策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BO-U04",
+            "BO-P02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BO-U04",
+          "kind": "understand",
+          "goal": "核对JSONL坏行与反向读取顺序",
+          "prompt": "Trace the supplied JSONL using the real JSONLIterator in strict, ignore_errors and reverse modes. Explain blank lines, where strict iteration stops and the order of valid values when skipping errors. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/records.jsonl",
+            "materials/jsonl-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BO-U04.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-U04.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BO-P02",
+          "kind": "plan",
+          "goal": "规划可审计的本地JSONL导入",
+          "prompt": "Plan the supplied auditable JSONL import with an explicit malformed-line policy, record schema validation and publication semantics. Choose current iterator convenience or application line-by-line JSON parsing where needed; do not add a library API or implement changes.",
+          "requires": [],
+          "materials": [
+            "materials/records.jsonl",
+            "materials/jsonl-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan_no_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BO-P02.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-P02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

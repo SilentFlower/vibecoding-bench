@@ -1,0 +1,1 @@
+Complete synthetic sequence: Console(file=StringIO(),record=True,force_terminal=False); console.print("invoice-marker"); text=console.export_text(); html=console.export_html(). No clear argument was supplied to either export. The text contains the marker; the later HTML has its document scaffold but not the marker.

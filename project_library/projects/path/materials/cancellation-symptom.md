@@ -1,0 +1,1 @@
+A rewrite was cancelled and the original file content was not available afterward. The API used, exact exception, file modes, backup options and reader/writer lifecycle have not been supplied. Obtain sufficient evidence before attributing the incident.

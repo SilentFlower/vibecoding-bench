@@ -1,0 +1,1 @@
+A synthetic polling target always returns[]. Use on_predicate(constant,interval=0,jitter=None,max_tries=3,logger=None), with its default predicate. Determine calls and returned value on exhaustion; application success requires a nonempty result. Do not assume absence of an exception proves successful polling.

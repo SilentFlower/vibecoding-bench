@@ -1,0 +1,1 @@
+This is the complete synthetic reproduction. It prints ValueError followed by [0, 1, 2, 3]. Each list append completes before requesting the next batch; no transaction or undo operation is present. No production database or account is involved.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AG-D01",
+  "source_commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Initially request sufficient left/right rows or cardinality evidence, exact join arguments and intended relationship. Attribute only disclosed reproduction behavior to pinned join semantics; no invented duplicate keys, production data or library defect. insufficient_information is valid when evidence cannot be supplied.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,293 @@
+{
+  "schema": 2,
+  "project_key": "python-markdown",
+  "title": "Python-Markdown文档发布工作场景",
+  "category": "文档转换与发布",
+  "description": "固定真实源码上的多文章取证、发布策略、中文目录和明确扩展入口八项独立只读任务。",
+  "seed_digest": "9556133a4aca134d366decb284123a77b9ab85a2eace45659d7a2b0b001f75c8",
+  "environment": "python-markdown-py312",
+  "source": {
+    "repository": "https://github.com/Python-Markdown/markdown",
+    "commit": "b41e0aaf1181f1a8cb200cf5a815aad7c0020d23",
+    "license_files": [
+      "seed/library/LICENSE.md"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PM-S01",
+      "title": "独立文章转换会话",
+      "goal": "区分文档状态与证据充分的内容串入诊断",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PM-U01",
+            "PM-D01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "PM-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "PM-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PM-U01",
+          "kind": "understand",
+          "goal": "解释多文档复用实例和reset边界",
+          "prompt": "Trace the supplied complete converter program. Explain why the second independent document differs before/after reset and how separate instances compare. Does convert automatically reset registered extension state between documents? Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/documents.py",
+            "materials/document-lifecycle.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PM-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/PM-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PM-D01",
+          "kind": "diagnose",
+          "goal": "先取转换生命周期再判断文章内容串入",
+          "prompt": "Investigate the supplied foreign-content symptom. Request actual converter construction/reuse, extensions and full input/output sequence or an equivalent reproduction before assigning a cause. Diagnose disclosed evidence only and state the evidence limit if unavailable. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/foreign-content-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PM-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "document-evidence",
+              "when": "The actual converter lifecycle, extension configuration and complete input/output sequence have not been disclosed, the conversation does not say they are unavailable, and the answer reasonably requests a sufficient reproduction.",
+              "materials": [
+                "disclosure/documents.py",
+                "disclosure/document-events.md"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PM-S02",
+      "title": "文档与访客内容发布",
+      "goal": "按明确业务信任边界规划渲染和输出策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PM-C01",
+            "PM-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PM-C01",
+          "kind": "consult",
+          "goal": "区分原始HTML渲染和业务输出策略",
+          "prompt": "Explain the supplied inert raw span versus its code-span form and assess the two explicitly stated publishing policies. Does Markdown conversion itself sanitize arbitrary HTML? Recommend the appropriate application boundary without installing tools or editing files.",
+          "requires": [],
+          "materials": [
+            "materials/raw-content.md",
+            "materials/content-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PM-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/PM-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PM-P01",
+          "kind": "plan",
+          "goal": "规划两种发布渠道和独立文档生命周期",
+          "prompt": "Plan the supplied trusted-article and visitor-comment publishing channels using current renderer capabilities. Cover extension selection, document state isolation, explicit output policy and verification examples, while identifying the missing approved output-treatment choice. Do not implement changes.",
+          "requires": [],
+          "materials": [
+            "materials/publication-plan.md",
+            "materials/content-policy.md",
+            "materials/document-lifecycle.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_with_explicit_boundaries"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PM-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/PM-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PM-S03",
+      "title": "文章目录和中文锚点",
+      "goal": "用现有目录层级与回调满足发布要求",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PM-U02",
+            "PM-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PM-U02",
+          "kind": "understand",
+          "goal": "解释文章目录层级、重复锚点和深度",
+          "prompt": "Trace the supplied outline with TocExtension(toc_depth=\"1-2\"). Give actual nested toc_tokens ids for Cafe and the duplicate Menu headings. Explain whether excluding level3 from the TOC also removes its heading from body HTML. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/outline.md",
+            "materials/outline-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PM-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/PM-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PM-C02",
+          "kind": "consult",
+          "goal": "用已有Unicode回调满足中文锚点策略",
+          "prompt": "Meet the supplied Chinese-anchor requirement with existing TocExtension configuration. Explain duplicate Chinese headings, current article uniqueness and what must remain an explicit application convention across combined documents. No changes are authorized.",
+          "requires": [],
+          "materials": [
+            "materials/outline-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PM-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/PM-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PM-S04",
+      "title": "扩展加载和输出格式",
+      "goal": "在真实源码环境选择已有明确入口",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PM-U03",
+            "PM-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PM-U03",
+          "kind": "understand",
+          "goal": "解释显式表格扩展和序列化格式选择",
+          "prompt": "Compare the supplied table input with no extension and an explicit TableExtension instance. Then explain the horizontal-rule output under html versus xhtml formats. Distinguish these current choices from a requested parser change. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/table.md",
+            "materials/extensions-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PM-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/PM-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PM-C03",
+          "kind": "consult",
+          "goal": "在仅源码环境用已有明确扩展入口",
+          "prompt": "Explain the supplied source-only extension-loading situation and select a current API that works without installed distribution entry-point metadata. Compare a short alias, full module string and an explicit extension instance. Do not alter the loader or install a different Markdown copy.",
+          "requires": [],
+          "materials": [
+            "materials/table.md",
+            "materials/extensions-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PM-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/PM-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

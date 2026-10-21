@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PM-P01",
+  "source_commit": "b41e0aaf1181f1a8cb200cf5a815aad7c0020d23",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Separate channel trust/policy explicitly, configure actual extensions, reset or isolate renderers per document, and apply the approved output policy before publication. Include multi-document and raw/code HTML regression examples and identify unprovided treatment decisions. Do not claim conversion sanitizes output, a safe-mode flag exists, or an external treatment has already been validated.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,1 @@
+The synthetic reproduction reuses one renderer for two independent articles. The second output before reset contains first-note although its own input contains no footnote definition; after reset the same input retains a literal unresolved reference and no first-note. No concurrency or production cache facts are supplied.

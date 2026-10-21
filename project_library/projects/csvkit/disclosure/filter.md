@@ -1,0 +1,1 @@
+Complete synthetic input: id,status,note; rows A,hit,miss / B,miss,hit / C,hit,hit. The command is csvgrep -c status,note -m hit input.csv. Compare the identical input/command with -a appended. No prior cleaning or other flags are present.

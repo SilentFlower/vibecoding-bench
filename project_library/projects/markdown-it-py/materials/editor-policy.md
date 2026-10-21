@@ -1,0 +1,1 @@
+Parse the supplied three-line document with MarkdownIt(). Inspect opening/inline/closing tokens, nesting, inline.children, and actual map values. An editor wants to map rendered selections back to original source. Distinguish line ranges from a complete character/byte-offset map; no parser change or implementation is authorized.

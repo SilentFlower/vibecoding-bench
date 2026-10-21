@@ -1,0 +1,15 @@
+environment:
+  matrix:
+    - PYTHON: "C:\\Python36"
+    - PYTHON: "C:\\Python37"
+
+build: off
+
+before_test:
+  - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
+  - pip install -r requirements-dev.txt
+  - pip install -e .
+test_script:
+  - pytest --cov-report= --cov=cli_helpers
+  - coverage report
+  - codecov

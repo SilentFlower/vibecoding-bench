@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CT-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "file_hit_and_expiry": true,
+    "invalid_json_not_cached": true
+  },
+  "resource_profile": "business"
+}

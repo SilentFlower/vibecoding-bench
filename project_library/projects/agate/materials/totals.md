@@ -1,0 +1,1 @@
+Typed rows(region:Text,amount:Number)=(east,2),(east,None),(west,3). Compare Sum(amount), Count(), Count(amount), Count(amount,None), and group_by(region).aggregate with total/present/rows. Separately compare a two-row all-None Number column and a two-row all-zero Number column. A report needs amount totals and measurement completeness, not fabricated zero measurements.

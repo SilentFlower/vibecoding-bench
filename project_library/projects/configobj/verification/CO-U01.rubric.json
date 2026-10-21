@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CO-U01",
+  "source_commit": "b7707c94c0317b8f89b704a01525a68eb6c72521",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Successful validation returns the singleton True, converts port to int8000 and enabled to False, and supplies int workers2. Existing ConfigObj validation may update the configuration values; it is not a detached report with no mutation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

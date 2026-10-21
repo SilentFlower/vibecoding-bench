@@ -1,0 +1,23 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BO-M01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "falsey_callable_respected": true,
+    "falsey_group_mode_preserved": true,
+    "zero_length_callable_handles_records": true,
+    "none_default_preserved": true,
+    "invalid_and_key_errors_preserved": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

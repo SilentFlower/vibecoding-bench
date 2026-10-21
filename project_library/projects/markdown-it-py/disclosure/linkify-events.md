@@ -1,0 +1,1 @@
+The complete synthetic reproduction runs with the frozen linkify-it-py dependency available. Its initial commonmark core chain does not include linkify; setting the option alone leaves the URL as text. Explicit enable("linkify") causes the supplied URL to become a link. No URL is fetched.

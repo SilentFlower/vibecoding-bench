@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DD-U01",
+  "source_commit": "79e4379278b1cfdd8e9e3dccac364956908e8989",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With ignoreOrderTrue alone,the comparison is empty despite changed counts. Adding reportRepetitionTrue reports1 from2to1 and2 from1to2,with original/new indexes in the report. Order-insensitive comparison and multiset count preservation are independent business policies; inputs remain unchanged.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

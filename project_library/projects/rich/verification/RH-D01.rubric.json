@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "RH-D01",
+  "source_commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Initially request enough construction/record, render and export/clear evidence; visible terminal output alone does not establish export buffer state. Explain only the disclosed reproduction and existing compatible remedy, or accept insufficient_information. Do not assume a hidden first export or that empty content means the HTML string itself is empty.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

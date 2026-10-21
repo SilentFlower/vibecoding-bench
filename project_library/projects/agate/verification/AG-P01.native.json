@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AG-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "duplicate_dimension_matches_expand_measures": true,
+    "require_match_rejects_missing_not_duplicate_keys": true
+  },
+  "resource_profile": "business"
+}

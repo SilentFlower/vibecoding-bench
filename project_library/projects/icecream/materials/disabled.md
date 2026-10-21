@@ -1,0 +1,1 @@
+Disable a fresh debugger. costly() appends called to a synthetic effects list and returns7. Evaluate debugger(costly()). A production path must avoid executing optional expensive work when debugging is disabled. Explain actual output/return/effect behavior and how to own the evaluation boundary without implementation.

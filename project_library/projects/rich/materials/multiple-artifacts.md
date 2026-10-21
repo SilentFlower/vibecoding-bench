@@ -1,0 +1,1 @@
+A report renders <invoice> once and needs both text and HTML from that same recorded output. Plan explicit record ownership, clear=False/true lifecycle, escaping expectations and limits of already cropped output. Distinguish capture from record; do not write output files or implement a new exporter.

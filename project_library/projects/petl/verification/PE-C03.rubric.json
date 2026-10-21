@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PE-C03",
+  "source_commit": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Validate a one-price-per-SKU key constraint or obtain a specified deterministic version/aggregation rule before joining. Explain the current four-combination result as normal duplicate-key behavior, not automatic selection or a missing existing join feature. Do not invent approval order, silently take first/last or call the supplied data already unique.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

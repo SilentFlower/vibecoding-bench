@@ -1,0 +1,1 @@
+A preview service says linkify was enabled but a plain URL remained unlinked. The actual preset/options, active rule chains, linkify dependency and complete input/output have not been supplied. Request evidence before assigning a cause.

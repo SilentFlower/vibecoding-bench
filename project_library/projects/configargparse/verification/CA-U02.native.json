@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CA-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "append_keeps_declared_defaults_but_selects_one_supplied_source": true
+  },
+  "resource_profile": "business"
+}

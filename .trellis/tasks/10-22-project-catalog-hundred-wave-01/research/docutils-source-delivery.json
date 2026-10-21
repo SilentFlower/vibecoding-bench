@@ -1,0 +1,254 @@
+{
+  "schema": 1,
+  "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+  "fixed_public_source_files": [
+    {
+      "path": "sandbox/docutils_xml/global.log",
+      "git_mode": "100644",
+      "git_blob": "2e22ea13ef50b4be3cba95c448ace7390dacc8dd",
+      "size": 33716,
+      "sha256": "e9152aa807000109164abc9e29fe616d28fa0c98c82e9321e8cb379cc914e515"
+    },
+    {
+      "path": "sandbox/docutils_xml/tag.log",
+      "git_mode": "100644",
+      "git_blob": "f2c7b6f9cda4f6ece500b125574e6776791d4773",
+      "size": 18,
+      "sha256": "4865d24221a0494ced07cd65179bec1e913c90f0a4b73af7ae73241b104faaf7"
+    },
+    {
+      "path": "sandbox/odf2docutils/global.log",
+      "git_mode": "100644",
+      "git_blob": "0050ce3cbcb92e56f953255c120a9bf89601d2d8",
+      "size": 69701,
+      "sha256": "4655300e0e8b1d7a26fc1208fb40be8f30c8aed07a362cbf26bd67a5890249eb"
+    },
+    {
+      "path": "sandbox/odf2docutils/tag.log",
+      "git_mode": "100644",
+      "git_blob": "18901b5cb16ee6ddb292ef1244c3329dabcc0990",
+      "size": 19,
+      "sha256": "09147df9ccd8e0cdd4ed3143310467058e6ac298803e1346ad8c674a6ef2ab9e"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/presentationSimple/target/italicAutomatic.rst",
+      "git_mode": "100644",
+      "git_blob": "010c2876cd0d0983bdd6d66ee1da0acae23f5033",
+      "size": 21,
+      "sha256": "95aa7d8da563c64233ba6a958808afa39e7ce271d220ac312aefaf6e927fa652"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/presentationSimple/target/nestedBullets.rst",
+      "git_mode": "100644",
+      "git_blob": "93011d36d57a9b1d1d625205051095977ebfd9ba",
+      "size": 160,
+      "sha256": "4af06a4f55408bf9df44a35574932753c5a85a916bf0b9873b1bf94f1cc1ce91"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/presentationSimple/target/oneBullet.rst",
+      "git_mode": "100644",
+      "git_blob": "a568f623b1e2249732335ff38200b01d08afcaab",
+      "size": 13,
+      "sha256": "c8f3661ebdd27a314586d7175fa8c3a12a2dad32f1deae47b1e9ac632773124b"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/presentationSimple/target/oneTitle.rst",
+      "git_mode": "100644",
+      "git_blob": "89ba984cff03c5b0587ab958dc93a9d705158f32",
+      "size": 20,
+      "sha256": "4aa28b46e7b8bcbfe6bcc2b14d464c3526dd1a31dccaee0e34825e9623e26c11"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/presentationSimple/target/twoBullets.rst",
+      "git_mode": "100644",
+      "git_blob": "2ee4f08b34c3c5a7577b001a27570ccffa533e59",
+      "size": 57,
+      "sha256": "398ba17cd9cfa51c1f45ddea6248b564479a216f3e0f52d9f01b25165fdea8bc"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/presentationSimple/target/wrongNesting.rst",
+      "git_mode": "100644",
+      "git_blob": "4229468e3cbed718b62052690b8137472fc425ac",
+      "size": 125,
+      "sha256": "3ab9b4f46c69cca10757a7d28bed9f1deeeac4ac5aa91127f3bc4edf9488298d"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/textSimple/target/emphasis.rst",
+      "git_mode": "100644",
+      "git_blob": "788459b266e8ce39aea4e8497f4f58b7b250c8db",
+      "size": 21,
+      "sha256": "5a769987aa585fb3b05969980e7875ec5900fd58ad8e0ef53e144cb5b36fc563"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/textSimple/target/italicAutomatic.rst",
+      "git_mode": "100644",
+      "git_blob": "df42448e1ce26d5bbaebafac31b86f05a268801b",
+      "size": 19,
+      "sha256": "b1b9df35ea95d37fd400fd08b4b9f224eb066df164b13c2a113fa7cb99fe63b5"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/textSimple/target/manyHeaders.rst",
+      "git_mode": "100644",
+      "git_blob": "000c508ab5411d01a38271bdcae62c647f486738",
+      "size": 390,
+      "sha256": "cb552baf654de03c3954850dc988d15574f7f2d4f30b41f6b2a59d3a3ca4f676"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/textSimple/target/nestedHeader.rst",
+      "git_mode": "100644",
+      "git_blob": "706d956530e9974fae409250298c0553cee99605",
+      "size": 91,
+      "sha256": "129d7c92242a5c21e2bc07dd501fd878fb82aa696d53009224759041c171fc31"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/textSimple/target/nestedList.rst",
+      "git_mode": "100644",
+      "git_blob": "49a4f8b3afb3910c2483ff8b60d21feaa0ac4739",
+      "size": 153,
+      "sha256": "7e7e9efdaa3f977f44164d982cfa853ff557d841914b3c5e72a8dd4418fb6b1e"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/textSimple/target/oneHeader.rst",
+      "git_mode": "100644",
+      "git_blob": "bcb191a8bbb6e8a293a87245e620058624bdd830",
+      "size": 34,
+      "sha256": "e7b7d7ae136be16dd479e89addc63a23e767af9727c665e50be59e333630d4c3"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/textSimple/target/oneLine.rst",
+      "git_mode": "100644",
+      "git_blob": "9557aa1b40209d165e83a799eab32d8d2caf04ac",
+      "size": 10,
+      "sha256": "b43a53f4b1f532bca5796d5a949423c2d849a7282513a9bd5f4ad40180c36c07"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/textSimple/target/simpleList.rst",
+      "git_mode": "100644",
+      "git_blob": "dd3117054a3a9ab647cc9fbbf5760aa7214e44e0",
+      "size": 32,
+      "sha256": "9425acd0c2f165d3ae8775e43c269e9a5d752bae6a82cd21b3e8fb46a2253d76"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/textSimple/target/twoHeaders.rst",
+      "git_mode": "100644",
+      "git_blob": "9c563a45c362bbc5918b5c4b7a7d2602c043060b",
+      "size": 45,
+      "sha256": "8a4b2b8f246ba4f66a892ea3177888b8133b367a70dfa8ef838764e38ce99438"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/textSimple/target/twoParas.rst",
+      "git_mode": "100644",
+      "git_blob": "f6c11daebf32a458c7f6fb2c6dce3ddd911ddc8d",
+      "size": 36,
+      "sha256": "95ff34f2f88f876b2eafd80ef2f9b2134722eb09836b48e1e29b6f8578e7cfd5"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/textSimple/target/wrongNestedHeader.rst",
+      "git_mode": "100644",
+      "git_blob": "a93556d3a492faf4a411577a2b58cee239b856cf",
+      "size": 91,
+      "sha256": "6b211899fadc1938c64240543c0885f1df58cbe341c0f38015b18096a40c1863"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/textSimple/target/wrongNesting.rst",
+      "git_mode": "100644",
+      "git_blob": "1dcaf247c7a067ecb44ee7c57c42cbaae13f0c9b",
+      "size": 58,
+      "sha256": "47ff52307c7c8b9f1f1c8e97ae2718ae2f8eee6ee219bc305b50f90002d00e0d"
+    },
+    {
+      "path": "sandbox/odf2docutils/tests/textSimple/target/wrongerNesting.rst",
+      "git_mode": "100644",
+      "git_blob": "3cb905fcf54ce603ff809bd7ca83f4b1f525edd3",
+      "size": 73,
+      "sha256": "b83d8341b50ddfc8d3eb12bcbc7522b0d2af0134de83a8c13d904c8fa701b31c"
+    },
+    {
+      "path": "sandbox/rst2beamer/feature_requests/alan_isaac_slides_test01_with_docinfo_docutils_v_0_8.log",
+      "git_mode": "100644",
+      "git_blob": "49b0dc033245b7e37158ad1e848516e0f69c8122",
+      "size": 34311,
+      "sha256": "1aaf1f44ea4d019009663ec4b6f8c3a5d094a01d7a3f791e290a00a2c6dde7a2"
+    },
+    {
+      "path": "sandbox/rst2beamer/feature_requests/alan_isaac_slides_test01_without_beamer_visit_docinfo.log",
+      "git_mode": "100644",
+      "git_blob": "ad4eb19d9eca83d1692b83c615bcf93c0b52d258",
+      "size": 34767,
+      "sha256": "8f275578582bae45cc1d1227c094bbf36a3e995b0ce3c89d1e773b32de59b9d5"
+    },
+    {
+      "path": "sandbox/rst2beamer/feature_requests/alan_isaac_slides_test01_without_beamer_visit_docinfo_with_latex_docinfo.log",
+      "git_mode": "100644",
+      "git_blob": "c9162b212cec02e5650905b6f43d7ac3d58920fd",
+      "size": 35281,
+      "sha256": "a613487a0960d43b2cfd9a9785349788fc1f432c653a47c9e9a190f4245796f8"
+    },
+    {
+      "path": "sandbox/rst2graph/global.log",
+      "git_mode": "100644",
+      "git_blob": "19d9dc79fd6869ed035e78087090dd1a3e77ebf5",
+      "size": 62351,
+      "sha256": "fa363951035ff3ce3170fc241e6030144d20de49de488546a1e61c958f12f771"
+    },
+    {
+      "path": "sandbox/rst2graph/tag.log",
+      "git_mode": "100644",
+      "git_blob": "85527e09d68d1f0591c616fea52d9baced04ff54",
+      "size": 15,
+      "sha256": "d34558be7a4974d8049796e1059717aa325f6a07b31eb4522b5f9c46b608c2b9"
+    },
+    {
+      "path": "sandbox/rst2outline/global.log",
+      "git_mode": "100644",
+      "git_blob": "6e7d5bbfbcbd7cb39c28347ad028c1a842cbfac8",
+      "size": 7842,
+      "sha256": "292a0ccddb53f5bf3fe72e1436c43d2a4ded4233cbfba06fe0a9253c67e0119b"
+    },
+    {
+      "path": "sandbox/rst2outline/tag.log",
+      "git_mode": "100644",
+      "git_blob": "2a12ee136f491fa01dee99f24620ba5da0a0db0a",
+      "size": 17,
+      "sha256": "463fdf1901ce0c9019170fbe4507649dd246f6f83e17a7c33db874be4a3ad578"
+    },
+    {
+      "path": "sandbox/rstdiff/global.log",
+      "git_mode": "100644",
+      "git_blob": "a782ca9095cbdf621352034aa55223228bf47331",
+      "size": 75845,
+      "sha256": "06c285535013062c9b3747934e31ed6b9c82b125cf621bff1524ebbe152d152e"
+    },
+    {
+      "path": "sandbox/rstdiff/tag.log",
+      "git_mode": "100644",
+      "git_blob": "90c96762f8ae04921a80c05dd35c1a79ff5b020e",
+      "size": 14,
+      "sha256": "b35696f8d3b87e8bd1a197a622c8b0e2f4286a9f90b40eb007869d2dadbeed25"
+    },
+    {
+      "path": "sandbox/xml2rst/global.log",
+      "git_mode": "100644",
+      "git_blob": "b364f1f812cc302db2fd5017c568f039015c0738",
+      "size": 124753,
+      "sha256": "3e26aa162b50e46e34c251731e7f62586c6c04b3cc6c6057f2276845f72aa642"
+    },
+    {
+      "path": "sandbox/xml2rst/tag.log",
+      "git_mode": "100644",
+      "git_blob": "ce2b3e9194ba9bcc5c79572c3d67eda4d6340305",
+      "size": 14,
+      "sha256": "cd84655f263f61f47c6d6b0c17281c451ce9b98ee33b5682073dd585b65cea8e"
+    }
+  ],
+  "failure": ".deploy/project-catalog-hundred/stage-01/delivery/attempt-007/result.json",
+  "successful_delivery": "delivery-first-twenty.json",
+  "source_filter_sha256": "86b779addfcfd34417e5ddb8e458329b8de793d0cd1eb2b2211c34e52169712e",
+  "dockerignore_sha256": "1153e1f9de9365e5bcf341928fd6d8a70afef4d0fd93efd8183e04aeb0276dfa",
+  "management_regressions": {
+    "tests": 28,
+    "passed": true,
+    "source": "本会话真实unittest工具执行，未执行部署"
+  },
+  "scope": "仅34个固定Git原件；目录全集、字节和执行位有摘要约束，未知文件不放行"
+}

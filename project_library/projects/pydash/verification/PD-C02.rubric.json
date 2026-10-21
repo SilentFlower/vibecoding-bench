@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PD-C02",
+  "source_commit": "ef6a6427e488e29e827e0e0819f2630ad3ff4cdc",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use iteratee with the real left/right/key/destination/source arguments, returning concatenation only when both values are lists and None to delegate other cases. tags becomes[a,b]. Returning None for limit delegates to7; returning0 explicitly produces0. None is not a universal clear-to-null override sentinel, and falsy results other thanNone remain meaningful.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

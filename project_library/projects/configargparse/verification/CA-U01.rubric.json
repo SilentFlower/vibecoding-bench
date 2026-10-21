@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CA-U01",
+  "source_commit": "3ab2f323abcdd321b6c423f9eb6304ce35681307",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Results are4,3,2,1 with CLI overriding environment, then config, then declared default. Use fresh parsers and explicit inputs. Source precedence is not evidence that an unrelated process environment, config search path or application validation was tested.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,1 @@
+A caller reports an extra supplied input field disappeared from the document used later. The schema,validator options,call,result and original object have not been supplied. Investigate without assuming a purge option or upstream data loss.

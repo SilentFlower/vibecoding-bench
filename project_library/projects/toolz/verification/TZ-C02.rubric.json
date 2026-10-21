@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TZ-C02",
+  "source_commit": "451af60dec590a6010e2babdbf391ea8f815122f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The three quote results are4,4,6: changing external price does not invalidate a cached qty key, and clearing the supplied cache dict permits recomputation. Prefer making pricing input/version explicit in a pure calculation or deliberately scoping/clearing the provided cache. No automatic TTL/current-price detection or returned-function cache_clear API is established.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

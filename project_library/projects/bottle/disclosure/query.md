@@ -1,0 +1,1 @@
+Complete in-process request: GET /search?tag=A&tag=B. Route uses request.query["tag"]. The callback sees scalarB while request.query.getall("tag") is[A,B]. No proxy, form body or other parser is involved. The intended business contract accepts multiple tags.

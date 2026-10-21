@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "id": "backoff-py312",
+  "adapter": "python-native",
+  "platform": "linux-amd64",
+  "python": "3.12.15",
+  "requirements": [
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==7.4.4",
+    "pytest-asyncio==0.18.3",
+    "coverage==7.16.2",
+    "pytest-cov==3.0.0",
+    "requests==2.34.2",
+    "responses==0.20.0",
+    "certifi==2026.10.19",
+    "charset-normalizer==3.5.2",
+    "idna==3.20",
+    "urllib3==2.8.0",
+    "PyYAML==6.0.3"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-7.4.4-py3-none-any.whl",
+      "digest": "b090cdf5ed60bf4c45261be03239c2c1c22df034fbffe691abe93cd80cea01d8",
+      "size": 325287
+    },
+    {
+      "path": "artifacts/pytest_asyncio-0.18.3-1-py3-none-any.whl",
+      "digest": "16cf40bdf2b4fb7fc8e4b82bd05ce3fbcd454cbf7b92afc445fe299dabb88213",
+      "size": 14768
+    },
+    {
+      "path": "artifacts/coverage-7.16.2-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+      "digest": "5375ebd99038021b35e99dc88255022912c06565d316212f4a576e4b08d30f5d",
+      "size": 258571
+    },
+    {
+      "path": "artifacts/pytest_cov-3.0.0-py3-none-any.whl",
+      "digest": "578d5d15ac4a25e5f961c938b85a05b09fdaae9deef3bb6de9a6e766622ca7a6",
+      "size": 20981
+    },
+    {
+      "path": "artifacts/requests-2.34.2-py3-none-any.whl",
+      "digest": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0",
+      "size": 73075
+    },
+    {
+      "path": "artifacts/responses-0.20.0-py3-none-any.whl",
+      "digest": "18831bc2d72443b67664d98038374a6fa1f27eaaff4dd9a7d7613723416fea3c",
+      "size": 27770
+    },
+    {
+      "path": "artifacts/certifi-2026.10.19-py3-none-any.whl",
+      "digest": "42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b",
+      "size": 136464
+    },
+    {
+      "path": "artifacts/charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "3d31298449090ab8d47b7b1b2a555ff73cac7ed438a08b7ac160980c7ebed649",
+      "size": 257601
+    },
+    {
+      "path": "artifacts/idna-3.20-py3-none-any.whl",
+      "digest": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+      "size": 69583
+    },
+    {
+      "path": "artifacts/urllib3-2.8.0-py3-none-any.whl",
+      "digest": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3",
+      "size": 135717
+    },
+    {
+      "path": "artifacts/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc",
+      "size": 807870
+    }
+  ],
+  "source_commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+  "verification_status": "verified_target_runtime"
+}

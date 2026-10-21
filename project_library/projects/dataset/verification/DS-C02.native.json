@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DS-C02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "upsert_updates_all_existing_key_matches": true,
+    "automatic_key_index_is_not_unique": true
+  },
+  "resource_profile": "business"
+}

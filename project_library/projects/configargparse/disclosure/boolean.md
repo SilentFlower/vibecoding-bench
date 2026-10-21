@@ -1,0 +1,1 @@
+Complete synthetic call: parser=ArgumentParser(add_help=False); parser.add_argument("--enabled",type=bool,env_var="APP_ENABLED"); result=parser.parse_args([],env_vars={"APP_ENABLED":"false"}).enabled. No config values or CLI options are supplied. The result is True.

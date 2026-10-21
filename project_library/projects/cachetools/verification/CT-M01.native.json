@@ -1,0 +1,26 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CT-M01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "positional_bound_controls": true,
+    "keyword_receiver_equivalent": true,
+    "custom_receiver_name": true,
+    "missing_receiver_rejected": true,
+    "duplicate_receiver_rejected": true,
+    "positional_only_preserved": true,
+    "instance_isolation": true,
+    "cache_info_preserved": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

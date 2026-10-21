@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DP-P01",
+  "source_commit": "15759d96a006fef5278de731cd263b4d839094c3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The early added2 entry is already written when later int/string mismatch raisesTypeError; TYPESAFE is a type check,not rollback. Work on owned deep copies of destination and incoming plain-data source,validate the whole result,and publish only on success; failure discards the working result while baseline/source stay unchanged. Define bounds/allowed types explicitly instead of claiming atomicity from the flag.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

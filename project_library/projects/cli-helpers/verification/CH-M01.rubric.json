@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "CH-M01",
+  "source_commit": "e2538b1d338ead4ed803ec0017017bf6779a380b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Ensure per-call kwargs do not mutate registered or registration-caller defaults across instances or repeated/deferred consumption, including custom handlers. Preserve signatures and pipeline behavior, and do not broaden the patch to unrelated formatting issues. Complete original regression and public tests must pass.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized file that fail on the pinned original and pass after the repair; cite the actual implementation and tests. Preserve all original tests and controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

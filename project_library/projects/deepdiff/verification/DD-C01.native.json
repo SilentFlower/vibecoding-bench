@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DD-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "group_identity_requires_a_deliberate_duplicate_key_policy": true
+  },
+  "resource_profile": "business"
+}

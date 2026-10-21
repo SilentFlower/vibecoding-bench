@@ -1,0 +1,1 @@
+Create Console(file=a_StringIO,record=False), capture a print of captured inside with console.capture() as capture, then inspect capture.get(), the destination stream and export_text. Explain local test capture versus recorded artifact export. No files may be changed.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CH-D01",
+  "source_commit": "e2538b1d338ead4ed803ec0017017bf6779a380b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Identify dict(zip(headers,row,strict=True)) overwriting equal keys and CustomEncoder converting Decimal to float. strict zip checks lengths, not unique keys. Do not invent an existing duplicate_headers or decimal_mode option.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

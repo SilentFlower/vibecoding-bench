@@ -1,0 +1,20 @@
+{
+  "project": "path",
+  "revision": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+  "artifact": "seed/app/licenses/LICENSE.path.build.txt",
+  "sha256": "9755a18519666e5f0f4cae3daad3d7012bcae48a600b31237d75e9fe134e6683",
+  "origin": ".deploy/github-100-research/cli-config/path/build-generated-LICENSE.txt",
+  "build_distribution": "path==0.1.dev1+gb5ae11e41",
+  "build_metadata_sha256": "194583f810920908c688195fd59621ebff460eaa3cf2531628d089d78e913010",
+  "editable_direct_url": {
+    "dir_info": {
+      "editable": true
+    },
+    "url": "file:///tmp/github-research-path-tpvfua11/source"
+  },
+  "matches_built_distribution_license": true,
+  "tracked_source_untouched": true,
+  "copyright_placeholder_preserved": true,
+  "skeleton_document_read": "https://blog.jaraco.com/skeleton/",
+  "scope": "保留固定提交真实构建产生的MIT许可，不把它伪称原版Git跟踪文件或正式发行版"
+}

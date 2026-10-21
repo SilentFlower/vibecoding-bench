@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CO-P01",
+  "source_commit": "b7707c94c0317b8f89b704a01525a68eb6c72521",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Validate a private configuration, require result is True, then enforce an explicit extra-key policy using get_extra_values after validation; before validation its empty list proves nothing. Valid extra fields are not automatically rejected by configspec. Publish only a fully accepted configuration, preserving paths/error distinctions in diagnostics.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

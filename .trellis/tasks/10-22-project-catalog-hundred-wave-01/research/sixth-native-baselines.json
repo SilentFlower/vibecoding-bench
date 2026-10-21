@@ -1,0 +1,117 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "python-box",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/python-box/result.json",
+      "result_sha256": "1a96869f4bedd87763cc0cae226f0acc0aa684797c2c36423b3b1fb93fddb10d",
+      "main_collected": 159,
+      "counts": {
+        "passed": 159,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "xml_testcases": 159,
+      "xml_skipped": 0,
+      "runner_sha256": "3c96af2065e313156ff341ced4ed6f35c0756138d59fffcf09c4ddce0cb630ba",
+      "contract_sha256": "f841460201fcb82f2bea8d9766debb342f8bc57031771992c6fc531cf34af9f0",
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前实际基线；未运行多平台、Cython加速、lint或静态类型矩阵，不是业务完成"
+    },
+    {
+      "project": "rich",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/rich/result.json",
+      "result_sha256": "f9d996600681f60cda12814f30bfeacde24c7d19cca660ba77014c0696758259",
+      "main_collected": 981,
+      "counts": {
+        "passed": 956,
+        "failed": 0,
+        "error": 0,
+        "skipped": 25,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "xml_testcases": 981,
+      "xml_skipped": 25,
+      "runner_sha256": "3c96af2065e313156ff341ced4ed6f35c0756138d59fffcf09c4ddce0cb630ba",
+      "contract_sha256": "e4982d3cc5295b93eea99952c77588fc39851d7434910e8b693301cf4ff0d32f",
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前实际基线；未运行多平台、Cython加速、lint或静态类型矩阵，不是业务完成"
+    },
+    {
+      "project": "pydash",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/pydash/result.json",
+      "result_sha256": "5364c86f280df4f5e9cfb9c5e11f3d41ab614707052a364256844d1a2e5a2293",
+      "main_collected": 2880,
+      "counts": {
+        "passed": 2880,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 359,
+      "subtest_count": 0,
+      "xml_testcases": 2880,
+      "xml_skipped": 0,
+      "runner_sha256": "3c96af2065e313156ff341ced4ed6f35c0756138d59fffcf09c4ddce0cb630ba",
+      "contract_sha256": "3ddf60e69cc9b6d783b58e7a2708e96cb6f0f1249d5897300f8fc9928609ac30",
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前实际基线；未运行多平台、Cython加速、lint或静态类型矩阵，不是业务完成"
+    },
+    {
+      "project": "configargparse",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/configargparse/result.json",
+      "result_sha256": "b57b59afc2eabc8b24606484d1a6de811a7943681fdbb6ccc4ba8a8bbb61f206",
+      "main_collected": 169,
+      "counts": {
+        "passed": 164,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 5,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 225,
+      "xml_testcases": 169,
+      "xml_skipped": 5,
+      "runner_sha256": "3c96af2065e313156ff341ced4ed6f35c0756138d59fffcf09c4ddce0cb630ba",
+      "contract_sha256": "6f76224aec985484812b02df8058cf6cc8b6189f8b1eb06ad84387281ca96af4",
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前实际基线；未运行多平台、Cython加速、lint或静态类型矩阵，不是业务完成"
+    }
+  ]
+}

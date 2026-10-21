@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DS-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "escaping_context_error_rolls_back": true,
+    "ensure_false_filters_unknown_fields": true
+  },
+  "resource_profile": "business"
+}

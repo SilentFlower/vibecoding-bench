@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BT-C03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "simple_template_escapes_values_and_raw_expression_explicitly_bypasses_it": true
+  },
+  "resource_profile": "business"
+}

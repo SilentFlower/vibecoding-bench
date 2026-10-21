@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "id": "petl-py312",
+  "adapter": "python-native",
+  "platform": "linux-amd64",
+  "python": "3.12.15",
+  "requirements": [
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==8.4.2",
+    "coverage==7.16.2",
+    "pytest-cov==6.3.0",
+    "pytest-timeout==2.4.0",
+    "setuptools==84.2.1"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-8.4.2-py3-none-any.whl",
+      "digest": "872f880de3fc3a5bdc88a11b39c9710c3497a547cfa9320bc3c5e62fbf272e79",
+      "size": 365750
+    },
+    {
+      "path": "artifacts/coverage-7.16.2-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+      "digest": "5375ebd99038021b35e99dc88255022912c06565d316212f4a576e4b08d30f5d",
+      "size": 258571
+    },
+    {
+      "path": "artifacts/pytest_cov-6.3.0-py3-none-any.whl",
+      "digest": "440db28156d2468cafc0415b4f8e50856a0d11faefa38f30906048fe490f1749",
+      "size": 25115
+    },
+    {
+      "path": "artifacts/pytest_timeout-2.4.0-py3-none-any.whl",
+      "digest": "c42667e5cdadb151aeb5b26d114aff6bdf5a907f176a007a30b940d3d865b5c2",
+      "size": 14382
+    },
+    {
+      "path": "artifacts/setuptools-84.2.1-py3-none-any.whl",
+      "digest": "ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2",
+      "size": 876263
+    }
+  ],
+  "source_commit": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+  "verification_status": "verified_target_runtime",
+  "notes": "完整适用原生基线在当前目标镜像实际通过，业务和正式准入另验；可选依赖及平台分支的原生跳过单独保留。"
+}

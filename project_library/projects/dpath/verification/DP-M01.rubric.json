@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "DP-M01",
+  "source_commit": "15759d96a006fef5278de731cd263b4d839094c3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "When afilter is present,delete must select only leaves satisfying both the glob and predicate; preserve outside matching-value leaves,return the correct count,and retain PathNotFound when no effective match. Preserve no-filter glob behavior,custom separators and list semantics. Deliver actual public regressions in app/test_delete_filter.py and change only the authorized implementation file plus that test file.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized file that fail on the pinned original and pass after the repair; cite the actual implementation and tests. Preserve all original tests and controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

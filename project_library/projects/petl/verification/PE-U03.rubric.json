@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PE-U03",
+  "source_commit": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Two A order rows times two A price rows produce four combinations. Inner join has four data rows; leftjoin adds B/3/None for five data rows, in addition to the header. Neither operation chooses or enforces one price per A automatically.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

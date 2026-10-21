@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PA-C02",
+  "source_commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Iterate walk so each returned directory can receive a callable returning False; the source falls back to is_dir for a falsy sent value, so bare False is not that callable. Consume the item returned by send or it can be lost. Walk all needed directories for pruning, then filter results; matching names alone does not prevent descent. No new walk option or unbounded symlink scan is required.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

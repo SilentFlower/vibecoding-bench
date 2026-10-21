@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "XD-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "attribute_text_shape": true,
+    "single_multiple_shape": true
+  },
+  "resource_profile": "business"
+}

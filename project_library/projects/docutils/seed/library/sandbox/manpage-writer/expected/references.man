@@ -1,0 +1,121 @@
+.\" Man page generated from reStructuredText
+.\" by the Docutils 1.0b1.dev manpage writer.
+.
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.TH "reference tests" "" "" ""
+.SH Name
+reference tests \- 
+.SH how to markup
+.sp
+link adr in .UR .UE or simply in parantheses
+.INDENT 0.0
+.IP \(bu 2
+man and mandoc convert UR/UE to \fB<\fP and \fB>\fP\&.
+.IP \(bu 2
+pandoc transforms
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.EX
+See the \(gaPython home page <https://www.python.org>\(ga_ for info.
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+to
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.EX
+see See the Python home page (https://www.python.org) for info.
+.EE
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.SH test for references in man pages
+.sp
+embedded in a paragraph
+.INDENT 0.0
+.IP \(bu 2
+at line start
+.IP \(bu 2
+in line
+.IP \(bu 2
+at eol
+.UNINDENT
+.sp
+at start of paragraph
+.INDENT 0.0
+.IP \(bu 2
+followed by text
+.IP \(bu 2
+at eol
+.UNINDENT
+.sp
+at end of paragraph
+.SH tests
+.sp
+See \%<https://\:docutils\:.sourceforge\:.io/\:docs/\:user/\:rst/\:quickref\:.html#\:explicit-markup>
+for more
+.sp
+See the Python home page \%<https://\:www\:.python\:.org> for info.
+.sp
+External hyperlinks, like Python \%<https://\:www\:.python\:.org>\&.
+.sp
+Want to learn about my favorite programming language \%<https://\:www\:.python\:.org>?
+.sp
+Clicking on this internal hyperlink will take us to the target
+below.
+.sp
+The hyperlink target above points to this paragraph.
+.INDENT 0.0
+.IP \(bu 2
+bullet list
+.sp
+second item is an inline target.
+.IP \(bu 2
+second item, with hyperlink target.
+.UNINDENT
+.sp
+See the Python \%<https://\:www\:.python\:.org> home page for info.
+.sp
+Write to me \%<mailto:jdoe@\:example\:.com> with your questions.
+.sp
+The one\-liner \%<https://\:docutils\:.sourceforge\:.io/\:rst\:.html> and starts\-on\-this\-line \%<https://\:docutils\:.sourceforge\:.net/\:rst\:.html> or entirely\-below \%<https://\:docutils\:.sourceforge\:.net/\:rst\:.html> point to  \%<https://\:docutils\:.sourceforge\:.io/\:rst\:.html> and in man are ... ?
+.sp
+Escaped whitespace is preserved as intentional spaces, e.g.:
+.sp
+some reference \%<../\:local path with spaces\:.html> to a local path.
+.sp
+Anonymous hyperlink references are specified with two underscores instead of one:
+.sp
+See the web site of my favorite programming language \%<https://\:www\:.python\:.org>\&.
+.sp
+Anonymous targets begin with \(dq.. __:\(dq; no reference name is required or allowed:
+.\" End of generated man page.

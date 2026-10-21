@@ -1,0 +1,1 @@
+A value that the importer team considers an invalid email was accepted. The actual schema, validator construction, checker settings and sample have not been supplied. Investigate before assigning a cause.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DS-C01",
+  "source_commit": "db592cc041014762bba55fd544e982170831f227",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "ensure=False prevents automatic creation and filters unknown fields rather than raising a strict-schema error. Existing order=C is inserted while unapproved is absent. Validate key allowlists and required/types before calling writes; do not claim the ensure flag already rejects unknown fields.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

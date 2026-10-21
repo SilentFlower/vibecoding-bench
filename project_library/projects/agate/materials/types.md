@@ -1,0 +1,1 @@
+Compare default Table.from_csv with column_types forcing code and note to Text(cast_nulls=False) and amount to Number. code is an exact external identifier; NA in note is literal business text, not missing data. Monetary values remain decimal. Do not edit files.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BT-P01",
+  "source_commit": "8ec5fe29420d14998c0d86885083983eaea8b839",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use explicit fresh Bottle instances and register routes/plugins/config/dependencies on the intended instance rather than accumulating module-level default-app state. First app returnsA thenB for separate environments; empty second app has no route and returns404. request is rebound per call; this does not itself isolate a shared database/dependency or establish arbitrary coroutine safety. Keep request data local and test each supported deployment concurrency model separately.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,94 @@
+{
+  "project": "python-decouple",
+  "stage": "formal_registered_local_verified",
+  "cases": 8,
+  "all_expectations_met": true,
+  "reference_changed_paths": [],
+  "formal_catalog_modified": true,
+  "real_model_calls": 0,
+  "pending": [],
+  "evidence": [
+    {
+      "case": "original-DC-C01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/python-decouple/attempt-001/original-DC-C01.json",
+      "sha256": "45df0ba88bb0ca80eb3f3a352a6e4acf1ea0acc977a3b41b4618d464be848ea5"
+    },
+    {
+      "case": "original-DC-C02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/python-decouple/attempt-001/original-DC-C02.json",
+      "sha256": "8f47a7dda6a5b41572116a6f51161beb8d9f65cbca3270c78db2bfda10870181"
+    },
+    {
+      "case": "original-DC-C03",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/python-decouple/attempt-001/original-DC-C03.json",
+      "sha256": "2e4199ea47cb8fed3f5b3b0ffb46d13f4aae0075e39ef8e36efd697c51890246"
+    },
+    {
+      "case": "original-DC-C04",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/python-decouple/attempt-001/original-DC-C04.json",
+      "sha256": "16808c9c1227a2132d88aa6290db188869ac6d7e8cc14f04395bf47cf80471a7"
+    },
+    {
+      "case": "original-DC-P01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/python-decouple/attempt-001/original-DC-P01.json",
+      "sha256": "b3bbbc3ac0aaa0ffe8b6deb4cbf49e2631a5206bf7cbcdd36813ac6b802b7799"
+    },
+    {
+      "case": "original-DC-U01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/python-decouple/attempt-001/original-DC-U01.json",
+      "sha256": "c531bb5708f9caad0e652348d98ed157e90881d0b98411e90c9da9bdad5e8053"
+    },
+    {
+      "case": "original-DC-U02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/python-decouple/attempt-001/original-DC-U02.json",
+      "sha256": "aaeaff0efd5e054a417374cfa36c608d32d1528b891869278c63e85150d66c12"
+    },
+    {
+      "case": "original-DC-U03",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/python-decouple/attempt-001/original-DC-U03.json",
+      "sha256": "671e316ef0ba3c6343e49dd27005f45784109595e915a1de0887117914b6a36c"
+    }
+  ],
+  "mock_status": "passed",
+  "formal_version": "real-project-scenarios-v5-en",
+  "formal_digest": "e85aea945cffdfe2924a2f745a61f6d44e7d4597ac41bb0902500880cce61161",
+  "full_delivery_files": 3362,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-002/run-001/evidence/result.json",
+      "sha256": "7ee63a068fd359bc7f77f5d29b2de09579b1dab6f2884f8c601286f60143b913"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-002/run-001/cleanup.json",
+      "sha256": "f2e7711f3b0c83ca2d96c394306b4763683185ecf79b5fd4bbf0cf11df7cb29d"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-002/audit-attempt-001.json",
+      "sha256": "75b6700f41d8eb921a9db844d233d0c73b3a939f2cbc40cda248460c3412ba5a"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-002/browser/run-001/diagnostics/result.json",
+      "sha256": "ca92ff5e307042efffa7d903da6a34f20ce085d86d34e34668bbb9329df728ec"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/delivery-first-four.json",
+      "sha256": "f485abc48e0ae6418b1dcbfcbbfb7447758f4a565b4ea5f7834bb5cc0082b5d1"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CT-D02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "positional_bound_controls": true,
+    "original_keyword_receiver_rejected": true
+  },
+  "resource_profile": "business"
+}

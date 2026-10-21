@@ -1,0 +1,1 @@
+The actual synthetic call is cfg=ConfigObj(config_lines, configspec=spec_lines); result=cfg.validate(Validator(), preserve_errors=True); flatten_errors(cfg,result). No custom checks are registered. The application tested if result and mistakenly treated a nonempty failure mapping as complete success. No further production facts are supplied.

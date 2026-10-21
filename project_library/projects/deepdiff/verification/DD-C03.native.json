@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DD-C03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "tree_nodes_expose_typed_path_segments_and_before_after_values": true
+  },
+  "resource_profile": "business"
+}

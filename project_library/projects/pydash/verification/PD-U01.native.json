@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PD-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "explicit_missing_sentinel_distinguishes_present_falsey_values": true
+  },
+  "resource_profile": "business"
+}

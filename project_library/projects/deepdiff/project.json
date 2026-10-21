@@ -1,0 +1,216 @@
+{
+  "schema": 2,
+  "project_key": "deepdiff",
+  "title": "DeepDiff对象变更工作场景",
+  "category": "深度比较与变更预览",
+  "description": "固定真实源码上的重复计数、业务身份、数字政策、字段排除、结构化事件和双向预览六项任务。",
+  "seed_digest": "8ebe7ccc10deb0a3a3a3d4ec966dd5e50c0b35f855be0013c5ed8f1a3c1a6e82",
+  "environment": "deepdiff-py312",
+  "source": {
+    "repository": "https://github.com/qlustered/deepdiff",
+    "commit": "79e4379278b1cfdd8e9e3dccac364956908e8989",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "DD-S01",
+      "title": "列表数量与记录身份",
+      "goal": "明确重复次数和业务主键政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DD-U01",
+            "DD-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DD-U01",
+          "kind": "understand",
+          "goal": "区分无序比较和重复次数变化",
+          "prompt": "Trace both complete unordered controls and the multiplicity change of each supplied value. Explain the inventory implication without modifying files.",
+          "requires": [],
+          "materials": [
+            "materials/repetition.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DD-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/DD-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DD-C01",
+          "kind": "consult",
+          "goal": "为业务主键对齐声明重复记录政策",
+          "prompt": "Meet the complete row-identity comparison requirement using current grouping controls and explicit duplicate policy. Compare all supplied controls without silently dropping rows or implementing changes.",
+          "requires": [],
+          "materials": [
+            "materials/grouping.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DD-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/DD-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DD-S02",
+      "title": "报告比较政策",
+      "goal": "区分数字类型及精确易变字段排除",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DD-U02",
+            "DD-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DD-U02",
+          "kind": "understand",
+          "goal": "区分数字表示类型和实际业务数值",
+          "prompt": "Trace all complete price controls under the supplied type policy. State what has and has not been specified about numeric equality; do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/numbers.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DD-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/DD-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DD-C02",
+          "kind": "consult",
+          "goal": "只排除声明的易变字段而保留订单变化",
+          "prompt": "Meet the complete report-filter requirement using exact current exclude_paths. Give the retained change and input observations,without implementation or generic redaction claims.",
+          "requires": [],
+          "materials": [
+            "materials/exclusions.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DD-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/DD-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DD-S03",
+      "title": "结构化变更事件",
+      "goal": "保留真实路径段和前后值",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DD-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DD-C03",
+          "kind": "consult",
+          "goal": "从树形节点取得结构化变更事件",
+          "prompt": "Meet the complete structured-event requirement with existing tree-view APIs. Give exact segments and before/after values while respecting representability limits; no implementation is authorized.",
+          "requires": [],
+          "materials": [
+            "materials/paths.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DD-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/DD-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DD-S04",
+      "title": "双向补丁预览",
+      "goal": "绑定来源并验证独立变更结果",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DD-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DD-P01",
+          "kind": "plan",
+          "goal": "规划带原值检查的双向变更预览",
+          "prompt": "Plan the complete trusted in-memory delta preview with exact observed round-trip and mismatch controls. Define validation,ownership and publication limits without implementing or mutating real data.",
+          "requires": [],
+          "materials": [
+            "materials/delta.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DD-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/DD-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

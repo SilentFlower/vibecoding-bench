@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AG-C02",
+  "source_commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Every computation in one compute call reads the original self; plus cannot read newly computed double there and raises KeyError. Compute double first, then plus on the returned table: plus values5,3,7. Original table stays unchanged, and stage ownership is explicit; list ordering alone is not a computation dependency graph.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

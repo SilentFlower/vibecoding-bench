@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IT-P01",
+  "source_commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Register a real link_open callback, use Token.attrSet to add target/rel/data-origin while retaining href, and delegate to renderer.renderToken for established attribute encoding. Preserve Tea and its destination, encode the quote/angle literal as attribute data, and verify callback execution with actual token types. Do not manually interpolate unencoded attributes or require a new core feature.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

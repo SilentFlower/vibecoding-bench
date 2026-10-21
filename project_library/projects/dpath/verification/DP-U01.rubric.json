@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DP-U01",
+  "source_commit": "15759d96a006fef5278de731cd263b4d839094c3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Missing lookup returns the same supplied sentinel. Two matches for* raiseValueError even with a default; that default handles absence,not cardinality ambiguity. Slash and empty path return the original root object. Use search/values when multiple matches are intended.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

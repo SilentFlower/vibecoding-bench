@@ -1,0 +1,343 @@
+{
+  "schema": 2,
+  "project_key": "tabulate",
+  "title": "Tabulate业务报表工作场景",
+  "category": "报表表示与终端输出",
+  "description": "固定真实源码上的商品报表、数据取证、tuple修复、HTML、中文宽度和本地CLI；五场景九任务。",
+  "seed_digest": "81d150c00cf69a817d431bd984f45afcca9357492ed4ea13bad1f12c7c6ec14f",
+  "environment": "tabulate-py312",
+  "source": {
+    "repository": "https://github.com/astanin/python-tabulate",
+    "commit": "268615a5c27dc40e5c22454c07b44d5c50410da0",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TB-S01",
+      "title": "商品标识符与库存报表",
+      "goal": "用已有格式策略表达真实业务数据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TB-U01",
+            "TB-C01",
+            "TB-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-U01",
+          "kind": "understand",
+          "goal": "解释数字形商品标识符与金额显示",
+          "prompt": "Trace the supplied report. Explain the displayed SKU and price values, column type inference and default numeric formatting. Distinguish changed display from mutated source records. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/products.json",
+            "materials/numeric-report.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TB-C01",
+          "kind": "consult",
+          "goal": "用已有按列策略保护商品标识符",
+          "prompt": "Recommend an existing API call that preserves the literal SKU strings while displaying prices with two decimal places. Explain global versus per-column disable_numparse and decide whether the library needs a patch. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/products.json",
+            "materials/numeric-report.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TB-P01",
+          "kind": "plan",
+          "goal": "规划库存报表与机器导出边界",
+          "prompt": "Plan the supplied inventory report: explicit field order, literal identifiers, prices, None versus empty strings, immutable source records and a separate machine-readable export. Use existing APIs and state format limits. Do not implement changes.",
+          "requires": [],
+          "materials": [
+            "materials/products.json",
+            "materials/report-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan_no_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TB-S02",
+      "title": "标识符变化的最小取证",
+      "goal": "先取得实际数据再诊断显示变化",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TB-D01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "TB-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "TB-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-D01",
+          "kind": "diagnose",
+          "goal": "先取原值和调用再判断标识符变化",
+          "prompt": "Investigate the supplied display symptom. Request original values, the exact formatting call and observed output before assigning a cause. Use actual subsequent evidence; if unavailable, state the limit and evidence plan. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/display-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "report-evidence",
+              "when": "The actual source values, formatting call and output have not been disclosed, the conversation does not say they are unavailable, and the answer reasonably requests them or an equivalent sufficient reproduction.",
+              "materials": [
+                "disclosure/actual-report.py",
+                "disclosure/actual-output.txt"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TB-S03",
+      "title": "可复用的序列排版配置",
+      "goal": "独立诊断并修复tuple与list不一致",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TB-D02",
+            "TB-M01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "TB-D02"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "TB-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-D02",
+          "kind": "diagnose",
+          "goal": "定位tuple排版参数与list的差异",
+          "prompt": "Trace the complete supplied layout reproduction. Explain why list configuration works while rowalign and maxheadercolwidths tuples fail. Locate the shared source boundary and preserve the successful controls. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/tuple-layout.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-D02.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-D02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TB-M01",
+          "kind": "modify",
+          "goal": "统一tuple排版序列并保持原有输出",
+          "prompt": "Repair the complete supplied tuple/list layout contract. Cover rowalign and maxheadercolwidths, preserve defaults and caller sequences, and deliver meaningful original-failing public tests. Modify only the two authorized files.",
+          "requires": [],
+          "materials": [
+            "materials/tuple-layout.py",
+            "materials/tuple-contract.md"
+          ],
+          "allowed_paths": [
+            "library/tabulate/__init__.py",
+            "library/test/test_api.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TB-S04",
+      "title": "HTML与中文终端输出",
+      "goal": "按介质选择文字表示与宽度策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TB-U02",
+            "TB-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-U02",
+          "kind": "understand",
+          "goal": "解释HTML文字转义与显式原始标记",
+          "prompt": "Explain the two HTML outputs for the supplied ordinary <b>商品</b> cell. Which output treats it as literal text and which preserves markup? Distinguish explicit format selection from a general guarantee about every output medium. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/output-medium.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TB-C02",
+          "kind": "consult",
+          "goal": "规划中文终端表的显示宽度",
+          "prompt": "Assess the supplied Chinese grid output under the pinned wcwidth environment. Explain display columns versus Python character counts, maxcolwidths versus a whole-table terminal budget, and existing configuration/application choices. Do not promise an automatic total-width allocator or modify files.",
+          "requires": [],
+          "materials": [
+            "materials/output-medium.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TB-S05",
+      "title": "本地报表CLI",
+      "goal": "核真实输入格式、表头与文件副作用",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TB-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-U03",
+          "kind": "understand",
+          "goal": "核对真实CLI的CSV与JSONL输入输出",
+          "prompt": "Explain and, where useful, run the supplied candidate CLI cases. Cover quoted CSV commas, first-row headers, JSONL keys, file versus stdout output and unsupported output format status. Distinguish actual CLI options from richer Python API options. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/cli-inputs.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

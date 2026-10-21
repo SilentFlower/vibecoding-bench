@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DS-C02",
+  "source_commit": "db592cc041014762bba55fd544e982170831f227",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The automatically created business-key index is ordinary, not a unique constraint. This upsert is update followed by conditional insert, not a single atomic database conflict statement. Define an actual unique constraint and explicit conflict/transaction/retry handling supported by the chosen backend; do not promise concurrency safety from the helper or from a sequential SQLite sample.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,1 @@
+Fresh parser each time: --tag action=append,default=[base],env_var=APP_TAGS. Compare CLI --tag cli plus env APP_TAGS=["env1","env2"] plus config tag=[cfg]; then env+config withoutCLI; then config only. All values are synthetic. Determine source precedence versus the separate argparse default-list append behavior; do not assume list sources all concatenate.

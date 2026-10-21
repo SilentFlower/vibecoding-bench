@@ -1,0 +1,270 @@
+{
+  "schema": 2,
+  "project_key": "petl",
+  "title": "PETL订单表流转工作场景",
+  "category": "本地ETL与表交换",
+  "description": "固定真实源码上的惰性表、转换错误、重复键关联和CSV协议八项独立只读任务。",
+  "seed_digest": "0fc02f2f761e1a7fb05acf2cbb044dbdb6016597e8f411be41c1e8c52de10186",
+  "environment": "petl-py312",
+  "source": {
+    "repository": "https://github.com/petl-developers/petl",
+    "commit": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PE-S01",
+      "title": "惰性订单表视图",
+      "goal": "区分重执行、一次源和稳定快照要求",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PE-U01",
+            "PE-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PE-U01",
+          "kind": "understand",
+          "goal": "解释惰性表视图的实际拉取与重读",
+          "prompt": "Trace the supplied reusable-source convert view before consumption, after two traversals, and after changing the underlying row before a third traversal. Is it a frozen snapshot? Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/lazy-source.py",
+            "materials/replay-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PE-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/PE-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PE-C01",
+          "kind": "consult",
+          "goal": "为重复读取明确可重读源或物化边界",
+          "prompt": "Advise how to satisfy the supplied stable repeated-read requirement. Compare the exact one-shot iterator example with the reusable source and identify an appropriate size/replay policy using existing capabilities. Do not modify files.",
+          "requires": [],
+          "materials": [
+            "materials/lazy-source.py",
+            "materials/replay-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PE-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/PE-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PE-S02",
+      "title": "订单数量转换与拒绝策略",
+      "goal": "按真实消费时机选择错误和发布边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PE-U02",
+            "PE-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PE-U02",
+          "kind": "understand",
+          "goal": "解释数量转换的替代值和异常策略",
+          "prompt": "Trace all supplied qty conversion policies on the complete table. Give the good/invalid row values and distinguish a replacement marker from an exception object or raised error. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/conversion.json",
+            "materials/conversion-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PE-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/PE-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PE-C02",
+          "kind": "consult",
+          "goal": "在消费时校验完整订单后再发布",
+          "prompt": "Plan the supplied reject-bad-file policy with current conversion options and lazy consumption behavior. Explain what must happen before publication and how partial consumption affects side effects. No implementation is authorized.",
+          "requires": [],
+          "materials": [
+            "materials/conversion.json",
+            "materials/conversion-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PE-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/PE-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PE-S03",
+      "title": "订单与价格表关联",
+      "goal": "解释关联基数并明确一价一键的业务规则",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PE-U03",
+            "PE-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PE-U03",
+          "kind": "understand",
+          "goal": "解释重复键关联的真实输出基数",
+          "prompt": "Trace join and leftjoin for the supplied order/price tables and explicit key. Give matching combinations and treatment of unmatched B. Does either operation choose one A price automatically? Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/join.json",
+            "materials/join-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PE-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/PE-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PE-C03",
+          "kind": "consult",
+          "goal": "在一价一键规则明确后再关联",
+          "prompt": "Advise how to meet the supplied one-approved-price-per-SKU requirement given the actual duplicate table. Identify the needed business decision/validation before using existing joins. Do not modify the library or silently pick an arbitrary price.",
+          "requires": [],
+          "materials": [
+            "materials/join.json",
+            "materials/join-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PE-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/PE-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PE-S04",
+      "title": "CSV交换保真",
+      "goal": "保留标识符和文本，并明确缺失值协议",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PE-U04",
+            "PE-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PE-U04",
+          "kind": "understand",
+          "goal": "解释CSV字符串、前导零和显式数量转换",
+          "prompt": "Trace the supplied CSV extraction, qty conversion and temporary roundtrip. Explain actual field types, SKU001, quoted comma and Unicode behavior. Do not access real files or edit project files.",
+          "requires": [],
+          "materials": [
+            "materials/orders.csv",
+            "materials/csv-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PE-U04.rubric.json",
+            "semantic": true,
+            "native": "verification/PE-U04.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PE-P01",
+          "kind": "plan",
+          "goal": "规划缺失值与空字符串的交换协议",
+          "prompt": "Plan the supplied CSV exchange so the receiver can distinguish missing None from an empty string where required. Ground the proposal in the actual default roundtrip and existing APIs; identify encoding/schema decisions explicitly without implementing changes.",
+          "requires": [],
+          "materials": [
+            "materials/orders.csv",
+            "materials/csv-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_with_explicit_exchange_policy"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PE-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/PE-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

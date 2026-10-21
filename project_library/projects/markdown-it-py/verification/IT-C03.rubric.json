@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IT-C03",
+  "source_commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The reused env intentionally supplies the first reference and creates that link, while a fresh empty env leaves [a] unresolved as literal text. Create or deliberately scope an env per independent document and retain it only for that parse/render operation. Do not claim the parser automatically clears caller metadata or that all shared env usage is a defect.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

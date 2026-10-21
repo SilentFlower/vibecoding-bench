@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IT-D01",
+  "source_commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Initially request sufficient actual parser construction, rule/dependency state and reproduction without assuming which condition failed. Relate only disclosed evidence to the pinned APIs and support the diagnosis and compatible remedy. Unavailable material permits insufficient_information and an evidence plan, rather than an invented parser defect.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

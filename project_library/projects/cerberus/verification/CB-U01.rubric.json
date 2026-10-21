@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CB-U01",
+  "source_commit": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default validate converts the copied document n from\"2\" to2 and returnsTrue; input remains the string. normalizeFalse skips coercion so string2 fails integer validation. The bool result and validator.document are separate outputs; do not claim conversion mutates the supplied mapping.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

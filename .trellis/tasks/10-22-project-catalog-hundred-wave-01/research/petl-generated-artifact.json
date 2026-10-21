@@ -1,0 +1,12 @@
+{
+  "project": "petl",
+  "revision": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+  "artifact": "seed/library/petl/version.py",
+  "sha256": "a46ce91b7244f8e5351bf3805234e2f13b91e330fc44ee3a5d8de4973df59c03",
+  "origin": ".deploy/github-100-research/data-tools/petl/source/petl/version.py",
+  "generated_version": "0.1.dev1",
+  "generated_commit": "gcd5ed9dd3",
+  "build_rule": "setup.py use_scm_version write_to=petl/version.py",
+  "tracked_source_untouched": true,
+  "scope": "固定提交原始构建生成的运行版本模块；非Git跟踪文件，不能删掉后用另一份已安装PETL替代候选"
+}

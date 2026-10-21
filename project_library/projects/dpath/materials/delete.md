@@ -1,0 +1,1 @@
+Synthetic object{xs:[A,B,C]};delete xs/1,then xs/2,and separately delete missing. Observe exact list content and exception behavior; retained item indexes must not be silently reinterpreted. No real data or project edits are authorized for this explanation.

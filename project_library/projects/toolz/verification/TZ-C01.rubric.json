@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TZ-C01",
+  "source_commit": "451af60dec590a6010e2babdbf391ea8f815122f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "curried.map remains lazy, so double is not called before consumption. partition_all preserves (2,4),(6,8),(10,), while default partition drops the incomplete (10,) tail. Choose partition_all when every record must be exported, and do not accidentally reuse an exhausted comparison iterator or claim curry materializes data.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

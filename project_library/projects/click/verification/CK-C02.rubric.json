@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CK-C02",
+  "source_commit": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use get_parameter_source for actual recorded direct parsing and preserve None as unknown when no record exists. Do not pretend arbitrary Python invoke/forward calls are command-line input or claim the pinned source has a new INVOCATION source.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

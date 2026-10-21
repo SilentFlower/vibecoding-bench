@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TZ-U04",
+  "source_commit": "451af60dec590a6010e2babdbf391ea8f815122f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The result is a new outer dict with theme=dark, while base.theme remains light. merge is shallow and shares the options object, so appending b through result.options.labels also changes base nested labels to[a,b]. Do not call it a deep immutable copy or claim the merge call itself replaced base.theme.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

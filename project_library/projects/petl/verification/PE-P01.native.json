@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PE-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "csv_reads_strings_and_preserves_selected_fields": true,
+    "plain_csv_collapses_none_and_empty_string": true
+  },
+  "resource_profile": "business"
+}

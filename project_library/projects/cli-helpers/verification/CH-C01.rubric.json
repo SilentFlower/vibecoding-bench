@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CH-C01",
+  "source_commit": "e2538b1d338ead4ed803ec0017017bf6779a380b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Choose existing CSV/JSONL for defined machine exchange and a display format for people. Explain the actual None policies and iterator interface with correct consumption; no library modification is required for selecting formats.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

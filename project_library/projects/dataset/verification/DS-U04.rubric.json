@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DS-U04",
+  "source_commit": "db592cc041014762bba55fd544e982170831f227",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Ordering by score then id produces C,A,B; offset1/limit2 returns A,B. The named :status parameter binds the entire literal x' OR 1=1 -- and returns only A, without expanding the WHERE condition. Explicit ordering is required for a specified repeatable page; do not claim default row order or string interpolation is equivalent.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

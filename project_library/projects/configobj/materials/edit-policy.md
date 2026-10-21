@@ -1,0 +1,1 @@
+Parse the supplied synthetic lines with encoding="utf-8", change service.limit to "3" in a separate in-memory experiment, and inspect write() without a filename. Explain original comments and Unicode, returned element types and how a caller can use an appropriate memory/binary output target. No project files may be edited. Is this a general byte-identical text editor?

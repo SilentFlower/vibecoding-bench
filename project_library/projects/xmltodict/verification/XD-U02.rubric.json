@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "XD-U02",
+  "source_commit": "6e29fba282e68631034dd2722a413b4e35276584",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain that the empty list emits no child, while None, [None] and [\"\"] produce explicit empty children in this mapping. Ground the distinction in actual XML, without equating all empty values.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use actual supplied materials and pinned source, respect authorization and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

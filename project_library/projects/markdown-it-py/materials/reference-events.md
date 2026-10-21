@@ -1,0 +1,1 @@
+Call parser.parse on the supplied definitions with an explicit empty env dict; inspect tokens, env.references and env.duplicate_refs including source maps. Then render [a] using that same env and compare rendering [a] with a fresh empty dict. These represent separate documents for the isolation question. All URLs are inert strings and are not fetched.

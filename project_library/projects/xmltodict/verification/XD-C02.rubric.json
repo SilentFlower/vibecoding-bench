@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "XD-C02",
+  "source_commit": "6e29fba282e68631034dd2722a413b4e35276584",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Ground the answer in expanded URI keys and the actual namespaces mapping API. Distinguish URI identity from arbitrary XML prefixes and disclose potential collisions when removing namespaces; do not promise lexical prefix preservation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use actual supplied materials and pinned source, respect authorization and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PE-U04"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "csv_reads_strings_and_preserves_selected_fields": true
+  },
+  "resource_profile": "business"
+}

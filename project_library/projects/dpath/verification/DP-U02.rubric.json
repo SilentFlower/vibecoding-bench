@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DP-U02",
+  "source_commit": "15759d96a006fef5278de731cd263b4d839094c3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "set updates two existing state matches and returns2; missing path returns0 without creating it. new creates and returns its original object with literal* as a key and numeric next component creating a list[{id:A}]. new path is literal construction rather than glob expansion; neither API establishes authorization or bounded user-path validation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

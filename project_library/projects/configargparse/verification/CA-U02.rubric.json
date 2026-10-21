@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CA-U02",
+  "source_commit": "3ab2f323abcdd321b6c423f9eb6304ce35681307",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "CLI case gives[base,cli], env case[base,env1,env2], config-only[base,cfg]. Lower-priority supplied sources are suppressed, while the declared nonempty default participates in append. List ordering/source precedence and default-list accumulation are distinct policies.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

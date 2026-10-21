@@ -1,0 +1,1 @@
+Produce a readable inventory report with explicit SKU/price columns, literal SKU identifiers, two decimal places for prices and N/A for None. Preserve the source records. Keep machine-readable CSV/JSON exports separate from display tables; choose an explicit policy for missing versus empty text. Do not implement a library change.

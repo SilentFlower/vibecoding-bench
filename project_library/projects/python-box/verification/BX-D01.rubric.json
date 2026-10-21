@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BX-D01",
+  "source_commit": "a4c10e977b574114613431394b30412b50aaacce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Initially request sufficient objects and update/merge method/options with observed output. Explain only what disclosed evidence supports; missing data alone cannot establish shallow replacement, default creation or a defect. insufficient_information is valid when reproduction cannot be supplied.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,321 @@
+{
+  "baseline_digest": "2ec38d4e98cbe35aa1808340aa1bfc8f8cdcae7dc6f71ff8658adfaf6c44b433",
+  "nodes": [
+    {
+      "id": "test/test_database.py::test_contains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_create_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_create_table_custom_id1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_create_table_custom_id2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_create_table_custom_id3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_create_table_no_ids",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_create_table_shorthand1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_create_table_shorthand2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_database_url_query_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_invalid_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_load_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_query",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_table_cache_updates",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_tables",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_thread_connections_released",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_valid_database_url",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_database.py::test_with",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_row_type.py::test_distinct",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_row_type.py::test_find",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_row_type.py::test_find_one",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_row_type.py::test_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_cased_column_names",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_chunked_insert",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_chunked_insert_callback",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_chunked_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_columns",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_count",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_create_column",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_delete",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_delete_nonexist_entry",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_distinct",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_drop_column",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_drop_operations",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_empty_query",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_ensure_column",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_find",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_find_dsl",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_find_one",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_insert",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_insert_ignore",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_insert_ignore_all_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_insert_json",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_insert_many",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_invalid_column_names",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_key_order",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_offset",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_startswith_endswith",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_streamed_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_table_drop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_table_drop_then_create",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_update_many",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_update_while_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_upsert",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_upsert_all_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_upsert_id",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_upsert_many",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_upsert_single_column",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_table.py::test_weird_column_names",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "dataset",
+  "python": "3.12.15",
+  "schema": 1
+}

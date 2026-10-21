@@ -1,0 +1,1 @@
+Complete synthetic call: Draft202012Validator({"type":"string","format":"email"}).is_valid("broken") returns True. No format_checker was passed. Compare the same schema with an explicit FormatChecker and valid a@example.test. No actual account or email service exists.

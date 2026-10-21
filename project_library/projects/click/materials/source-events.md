@@ -1,0 +1,1 @@
+Compare direct CLI --copies 4 with environment VB_CASE_COPIES=3 and default_map={"copies":2}; then remove each stronger source in order, ending with the declared default 1. These are synthetic values. A newly created Context before any parse has no recorded copies source; do not relabel an unknown Python invocation as command-line input.

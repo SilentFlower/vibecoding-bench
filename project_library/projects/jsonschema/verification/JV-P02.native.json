@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "JV-P02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "registry_has_explicit_resources_and_rejects_unknown": true
+  },
+  "resource_profile": "business"
+}

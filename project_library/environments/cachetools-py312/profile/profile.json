@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "cachetools-py312",
+  "adapter": "python-native",
+  "platform": "linux-amd64",
+  "python": "3.12.15",
+  "requirements": [
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==9.1.1"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+      "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+      "size": 386536
+    }
+  ],
+  "source_commit": "6f23e2a7b75a42d30cb9d890ab3ca4059ee01bfd",
+  "verification_status": "verified_target_runtime",
+  "tested_image": "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39609484070-1",
+  "tested_image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+  "tested_repository_digests": [
+    "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+  ],
+  "notes": "当前Python3.12.15镜像中实际完成原版366主项和8子测试校准；8个有native的任务完成原版正反验收，参考修改及完整原生回归通过，硬编码receiver错误候选拒绝，公开两测试原版失败／参考通过。业务256MiB／30秒，回归512MiB／180秒。D01语义路径与产品链mock尚未验证，不代表正式接入或真实模型完成。"
+}

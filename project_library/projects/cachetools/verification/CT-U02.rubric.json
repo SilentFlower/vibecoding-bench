@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CT-U02",
+  "source_commit": "6f23e2a7b75a42d30cb9d890ab3ca4059ee01bfd",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default hashkey preserves raw positional/keyword call structure and does not fill function defaults. typedkey distinguishes value types rather than normalizing signatures; a correctly defined existing custom key can normalize this specific function.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use only actually supplied evidence and the pinned public source. Respect the task authorization and distinguish observed facts, normal limitations and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations grounded in actual evidence; do not match wording, verbosity or a reference answer."
+}

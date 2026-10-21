@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TB-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "existing_column_policy": true,
+    "missing_value_policy": true,
+    "input_unchanged": true
+  },
+  "resource_profile": "business"
+}

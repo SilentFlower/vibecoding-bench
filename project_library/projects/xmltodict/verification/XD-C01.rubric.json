@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "XD-C01",
+  "source_commit": "6e29fba282e68631034dd2722a413b4e35276584",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use the real force_list tuple or callable API with the correct path/key semantics. Provide a valid policy for the supplied orders and preserve unrelated element shapes; no library change is required.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use actual supplied materials and pinned source, respect authorization and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

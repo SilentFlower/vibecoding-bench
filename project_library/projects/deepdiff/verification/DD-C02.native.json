@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DD-C02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "exact_exclusion_keeps_other_business_changes_and_inputs": true
+  },
+  "resource_profile": "business"
+}

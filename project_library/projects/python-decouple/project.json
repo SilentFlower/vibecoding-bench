@@ -1,0 +1,315 @@
+{
+  "schema": 2,
+  "project_key": "python-decouple",
+  "title": "Python-decouple应用配置工作场景",
+  "category": "应用配置与输入语义",
+  "description": "固定真实源码上的配置优先级、验证、取证、文件快照、编码和列表咨询；四场景九项无需改库任务。",
+  "seed_digest": "c19a29c30e6315ecbb6d5430415edfe0151cf8fc69be2eb2b2045f147195e8f6",
+  "environment": "python-decouple-py312",
+  "source": {
+    "repository": "https://github.com/HBNetwork/python-decouple",
+    "commit": "0573e6f96637f08fb4cb85e0552f0622d36827d4",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "DC-S01",
+      "title": "应用启动配置与验证",
+      "goal": "理解来源并规划显式启动校验",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DC-U01",
+            "DC-C01",
+            "DC-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-U01",
+          "kind": "understand",
+          "goal": "解释环境、文件、默认和空值顺序",
+          "prompt": "Trace the supplied synthetic configuration events. Explain which source wins, whether an empty environment value counts as present, and when a missing key uses its default or raises UndefinedValueError. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/startup.env",
+            "materials/startup-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DC-C01",
+          "kind": "consult",
+          "goal": "选择已有类型转换并处理失败",
+          "prompt": "Explain bool/int/Choices conversion for the supplied configuration and invalid-value events. Does a conversion error trigger the declared default? Recommend an explicit existing-API validation policy without changing the library.",
+          "requires": [],
+          "materials": [
+            "materials/startup.env",
+            "materials/startup-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DC-P01",
+          "kind": "plan",
+          "goal": "规划启动配置校验和完整发布",
+          "prompt": "Plan the supplied startup validation workflow with current Config, Csv, Choices or explicit callables. Include source precedence, range/choice checks, field-error collection and publication only after complete validation. Do not implement changes or invent a built-in schema API.",
+          "requires": [],
+          "materials": [
+            "materials/startup.env",
+            "materials/startup-events.md",
+            "materials/startup-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan_no_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DC-S02",
+      "title": "配置文件变化与最小取证",
+      "goal": "区分文件快照、环境变化和重载策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DC-D01",
+            "DC-C02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "DC-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "DC-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-D01",
+          "kind": "diagnose",
+          "goal": "先取读取时序再判断配置不更新",
+          "prompt": "Investigate the supplied stale-file symptom. Request the actual repository construction, file-edit/read sequence and relevant environment override state before assigning a cause. Diagnose actual disclosed evidence only; if unavailable, explain the limit and evidence plan. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/reload-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "reload-evidence",
+              "when": "Actual construction, file-edit/read timing and relevant environment override state have not been disclosed, the conversation does not say they are unavailable, and the answer reasonably requests them or an equivalent sufficient reproduction.",
+              "materials": [
+                "disclosure/reload.py",
+                "disclosure/reload-events.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "DC-C02",
+          "kind": "consult",
+          "goal": "区分文件快照和动态环境读取",
+          "prompt": "Explain the complete supplied file-reload reproduction and the separate environment-change comparison. Recommend an explicit existing-API reload/publication policy, including consistency tradeoffs, without adding a library reload method or changing files.",
+          "requires": [],
+          "materials": [
+            "materials/reload.py",
+            "materials/reload-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DC-S03",
+      "title": "文件编码与ENV输入方言",
+      "goal": "用实际解析能力解决输入兼容问题",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DC-U02",
+            "DC-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-U02",
+          "kind": "understand",
+          "goal": "用已有编码参数识别文件首BOM",
+          "prompt": "Explain the supplied BOM reproduction under default UTF-8 and explicit utf-8-sig. Show why the first key is affected and whether an existing API solves it, preserving the embedded U+FEFF inside a value. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/encoding-reproduction.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained_with_existing_solution"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DC-C03",
+          "kind": "consult",
+          "goal": "明确ENV简单方言与shell的区别",
+          "prompt": "Explain how the actual RepositoryEnv reads the supplied export, #, equals and quoted lines. Is it a shell or a universal dotenv parser? Recommend a compatible input/application policy without executing shell syntax or modifying the library.",
+          "requires": [],
+          "materials": [
+            "materials/simple-dialect.env"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DC-S04",
+      "title": "列表配置与字面字段",
+      "goal": "区分shlex助手和标准CSV需求",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DC-U03",
+            "DC-C04"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-U03",
+          "kind": "understand",
+          "goal": "解释Csv的shlex与后处理语义",
+          "prompt": "Trace the supplied Csv calls, including #, backslashes, consecutive delimiters, a quoted comma and int/tuple postprocessing. Distinguish this existing helper behavior from complete RFC-style CSV field preservation. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/list-casts.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DC-C04",
+          "kind": "consult",
+          "goal": "用已有callable cast满足字面CSV保真",
+          "prompt": "Meet the supplied literal CSV requirement using existing Config cast support where possible. Preserve #, backslash and the empty field, keep default Csv compatibility, and explain quote/error handling. Decide whether changing the library is necessary; do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/list-casts.py",
+            "materials/literal-list-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-C04.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-C04.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

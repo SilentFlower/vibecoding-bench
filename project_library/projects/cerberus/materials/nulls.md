@@ -1,0 +1,1 @@
+Schema a={type:integer,default:5},b={type:integer,nullable:True,default:5}. Compare complete documents {a:None,b:None},{},{a:0,b:0} using validated. Separately schema n={required:True,nullable:True,type:integer} checks{} and{n:None}. Explain missing/null/zero without assuming they are interchangeable.

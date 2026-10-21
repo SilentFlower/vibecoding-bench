@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BT-C02",
+  "source_commit": "8ec5fe29420d14998c0d86885083983eaea8b839",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "application/json object withquantity0 and array[1,2] both parse and the unvalidated echo returns200; malformedJSON produces400; text/plain produces request.jsonNone and echo200. Parsing acceptsJSON values, not an object/positive-quantity schema or an unsupported-media rejection policy. Explicitly enforce media type, object shape, integer semantics including bool exclusion if required,positive range and errors before business effects.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

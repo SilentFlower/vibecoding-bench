@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DU-C02",
+  "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The unresolved target generates an ERROR/system_message level3 and problematic reference. report_level5 changes report visibility but halt_level6 still permits return. halt_level3 raises SystemMessage at this error. Set explicit halt and catch/report at the application boundary, or deliberately use the documented CLI exit policy; report suppression alone is not a failing build gate.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

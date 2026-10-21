@@ -1,0 +1,343 @@
+{
+  "baseline_digest": "e1c02f2be7416263a03e9e971525b665f0e1b83c57b98598b11f879d435fc5eb",
+  "framework": "unittest",
+  "nodes": [
+    {
+      "id": "test_icecream.TestIceCream.test_arg_to_string_function",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_as_argument",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_call_surrounded_by_expressions",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_coloring",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_comments",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_complicated",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_configure_output_with_no_parameters",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_context_abs_path_multi_line",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_context_abs_path_single_line",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_different_name",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_empty_repr_multiline_output_no_crash",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_enable_disable",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_expression_arguments",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_flat_medium_list_prints_on_one_line",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_format",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_include_context_multi_line",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_include_context_single_line",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_metadata",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_method_arguments",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_multiline_container_args",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_multiline_invocation_with_comments",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_multiline_strings_output",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_multiline_value_wrapped",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_multiple_arguments",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_multiple_arguments_long_line_wrapped",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_multiple_calls_on_same_line",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_multiple_tuple_arguments",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_nested_multiline",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_no_color_disables_coloring",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_no_color_toggle",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_no_color_with_explicit_output_function",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_no_color_with_use_stderr",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_no_color_with_use_stdout",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_no_source_available_issues_exactly_one_warning",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_no_source_available_prints_multiline",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_no_source_available_prints_values",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_non_ascii_characters_no_syntax_highlighting",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_output_function",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_prefix_configuration",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_return_value",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_single_argument",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_single_argument_long_line_not_wrapped",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_single_tuple_argument",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_singledispatch_argument_to_string",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_sympy_dict_keys_do_not_crash",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_sympy_solve_result_does_not_crash",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_timer_context_manager_basic",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_timer_context_manager_exit_without_enter",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_timer_context_manager_measures_elapsed_time",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_timer_context_manager_propagates_exception",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_timer_context_manager_resets_enter_time_after_exit",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_timer_context_manager_when_disabled",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_timer_decorator_nested",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_timer_decorator_output_function",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_timer_decorator_output_on_exception",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_timer_decorator_prefix_configuration",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_timer_decorator_preserves_function_metadata",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_timer_decorator_return_value",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_timer_decorator_when_disabled",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_timer_decorator_with_arguments",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_values",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_with_timer_decorator",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_icecream.TestIceCream.test_without_args",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_install.TestIceCreamInstall.test_install",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_install.TestIceCreamInstall.test_uninstall",
+      "kind": "UnittestCase",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "stdlib",
+      "module": "unittest",
+      "module_sha256": "32ed48385c0377bc2900a76e9a6acc3705aeef402c72de8554b3c637420506f0",
+      "version": "3.12.15"
+    }
+  ],
+  "project": "icecream",
+  "python": "3.12.15",
+  "schema": 1,
+  "unittest_skips": []
+}

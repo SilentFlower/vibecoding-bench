@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PM-C03",
+  "source_commit": "b41e0aaf1181f1a8cb200cf5a815aad7c0020d23",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Short aliases depend on installed markdown.extensions entry points; an importable source checkout alone does not supply them. In the supplied environment tables falls through to a module import and fails. Existing full markdown.extensions.tables or a TableExtension instance loads the actual candidate and yields equivalent output. Do not claim a universal alias failure for properly installed distributions or install another implementation as a substitute.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

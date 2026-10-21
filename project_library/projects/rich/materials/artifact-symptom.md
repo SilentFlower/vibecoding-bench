@@ -1,0 +1,1 @@
+The invoice appeared in terminal output, but a later HTML artifact lacks its content. Actual Console construction, rendering/export call sequence, clear parameters and original outputs are not supplied. Investigate before deciding the cause.

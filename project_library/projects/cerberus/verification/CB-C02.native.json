@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CB-C02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "unknown_policy_distinguishes_reject_purge_and_allow": true
+  },
+  "resource_profile": "business"
+}

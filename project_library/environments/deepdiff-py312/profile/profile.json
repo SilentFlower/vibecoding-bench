@@ -1,0 +1,197 @@
+{
+  "schema": 1,
+  "id": "deepdiff-py312",
+  "adapter": "python-native",
+  "platform": "linux-amd64",
+  "python": "3.12.15",
+  "requirements": [
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==9.0.3",
+    "annotated-types==0.8.0",
+    "cachebox==5.2.3",
+    "click==8.3.3",
+    "jsonpickle==4.1.4",
+    "numpy==2.2.6",
+    "orderly-set==5.5.0",
+    "orjson==3.11.9",
+    "pandas==3.0.6",
+    "polars==1.39.3",
+    "polars-runtime-32==1.39.3",
+    "py-cpuinfo==9.0.0",
+    "pydantic==2.12.5",
+    "pydantic_core==2.41.5",
+    "pytest-benchmark==5.2.3",
+    "python-dateutil==2.9.0.post0",
+    "python-dotenv==1.2.4",
+    "pytz==2026.5",
+    "PyYAML==6.0.3",
+    "six==1.17.0",
+    "tomli==2.4.1",
+    "tomli-w==1.2.0",
+    "typing-inspection==0.4.4",
+    "typing_extensions==4.16.0",
+    "uuid6==2025.0.1"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-9.0.3-py3-none-any.whl",
+      "digest": "2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9",
+      "size": 375249
+    },
+    {
+      "path": "artifacts/annotated_types-0.8.0-py3-none-any.whl",
+      "digest": "f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0",
+      "size": 13427
+    },
+    {
+      "path": "artifacts/cachebox-5.2.3-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "digest": "2a1e7d3cb8a5e7e68996a8619e3ef8771a124d14568c251f9e586eba88d759c1",
+      "size": 398223
+    },
+    {
+      "path": "artifacts/click-8.3.3-py3-none-any.whl",
+      "digest": "a2bf429bb3033c89fa4936ffb35d5cb471e3719e1f3c8a7c3fff0b8314305613",
+      "size": 110502
+    },
+    {
+      "path": "artifacts/jsonpickle-4.1.4-py3-none-any.whl",
+      "digest": "c46024ba4acd8adb9a8b8485d074e141cbfacafe334c2aa982e5b32efabc2f0e",
+      "size": 47763
+    },
+    {
+      "path": "artifacts/numpy-2.2.6-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "digest": "fd83c01228a688733f1ded5201c678f0c53ecc1006ffbc404db9f7a899ac6249",
+      "size": 16527618
+    },
+    {
+      "path": "artifacts/orderly_set-5.5.0-py3-none-any.whl",
+      "digest": "46f0b801948e98f427b412fcabb831677194c05c3b699b80de260374baa0b1e7",
+      "size": 13068
+    },
+    {
+      "path": "artifacts/orjson-3.11.9-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "digest": "be4fa4f0af7fa18951f7ab3fc2148e223af211bf03f59e1c6034ec3f97f21d61",
+      "size": 134014
+    },
+    {
+      "path": "artifacts/pandas-3.0.6-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "0704044b676496b8350e023b09f174a26772456c974a2b11c36bebb558c9490d",
+      "size": 10788193
+    },
+    {
+      "path": "artifacts/polars-1.39.3-py3-none-any.whl",
+      "digest": "c2b955ccc0a08a2bc9259785decf3d5c007b489b523bf2390cf21cec2bb82a56",
+      "size": 823985
+    },
+    {
+      "path": "artifacts/polars_runtime_32-1.39.3-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "digest": "8bc9e13dc1d2e828331f2fe8ccbc9757554dc4933a8d3e85e906b988178f95ed",
+      "size": 46877498
+    },
+    {
+      "path": "artifacts/py_cpuinfo-9.0.0-py3-none-any.whl",
+      "digest": "859625bc251f64e21f077d099d4162689c762b5d6a4c3c97553d56241c9674d5",
+      "size": 22335
+    },
+    {
+      "path": "artifacts/pydantic-2.12.5-py3-none-any.whl",
+      "digest": "e561593fccf61e8a20fc46dfc2dfe075b8be7d0188df33f221ad1f0139180f9d",
+      "size": 463580
+    },
+    {
+      "path": "artifacts/pydantic_core-2.41.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "digest": "eceb81a8d74f9267ef4081e246ffd6d129da5d87e37a77c9bde550cb04870c1c",
+      "size": 2075366
+    },
+    {
+      "path": "artifacts/pytest_benchmark-5.2.3-py3-none-any.whl",
+      "digest": "bc839726ad20e99aaa0d11a127445457b4219bdb9e80a1afc4b51da7f96b0803",
+      "size": 45255
+    },
+    {
+      "path": "artifacts/python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+      "digest": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
+      "size": 229892
+    },
+    {
+      "path": "artifacts/python_dotenv-1.2.4-py3-none-any.whl",
+      "digest": "42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc",
+      "size": 23266
+    },
+    {
+      "path": "artifacts/pytz-2026.5-py2.py3-none-any.whl",
+      "digest": "e658af3757f9e26a9d25dd2aff38335acd92bc9104f890a894b2c1ba28311b03",
+      "size": 506342
+    },
+    {
+      "path": "artifacts/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc",
+      "size": 807870
+    },
+    {
+      "path": "artifacts/six-1.17.0-py2.py3-none-any.whl",
+      "digest": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+      "size": 11050
+    },
+    {
+      "path": "artifacts/tomli-2.4.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "136443dbd7e1dee43c68ac2694fde36b2849865fa258d39bf822c10e8068eac5",
+      "size": 253341
+    },
+    {
+      "path": "artifacts/tomli_w-1.2.0-py3-none-any.whl",
+      "digest": "188306098d013b691fcadc011abd66727d3c414c571bb01b1a174ba8c983cf90",
+      "size": 6675
+    },
+    {
+      "path": "artifacts/typing_inspection-0.4.4-py3-none-any.whl",
+      "digest": "65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147",
+      "size": 14750
+    },
+    {
+      "path": "artifacts/typing_extensions-4.16.0-py3-none-any.whl",
+      "digest": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+      "size": 45571
+    },
+    {
+      "path": "artifacts/uuid6-2025.0.1-py3-none-any.whl",
+      "digest": "80530ce4d02a93cdf82e7122ca0da3ebbbc269790ec1cb902481fa3e9cc9ff99",
+      "size": 6979
+    }
+  ],
+  "source_commit": "79e4379278b1cfdd8e9e3dccac364956908e8989",
+  "verification_status": "verified_target_runtime"
+}

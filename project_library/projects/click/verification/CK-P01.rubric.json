@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CK-P01",
+  "source_commit": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Give a workable explicit policy: x/exclusive creation for no-overwrite, or a validated temporary result and deliberate atomic replacement when replacement is allowed. A pre-check alone is racy and atomic replacement alone does not mean no-overwrite. Do not promise transactions or invent a Click must_not_exist API.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

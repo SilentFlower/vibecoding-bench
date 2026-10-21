@@ -1,0 +1,1 @@
+Schema: {"type":"object","properties":{"retries":{"type":"integer","default":3}},"required":["retries"]}. Validate an initially empty dict and compare with {"retries":3}; inspect whether validation inserts defaults or changes its input. No mutation is authorized.

@@ -1,0 +1,282 @@
+{
+  "schema": 2,
+  "project_key": "click",
+  "title": "Click工具命令工作场景",
+  "category": "命令参数与应用交互",
+  "description": "固定真实源码上的批处理参数、配置来源、文件发布和错误附注增强；四场景八任务。",
+  "seed_digest": "24c87bbf14d4d0f69a21dafc9592c3f531c403f17a4a38aa5c4ae3573ecc833c",
+  "environment": "click-py312",
+  "source": {
+    "repository": "https://github.com/pallets/click",
+    "commit": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CK-S01",
+      "title": "批处理命令的参数设计",
+      "goal": "用已有参数类型表达标签和文件批次",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CK-U01",
+            "CK-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CK-U01",
+          "kind": "understand",
+          "goal": "解释重复标签、Choice与范围转换",
+          "prompt": "Trace the supplied order command and invocation events. Explain repeated tag values, no-tag defaults, case-insensitive Choice normalization and IntRange failure/exit behavior. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/order-command.py",
+            "materials/argument-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CK-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/CK-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CK-C01",
+          "kind": "consult",
+          "goal": "选择已有重复选项和变长位置参数",
+          "prompt": "Recommend an existing parameter design for repeated tags and a separate batch of positional files. Explain why a literal comma does not split a tag and how multiple=True differs from Argument(nargs=-1) and unsupported variadic options. Decide whether a library change is needed.",
+          "requires": [],
+          "materials": [
+            "materials/order-command.py",
+            "materials/argument-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CK-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/CK-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CK-S02",
+      "title": "参数配置与真实来源",
+      "goal": "解释实际来源并保留未知状态",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CK-U02",
+            "CK-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CK-U02",
+          "kind": "understand",
+          "goal": "核对四层参数值与来源",
+          "prompt": "Trace the supplied source command and removal sequence. Give the selected value and ParameterSource for CLI, environment, default_map and declared default. Distinguish actual provenance from equality to a default. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/source-command.py",
+            "materials/source-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CK-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/CK-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CK-C02",
+          "kind": "consult",
+          "goal": "用已有接口解释来源并保留未知",
+          "prompt": "Recommend how the supplied application can report the source of a directly parsed parameter using existing APIs. Explain what to do when Context has no recorded source, including Python-level invocation limits, without inventing provenance or rewriting parsing.",
+          "requires": [],
+          "materials": [
+            "materials/source-command.py",
+            "materials/source-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CK-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/CK-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CK-S03",
+      "title": "本地报告输出策略",
+      "goal": "区分路径验证、拒绝覆盖和原子发布",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CK-C03",
+            "CK-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CK-C03",
+          "kind": "consult",
+          "goal": "澄清exists=False与禁止覆盖的区别",
+          "prompt": "Assess the supplied output path policy. Does click.Path(exists=False) mean a destination must not exist? Explain actual behavior for existing and new paths and recommend an application boundary without changing the documented path meaning.",
+          "requires": [],
+          "materials": [
+            "materials/output-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CK-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/CK-C03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CK-P01",
+          "kind": "plan",
+          "goal": "规划拒绝覆盖和原子结果发布",
+          "prompt": "Plan the local report output workflow under the supplied policy. Separate path validation, exclusive creation versus intentional replacement, atomic publication, race boundaries and cleanup. Use existing Click/Python APIs without implementing a library change.",
+          "requires": [],
+          "materials": [
+            "materials/output-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan_no_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CK-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/CK-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CK-S04",
+      "title": "可操作的命令错误信息",
+      "goal": "定位并增强受控错误附注输出",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CK-D01",
+            "CK-M01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "CK-D01"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "CK-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CK-D01",
+          "kind": "diagnose",
+          "goal": "定位CLI错误附注未显示的边界",
+          "prompt": "Use the complete supplied error-note reproduction. Explain why the command exits with the normal error status but the attached notes do not appear. Locate the actual controlled display boundary and distinguish an output enhancement from failed argument parsing. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/error-notes.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CK-D01.rubric.json",
+            "semantic": true,
+            "native": "verification/CK-D01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CK-M01",
+          "kind": "modify",
+          "goal": "展示有序错误附注并保护既有CLI输出",
+          "prompt": "Implement the complete public note-display enhancement for both base and usage errors. Preserve streams, color, unnoted output, usage, exit codes and format_message. Modify only the authorized implementation and new public test file, with meaningful original-failing tests.",
+          "requires": [],
+          "materials": [
+            "materials/error-notes.py",
+            "materials/notes-contract.md"
+          ],
+          "allowed_paths": [
+            "library/src/click/exceptions.py",
+            "library/tests/test_exceptions/test_click_exception.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CK-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/CK-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

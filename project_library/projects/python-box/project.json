@@ -1,0 +1,300 @@
+{
+  "schema": 2,
+  "project_key": "python-box",
+  "title": "Python-Box配置访问工作场景",
+  "category": "配置对象与字段治理",
+  "description": "固定真实纯Python源码上的属性键、默认读取、覆盖取证、已有递归合并、点键与严格转换八项独立只读任务。",
+  "seed_digest": "5286c17ca75866756e7ba0fc5ca17b93cd80f2cb556fa5d6c60908714cb746f1",
+  "environment": "python-box-py312",
+  "source": {
+    "repository": "https://github.com/cdgriffith/Box",
+    "commit": "a4c10e977b574114613431394b30412b50aaacce",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "BX-S01",
+      "title": "外部键与属性准入",
+      "goal": "保留原键并拒绝模糊属性入口",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BX-U01",
+            "BX-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BX-U01",
+          "kind": "understand",
+          "goal": "区分字典方法、属性别名和原始键",
+          "prompt": "Trace the complete first Box example and give actual attribute/item/key behavior. Explain why method names and converted aliases do not replace exact-key access. Do not modify files.",
+          "requires": [],
+          "materials": [
+            "materials/attribute-keys.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BX-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/BX-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BX-C01",
+          "kind": "consult",
+          "goal": "拒绝有歧义的属性别名配置",
+          "prompt": "Meet the complete attribute-facing ingestion requirement for the supplied two distinct keys. Compare actual default/error/no-conversion controls and recommend an explicit accepted-key policy without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/attribute-keys.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BX-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/BX-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BX-S02",
+      "title": "默认读取与必填预检",
+      "goal": "分清自动创建、缺失证据和业务校验",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BX-U02",
+            "BX-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BX-U02",
+          "kind": "understand",
+          "goal": "追踪默认读取为何创建嵌套配置",
+          "prompt": "Trace the retained default_box=True read experiment and report the final object. Explain whether this lookup is free of in-memory mutation and distinguish that from permission to edit project files.",
+          "requires": [],
+          "materials": [
+            "materials/missing.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BX-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/BX-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BX-P01",
+          "kind": "plan",
+          "goal": "规划不自动补结构的必填配置预检",
+          "prompt": "Plan the supplied required-customer/region preflight using current APIs and explicit schema rules. Compare noncreating controls and actual missing behavior; do not invent a library validator or implement changes.",
+          "requires": [],
+          "materials": [
+            "materials/missing.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BX-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/BX-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BX-S03",
+      "title": "环境覆盖与合并政策",
+      "goal": "从真实调用取证并选择已有嵌套／列表规则",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BX-D01",
+            "BX-C02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "BX-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "BX-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BX-D01",
+          "kind": "diagnose",
+          "goal": "先取实际覆盖调用再定位消失的连接设置",
+          "prompt": "Investigate the supplied disappeared-setting symptom. Request complete base/override objects, exact method/options and before/after values before assigning a cause. Diagnose disclosed evidence only or close with an evidence plan if unavailable. Do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/overlay-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BX-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "overlay-evidence",
+              "when": "The actual objects, update method/options and before/after values have not been supplied or declared unavailable, and the answer reasonably requests sufficient evidence.",
+              "materials": [
+                "disclosure/overlay.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "BX-C02",
+          "kind": "consult",
+          "goal": "用已有递归合并并明确列表重复政策",
+          "prompt": "Meet the complete nested-field/list-policy requirement using existing methods. Give actual update versus merge_update and default/extend/unique results on fresh objects; do not change source mappings or build a new merge feature.",
+          "requires": [],
+          "materials": [
+            "materials/merge-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BX-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/BX-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BX-S04",
+      "title": "字面点键协议",
+      "goal": "核构造时路径展开及明确的字面键政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BX-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BX-U03",
+          "kind": "understand",
+          "goal": "区分构造时路径展开和字面点键",
+          "prompt": "Trace the complete ordered-input and dotted-option controls, including actual resulting dictionaries and lookups. Explain construction-time expansion, reversed input order and existing literal-key controls. Do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/dots.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BX-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/BX-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BX-S05",
+      "title": "配置值严格转换",
+      "goal": "把近似转换与业务词汇校验分开",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BX-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BX-C03",
+          "kind": "consult",
+          "goal": "为严格业务开关补明确词汇校验",
+          "prompt": "Explain the complete ConfigBox casting results and recommend a strict business-input policy using existing behavior. Include whitespace, unknown values, integer failure and original data ownership. Do not alter global casting or implement changes.",
+          "requires": [],
+          "materials": [
+            "materials/config-casts.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BX-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/BX-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

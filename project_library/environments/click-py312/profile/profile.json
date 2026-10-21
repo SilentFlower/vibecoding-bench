@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "id": "click-py312",
+  "adapter": "python-native",
+  "platform": "linux-amd64",
+  "python": "3.12.15",
+  "requirements": [
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==9.1.1"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+      "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+      "size": 386536
+    },
+    {
+      "path": "artifacts/less/copyright",
+      "digest": "e769e64d04abc3d772e5f397d2848d193c1e2015ff4ca92d7b73dfec8ca791a5",
+      "size": 4579
+    },
+    {
+      "path": "artifacts/less/less",
+      "digest": "411d7dabb7fb71fc65a0ad4bc0349d543c36b4df8d2f875e192dbee934b2b13f",
+      "size": 198960
+    },
+    {
+      "path": "artifacts/less/less_590-2.1~deb12u2.debian.tar.xz",
+      "digest": "4a54c48a25cabb5408af6d7bc174cad96614e540b47d2b8962b3e13819fd9b30",
+      "size": 23852
+    },
+    {
+      "path": "artifacts/less/less_590-2.1~deb12u2.dsc",
+      "digest": "1a4219f8ec9342851805089d9ee5ec7c0150287d5722ecc914c50790673ad9a6",
+      "size": 2228
+    },
+    {
+      "path": "artifacts/less/less_590-2.1~deb12u2_amd64.deb",
+      "digest": "3c4ee8ce5e0f625e1169da9584e309c375a8a68e22de5821461d14446825cc1a",
+      "size": 132044
+    },
+    {
+      "path": "artifacts/less/less_590.orig.tar.gz",
+      "digest": "6aadf54be8bf57d0e2999a3c5d67b1de63808bb90deb8f77b028eafae3a08e10",
+      "size": 352574
+    }
+  ],
+  "source_commit": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+  "verification_status": "verified_target_runtime",
+  "notes": "Click完整原生分页测试需要Debian Bookworm less 590-2.1~deb12u2；制品以数据保存，验证器只在本次/work独占venv复制并赋予执行位，不改系统或挂载权限。保留官方包、许可和匹配源文件。 当前Python3.12.15镜像业务13条路径符合独立期望；参考完整原生2287节点匹配冻结合同。真实模型效果、真实产品链和交付另验。"
+}

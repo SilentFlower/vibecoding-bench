@@ -1,0 +1,1 @@
+Complete object {nil:None,disabled:False,count:0}. Compare get for each existing field and a missing field with one explicit unique sentinel, plus has for nil/missing. Separately query {"a.b":{"value":1},"a":{"b":{"value":2}}} with string a.b.value and token list ["a.b","value"]. An external field may contain literal dots. No files may be changed.

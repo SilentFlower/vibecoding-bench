@@ -1,0 +1,14 @@
+import click
+from click.testing import CliRunner
+
+@click.command()
+def ship():
+    """抛出带本地补救信息的合成错误。@return None。"""
+    error = click.ClickException("Order unavailable")
+    error.add_note("Check local input")
+    error.add_note("咖啡\nsecond line")
+    raise error
+
+result = CliRunner().invoke(ship)
+print(result.exit_code)
+print(result.stderr)

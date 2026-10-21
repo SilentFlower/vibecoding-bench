@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "PA-M01",
+  "source_commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Every required BaseException from the yielded user block restores the exact original bytes/permissions, closes reader and writer, removes the temporary backup and propagates the same original object. Preserve success, ordinary errors, text/binary and custom extension behavior, signatures and original native tests. Do not implement only a finite tuple of common exceptions or broaden to unrelated crash/setup guarantees.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized file that fail on the pinned original and pass after the repair; cite the actual implementation and tests. Preserve all original tests and controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

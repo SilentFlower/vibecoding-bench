@@ -1,0 +1,281 @@
+{
+  "schema": 2,
+  "project_key": "cli-helpers",
+  "title": "CLI Helpers数据输出工作场景",
+  "category": "查询导出与格式管线",
+  "description": "固定真实源码上的CSV/JSONL、数据保真、导出方案、选项隔离修复和一次性行输入咨询；四场景八任务。",
+  "seed_digest": "3697c8f0bd02a60d640370a622de699b07de0652769e9febe6933ac195ca5fa2",
+  "environment": "cli-helpers-py312",
+  "source": {
+    "repository": "https://github.com/dbcli/cli_helpers",
+    "commit": "e2538b1d338ead4ed803ec0017017bf6779a380b",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CH-S01",
+      "title": "查询结果的显示与机器导出",
+      "goal": "选择真实格式并规划明确导出合同",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CH-U01",
+            "CH-C01",
+            "CH-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CH-U01",
+          "kind": "understand",
+          "goal": "解释显示表、CSV和JSONL的真实数据表示",
+          "prompt": "Trace the supplied three-format export. Explain how the output is consumed and how commas, Unicode and None appear in a readable table, CSV and JSONL. Distinguish representation from mutated source data. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/export-formats.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CH-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/CH-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CH-C01",
+          "kind": "consult",
+          "goal": "选择人读报表和机器交换格式",
+          "prompt": "Recommend existing formatter choices for the supplied terminal report and machine importer. Explain how to consume results, preserve quoted commas/Unicode and handle nulls, without treating a padded display table as lossless serialization or changing the library.",
+          "requires": [],
+          "materials": [
+            "materials/export-formats.py",
+            "materials/export-contract.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CH-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/CH-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CH-P01",
+          "kind": "plan",
+          "goal": "规划明确列和失败边界的数据导出",
+          "prompt": "Plan the supplied local export contract with ordered fields, null/type rules, Unicode, output consumption, validation and file publication. State memory and partial-output limits from the real pipeline. Do not implement changes.",
+          "requires": [],
+          "materials": [
+            "materials/export-formats.py",
+            "materials/export-contract.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan_no_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CH-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/CH-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CH-S02",
+      "title": "JSON字段与精度边界",
+      "goal": "诊断表示限制并给出兼容策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CH-D01",
+            "CH-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CH-D01",
+          "kind": "diagnose",
+          "goal": "定位JSONL同名列与Decimal精度边界",
+          "prompt": "Use the complete supplied JSONL reproduction. Explain why one duplicate id value disappears and the Decimal does not retain all digits. Locate the actual adapter operations and distinguish observed representation limits from an already supported strict export mode. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/json-boundaries.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CH-D01.rubric.json",
+            "semantic": true,
+            "native": "verification/CH-D01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CH-C02",
+          "kind": "consult",
+          "goal": "用应用校验和显式字符串满足严格JSON需求",
+          "prompt": "Meet the supplied strict JSON importer requirements using existing application preprocessing where possible. Explain unique-header validation, Decimal text preservation and the resulting JSON type, without modifying files or silently changing every existing caller.",
+          "requires": [],
+          "materials": [
+            "materials/json-boundaries.py",
+            "materials/strict-json-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CH-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/CH-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CH-S03",
+      "title": "每次输出的选项隔离",
+      "goal": "独立定位并修复共享默认污染",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CH-D02",
+            "CH-M01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "CH-D02"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "CH-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CH-D02",
+          "kind": "diagnose",
+          "goal": "定位跨实例缺值选项污染",
+          "prompt": "Trace the complete missing-value reproduction. Explain why a later new formatter instance inherits a prior per-call option. Locate the shared mutation and distinguish it from input mutation or a chosen per-instance default. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/option-leak.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CH-D02.rubric.json",
+            "semantic": true,
+            "native": "verification/CH-D02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CH-M01",
+          "kind": "modify",
+          "goal": "隔离每次格式覆盖并保持注册默认",
+          "prompt": "Repair the complete per-call top-level option isolation contract for built-in and custom formatters. Preserve override priority, defaults, callers, preprocessors and output consumption. Modify only the authorized files and add meaningful original-failing public tests.",
+          "requires": [],
+          "materials": [
+            "materials/option-leak.py",
+            "materials/option-contract.md"
+          ],
+          "allowed_paths": [
+            "library/cli_helpers/tabular_output/output_formatter.py",
+            "library/tests/tabular_output/test_output_formatter.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CH-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/CH-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CH-S04",
+      "title": "一次性行结果的消费",
+      "goal": "为有限输入选择兼容且有界的办法",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CH-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CH-C03",
+          "kind": "consult",
+          "goal": "处理一次性行输入的有界兼容需求",
+          "prompt": "Explain the supplied generator-of-row-iterators result and recommend a compatible application workaround for a known finite local result set. Locate the repeated-consumption boundary, bound memory explicitly, and state limits for unbounded input. Do not edit files or claim a library repair has been delivered.",
+          "requires": [],
+          "materials": [
+            "materials/one-shot-rows.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CH-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/CH-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,312 @@
+{
+  "schema": 2,
+  "project_key": "more-itertools",
+  "title": "More-itertools流式处理工作场景",
+  "category": "迭代器与数据流",
+  "description": "固定真实源码上的取样副作用、严格分批取证、订单去重和有界缓存咨询，九项独立只读任务。",
+  "seed_digest": "13d8ffd83b5f0c71f58680f0caf72c6d12fab52540c51b130038e9268c64ff89",
+  "environment": "more-itertools-py312",
+  "source": {
+    "repository": "https://github.com/more-itertools/more-itertools",
+    "commit": "4aeb4338ae1407d8da9723e86da99efeb446f719",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "MI-S01",
+      "title": "单次数据流预览",
+      "goal": "对照原源拉取与包装迭代器输出",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MI-U01",
+            "MI-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MI-U01",
+          "kind": "understand",
+          "goal": "解释取样对单次源和回放流的不同影响",
+          "prompt": "Trace the supplied spy experiment, including source pulls before and after consuming the returned replay iterator. Explain why reading the original source directly afterward differs from using replay. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/preview.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MI-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/MI-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "MI-C01",
+          "kind": "consult",
+          "goal": "为有限前瞻选择缓存方式",
+          "prompt": "Advise whether the supplied peekable access pattern is suitable for a potentially unbounded stream. Explain bool, peek, negative indexing and retained output using the actual finite reproduction. No code changes are authorized.",
+          "requires": [],
+          "materials": [
+            "materials/preview.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MI-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/MI-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MI-S02",
+      "title": "订单分批导入边界",
+      "goal": "区分尾批校验、实际提交与完整导入保证",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MI-U02",
+            "MI-D01",
+            "MI-P01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "MI-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "MI-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MI-U02",
+          "kind": "understand",
+          "goal": "定位严格分批的延迟异常和末尾消费",
+          "prompt": "Trace normal and strict chunking of the supplied five records. Identify complete batches emitted, the incomplete tail consumed, and the point ValueError is raised. Does strict=True prevalidate the entire input before yielding anything? Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/batches.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MI-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/MI-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "MI-D01",
+          "kind": "diagnose",
+          "goal": "先取实际导入与提交时序再判断部分完成",
+          "prompt": "Investigate the supplied partial-import symptom. Request the actual iterator/options, loop and side-effect or commit boundaries before attributing the incident. Diagnose disclosed evidence only; close with an evidence plan if it cannot be provided. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/partial-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MI-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "partial-evidence",
+              "when": "The actual iterator/options, loop and side-effect or commit boundaries have not been disclosed, the conversation does not say they are unavailable, and the answer reasonably requests a sufficient reproduction.",
+              "materials": [
+                "disclosure/partial.py",
+                "disclosure/partial-events.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "MI-P01",
+          "kind": "plan",
+          "goal": "规划有限文件的完整校验与原子导入",
+          "prompt": "Plan the supplied all-or-nothing finite-file import with existing iterator helpers and application/storage controls. Address files larger than RAM, validation, transaction or staging boundaries, retries and irreversible external writes. Do not implement or invent a library transaction API.",
+          "requires": [],
+          "materials": [
+            "materials/atomic-import.md",
+            "materials/batches.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MI-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/MI-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MI-S03",
+      "title": "订单事件与标签去重",
+      "goal": "明确首条保留、键和逐次重复事件",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MI-C02",
+            "MI-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MI-C02",
+          "kind": "consult",
+          "goal": "用显式键满足订单首条与标签次序去重",
+          "prompt": "Meet the supplied first-order-event and ordered-label dedup requirements with existing APIs. Explain output order, raw unhashable label behavior and an explicit key. Do not substitute latest-revision selection or modify the library.",
+          "requires": [],
+          "materials": [
+            "materials/orders.json",
+            "materials/dedup-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MI-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/MI-C02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "MI-U03",
+          "kind": "understand",
+          "goal": "区分逐次重复事件和重复订单代表",
+          "prompt": "For the supplied event sequence, explain duplicates_everseen keyed by order. List which original event records appear and how to obtain one representative per duplicated order with current helpers. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/orders.json",
+            "materials/dedup-requirements.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MI-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/MI-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MI-S04",
+      "title": "有限回看与恢复",
+      "goal": "理解当前缓存位置和持久检查点的责任",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MI-U04",
+            "MI-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MI-U04",
+          "kind": "understand",
+          "goal": "解释有限缓存的相对起点和动态视图",
+          "prompt": "Trace the supplied maxlen=2 seekable experiment. Explain what seek(0) means after cache eviction, what the retained SequenceView shows before and after reading D, and whether original A is still replayable from this object. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/seek.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MI-U04.rubric.json",
+            "semantic": true,
+            "native": "verification/MI-U04.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "MI-C03",
+          "kind": "consult",
+          "goal": "区分内存回看与进程重启检查点",
+          "prompt": "Advise on bounded lookahead and process-restart recovery for the supplied seekable consumer. Explain maxlen=0 peek behavior and identify what durable position/source guarantees must come from the application or upstream. No files may be changed.",
+          "requires": [],
+          "materials": [
+            "materials/seek.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MI-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/MI-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

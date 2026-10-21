@@ -1,0 +1,142 @@
+{
+  "project": "xmltodict",
+  "stage": "formal_registered_local_verified",
+  "cases": 15,
+  "all_expectations_met": true,
+  "formal_catalog_modified": true,
+  "real_model_calls": 0,
+  "pending": [],
+  "evidence": [
+    {
+      "case": "original-XD-C01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/original-XD-C01.json",
+      "sha256": "9f6d66ea6317eae3a3bb4397d62a5b61a218c12f0a441361f5fce1451542f7f1"
+    },
+    {
+      "case": "original-XD-C02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/original-XD-C02.json",
+      "sha256": "1fa62bb3908855aebc0591e25e6dc5712d6bd31b217401d9451725df696328ad"
+    },
+    {
+      "case": "original-XD-C03",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/original-XD-C03.json",
+      "sha256": "145a83afa0fb51ee0aaecb2a5d5e3c5a312d06f5161281e698415ac8fa77e51d"
+    },
+    {
+      "case": "original-XD-C04",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/original-XD-C04.json",
+      "sha256": "04b9bddde41896c293ee56dccc4507eee8d594e2daff1b4f00bd3e745ccd6560"
+    },
+    {
+      "case": "original-XD-D02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/original-XD-D02.json",
+      "sha256": "1f20b78cf44285bfd2e498ab8af2963dcf194434a7e5a8c92cc7512a4066ab5b"
+    },
+    {
+      "case": "original-XD-M01",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/original-XD-M01.json",
+      "sha256": "747551a9047e205265018b93ea3d7f48be01bb7b5774d5cd305b067d0d923c9d"
+    },
+    {
+      "case": "original-XD-P01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/original-XD-P01.json",
+      "sha256": "d206b5e9739d34063e970e13aebad56d48af169218a44f8a50d4a4524a64f990"
+    },
+    {
+      "case": "original-XD-P02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/original-XD-P02.json",
+      "sha256": "6d91a5b316893200d76ec6ce5f40e78986d1ae0aad48afc4803dc7824297607f"
+    },
+    {
+      "case": "original-XD-U01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/original-XD-U01.json",
+      "sha256": "8d5be37bbe780938ac7c0a276e7f5f6ccd225c93eeba648eebd83f4698845609"
+    },
+    {
+      "case": "original-XD-U02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/original-XD-U02.json",
+      "sha256": "f20a6c25e09ac6b9fa32a5bc3dab7caf8b17d55b2344107a4d1a80e4abcc495b"
+    },
+    {
+      "case": "public-tests-original",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/public-tests-original.json",
+      "sha256": "5b1364fb76239849469a5027b23822e3ff2dacdaaed802d74b49bc7df770bdb0"
+    },
+    {
+      "case": "public-tests-reference",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/public-tests-reference.json",
+      "sha256": "c114d12a250ec6dd6c25e7ef554979a61f93169c2cc868b89f35512da83eba94"
+    },
+    {
+      "case": "reference-XD-M01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/reference-XD-M01.json",
+      "sha256": "634cfe2c1c743a6829736375c94e14ba1a7bedec3814c68cead663504d7d57d2"
+    },
+    {
+      "case": "reference-full-regression",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/reference-full-regression.json",
+      "sha256": "80284a938a622cc0678b0356e15bdef6a95cb1d76c506a04f22021a2efd6793c"
+    },
+    {
+      "case": "wrong-xmltodict-buffer-all",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/xmltodict/attempt-001/wrong-xmltodict-buffer-all.json",
+      "sha256": "8e1d92893e5e0fd4347f76f9c1c57320868092f4f6e286621954ef3fb89dd2fe"
+    }
+  ],
+  "mock_status": "passed",
+  "formal_version": "real-project-scenarios-v5-en",
+  "formal_digest": "e85aea945cffdfe2924a2f745a61f6d44e7d4597ac41bb0902500880cce61161",
+  "full_delivery_files": 3362,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-001/run-001/evidence/result.json",
+      "sha256": "8617a4a19c1fb55b316cc0065b15afac51f29d30c0ade635aeddd88bf2f01868"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-001/run-001/cleanup.json",
+      "sha256": "7c1c33950397555b119222166b9858dd5636b0eb1f2f84c1430da265d1236aeb"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-001/audit-attempt-001.json",
+      "sha256": "f151bc45092099db74e5a8ea9ae094ede83d51f317e89c5a99d87ab961e76b0e"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-001/browser/run-003/diagnostics/result.json",
+      "sha256": "bf16f483d7dab31b379d528687d664c381c775f1df43db2ac33a52445ea40c2e"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/delivery-first-four.json",
+      "sha256": "f485abc48e0ae6418b1dcbfcbbfb7447758f4a565b4ea5f7834bb5cc0082b5d1"
+    }
+  ]
+}

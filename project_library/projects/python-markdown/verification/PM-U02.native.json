@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PM-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "toc_tokens_keep_hierarchy_and_unique_ids": true,
+    "toc_depth_does_not_remove_body_heading": true
+  },
+  "resource_profile": "business"
+}

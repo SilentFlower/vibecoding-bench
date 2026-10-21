@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DD-P01",
+  "source_commit": "79e4379278b1cfdd8e9e3dccac364956908e8989",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With explicit bidirectionalTrue/raiseErrorsTrue/logErrorsFalse and default nonmutating mode,before+delta equalsafter,forward-delta equalsbefore,and originalbefore remains unchanged. A mismatchedqty9 raisesDeltaError under the explicit old-value check; default logging/error settings should not be assumed to reject. Bind the preview to the reviewed source/version,validate final business state and publish deliberately. This is not a database transaction or proof for untrusted serialized/pickle delta input.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

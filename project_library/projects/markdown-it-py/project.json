@@ -1,0 +1,292 @@
+{
+  "schema": 2,
+  "project_key": "markdown-it-py",
+  "title": "Markdown-it-py编辑预览工作场景",
+  "category": "结构化文档与预览",
+  "description": "固定真实源码上的token、规则取证、渲染扩展和引用元数据八项独立只读任务。",
+  "seed_digest": "365a7e1f9ae974597c53c307760df1944c9a27182ccfa5629cd9a576e7ecdec5",
+  "environment": "markdown-it-py-py312",
+  "source": {
+    "repository": "https://github.com/executablebooks/markdown-it-py",
+    "commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+    "license_files": [
+      "seed/library/LICENSE.markdown-it",
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "IT-S01",
+      "title": "编辑器token与定位",
+      "goal": "明确现有行映射和精确选区需求的边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IT-U01",
+            "IT-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IT-U01",
+          "kind": "understand",
+          "goal": "解释块token和行内子项及行区间",
+          "prompt": "Trace tokens for the supplied editor document. Explain opening/inline/closing nesting, where strong markup appears, and actual heading/paragraph map ranges. Distinguish tokens from a ready-made per-character AST. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/editor.md",
+            "materials/editor-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IT-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/IT-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "IT-C01",
+          "kind": "consult",
+          "goal": "界定编辑器选区定位的已有映射能力",
+          "prompt": "Advise how far the supplied existing Token.map metadata supports editor source positioning and what an application must define for exact rendered-selection mapping. Address lines versus characters/bytes without inventing a field or implementing a parser feature.",
+          "requires": [],
+          "materials": [
+            "materials/editor.md",
+            "materials/editor-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IT-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/IT-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "IT-S02",
+      "title": "URL预览规则取证",
+      "goal": "按真实预设、选项和规则选择已有解决方式",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IT-D01",
+            "IT-C02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "IT-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "IT-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IT-D01",
+          "kind": "diagnose",
+          "goal": "先取预设和激活规则再判断URL未链接",
+          "prompt": "Investigate the supplied URL-preview symptom. Request actual preset/options, active rules, dependency availability and full input/output or a sufficient reproduction before attributing a cause. Diagnose consumed evidence only; unavailable evidence can legitimately limit the result. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/url-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IT-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "preview-evidence",
+              "when": "The actual preset/options, active rules, dependency state and complete input/output have not been disclosed, the conversation does not say they are unavailable, and the answer reasonably requests a sufficient reproduction.",
+              "materials": [
+                "disclosure/linkify.py",
+                "disclosure/linkify-events.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "IT-C02",
+          "kind": "consult",
+          "goal": "用已有规则激活满足明确URL预览需求",
+          "prompt": "Explain the complete supplied commonmark/linkify reproduction with its dependency present. Identify why the first and second outputs differ and choose an existing compatible setup for this requirement. Do not modify the core or fetch any URL.",
+          "requires": [],
+          "materials": [
+            "materials/linkify.py",
+            "materials/linkify-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IT-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/IT-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "IT-S03",
+      "title": "定制链接渲染",
+      "goal": "用真实token类型和已有属性编码实现需求",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IT-U02",
+            "IT-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IT-U02",
+          "kind": "understand",
+          "goal": "解释渲染回调名称为何必须匹配实际token",
+          "prompt": "Compare registering the supplied custom opener under business-link-style versus link_open. Explain which callback runs, how its arguments bind, and why an arbitrary registration label need not raise an immediate error. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/render-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IT-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/IT-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "IT-P01",
+          "kind": "plan",
+          "goal": "规划保留链接与属性编码的已有渲染定制",
+          "prompt": "Plan the supplied link customization with current extension APIs. Keep the original destination/label, add the required attributes including the quote/angle-containing inert value, and preserve attribute encoding. No parser-core or project-file changes are authorized.",
+          "requires": [],
+          "materials": [
+            "materials/render-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_core_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IT-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/IT-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "IT-S04",
+      "title": "引用定义和文档元数据",
+      "goal": "区分首定义、重复信息和显式env共享",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IT-U03",
+            "IT-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IT-U03",
+          "kind": "understand",
+          "goal": "解释引用首定义和重复元数据",
+          "prompt": "Trace parsing of the supplied duplicate reference definitions with an explicit env. Explain the returned tokens, normalized label, retained href/map and duplicate_refs entry. Does the later definition silently replace the first? Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/references.md",
+            "materials/reference-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IT-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/IT-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "IT-C03",
+          "kind": "consult",
+          "goal": "按文档边界管理调用方引用env",
+          "prompt": "Explain rendering [a] with the populated shared env versus a fresh empty dict in the supplied separate-document experiment. Recommend an explicit per-document metadata boundary using current APIs. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/references.md",
+            "materials/reference-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IT-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/IT-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

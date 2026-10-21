@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DD-C01",
+  "source_commit": "79e4379278b1cfdd8e9e3dccac364956908e8989",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Unique rows compare equal after reordering with groupByid. Without a group sort key,duplicate ids map to one row per key and the later unchangedqty2 hides the earlier1to99 change. With groupBySortKeyqty,the supplied distinct rows are retained as grouped lists and a difference is visible. Enforce unique ids if that is the business contract; if repeats are legal,choose explicit grouping/order/identity policy. Sorting does not validate uniqueness or define every business matching rule.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

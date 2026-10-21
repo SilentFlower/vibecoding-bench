@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CO-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "flattened_errors_keep_path_and_exception": true,
+    "failed_mapping_is_truthy_but_not_true": true
+  },
+  "resource_profile": "business"
+}

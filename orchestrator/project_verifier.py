@@ -36,7 +36,7 @@ if prepared.returncode:
     raise SystemExit(80)
 python='/work/python/bin/python'
 installed=subprocess.run([python,'-m','pip','install','--disable-pip-version-check','--no-index',
-    '--no-deps','--find-links','/offline/artifacts',*spec['requirements']],
+    '--no-deps','--no-compile','--find-links','/offline/artifacts',*spec['requirements']],
     stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
 if prepared.returncode or installed.returncode:
     print('NATIVE_ENVIRONMENT_ERROR',file=sys.stderr)

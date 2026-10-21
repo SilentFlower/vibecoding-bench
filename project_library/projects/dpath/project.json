@@ -1,0 +1,277 @@
+{
+  "schema": 2,
+  "project_key": "dpath",
+  "title": "Dpath路径数据工作场景",
+  "category": "嵌套对象路径操作",
+  "description": "真实路径、列表、投影、合并和删除八项独立任务，包含已复现的过滤删除最小修复。",
+  "seed_digest": "07c2527be8f5d9424d1f37732b90bb3f087c03525bad4871279ab131c68eaaea",
+  "environment": "dpath-py312",
+  "source": {
+    "repository": "https://github.com/dpath-maintainers/dpath-python",
+    "commit": "15759d96a006fef5278de731cd263b4d839094c3",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "DP-S01",
+      "title": "单结果查询和路径协议",
+      "goal": "区分缺失、歧义及含分隔符字段",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DP-U01",
+            "DP-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DP-U01",
+          "kind": "understand",
+          "goal": "明确单结果查询、缺失默认和多命中错误",
+          "prompt": "Trace all complete singular-lookup controls and explain default versus ambiguity. Use the actual API without editing files.",
+          "requires": [],
+          "materials": [
+            "materials/get.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DP-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/DP-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DP-C01",
+          "kind": "consult",
+          "goal": "为含分隔符的字段选择路径序列",
+          "prompt": "Meet the complete literal-separator key requirement using existing APIs. Compare exact values and state the remaining glob contract without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/keys.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DP-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/DP-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DP-S02",
+      "title": "路径写入和删除边界",
+      "goal": "明确已有／新建路径及过滤删除的授权范围",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DP-U02",
+            "DP-U03",
+            "DP-M01"
+          ]
+        },
+        {
+          "id": "inspect_only",
+          "task_ids": [
+            "DP-U03"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "DP-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DP-U02",
+          "kind": "understand",
+          "goal": "区分已有路径批改和字面新建",
+          "prompt": "Trace the complete set/new controls,counts,identity and exact created containers. Do not change project files or apply unbounded user paths.",
+          "requires": [],
+          "materials": [
+            "materials/write.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DP-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/DP-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DP-U03",
+          "kind": "understand",
+          "goal": "解释列表删除留空位及无匹配错误",
+          "prompt": "Trace the complete two list deletions and missing-path control. Explain index-preservation semantics without editing files.",
+          "requires": [],
+          "materials": [
+            "materials/delete.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DP-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/DP-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DP-M01",
+          "kind": "modify",
+          "goal": "修复过滤删除越过路径范围的问题",
+          "prompt": "Implement only the explicitly authorized filtered-delete repair and public regressions in the supplied material. Preserve original tests and all listed compatibility boundaries.",
+          "requires": [],
+          "materials": [
+            "materials/delete-repair.md"
+          ],
+          "allowed_paths": [
+            "library/dpath/__init__.py",
+            "app/test_delete_filter.py"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DP-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/DP-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DP-S03",
+      "title": "字段导出形状",
+      "goal": "按业务选择树形投影或路径值记录",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DP-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DP-C02",
+          "kind": "consult",
+          "goal": "选择树形字段投影或路径值导出",
+          "prompt": "Meet the complete id export requirement using current search modes. Give exact results and source observation,without an implementation or universal copy/sanitizer claim.",
+          "requires": [],
+          "materials": [
+            "materials/search.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DP-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/DP-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DP-S04",
+      "title": "合并和隔离预览",
+      "goal": "明确源引用及失败后部分更新",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DP-U04",
+            "DP-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DP-U04",
+          "kind": "understand",
+          "goal": "追踪列表合并政策和源引用副作用",
+          "prompt": "Trace all complete merge controls and actual object ownership. Compare default addition with explicit replacement without changing files.",
+          "requires": [],
+          "materials": [
+            "materials/merge.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DP-U04.rubric.json",
+            "semantic": true,
+            "native": "verification/DP-U04.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DP-P01",
+          "kind": "plan",
+          "goal": "规划类型安全失败后的隔离预览",
+          "prompt": "Plan the complete accepted-baseline preview requirement using actual failed TYPESAFE behavior. Give ownership,validation and publication boundaries without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/atomicity.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DP-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/DP-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

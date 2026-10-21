@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CO-C03"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "interpolation_is_resolved_at_read": true,
+    "write_preserves_interpolation_expression": true
+  },
+  "resource_profile": "business"
+}

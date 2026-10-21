@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PD-P01",
+  "source_commit": "ef6a6427e488e29e827e0e0819f2630ad3ff4cdc",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Deep-clone the declared plain-data baseline before set_ updates and keep candidate/source ownership explicit; the supplied clone becomes idB while original remainsA. Validate an allowlisted typed path/index protocol and bounded sizes before applying updates, then validate resulting business schema and return a preview. set_ alone is mutation, not authorization, schema validation or a transaction.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

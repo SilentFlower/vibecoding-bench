@@ -1,0 +1,1 @@
+../deepdiff/docstrings/commandline.rst

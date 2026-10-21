@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BO-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "chunk_consumption_is_incremental": true,
+    "explicit_none_fill_is_distinct": true,
+    "nonpositive_batch_size_rejected": true
+  },
+  "resource_profile": "business"
+}

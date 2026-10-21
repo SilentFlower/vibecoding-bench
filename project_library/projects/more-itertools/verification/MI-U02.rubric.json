@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MI-U02",
+  "source_commit": "4aeb4338ae1407d8da9723e86da99efeb446f719",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Normal chunking yields [0,1],[2,3],[4]. Strict chunking yields the first two batches then consumes 4 and raises before yielding that final partial batch. The strict flag is not a whole-stream preflight or rollback guarantee.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

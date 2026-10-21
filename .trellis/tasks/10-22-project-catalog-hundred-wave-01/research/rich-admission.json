@@ -1,0 +1,133 @@
+{
+  "project": "rich",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+  "source_file_count": 553,
+  "license_files": [
+    "seed/library/LICENSE"
+  ],
+  "scenarios": 4,
+  "unique_tasks": 7,
+  "modify_tasks": 0,
+  "non_modify_tasks": 7,
+  "native_baseline": {
+    "project": "rich",
+    "attempt": 1,
+    "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/rich/result.json",
+    "result_sha256": "f9d996600681f60cda12814f30bfeacde24c7d19cca660ba77014c0696758259",
+    "main_collected": 981,
+    "counts": {
+      "passed": 956,
+      "failed": 0,
+      "error": 0,
+      "skipped": 25,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "subtest_count": 0,
+    "xml_testcases": 981,
+    "xml_skipped": 25,
+    "runner_sha256": "3c96af2065e313156ff341ced4ed6f35c0756138d59fffcf09c4ddce0cb630ba",
+    "contract_sha256": "e4982d3cc5295b93eea99952c77588fc39851d7434910e8b693301cf4ff0d32f",
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "当前实际基线；未运行多平台、Cython加速、lint或静态类型矩阵，不是业务完成"
+  },
+  "verified_unique_native_cases": 6,
+  "native_evidence": [
+    {
+      "case": "original-RH-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/rich/attempt-001/original-RH-C01.json",
+      "sha256": "5120181c92cf0fb2597393bc19a565ba6d0d66b3d1d2d1e71adb98c0d6b68dc3",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-RH-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/rich/attempt-001/original-RH-C02.json",
+      "sha256": "0567be73cef74b2ecd3bddcabe6af745e05c158664de4a035fe520124b61bf51",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-RH-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/rich/attempt-001/original-RH-P01.json",
+      "sha256": "2268b1e14f31d673fe4aef07b73b0c33dbac7dcd2fed348152d04b67f5a27012",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-RH-P02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/rich/attempt-001/original-RH-P02.json",
+      "sha256": "a1830e2450dd044b22de97850868d51dcea5a525430dacbd2a45ae2dca74adaa",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-RH-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/rich/attempt-001/original-RH-U01.json",
+      "sha256": "14ffa1c1c79ad2061ce7dfeb6f9f81ecf97ec68d46f9d4d07ce269e1103450d9",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-RH-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/rich/attempt-001/original-RH-U02.json",
+      "sha256": "989415b5acb9dcdc477af891dfbfa56d2cc3cfd57968a7df4cd47421730068e5",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-01/business/rich/attempt-001/summary.json",
+      "sha256": "530b3717cccc043b9cb490132dc32a42e47df351cd2a2b79d01130e6bd629170",
+      "passed": true
+    }
+  ],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v11-en",
+  "formal_digest": "69b449dbf378b25edd8ba8d011f43ee34d157bbd9d0bc48d15527ed96cf8e761",
+  "full_delivery_files": 10589,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-011/run-001/evidence/result.json",
+      "sha256": "bccedebb302de1cd2a620ffab4999a28d029dd750eacd34a14bf77b0903967a0"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-011/run-001/cleanup.json",
+      "sha256": "3df72fef135ecbbd89f4c03a7d31ba539a130ca35c5ff4e3d9b27a143a7eed74"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/mock-batch-011-audit.json",
+      "sha256": "996ade419598e907d26eba357511301286105ff98b3d7d36f5e864d9391afdeb"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-011/browser/run-001/diagnostics/result.json",
+      "sha256": "db90c4d628bc97f221502f054fb31f15bc5f9752d447bfe82c1ed5cb22fe8c22"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/delivery-first-twenty-four.json",
+      "sha256": "4a767dabe5b48412ba71e2dcfa74ff47ab0e394b956098ed90c5425e44847f64"
+    }
+  ]
+}

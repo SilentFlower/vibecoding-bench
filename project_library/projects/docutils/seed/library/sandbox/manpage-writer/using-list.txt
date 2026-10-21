@@ -1,0 +1,53 @@
+List of projects using the manpage-writer to generate their man-pages.
+
+Use for sanity checks from time to time.
+
+* https://salsa.debian.org/debian/init-system-helpers/-/tree/master/man8
+
+Sphinx
+------
+
+* https://github.com/kdave/btrfs-progs/tree/master/Documentation
+
+  via sphinx requires custom roles
+
+* https://gitlab.isc.org/isc-projects/bind9/-/tree/main/doc/man
+
+  with sphinx and the files in man directory refere to the ones in bin.
+
+How to find projects
+--------------------
+
+Find with ::
+
+  for F in $(zgrep rst2man /usr/share/man/*/*|cut -d: -f1|uniq) ;  do dpkg -S $F ;  done | cut -d: -f1 |sort|uniq
+
+on my machine gives me::
+
+  alsa-utils
+  bind9-dnsutils
+  bind9-host
+  bluez
+  btrfs-progs
+  ghc
+  init-system-helpers
+  libgdk-pixbuf2.0-bin
+  libgtk-4-bin
+  mpv
+  pdfposter
+  pipewire-bin
+  pipewire-pulse
+  proj-bin
+  python3-minimal
+  python3-mutagen
+  python3-pip
+  sddm
+  snapd
+  texlive-latex-extra
+  texlive-luatex
+
+  manpages: /usr/share/man/man7/bpf-helpers.7.gz
+  
+  
+  
+  

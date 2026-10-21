@@ -1,0 +1,1 @@
+With width4 print the exact source text 茶tea. Compare Python len with rich.cells.cell_len. Separately print ABCDEFGHIJK at width8 with record=True,no_wrap=True,overflow=ellipsis, then export_text. The full identifier is needed for canonical reconciliation while the narrow display may abbreviate it. Choose ownership for original values versus rendered artifacts; do not edit files.

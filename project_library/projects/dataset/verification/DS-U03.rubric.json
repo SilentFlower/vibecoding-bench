@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DS-U03",
+  "source_commit": "db592cc041014762bba55fd544e982170831f227",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "update matches both rows and changes both qty values to 9; upsert returns True and preserves two rows. It does not collapse duplicate business keys or automatically choose one record. The later insert path only runs when update reports zero matching rows.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

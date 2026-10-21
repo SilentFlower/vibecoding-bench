@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CK-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "exists_false_allows_existing": true,
+    "exclusive_creation_is_distinct": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BX-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "explicit_get_and_noncreating_default_do_not_validate_required_fields": true
+  },
+  "resource_profile": "business"
+}

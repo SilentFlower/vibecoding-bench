@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CV-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "match_is_substring_while_file_and_anchored_regex_are_exact": true,
+    "multiple_columns_default_to_all_and_any_is_explicit": true
+  },
+  "resource_profile": "business"
+}

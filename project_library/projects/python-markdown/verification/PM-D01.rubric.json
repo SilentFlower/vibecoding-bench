@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PM-D01",
+  "source_commit": "b41e0aaf1181f1a8cb200cf5a815aad7c0020d23",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The symptom alone is insufficient. Obtain the real lifecycle, extension configuration and sequence; relate only consumed evidence to actual pinned APIs and support the resulting diagnosis and limits. Do not preassign cache, concurrency, parser or application causes. Unavailable evidence permits insufficient_information and a concrete reproduction plan.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

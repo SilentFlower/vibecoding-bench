@@ -1,0 +1,80 @@
+.\" Man page generated from reStructuredText
+.\" by the Docutils 0.22.3b1.dev manpage writer.
+.
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.TH "special-characters" "" "" ""
+.SH Name
+special-characters \- test special characters
+.SH SEE ALSO
+.sp
+In mercurial the following substitutions are in use:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+\&.. |hg(1)| replace:: **hg**\e (1)
+\&.. |hgrc(5)| replace:: **hgrc**\e (5)
+\&.. |hgignore(5)| replace:: **hgignore**\e (5)
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+resulting in.
+.sp
+\fBhgignore\fP(5) \%<hgignore\:.5\:.html>, \fBhgrc\fP(5) \%<hgrc\:.5\:.html>
+.SH DESCRIPTION
+.sp
+encodings are problematic as alway.
+.INDENT 0.0
+.IP \(bu 2
+accents:
+.INDENT 2.0
+.IP \(bu 2
+right: \'
+.IP \(bu 2
+left: \(ga
+.UNINDENT
+.IP \(bu 2
+quotes:
+.INDENT 2.0
+.IP \(bu 2
+straight: \(aq
+.IP \(bu 2
+double: \(dq
+.IP \(bu 2
+single: ‘ ’
+.IP \(bu 2
+double: “ ”
+.UNINDENT
+.UNINDENT
+.sp
+Some text afterwards, test.txt ended with quotes test.
+Unicode breaks the man processing chain. The display
+ends with \fBsingle:\fP .
+.\" End of generated man page.

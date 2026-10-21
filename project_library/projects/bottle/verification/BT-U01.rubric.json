@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BT-U01",
+  "source_commit": "8ec5fe29420d14998c0d86885083983eaea8b839",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "GET /orders/7 matches and converts identifier to integer7, automatically serializing the returned dict asJSON. Noninteger path does not match the int filter and yields404; POST to a GET-only matching path yields405. Path filtering, method matching, business validation and authentication are distinct.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

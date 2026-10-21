@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CH-C02",
+  "source_commit": "e2538b1d338ead4ed803ec0017017bf6779a380b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Validate header uniqueness before export and explicitly pre-format Decimal as text when exact decimal text is required, preserving it as a JSON string. Do not claim numeric Decimal output is lossless or invent a built-in strict mode; an application policy avoids a required library modification.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

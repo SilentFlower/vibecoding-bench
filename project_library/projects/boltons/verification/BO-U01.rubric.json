@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BO-U01",
+  "source_commit": "4e5faa3d7e4008d89e0d8bf1ea87b6d9a061a16d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain unique retaining A/B, redundant returning the first redundant a/b values and grouped original records ordered by first redundancy. Normalized keys are comparison keys, not substituted return values.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

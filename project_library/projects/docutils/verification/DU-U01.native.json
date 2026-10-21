@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DU-U01"
+  ],
+  "python_paths": [
+    "library/docutils",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "first_section_can_be_promoted_to_document_title": true
+  },
+  "resource_profile": "business"
+}

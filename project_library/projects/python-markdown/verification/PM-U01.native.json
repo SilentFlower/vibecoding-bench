@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PM-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "shared_instance_preserves_footnote_state": true,
+    "reset_separates_document_state": true,
+    "fresh_instance_matches_reset_document": true
+  },
+  "resource_profile": "business"
+}

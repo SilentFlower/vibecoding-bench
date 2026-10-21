@@ -1,0 +1,1 @@
+Render two separate documents using the explicit target .. _payments-api: before a top heading: first Payment methods, then Payment endpoints. Compare all node IDs and title-derived IDs. Published external links must keep the agreed payments-api anchor despite renaming the visible heading. No files may be changed.

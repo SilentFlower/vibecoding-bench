@@ -1,0 +1,425 @@
+{
+  "baseline_digest": "b17f68cbf7ee3b98afb9068d896157336802c2015ec0b97037ac2a6e9d8404c2",
+  "framework": "nose2",
+  "nodes": [
+    {
+      "id": "tests.test_broken_afilter.test_broken_afilter",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_delete.test_delete_existing",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_delete.test_delete_filter",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_delete.test_delete_missing",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_delete.test_delete_separator",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_get_values.test_get_absent",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_get_values.test_get_explicit_single",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_get_values.test_get_glob_multiple",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_get_values.test_get_glob_single",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_get_values.test_non_leaf_leaf",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_get_values.test_none_values",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_get_values.test_util_get_root",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_get_values.test_values",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_get_values.test_values_list",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_get_values.test_values_passes_through",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_merge.test_merge_filter",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_merge.test_merge_list",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_merge.test_merge_mutables",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_merge.test_merge_replace_1",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_merge.test_merge_replace_2",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_merge.test_merge_simple_dict",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_merge.test_merge_simple_int",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_merge.test_merge_simple_list_additive",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_merge.test_merge_simple_list_replace",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_merge.test_merge_simple_string",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_merge.test_merge_typesafe",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_merge.test_merge_typesafe_and_separator",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_new.test_int_segment_dict_type_check",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_new.test_int_segment_list_type_check",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_new.test_set_list_with_dict_int_ambiguity",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_new.test_set_new_dict",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_new.test_set_new_list",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_new.test_set_new_list_integer_path_with_creator",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_new.test_set_new_list_path_with_separator",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_new.test_set_new_separator",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_path_get.test_path_get_list_of_dicts",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_path_paths.test_path_paths_empty_key_allowed",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_path_paths.test_path_paths_empty_key_disallowed",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_paths.test_util_safe_path_list",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_search.test_search_afilter",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_search.test_search_globbing",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_search.test_search_list_key_with_separator",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_search.test_search_multiple_stars",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_search.test_search_negative_index",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_search.test_search_paths",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_search.test_search_paths_with_separator",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_search.test_search_return_dict_globbed",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_search.test_search_return_dict_head",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_search.test_search_return_list_globbed",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_search.test_search_return_list_head",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_expand",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_fold",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_get",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_has",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_kvs",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_leaf_with_leaf",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_leaf_with_node",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_leaves",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_match",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_match_nonmatching",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_set_create_missing",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_set_walkable",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_types",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_view",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_segments.TestSegments.test_walk",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_set.test_set_existing_dict",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_set.test_set_existing_list",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_set.test_set_existing_path_with_separator",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_set.test_set_existing_separator",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_set.test_set_filter",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_types.test_delete_filter",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_types.test_types_get_absent",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_types.test_types_get_glob_multiple",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_types.test_types_get_list_of_dicts",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_types.test_types_merge_simple_list_replace",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_types.test_types_set",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_unicode.test_unicode_merge",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_unicode.test_unicode_search",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.test_unicode.test_unicode_str_hybrid",
+      "kind": "Nose2Case",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "stdlib",
+      "module": "unittest",
+      "module_sha256": "32ed48385c0377bc2900a76e9a6acc3705aeef402c72de8554b3c637420506f0",
+      "version": "3.12.15"
+    },
+    {
+      "distribution": "nose2",
+      "module": "nose2",
+      "module_sha256": "0b60fbda6003c478f8f240ff79b3954fb33dec54ef9006425b21757356c48e4f",
+      "version": "0.16.0"
+    },
+    {
+      "distribution": "nose2",
+      "module": "nose2.plugins.junitxml",
+      "module_sha256": "307273ca3708a28865bda4bc3cf20ec89dbeee1c35f3fddc1c45ede188dd9795",
+      "version": "0.16.0"
+    }
+  ],
+  "project": "dpath",
+  "python": "3.12.15",
+  "schema": 1,
+  "unittest_skips": []
+}

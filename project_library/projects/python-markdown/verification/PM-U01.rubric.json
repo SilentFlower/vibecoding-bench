@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PM-U01",
+  "source_commit": "b41e0aaf1181f1a8cb200cf5a815aad7c0020d23",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "convert does not automatically reset document state. The shared footnote extension retains the first definition, while reset clears registered extension/document state and the second unresolved reference remains literal without first-note. A separately configured fresh instance matches the reset independent document. Use existing reset or separate instances.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

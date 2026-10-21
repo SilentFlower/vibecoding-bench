@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CV-U02",
+  "source_commit": "6d19c625214977ab2988e674441ca24638bc12d3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "-m AB is substring and keepsAB/XAB/ABC; the file containingAB and anchored ^AB$ each keep onlyAB. Multiple selected columns default to all matching, keepingC; -a changes to any, keepingA/B/C. Match mode and combination mode are distinct settings; neither is SQL equality inferred from a string argument.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

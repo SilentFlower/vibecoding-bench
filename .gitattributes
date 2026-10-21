@@ -17,3 +17,8 @@ project_library/** -text
 .trellis/tasks/10-21-project-catalog-pilot-pack/research/** -text
 # 第二批四仓的固定来源、原始断言与准入记录同样按字节保留。
 .trellis/tasks/10-22-project-catalog-second-pack/research/** -text
+# 百项目扩容的来源与逐阶段证据保留实际验证字节。
+.trellis/tasks/10-22-project-catalog-hundred/research/** -text
+.trellis/tasks/10-22-project-catalog-hundred-wave-01/research/** -text
+.trellis/tasks/10-22-project-catalog-hundred-wave-02/research/** -text
+.trellis/tasks/10-22-project-catalog-hundred-wave-03/research/** -text

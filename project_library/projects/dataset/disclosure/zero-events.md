@@ -1,0 +1,1 @@
+The supplied complete synthetic program prints 0. rows is a fresh one-shot generator, not a list or another reusable Sequence, and it was not consumed before this call. The database is a dedicated temporary SQLite file. No production incident facts beyond this reproduction are available.

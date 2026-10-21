@@ -1,0 +1,1996 @@
+{
+  "baseline_digest": "7c811e8187a4d76c85c0e64b4b2b0627585b3bc36116b7db5a4e4eaeeb7648ad",
+  "nodes": [
+    {
+      "id": "tests/test_agate.py::TestCSV::test_agate",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestBooleanAggregation::test_all",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestBooleanAggregation::test_any",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestDateTimeAggregation::test_max",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestDateTimeAggregation::test_max_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestDateTimeAggregation::test_max_time_delta",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestDateTimeAggregation::test_mean",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestDateTimeAggregation::test_mean_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestDateTimeAggregation::test_mean_with_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestDateTimeAggregation::test_min",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestDateTimeAggregation::test_min_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestDateTimeAggregation::test_min_time_delta",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestDateTimeAggregation::test_sum",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestDateTimeAggregation::test_sum_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_deciles",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_deciles_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_iqr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_irq_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_mad",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_mad_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_max",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_max_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_max_precision",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_max_precision_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_mean",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_mean_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_mean_with_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_median",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_median_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_min",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_min_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_mode",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_mode_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_percentiles",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_percentiles_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_percentiles_locate",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_population_stdev",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_population_stdev_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_population_variance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_population_variance_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_quartiles",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_quartiles_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_quartiles_locate",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_quintiles",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_quintiles_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_stdev",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_stdev_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_sum",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_sum_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_variance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestNumberAggregation::test_variance_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestSimpleAggregation::test_all",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestSimpleAggregation::test_any",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestSimpleAggregation::test_count",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestSimpleAggregation::test_count_column",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestSimpleAggregation::test_count_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestSimpleAggregation::test_first",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestSimpleAggregation::test_has_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestSimpleAggregation::test_summary",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestTextAggregation::test_max_length",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestTextAggregation::test_max_length_all_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestTextAggregation::test_max_length_invalid",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_aggregations.py::TestTextAggregation::test_max_length_unicode",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_columns.py::TestColumn::test_data_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_columns.py::TestColumn::test_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_columns.py::TestColumn::test_index",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_columns.py::TestColumn::test_items",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_columns.py::TestColumn::test_keys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_columns.py::TestColumn::test_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_columns.py::TestColumn::test_pickleable",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_columns.py::TestColumn::test_row_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_columns.py::TestColumn::test_values",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_columns.py::TestColumn::test_values_distinct",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_columns.py::TestColumn::test_values_sorted",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_columns.py::TestColumn::test_values_without_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_columns.py::TestColumn::test_values_without_nulls_sorted",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestDateAndTimeComputations::test_change_dates",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestDateAndTimeComputations::test_change_datetimes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestDateAndTimeComputations::test_change_timedeltas",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_change",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_change_mixed_types",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_change_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_changed_invalid_types",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_formula",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_formula_invalid",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_formula_no_validate",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_percent",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_percent_change",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_percent_change_invalid_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_percent_change_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_percent_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_percent_total_override",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_percent_zeros",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_percentile_rank",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_percentile_rank_invalid_types",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_percentile_rank_null",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_rank_number",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_rank_number_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_rank_number_reverse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_rank_number_reverse_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_rank_number_reverse_nulls_ranked_last",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_rank_text",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_slug",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_slug_column_name_sequence",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_slug_contains_null_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_computations.py::TestTableComputation::test_slug_ensure_unique",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestBoolean::test_cast",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestBoolean::test_cast_custom_strings",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestBoolean::test_cast_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestBoolean::test_test",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDate::test_cast_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDate::test_cast_format",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDate::test_cast_format_locale",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDate::test_cast_locale",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDate::test_cast_parser",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDate::test_iso_format",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDate::test_pickle_parser",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDate::test_test",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDate::test_test_format",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDateTime::test_cast_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDateTime::test_cast_format",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDateTime::test_cast_format_locale",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDateTime::test_cast_locale",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDateTime::test_cast_parser",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDateTime::test_cast_parser_timezone",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDateTime::test_iso_format",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDateTime::test_pickle_parser",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDateTime::test_test",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestDateTime::test_test_format",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestNumber::test_boolean_cast",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestNumber::test_cast",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestNumber::test_cast_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestNumber::test_cast_error_leading_zeroes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestNumber::test_cast_floats",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestNumber::test_cast_locale",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestNumber::test_cast_text",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestNumber::test_currency_cast",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestNumber::test_test",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestText::test_cast",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestText::test_no_cast_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestText::test_null_values",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestText::test_test",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestTimeDelta::test_cast_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestTimeDelta::test_cast_parser",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_data_types.py::TestTimeDelta::test_test",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_fixed.py::TestFixed::test_dict_reader",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_fixed.py::TestFixed::test_reader",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_fixed.py::TestFixed::test_reader_func",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_from_json.py::TestJSON::test_from_json",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_from_json.py::TestJSON::test_from_json_ambiguous",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_from_json.py::TestJSON::test_from_json_error_newline_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_from_json.py::TestJSON::test_from_json_file_like_object",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_from_json.py::TestJSON::test_from_json_mixed_keys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_from_json.py::TestJSON::test_from_json_nested",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_from_json.py::TestJSON::test_from_json_newline_delimited",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_from_json.py::TestJSON::test_from_json_no_type_tester",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_from_json.py::TestJSON::test_from_json_with_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_contains",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_dict_no_keys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_eq",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_get",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_get_by_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_get_by_slice",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_get_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_get_invalid",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_get_item",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_is_immutable",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_items",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_iterate",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_keys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_length",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_ne",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_set_item",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_stringify",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_stringify_long",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mapped_sequence.py::TestMappedSequence::test_values",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestDictReader::test_reader",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestDictReader::test_reader_alias",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestDictWriter::test_line_numbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestDictWriter::test_writer",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestDictWriter::test_writer_alias",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestDictWriter::test_writerows",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestFieldSizeLimit::test_field_size_limit",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestReader::test_line_numbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestReader::test_properties",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestReader::test_reader_alias",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestReader::test_utf8",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestSniffer::test_sniffer",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestWriter::test_line_numbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestWriter::test_utf8",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestWriter::test_writer_alias",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_py3.py::TestWriter::test_writerows",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_aggregate.py::TestAggregate::test_count",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_aggregate.py::TestAggregate::test_multiple",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_aggregate.py::TestAggregate::test_sum",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_bins.py::TestBins::test_bins",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_bins.py::TestBins::test_bins_decimals",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_bins.py::TestBins::test_bins_mixed_signs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_bins.py::TestBins::test_bins_negative",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_bins.py::TestBins::test_bins_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_bins.py::TestBins::test_bins_small_numbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_bins.py::TestBins::test_bins_values_outside_start_end",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_charting.py::TestTableCharts::test_bar_chart",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_charting.py::TestTableCharts::test_column_chart",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_charting.py::TestTableCharts::test_line_chart",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_charting.py::TestTableCharts::test_scatterplot",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_compute.py::TestCompute::test_compute",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_compute.py::TestCompute::test_compute_multiple",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_compute.py::TestCompute::test_compute_replace",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_compute.py::TestCompute::test_compute_replace_change_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_compute.py::TestCompute::test_compute_replace_partial",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_compute.py::TestCompute::test_compute_with_row_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_denormalize.py::TestDenormalize::test_denormalize",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_denormalize.py::TestDenormalize::test_denormalize_column_type_tester",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_denormalize.py::TestDenormalize::test_denormalize_column_types",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_denormalize.py::TestDenormalize::test_denormalize_default_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_denormalize.py::TestDenormalize::test_denormalize_multiple_keys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_denormalize.py::TestDenormalize::test_denormalize_no_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_cr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_crlf",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_empty_input",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_empty_input_with_column_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_file_like_object",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_no_header",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_no_header_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_no_type_tester",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_row_limit",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_row_limit_no_header_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_row_limit_too_high",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_skip_lines_cr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_skip_lines_crlf",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_sniff_limit_0",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_sniff_limit_200",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_sniff_limit_none",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_csv.py::TestFromCSV::test_from_csv_type_tester",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_fixed.py::TestFromFixed::test_from_fixed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_from_fixed.py::TestFromFixed::test_from_fixed_file_like_objects",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_group_by.py::TestGroupBy::test_group_by",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_group_by.py::TestGroupBy::test_group_by_bad_column",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_group_by.py::TestGroupBy::test_group_by_function",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_group_by.py::TestGroupBy::test_group_by_key_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_group_by.py::TestGroupBy::test_group_by_key_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_group_by.py::TestGroupBy::test_group_by_number",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_homogenize.py::TestHomogenize::test_homogenize_column_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_homogenize.py::TestHomogenize::test_homogenize_default_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_homogenize.py::TestHomogenize::test_homogenize_lambda_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_homogenize.py::TestHomogenize::test_homogenize_multiple_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_full_outer",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_full_outer_key_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_inner_join",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_inner_join2",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_inner_join_func",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_inner_join_same_column_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join2",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join_by_row_number",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join_by_row_number_short_left",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join_by_row_number_short_right",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join_column_does_not_exist",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join_column_indicies",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join_columns_kwarg",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join_columns_kwarg_right_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join_func",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join_match_multiple",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join_multiple_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join_require_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join_rows_are_tuples",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join_same_column_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_join.py::TestJoin::test_join_with_row_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_merge.py::TestMerge::test_merge",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_merge.py::TestMerge::test_merge_different_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_merge.py::TestMerge::test_merge_different_types",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_merge.py::TestMerge::test_merge_mixed_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_merge.py::TestMerge::test_merge_with_column_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_merge.py::TestMerge::test_merge_with_row_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_normalize.py::TestNormalize::test_normalize",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_normalize.py::TestNormalize::test_normalize_change_order",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_normalize.py::TestNormalize::test_normalize_column_type_tester",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_normalize.py::TestNormalize::test_normalize_column_types",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_normalize.py::TestNormalize::test_normalize_multiple_fields",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_normalize.py::TestNormalize::test_normalize_multiple_keys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_order_py.py::TestOrderBy::test_order_by",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_order_py.py::TestOrderBy::test_order_by_empty_table",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_order_py.py::TestOrderBy::test_order_by_func",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_order_py.py::TestOrderBy::test_order_by_multiple_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_order_py.py::TestOrderBy::test_order_by_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_order_py.py::TestOrderBy::test_order_by_reverse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_order_py.py::TestOrderBy::test_order_by_with_row_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_pivot.py::TestPivot::test_pivot",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_pivot.py::TestPivot::test_pivot_by_lambda",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_pivot.py::TestPivot::test_pivot_by_lambda_group_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_pivot.py::TestPivot::test_pivot_by_lambda_group_name_sequence_invalid",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_pivot.py::TestPivot::test_pivot_compute",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_pivot.py::TestPivot::test_pivot_compute_kwargs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_pivot.py::TestPivot::test_pivot_compute_pivots",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_pivot.py::TestPivot::test_pivot_default_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_pivot.py::TestPivot::test_pivot_multiple_keys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_pivot.py::TestPivot::test_pivot_multiple_keys_no_pivot",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_pivot.py::TestPivot::test_pivot_no_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_pivot.py::TestPivot::test_pivot_no_pivot",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_pivot.py::TestPivot::test_pivot_sum",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_bars.py::TestPrintBars::test_print_bars",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_bars.py::TestPrintBars::test_print_bars_domain",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_bars.py::TestPrintBars::test_print_bars_domain_invalid",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_bars.py::TestPrintBars::test_print_bars_invalid_values",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_bars.py::TestPrintBars::test_print_bars_mixed_signs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_bars.py::TestPrintBars::test_print_bars_negative",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_bars.py::TestPrintBars::test_print_bars_width",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_bars.py::TestPrintBars::test_print_bars_width_overlap",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_bars.py::TestPrintBars::test_print_bars_with_nulls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_html.py::TestPrintHTML::test_print_html",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_html.py::TestPrintHTML::test_print_html_max_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_html.py::TestPrintHTML::test_print_html_max_rows",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_html.py::TestPrintHTML::test_print_html_tags",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_structure.py::TestPrintStructure::test_print_structure",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_table.py::TestPrintTable::test_print_table",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_table.py::TestPrintTable::test_print_table_locale_american",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_table.py::TestPrintTable::test_print_table_locale_german",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_table.py::TestPrintTable::test_print_table_max_column_width",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_table.py::TestPrintTable::test_print_table_max_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_table.py::TestPrintTable::test_print_table_max_precision",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_table.py::TestPrintTable::test_print_table_max_rows",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_print_table.py::TestPrintTable::test_print_table_replace_newlines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_rename.py::TestRename::test_rename_column_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_rename.py::TestRename::test_rename_column_names_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_rename.py::TestRename::test_rename_column_names_renames_row_values",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_rename.py::TestRename::test_rename_row_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_rename.py::TestRename::test_rename_row_names_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_rename.py::TestRename::test_rename_slugify_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_rename.py::TestRename::test_rename_slugify_columns_in_place",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_rename.py::TestRename::test_rename_slugify_rows",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_rename.py::TestRename::test_rename_slugify_rows_in_place",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_csv.py::TestToCSV::test_print_csv",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_csv.py::TestToCSV::test_to_csv",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_csv.py::TestToCSV::test_to_csv_file_like_object",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_csv.py::TestToCSV::test_to_csv_make_dir",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_csv.py::TestToCSV::test_to_csv_quote_nonnumeric",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_csv.py::TestToCSV::test_to_csv_to_stdout",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_json.py::TestJSON::test_print_json",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_json.py::TestJSON::test_to_json",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_json.py::TestJSON::test_to_json_error_newline_indent",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_json.py::TestJSON::test_to_json_error_newline_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_json.py::TestJSON::test_to_json_file_output",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_json.py::TestJSON::test_to_json_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_json.py::TestJSON::test_to_json_key_decimal",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_json.py::TestJSON::test_to_json_key_func",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_json.py::TestJSON::test_to_json_make_dir",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_json.py::TestJSON::test_to_json_newline_delimited",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_table/test_to_json.py::TestJSON::test_to_json_non_string_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_aggregate.py::TestAggregate::test_aggregate_key_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_aggregate.py::TestAggregate::test_aggregate_key_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_aggregate.py::TestAggregate::test_aggregate_max_length",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_aggregate.py::TestAggregate::test_aggregate_min",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_aggregate.py::TestAggregate::test_aggregate_row_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_aggregate.py::TestAggregate::test_aggregate_sum",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_aggregate.py::TestAggregate::test_aggregate_sum_invalid",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_aggregate.py::TestAggregate::test_aggregate_two_ops",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_aggregate.py::TestAggregate::test_aggregeate_bad_column",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_aggregate.py::TestAggregate::test_nested_aggregate_row_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_aggregate.py::TestAggregate::test_nested_aggregation",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_charting.py::TestTableSetCharts::test_bar_chart",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_charting.py::TestTableSetCharts::test_column_chart",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_charting.py::TestTableSetCharts::test_line_chart",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_charting.py::TestTableSetCharts::test_scatterplot",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_having.py::TestHaving::test_having_complex",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_having.py::TestHaving::test_having_simple",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_merge.py::TestAggregate::test_merge",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_merge.py::TestAggregate::test_merge_groups",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_merge.py::TestAggregate::test_merge_groups_invalid_length",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_merge.py::TestAggregate::test_merge_groups_invalid_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tableset/test_merge.py::TestAggregate::test_merge_key_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_boolean_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_date_time_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_date_time_type_isoformat",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_date_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_date_type_iso_format",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_force_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_limit",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_number_currency",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_number_currency_locale",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_number_percent",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_number_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_text_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_time_delta_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_types_force_text",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_types_no_boolean",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_type_tester.py::TestTypeTester::test_types_number_locale",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::TestMisc::test_letter_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::TestMisc::test_round_limits",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::TestQuantiles::test_locate",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::TestQuantiles::test_methods",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "agate",
+  "python": "3.12.15",
+  "schema": 1
+}

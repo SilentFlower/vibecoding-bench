@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MS-C02",
+  "source_commit": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain that the current CLI asserts a string even when the AST renderer returns a list. Recommend the existing AST API with explicit JSON serialization and output handling; do not claim the pinned CLI already implements AST JSON export or conflate the failure with invalid Markdown.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

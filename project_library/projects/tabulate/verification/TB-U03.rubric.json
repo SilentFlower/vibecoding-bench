@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TB-U03",
+  "source_commit": "268615a5c27dc40e5c22454c07b44d5c50410da0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use the real candidate module CLI, preserve the quoted CSV field as one cell, explain default JSONL key headers and local file output, and identify exit code 3 for unsupported format. Do not invent CLI flags from Python API parameter names.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -417,5 +417,48 @@ class OfflineAndStatusTests(unittest.TestCase):
         self.assertNotIn('"legacy"', output.getvalue())
 
 
+class PublicSourceSnapshotTests(unittest.TestCase):
+    """固定上游同名原件可交付，未知文件和链接仍然拒绝。"""
+
+    def test_tracked_target_requires_whole_original_tree(self) -> None:
+        """保留真实期望夹具，但额外文件或字节变化不能借目录例外进入。@return None。"""
+        relative = Path('project_library/projects/docutils/seed/library/sandbox/odf2docutils/tests/presentationSimple/target')
+        original = manage.REPO / relative
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / relative
+            shutil.copytree(original, target)
+            with patch.object(manage, 'REPO', root):
+                self.assertEqual({'.env', 'local.log'}, manage.source_snapshot_ignore(str(target.parent), ['target', '.env', 'local.log']))
+                extra = target / 'unknown.env'
+                extra.write_text('synthetic-extra')
+                with self.assertRaisesRegex(ValueError, '摘要'):
+                    manage.source_snapshot_ignore(str(target.parent), ['target'])
+                extra.unlink()
+                tracked = target / 'oneTitle.rst'
+                tracked.write_bytes(tracked.read_bytes() + b'changed')
+                with self.assertRaisesRegex(ValueError, '摘要'):
+                    manage.source_snapshot_ignore(str(target.parent), ['target'])
+
+    def test_public_log_exception_does_not_allow_other_logs_or_env(self) -> None:
+        """只允许精确路径和原始字节，改内容或换链接必须拒绝。@return None。"""
+        relative = Path('project_library/projects/docutils/seed/library/sandbox/docutils_xml/global.log')
+        original = manage.REPO / relative
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / relative
+            target.parent.mkdir(parents=True)
+            shutil.copyfile(original, target)
+            with patch.object(manage, 'REPO', root):
+                self.assertEqual({'.env', 'private.log'}, manage.source_snapshot_ignore(str(target.parent), ['global.log', '.env', 'private.log']))
+                target.write_bytes(target.read_bytes() + b'changed')
+                with self.assertRaisesRegex(ValueError, '摘要'):
+                    manage.source_snapshot_ignore(str(target.parent), ['global.log'])
+                target.unlink()
+                target.symlink_to(original)
+                with self.assertRaisesRegex(ValueError, '摘要'):
+                    manage.source_snapshot_ignore(str(target.parent), ['global.log'])
+
+
 if __name__ == "__main__":
     unittest.main()

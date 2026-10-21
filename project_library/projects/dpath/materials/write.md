@@ -1,0 +1,1 @@
+On{orders:[{state:old},{state:old}]}run set("orders/*/state","new"),then set("missing/name","value"). On a fresh{}run new("literal*/0/id","A"). Compare counts,created shape,returned identity and actual glob/literal semantics. No project files may change and no unbounded user index is authorized.

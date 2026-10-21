@@ -1,0 +1,1 @@
+Complete reproduction: publish_doctree("See missing_.\n",source_path="guide.rst",settings_overrides={"_disable_config":True,"report_level":2,"halt_level":6,"warning_stream":a_StringIO}). No target named missing is defined. The programmatic function returns a document rather than enabling command-line exit-status handling.

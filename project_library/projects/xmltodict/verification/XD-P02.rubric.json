@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "XD-P02",
+  "source_commit": "6e29fba282e68631034dd2722a413b4e35276584",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Give a workable callback-based plan and explicit commit semantics. A callback may validate and stop with ParsingInterrupted, but parser streaming alone does not roll back prior effects or bound the size of one individual item.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use actual supplied materials and pinned source, respect authorization and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,1 @@
+This complete synthetic user-block reproduction uses in_place, text mode and default backup. KeyboardInterrupt propagates to the caller. Before the final explicit cleanup, the new output does not contain the original bytes and both streams remain open; the default backup has been removed. No real file or production operation was used.

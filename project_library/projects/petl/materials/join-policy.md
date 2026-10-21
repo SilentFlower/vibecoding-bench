@@ -1,0 +1,1 @@
+Compare join and leftjoin with explicit key="sku" for the supplied complete tables. The business later requires one approved price per SKU; explain why the supplied duplicates do not satisfy it and what uniqueness or deterministic aggregation decision must precede the join. Do not silently select a row, invent a missing cardinality constraint or change the library.

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DD-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "bidirectional_delta_roundtrip_is_copied_and_old_value_guard_is_explicit": true
+  },
+  "resource_profile": "business"
+}

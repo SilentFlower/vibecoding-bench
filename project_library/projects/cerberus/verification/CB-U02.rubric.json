@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CB-U02",
+  "source_commit": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "For explicitNone, nonnullablea takes default5 while nullableb remainsNone. Missing both supplies5 for both; explicit0 remains0 for both. Required-nullable n rejects absence but accepts explicitNone. nullable does not make a field optional, and defaults do not replace all falsey values.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

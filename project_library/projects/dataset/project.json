@@ -1,0 +1,290 @@
+{
+  "schema": 2,
+  "project_key": "dataset",
+  "title": "Dataset订单数据工作场景",
+  "category": "本地数据导入与查询",
+  "description": "固定真实源码和合成SQLite上的输入契约、列校验、事务、业务键与查询八项独立只读任务。",
+  "seed_digest": "11668d0b0b335e1a3c6f7109f4f3296ce70dff3e85f857c5153a07984fe7b7da",
+  "environment": "dataset-py312",
+  "source": {
+    "repository": "https://github.com/pudo/dataset",
+    "commit": "db592cc041014762bba55fd544e982170831f227",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "DS-S01",
+      "title": "订单输入与列规则",
+      "goal": "明确可重用输入、扩列和实际零行取证",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DS-U01",
+            "DS-C01",
+            "DS-D01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "DS-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "DS-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DS-U01",
+          "kind": "understand",
+          "goal": "解释异构订单字典的列并集和缺失值",
+          "prompt": "Trace the supplied heterogeneous dictionary-list import and ordered rows. Explain column creation, padding of missing values and whether caller dictionaries are mutated. Use actual pinned APIs and do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/input.json",
+            "materials/input-rules.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DS-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/DS-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DS-C01",
+          "kind": "consult",
+          "goal": "区分关闭自动扩列和拒绝未知字段",
+          "prompt": "Does ensure=False satisfy the supplied requirement to reject unapproved fields? Explain the actual C record result and propose an explicit validation boundary with existing APIs. No library or application files may be changed.",
+          "requires": [],
+          "materials": [
+            "materials/input.json",
+            "materials/input-rules.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DS-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/DS-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DS-D01",
+          "kind": "diagnose",
+          "goal": "先取输入对象与消费历史再定位零行导入",
+          "prompt": "Investigate the supplied zero-row symptom. Request actual input type/construction, prior consumption, insert_many call and database lifecycle or an equivalent sufficient reproduction. Diagnose actual disclosed evidence only; unavailable material can legitimately limit the result. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/zero-row-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DS-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "input-evidence",
+              "when": "The actual rows type/construction, consumption history, insertion call and database lifecycle have not been disclosed, the conversation does not say they are unavailable, and the answer reasonably requests a sufficient reproduction.",
+              "materials": [
+                "disclosure/zero-rows.py",
+                "disclosure/zero-events.md"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "DS-S02",
+      "title": "有限文件事务导入",
+      "goal": "按真实异常边界设计完整导入",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DS-U02",
+            "DS-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DS-U02",
+          "kind": "understand",
+          "goal": "按with边界判断提交与回滚",
+          "prompt": "Compare the two supplied transaction experiments using the existing table. Which row persists, and why does catching the same validation error at a different location change the result? Do not generalize to schema-change atomicity or edit files.",
+          "requires": [],
+          "materials": [
+            "materials/transactions.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DS-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/DS-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DS-P01",
+          "kind": "plan",
+          "goal": "规划预校验和完整文件事务导入",
+          "prompt": "Plan the supplied finite-file all-or-nothing import using actual Dataset capabilities. Include unknown-field validation, bounded reusable batches, prebuilt schema, transaction boundaries and error propagation, plus retry limits. No implementation or real database operation is authorized.",
+          "requires": [],
+          "materials": [
+            "materials/import-policy.md",
+            "materials/transactions.md",
+            "materials/input-rules.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DS-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/DS-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DS-S03",
+      "title": "订单业务身份",
+      "goal": "区分匹配更新、索引和唯一性保证",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DS-U03",
+            "DS-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DS-U03",
+          "kind": "understand",
+          "goal": "解释upsert对多个匹配业务键的真实作用",
+          "prompt": "Trace the supplied duplicate-order upsert, including matching row count, quantities and return value. Does this operation merge the existing two rows into one? Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/upsert.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DS-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/DS-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DS-C02",
+          "kind": "consult",
+          "goal": "明确普通索引和并发唯一性的差别",
+          "prompt": "Assess the concurrent one-row-per-order guarantee requested in the supplied upsert case. Ground the answer in the actual index and update-then-insert implementation. Recommend the required database/application boundary without running concurrency experiments or modifying files.",
+          "requires": [],
+          "materials": [
+            "materials/upsert.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DS-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/DS-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DS-S04",
+      "title": "可重复订单查询",
+      "goal": "明确排序、分页和字面值绑定",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DS-U04"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DS-U04",
+          "kind": "understand",
+          "goal": "解释稳定排序、分页和命名参数绑定",
+          "prompt": "Trace the supplied sorted page and named-bound status query. Explain the id tie-breaker and why the quote/comment-like text remains an exact value. Give actual returned order keys and use existing find/query APIs; do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/query.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DS-U04.rubric.json",
+            "semantic": true,
+            "native": "verification/DS-U04.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

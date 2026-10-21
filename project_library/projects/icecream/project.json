@@ -1,0 +1,178 @@
+{
+  "schema": 2,
+  "project_key": "icecream",
+  "title": "IceCream调试工作场景",
+  "category": "开发调试与输出",
+  "description": "真实源码上的值流、关闭调试求值、显式格式、表达式披露和配置所有权五项独立任务。",
+  "seed_digest": "2ff55d158116131897483327f71a5bca1b488ef5df3f1484ccf53c6ea4014a05",
+  "environment": "icecream-py312",
+  "source": {
+    "repository": "https://github.com/gruns/icecream",
+    "commit": "05af3e95b0080162813bb017de90966bc75f3b91",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "IC-S01",
+      "title": "调试调用与值流",
+      "goal": "理解返回身份并控制可选参数求值",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IC-U01",
+            "IC-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IC-U01",
+          "kind": "understand",
+          "goal": "解释调试调用的返回值和对象身份",
+          "prompt": "Trace all complete debugger return controls and output count, distinguishing pass-through from copying. Do not modify files.",
+          "requires": [],
+          "materials": [
+            "materials/values.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IC-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/IC-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "IC-C01",
+          "kind": "consult",
+          "goal": "避免关闭调试后仍执行昂贵参数表达式",
+          "prompt": "Meet the complete optional-work requirement using actual Python evaluation and debugger behavior. Give observed return,output and side effect, then an application boundary without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/disabled.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IC-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/IC-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "IC-S02",
+      "title": "文本格式与披露边界",
+      "goal": "区分输出开关和值／表达式格式政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IC-U02",
+            "IC-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IC-U02",
+          "kind": "understand",
+          "goal": "区分显式format与调试输出开关",
+          "prompt": "Trace the complete disabled format control and explain what is computed and what is emitted. Use the actual readable-source setting and do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/format.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IC-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/IC-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "IC-C02",
+          "kind": "consult",
+          "goal": "把值格式器与表达式源码披露边界分开",
+          "prompt": "Meet the complete trace privacy requirement using observed current behavior and an explicit application policy. Compare both synthetic calls without publishing raw traces or claiming a generic sanitizer.",
+          "requires": [],
+          "materials": [
+            "materials/format-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IC-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/IC-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "IC-S03",
+      "title": "组件调试配置",
+      "goal": "明确实例所有权和动态标签",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IC-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IC-P01",
+          "kind": "plan",
+          "goal": "规划组件拥有的输出配置和动态前缀",
+          "prompt": "Plan the complete independent-debugger configuration flow and exact prefix observations. Use current APIs without changing globals or asserting untested concurrency/context propagation.",
+          "requires": [],
+          "materials": [
+            "materials/config.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IC-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/IC-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

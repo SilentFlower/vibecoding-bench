@@ -1,0 +1,110 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "more-itertools",
+      "attempt": 3,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-003/more-itertools/result.json",
+      "result_sha256": "3be0fcd69b3091ba8f921e2dd63026c388e45dd22478749e7635af7a8cd313b3",
+      "main_collected": 765,
+      "counts": {
+        "passed": 765,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 21194,
+      "supplementary_examples": 0,
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 128
+      },
+      "runner_sha256": "41ef9fd27615a74832029e37716758d0627cb44046f662f93adcc759cd6ffb22",
+      "contract_sha256": "8f1ee3d1cbc3aa7fedee10808b2e97a4a4e208339f04dd83b9d8359aa7895c48",
+      "scope": "原生基线校准通过，业务内容和正式准入单独验证"
+    },
+    {
+      "project": "configobj",
+      "attempt": 2,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/configobj/result.json",
+      "result_sha256": "ba5344fb179f213a5a2c398fff02ecc0d8753e6ae4b852e1fd0a0a7857c0f0ef",
+      "main_collected": 79,
+      "counts": {
+        "passed": 79,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "supplementary_examples": 524,
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "runner_sha256": "41ef9fd27615a74832029e37716758d0627cb44046f662f93adcc759cd6ffb22",
+      "contract_sha256": "fde546679e75e0d7e6171d85749aa1b41594cae8f0e10dfb2249dbbc9e89ff65",
+      "scope": "原生基线校准通过，业务内容和正式准入单独验证"
+    },
+    {
+      "project": "dataset",
+      "attempt": 2,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/dataset/result.json",
+      "result_sha256": "22be10d0ccf9206c0b207883a0fb985fc9e2151f0eab2e5b10bd97cdeed710ae",
+      "main_collected": 61,
+      "counts": {
+        "passed": 61,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "supplementary_examples": 0,
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "runner_sha256": "41ef9fd27615a74832029e37716758d0627cb44046f662f93adcc759cd6ffb22",
+      "contract_sha256": "5b354198567f183faf9f1531771c216abcf4d6cf5350e39e36bf56d292ad8ad0",
+      "scope": "原生基线校准通过，业务内容和正式准入单独验证"
+    },
+    {
+      "project": "python-markdown",
+      "attempt": 2,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/python-markdown/result.json",
+      "result_sha256": "ef10672663511993c782fd2394e16203ca9a501db499b4f4597e0bd1e7f94f7c",
+      "main_collected": 1129,
+      "counts": {
+        "passed": 1019,
+        "failed": 0,
+        "error": 0,
+        "skipped": 110,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "supplementary_examples": 0,
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "runner_sha256": "41ef9fd27615a74832029e37716758d0627cb44046f662f93adcc759cd6ffb22",
+      "contract_sha256": "65e0b86b4512adaa1b4618bed2cd0fe17f99707f93917df0c6382eae9981e202",
+      "scope": "原生基线校准通过，业务内容和正式准入单独验证"
+    }
+  ],
+  "real_model_calls": 0
+}

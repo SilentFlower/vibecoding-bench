@@ -1,0 +1,283 @@
+{
+  "schema": 2,
+  "project_key": "mistune",
+  "title": "Mistune文档处理工作场景",
+  "category": "文档解析与本地转换",
+  "description": "固定真实源码上的文档配置、AST、CLI兼容、空输入修复和Markdown重排咨询；四场景八任务。",
+  "seed_digest": "69380eb6a395d926252293d0f9635ee0a671c1d7edccad33c6ecda43593b3aa5",
+  "environment": "mistune-py312",
+  "source": {
+    "repository": "https://github.com/lepture/mistune",
+    "commit": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "MS-S01",
+      "title": "文档语法和渲染配置",
+      "goal": "明确快捷入口差异并规划复用",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MS-U01",
+            "MS-C01",
+            "MS-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MS-U01",
+          "kind": "understand",
+          "goal": "解释快捷HTML入口和默认Markdown入口",
+          "prompt": "Trace the supplied document through mistune.markdown and mistune.html. Explain observed raw HTML escaping and table/strikethrough behavior from their actual defaults. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/document.md",
+            "materials/entry-comparison.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MS-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/MS-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "MS-C01",
+          "kind": "consult",
+          "goal": "用已有工厂明确文档插件与HTML策略",
+          "prompt": "Recommend an explicit existing parser configuration for the supplied table/strikethrough document and chosen literal HTML policy. Explain how create_markdown resolves plugins and renderer choices, and decide whether the library needs a patch.",
+          "requires": [],
+          "materials": [
+            "materials/document.md",
+            "materials/entry-comparison.py",
+            "materials/document-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MS-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/MS-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "MS-P01",
+          "kind": "plan",
+          "goal": "规划可复用的本地文档转换配置",
+          "prompt": "Plan the supplied local document workflow with explicit syntax plugins, renderer, HTML policy, per-document state and representative regression fixtures. Separate publishing and AST consumers and state reuse/concurrency boundaries. Do not implement changes.",
+          "requires": [],
+          "materials": [
+            "materials/document.md",
+            "materials/document-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "viable_plan_no_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MS-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/MS-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MS-S02",
+      "title": "编辑器的结构化文档",
+      "goal": "区分AST对象和已有导出边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MS-U02",
+            "MS-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MS-U02",
+          "kind": "understand",
+          "goal": "解释结构化AST与JSON序列化边界",
+          "prompt": "Trace the supplied AST API call. Explain the returned Python structure, its purpose versus rendered HTML, and the explicit serialization step needed for JSON text. Do not edit files or assume every renderer returns a string.",
+          "requires": [],
+          "materials": [
+            "materials/ast-api.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MS-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/MS-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "MS-C02",
+          "kind": "consult",
+          "goal": "为现有CLI的AST限制选择兼容导出",
+          "prompt": "Diagnose the supplied CLI AST assertion at its actual result boundary, then recommend an existing API-based local JSON export for the editor/indexer. Do not modify files or claim an unimplemented CLI feature was delivered.",
+          "requires": [],
+          "materials": [
+            "materials/ast-api.py",
+            "materials/ast-cli.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MS-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/MS-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MS-S03",
+      "title": "空文档的本地CLI处理",
+      "goal": "独立诊断并修复输入存在性判断",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MS-D01",
+            "MS-M01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "MS-D01"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "MS-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MS-D01",
+          "kind": "diagnose",
+          "goal": "定位空文档和未提供输入的混淆",
+          "prompt": "Use the complete supplied CLI cases. Explain why empty piped stdin and explicit empty -m are rejected while the API and zero-byte file accept an empty document. Locate the actual dispatch condition and preserve the successful controls. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/empty-cases.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MS-D01.rubric.json",
+            "semantic": true,
+            "native": "verification/MS-D01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "MS-M01",
+          "kind": "modify",
+          "goal": "修复空文档CLI并保留真实输出副作用",
+          "prompt": "Implement the complete public empty-document CLI contract, including actual -o file creation, explicit empty-message precedence and nonblocking interactive absence. Preserve nonempty/missing-file behavior and modify only the authorized implementation/test files with meaningful original-failing public tests.",
+          "requires": [],
+          "materials": [
+            "materials/empty-cases.md",
+            "materials/empty-contract.md"
+          ],
+          "allowed_paths": [
+            "library/src/mistune/__main__.py",
+            "library/tests/test_cli.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MS-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/MS-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MS-S04",
+      "title": "Markdown重排与保真",
+      "goal": "按真实表示能力选择工具边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MS-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MS-C03",
+          "kind": "consult",
+          "goal": "区分Markdown规范化与原始文本保真",
+          "prompt": "Explain the supplied MarkdownRenderer example and assess whether it meets a byte-for-byte source-preservation requirement. Compare actual formatting normalization with retained rendered meaning and recommend an appropriate application boundary without modifying the library.",
+          "requires": [],
+          "materials": [
+            "materials/normalize-markdown.py"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MS-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/MS-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

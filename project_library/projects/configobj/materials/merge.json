@@ -1,0 +1,1 @@
+{"base":{"service":{"host":"old-db","port":"8000","labels":["a","b"]}},"override":{"service":{"port":"9000","labels":["c"]}}}

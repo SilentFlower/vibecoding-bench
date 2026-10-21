@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CA-D01",
+  "source_commit": "3ab2f323abcdd321b6c423f9eb6304ce35681307",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Initially request sufficient real definition and source inputs; the symptom cannot establish bool conversion or precedence. Relate only disclosed evidence to current behavior and a compatible remedy, or use insufficient_information when missing. Do not assume type=bool or an overriding CLI before disclosure.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

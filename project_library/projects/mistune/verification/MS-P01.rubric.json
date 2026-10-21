@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MS-P01",
+  "source_commit": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Give a workable existing-API configuration/reuse plan, fresh per-document state and meaningful output validation. Do not promise arbitrary custom plugin thread safety or byte-perfect Markdown rewriting, and do not introduce an unnecessary service or parser API.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

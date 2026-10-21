@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TZ-U04"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "merge_is_new_shallow_mapping_with_later_precedence": true
+  },
+  "resource_profile": "business"
+}

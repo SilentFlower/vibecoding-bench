@@ -1,0 +1,1 @@
+An application reports that editing its local configuration file does not change a later read. The actual repository construction, reads, file edit sequence and relevant environment override state have not been supplied. Do not assign a cause yet.

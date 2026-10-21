@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "RH-C02",
+  "source_commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The supplied Unicode text has four code points but five display cells and folds at width4. An ellipsized width8 rendering no longer contains the complete identifier, and record/export retains those rendered segments rather than recovering original data. Keep canonical structured identifiers separately; choose width/wrapping deliberately and do not infer display width from len or promise exports undo cropping.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

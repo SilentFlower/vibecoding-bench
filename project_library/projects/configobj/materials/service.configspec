@@ -1,0 +1,5 @@
+[service]
+port = integer(min=1, max=65535)
+enabled = boolean
+required = string(min=1)
+workers = integer(min=1, default=2)

@@ -1,0 +1,291 @@
+{
+  "schema": 2,
+  "project_key": "csvkit",
+  "title": "CSVkit数据导出工作场景",
+  "category": "CSV命令行与本地查询",
+  "description": "固定真实源码上的引用投影、筛选取证、类型排序、字段保真、DDL预览和内存汇总八项独立只读任务。",
+  "seed_digest": "3ebbccf986d52a1a95f98dfa2e8c0335ae5e996005472ee70e4343708b1ce027",
+  "environment": "csvkit-py312",
+  "source": {
+    "repository": "https://github.com/wireservice/csvkit",
+    "commit": "6d19c625214977ab2988e674441ca24638bc12d3",
+    "license_files": [
+      "seed/library/COPYING"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CV-S01",
+      "title": "CSV投影与空行政策",
+      "goal": "按逻辑单元格保真并明确丢弃规则",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CV-U01",
+            "CV-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CV-U01",
+          "kind": "understand",
+          "goal": "解释CSV投影为何保持引用单元格和编号",
+          "prompt": "Trace the supplied complete csvcut projection and list logical output rows/cells in the selected order. Explain quoted commas/newlines and identifier preservation without naively splitting lines. Do not modify files.",
+          "requires": [],
+          "materials": [
+            "materials/orders.csv",
+            "materials/projection.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CV-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/CV-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CV-C01",
+          "kind": "consult",
+          "goal": "确认删除空行依据的是投影后的字段",
+          "prompt": "Advise on the complete short-row/drop-policy examples using existing csvcut options. Give each actual output and explain whether -x preserves nonempty orders when their selected cells are empty. No code/data changes are requested.",
+          "requires": [],
+          "materials": [
+            "materials/short.csv",
+            "materials/projection.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CV-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/CV-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CV-S02",
+      "title": "筛选取证与匹配方式",
+      "goal": "分清实际命令、匹配模式和多列组合",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CV-D01",
+            "CV-U02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "CV-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "CV-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CV-D01",
+          "kind": "diagnose",
+          "goal": "先取实际筛选命令再定位漏选记录",
+          "prompt": "Investigate the supplied fewer-exported-rows symptom. Request the actual command/options, selected columns, matching mode and representative input before choosing a cause. Diagnose disclosed facts only; close with an evidence plan if unavailable. Do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/filter-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CV-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "filter-evidence",
+              "when": "The exact command/options, matching mode and input rows have not been supplied or declared unavailable, and the answer reasonably requests sufficient evidence.",
+              "materials": [
+                "disclosure/filter.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "CV-U02",
+          "kind": "understand",
+          "goal": "区分子串、精确名单和多列匹配组合",
+          "prompt": "Trace all complete matching controls in the supplied material. Give exact selected rows for substring/file/anchored-regex and default multi-column/all versus explicit any matching. No changes are authorized.",
+          "requires": [],
+          "materials": [
+            "materials/matching.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CV-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/CV-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CV-S03",
+      "title": "金额排序与字段保真",
+      "goal": "兼顾数值顺序、外部编号和字面空值标记",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CV-U03",
+            "CV-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CV-U03",
+          "kind": "understand",
+          "goal": "解释数值排序与全字符串模式的不同顺序",
+          "prompt": "Trace actual amount order under default inference and -I for the complete sort reproduction. Explain the role of -y 0 and distinguish input parsing from row sorting. Do not modify files.",
+          "requires": [],
+          "materials": [
+            "materials/sort.csv",
+            "materials/type-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CV-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/CV-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CV-C02",
+          "kind": "consult",
+          "goal": "兼顾数值排序、前导零编号和字面NA",
+          "prompt": "Meet the supplied complete typing/sorting policy with existing options. Compare all-text mode with targeted leading-zero and null-token policies, including exact controls and input ownership. No implementation is requested.",
+          "requires": [],
+          "materials": [
+            "materials/sort.csv",
+            "materials/type-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CV-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/CV-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CV-S04",
+      "title": "SQL预览与本地汇总",
+      "goal": "明确DDL输出、内存查询和连接生命周期",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CV-C03",
+            "CV-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CV-C03",
+          "kind": "consult",
+          "goal": "确认DDL预览和实际数据库导入的区别",
+          "prompt": "Explain the complete schema-preview invocation and recommend how the reviewer can inspect it without database writes. Identify what the command actually emits and avoid executing unrequested import/overwrite flags.",
+          "requires": [],
+          "materials": [
+            "materials/sales.csv",
+            "materials/sql.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CV-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/CV-C03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CV-P01",
+          "kind": "plan",
+          "goal": "规划仅在内存中汇总CSV的本地报表",
+          "prompt": "Plan the complete local-only reporting invocation with current CSVSQL behavior. State the implied connection, input lifetime, actual last-query output and controls; no external database access or implementation is authorized.",
+          "requires": [],
+          "materials": [
+            "materials/sales.csv",
+            "materials/sql.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CV-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/CV-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

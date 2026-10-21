@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AG-U04"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "group_totals_and_non_null_counts_have_distinct_meanings": true
+  },
+  "resource_profile": "business"
+}

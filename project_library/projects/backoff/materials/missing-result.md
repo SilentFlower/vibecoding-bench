@@ -1,0 +1,1 @@
+A caller says a decorated operation returned None where it expected a result or exception. The target behavior, decorator options, events and final caller logic are missing. Investigate without assigning a cause.

@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DC-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "environment_file_default_order": true,
+    "empty_environment_wins": true
+  },
+  "resource_profile": "business"
+}

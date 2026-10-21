@@ -1,0 +1,1 @@
+../deepdiff/docstrings/colored_view.rst

@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TB-U03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "cli_csv_file_output": true,
+    "cli_jsonl_headers": true,
+    "cli_invalid_format_rejected": true
+  },
+  "resource_profile": "business"
+}

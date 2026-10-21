@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CK-U02",
+  "source_commit": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain the observed precedence and exact COMMANDLINE, ENVIRONMENT, DEFAULT_MAP and DEFAULT provenance. A value equal to a default is not proof it came from that default.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

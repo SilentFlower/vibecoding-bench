@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DP-U04",
+  "source_commit": "15759d96a006fef5278de731cd263b4d839094c3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "merge returns/mutates destination. Default list addition yields[A,B],and the first source.tags is that same list and also changes to[A,B]. REPLACE yields[B]for the separate fresh control. The API documents source references rather than deep-copy isolation; addition does not deduplicate.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

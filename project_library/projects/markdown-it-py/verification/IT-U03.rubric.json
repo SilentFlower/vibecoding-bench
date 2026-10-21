@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IT-U03",
+  "source_commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Definitions alone return no body tokens. env.references stores normalized label A with the first href and map[0,1]; duplicate_refs records the later second href/label A/map[2,3]. The later definition does not silently win, and env is the supplied mutable mapping.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

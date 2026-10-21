@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BX-C02",
+  "source_commit": "a4c10e977b574114613431394b30412b50aaacce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "update replaces db with hostB and loses port. merge_update retains port5432 and changes hostB. Default tags replace with[new,new], extend gives[base,new,new], unique gives[base,new]. These methods mutate the destination, so use an explicitly owned destination/fresh Box and preserve source mappings. Select the required list policy rather than assume all recursive merge is concatenation or pure.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

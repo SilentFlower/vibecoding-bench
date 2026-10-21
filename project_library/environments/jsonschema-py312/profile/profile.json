@@ -1,0 +1,233 @@
+{
+  "schema": 1,
+  "id": "jsonschema-py312",
+  "adapter": "python-native",
+  "platform": "linux-amd64",
+  "python": "3.12.15",
+  "requirements": [
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==9.1.1",
+    "arrow==1.4.0",
+    "attrs==26.1.0",
+    "Automat==25.4.16",
+    "click==8.5.0",
+    "colorama==0.4.6",
+    "constantly==23.10.4",
+    "fqdn==1.6.0",
+    "hyperlink==21.0.0",
+    "idna==3.20",
+    "Incremental==24.11.0",
+    "isoduration==20.11.0",
+    "jsonpath-ng==1.12.0",
+    "jsonpointer==3.4",
+    "jsonschema-specifications==2025.9.1",
+    "lark==1.3.1",
+    "pyrsistent==0.20.0",
+    "python-dateutil==2.9.0.post0",
+    "referencing==0.37.0",
+    "rfc3339-validator==0.1.4",
+    "rfc3986-validator==0.1.1",
+    "rfc3987-syntax==1.1.0",
+    "rpds-py==2026.9.1",
+    "six==1.17.0",
+    "Twisted==26.4.0",
+    "typing_extensions==4.16.0",
+    "tzdata==2026.5",
+    "uri-template==1.3.0",
+    "virtue==2025.7.1",
+    "webcolors==25.10.0",
+    "zope.interface==8.7"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+      "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+      "size": 386536
+    },
+    {
+      "path": "artifacts/arrow-1.4.0-py3-none-any.whl",
+      "digest": "749f0769958ebdc79c173ff0b0670d59051a535fa26e8eba02953dc19eb43205",
+      "size": 68797
+    },
+    {
+      "path": "artifacts/attrs-26.1.0-py3-none-any.whl",
+      "digest": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+      "size": 67548
+    },
+    {
+      "path": "artifacts/automat-25.4.16-py3-none-any.whl",
+      "digest": "04e9bce696a8d5671ee698005af6e5a9fa15354140a87f4870744604dcdd3ba1",
+      "size": 42842
+    },
+    {
+      "path": "artifacts/click-8.5.0-py3-none-any.whl",
+      "digest": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360",
+      "size": 125251
+    },
+    {
+      "path": "artifacts/colorama-0.4.6-py2.py3-none-any.whl",
+      "digest": "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6",
+      "size": 25335
+    },
+    {
+      "path": "artifacts/constantly-23.10.4-py3-none-any.whl",
+      "digest": "3fd9b4d1c3dc1ec9757f3c52aef7e53ad9323dbe39f51dfd4c43853b68dfa3f9",
+      "size": 13547
+    },
+    {
+      "path": "artifacts/fqdn-1.6.0-py3-none-any.whl",
+      "digest": "6c793c312ccfa29981e1135b3ef5e1277ebe639731a6b0f7350d90e96e63f0b4",
+      "size": 12569
+    },
+    {
+      "path": "artifacts/hyperlink-21.0.0-py2.py3-none-any.whl",
+      "digest": "e6b14c37ecb73e89c77d78cdb4c2cc8f3fb59a885c5b3f819ff4ed80f25af1b4",
+      "size": 74638
+    },
+    {
+      "path": "artifacts/idna-3.20-py3-none-any.whl",
+      "digest": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+      "size": 69583
+    },
+    {
+      "path": "artifacts/incremental-24.11.0-py3-none-any.whl",
+      "digest": "a34450716b1c4341fe6676a0598e88a39e04189f4dce5dc96f656e040baa10b3",
+      "size": 21109
+    },
+    {
+      "path": "artifacts/isoduration-20.11.0-py3-none-any.whl",
+      "digest": "b2904c2a4228c3d44f409c8ae8e2370eb21a26f7ac2ec5446df141dde3452042",
+      "size": 11321
+    },
+    {
+      "path": "artifacts/jsonpath_ng-1.12.0-py3-none-any.whl",
+      "digest": "6fc33404ab2a9b77895e9acde23f80998c61567c8e9c182301e73a78f158e585",
+      "size": 80563
+    },
+    {
+      "path": "artifacts/jsonpointer-3.4-py3-none-any.whl",
+      "digest": "136e2e3273fd82a1502274f56ec172f331b6a1703d86a1824d503af4d9a96142",
+      "size": 9047
+    },
+    {
+      "path": "artifacts/jsonschema_specifications-2025.9.1-py3-none-any.whl",
+      "digest": "98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe",
+      "size": 18437
+    },
+    {
+      "path": "artifacts/lark-1.3.1-py3-none-any.whl",
+      "digest": "c629b661023a014c37da873b4ff58a817398d12635d3bbb2c5a03be7fe5d1e12",
+      "size": 113151
+    },
+    {
+      "path": "artifacts/pyrsistent-0.20.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "digest": "b14decb628fac50db5e02ee5a35a9c0772d20277824cfe845c8a8b717c15daa3",
+      "size": 122335
+    },
+    {
+      "path": "artifacts/python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+      "digest": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
+      "size": 229892
+    },
+    {
+      "path": "artifacts/referencing-0.37.0-py3-none-any.whl",
+      "digest": "381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231",
+      "size": 26766
+    },
+    {
+      "path": "artifacts/rfc3339_validator-0.1.4-py2.py3-none-any.whl",
+      "digest": "24f6ec1eda14ef823da9e36ec7113124b39c04d50a4d3d3a3c2859577e7791fa",
+      "size": 3490
+    },
+    {
+      "path": "artifacts/rfc3986_validator-0.1.1-py2.py3-none-any.whl",
+      "digest": "2f235c432ef459970b4306369336b9d5dbdda31b510ca1e327636e01f528bfa9",
+      "size": 4242
+    },
+    {
+      "path": "artifacts/rfc3987_syntax-1.1.0-py3-none-any.whl",
+      "digest": "6c3d97604e4c5ce9f714898e05401a0445a641cfa276432b0a648c80856f6a3f",
+      "size": 8046
+    },
+    {
+      "path": "artifacts/rpds_py-2026.9.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "digest": "addeda51556dac7c1a2f14cda62db8b621cd12afba3091d03a96c72932387eab",
+      "size": 371261
+    },
+    {
+      "path": "artifacts/six-1.17.0-py2.py3-none-any.whl",
+      "digest": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+      "size": 11050
+    },
+    {
+      "path": "artifacts/twisted-26.4.0-py3-none-any.whl",
+      "digest": "dc25ea0ebf6511c24f03232ee9f4afa54b291c5d897990e3a39cc4d14a1ef4c0",
+      "size": 3230362
+    },
+    {
+      "path": "artifacts/typing_extensions-4.16.0-py3-none-any.whl",
+      "digest": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+      "size": 45571
+    },
+    {
+      "path": "artifacts/tzdata-2026.5-py2.py3-none-any.whl",
+      "digest": "b683bd1b6659ddcd810ff02ad09ba821d4bf1065072805063eb35c49617905ac",
+      "size": 347996
+    },
+    {
+      "path": "artifacts/uri_template-1.3.0-py3-none-any.whl",
+      "digest": "a44a133ea12d44a0c0f06d7d42a52d71282e77e2f937d8abd5655b8d56fc1363",
+      "size": 11140
+    },
+    {
+      "path": "artifacts/virtue-2025.7.1-py3-none-any.whl",
+      "digest": "37c55eb88e8ac74041389cc07a7191cac0584f9ee8a76df36842ea367cd6ffee",
+      "size": 22815
+    },
+    {
+      "path": "artifacts/webcolors-25.10.0-py3-none-any.whl",
+      "digest": "032c727334856fc0b968f63daa252a1ac93d33db2f5267756623c210e57a4f1d",
+      "size": 14905
+    },
+    {
+      "path": "artifacts/zope_interface-8.7-cp312-cp312-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl",
+      "digest": "90aef6e0a9924af18f60528895f2fc50cb634191939d65b10a96d9ced05030b5",
+      "size": 284199
+    }
+  ],
+  "source_commit": "c497561ea0a95f5aac09cd63d15eb1420eb7bbec",
+  "verification_status": "verified_target_runtime"
+}

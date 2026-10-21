@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CV-C01",
+  "source_commit": "6d19c625214977ab2988e674441ca24638bc12d3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Selecting b produces a header plus three empty cells, including padding for short rowC. Adding -x leaves only the b header; selecting a with -x keeps keep and x. The empty check occurs after projection, so original nonempty IDs do not prevent dropping. Choose an explicit business filter rather than treating -x as validation of complete original rows.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

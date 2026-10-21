@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MI-U03",
+  "source_commit": "4aeb4338ae1407d8da9723e86da99efeb446f719",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The later A/rev2 and A/rev3 events both appear; original A/rev1 and unique B/rev1 do not. Compose unique_everseen on that output with the same key to obtain A/rev2 once. Preserve original record identity and arrival order.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

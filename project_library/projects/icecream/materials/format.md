@@ -1,0 +1,1 @@
+Disable a fresh debugger with prefix trace| and outputFunction=output.append. Set value=5 and call debugger.format(value). Explain returned text and emitted output, and compare explicit formatting with the output gate on debugger(...). Source is a real readable Python file, not a dynamically generated code string.

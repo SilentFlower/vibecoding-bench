@@ -1,0 +1,1 @@
+A publication service says one rendered article sometimes contains content associated with another article. The actual converter construction/reuse, extensions and input/output sequence have not been supplied. Request sufficient evidence before attributing a cause.

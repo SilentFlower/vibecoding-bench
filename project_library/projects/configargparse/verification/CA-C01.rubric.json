@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CA-C01",
+  "source_commit": "3ab2f323abcdd321b6c423f9eb6304ce35681307",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "get_source_to_settings_dict includes the synthetic APP_PASSWORD action/value and format_values prints that value. These APIs provide provenance, not automatic redaction. Build an explicit allowed-field/source summary or redact declared sensitive fields before display, preserving useful source identity without dumping the raw formatted string. No real secret or sanitizer execution is claimed.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

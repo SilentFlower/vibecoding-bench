@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TB-C02",
+  "source_commit": "268615a5c27dc40e5c22454c07b44d5c50410da0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use actual wcwidth-enabled display width and per-column wrapping behavior. Account for headers, separators and padding when discussing a total budget; do not invent a max_table_width API or claim a column cap is a whole-table cap.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

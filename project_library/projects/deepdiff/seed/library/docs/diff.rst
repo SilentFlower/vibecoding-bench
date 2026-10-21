@@ -1,0 +1,1 @@
+../deepdiff/docstrings/diff.rst

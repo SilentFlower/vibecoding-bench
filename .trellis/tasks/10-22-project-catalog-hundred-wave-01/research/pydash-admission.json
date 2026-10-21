@@ -1,0 +1,141 @@
+{
+  "project": "pydash",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "ef6a6427e488e29e827e0e0819f2630ad3ff4cdc",
+  "source_file_count": 78,
+  "license_files": [
+    "seed/library/LICENSE.rst"
+  ],
+  "scenarios": 4,
+  "unique_tasks": 8,
+  "modify_tasks": 0,
+  "non_modify_tasks": 8,
+  "native_baseline": {
+    "project": "pydash",
+    "attempt": 1,
+    "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/pydash/result.json",
+    "result_sha256": "5364c86f280df4f5e9cfb9c5e11f3d41ab614707052a364256844d1a2e5a2293",
+    "main_collected": 2880,
+    "counts": {
+      "passed": 2880,
+      "failed": 0,
+      "error": 0,
+      "skipped": 0,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 359,
+    "subtest_count": 0,
+    "xml_testcases": 2880,
+    "xml_skipped": 0,
+    "runner_sha256": "3c96af2065e313156ff341ced4ed6f35c0756138d59fffcf09c4ddce0cb630ba",
+    "contract_sha256": "3ddf60e69cc9b6d783b58e7a2708e96cb6f0f1249d5897300f8fc9928609ac30",
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "当前实际基线；未运行多平台、Cython加速、lint或静态类型矩阵，不是业务完成"
+  },
+  "verified_unique_native_cases": 7,
+  "native_evidence": [
+    {
+      "case": "original-PD-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/pydash/attempt-001/original-PD-C01.json",
+      "sha256": "a2ab59a834956dab549487b3d9f87a12257e4e9f00c080c874a3b9b956e82ec8",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PD-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/pydash/attempt-001/original-PD-C02.json",
+      "sha256": "00af13ea7ee720b27405059c51241897ac5b002bf5b58f37cd06d148fb493df2",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PD-C03",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/pydash/attempt-001/original-PD-C03.json",
+      "sha256": "a25c5687d41197e37b35b23cff9c75313c7f8c9328359c92497388bb3a3eaea0",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PD-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/pydash/attempt-001/original-PD-P01.json",
+      "sha256": "8a94bc47fdfc2c887c97130ed1654045d10767b57f33daeb769e5caa095ce799",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PD-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/pydash/attempt-001/original-PD-U01.json",
+      "sha256": "1d5532b3d672f01d8d3df3f1a5ad126bd4177632cb513cb393127b1cf5718afd",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PD-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/pydash/attempt-001/original-PD-U02.json",
+      "sha256": "84141e9c8556443c9a6fcf5661d66f5f151613eec8428d5809e52107aeb0648c",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PD-U03",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/pydash/attempt-001/original-PD-U03.json",
+      "sha256": "1d26d78970ff413fbbf29178cd887e762d207816a5992ccae2f327d0cbc4f4a7",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-01/business/pydash/attempt-001/summary.json",
+      "sha256": "76e1d1e87b0575298463ebe5a633eaf20d379d655c69163d74157a7c7fa3589e",
+      "passed": true
+    }
+  ],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v11-en",
+  "formal_digest": "69b449dbf378b25edd8ba8d011f43ee34d157bbd9d0bc48d15527ed96cf8e761",
+  "full_delivery_files": 10589,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-012/run-001/evidence/result.json",
+      "sha256": "310038c0f3f953f5abaae3cf65e7c184777e835cf15358ec0a15ef89865f4776"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-012/run-001/cleanup.json",
+      "sha256": "3865254fd796773634c9bcd2415e9c44aa55cb49f5966e43fa9f59fc2ac6089a"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/mock-batch-012-audit.json",
+      "sha256": "1fdbbb528a6ec8c546046a427bfc2398611b5296f9f45688ac0bac28ec04042b"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-012/browser/run-001/diagnostics/result.json",
+      "sha256": "7fb9d2560acf438a42411e976021fba69e573186d7274571b9f0e9e651ff1c70"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/delivery-first-twenty-four.json",
+      "sha256": "4a767dabe5b48412ba71e2dcfa74ff47ab0e394b956098ed90c5425e44847f64"
+    }
+  ]
+}

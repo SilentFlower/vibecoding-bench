@@ -1,0 +1,1 @@
+Use the full supplied commonmark reproduction with linkify-it-py present. The desired preview links the supplied explicit HTTPS URL. Compare the linkify option with the active core rule and existing enable API; do not fetch the URL, patch the core or add an imaginary always-on guarantee.

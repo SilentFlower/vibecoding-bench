@@ -1,0 +1,1 @@
+Compare recursive merge of the supplied dictionaries with list concatenation expectations. Separately read service.root from the supplied interpolated configuration, set the root base value to /opt in memory, read again, and inspect write(). Only the synthetic in-memory experiment is authorized; do not change files.

@@ -1,0 +1,106 @@
+name: Run tests
+
+on:
+  push:
+    branches-ignore:
+      - 'wip-*'
+  pull_request:
+    branches-ignore:
+      - 'wip-*'
+  workflow_dispatch:
+
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: "3.13"
+
+      - name: ruff lint
+        run: uv run --locked --group lint ruff check .
+
+      - name: mypy lint
+        run: uv run --locked --group lint mypy
+
+  docs:
+    needs: lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: "3.13"
+
+      - name: Build documentation without remote inventories
+        env:
+          MISTUNE_DOCS_OFFLINE: "1"
+        run: uv run --locked --group docs sphinx-build -W -b dummy docs /tmp/mistune-docs
+
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        python-version:
+          - "3.11"
+          - "3.12"
+          - "3.13"
+          - "3.14"
+          - "3.15"
+          - "pypy3.11"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Report coverage
+        run: uv run --locked --group test pytest --cov=mistune --cov-branch --cov-report=xml
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  sonar:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: "3.13"
+
+      - name: Generate coverage
+        run: uv run --locked --group test pytest --cov=mistune --cov-branch --cov-report=xml
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v8
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

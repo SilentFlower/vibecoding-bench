@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BO-U04"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "strict_jsonl_error_observed": true,
+    "skip_and_reverse_order_observed": true
+  },
+  "resource_profile": "business"
+}

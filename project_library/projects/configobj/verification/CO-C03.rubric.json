@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CO-C03",
+  "source_commit": "b7707c94c0317b8f89b704a01525a68eb6c72521",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The reads yield /srv/orders then /opt/orders because existing interpolation resolves against current configuration at access. write temporarily disables interpolation and retains root=%(base)s/orders, then restores behavior. A deliberate application snapshot is separate; do not claim an initial read permanently rewrites raw expressions or supplies environment expansion.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

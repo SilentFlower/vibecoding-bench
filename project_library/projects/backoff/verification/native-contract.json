@@ -1,0 +1,643 @@
+{
+  "baseline_digest": "b741c8967f735d2e6d642435b2c35830cc48b5d0399e15825d8dee67707c7b36",
+  "nodes": [
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-10-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-10-20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-10-30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-10-40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-10-50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-20-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-20-20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-20-30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-20-40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-20-50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-30-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-30-20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-30-30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-30-40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-30-50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-40-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-40-20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-40-30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-40-40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-40-50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-50-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-50-20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-50-30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-50-40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_exception_factory-50-50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-10-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-10-20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-10-30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-10-40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-10-50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-20-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-20-20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-20-30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-20-40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-20-50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-30-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-30-20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-30-30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-30-40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-30-50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-40-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-40-20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-40-30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-40-40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-40-50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-50-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-50-20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-50-30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-50-40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_event_log_levels[_on_predicate_factory-50-50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_callable_gen_kwargs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_callable_max_tries",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_callable_max_tries_reads_every_time",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_constant_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_giveup[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_giveup[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_giveup_predicate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_in_thread",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_logger_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_logger_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_logger_user",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_logger_user_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_max_tries",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_max_tries_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_success",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_success_0_arg_jitter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_success_full_jitter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_success_random_jitter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_exception_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_predicate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_predicate_constant_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_predicate_giveup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_predicate_in_thread",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_predicate_iterable_handlers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_predicate_max_time",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_predicate_max_time_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_predicate_max_tries",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_predicate_success",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff.py::test_on_predicate_success_0_arg_jitter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_callable_gen_kwargs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_callable_max_tries",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_callable_max_tries_reads_every_time",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_constant_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_coro_cancelling",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_giveup[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_giveup[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_giveup_coro",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_giveup_predicate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_max_tries",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_max_tries_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_on_regular_function_without_event_loop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_success",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_success_0_arg_jitter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_success_full_jitter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_success_random_jitter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_exception_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_predicate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_predicate_constant_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_predicate_giveup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_predicate_iterable_handlers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_predicate_max_tries",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_predicate_max_tries_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_predicate_on_regular_function_without_event_loop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_predicate_success",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_backoff_async.py::test_on_predicate_success_0_arg_jitter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_integration.py::test_on_exception_runtime",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_integration.py::test_on_predicate_runtime",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_jitter.py::test_full_jitter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wait_gen.py::test_constant",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wait_gen.py::test_decay",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wait_gen.py::test_decay_init100",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wait_gen.py::test_decay_init100_decay3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wait_gen.py::test_decay_init100_decay3_min5",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wait_gen.py::test_expo",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wait_gen.py::test_expo_base3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wait_gen.py::test_expo_base3_factor5",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wait_gen.py::test_expo_factor3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wait_gen.py::test_expo_max_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wait_gen.py::test_fibo",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wait_gen.py::test_fibo_max_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wait_gen.py::test_runtime",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ff25ba88c3f21377d4fcb8973c2c082eefab59c318a2e552996438f52e2f9a47",
+      "version": "7.4.4"
+    },
+    {
+      "distribution": "pytest-asyncio",
+      "module": "pytest_asyncio.plugin",
+      "module_sha256": "976aec7aa86580ab5ae4ccb37564f21ba566a3938216820b5e57b9099d6e81fd",
+      "version": "0.18.3"
+    },
+    {
+      "distribution": "pytest-cov",
+      "module": "pytest_cov.plugin",
+      "module_sha256": "9b30828e8d5943b175ed7369e12349a1eb75b94f8c3d4f2b868079513a6faf40",
+      "version": "3.0.0"
+    }
+  ],
+  "project": "backoff",
+  "python": "3.12.15",
+  "schema": 1
+}

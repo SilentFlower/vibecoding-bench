@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CH-U01",
+  "source_commit": "e2538b1d338ead4ed803ec0017017bf6779a380b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain actual iterator consumption, CSV quoting/empty missing field, JSONL Unicode and null, and the display <null> marker. Do not equate all output formats or claim the input records are modified.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

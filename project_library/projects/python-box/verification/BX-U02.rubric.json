@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BX-U02",
+  "source_commit": "a4c10e977b574114613431394b30412b50aaacce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Accessing customer.region creates nested default Boxes, leaving {customer:{region:{}}}. The original object changes through lookup under these options. It is not evidence that those required business values were supplied or a filesystem modification.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CT-P01",
+  "source_commit": "6f23e2a7b75a42d30cb9d890ab3ca4059ee01bfd",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Provide a workable application plan for atomic publication, validated values, bounded caching and explicit consistency; do not promise exception caching, live file watching or independent copies from ordinary memoization.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use only actually supplied evidence and the pinned public source. Respect the task authorization and distinguish observed facts, normal limitations and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations grounded in actual evidence; do not match wording, verbosity or a reference answer."
+}

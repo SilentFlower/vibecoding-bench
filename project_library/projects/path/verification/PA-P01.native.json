@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PA-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "normal_success_and_backup_cleanup": true,
+    "ordinary_runtime_error_restores_bytes": true
+  },
+  "resource_profile": "business"
+}

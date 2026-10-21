@@ -1,0 +1,1 @@
+Construct a typed Table with rows(A,2),(B,1),(C,3), columns order:Text and amount:Number. Filter amount>=2 then order_by amount descending. Separately compute double=amount*2 and plus=double+1 using Formula(Number(),callback): compare listing both in one compute with two explicit compute stages. Inspect the original table after each attempt.

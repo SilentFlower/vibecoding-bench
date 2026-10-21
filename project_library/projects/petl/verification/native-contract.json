@@ -1,0 +1,4711 @@
+{
+  "baseline_digest": "a0c6f4da35c55a8f08c0b12c18967f9a598c2157e0abb4ad23b2c11f14075970",
+  "collection_skips": [
+    {
+      "id": "petl/test/io/test_avro.py",
+      "line": 34,
+      "outcome": "skipped",
+      "reason": "Skipped: SKIP avro tests: No module named 'fastavro'"
+    },
+    {
+      "id": "petl/test/io/test_bcolz.py",
+      "line": 14,
+      "outcome": "skipped",
+      "reason": "Skipped: SKIP bcolz tests: No module named 'bcolz'"
+    },
+    {
+      "id": "petl/test/io/test_db_inference.py",
+      "line": 8,
+      "outcome": "skipped",
+      "reason": "Skipped: SKIP generic DB inference tests: No module named 'sqlalchemy'"
+    },
+    {
+      "id": "petl/test/io/test_gsheet.py",
+      "line": 15,
+      "outcome": "skipped",
+      "reason": "Skipped: could not import 'gspread': No module named 'gspread'"
+    },
+    {
+      "id": "petl/test/io/test_numpy.py",
+      "line": 15,
+      "outcome": "skipped",
+      "reason": "Skipped: SKIP numpy tests: No module named 'numpy'"
+    },
+    {
+      "id": "petl/test/io/test_pandas.py",
+      "line": 16,
+      "outcome": "skipped",
+      "reason": "Skipped: SKIP pandas tests: No module named 'pandas'"
+    },
+    {
+      "id": "petl/test/io/test_pytables.py",
+      "line": 19,
+      "outcome": "skipped",
+      "reason": "Skipped: SKIP pytables tests: No module named 'tables'"
+    },
+    {
+      "id": "petl/test/io/test_sqlalchemy.py",
+      "line": 8,
+      "outcome": "skipped",
+      "reason": "Skipped: could not import 'sqlalchemy': No module named 'sqlalchemy'"
+    },
+    {
+      "id": "petl/test/io/test_whoosh.py",
+      "line": 19,
+      "outcome": "skipped",
+      "reason": "Skipped: SKIP whoosh tests: No module named 'whoosh'"
+    },
+    {
+      "id": "petl/test/io/test_xls.py",
+      "line": 35,
+      "outcome": "skipped",
+      "reason": "Skipped: SKIP xls tests: No module named 'xlrd'"
+    },
+    {
+      "id": "petl/test/io/test_xlsx.py",
+      "line": 14,
+      "outcome": "skipped",
+      "reason": "Skipped: could not import 'openpyxl': No module named 'openpyxl'"
+    },
+    {
+      "id": "petl/test/transform/test_intervals.py",
+      "line": 25,
+      "outcome": "skipped",
+      "reason": "Skipped: SKIP interval tests: No module named 'intervaltree'"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "petl/test/io/test_csv.py::test_fromcsv",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_csv.py::test_fromcsv_gz",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_csv.py::test_fromcsv_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_csv.py::test_fromcsv_lineterminators",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_csv.py::test_fromcsv_quoted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_csv.py::test_fromtsv",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_csv.py::test_tocsv_appendcsv",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_csv.py::test_tocsv_appendcsv_gz",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_csv.py::test_tocsv_noheader",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_csv.py::test_totsv_appendtsv",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_csv_unicode.py::test_appendcsv",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_csv_unicode.py::test_fromcsv",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_csv_unicode.py::test_fromcsv_lineterminators",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_csv_unicode.py::test_tocsv",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_csv_unicode.py::test_tocsv_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db.py::test_drop_table_if_exists_sql",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db.py::test_fromdb",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db.py::test_fromdb_mkcursor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db.py::test_fromdb_withargs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db.py::test_todb_appenddb",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db.py::test_todb_appenddb_cursor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db.py::test_todb_drop_false_skips_drop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db.py::test_todb_drop_if_exists_uses_if_exists",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db.py::test_todb_drop_true_uses_plain_drop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db.py::test_todb_truncate_default_truncates",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db.py::test_todb_truncate_false_appends",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db.py::test_todb_truncate_false_keeps_existing_rows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_create.py::test_make_date_column",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "petl/test/io/test_db_create.py::test_make_datetime_column",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "petl/test/io/test_db_create.py::test_mysql_create",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "petl/test/io/test_db_create.py::test_postgresql_create",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "petl/test/io/test_db_create.py::test_sqlite3_create",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_clickhouse_adapter_closes_cursor_after_driver_error[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_clickhouse_adapter_closes_cursor_after_driver_error[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_clickhouse_insert_error_survives_cursor_close_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_load_does_not_close_borrowed_cursor_after_error[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_load_does_not_close_borrowed_cursor_after_error[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_load_error_survives_cursor_close_error[False-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_load_error_survives_cursor_close_error[False-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_load_error_survives_cursor_close_error[False-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_load_error_survives_cursor_close_error[False-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_load_error_survives_cursor_close_error[True-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_load_error_survives_cursor_close_error[True-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_load_error_survives_cursor_close_error[True-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_load_error_survives_cursor_close_error[True-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_owned_cursor_closes_after_truncate_error[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_owned_cursor_closes_after_truncate_error[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_owned_load_cursor_closes_after_error[False-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_owned_load_cursor_closes_after_error[False-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_owned_load_cursor_closes_after_error[False-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_owned_load_cursor_closes_after_error[False-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_owned_load_cursor_closes_after_error[True-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_owned_load_cursor_closes_after_error[True-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_owned_load_cursor_closes_after_error[True-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_owned_load_cursor_closes_after_error[True-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_owned_load_cursor_closes_with_commit_control[False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_owned_load_cursor_closes_with_commit_control[False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_owned_load_cursor_closes_with_commit_control[True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_owned_load_cursor_closes_with_commit_control[True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_replacement_cursor_factory_error_closes_first_cursor_once",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_source_interrupt_survives_cursor_close_error[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_source_interrupt_survives_cursor_close_error[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_successful_load_still_reports_cursor_close_error[False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_successful_load_still_reports_cursor_close_error[False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_successful_load_still_reports_cursor_close_error[True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_successful_load_still_reports_cursor_close_error[True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_truncate_cursor_close_error_is_not_retried",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_truncate_error_survives_cursor_close_error[clickhouse]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_truncate_error_survives_cursor_close_error[connection]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_cursor_cleanup.py::test_truncate_error_survives_cursor_close_error[factory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_db_server.py::test_mysqldb",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "petl/test/io/test_db_server.py::test_postgresql",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "petl/test/io/test_db_server.py::test_pymysql",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[False-12.345-teehtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[False-12.345-tohtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[False-12345-teehtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[False-12345-tohtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[False-None-teehtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[False-None-tohtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[False-caf\\xe9-teehtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[False-caf\\xe9-tohtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[True-12.345-teehtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[True-12.345-tohtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[True-12345-teehtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[True-12345-tohtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[True-None-teehtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[True-None-tohtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[True-caf\\xe9-teehtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_html_truncates_non_string_headers[True-caf\\xe9-tohtml]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_tohtml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_tohtml_caption",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_tohtml_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html.py::test_tohtml_with_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_html_unicode.py::test_tohtml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_dicts_attribute_assignment",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_dicts_attribute_reads_as_data",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_dicts_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_explicit_empty_header[generator-header0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_explicit_empty_header[generator-header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_explicit_empty_header[list-header0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_explicit_empty_header[list-header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_generator_dicts_attribute_is_consumable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_generator_dicts_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_generator_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_generator_missing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_generator_random_access",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_generator_single",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_generator_twice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_header_does_not_raise",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_header_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_header_sample[0-generator]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_header_sample[0-iterator]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_header_sample[0-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_header_sample[1-generator]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_header_sample[1-iterator]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_header_sample[1-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_header_sample[2-generator]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_header_sample[2-iterator]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_header_sample[2-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_missing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_onepass",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_ordered",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_single_sample_empty[generator]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_single_sample_empty[iterator]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromdicts_single_sample_empty[list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromjson_1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromjson_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromjson_3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromjson_empty_lines[None-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromjson_empty_lines[header1-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromjson_empty_lines_from_tojson",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromjson_lines_invalid_record_still_raises[\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromjson_lines_invalid_record_still_raises[not json\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromjson_lines_preserves_first_record",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromjson_single_sample[records0-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_fromjson_single_sample[records1-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_tojson",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_tojson_fromcsv_stdin_subprocess",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_tojsonarrays",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_tojsonarrays_fromcsv_stdin_subprocess",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json.py::test_tojsonarrays_header_fromcsv_stdin_subprocess",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_json_unicode.py::test_json_unicode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_custom_decoder_keyword_names[args-None-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_custom_decoder_keyword_names[args-None-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_custom_decoder_keyword_names[args-header1-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_custom_decoder_keyword_names[args-header1-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_custom_decoder_keyword_names[f-None-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_custom_decoder_keyword_names[f-None-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_custom_decoder_keyword_names[f-header1-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_custom_decoder_keyword_names[f-header1-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_custom_decoder_keyword_names[kwargs-None-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_custom_decoder_keyword_names[kwargs-None-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_custom_decoder_keyword_names[kwargs-header1-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_custom_decoder_keyword_names[kwargs-header1-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_decoder_options[None-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_decoder_options[None-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_decoder_options[header1-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_decoder_options[header1-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_finite_decoder_callback[None-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_finite_decoder_callback[None-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_finite_decoder_callback[header1-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_finite_decoder_callback[header1-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_decoder_error_timing[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_decoder_error_timing[header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_decoder_once_per_iteration[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_decoder_once_per_iteration[header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_default_iteration[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_default_iteration[header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_empty_decoder_iteration[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_empty_decoder_iteration[header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_invalid_decoder_option[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_invalid_decoder_option[header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_malformed_decoder_timing[False-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_malformed_decoder_timing[False-header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_malformed_decoder_timing[True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_malformed_decoder_timing[True-header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_object_hook[False-False-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_object_hook[False-False-header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_object_hook[False-True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_object_hook[False-True-header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_object_hook[True-False-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_object_hook[True-False-header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_object_hook[True-True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_object_hook[True-True-header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_stateful_schema_hook[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_fromjson_lines_stateful_schema_hook[header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_iterjlines_three_argument_call",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_tojson_1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_jsonl.py::test_tojson_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_markdown.py::test_tomarkdown",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_markdown.py::test_tomarkdown_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_markdown.py::test_tomarkdown_empty_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_markdown.py::test_tomarkdown_escape",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_markdown.py::test_tomarkdown_escape_backslash",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_markdown.py::test_tomarkdown_fluent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_markdown.py::test_tomarkdown_irregular_rows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_markdown.py::test_tomarkdown_unicode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_markdown.py::test_tomarkdown_vrepr_lineterminator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_pickle.py::test_frompickle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_pickle.py::test_topickle_appendpickle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_pickle.py::test_topickle_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_remotes.py::test_helper_fsspec",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "petl/test/io/test_remotes.py::test_helper_local",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_remotes.py::test_helper_smb",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "petl/test/io/test_remotes.py::test_helper_smb_url_parse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sources.py::test_bzip2source",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sources.py::test_bzip2source_without_bz2_module",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sources.py::test_gzipsource",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sources.py::test_memorysource",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sources.py::test_memorysource_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sources.py::test_popensource",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sources.py::test_stdoutsource",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sources.py::test_stdoutsource_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sources.py::test_stdoutsource_unicode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sources.py::test_zipsource",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sqlite3.py::test_fromsqlite3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sqlite3.py::test_fromsqlite3_connection",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sqlite3.py::test_fromsqlite3_withargs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sqlite3.py::test_tosqlite3_appendsqlite3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sqlite3.py::test_tosqlite3_appendsqlite3_connection",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_sqlite3.py::test_tosqlite3_identifiers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_tees.py::test_teecsv",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_tees.py::test_teecsv_unicode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_tees.py::test_teecsv_unicode_write_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_tees.py::test_teecsv_write_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_tees.py::test_teehtml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_tees.py::test_teehtml_unicode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_tees.py::test_teepickle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_tees.py::test_teetext",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_tees.py::test_teetext_unicode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_tees.py::test_teetsv",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_tees.py::test_teetsv_unicode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_text.py::test_fromtext",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_text.py::test_fromtext_gz",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_text.py::test_fromtext_lineterminators",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_text.py::test_totext",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_text.py::test_totext_gz",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_text.py::test_totext_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_text_unicode.py::test_fromtext",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_text_unicode.py::test_totext",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_fromxml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_fromxml_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_fromxml_3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_fromxml_4",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_fromxml_5",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_fromxml_6",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_fromxml_entity",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_fromxml_url",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml00",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml01",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml02",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml03",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml04",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml05",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml06",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml07",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml08",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml09",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml10",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml11",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml12",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml13",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml131",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml14",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml15",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml16",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml17",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml18",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml19",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml20",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml21",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/io/test_xml.py::test_toxml22",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_comparison.py::test_comparable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_comparison.py::test_comparable_datetime",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_comparison.py::test_comparable_ieq_missing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_comparison.py::test_comparable_ieq_rows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_comparison.py::test_comparable_ieq_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_comparison.py::test_comparable_nested",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_errors.py::test_error_message[DuplicateKeyError-duplicate key: -3-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_errors.py::test_error_message[DuplicateKeyError-duplicate key: -None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_errors.py::test_error_message[DuplicateKeyError-duplicate key: -foo-'foo']",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_errors.py::test_error_message[DuplicateKeyError-duplicate key: -value0-()]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_errors.py::test_error_message[DuplicateKeyError-duplicate key: -value1-('foo',)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_errors.py::test_error_message[DuplicateKeyError-duplicate key: -value2-('foo', 'bar')]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_errors.py::test_error_message[FieldSelectionError-selection is not a field or valid field index: -3-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_errors.py::test_error_message[FieldSelectionError-selection is not a field or valid field index: -None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_errors.py::test_error_message[FieldSelectionError-selection is not a field or valid field index: -foo-'foo']",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_errors.py::test_error_message[FieldSelectionError-selection is not a field or valid field index: -value0-()]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_errors.py::test_error_message[FieldSelectionError-selection is not a field or valid field index: -value1-('foo',)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_errors.py::test_error_message[FieldSelectionError-selection is not a field or valid field index: -value2-('foo', 'bar')]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_errors.py::test_lookupone_duplicate_compound_key_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_errors.py::test_valuecounter_invalid_tuple_field_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_fluent.py::test_basics",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_fluent.py::test_container",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_fluent.py::test_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_fluent.py::test_staticmethods",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_fluent.py::test_values_container_convenience_methods",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_fluent.py::test_wrap_tuple_return",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_helpers.py::test_helper_get_env_vars_named_not_found",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_helpers.py::test_helper_get_env_vars_named_prefixed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_helpers.py::test_helper_get_env_vars_named_unprefixed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_interactive.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_interactive.py::test_repr_html",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_interactive.py::test_repr_html_limit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_interactive.py::test_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_addfield_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_addfield_index_option_still_honoured",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_cache_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_cacheview_clearcache_still_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_cat_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_fieldselect_complement",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_fromavro_skip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_frombcolz_skip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_fromcolumns_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_fromcsv_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_fromjson_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_fromtext_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_hashjoin_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_hashjoin_cache_option_still_honoured",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_hashleftjoin_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_hashrightjoin_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_mergesort_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_method_matches_function_form",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_movefield_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_movefield_index_option_still_honoured",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_no_shadowed_api_names",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_pushheader_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_rowgroupmap_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_rowmap_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_rowmapmany_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_rowreduce_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_rowselect_complement",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_search_complement",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_search_complement_option_still_honoured",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_select_complement_option_still_honoured",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_setheader_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_sort_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_sort_cache_option_still_honoured",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/test_method_shadow.py::test_validate_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addcolumn",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addcolumn_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addfield",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addfield_coalesce",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addfield_dupfield",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addfield_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addfield_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addfield_uneven_rows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addfields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addfields_uneven_rows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addfieldusingcontext",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addfieldusingcontext_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addfieldusingcontext_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addfieldusingcontext_stateful",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addrownumbers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addrownumbers_field_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_addrownumbers_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_annex",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_annex_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_annex_uneven_rows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_cat",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_cat_dupfields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_cat_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_cat_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_cat_with_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_cut",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_cut_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_cut_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_cutout",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_cutout_field_sequence[fields0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_cutout_field_sequence[fields1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_cutout_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_empty_addcolumn",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_head",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_head_raises_stop_iteration_for_empty_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_head_raises_stop_iteration_for_header_only",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_movefield",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_rowslice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_rowslice_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_rowslice_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_skipcomments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_skipcomments_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_stack_dupfields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_stack_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_tail",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_tail_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_basics.py::test_tail_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_convert",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_convert_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_convert_failonerror",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_convert_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_convert_headerless_no_conversions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_convert_indexes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_convert_translate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_convert_where",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_convert_with_row",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_convert_with_row_backwards_compat",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_convertall",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_convertnumbers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_fieldconvert",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_format",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_interpolate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_replace_unhashable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_replace_where",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_conversions.py::test_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_conflicts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_conflicts_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_distinct",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_distinct_count",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_distinct_count_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_duplicates",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_duplicates_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_duplicates_headerless_explicit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_duplicates_headerless_no_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_duplicates_wholerow",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_isunique",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_key_distinct",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_key_distinct_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_key_distinct_count",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_unique",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_unique_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_dedup.py::test_unique_wholerow",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_fills.py::test_filldown",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_fills.py::test_filldown_header_only",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_fills.py::test_filldown_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_fills.py::test_fillleft",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_fills.py::test_fillleft_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_fills.py::test_fillright",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_fills.py::test_fillright_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_extendheader",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_extendheader_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_extendheader_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_prefixheader",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_prefixheader_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_pushheader",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_pushheader_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_pushheader_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_pushheader_positional",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_rename",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_rename_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_rename_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_rename_strict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_setheader",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_setheader_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_setheader_callable_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_setheader_callable_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_setheader_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_setheader_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_skip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_skip_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_skip_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_skiplast[0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_skiplast[10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_skiplast[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_skiplast[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_skiplast[3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_skiplast[4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_skiplast_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_skiplast_invalid_count[-1-ValueError]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_skiplast_invalid_count[1.5-TypeError]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_skiplast_streams_single_pass_input",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_sortheader_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_sortheaders",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_sortheaders_duplicate_headers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_suffixheader",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_headers.py::test_suffixheader_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_antijoin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_crossjoin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_crossjoin_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_crossjoin_novaluefield",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_crossjoin_prefix",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_crossjoin_uneven_rows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_hashantijoin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_hashjoin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_hashleftjoin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_hashlookupjoin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_hashrightjoin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_join",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_leftjoin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_lookupjoin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_outerjoin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_outerjoin_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_outerjoin_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_outerjoin_fieldorder",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_outerjoin_lrkey",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_outerjoin_multiple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_outerjoin_novaluefield",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_outerjoin_prefix",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_rightjoin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_unjoin_explicit_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_unjoin_explicit_key_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_unjoin_explicit_key_3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_unjoin_explicit_key_4",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_unjoin_explicit_key_5",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_joins.py::test_unjoin_implicit_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_fieldmap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_fieldmap_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_fieldmap_failonerror",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_fieldmap_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_fieldmap_record_access",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_fieldmap_untrusted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_recordmap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_recordmapmany",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_recordmapmany_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_rowmap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_rowmap_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_rowmap_failonerror",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_rowmap_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_rowmapmany",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_maps.py::test_rowmapmany_failonerror",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_empty_key_is_None",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_more",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_more_key_is_None",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_key_is_None",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_key_shapes[None-expected3-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_key_shapes[None-expected3-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_key_shapes[foo-expected0-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_key_shapes[foo-expected0-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_key_shapes[key1-expected1-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_key_shapes[key1-expected1-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_key_shapes[key2-expected2-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_key_shapes[key2-expected2-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-dict-key_values0-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-dict-key_values0-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-dict-key_values1-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-dict-key_values1-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-dict-key_values2-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-dict-key_values2-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-dict-key_values3-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-dict-key_values3-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-dict-key_values4-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-dict-key_values4-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-dict-key_values5-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-dict-key_values5-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-list-key_values0-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-list-key_values0-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-list-key_values1-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-list-key_values1-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-list-key_values2-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-list-key_values2-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-list-key_values3-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-list-key_values3-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-list-key_values4-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-list-key_values4-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-list-key_values5-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-list-key_values5-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-suffix-key_values0-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-suffix-key_values0-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-suffix-key_values1-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-suffix-key_values1-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-suffix-key_values2-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-suffix-key_values2-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-suffix-key_values3-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-suffix-key_values3-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-suffix-key_values4-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-suffix-key_values4-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-suffix-key_values5-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[False-suffix-key_values5-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-dict-key_values0-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-dict-key_values0-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-dict-key_values1-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-dict-key_values1-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-dict-key_values2-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-dict-key_values2-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-dict-key_values3-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-dict-key_values3-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-dict-key_values4-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-dict-key_values4-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-dict-key_values5-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-dict-key_values5-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-list-key_values0-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-list-key_values0-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-list-key_values1-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-list-key_values1-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-list-key_values2-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-list-key_values2-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-list-key_values3-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-list-key_values3-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-list-key_values4-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-list-key_values4-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-list-key_values5-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-list-key_values5-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-suffix-key_values0-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-suffix-key_values0-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-suffix-key_values1-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-suffix-key_values1-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-suffix-key_values2-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-suffix-key_values2-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-suffix-key_values3-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-suffix-key_values3-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-suffix-key_values4-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-suffix-key_values4-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-suffix-key_values5-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key[True-suffix-key_values5-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key_empty[False-dict-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key_empty[False-dict-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key_empty[False-list-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key_empty[False-list-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key_empty[False-suffix-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key_empty[False-suffix-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key_empty[True-dict-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key_empty[True-dict-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key_empty[True-list-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key_empty[True-list-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key_empty[True-suffix-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multifield_singleton_key_empty[True-suffix-tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multiple_source_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_multiple_source_fields_key_is_None",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_simple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_aggregate_simple_key_is_None",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_fold",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_mergeduplicates",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_mergeduplicates_compoundkey",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_mergeduplicates_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_mergeduplicates_shortrows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_rowreduce",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_rowreduce_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_rowreduce_fieldnameaccess",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reductions.py::test_rowreduce_more",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_regex.py::test_capture",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_regex.py::test_capture_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_regex.py::test_capture_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_regex.py::test_capture_none_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_regex.py::test_capture_nonmatching",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_regex.py::test_search",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_regex.py::test_search_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_regex.py::test_search_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_regex.py::test_search_unicode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_regex.py::test_searchcomplement",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_regex.py::test_split",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_regex.py::test_split_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_regex.py::test_split_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_regex.py::test_splitdown",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_flatten",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_flatten_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_flatten_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_melt_1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_melt_1_shortrow",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_melt_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_melt_2_shortrow",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_melt_and_capture",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_melt_and_split",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_melt_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_melt_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_pivot",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_pivot_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_pivot_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast4",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cache_before_data_read[2-annex]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cache_before_data_read[2-cat]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cache_before_data_read[2-stack]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cache_before_data_read[None-annex]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cache_before_data_read[None-cat]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cache_before_data_read[None-stack]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cache_cleanup[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cache_cleanup[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cache_with_changed_fields[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cache_with_changed_fields[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cached_row_edits[2-0-3-fresh_rows1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cached_row_edits[2-1-z-fresh_rows2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cached_row_edits[2-2-99-fresh_rows0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cached_row_edits[None-0-3-fresh_rows1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cached_row_edits[None-1-z-fresh_rows2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cached_row_edits[None-2-99-fresh_rows0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cached_source_changes[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_cached_source_changes[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_date",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_empty_cache[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_empty_cache[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_invalid_fields[header0-kwargs0-invalid value field: value]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_invalid_fields[header1-kwargs1-invalid value field: missing]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_invalid_fields[header2-kwargs2-invalid key field: missing]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_invalid_fields[header3-kwargs3-invalid variable field: missing]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_invalid_fields[header4-kwargs4-invalid variable field: missing]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_invalid_fields[header5-kwargs5-value field cannot be a key field]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_invalid_fields[header6-kwargs6-value field cannot be a variable field]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_lazy_partial_read[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_lazy_partial_read[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_preserves_sample[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_preserves_sample[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_reducer_error[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_reducer_error[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_reuses_sort[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_reuses_sort[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_row_edits_after_partial_read[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_row_edits_after_partial_read[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_sort_error[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_sort_error[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_source_reuses_row[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_source_reuses_row[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_validation_retry[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_validation_retry[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_recast_validation_with_optimization",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_transpose",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_transpose_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_unflatten",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_unflatten_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_reshape.py::test_unflatten_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_facet",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_facet_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_facet_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_fieldselect_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_recordselect",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_rowlenselect",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_rowselect",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_rowselect_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_select",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_select_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_select_falsey",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_select_untrusted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_selectcontains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_selectgt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_selectin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_selectlt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_selectusingcontext",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_selectusingcontext_header_only",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_selects.py::test_selectusingcontext_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_setops.py::test_complement",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_setops.py::test_complement_seqtypes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_setops.py::test_diff",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_setops.py::test_hashcomplement",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_setops.py::test_hashcomplement_seqtypes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_setops.py::test_hashintersection",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_setops.py::test_intersection",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_setops.py::test_recordcomplement_1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_setops.py::test_recordcomplement_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_setops.py::test_recordcomplement_3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_setops.py::test_recordcomplement_4",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_setops.py::test_recorddiff",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_issorted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_issorted_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_mergesort_1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_mergesort_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_mergesort_3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_mergesort_4",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_mergesort_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_4",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_5",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_6",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_buffered",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_buffered_cleanup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_buffered_cleanup_open_iterator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_buffered_independent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_buffered_tempdir",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_chained_mixed_directions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_headerless_explicit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_headerless_no_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_missing_cell_numeric",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_missing_cell_text",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_sorts.py::test_sort_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_standardize.py::test_standardize_constant_and_non_numeric_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_standardize.py::test_standardize_decimal_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_standardize.py::test_standardize_empty_and_header_only_tables",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_standardize.py::test_standardize_field_without_finite_numbers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_standardize.py::test_standardize_invalid_arguments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_standardize.py::test_standardize_large_values_without_precision_loss",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_standardize.py::test_standardize_new_fields_and_sample_std",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_standardize.py::test_standardize_one_shot_input",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_standardize.py::test_standardize_overwrite_single_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_standardize.py::test_standardize_preserves_non_finite_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_standardize.py::test_standardize_short_rows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_standardize.py::test_standardize_table_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_unpacks.py::test_unpack",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_unpacks.py::test_unpack_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_unpacks.py::test_unpack_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_unpacks.py::test_unpackdict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_validation.py::test_constraints",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_validation.py::test_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_validation.py::test_non_optional_constraint_with_missing_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_validation.py::test_optional_constraint_with_missing_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_validation.py::test_row_length",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/transform/test_validation.py::test_validation_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_data",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_data_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_dicts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_dicts_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_dicts_shortrows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_distinctvalues",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_distinctvalues_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_distinctvalues_invalid_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_distinctvalues_missing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_distinctvalues_unhashable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_expr_inject",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_expr_nok",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_expr_nok_untrusted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_expr_ok",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_expr_ok_untrusted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_expr_untrusted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_fieldnames",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_itervalues",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_itervalues_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_namedtuples",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_namedtuples_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_namedtuples_unevenrows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_recordlookup_shelve",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_legacy_pickle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row0-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row0-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row0-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row0-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row0-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row0-5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row1-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row1-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row1-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row1-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row1-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row1-5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row2-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row2-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row2-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row2-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row2-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_pickle[row2-5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_records_unevenrows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_rowgroupby",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_rowgroupby_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_base.py::test_values_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_nrows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_parsecounts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_parser_ordinary_exceptions_are_counted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_parser_process_control_exceptions[False-GeneratorExit]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_parser_process_control_exceptions[False-KeyboardInterrupt]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_parser_process_control_exceptions[False-SystemExit]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_parser_process_control_exceptions[True-GeneratorExit]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_parser_process_control_exceptions[True-KeyboardInterrupt]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_parser_process_control_exceptions[True-SystemExit]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_rowlengths",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_stringpatterns",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_typecounts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_valuecount",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_valuecount_empty_data_validates_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_valuecount_without_data_rows[0-x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_valuecount_without_data_rows[field2-value2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_valuecount_without_data_rows[foo-x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_valuecounter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_valuecounter_shortrows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_valuecounts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_valuecounts_multifields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_counting.py::test_valuecounts_shortrows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_lookups.py::test_dictlookup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_lookups.py::test_dictlookupone",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_lookups.py::test_lookup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_lookups.py::test_lookup_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_lookups.py::test_lookupone",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_lookups.py::test_lookupone_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_lookups.py::test_recordlookup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_lookups.py::test_recordlookupone",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_materialise.py::test_columns",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_materialise.py::test_columns_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_materialise.py::test_columns_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_materialise.py::test_facetcolumns",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_materialise.py::test_facetcolumns_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_misc.py::test_diffheaders",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_misc.py::test_diffvalues",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_misc.py::test_substringafter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_misc.py::test_substringbefore",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_misc.py::test_typeset",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_parsers.py::test_boolparser_non_strict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_parsers.py::test_laxparsers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_parsers.py::test_numparser",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_parsers.py::test_numparser_strict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_random.py::test_dummytable_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_random.py::test_dummytable_custom_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_random.py::test_dummytable_int_seed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_random.py::test_dummytable_no_seed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_random.py::test_randomseed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_random.py::test_randomtable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_random.py::test_randomtable_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_statistics.py::test_stats",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_timing.py::test_log_progress",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_timing.py::test_log_progress_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_timing.py::test_progress",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_timing.py::test_progress_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_look",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_look_bool",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_look_headerless",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_look_index_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_look_irregular_rows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_look_style_minimal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_look_style_simple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_look_truncate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_look_width",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_lookstr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_duplicateheader",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_index_header",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[2-False-header0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[2-False-header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[2-False-header2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[2-False-header3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[2-True-header0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[2-True-header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[2-True-header2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[2-True-header3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[None-False-header0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[None-False-header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[None-False-header2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[None-False-header3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[None-True-header0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[None-True-header1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[None-True-header2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "petl/test/util/test_vis.py::test_see_irregular_rows[None-True-header3]",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "66993a5e3905005e0981159b4794d10b1adacf341a58a44d696ad2c4442dcdc6",
+      "version": "8.4.2"
+    },
+    {
+      "distribution": "pytest-timeout",
+      "module": "pytest_timeout",
+      "module_sha256": "a0bd61d881212d27a922b8fa008b79270a55bcbec467f948d2423a152d37233a",
+      "version": "2.4.0"
+    }
+  ],
+  "project": "petl",
+  "python": "3.12.15",
+  "schema": 1
+}

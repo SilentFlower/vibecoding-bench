@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IT-U02",
+  "source_commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The renderer dispatches by actual Token.type. business-link-style is registered but unused because that token type is not produced; link_open runs once for this link. add_render_rule binds the renderer as the callback first argument. Do not invent a separate arbitrary business-label routing stage.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,24 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MS-M01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "pipe_and_message_empty_valid": true,
+    "empty_file_preserved": true,
+    "explicit_empty_output_file_written": true,
+    "explicit_empty_message_has_priority": true,
+    "nonempty_and_missing_preserved": true,
+    "interactive_absence_does_not_block": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

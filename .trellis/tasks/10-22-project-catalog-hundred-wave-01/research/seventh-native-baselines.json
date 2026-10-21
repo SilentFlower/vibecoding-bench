@@ -1,0 +1,203 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "backoff",
+      "attempt": 2,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/backoff/result.json",
+      "result_sha256": "9a17ded5387e36cbb7ec7a5339ac580727dea59bdc759f0bca64e90364b36c61",
+      "main_collected": 123,
+      "counts": {
+        "passed": 123,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "xml_testcases": 123,
+      "xml_skipped": 0,
+      "runner_sha256": "158bd0fd313e6f3fd645a01b4af10e150a08bd24fdcf828cf87ba08420e545db",
+      "contract_sha256": "487f0a38d2d1d8d2e55fccbe38887169dd6edf97bf6df2887f332f57014e8137",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前镜像实际完整默认集合；未运行多平台、lint或额外慢测试矩阵，不代表业务或模型完成"
+    },
+    {
+      "project": "bottle",
+      "attempt": 2,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/bottle/result.json",
+      "result_sha256": "3c337db6d38b7dad49e5e8106c75a5293ecf61568d2f6923ad61bf24402d85e9",
+      "main_collected": 382,
+      "counts": {
+        "passed": 382,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "xml_testcases": 382,
+      "xml_skipped": 0,
+      "runner_sha256": "158bd0fd313e6f3fd645a01b4af10e150a08bd24fdcf828cf87ba08420e545db",
+      "contract_sha256": "9b9ec75f6c8c0dbe8bd2591cdfc40a05ec8b466ead36b1f3b025c3765f9cd403",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前镜像实际完整默认集合；未运行多平台、lint或额外慢测试矩阵，不代表业务或模型完成"
+    },
+    {
+      "project": "deepdiff",
+      "attempt": 4,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-004/deepdiff/result.json",
+      "result_sha256": "d77396322555e8d66be29eedbc70190a23f176dd2e6d22f583acbc039613077e",
+      "main_collected": 1308,
+      "counts": {
+        "passed": 1264,
+        "failed": 0,
+        "error": 0,
+        "skipped": 44,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "xml_testcases": 1308,
+      "xml_skipped": 44,
+      "runner_sha256": "158bd0fd313e6f3fd645a01b4af10e150a08bd24fdcf828cf87ba08420e545db",
+      "contract_sha256": "1084cf3553d0f3e1dcf648229bd8d1ca3734c2b0c40f43f01ee40d5cfd90955c",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前镜像实际完整默认集合；未运行多平台、lint或额外慢测试矩阵，不代表业务或模型完成"
+    },
+    {
+      "project": "cerberus",
+      "attempt": 2,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/cerberus/result.json",
+      "result_sha256": "ebb10a322d0cc790b27dcdbc39f57714c57827f14001912b2dec87be65638d38",
+      "main_collected": 247,
+      "counts": {
+        "passed": 246,
+        "failed": 0,
+        "error": 0,
+        "skipped": 1,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "xml_testcases": 247,
+      "xml_skipped": 1,
+      "runner_sha256": "158bd0fd313e6f3fd645a01b4af10e150a08bd24fdcf828cf87ba08420e545db",
+      "contract_sha256": "c460f3e19340b15e1a35901c57bbfb0b5a686382f9358203df1777b2886978f7",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前镜像实际完整默认集合；未运行多平台、lint或额外慢测试矩阵，不代表业务或模型完成"
+    },
+    {
+      "project": "icecream",
+      "attempt": 2,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/icecream/result.json",
+      "result_sha256": "24a6e48110bd2cdd545c2de1de462710d3416e8b107c764cd5ebf003a7630869",
+      "main_collected": 65,
+      "counts": {
+        "passed": 65,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "xml_testcases": 65,
+      "xml_skipped": 0,
+      "runner_sha256": "158bd0fd313e6f3fd645a01b4af10e150a08bd24fdcf828cf87ba08420e545db",
+      "contract_sha256": "5e4275072330fd88449507ece8a415c92c1441615c45773a723958cb1371a50f",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前镜像实际完整默认集合；未运行多平台、lint或额外慢测试矩阵，不代表业务或模型完成"
+    },
+    {
+      "project": "dpath",
+      "attempt": 2,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/dpath/result.json",
+      "result_sha256": "b29b00dd516d656ee7c6dae4e451005fbe83c360b95fd45f03dfb6a8842d6659",
+      "main_collected": 79,
+      "counts": {
+        "passed": 79,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "xml_testcases": 79,
+      "xml_skipped": 0,
+      "runner_sha256": "158bd0fd313e6f3fd645a01b4af10e150a08bd24fdcf828cf87ba08420e545db",
+      "contract_sha256": "acd6ce531f415ebd795051acf3b3422e4e78b0abd90a0045d50e499fd68a0148",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前镜像实际完整默认集合；未运行多平台、lint或额外慢测试矩阵，不代表业务或模型完成"
+    }
+  ]
+}

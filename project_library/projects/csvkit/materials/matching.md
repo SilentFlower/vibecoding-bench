@@ -1,0 +1,1 @@
+Input sku.csv has one column sku and rows AB,XAB,ABC. Compare csvgrep -c sku -m AB, -f approved.txt containing only AB newline, and -r ^AB$. For a separate complete multi.csv with id,status,note rows A,hit,miss / B,miss,hit / C,hit,hit, compare -c status,note -m hit with and without -a. Decide matches using the actual parser and quoting. No code/data changes are authorized.

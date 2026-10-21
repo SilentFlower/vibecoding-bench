@@ -1,0 +1,87 @@
+[flake8]
+# Problems that are either not fixed yet or allowed by PEP8:
+ignore =
+  E123,
+  # E123: "closing bracket does not match indentation of opening bracket's line"
+  # PEP8 "may either line up under the first […] character of the last line …"
+
+  E125,
+  # E125: "continuation line with same indent as next logical line"
+  # allowed by PEP8 cf. https://github.com/PyCQA/pycodestyle/issues/126
+
+  E126,
+  # E126: "continuation line over-indented for hanging indent"
+  # some cases are mandated by PEP8 to distinguish hanging indent from nesting.
+  # Other cases improve readability.
+
+  E129,
+  # E129: "visually indented line with same indent as next logical line"
+  # allowed by PEP8
+
+  E226, E227, E228,
+  # E226: "missing whitespace around arithmetic operator"
+  # E227: "missing whitespace around bitwise or shift operator"
+  # E228: "missing whitespace around modulo operator"
+  # not generally frowned on by PEP8:
+  # "If operators with different priorities are used, consider adding
+  # whitespace around the operators with the lowest priority(ies).
+  # Use your own judgment; …"
+
+  F811,
+  # F811: "redefinition of unused '…' from line …"
+  # flake8 does not recognise ``@overload`` from any name other than 'typing'.
+
+  W503,
+  # W503: "line break before binary operator"
+  # this is the recommended style (changed on April 16th, 2016)
+
+# Allow exceptions for specific files (requires flake8 >= 3.7.0)
+per-file-ignores =
+  # class definitions with "…: pass" on one line
+  docutils/docutils/__init__.py:E701
+  docutils/docutils/nodes.py:E701
+  docutils/docutils/io.py:E701
+  docutils/docutils/statemachine.py:E701
+  docutils/docutils/utils/__init__.py:E701
+  # start of error message should be visible in traceback
+  docutils/docutils/parsers/rst/directives/tables.py:E128
+  # complex regexp definitions
+  docutils/docutils/parsers/rst/states.py:E121,E128,E701
+  # deprecated module, will be removed
+  docutils/docutils/utils/error_reporting.py:E261
+  # module with 3rd-party origin
+  docutils/docutils/utils/math/math2html.py:E241,E501,E731
+  # generated auxiliary files
+  docutils/docutils/utils/math/unichar2tex.py:E122
+  docutils/docutils/utils/math/tex2unichar.py:E262,E501
+  docutils/docutils/utils/math/mathalphabet2unichar.py:E501
+  # allow aligning values in data-collections
+  docutils/docutils/utils/smartquotes.py:E241
+  docutils/docutils/utils/roman.py:E241,E701
+  docutils/docutils/utils/math/latex2mathml.py:E241,E501,E701
+  docutils/docutils/writers/xetex/__init__.py:E241
+  # also allow '##' to mark deactivated code:
+  docutils/docutils/writers/latex2e/__init__.py:E241,E266
+
+  # included configuration files referencing externally defined variables
+  docutils/test/functional/tests/*:F821
+  # deprecated module, will be removed
+  docutils/test/test_error_reporting.py:E261
+  # Lists with multi-line test output samples
+  # may contain long lines (E501)
+  # and are not indented (E122, E124, E128)
+  docutils/test/test_parsers/*:E122,E124,E128,E501
+  docutils/test/test_publisher.py:E501
+  docutils/test/test_readers/test_pep/*:E122,E128,E501
+  docutils/test/test_transforms/*:E122,E124,E128,E501
+  docutils/test/test_writers/*:E122,E124,E128,E501
+  # test output contains trailing whitespace, long lines, operator at end
+  docutils/test/test_writers/test_manpage.py:E122,E128,W291,E501,W504
+
+exclude =
+  .venv
+  .tox
+  dist
+  *egg
+  build
+  sandbox/*

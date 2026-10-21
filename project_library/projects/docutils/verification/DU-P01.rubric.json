@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DU-P01",
+  "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explicitly disable raw_enabled and file_insertion_enabled, isolate source paths/external configs and restrict parser/plugin/config ownership. Ordinary external reference links still survive, so apply an explicit approved link/rendered-output policy rather than claiming both switches sanitize all HTML/URLs. Define bounded rendering and rejection/diagnostic handling with raw/include negative and approved-link/table positive controls. Do not claim a sandbox or sanitizer was executed.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

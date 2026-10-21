@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CV-D01",
+  "source_commit": "6d19c625214977ab2988e674441ca24638bc12d3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The initial expectation cannot establish actual multi-column combination or pattern semantics. Request sufficient exact command and rows, then explain only the disclosed result and compatible existing option. insufficient_information is valid when missing. Do not assume hidden -a absence, malformed quoting or a library defect before disclosure.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

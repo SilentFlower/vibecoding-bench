@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DS-U04"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "explicit_order_limit_offset_are_repeatable": true,
+    "named_bind_preserves_literal_value": true
+  },
+  "resource_profile": "business"
+}

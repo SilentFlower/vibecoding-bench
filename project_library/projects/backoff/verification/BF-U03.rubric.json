@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BF-U03",
+  "source_commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The one target call returnsok after its0.02second sleep despite max_time0.001. max_time is checked around retry scheduling and may clip waits; it does not interrupt a running target or guarantee a hard wall-clock deadline. Use an actual per-operation timeout/deadline mechanism and account for retry/idempotency at the application boundary.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

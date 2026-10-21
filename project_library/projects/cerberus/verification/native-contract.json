@@ -1,0 +1,1251 @@
+{
+  "baseline_digest": "aef330d008fbe751032a70876b49d9155e796d9617e312a55f12098d823697f5",
+  "nodes": [
+    {
+      "id": "cerberus/tests/test_assorted.py::test_clear_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_assorted.py::test_docstring",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_assorted.py::test_dynamic_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_assorted.py::test_mixin_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_assorted.py::test_mro",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_assorted.py::test_pkgresources_version",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_assorted.py::test_sub_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_assorted.py::test_that_test_fails[assert_fail-document0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_assorted.py::test_that_test_fails[assert_success-document1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_assorted.py::test_version_not_found",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_customization.py::test_check_with_method[check_with]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_customization.py::test_check_with_method[validator]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_customization.py::test_contextual_data_preservation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_customization.py::test_docstring_parsing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_customization.py::test_schema_validation_can_be_disabled_in_schema_setter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_customization.py::test_validator_method[check_with]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_customization.py::test_validator_method[validator]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_errors.py::test__error_1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_errors.py::test__error_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_errors.py::test__error_3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_errors.py::test_basic_error_handler",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_errors.py::test_basic_error_of_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_errors.py::test_error_tree_from_anyof",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_errors.py::test_error_tree_from_subschema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_errors.py::test_nested_error_paths",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_errors.py::test_path_resolution_for_registry_references",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_errors.py::test_queries",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_errors.py::test_wrong_amount_of_items",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_271_normalising_tuples",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_allow_unknown_with_of_rules",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_allow_unknown_with_purge_unknown",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_allow_unknown_with_purge_unknown_subdocument",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_allow_unknown_wo_schema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_circular_depending_default_setters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_catches_TypeError",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_catches_ValueError",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_chain",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_chain_aborts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_in_dictschema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_in_dictschema_in_listschema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_in_keysrules",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_in_listitems",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_in_listitems_catches_TypeError",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_in_listitems_catches_ValueError",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_in_listschema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_in_valuesrules",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_non_digit_in_sequence",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_not_destructive",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coerce_unknown",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_coercion_of_sequence_items",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_custom_coerce_and_rename",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_default_existent[default0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_default_existent[default1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_default_missing[default0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_default_missing[default1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_default_missing_in_subschema[default0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_default_missing_in_subschema[default1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_default_none_default_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_default_none_nonnullable[default0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_default_none_nonnullable[default1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_default_none_nullable[default0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_default_none_nullable[default1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_defaults_in_allow_unknown_schema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_depending_default_setters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_issue_147_complex",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_issue_147_nested_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_issue_250",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_issue_250_no_type_fail_on_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_issue_250_no_type_fail_pass_on_other",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_issue_250_no_type_pass_on_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_normalized",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_nullables_dont_fail_coerce",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_nullables_fail_coerce_on_non_null_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_purge_readonly",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_purge_unknown",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_purge_unknown_in_subschema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_rename",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_normalization.py::test_rename_handler",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_registries.py::test_allow_unknown_as_reference",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_registries.py::test_normalization_with_rules_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_registries.py::test_recursion",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_registries.py::test_references_remain_unresolved",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_registries.py::test_rules_registry_with_anyof_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_registries.py::test_rules_set_simple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_registries.py::test_rules_set_with_dict_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_registries.py::test_schema_registry_simple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_registries.py::test_schema_registry_with_anyof_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_registries.py::test_top_level_reference",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_anyof_allof_schema_validate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_anyof_check_with",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_bad_of_rules",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_bad_schema_definition",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_bad_schema_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_bad_schema_type_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_deprecated_rule_names_in_valueschema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_empty_schema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_expansion_in_nested_schema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_normalization_rules_are_invalid_in_of_rules",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_rulename_space_is_normalized",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_unknown_rule",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_unknown_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_unvalidated_schema_can_be_copied",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_schema.py::test_validated_schema_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_utils.py::test_compare_paths",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_a_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_a_dict_with_valuesrules",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_a_list_length",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_a_list_of_dicts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_a_list_of_integers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_a_list_of_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_allof",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_allow_unknown_with_oneof_rules",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_allowed_when_passing_list_of_dicts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_an_array_from_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_anyof",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_anyof_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_anyof_allof",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_anyof_schema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_anyof_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_array",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_array_unallowed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_bad_document_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_bad_excludes_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_bad_list_of_dicts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_bad_list_of_integers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_bad_list_of_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_bad_max_length",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_bad_max_length_binary",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_bad_max_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_bad_min_length",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_bad_min_length_binary",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_bad_min_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_bad_schema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_bad_valuesrules",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_boolean",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_boolean_is_not_a_number",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_callable_validator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_contains[Terry Gilliam]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_contains[constraint0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_custom_datatype",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_custom_datatype_rule",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_custom_validator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_datetime",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dependencies_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dependencies_dict_with_required_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dependencies_dict_with_subdocuments_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dependencies_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dependencies_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dependencies_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dependencies_field_satisfy_nullable_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dependencies_field_with_mutually_dependent_nullable_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dependencies_in_oneof",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dependencies_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dependencies_list_with_required_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dependencies_list_with_subodcuments_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dependencies_on_boolean_field_with_one_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dependencies_on_boolean_field_with_value_in_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dict_length",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_document_path",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_dont_type_validate_nulled_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_empty_document",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_empty_field_definition",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_empty_skips_regex",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_empty_values[-string]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_empty_values[value1-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_empty_values[value2-dict]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_empty_values[value3-list]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_excludes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_float",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_forbidden",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_forbidden_number",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_ignore_none_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_integer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_integer_allowed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_integer_unallowed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_issue_107",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_keysrules[keyschema]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_keysrules[keysrules]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_mapping_with_sequence_schema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_min_max_date",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_multiples_exclusions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_mutual_excludes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_nested_oneof_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_nested_oneofs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_nested_readonly_field_with_default_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_nested_unknown_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_no_of_validation_if_type_fails",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_noneof",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_not_a_binary",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_not_a_boolean",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_not_a_datetime",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_not_a_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_not_a_float",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_not_a_integer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_not_a_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_not_a_number",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_not_a_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_novalidate_noerrors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_nullable_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_nullable_skips_allowed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_nullable_skips_of_roles[all]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_nullable_skips_of_roles[any]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_nullable_skips_of_roles[none]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_nullable_skips_of_roles[one]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_number",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_one_of_two_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_oneof",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_oneof_schema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_options_passed_to_nested_validators",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_readonly_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_readonly_field_first_rule",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_readonly_field_with_default_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_regex",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_regex_with_flag",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_repeated_readonly",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_require_all_and_exclude",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_require_all_override_by_required",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_require_all_override_by_subdoc_require_all[False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_require_all_override_by_subdoc_require_all[False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_require_all_override_by_subdoc_require_all[True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_require_all_override_by_subdoc_require_all[True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_require_all_simple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_required_excludes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_required_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_root_relative_dependencies",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_schema_validation_from_rules_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_self_root_document",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_sequence_with_mapping_schema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_string_allowed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_string_unallowed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_type_error_aborts_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_unicode_allowed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_unicode_allowed_py2",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_unicode_allowed_py3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_unknown_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_unknown_key_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_unknown_key_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_unknown_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_unknown_keys_list_of_dicts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_unknown_keys_retain_custom_rules",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_validate_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_validated",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "cerberus/tests/test_validation.py::test_validator_rule",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "cerberus",
+  "python": "3.12.15",
+  "schema": 1
+}

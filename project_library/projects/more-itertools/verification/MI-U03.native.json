@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MI-U03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "duplicates_keep_every_later_event": true,
+    "one_duplicate_per_key_requires_composition": true
+  },
+  "resource_profile": "business"
+}

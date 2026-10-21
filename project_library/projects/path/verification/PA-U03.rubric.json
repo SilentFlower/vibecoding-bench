@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PA-U03",
+  "source_commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "same.txt becomes new, nested/keep.txt is copied, ignored.tmp is not copied, and target-only.txt remains retain. merge_tree overlays source content and retains target-only files; it is not a deletion/mirror synchronization operation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MI-C03",
+  "source_commit": "4aeb4338ae1407d8da9723e86da99efeb446f719",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With maxlen=0, peek still preserves the next item while elements stays empty. seekable is an in-memory cache, not a durable checkpoint or upstream rewind. Define source identity/offset, re-readability and completed-side-effect checkpointing for restart; do not promise replay of evicted data.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

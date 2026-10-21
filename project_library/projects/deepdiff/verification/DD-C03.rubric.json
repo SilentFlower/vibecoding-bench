@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DD-C03",
+  "source_commit": "79e4379278b1cfdd8e9e3dccac364956908e8989",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The one values_changed DiffLevel provides path(output_format=list)as[a/b,qty],t1=1,t2=2. Preserve the literal first key; use actual node APIs rather than eval or manual parsing/splitting of a display string. Sets/custom-object keys may need an explicitly different representation; this mapping example is not a guarantee that every Python object has a unique serializable address.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

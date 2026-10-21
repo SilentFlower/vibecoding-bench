@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CV-U01",
+  "source_commit": "6d19c625214977ab2988e674441ca24638bc12d3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Output columns note,id preserve tea, green as one cell, line1 newline line2 as one cell, and exact IDs001/002. There are two data records even though one spans physical lines. csvcut projects CSV strings rather than inferring numeric IDs or splitting raw commas.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

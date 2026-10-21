@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BF-C01",
+  "source_commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Current runtime receives the response, value parses retry_after, predicate selects429, and jitterNone preserves requested wait3 before final200. Default full_jitter chooses a random value between0 and the supplied upper bound, so exact-delay semantics require explicit jitter policy. Validate header values and own request timeout/idempotency separately.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,1 @@
+Schema id={type:string,required:True},confirm={type:boolean,dependencies:token},token={type:string}. Compare default validate({token:synthetic}),update=True for that document,update=True for{confirm:True},and update=True for{confirm:True,token:synthetic}. There is no existing stored record to merge in; do not invent cross-document dependency validation.

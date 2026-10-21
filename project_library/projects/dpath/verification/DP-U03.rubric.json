@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DP-U03",
+  "source_commit": "15759d96a006fef5278de731cd263b4d839094c3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Deleting middle index1 returns1 and leaves[A,None,C] to preserve later positions. Deleting tail index2 returns1 and removes that tail,leaving[A,None]. Missing path raisesPathNotFound. Do not claim every delete compacts or renumbers the list.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

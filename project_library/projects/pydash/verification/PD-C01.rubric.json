@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PD-C01",
+  "source_commit": "ef6a6427e488e29e827e0e0819f2630ad3ff4cdc",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "String a.b.value traverses nested a/b/value and returns2. Token list[a.b,value] preserves the first literal key and returns1. Own the field/path protocol explicitly rather than silently splitting an externally supplied literal key or claiming a new path parser is needed.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

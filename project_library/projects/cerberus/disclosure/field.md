@@ -1,0 +1,1 @@
+Complete synthetic call: schema={name:{type:string}};input={name:A,extra:1};v=Validator(schema,purge_unknown=True);out=v.validated(input). out is{name:A}; original input still has extra1. The consumer requires unknown fields to be rejected rather than silently removed. No transport or database is involved.

@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "CK-M01",
+  "source_commit": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Satisfy the complete declared note order/prefix/empty/Unicode contract on ClickException and UsageError, preserving ordinary output, color, streams, usage and exit codes. Do not move notes into format_message or modify original tests/controls; complete frozen original regression must pass.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized file that fail on the pinned original and pass after the repair; cite the actual implementation and tests. Preserve all original tests and controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

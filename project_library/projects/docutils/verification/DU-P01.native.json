@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DU-P01"
+  ],
+  "python_paths": [
+    "library/docutils",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "raw_and_include_are_separately_controlled": true,
+    "directive_settings_do_not_remove_normal_external_links": true
+  },
+  "resource_profile": "business"
+}

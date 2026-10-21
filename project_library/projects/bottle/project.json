@@ -1,0 +1,277 @@
+{
+  "schema": 2,
+  "project_key": "bottle",
+  "title": "Bottle轻量Web工作场景",
+  "category": "WSGI与HTTP入口",
+  "description": "固定单文件框架上的路由、HEAD、多值取证、JSON校验、模板和应用工厂七项独立任务。",
+  "seed_digest": "cf0efc66f121c844754472ff5fb9ba92d4cebaf46da0a66410434312cad7e17d",
+  "environment": "bottle-py312",
+  "source": {
+    "repository": "https://github.com/bottlepy/bottle",
+    "commit": "8ec5fe29420d14998c0d86885083983eaea8b839",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "BT-S01",
+      "title": "HTTP路由和读取语义",
+      "goal": "区分路径、方法和HEAD回退",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BT-U01",
+            "BT-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BT-U01",
+          "kind": "understand",
+          "goal": "区分路径转换、缺失路由和方法拒绝",
+          "prompt": "Trace the complete WSGI route controls, exact statuses and converted response data. Explain existing JSON output behavior without launching a server or editing files.",
+          "requires": [],
+          "materials": [
+            "materials/routes.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BT-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/BT-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BT-C01",
+          "kind": "consult",
+          "goal": "明确HEAD回退时的只读处理责任",
+          "prompt": "Meet the supplied read-endpoint requirement using actual HEAD behavior. Explain callback/response observations and a compatible method boundary; no implementation is authorized.",
+          "requires": [],
+          "materials": [
+            "materials/head.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BT-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/BT-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BT-S02",
+      "title": "多值查询和取证",
+      "goal": "明确输入基数与缺失值政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BT-U02",
+            "BT-D01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "BT-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "BT-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BT-U02",
+          "kind": "understand",
+          "goal": "解释重复查询值、缺失项和转换默认值",
+          "prompt": "Trace all complete request-query access controls and distinguish returned convenience defaults from validated user input. Do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/query.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BT-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/BT-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BT-D01",
+          "kind": "diagnose",
+          "goal": "先取实际请求和访问表达式再定位筛选缺失",
+          "prompt": "Investigate the supplied filter symptom. Request exact request/body and callback access before selecting a cause; use disclosed evidence only or close with an evidence plan if unavailable. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/query-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BT-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "query-evidence",
+              "when": "The exact request and callback access have not been supplied or declared unavailable, and the answer reasonably requests sufficient evidence.",
+              "materials": [
+                "disclosure/query.md"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "BT-S03",
+      "title": "JSON业务入口",
+      "goal": "先解析再验证并决定错误边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BT-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BT-C02",
+          "kind": "consult",
+          "goal": "把JSON解析和订单对象校验分开",
+          "prompt": "Meet the complete order-body contract using current request APIs and explicit validation. Give all supplied parsing/status controls and rejection responsibilities without implementing a service.",
+          "requires": [],
+          "materials": [
+            "materials/json.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BT-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/BT-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BT-S04",
+      "title": "模板数据边界",
+      "goal": "保留用户文本转义和可信模板边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BT-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BT-C03",
+          "kind": "consult",
+          "goal": "为用户文本保留模板默认转义",
+          "prompt": "Meet the supplied text-display requirement with current SimpleTemplate behavior. Compare exact outputs and trusted-template boundaries; do not execute untrusted template source or change files.",
+          "requires": [],
+          "materials": [
+            "materials/template.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BT-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/BT-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BT-S05",
+      "title": "应用工厂与测试",
+      "goal": "明确实例和请求的数据所有权",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BT-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BT-P01",
+          "kind": "plan",
+          "goal": "规划显式应用工厂和逐请求数据边界",
+          "prompt": "Plan the supplied repeatable application-factory/test setup, using observed route ownership and request rebinding. State external-state/concurrency limits and do not implement or deploy anything.",
+          "requires": [],
+          "materials": [
+            "materials/factory.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BT-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/BT-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

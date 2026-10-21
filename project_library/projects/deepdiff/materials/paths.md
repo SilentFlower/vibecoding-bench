@@ -1,0 +1,1 @@
+Compare{"a/b":{"qty":1}}with{"a/b":{"qty":2}}using view="tree". A structured change event needs path segments and actual before/after values. Use current DiffLevel.path(output_format="list"),t1,t2; do not eval a display path,split a literal key on/ or claim every set/custom-object change has a unique serializable path. No service implementation is authorized.

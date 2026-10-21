@@ -1,0 +1,326 @@
+{
+  "schema": 2,
+  "project_key": "jsonschema",
+  "title": "JSON Schema数据准入工作场景",
+  "category": "结构校验与schema治理",
+  "description": "固定真实源码上的配置注解、完整错误、格式取证、数值兼容、组合闭合和离线引用九项独立只读任务。",
+  "seed_digest": "e02048d8535190fc19f8bac854606439982d2097f55ccf53d2000e70c41399ca",
+  "environment": "jsonschema-py312",
+  "source": {
+    "repository": "https://github.com/python-jsonschema/jsonschema",
+    "commit": "c497561ea0a95f5aac09cd63d15eb1420eb7bbec",
+    "license_files": [
+      "seed/library/COPYING"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "JV-S01",
+      "title": "配置导入与错误预览",
+      "goal": "明确注解、副作用和完整错误输出",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "JV-U01",
+            "JV-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JV-U01",
+          "kind": "understand",
+          "goal": "区分配置默认值注解和实际填充值",
+          "prompt": "Trace the complete required/default configuration example. Give validation results, errors and final input state; distinguish validation from any proposed normalization. Do not change files or fill defaults.",
+          "requires": [],
+          "materials": [
+            "materials/config.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JV-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/JV-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "JV-C01",
+          "kind": "consult",
+          "goal": "为导入预览选择完整结构化错误清单",
+          "prompt": "Recommend current validation APIs for the supplied full import-preview error-report requirement. Identify all three actual instance locations and keywords, reusable schema validation and output privacy limits. Do not implement.",
+          "requires": [],
+          "materials": [
+            "materials/errors.json",
+            "materials/error-report.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JV-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/JV-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "JV-S02",
+      "title": "邮箱取证与货位格式",
+      "goal": "区分实际调用、检查器启用和局部格式注册",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "JV-D01",
+            "JV-C02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "JV-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "JV-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JV-D01",
+          "kind": "diagnose",
+          "goal": "先取校验调用再判断邮箱为何通过",
+          "prompt": "Investigate the supplied accepted-email symptom. Request the actual schema, sample and validator/checker construction before deciding the cause. Relate only disclosed evidence to the pinned API; if unavailable, close with a bounded evidence plan. Do not modify files.",
+          "requires": [],
+          "materials": [
+            "materials/format-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JV-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "format-call",
+              "when": "The actual schema, sample and validator/checker construction are not yet supplied or declared unavailable, and the answer reasonably requests sufficient evidence.",
+              "materials": [
+                "disclosure/format.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "JV-C02",
+          "kind": "consult",
+          "goal": "限定货位格式检查器的作用域和错误原因",
+          "prompt": "Meet the supplied warehouse-bin validation requirement using existing APIs without implementation. Explain checker activation, local registration, ValueError handling/cause, valid/invalid controls and unknown-format handling.",
+          "requires": [],
+          "materials": [
+            "materials/bin-format.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JV-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/JV-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "JV-S03",
+      "title": "进程内数值兼容",
+      "goal": "保留标准JSON语义并隔离Decimal扩展",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "JV-U02",
+            "JV-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JV-U02",
+          "kind": "understand",
+          "goal": "区分JSON整数和Python布尔继承关系",
+          "prompt": "Trace the supplied integer type examples under the fixed 2020-12 validator, including the in-process Decimal control. Explain why Python isinstance assumptions alone are insufficient. Do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/types.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JV-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/JV-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "JV-P01",
+          "kind": "plan",
+          "goal": "规划局部Decimal整数适配而不改变全局类型",
+          "prompt": "Plan the supplied in-process accounting compatibility requirement with existing extension APIs. Preserve bool rejection and standard validator behavior; distinguish this adapter from JSON wire encoding. No implementation is authorized.",
+          "requires": [],
+          "materials": [
+            "materials/types.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JV-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/JV-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "JV-S04",
+      "title": "组合schema字段闭合",
+      "goal": "按真实draft选择分支约束与求值后闭合",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "JV-U03",
+            "JV-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JV-U03",
+          "kind": "understand",
+          "goal": "解释组合schema分支为何互相拒绝字段",
+          "prompt": "Trace the supplied payload after closing each allOf branch independently. Explain exactly which scope additionalProperties examines and why this is not cross-branch property union. Do not edit the schema.",
+          "requires": [],
+          "materials": [
+            "materials/composition.json",
+            "materials/composition.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JV-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/JV-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "JV-C03",
+          "kind": "consult",
+          "goal": "为组合对象选择有明确draft的闭合策略",
+          "prompt": "Recommend an existing schema/validator strategy meeting the complete two-fields-only requirement. Compare actual 2020-12 and draft7 behavior, valid and extra-property controls; no implementation is requested.",
+          "requires": [],
+          "materials": [
+            "materials/composition.json",
+            "materials/composition.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JV-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/JV-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "JV-S05",
+      "title": "离线schema引用目录",
+      "goal": "用明确资源集合保证离线引用结果可解释",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "JV-P02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JV-P02",
+          "kind": "plan",
+          "goal": "规划离线schema引用目录与缺失资源失败",
+          "prompt": "Plan the complete approved-resource offline importer using the installed referencing APIs and fixed validator. Explain registration ownership,2/0 controls, missing-resource behavior and version/dialect policy. Do not fetch external resources or implement/deploy anything.",
+          "requires": [],
+          "materials": [
+            "materials/references.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JV-P02.rubric.json",
+            "semantic": true,
+            "native": "verification/JV-P02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

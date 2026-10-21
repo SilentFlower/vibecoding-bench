@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CO-C01",
+  "source_commit": "b7707c94c0317b8f89b704a01525a68eb6c72521",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Ordinary validation adds workers2 but marks a missing default in section.defaults, so write skips it. On a separate object, validate(copy=True) leaves that generated default as a written value and outputs workers=2. Existing copy behavior satisfies this output need; do not globally alter default writing.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

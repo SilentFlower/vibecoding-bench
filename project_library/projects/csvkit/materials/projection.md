@@ -1,0 +1,1 @@
+Run the existing csvcut tool with -c note,id on the supplied CSV. Preserve identifiers and logical records with quoted commas/newlines. Separately use short.csv with -c b, then -c b -x, then -c a -x. The business must decide whether an empty selected projection is grounds to drop a nonempty original order. No files may be changed.

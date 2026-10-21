@@ -1,0 +1,172 @@
+{
+  "project": "path",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+  "source_file_count": 32,
+  "license_files": [
+    "seed/app/licenses/LICENSE.path.build.txt"
+  ],
+  "scenarios": 4,
+  "unique_tasks": 9,
+  "modify_tasks": 1,
+  "non_modify_tasks": 8,
+  "native_baseline": {
+    "project": "path",
+    "attempt": 2,
+    "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/path/result.json",
+    "result_sha256": "bfe36decb966881564664f17a9a6eaba6168dd86a0d0b5f2914a444228135cf5",
+    "main_collected": 143,
+    "counts": {
+      "passed": 142,
+      "failed": 0,
+      "error": 0,
+      "skipped": 1,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 27,
+    "collection_skip_count": 0,
+    "xml_testcases": 143,
+    "xml_skipped": 1,
+    "runner_sha256": "aa63dd488a6b5e68358b10f577a3c5cd762edf3fb2e42c6940785db361366dd7",
+    "contract_sha256": "a9f7549ed59eb2b776baf8cf508b1adb846651fdff59353b64975e9376052c72",
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "原生基线而非业务完成；模块收集跳过和已收集用例跳过分别计数"
+  },
+  "verified_unique_native_cases": 13,
+  "native_evidence": [
+    {
+      "case": "original-PA-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/path/attempt-001/original-PA-C01.json",
+      "sha256": "35a397ab4d243fbd302c54a419e0f13fd1e9e6ca9e66f2a1c9cb8d27e9d855f3",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PA-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/path/attempt-001/original-PA-C02.json",
+      "sha256": "a40ef4c1a2d98a9bc3b6724517da898feda426cde244fd74fc1911d63b703c06",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PA-C03",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/path/attempt-001/original-PA-C03.json",
+      "sha256": "19dc393fafb16283eb9a6ab7799d3fef514d195e1240357aba7d351d9f577a7a",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PA-M01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/path/attempt-001/original-PA-M01.json",
+      "sha256": "db5ace4ce5ee44708090d9f5854bb03dca6135fc0b12c6da4beb7286bf0a81fa",
+      "expected": "failed",
+      "actual_status": "failed"
+    },
+    {
+      "case": "original-PA-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/path/attempt-001/original-PA-P01.json",
+      "sha256": "a7f32a3524a2d9d5847bf47a1cd46ffeaccf333349209b2af70d145c4aa60b3b",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PA-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/path/attempt-001/original-PA-U01.json",
+      "sha256": "be33f98e8af1ebb59ab27c2b14c853f2ebea6ed6d5385c638537d65e82a3126c",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PA-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/path/attempt-001/original-PA-U02.json",
+      "sha256": "0ea96f08ff19bef910369b0f4d9313201922b3522047261d89964ac20dacac34",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PA-U03",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/path/attempt-001/original-PA-U03.json",
+      "sha256": "31542911f665ba94384d2b7872cea4172bcfc63b8ed5fa76bff6d0483bf99bed",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "public-tests-original",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/path/attempt-001/public-tests-original.json",
+      "sha256": "0f7f063372c3ccea0ed6897a9e339210fb981eaff073da358b229198690131dd",
+      "expected": "failed",
+      "actual_status": "failed"
+    },
+    {
+      "case": "public-tests-reference",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/path/attempt-001/public-tests-reference.json",
+      "sha256": "55f3fe53c073affab2a32126e68c00c73134790f502e28bba886b4fafb0b73b3",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "reference-PA-M01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/path/attempt-001/reference-PA-M01.json",
+      "sha256": "c182a866cbb2ade414a397134bf983abb79307346ae498e16085c20d09a12315",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "reference-full-regression",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/path/attempt-001/reference-full-regression.json",
+      "sha256": "1767b2c6d37d1677a21110de0f03637b02629f7e147a3046fb61333bb9e7f0d5",
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "wrong-path-builtins-only",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/path/attempt-001/wrong-path-builtins-only.json",
+      "sha256": "e5d92e321ed0b01be5a0e2e5e16473c7e8eb77dfbf9c86772206e600f765765e",
+      "expected": "failed",
+      "actual_status": "failed"
+    }
+  ],
+  "reference_changed_paths": [
+    "library/path/__init__.py",
+    "library/tests/test_path.py"
+  ],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "mock_bundle": ".deploy/project-catalog-hundred/stage-01/mock-batch-007",
+  "formal_version": "real-project-scenarios-v8-en",
+  "formal_digest": "7c3c66969f5585f2f6b83360a22f0d861a24b64cd932ba8eae38e59157d7fc1b",
+  "full_delivery_files": 5070,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-007/run-001/evidence/result.json",
+      "sha256": "c407f56b1b996f781a5de4e28da60f157d87924fa2a5868ac89f31ede48b74da"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-007/run-001/cleanup.json",
+      "sha256": "df7961c0cad8fdf56ce9c7b208edae851c93c73331d5f192b9a5ab088dfadf75"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/mock-batch-007-audit.json",
+      "sha256": "0eb3781f331ddc2dcab8b6cd823ebef14cbec3748a6f7e9f0b10078c75f6abb6"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-007/browser/run-001/diagnostics/result.json",
+      "sha256": "d0f6f8245ecd4acb664608e098cbe99e9144859a7ceff95ab9bb738b5d830d85"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/delivery-first-fourteen.json",
+      "sha256": "e8d3e344b1657e9cf25d89925fcc57c9024832491656350de6b959afecbcc962"
+    }
+  ]
+}

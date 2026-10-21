@@ -1,0 +1,266 @@
+{
+  "schema": 2,
+  "project_key": "toolz",
+  "title": "Toolz纯函数数据工作场景",
+  "category": "函数式管道与聚合",
+  "description": "固定真实源码上的组合分批、缓存键、区域归约和映射合并八项独立只读任务。",
+  "seed_digest": "c9f35ac651c8c23d4912bb082fba900ef1bef82401c80d843b62c11625acdffb",
+  "environment": "toolz-py312",
+  "source": {
+    "repository": "https://github.com/pytoolz/toolz",
+    "commit": "451af60dec590a6010e2babdbf391ea8f815122f",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TZ-S01",
+      "title": "函数组合与订单分批",
+      "goal": "明确执行方向、惰性和尾项保留",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TZ-U01",
+            "TZ-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TZ-U01",
+          "kind": "understand",
+          "goal": "解释函数组合与数据管道的不同方向",
+          "prompt": "Trace the two complete numeric pipeline expressions. Give their actual outputs and the execution direction of compose versus pipe. Do not modify files or treat the two argument lists as equivalent.",
+          "requires": [],
+          "materials": [
+            "materials/pipeline.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TZ-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/TZ-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TZ-C01",
+          "kind": "consult",
+          "goal": "选择保留订单尾项的已有分批助手",
+          "prompt": "Meet the supplied no-order-loss export requirement using current curried mapping and partition helpers. Explain actual source consumption and final batch behavior, using fresh sources for comparisons. No implementation is authorized.",
+          "requires": [],
+          "materials": [
+            "materials/pipeline.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TZ-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/TZ-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TZ-S02",
+      "title": "纯价格计算与缓存",
+      "goal": "按真实键接口和价格生命周期决定缓存政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TZ-U02",
+            "TZ-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TZ-U02",
+          "kind": "understand",
+          "goal": "解释可哈希缓存键和真实key调用接口",
+          "prompt": "Trace the complete price examples. Explain default list-argument failure and a correct explicit key for both supplied discount call forms. Give results and actual cache-hit/call behavior without changing files.",
+          "requires": [],
+          "materials": [
+            "materials/price-key.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TZ-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/TZ-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TZ-C02",
+          "kind": "consult",
+          "goal": "为变化价格明确缓存生命周期",
+          "prompt": "Explain the complete external-price/cache-dict reproduction and recommend an explicit current-price policy with existing APIs. Distinguish pure inputs from changing external state and identify the real invalidation handle. Do not modify files or invent methods.",
+          "requires": [],
+          "materials": [
+            "materials/price-lifetime.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TZ-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/TZ-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TZ-S03",
+      "title": "区域订单统计",
+      "goal": "按分组或总量目标选择已有全流归约",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TZ-U03",
+            "TZ-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TZ-U03",
+          "kind": "understand",
+          "goal": "解释全流分组而非连续分组",
+          "prompt": "Trace groupby for the supplied nonconsecutive region orders. Explain which original records appear in each list and when the one-shot input has been consumed. Do not modify files or apply itertools.groupby semantics.",
+          "requires": [],
+          "materials": [
+            "materials/regions.json",
+            "materials/grouping.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TZ-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/TZ-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TZ-C03",
+          "kind": "consult",
+          "goal": "用已有按键归约避免保留整组订单",
+          "prompt": "Choose an existing API for the supplied totals-only report and explain its memory boundary as region cardinality grows. Compare with retaining groupby lists without implementing changes.",
+          "requires": [],
+          "materials": [
+            "materials/regions.json",
+            "materials/grouping.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TZ-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/TZ-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TZ-S04",
+      "title": "配置和账单映射合并",
+      "goal": "区分浅层所有权、覆盖和同键累加",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TZ-U04",
+            "TZ-C04"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TZ-U04",
+          "kind": "understand",
+          "goal": "区分浅层新映射和嵌套对象共享",
+          "prompt": "Trace the supplied config merge and subsequent in-memory nested-list edit. Explain precedence, outer identity, whether merge itself changes base.theme, and whether nested options is deeply copied. Do not edit project files.",
+          "requires": [],
+          "materials": [
+            "materials/config-merge.json",
+            "materials/merge-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TZ-U04.rubric.json",
+            "semantic": true,
+            "native": "verification/TZ-U04.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TZ-C04",
+          "kind": "consult",
+          "goal": "按账单规则选择覆盖或同键累加",
+          "prompt": "Meet the supplied sum-repeated-charge requirement with current mapping helpers. Compare actual merge and merge_with(sum) outputs and input ownership. No implementation or project-file change is requested.",
+          "requires": [],
+          "materials": [
+            "materials/bills.json",
+            "materials/merge-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TZ-C04.rubric.json",
+            "semantic": true,
+            "native": "verification/TZ-C04.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

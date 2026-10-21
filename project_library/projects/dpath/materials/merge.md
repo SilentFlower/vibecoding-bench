@@ -1,0 +1,1 @@
+Startdst={},source={tags:[A]};merge dst withsource thenmerge dst with{tags:[B]}. Inspect destination identity,source.tags and shared list. Separately merge fresh{tags:[A]}with{tags:[B]}using MergeType.REPLACE. Do not assume merge deep-copies sources or list addition means uniqueness.

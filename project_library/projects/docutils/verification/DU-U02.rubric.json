@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DU-U02",
+  "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "payments-api remains a target in both trees; payment-methods changes to payment-endpoints with the visible title. Use the explicit agreed target for stable external links, preserve uniqueness, and do not mistake title-derived automatic IDs for an immutable routing contract.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

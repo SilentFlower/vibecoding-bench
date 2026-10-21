@@ -1,0 +1,1 @@
+../deepdiff/docstrings/search_doc.rst

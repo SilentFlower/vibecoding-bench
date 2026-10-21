@@ -1,0 +1,817 @@
+{
+  "baseline_digest": "5c24faeaf34b4a37d146dec9dbb7b5c7b52d7dde9563df68f4d690a598e7f8c8",
+  "nodes": [
+    {
+      "id": "test/test_box.py::TestBox::test_add_boxes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_add_frozen_boxes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_adding_frozen_boxes_result_in_frozen_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_adding_nested_frozen_boxes_result_in_frozen_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_auto_attr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_bad_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_bad_from_json",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_bad_from_yaml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_bad_inits",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_bad_recursive",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_basic_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_default_not_create_on_get",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_dots",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_from_bad_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_from_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_from_empty_yaml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_greek",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_inits",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_kwargs_should_not_be_included",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_modify_at_depth",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_modify_tuples",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_namespace",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_propagation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_property_support",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_safe_references",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_set_attribs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_box_slice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_camel_killer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_camel_killer_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_camel_killer_hashables",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_circular_references",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_clear",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_config",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_contains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_conversion_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_conversion_dup_only",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_create_subdicts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_custom_key_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_default_and_camel_killer_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_default_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_default_box_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_default_box_none_transforms",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_default_box_restricted_calls",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_default_dots",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_delete_attributes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_dir",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_dots",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_dots_exclusion",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_duplicate_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_error_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_from_json",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_from_json_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_from_multiline",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_from_yaml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_from_yaml_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_frozen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_functional_data",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_functional_spaceballs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_get",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_get_box_config",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_get_default_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_hashing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_iadd_boxes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_inheritance",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_inheritance_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_intact_types_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_ior_boxes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_is_in",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_item_view",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_items",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_key_error_popitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_key_view",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_merge_list_options",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_merge_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_msgpack_files",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_msgpack_no_input",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_msgpack_strings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_msgpack_strings_no_strick_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_no_key_error_pop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_nontype_recast",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_or_boxes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_parameter_pass_through",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_pickle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_pickle_default_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_pop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_pop_items",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_protected_box_methods",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_radd_boxes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_recursive_tuples",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_revered",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_ror_boxes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_safe_attrs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_set_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_set_default_box_dots",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_set_default_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_setdefault_dots",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_setdefault_dots_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_setdefault_simple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_sub",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_sub_with_frozen_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_sub_with_non_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_through_queue",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_to_json_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_to_multiline",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_to_yaml_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_to_yaml_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_to_yaml_width",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_toml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_toon_files",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_toon_from_toon_with_box_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_toon_no_input",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_toon_strings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_type_recast",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_underscore_removal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_unicode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_union_frozen_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_update_with_integer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_value_view",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box.py::TestBox::test_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_bad_csv",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_box_config_propagate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_box_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_box_list_default_dots",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_box_list_dots",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_box_list_from_json",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_box_list_from_tml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_box_list_from_yaml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_box_list_to_json",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_box_list_to_toml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_box_list_to_yaml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_circular_references",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_from_csv",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_frozen_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_intact_types_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_no_recursion_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_to_csv",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_toon_files",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_toon_no_input",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_box_list.py::TestBoxList::test_toon_strings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_config_box.py::TestConfigBox::test_config_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_config_box.py::TestConfigBox::test_config_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_config_box.py::TestConfigBox::test_dir",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_converters.py::TestConverters::test_bad_from_toml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_converters.py::TestConverters::test_from_toml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_converters.py::TestConverters::test_from_toml_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_converters.py::TestConverters::test_to_json",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_converters.py::TestConverters::test_to_msgpack",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_converters.py::TestConverters::test_to_toml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_converters.py::TestConverters::test_to_toml_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_converters.py::TestConverters::test_to_yaml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_converters.py::TestConverters::test_to_yaml_ruamel",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_from_file.py::TestFromFile::test_bad_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_from_file.py::TestFromFile::test_from_all",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_from_file.py::TestFromFile::test_from_string_all",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_sbox.py::TestSBox::test_property_box",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "pytest-cov",
+      "module": "pytest_cov.plugin",
+      "module_sha256": "13fae5915583a1d4a88e02ed139a91092b5a1394f4aa6a27297f70eb03abbb90",
+      "version": "5.0.0"
+    }
+  ],
+  "project": "python-box",
+  "python": "3.12.15",
+  "schema": 1
+}

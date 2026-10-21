@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MI-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "strict_yields_complete_batches_before_error": true,
+    "strict_consumes_incomplete_tail": true,
+    "default_keeps_partial_batch": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BX-U03",
+  "source_commit": "a4c10e977b574114613431394b30412b50aaacce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Construction uses path-aware __setitem__. With dots enabled/default_box=False, the first db.host item raises BoxKeyError because db does not yet exist. With default_box=True it creates that path, then the later db mapping replaces it, yielding only nested host=nested. Reversing input positions makes the parent exist and yields host=flat. Dots disabled or an explicit exclusion preserves literal db.host=flat alongside nested host=nested. A nested-only dotted lookup resolves only when enabled. Do not claim constructing arbitrary dotted input always succeeds or preserves literal keys.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

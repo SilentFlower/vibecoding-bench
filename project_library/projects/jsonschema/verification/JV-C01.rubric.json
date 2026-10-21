@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "JV-C01",
+  "source_commit": "c497561ea0a95f5aac09cd63d15eb1420eb7bbec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "iter_errors yields minimum at orders/0/qty, type at orders/1/qty and required at orders/2; validate raises one selected best-match error, not a complete report. Check the schema once then reuse its validator. Sort paths deliberately for presentation, preserve structured paths/keyword and avoid dumping full input or parsing the exception string.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

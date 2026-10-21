@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MS-U01",
+  "source_commit": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain the actual different escape/plugin defaults: markdown defaults to escaping with no chosen plugins, while html is preconfigured with escape=False and strikethrough/footnotes/table. Do not treat the two conveniences as identical.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

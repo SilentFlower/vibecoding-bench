@@ -1,0 +1,1 @@
+Compare the exact text ready styled bold red on (1) a StringIO console with force_terminal=False, (2) force_terminal=True,color_system=standard,no_color=True, and (3) force_terminal=True,color_system=None. No ambient color environment is present. A downstream plain-text parser rejects every ANSI sequence; does no_color alone meet that requirement? No files may be changed.

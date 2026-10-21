@@ -1,0 +1,1 @@
+Complete synthetic sequence: baseline={"limits":{"daily":1}}; a=merge(baseline,{"limits":{"daily":2}}); b=merge(baseline,{"name":"B"}). No clone is made. Inspect a is b is baseline, final limits and whether a also has nameB. No database or external service exists.

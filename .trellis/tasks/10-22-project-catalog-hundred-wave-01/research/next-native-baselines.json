@@ -1,0 +1,90 @@
+{
+  "projects": [
+    {
+      "project": "click",
+      "successful_attempt": 4,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-004/click/result.json",
+      "result_sha256": "611355f04902af1e5f9f2cd98261f1473530e2df263b0d57a3d4257fe74526de",
+      "contract_sha256": "eec3bacad62df82a9f6620499d61ef9a4a225260c0a5090595623523b41e81f6",
+      "collected": 2287,
+      "counts": {
+        "passed": 2262,
+        "failed": 0,
+        "error": 0,
+        "skipped": 24,
+        "xfailed": 1,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "doctests": 0,
+      "subtests": null,
+      "earlier_failures_preserved": true,
+      "scope": "仅当前镜像原生基线；业务、参考及产品链尚未准入"
+    },
+    {
+      "project": "cli-helpers",
+      "successful_attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/cli-helpers/result.json",
+      "result_sha256": "79351868ee590aef8011de5c1b22e771aa8e32e8ee889a920c3090dd369e0e0f",
+      "contract_sha256": "be5cd6e20ede594b0f91777536a32161dca02b9fb608f3f89b761a6176c34078",
+      "collected": 96,
+      "counts": {
+        "passed": 92,
+        "failed": 0,
+        "error": 0,
+        "skipped": 4,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "doctests": 0,
+      "subtests": null,
+      "earlier_failures_preserved": false,
+      "scope": "仅当前镜像原生基线；业务、参考及产品链尚未准入"
+    },
+    {
+      "project": "mistune",
+      "successful_attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/mistune/result.json",
+      "result_sha256": "3c800e5f67adec213f8a10c8079d523da7e3eb2095355d7cc01403d409bd6c2a",
+      "contract_sha256": "a1a8ee25f23981b1108e70ff07f1911320ea23138b138e94d871b1090ff26a79",
+      "collected": 1324,
+      "counts": {
+        "passed": 1324,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "doctests": 0,
+      "subtests": 158,
+      "earlier_failures_preserved": false,
+      "scope": "仅当前镜像原生基线；业务、参考及产品链尚未准入"
+    },
+    {
+      "project": "boltons",
+      "successful_attempt": 3,
+      "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-003/boltons/result.json",
+      "result_sha256": "b6dd4a95b028c6621d50f47014c66849935673dd2d68beb15cbf090f1e2298eb",
+      "contract_sha256": "8cb12634c60c51ca76609b55966ef3fe2a95ae492b270840407f9c7f548309e4",
+      "collected": 678,
+      "counts": {
+        "passed": 678,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "doctests": 153,
+      "subtests": 12,
+      "earlier_failures_preserved": true,
+      "scope": "仅当前镜像原生基线；业务、参考及产品链尚未准入"
+    }
+  ],
+  "real_model_calls": 0,
+  "formal_catalog_modified": false
+}

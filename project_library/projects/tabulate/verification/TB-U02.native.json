@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TB-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "safe_html_escapes_text": true,
+    "explicit_unsafe_format_distinct": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "JV-P02",
+  "source_commit": "c497561ea0a95f5aac09cd63d15eb1420eb7bbec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Create Resource.from_contents with its declared dialect and use the returned Registry.with_resource result; registries are immutable. Pass that explicit registry into Draft202012Validator:2 passes,0 fails minimum,unknown URN raises referencing.exceptions.Unresolvable. Validate versioned allowlisted resource completeness and fail closed on missing entries, with no implicit remote/file retrieval or changes to global defaults.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

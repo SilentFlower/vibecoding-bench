@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PE-U01",
+  "source_commit": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Constructing convert does not pull this source. Explicit view.list() traverses the reusable source once each time; the first two results match and a third sees qty7 after source mutation. Builtin list(view) can additionally call the inherited enumerating __len__ for a length hint, causing another traversal. The view is neither a cached immutable snapshot nor guaranteed to be read exactly once by every consumer.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TB-U01",
+  "source_commit": "268615a5c27dc40e5c22454c07b44d5c50410da0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain mixed numeric-looking SKU column inference, 00123/1e3 display as 123/1000 and default g price formatting; do not claim source records were rewritten.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

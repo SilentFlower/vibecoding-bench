@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "RH-C02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "display_width_differs_from_character_count": true,
+    "recorded_rendering_does_not_restore_cropped_identifier": true
+  },
+  "resource_profile": "business"
+}

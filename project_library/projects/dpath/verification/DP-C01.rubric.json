@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DP-C01",
+  "source_commit": "15759d96a006fef5278de731cd263b4d839094c3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "String a/b/x traverses nested keys and returns2. Segment sequence[a/b,x] retains the separator in the first field and returns1. Own the external key/path protocol; segment sequences do not disable glob matching for actual wildcard-pattern segments,so do not claim a universal literal-pattern escape.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

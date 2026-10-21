@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DD-U02",
+  "source_commit": "79e4379278b1cfdd8e9e3dccac364956908e8989",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default10versus10.0 produces a type change; ignoreNumericTypeChangesTrue suppresses that same-value representation difference. It still reports a values_changed difference for10versus10.5. Do not silently invent currency rounding,absolute/relative tolerance or a general equivalence for all numeric-like values.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

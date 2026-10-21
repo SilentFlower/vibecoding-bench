@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DU-U03",
+  "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The result is one table with three rows including the header, each with two cells. Quoted tea, green stays one cell, quantities are textual table entries2/3, and the original Unicode item survives. This directive parses CSV data rather than turning every comma into a table boundary.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

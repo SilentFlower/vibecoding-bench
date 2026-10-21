@@ -1,0 +1,1 @@
+A temporary .env is written as UTF-8 with an initial U+FEFF before VB_CASE_TITLE=咖啡 and another key VB_CASE_INSIDE=a<U+FEFF>b. Compare RepositoryEnv(path) and RepositoryEnv(path, encoding="utf-8-sig"). Only the first BOM is an encoding marker; the embedded value character must remain. No library modification is requested.

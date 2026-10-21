@@ -1,0 +1,1 @@
+The importer requires distinct column keys and exact decimal text. Existing default JSONL output is not asserted to provide either a duplicate-header error policy or Decimal text mode. Recommend an application pre-validation/pre-formatting policy using existing capabilities without modifying the library; make any resulting JSON string-versus-number type explicit.

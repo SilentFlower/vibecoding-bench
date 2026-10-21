@@ -1,0 +1,319 @@
+{
+  "schema": 2,
+  "project_key": "path",
+  "title": "Path文件处理工作场景",
+  "category": "文件保真与工作流",
+  "description": "固定真实源码上的字节、目录和取消恢复九项独立任务，包含一个授权最小工程修复。",
+  "seed_digest": "19de9272761218bbb76d83f0bcb136ce2a6a3a5e61173238c4f8c400c47b93cd",
+  "environment": "path-py312",
+  "source": {
+    "repository": "https://github.com/jaraco/path",
+    "commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+    "license_files": [
+      "seed/app/licenses/LICENSE.path.build.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PA-S01",
+      "title": "文件格式与字节保真",
+      "goal": "用现有文本和二进制接口表达不同保真要求",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PA-U01",
+            "PA-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PA-U01",
+          "kind": "understand",
+          "goal": "解释文本换行转换和已有保真选项",
+          "prompt": "Trace the supplied three write_text newline policies on the target Linux runtime. Give actual byte-level differences and explain which existing argument preserves the mixed original newlines. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/line-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained_with_existing_solution"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PA-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/PA-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PA-C01",
+          "kind": "consult",
+          "goal": "为字节保真选择已有二进制接口",
+          "prompt": "Recommend an existing-API approach for the supplied exact binary-copy requirement, including invalid UTF-8 bytes and mixed newlines. Explain bounded chunking versus text normalization. No implementation or real file access is authorized.",
+          "requires": [],
+          "materials": [
+            "materials/line-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PA-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/PA-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PA-S02",
+      "title": "目录资产盘点",
+      "goal": "区分非递归glob、递归盘点和显式剪枝",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PA-U02",
+            "PA-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PA-U02",
+          "kind": "understand",
+          "goal": "解释glob双星与递归文件盘点的区别",
+          "prompt": "Trace glob(\"**/*.txt\") and walkfiles(\"*.txt\") on the supplied complete synthetic tree. Explain the actual recursion guarantee and which files each covers. Do not edit files or traverse real paths.",
+          "requires": [],
+          "materials": [
+            "materials/traversal.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PA-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/PA-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PA-C02",
+          "kind": "consult",
+          "goal": "用已有生成器协议剪枝一棵子树",
+          "prompt": "Meet the supplied inventory requirement to skip the entire skip subtree with current walk capabilities. Explain how to consume generator.send results and why a match filter or sending a bare False is not the same policy. No project files may be changed.",
+          "requires": [],
+          "materials": [
+            "materials/traversal.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PA-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/PA-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PA-S03",
+      "title": "目录内容合并",
+      "goal": "保留目标独有内容并复用已有复制策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PA-U03",
+            "PA-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PA-U03",
+          "kind": "understand",
+          "goal": "解释目录合并保留目标独有数据",
+          "prompt": "Trace the supplied temporary merge and resulting same.txt, nested/keep.txt, ignored.tmp and target-only.txt. Is this operation a mirror that removes target-only data? Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/merge.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PA-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/PA-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PA-C03",
+          "kind": "consult",
+          "goal": "复用已有忽略和自定义复制策略",
+          "prompt": "Assess whether the supplied ignore/copy-policy requirements require a new merge_tree feature. Use the actual current parameters and callback behavior, and distinguish any undeclared mirror-deletion policy. No changes or real directory operation are authorized.",
+          "requires": [],
+          "materials": [
+            "materials/merge.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PA-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/PA-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PA-S04",
+      "title": "取消时的文件重写恢复",
+      "goal": "按实际材料定位并验证明确授权的最小恢复修复",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PA-D01",
+            "PA-P01",
+            "PA-M01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "PA-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "PA-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "PA-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PA-D01",
+          "kind": "diagnose",
+          "goal": "先取重写API和异常时序再判断原文丢失",
+          "prompt": "Investigate the supplied cancellation symptom. Request the actual API, exact exception, modes, backup options and stream lifecycle or a sufficient minimal reproduction. Diagnose only consumed evidence and state the limit if unavailable. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/cancellation-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PA-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "cancellation-evidence",
+              "when": "The actual API, exact exception, modes, backup options and stream lifecycle have not been disclosed, the conversation does not say they are unavailable, and the answer reasonably requests a sufficient reproduction.",
+              "materials": [
+                "disclosure/cancellation.py",
+                "disclosure/cancellation-events.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "PA-P01",
+          "kind": "plan",
+          "goal": "界定用户块恢复和持久文件保证",
+          "prompt": "Plan the supplied in_place recovery boundary and acceptance cases. Distinguish ordinary success/error and requested user-block cancellation cleanup from pre-yield setup failures, hard termination, durability and concurrent writers. Do not implement changes.",
+          "requires": [],
+          "materials": [
+            "materials/recovery-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_with_explicit_boundaries"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PA-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/PA-P01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PA-M01",
+          "kind": "modify",
+          "goal": "修复用户块取消时的原文件恢复",
+          "prompt": "Implement the explicitly authorized user-block cancellation recovery described in the supplied repair requirements. Preserve all existing behavior and original tests, and add meaningful public regression tests in the authorized existing test file. Modify only the two listed files and use dedicated temporary files.",
+          "requires": [],
+          "materials": [
+            "materials/cancellation.py",
+            "materials/repair.md"
+          ],
+          "allowed_paths": [
+            "library/path/__init__.py",
+            "library/tests/test_path.py"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PA-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/PA-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

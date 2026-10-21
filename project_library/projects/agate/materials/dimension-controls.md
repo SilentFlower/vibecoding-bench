@@ -1,0 +1,1 @@
+Complete plan controls: left(key:Text,qty:Number)=(A,2),(A,3),(B,1); right(key:Text,zone:Text)=(A,east),(A,west). Compare the default left join, inner=True and require_match=True, then only matched A facts. This complete planning example is public to AG-P01; AG-D01 receives its own evidence only through its disclosure branch.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PD-C03",
+  "source_commit": "ef6a6427e488e29e827e0e0819f2630ad3ff4cdc",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Picking whole contact also retains its synthetic token and shares that nested mapping, so top-level selection misses the requirement. Picking name and contact.email yields only those declared fields. Deep-path omit(password,contact.token) is already supported and deep-clones for the nested removal, preserving the original, but an omission policy must still consider future unknown fields. Prefer an explicit nested whitelist for this declared output.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

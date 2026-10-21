@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "JV-C03",
+  "source_commit": "c497561ea0a95f5aac09cd63d15eb1420eb7bbec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "For the original successful allOf schemas, root unevaluatedProperties:false with 2020-12 accepts name/age and rejects debug. Draft7 ignores this unsupported keyword, so pin/select the actual dialect rather than assuming an explicit Draft7Validator honors the schema URI. Repeating root properties is another scoped compatibility option; do not promise a generic schema merge.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

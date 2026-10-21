@@ -1,0 +1,1 @@
+The actual candidate command python -m mistune -r ast -m "# 咖啡" reaches an assertion that the renderer result is a string. The Python API can return structured tokens. The application needs local JSON for an editor/indexer; propose a compatible API-based export without claiming that the existing CLI already serializes AST JSON or delivering an unauthorized CLI feature.

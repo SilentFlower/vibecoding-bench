@@ -1,0 +1,1 @@
+../deepdiff/docstrings/exclude_paths.rst

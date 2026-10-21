@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IC-P01",
+  "source_commit": "05af3e95b0080162813bb017de90966bc75f3b91",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "First emits prefixesA1,A2,A-fixed; second emitsB twice. A callable prefix is evaluated per emission, and configuring one explicit debugger instance does not reconfigure the other. Own collectors/instances per component and derive any call-time label from an explicitly supplied context contract. Do not mutate module-global output settings during unrelated requests or infer arbitrary concurrent/context propagation guarantees from this sequential test.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,24 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CK-M01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "basic_notes_in_order": true,
+    "usage_notes_in_order": true,
+    "exit_codes_preserved": true,
+    "unnoted_output_preserved": true,
+    "format_message_unchanged": true,
+    "explicit_stream_and_color_preserved": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

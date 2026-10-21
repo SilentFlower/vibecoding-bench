@@ -1,0 +1,262 @@
+{
+  "schema": 2,
+  "project_key": "rich",
+  "title": "Rich终端报表工作场景",
+  "category": "终端展示与诊断",
+  "description": "固定源码上的字面字段、纯文本、Unicode布局、捕获取证、多制品生命周期和异常摘要七项独立只读任务。",
+  "seed_digest": "eae9db9c2541512a919b70b138b2be13b712012efc6916fff34e7708eede6e74",
+  "environment": "rich-py312",
+  "source": {
+    "repository": "https://github.com/Textualize/rich",
+    "commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "RH-S01",
+      "title": "客户字段与终端样式",
+      "goal": "按字段和输出目的地明确格式解释",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "RH-C01",
+            "RH-U01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "RH-C01",
+          "kind": "consult",
+          "goal": "让客户字段按字面显示并保留可信前缀样式",
+          "prompt": "Meet the complete invoice-description requirement with existing APIs. Compare actual default, literal and escaped mixed-markup output and define who owns formatting. Do not modify files or claim bracket escaping strips every possible terminal control.",
+          "requires": [],
+          "materials": [
+            "materials/literal-fields.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/RH-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/RH-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "RH-U01",
+          "kind": "understand",
+          "goal": "区分关闭颜色和完全不输出终端控制序列",
+          "prompt": "Trace all three complete terminal-output controls and answer the plain-text parser requirement. Explain automatic/deliberate terminal behavior without assuming real TTY or environment settings beyond those supplied.",
+          "requires": [],
+          "materials": [
+            "materials/terminal-output.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/RH-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/RH-U01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "RH-S02",
+      "title": "窄屏报表与原始标识",
+      "goal": "区分显示宽度、裁剪产物和规范数据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "RH-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "RH-C02",
+          "kind": "consult",
+          "goal": "分离窄屏展示宽度和完整业务标识",
+          "prompt": "Recommend a current-API layout/artifact policy for the complete Unicode and cropped-ID examples. Give actual width/wrapping and explain what record/export can recover. No implementation or source-data changes are requested.",
+          "requires": [],
+          "materials": [
+            "materials/narrow-report.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/RH-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/RH-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "RH-S03",
+      "title": "捕获、取证与多制品导出",
+      "goal": "明确局部捕获和共享记录生命周期",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "RH-U02",
+            "RH-D01",
+            "RH-P01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "RH-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "RH-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "RH-U02",
+          "kind": "understand",
+          "goal": "解释局部capture和record缓冲的不同用途",
+          "prompt": "Trace the complete capture experiment, including destination output and the later export attempt. Explain which value to use for a local assertion and what record=False does. Do not modify files.",
+          "requires": [],
+          "materials": [
+            "materials/capture.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/RH-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/RH-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "RH-D01",
+          "kind": "diagnose",
+          "goal": "先取导出顺序和clear参数再定位缺失内容",
+          "prompt": "Investigate the supplied missing-HTML-content symptom. Request Console settings and the exact render/export order and clear arguments before attributing a cause. Diagnose disclosed facts only or close with an evidence plan if unavailable. No file changes are authorized.",
+          "requires": [],
+          "materials": [
+            "materials/artifact-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/RH-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "export-sequence",
+              "when": "Console settings, render/export sequence and clear arguments have not been supplied or declared unavailable, and the answer reasonably requests sufficient evidence.",
+              "materials": [
+                "disclosure/exports.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "RH-P01",
+          "kind": "plan",
+          "goal": "规划一次渲染供多个制品共享的缓冲生命周期",
+          "prompt": "Plan the complete text-plus-HTML requirement using current record/export APIs. Define when to retain and clear, escaping and rendering limits, and normal/negative controls. Do not implement an exporter or write files.",
+          "requires": [],
+          "materials": [
+            "materials/multiple-artifacts.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/RH-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/RH-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "RH-S04",
+      "title": "支持诊断摘要",
+      "goal": "保留有用错误信息并定义外发字段政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "RH-P02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "RH-P02",
+          "kind": "plan",
+          "goal": "规划有明确字段政策的外发异常摘要",
+          "prompt": "Plan the supplied support-diagnostic requirement with existing traceback capabilities. Explain what show_locals=False proves, what still appears and which application-owned filtering/tests are needed. Do not read real logs, send messages, change files or claim a sanitizer has run.",
+          "requires": [],
+          "materials": [
+            "materials/diagnostic-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/RH-P02.rubric.json",
+            "semantic": true,
+            "native": "verification/RH-P02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

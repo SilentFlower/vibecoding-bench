@@ -1,0 +1,1 @@
+A regional report grew in row count and amount after joining a dimension table. Actual left/right rows, join arguments and expected key cardinalities have not been supplied. Investigate before assigning a cause.

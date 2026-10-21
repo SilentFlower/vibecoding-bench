@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CH-D01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "duplicate_header_last_value": true,
+    "decimal_numeric_output_not_exact": true
+  },
+  "resource_profile": "business"
+}

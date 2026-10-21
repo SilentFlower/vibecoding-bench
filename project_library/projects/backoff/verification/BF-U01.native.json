@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BF-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "max_tries_counts_initial_call_and_giveup_policy_controls_result": true
+  },
+  "resource_profile": "business"
+}

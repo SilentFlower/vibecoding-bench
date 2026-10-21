@@ -1,0 +1,1 @@
+An operator expected records with a hit in either of two columns, but fewer rows were exported. The exact command, selected columns, pattern mode and input rows have not been provided. Investigate before choosing a cause.

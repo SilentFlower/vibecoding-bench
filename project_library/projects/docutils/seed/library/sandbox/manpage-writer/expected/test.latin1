@@ -1,0 +1,289 @@
+[4mrst2man[24m(1)                      text processing                     [4mrst2man[24m(1)
+
+[1mName[0m
+       rst2man - generate unix manpages from reStructured text
+
+[1mSYNOPSIS[0m
+       [1mrst2man --help[0m
+
+       [1mrst2man [22m[ OPTIONS ] [ SOURCE [ [4mdestination[24m ] ]
+
+[1mDESCRIPTION[0m
+       Run it and examine output.
+
+[1mOPTIONS[0m
+       [1m-o [4m[22mx[24m   an option
+
+       [1m-b     [22manother
+
+       [1m-f[22m, [1m--force[0m
+              really do it
+
+       For all other options see [1m--help[22m.
+
+[1mEXAMPLES[0m
+       [1mrst2man.py xml-schema-catalog.rst xml-schema-catalog.man[0m
+              create a manpage from xml-schema-catalog.rst
+
+   [1mCharacter formatting[0m
+       [4mBUG[24m The section title should be separated from the title above.
+
+       Test [1mbold [22mor [1mstrong [22mformatting.
+
+       Special characters:
+
+       · backslash: \
+
+       · hyphen: -
+
+       · accents: ´ `
+
+       · quotes: ' "
+
+       .period ad line start.
+
+   [1mLists[0m
+       · bullet list
+
+       · and  a  longer  entry,  and a longer entry, and a longer entry, and a
+         longer entry, and a longer entry, and a longer entry,  and  a  longer
+         entry, and a longer entry,
+
+         1.  and a nested
+
+         2.  enumeration
+
+           · some line
+
+           · bullets
+
+         3.  a third
+
+         4.  a third
+
+         5.  a third
+
+           a. alphabetically list
+
+           b. betacarotin
+
+           c. grammar
+
+         6.  a third
+
+           Y. the end
+
+           Z. yellow
+
+         7.  a third
+
+         8.  a third
+
+         9.  a third
+
+         10. bigger  indentation  if there are more than nine enumerated items
+             (or there are larger numbers)
+
+             a second paragraph that should be separated from the previous one
+             and not flowing into.
+
+       7. dont start with 1
+
+       9. dont increment by 1
+
+       13. Problematic: indentation does not match for nonconsecutive entries.
+
+       This paragraph must not be indented with the text the  last  list-item,
+       but start at the left margin of the numbers.
+
+       a  second  paragraph that should be separated from the previous one and
+       not flowing into.
+
+   [1mDefinition Lists[0m
+       [1mTerm   [22mDefinition
+
+       [1mTerm (classifier)[0m
+              Definition paragraph 1.
+
+              Definition paragraph 2.
+
+       [1m.ini-files[0m
+              Term starting with period.
+
+       [1mTerm   [22mDefinition
+
+   [1mField lists[0m
+       [1mfirst  [22ma short label and a short text
+
+       [1msecondly a longer label[0m
+              and some more text and some more text and some more  text    and
+              some more text
+
+       [1mdefinition lists[0m
+              are also a valuable option and simple nonintrusive formatting
+
+       [1mdefinition too :[0m
+              with the colon.
+
+   [1mDoctest Blocks[0m
+       >>> print 'Python-specific usage examples; begun with ">>>"'
+       Python-specific usage examples; begun with ">>>"
+       >>> print '(cut and pasted from interactive Python sessions)'
+       (cut and pasted from interactive Python sessions)
+
+   [1mTables[0m
+                            +-----------------+-------+
+                            | single          | frame |
+                            +-----------------+-------+
+                            | no table header |       |
+                            +-----------------+-------+
+
+   [1mlineblock[0m
+       paul
+       tel. 12345
+       LA
+
+
+       A  paragraph  following  the line block.  lorem ipsum lorem ipsum lorem
+       ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
+
+   [1mLiteral[0m
+       some literal text
+
+          here now it starts
+          and continues
+            indented
+          and back
+
+       and a paragraph after the literal.
+
+       some special characters and roff formatting in literal:
+
+          .SS "." at line start
+          backslash "\"
+
+   [1mLine blocks[0m
+       This is a line block.  It ends with a blank line.
+         Each new line begins with a vertical bar ("|").
+         Line breaks and initial indents are preserved.
+       Continuation lines are wrapped portions of long lines;
+       they begin with a space in place of the vertical bar.
+         The left edge of a continuation line need not be aligned with
+         the left edge of the text above it.
+
+       This is a second line block.
+
+       Blank lines are permitted internally, but they must begin with a "|".
+
+
+       Take it away, Eric the Orchestra Leader!
+          A one, two, a one two three four
+
+          Half a bee, philosophically,
+            must, [4mipso[24m [4mfacto[24m, half not be.
+          But half the bee has got to be,
+            [4mvis[24m [4ma[24m [4mvis[24m its entity.  D'you see?
+
+          But can a bee be said to be
+            or not to be an entire bee,
+              when half the bee is not a bee,
+                due to some ancient injury?
+
+          Singing...
+
+
+   [1mraw[0m
+       raw input to man
+
+   [1mAdmonitions[0m
+       [1mAttention!:[0m
+          Directives at large.
+
+       [1mCaution!:[0m
+          Don't take any wooden nickels.
+
+       [1m!DANGER!:[0m
+          Mad scientist at work!
+
+       [1mError:[0m
+          Does not compute.
+
+       [1mHint:[0m
+          It's bigger than a bread box.
+
+       [1mImportant:[0m
+
+          · Wash behind your ears.
+
+          · Clean up your room.
+
+          · Call your mother.
+
+          · Back up your data.
+
+       [1mNote:[0m
+          This is a note.
+
+       [1mTip:[0m
+          15% if the service is good.
+
+       [1mWarning:[0m
+          Strong prose may provoke extreme mental exertion.  Reader discretion
+          is strongly advised.
+
+          And, by the way...
+
+                 You can make up your own admonition too.
+
+                 With more than one paragraph.
+
+       Text after the admonition.
+
+   [1mother[0m
+       inline references [4mref[24m [4msomething[24m .  Contained verbose. Nothing special.
+
+[1mTop Section[0m
+       With mixed case
+
+[1mTop section b c d e f g[0m
+       with character formatting.
+
+[1mFILES[0m
+       This is a file.
+
+[1mSEE ALSO[0m
+       docutils <http://docutils.sourceforge.net>
+
+       [1mrst2xml[22m(dummy)
+
+       More information can be found about
+
+       · xml-schema-catalog at <http://xml-schema-catalog.origo.ethz.ch/>
+
+       And see the stars at the sky!
+
+[1mBUGS[0m
+       Numerous mapping problems.
+
+       1. Where do we get the manual section number from ? Commandline ?
+
+       2. docutils authors should be filled into section "AUTHORS".
+
+       3. be carefull with linebreaks in generated code.
+
+       4. list items.  bullets and enumerators.
+
+[1mAuthor[0m
+       grubert@users.sourceforge.net
+
+       Organization: humankind
+
+       Address:
+          123 Example Street
+          Example, EX  Canada
+          A1B 2C3
+
+[1mCopyright[0m
+       public domain Behave responsible.
+
+0.0.1                             2009-06-22                        [4mrst2man[24m(1)

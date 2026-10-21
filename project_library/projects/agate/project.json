@@ -1,0 +1,311 @@
+{
+  "schema": 2,
+  "project_key": "agate",
+  "title": "Agate数据分析工作场景",
+  "category": "类型化表格与分析",
+  "description": "真实编号保真、有限推断、计算阶段、维表取证和测量完整率九项独立只读任务。",
+  "seed_digest": "7a4bd0306e3cfb1e669fa928b7cd293938cba41b07db8637c2bc1a0a3d0d110b",
+  "environment": "agate-py312",
+  "source": {
+    "repository": "https://github.com/wireservice/agate",
+    "commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+    "license_files": [
+      "seed/library/COPYING"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "AG-S01",
+      "title": "编号与导入schema",
+      "goal": "按业务含义决定类型、空值和推断样本",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AG-U01",
+            "AG-C01",
+            "AG-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AG-U01",
+          "kind": "understand",
+          "goal": "追踪编号和空值在推断后的真实类型",
+          "prompt": "Trace the supplied CSV under default type inference. Report exact first-row identifier, amount and note values/types and explain why this may violate the business meaning. Do not modify files.",
+          "requires": [],
+          "materials": [
+            "materials/input.csv",
+            "materials/types.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AG-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/AG-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "AG-C01",
+          "kind": "consult",
+          "goal": "用已有列类型保留外部编号和字面NA",
+          "prompt": "Recommend the supplied exact-ID/literal-note import policy with current APIs while keeping amount numeric. Give preservation controls and distinguish absent None from literal null tokens. No implementation is authorized.",
+          "requires": [],
+          "materials": [
+            "materials/input.csv",
+            "materials/types.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AG-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/AG-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "AG-U02",
+          "kind": "understand",
+          "goal": "解释有限推断样本的后续转换和内存边界",
+          "prompt": "Trace both complete sampling reproductions and full inference. State actual failure/source consumption and whether the inference limit guarantees streaming or whole-file schema compatibility. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/sampling.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AG-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/AG-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AG-S02",
+      "title": "不可变派生表与计算",
+      "goal": "明确新表所有权和跨列计算阶段",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AG-U03",
+            "AG-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AG-U03",
+          "kind": "understand",
+          "goal": "解释筛选排序如何产生新表",
+          "prompt": "Trace the complete typed-order filtering/sorting example. Report derivative row order and original state, distinguishing table immutability from a claim of zero allocation or streaming. No changes are requested.",
+          "requires": [],
+          "materials": [
+            "materials/derivatives.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AG-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/AG-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "AG-C02",
+          "kind": "consult",
+          "goal": "为有依赖的新列选择明确计算阶段",
+          "prompt": "Recommend current compute/Formula usage for double then plus. Compare the simultaneous attempt with two stages and identify which input table each callback receives. Do not implement or add a new library feature.",
+          "requires": [],
+          "materials": [
+            "materials/derivatives.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AG-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/AG-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AG-S03",
+      "title": "维表匹配取证与准入",
+      "goal": "按真实连接语义检查一对一关系和数量守恒",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AG-D01",
+            "AG-P01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "AG-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "AG-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AG-D01",
+          "kind": "diagnose",
+          "goal": "先取左右表和匹配参数再解释报表放大",
+          "prompt": "Investigate the supplied enrichment symptom. Request sufficient actual rows, join arguments and expected key cardinality before choosing a cause. Diagnose disclosed evidence only or close with an evidence plan if unavailable. Do not change code/data.",
+          "requires": [],
+          "materials": [
+            "materials/join-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AG-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "join-evidence",
+              "when": "The actual tables/cardinalities and join arguments have not been supplied or declared unavailable, and the answer reasonably requests sufficient evidence.",
+              "materials": [
+                "disclosure/join.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "AG-P01",
+          "kind": "plan",
+          "goal": "规划一对一维表准入和连接后守恒检查",
+          "prompt": "Plan the complete one-approved-dimension-match requirement with existing APIs. Explain duplicate/missing controls, require_match limits and post-join count/quantity checks. Do not implement or invent transactions/unique constraints.",
+          "requires": [],
+          "materials": [
+            "materials/join-policy.md",
+            "materials/dimension-controls.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AG-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/AG-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AG-S04",
+      "title": "区域金额与测量完整率",
+      "goal": "同时报告金额、行数和有效测量数",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AG-U04",
+            "AG-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AG-U04",
+          "kind": "understand",
+          "goal": "区分区域金额、行数和非空测量数",
+          "prompt": "Trace the supplied total and grouped aggregations. Give actual row/non-null/null counts and regional values; explain each result rather than inferring completeness from a sum. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/totals.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AG-U04.rubric.json",
+            "semantic": true,
+            "native": "verification/AG-U04.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "AG-C03",
+          "kind": "consult",
+          "goal": "避免把全缺失金额误报为真实零值",
+          "prompt": "Recommend a current-API completeness policy for the complete all-null versus all-zero comparison. State exact existing sums/counts and a report representation that preserves the distinction. No implementation is requested.",
+          "requires": [],
+          "materials": [
+            "materials/totals.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AG-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/AG-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

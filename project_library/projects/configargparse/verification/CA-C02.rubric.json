@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CA-C02",
+  "source_commit": "3ab2f323abcdd321b6c423f9eb6304ce35681307",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "type=bool calls Python truthiness on a nonempty false string and yieldsTrue. Existing store_true action with environment support recognizes false asFalse and true asTrue, rejects maybe, and explicit CLI --enabled overrides false env. Select the real action or an explicitly strict application parser according to the required CLI shape, not a library repair or bool-string assumption.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,1 @@
+The importer requires exactly one approved dimension match per fact row and no unmatched fact keys. Counts and additive quantities must not change after enrichment. Plan checks using current Table APIs and explicit cardinality policy, including normal, duplicate and missing-key controls. No implementation or database exists.

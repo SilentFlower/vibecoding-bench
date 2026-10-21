@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AG-U01",
+  "source_commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The numeric-looking code001 becomes Decimal1, amount2.50 is Decimal, and NA becomes None under default null tokens. Type inference cannot know identifier or literal-note business meaning; this is not automatic lossless raw-text preservation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

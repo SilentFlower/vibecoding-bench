@@ -1,0 +1,130 @@
+{
+  "project": "icecream",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "05af3e95b0080162813bb017de90966bc75f3b91",
+  "source_file_count": 25,
+  "license_files": [
+    "seed/library/LICENSE.txt"
+  ],
+  "scenarios": 3,
+  "unique_tasks": 5,
+  "modify_tasks": 0,
+  "non_modify_tasks": 5,
+  "native_baseline": {
+    "project": "icecream",
+    "attempt": 2,
+    "result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/icecream/result.json",
+    "result_sha256": "24a6e48110bd2cdd545c2de1de462710d3416e8b107c764cd5ebf003a7630869",
+    "main_collected": 65,
+    "counts": {
+      "passed": 65,
+      "failed": 0,
+      "error": 0,
+      "skipped": 0,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "subtest_count": 0,
+    "xml_testcases": 65,
+    "xml_skipped": 0,
+    "runner_sha256": "158bd0fd313e6f3fd645a01b4af10e150a08bd24fdcf828cf87ba08420e545db",
+    "contract_sha256": "5e4275072330fd88449507ece8a415c92c1441615c45773a723958cb1371a50f",
+    "business": {
+      "timeout_sec": 30,
+      "memory_mb": 256,
+      "pids_limit": 64
+    },
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "当前镜像实际完整默认集合；未运行多平台、lint或额外慢测试矩阵，不代表业务或模型完成"
+  },
+  "verified_unique_native_cases": 5,
+  "native_evidence": [
+    {
+      "case": "original-IC-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/icecream/attempt-001/original-IC-C01.json",
+      "sha256": "3dc4f1a0b663a2d9957362a6b7fc89fc542514d00b02e7dfa9b762096fe3823b",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-IC-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/icecream/attempt-001/original-IC-C02.json",
+      "sha256": "e641560d951157218f42e5df55b7f38cf2c7a51f8494ef11b476836571a7827d",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-IC-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/icecream/attempt-001/original-IC-P01.json",
+      "sha256": "cc9c78577f730214c31e7bc396b03f55c8e541cf240dd871f2feb21b1d385b4b",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-IC-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/icecream/attempt-001/original-IC-U01.json",
+      "sha256": "a81ff3c39ddf9896234abd450251c463ef0424947014004608c58e7a335cdb8a",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-IC-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-01/business/icecream/attempt-001/original-IC-U02.json",
+      "sha256": "806c167d040d85d62b31be10609f12464ce8f6e31bc7c30cd4697d8484a3fea8",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-01/business/icecream/attempt-001/summary.json",
+      "sha256": "3aa8a967451965a884a5e8607076b01ff33de6eb71aaab3cd27397ea90174b7a",
+      "passed": true
+    }
+  ],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v13-en",
+  "formal_digest": "7a04cc49ca91c40fcff5f512da6bfaa2e3d557d75c6465e0aad4c71c07ce53f4",
+  "full_delivery_files": 11374,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-015/run-001/evidence/result.json",
+      "sha256": "216de35bbe1b753cddec396d767767658e1fafc23536bfccb0d1ca482e8b7586"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-015/run-001/cleanup.json",
+      "sha256": "87d18c890ac429b5110fa998b302c73083ed1fde9a65823638ce73d587ddc2f0"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/mock-batch-015-audit.json",
+      "sha256": "780c54139f950f581bb1e34fb9a6e0e79d14677f18619bffb1f40ee0cad5f04a"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-015/browser/run-001/diagnostics/result.json",
+      "sha256": "3d76c864a0c9dedca094d4e6f02107a296281ba8417b0fca147d8de22ced3b72"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/delivery-first-thirty.json",
+      "sha256": "6c4a82417194061ecf39ab4f6ca8cc18e012fc769d611db6dbe8e155af375c18"
+    }
+  ]
+}

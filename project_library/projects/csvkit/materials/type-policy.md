@@ -1,0 +1,1 @@
+Use csvsort -c amount -y 0 on sort.csv. Compare default inference, -I --blanks, and --no-leading-zeroes --blanks. Amount must sort numerically while id keeps leading zeros and note NA remains literal text. Explain which flags meet this complete policy and when all-text sorting changes the order. No files may be changed.

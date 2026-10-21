@@ -1,0 +1,203 @@
+{
+  "project": "boltons",
+  "stage": "formal_registered_local_verified",
+  "cases": 15,
+  "all_expectations_met": true,
+  "reference_changed_paths": [
+    "library/boltons/iterutils.py",
+    "library/tests/test_iterutils.py"
+  ],
+  "regression": {
+    "collected": 678,
+    "counts": {
+      "passed": 678,
+      "failed": 0,
+      "error": 0,
+      "skipped": 0,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "doctests": 153,
+    "subtests": 12,
+    "collection_matches_contract": true,
+    "subtests_match_contract": true
+  },
+  "public_tests": {
+    "original": {
+      "candidate_import": true,
+      "public_tests_passed": false,
+      "counts": {
+        "tests": 2,
+        "failed": 2,
+        "errors": 0,
+        "skipped": 0
+      },
+      "failures": [
+        {
+          "test": "test_redundant_grouped_records_use_zero_length_callable",
+          "message": "TypeError: unhashable type: 'dict'"
+        },
+        {
+          "test": "test_redundant_uses_falsey_callable_business_key",
+          "message": "AssertionError: assert [] == ['a', 'b']\n  \n  Right contains 2 more items, first extra item: 'a'\n  Use -v to get more diff"
+        }
+      ]
+    },
+    "reference": {
+      "candidate_import": true,
+      "public_tests_passed": true,
+      "counts": {
+        "tests": 2,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "failures": []
+    }
+  },
+  "wrong_candidate_actual": {
+    "candidate_import": true,
+    "falsey_callable_respected": true,
+    "falsey_group_mode_preserved": false,
+    "zero_length_callable_handles_records": true,
+    "none_default_preserved": true,
+    "invalid_and_key_errors_preserved": true
+  },
+  "formal_catalog_modified": true,
+  "real_model_calls": 0,
+  "pending": [],
+  "evidence": [
+    {
+      "case": "original-BO-C01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/original-BO-C01.json",
+      "sha256": "f297ac9b91d36bc017697e21e6b9140f0bc44cc1d5638e5c7037b5aa0ed6459b"
+    },
+    {
+      "case": "original-BO-C02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/original-BO-C02.json",
+      "sha256": "1ee98e7329b5ac9beea961e67e8feceb917d2ec7788394546043521750fa9e75"
+    },
+    {
+      "case": "original-BO-D01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/original-BO-D01.json",
+      "sha256": "a680f9d9e5977f533084ef67e9b242eeb8833a2ae6922af9e23c42001d5c6f78"
+    },
+    {
+      "case": "original-BO-M01",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/original-BO-M01.json",
+      "sha256": "31aa8dd6802065fa3079ebaa83a373bef8ff10d09e07a18197d7886a94d1fb89"
+    },
+    {
+      "case": "original-BO-P01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/original-BO-P01.json",
+      "sha256": "39da63e2748bef1693c59c39eb6ca9fe863e7dbf07044b183547654212620fae"
+    },
+    {
+      "case": "original-BO-P02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/original-BO-P02.json",
+      "sha256": "7bd8e9c2daa3fca9110a73c0a24ef6e416c34b33bf5eb28e4560249e91a21d91"
+    },
+    {
+      "case": "original-BO-U01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/original-BO-U01.json",
+      "sha256": "3df60eff14d631dd829b27cae8222dabbfe63e62db7274ae894760d91b7f14c7"
+    },
+    {
+      "case": "original-BO-U02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/original-BO-U02.json",
+      "sha256": "09ccbc8a1f285dccbc33ea95d2717f78f1eee3cefb98f153253b2a441669fbe2"
+    },
+    {
+      "case": "original-BO-U03",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/original-BO-U03.json",
+      "sha256": "9602992c757f247d0c48756cfa78fece9d4df941f8ffcd1168410eb4d35da5db"
+    },
+    {
+      "case": "original-BO-U04",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/original-BO-U04.json",
+      "sha256": "b57a3180132076f6c146c2fdd4aed595d39e6032b7d2d299092aa960b78bd252"
+    },
+    {
+      "case": "public-tests-original",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/public-tests-original.json",
+      "sha256": "1505a2e20b0e0e09f111d2a78174123c2588298d85e39663d0c2a5fef3c73a21"
+    },
+    {
+      "case": "public-tests-reference",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/public-tests-reference.json",
+      "sha256": "8045120b5909885509a3e39590aae065ba8f27e91f116105223acd3c6abc91d4"
+    },
+    {
+      "case": "reference-BO-M01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/reference-BO-M01.json",
+      "sha256": "463ca8f725681917d08073bda05adee1781122ee78c718320787f0fff7be0655"
+    },
+    {
+      "case": "reference-full-regression",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/reference-full-regression.json",
+      "sha256": "b955986b3d3d2cd3c0278e5eb19c0c52db6518b2c726714a80e4ae95a8d9dde3"
+    },
+    {
+      "case": "wrong-boltons-ungrouped-only",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/boltons/attempt-001/wrong-boltons-ungrouped-only.json",
+      "sha256": "57af76789231433f6264cb8907e2d4858a0a97b05153cf6a2e99de91fb6cb870"
+    }
+  ],
+  "mock_status": "passed",
+  "formal_version": "real-project-scenarios-v6-en",
+  "formal_digest": "93c4087afd28ae9315a7ac6975767974c720b8e4f10b5e5ad7de0d41252bb56a",
+  "full_delivery_files": 4018,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-004/run-001/evidence/result.json",
+      "sha256": "30e84ec3ed13f4803d47fc4948639eff2f426344c255743c02519aa92c1e8fd3"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-004/run-001/cleanup.json",
+      "sha256": "2f822f36a4601220b4dbe293ba85fb88d501ebf6d46341846384ab48d0727a11"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-004/audit-attempt-001.json",
+      "sha256": "51b4e46c9ab2582162a8dcb75b47c8181c45c8164809526adb6234077e89c6ac"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-004/browser/run-001/diagnostics/result.json",
+      "sha256": "d647d5b56093cacce6bd48499083228cb19c9008334463ca4172cbd5f36d35f5"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/delivery-first-eight.json",
+      "sha256": "a4f1da5d4141757840ca5f40fa9bbaa0e65e5901a39889f61f33aeb3a8b18e7e"
+    }
+  ]
+}

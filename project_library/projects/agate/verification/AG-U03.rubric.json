@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AG-U03",
+  "source_commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The derivative order is C,A; original rows remain A,B,C and original columns remain order,amount. where/order_by return new tables rather than mutating source; immutable table semantics do not promise deep copying every Python object, zero extra memory or lazy streaming.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

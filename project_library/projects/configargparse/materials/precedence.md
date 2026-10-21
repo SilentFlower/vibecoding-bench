@@ -1,0 +1,1 @@
+For each comparison construct a fresh ArgumentParser(add_help=False), add --workers with type=int,default=1,env_var=APP_WORKERS. Compare CLI4/env3/config workers=2; then noCLI/env3/config2; then noCLI/noenv/config2; then noCLI/noenv/emptyconfig. Pass explicit args,env_vars and config_file_contents instead of reading real process inputs.

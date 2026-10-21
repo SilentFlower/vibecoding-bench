@@ -1,0 +1,1 @@
+For the supplied synthetic VB_CASE_LIST value, preserve the literal #, backslash and empty field under standard CSV quoting. Keep existing default Csv behavior for other callers. Assess whether an existing callable cast can meet this need with the Python standard csv module, and explain malformed-quote policy. Do not modify files.

@@ -1,0 +1,1 @@
+Compare{price:10}with{price:10.0},using default policy and ignore_numeric_type_changes=True. Then compare10with10.5 using that flag. Explain representational type differences versus actual price changes; the business has not specified currency precision or tolerance. No implementation or arbitrary rounding is authorized.

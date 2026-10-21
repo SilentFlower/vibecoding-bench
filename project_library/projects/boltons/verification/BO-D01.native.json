@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BO-D01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "original_falsey_key_ignored": true,
+    "ordinary_duplicate_semantics": true
+  },
+  "resource_profile": "business"
+}

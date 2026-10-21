@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MS-D01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "original_empty_dispatch_gap": true,
+    "api_empty_document_valid": true
+  },
+  "resource_profile": "business"
+}

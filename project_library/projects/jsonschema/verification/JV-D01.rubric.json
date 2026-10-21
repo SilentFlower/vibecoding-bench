@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "JV-D01",
+  "source_commit": "c497561ea0a95f5aac09cd63d15eb1420eb7bbec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Initially request sufficient actual schema/value and constructor/checker evidence; acceptance alone does not prove a library bug. Explain only the disclosed call and a compatible current-API remedy, or use insufficient_information when the call cannot be supplied. Do not assume a missing checker or claim an observed format failure before disclosure.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

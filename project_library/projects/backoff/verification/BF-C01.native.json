@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BF-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "runtime_wait_uses_response_and_jitter_none_preserves_retry_after": true
+  },
+  "resource_profile": "business"
+}

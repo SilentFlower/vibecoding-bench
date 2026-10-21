@@ -1,0 +1,496 @@
+{
+  "baseline_digest": "17b0dd8776fa9161d1dbeaa387c79d8a99a15ff63300e83ee6a47949d72a30d8",
+  "nodes": [
+    {
+      "id": "tests/tabular_output/test_delimited_output_adapter.py::test_csv_noheader_wrapper",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_delimited_output_adapter.py::test_csv_wrapper",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_delimited_output_adapter.py::test_unicode_with_csv",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_json_output_adapter.py::test_decimal_with_jsonl",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_json_output_adapter.py::test_jsonl_wrapper",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_json_output_adapter.py::test_null_with_jsonl",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_json_output_adapter.py::test_unicode_with_jsonl",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_json_output_adapter.py::test_unicode_with_jsonl_esc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_additional_preprocessors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_all_text_type[extra_kwargs0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_all_text_type[extra_kwargs1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_all_text_type[extra_kwargs2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_enforce_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_format_name_attribute",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_get_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_headless_tabulate_format",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_provide_column_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_supported_json_formats",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_tabular_format_output_wrapper",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_tabular_output_escaped",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_tabular_output_formatter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_tabular_output_mysql",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_tabular_output_mysql_unicode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_tabulate_ansi_escape_in_default_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_output_formatter.py::test_unsupported_format",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_align_decimals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_align_decimals_empty_result",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_align_decimals_non_decimals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_bytes_to_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_convert_to_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_convert_to_undecoded_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_enforce_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_format_decimal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_format_float",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_format_integer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_format_integer_only",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_format_numbers_no_column_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_format_numbers_no_format_strings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_format_timestamps",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_override_missing_value_with_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_override_missing_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_override_tab_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_quote_whitespaces",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_quote_whitespaces_empty_result",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_quote_whitespaces_non_spaces",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_style_output",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_style_output_custom_tokens",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_style_output_no_pygments",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_style_output_no_styles",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_preprocessors.py::test_style_output_with_newlines",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_tabulate_adapter.py::test_markup_format",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_tabulate_adapter.py::test_style_output_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_tabulate_adapter.py::test_tabulate_wrapper",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_tsv_output_adapter.py::test_tsv_headerless_wrapper",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_tsv_output_adapter.py::test_tsv_wrapper",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_tsv_output_adapter.py::test_unicode_with_tsv",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_vertical_table_adapter.py::test_vertical_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_vertical_table_adapter.py::test_vertical_table_customized",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_vertical_table_adapter.py::test_vertical_table_header_display_width[headers0-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_vertical_table_adapter.py::test_vertical_table_header_display_width[headers1-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_vertical_table_adapter.py::test_vertical_table_header_display_width[headers2-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tabular_output/test_vertical_table_adapter.py::test_vertical_table_styled_header_display_width",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli_helpers.py::test_cli_helpers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_config_reading_configspec",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_config_reading_configspec_with_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_config_reading_default_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_config_reading_default_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_config_reading_no_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_config_reading_raise_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_config_user_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_mac_system_config_dirs_no_xdg",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_config.py::test_mac_user_config_dir_no_xdg",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_config.py::test_overwrite_default_config_from_configspec",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_read_invalid_config_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_sys_config_dirs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_user_config_dir",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_windows_user_config_dir_no_roaming",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_config.py::test_write_and_read_default_config",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_write_and_read_default_config_from_configspec",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_write_to_outfile",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_write_to_user_config",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_bytes_to_string_decode_bytes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_bytes_to_string_hexlify",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_bytes_to_string_non_bytes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_bytes_to_string_unprintable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_filter_dict_by_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_intlen_with_decimal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_intlen_without_decimal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_to_string_bytes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_to_string_non_bytes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_truncate_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_version_as_tuple_01",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_version_as_tuple_02",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_version_as_tuple_03",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_version_as_tuple_04",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_version_as_tuple_05",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "cli-helpers",
+  "python": "3.12.15",
+  "schema": 1
+}

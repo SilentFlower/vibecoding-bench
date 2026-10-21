@@ -1,0 +1,323 @@
+{
+  "schema": 2,
+  "project_key": "configobj",
+  "title": "ConfigObj应用配置工作场景",
+  "category": "配置校验与编辑",
+  "description": "固定真实源码上的类型默认、启动校验取证、注释输出和配置组合九项独立只读任务。",
+  "seed_digest": "c823142bc315c320f62465ead1eb062e63eaa3d64548f21487b35ad3ac27e108",
+  "environment": "configobj-py312",
+  "source": {
+    "repository": "https://github.com/DiffSK/configobj",
+    "commit": "b7707c94c0317b8f89b704a01525a68eb6c72521",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CO-S01",
+      "title": "类型转换与默认发布",
+      "goal": "使用现有校验和copy选项生成有效配置",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CO-U01",
+            "CO-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CO-U01",
+          "kind": "understand",
+          "goal": "解释configspec的真实类型转换与默认插入",
+          "prompt": "Trace validation of the supplied service configuration. Give actual Python types/values for port, enabled and missing workers, and explain whether validation merely reports or also mutates successful values. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/service.ini",
+            "materials/service.configspec",
+            "materials/default-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CO-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/CO-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CO-C01",
+          "kind": "consult",
+          "goal": "用已有copy选项把默认写入生成配置",
+          "prompt": "Explain why a readable default workers value may be absent from write() output and whether the supplied generated-output requirement needs a library patch. Compare ordinary validate and copy=True with actual defaults state. No files may be changed.",
+          "requires": [],
+          "materials": [
+            "materials/service.ini",
+            "materials/service.configspec",
+            "materials/default-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CO-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/CO-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CO-S02",
+      "title": "应用启动校验取证",
+      "goal": "按真实材料处理错误、真值和额外键策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CO-D01",
+            "CO-U02",
+            "CO-P01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "CO-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "CO-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CO-D01",
+          "kind": "diagnose",
+          "goal": "先取配置和校验调用再判断启动失败",
+          "prompt": "Investigate the supplied startup-validation symptom. Request actual configuration, configspec, validator setup and validation call/result or an equivalent reproduction. Diagnose disclosed evidence only, and report the evidence limit if unavailable. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/startup-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CO-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "validation-evidence",
+              "when": "The actual configuration, configspec, validator setup and validation call/result have not been disclosed, the conversation does not say they are unavailable, and the answer reasonably requests a sufficient reproduction.",
+              "materials": [
+                "disclosure/invalid.ini",
+                "disclosure/service.configspec",
+                "disclosure/startup-events.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "CO-U02",
+          "kind": "understand",
+          "goal": "解释嵌套校验错误、缺失值与真值陷阱",
+          "prompt": "Trace the supplied invalid configuration using preserve_errors=True and flatten_errors. Explain exact section/key paths, the difference between missing values and present invalid values, and why if result is an unsafe success test. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/invalid.ini",
+            "materials/service.configspec",
+            "materials/error-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CO-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/CO-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CO-P01",
+          "kind": "plan",
+          "goal": "规划完整校验和额外键拒绝后再发布",
+          "prompt": "Plan the supplied startup publication and unknown-key policy using real ConfigObj APIs. Include mutated validated values/defaults, explicit success checks, extra-key timing and structured diagnostics. No implementation is authorized.",
+          "requires": [],
+          "materials": [
+            "materials/startup-policy.md",
+            "materials/service.ini",
+            "materials/service.configspec",
+            "materials/error-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CO-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/CO-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CO-S03",
+      "title": "注释和Unicode编辑输出",
+      "goal": "明确已有写出接口和文本保真范围",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CO-U03",
+            "CO-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CO-U03",
+          "kind": "understand",
+          "goal": "解释保留注释的内存配置编辑输出",
+          "prompt": "Trace the supplied in-memory limit edit with explicit UTF-8. Explain which comments and Unicode survive, the return shape/types of write() without a filename, and how reparsing the returned content confirms the changed value. Do not edit project files.",
+          "requires": [],
+          "materials": [
+            "materials/edit.ini",
+            "materials/edit-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CO-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/CO-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CO-C02",
+          "kind": "consult",
+          "goal": "选择已有输出接口并明确文本保真边界",
+          "prompt": "Advise how to use the supplied edited configuration in memory or a binary output target with current APIs. Distinguish preserved comments/logical values from a promise of arbitrary byte-identical formatting. No library change or project-file edit is requested.",
+          "requires": [],
+          "materials": [
+            "materials/edit.ini",
+            "materials/edit-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CO-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/CO-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CO-S04",
+      "title": "配置层组合与插值",
+      "goal": "区分递归覆盖、列表替换和动态读取",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CO-U04",
+            "CO-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CO-U04",
+          "kind": "understand",
+          "goal": "解释配置层递归覆盖和列表替换",
+          "prompt": "Trace merge for the supplied base/override dictionaries. Give retained host, resulting port and labels, and clarify whether list values are recursively appended. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/merge.json",
+            "materials/composition-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CO-U04.rubric.json",
+            "semantic": true,
+            "native": "verification/CO-U04.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CO-C03",
+          "kind": "consult",
+          "goal": "区分读取时插值和保存原始配置表达式",
+          "prompt": "Explain the supplied interpolation reads before/after changing base in memory and the subsequent write output. Does an initial read permanently replace the expression? Recommend an explicit application snapshot boundary without changing files.",
+          "requires": [],
+          "materials": [
+            "materials/interpolation.ini",
+            "materials/composition-events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CO-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/CO-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

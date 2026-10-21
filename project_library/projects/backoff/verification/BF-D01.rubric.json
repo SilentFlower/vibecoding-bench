@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BF-D01",
+  "source_commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The symptom alone cannot establish suppression, target return semantics or exhaustion. Request sufficient actual evidence, then distinguish only disclosed behavior from hypotheses and recommend a compatible caller/giveup policy; insufficient_information is valid when unavailable.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

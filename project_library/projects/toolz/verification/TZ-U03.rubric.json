@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TZ-U03",
+  "source_commit": "451af60dec590a6010e2babdbf391ea8f815122f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Toolz groupby eagerly consumes the full source and groups both east records together despite west between them, preserving original items within lists. The result is east=[qty1,qty3],west=[qty2]; it is not a lazy consecutive-run grouper and retains grouped records.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

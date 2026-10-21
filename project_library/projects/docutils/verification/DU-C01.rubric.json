@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DU-C01",
+  "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "publish_parts returns text parts; choose the intended fragment rather than a full HTML document. publish_string with utf-8 returns bytes, while output_encoding=unicode returns str. Preserve Unicode and let the outer page/HTTP boundary encode once; rendered parts and text are not interchangeable with already encoded bytes.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

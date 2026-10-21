@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AG-U02",
+  "source_commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "limit1 guesses Number from2 then raises CastError on later oops; full inference selects Text and retains both strings. TypeTester-backed Table construction materializes all source rows before inference, so the three-row generator is fully pulled despite limit1. Sampling bounds inference work only, not table memory or later casting guarantees.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PE-C01",
+  "source_commit": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The explicit one_shot_view.list() first traversal consumes the source and a second cannot recover the header, raising FieldSelectionError. Builtin list(view) can already exhaust a one-shot source via the inherited __len__ before its actual traversal. Existing view.list() or list(iter(view)) avoids that outer length hint, but does not make the source replayable. Use a replayable source or an explicit size/storage-bounded snapshot; do not promise automatic caching or stable data against source changes.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,763 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "cachetools",
+      "source_commit": "6f23e2a7b75a42d30cb9d890ab3ca4059ee01bfd",
+      "original_git_files": 44,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "a10206d792d5c38cb77868d3d8a1696f98d327297255af9229b4f8c9c8b56c99",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/cachetools/result.json",
+      "native_result_sha256": "02383cbf675c88b061e60f4ce95d8b033619167e4a0d1e518db363206b21cc8c",
+      "main_collected": 366,
+      "counts": {
+        "passed": 366,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 8,
+      "contract_sha256": "8c73ed2858f13baeed704ba68b720f9fcd03b33cbb0afe01c3fd61553803b84f",
+      "status": "passed"
+    },
+    {
+      "project": "xmltodict",
+      "source_commit": "6e29fba282e68631034dd2722a413b4e35276584",
+      "original_git_files": 22,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "5dc9aaf807cafb8686febeccd3c0060625fc02399bdee243fdd193688a43e31e",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/xmltodict/result.json",
+      "native_result_sha256": "378d7efbcbc7c8e1caf4114f49c5411a13a07ff10840ea73966301ac8afff931",
+      "main_collected": 134,
+      "counts": {
+        "passed": 134,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "0c94f4133afc0b032320b91664a1121ce9d385a23a4718b301b816141a7cf0cf",
+      "status": "passed"
+    },
+    {
+      "project": "tabulate",
+      "source_commit": "268615a5c27dc40e5c22454c07b44d5c50410da0",
+      "original_git_files": 26,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "4ce5388303eaa424eb79a24a8192753e249476998b165c8ca4c85d6aff9c3283",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/tabulate/result.json",
+      "native_result_sha256": "db280f972fc8959c1ff618f261956b664e52efbb98dc2693c4784b1851be481b",
+      "main_collected": 383,
+      "counts": {
+        "passed": 366,
+        "failed": 0,
+        "error": 0,
+        "skipped": 17,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "14da9e7badc51dc5b97923963cdf5dadf1cf67cb1629e670888727d1a7c31131",
+      "status": "passed"
+    },
+    {
+      "project": "python-decouple",
+      "source_commit": "0573e6f96637f08fb4cb85e0552f0622d36827d4",
+      "original_git_files": 30,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "9730cb73d823a3b25c05c104fc2fe89b83d4e313a02dbeb2d1b75302c076f24a",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/python-decouple/result.json",
+      "native_result_sha256": "fc58245b37a5ca0ecf0b11d473ca454f7a4b7691616bb26205bd7565e1e1cb17",
+      "main_collected": 67,
+      "counts": {
+        "passed": 67,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "500fd72d7946926239d236f805cf3c5e39fd567ea0f6bf07e11d769d3e2dcd2f",
+      "status": "passed"
+    },
+    {
+      "project": "click",
+      "source_commit": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+      "original_git_files": 178,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE.txt"
+      ],
+      "source_proof_sha256": "65e8308345b4732b5961b5ea7bc3dd64c51ccbe35a47b25f10478b2c0512dbac",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-004/click/result.json",
+      "native_result_sha256": "611355f04902af1e5f9f2cd98261f1473530e2df263b0d57a3d4257fe74526de",
+      "main_collected": 2287,
+      "counts": {
+        "passed": 2262,
+        "failed": 0,
+        "error": 0,
+        "skipped": 24,
+        "xfailed": 1,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "eec3bacad62df82a9f6620499d61ef9a4a225260c0a5090595623523b41e81f6",
+      "status": "passed"
+    },
+    {
+      "project": "cli-helpers",
+      "source_commit": "e2538b1d338ead4ed803ec0017017bf6779a380b",
+      "original_git_files": 59,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "b934208a6281699d6ab7358b694c7daed51f7ee11ba73f87597bc34d5df11f67",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/cli-helpers/result.json",
+      "native_result_sha256": "79351868ee590aef8011de5c1b22e771aa8e32e8ee889a920c3090dd369e0e0f",
+      "main_collected": 96,
+      "counts": {
+        "passed": 92,
+        "failed": 0,
+        "error": 0,
+        "skipped": 4,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "be5cd6e20ede594b0f91777536a32161dca02b9fb608f3f89b761a6176c34078",
+      "status": "passed"
+    },
+    {
+      "project": "mistune",
+      "source_commit": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+      "original_git_files": 148,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "14eabca3800f1077856dce0e79b110eb55c7fb0ab1e2d311a29bd700530d244e",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/mistune/result.json",
+      "native_result_sha256": "3c800e5f67adec213f8a10c8079d523da7e3eb2095355d7cc01403d409bd6c2a",
+      "main_collected": 1324,
+      "counts": {
+        "passed": 1324,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 158,
+      "contract_sha256": "a1a8ee25f23981b1108e70ff07f1911320ea23138b138e94d871b1090ff26a79",
+      "status": "passed"
+    },
+    {
+      "project": "boltons",
+      "source_commit": "4e5faa3d7e4008d89e0d8bf1ea87b6d9a061a16d",
+      "original_git_files": 113,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "86397d6c88c27eed224d9bc4ab15264e989a9115fb5285283397b0c6f8ea909e",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-003/boltons/result.json",
+      "native_result_sha256": "b6dd4a95b028c6621d50f47014c66849935673dd2d68beb15cbf090f1e2298eb",
+      "main_collected": 678,
+      "counts": {
+        "passed": 678,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 12,
+      "contract_sha256": "8cb12634c60c51ca76609b55966ef3fe2a95ae492b270840407f9c7f548309e4",
+      "status": "passed"
+    },
+    {
+      "project": "more-itertools",
+      "source_commit": "4aeb4338ae1407d8da9723e86da99efeb446f719",
+      "original_git_files": 39,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "a2742a6450685126d517f1cb343ffc571c26b33a7a640c95e7c7b983d4019109",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-003/more-itertools/result.json",
+      "native_result_sha256": "3be0fcd69b3091ba8f921e2dd63026c388e45dd22478749e7635af7a8cd313b3",
+      "main_collected": 765,
+      "counts": {
+        "passed": 765,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 21194,
+      "contract_sha256": "8f1ee3d1cbc3aa7fedee10808b2e97a4a4e208339f04dd83b9d8359aa7895c48",
+      "status": "passed"
+    },
+    {
+      "project": "configobj",
+      "source_commit": "b7707c94c0317b8f89b704a01525a68eb6c72521",
+      "original_git_files": 33,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "a9ca4eccaf5ff9df478daeafce7de213b5913d61acb8d9bfd82b308d790e0b93",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/configobj/result.json",
+      "native_result_sha256": "ba5344fb179f213a5a2c398fff02ecc0d8753e6ae4b852e1fd0a0a7857c0f0ef",
+      "main_collected": 79,
+      "counts": {
+        "passed": 79,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "fde546679e75e0d7e6171d85749aa1b41594cae8f0e10dfb2249dbbc9e89ff65",
+      "status": "passed"
+    },
+    {
+      "project": "dataset",
+      "source_commit": "db592cc041014762bba55fd544e982170831f227",
+      "original_git_files": 37,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "92c9acaaa83cad1152982ba4259c2450e38855f2d1fc402667a497724233547e",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/dataset/result.json",
+      "native_result_sha256": "22be10d0ccf9206c0b207883a0fb985fc9e2151f0eab2e5b10bd97cdeed710ae",
+      "main_collected": 61,
+      "counts": {
+        "passed": 61,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "5b354198567f183faf9f1531771c216abcf4d6cf5350e39e36bf56d292ad8ad0",
+      "status": "passed"
+    },
+    {
+      "project": "python-markdown",
+      "source_commit": "b41e0aaf1181f1a8cb200cf5a815aad7c0020d23",
+      "original_git_files": 473,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE.md"
+      ],
+      "source_proof_sha256": "b5f5f79e00eb9adca92ccb1f98efecf8fb7d4a95c8750f0405cc5ecf18f2876a",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/python-markdown/result.json",
+      "native_result_sha256": "ef10672663511993c782fd2394e16203ca9a501db499b4f4597e0bd1e7f94f7c",
+      "main_collected": 1129,
+      "counts": {
+        "passed": 1019,
+        "failed": 0,
+        "error": 0,
+        "skipped": 110,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "65e0b86b4512adaa1b4618bed2cd0fe17f99707f93917df0c6382eae9981e202",
+      "status": "passed"
+    },
+    {
+      "project": "markdown-it-py",
+      "source_commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+      "original_git_files": 181,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE.markdown-it",
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "9b5b31962766d179ad1bee7aad24daa744a980911c8a687fecd06b9db5d64420",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/markdown-it-py/result.json",
+      "native_result_sha256": "10b4a65b99c6bfb3b53481981f739b9721a84c1f74120ea2d4197db25bcbecff",
+      "main_collected": 1032,
+      "counts": {
+        "passed": 1032,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "fe6f71df3244dbe36e70c1da30e6039bdd4e03187f9e8fa250a3f672b708c76f",
+      "status": "passed"
+    },
+    {
+      "project": "path",
+      "source_commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+      "original_git_files": 32,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/app/licenses/LICENSE.path.build.txt"
+      ],
+      "source_proof_sha256": "186be8195d5d04abac400056d713f5e92caafa919f6c91bbd352f9c1399931f4",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/path/result.json",
+      "native_result_sha256": "bfe36decb966881564664f17a9a6eaba6168dd86a0d0b5f2914a444228135cf5",
+      "main_collected": 143,
+      "counts": {
+        "passed": 142,
+        "failed": 0,
+        "error": 0,
+        "skipped": 1,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "a9f7549ed59eb2b776baf8cf508b1adb846651fdff59353b64975e9376052c72",
+      "status": "passed"
+    },
+    {
+      "project": "petl",
+      "source_commit": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+      "original_git_files": 239,
+      "generated_library_files": 1,
+      "license_files": [
+        "seed/library/LICENSE.txt"
+      ],
+      "source_proof_sha256": "af30abc8edf163a9bfbcce2edb4ce06334cec41210f9edf3455b20c74e27e9c0",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/petl/result.json",
+      "native_result_sha256": "6c6e94d9d8d96736b54009234027e9324294e231705ade0f52818566d631e663",
+      "main_collected": 923,
+      "counts": {
+        "passed": 912,
+        "failed": 0,
+        "error": 0,
+        "skipped": 11,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "d26d0fa53fef214e7381fe67bb0f7159f8e6e1fe063856e5c3de0d0f9723264b",
+      "status": "passed"
+    },
+    {
+      "project": "toolz",
+      "source_commit": "451af60dec590a6010e2babdbf391ea8f815122f",
+      "original_git_files": 81,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE.txt"
+      ],
+      "source_proof_sha256": "60b3765332bb6fde6acda13962f2097c1e2da7835be90abb596d62054f1c7c98",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-003/toolz/result.json",
+      "native_result_sha256": "9f58e4edf3f641efeb91cb785b309fcf8ea81894577e83e1e90babd3ff68f36a",
+      "main_collected": 193,
+      "counts": {
+        "passed": 192,
+        "failed": 0,
+        "error": 0,
+        "skipped": 1,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "51dbfadc3c3110a9a5c792b0dcfd4ee7bd2a00cb121c90632fe73b0b6bc815c4",
+      "status": "passed"
+    },
+    {
+      "project": "jsonschema",
+      "source_commit": "c497561ea0a95f5aac09cd63d15eb1420eb7bbec",
+      "original_git_files": 627,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/COPYING"
+      ],
+      "source_proof_sha256": "d1af1b7a511009c3347c4efb845d3db649854176293dc5c8d66f3acabb1cd095",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/jsonschema/result.json",
+      "native_result_sha256": "2a92c3e1e271c83392268335d4e9e43cb98969e60be279566806ebde1986b5c2",
+      "main_collected": 8529,
+      "counts": {
+        "passed": 8297,
+        "failed": 0,
+        "error": 0,
+        "skipped": 232,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "a1be1163cdcc0203fd6df5b3f58681a8148c46ff081fa8178b4359042126b631",
+      "status": "passed"
+    },
+    {
+      "project": "docutils",
+      "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+      "original_git_files": 2970,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/docutils/COPYING.rst",
+        "seed/library/docutils/licenses/BSD-0-Clause.rst",
+        "seed/library/docutils/licenses/BSD-2-Clause.rst",
+        "seed/library/docutils/licenses/gpl-3-0.txt"
+      ],
+      "source_proof_sha256": "228c9f4584cbcebafe4bddb98a751499afe9bfddeb8c349c2dc122d2fc856918",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/docutils/result.json",
+      "native_result_sha256": "6cd4ef8d9aff8b980e22092c478b0d41edb33434109cec6e6035014c4438cba5",
+      "main_collected": 459,
+      "counts": {
+        "passed": 457,
+        "failed": 0,
+        "error": 0,
+        "skipped": 2,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 1776,
+      "contract_sha256": "43f83211084d3e0c7176915b2f1c0d3c6d5c2fe028f777eea0924688e75742c0",
+      "status": "passed"
+    },
+    {
+      "project": "agate",
+      "source_commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+      "original_git_files": 250,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/COPYING"
+      ],
+      "source_proof_sha256": "497c794d0252ad2319914344a73bd15f16c4603fd18306706eff81ebb0cd77f8",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/agate/result.json",
+      "native_result_sha256": "686dd1cf18c93d2112c995ba7b46c4b4c107ddefe328d95ee3e603b4cc70c94a",
+      "main_collected": 396,
+      "counts": {
+        "passed": 396,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "28597d92d2c9d69a414b972251211a46d909d069f97dc3bee8f1977fa244a8b8",
+      "status": "passed"
+    },
+    {
+      "project": "csvkit",
+      "source_commit": "6d19c625214977ab2988e674441ca24638bc12d3",
+      "original_git_files": 211,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/COPYING"
+      ],
+      "source_proof_sha256": "5712d503bbc3570af4ceaee94a5581e015cad9374c6eaca9533f37221e6f31c7",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/csvkit/result.json",
+      "native_result_sha256": "6b42b9212020931dc6ff73e8e66e4a299adda7394d224ac62223d3c805746a21",
+      "main_collected": 355,
+      "counts": {
+        "passed": 351,
+        "failed": 0,
+        "error": 0,
+        "skipped": 4,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 31,
+      "contract_sha256": "bc854473f35bba8bc48266c9a4c088ecbaa981432043729fe461fb29b04bbbb9",
+      "status": "passed"
+    },
+    {
+      "project": "python-box",
+      "source_commit": "a4c10e977b574114613431394b30412b50aaacce",
+      "original_git_files": 51,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "8eb4f049204504c1b3eddc9a07ad6c3e49d580ff77b16ee18fd1864b52d46e5f",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/python-box/result.json",
+      "native_result_sha256": "1a96869f4bedd87763cc0cae226f0acc0aa684797c2c36423b3b1fb93fddb10d",
+      "main_collected": 159,
+      "counts": {
+        "passed": 159,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "f841460201fcb82f2bea8d9766debb342f8bc57031771992c6fc531cf34af9f0",
+      "status": "passed"
+    },
+    {
+      "project": "rich",
+      "source_commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+      "original_git_files": 553,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "15d42993c9173e710e022bdb3025ad5803a183fa686321181e059ac09421c64a",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/rich/result.json",
+      "native_result_sha256": "f9d996600681f60cda12814f30bfeacde24c7d19cca660ba77014c0696758259",
+      "main_collected": 981,
+      "counts": {
+        "passed": 956,
+        "failed": 0,
+        "error": 0,
+        "skipped": 25,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "e4982d3cc5295b93eea99952c77588fc39851d7434910e8b693301cf4ff0d32f",
+      "status": "passed"
+    },
+    {
+      "project": "pydash",
+      "source_commit": "ef6a6427e488e29e827e0e0819f2630ad3ff4cdc",
+      "original_git_files": 78,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE.rst"
+      ],
+      "source_proof_sha256": "0f6d7236890e4583d4f8ee3e29778a530adf8e482641c0d2d78555fcdcf82be0",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/pydash/result.json",
+      "native_result_sha256": "5364c86f280df4f5e9cfb9c5e11f3d41ab614707052a364256844d1a2e5a2293",
+      "main_collected": 2880,
+      "counts": {
+        "passed": 2880,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "3ddf60e69cc9b6d783b58e7a2708e96cb6f0f1249d5897300f8fc9928609ac30",
+      "status": "passed"
+    },
+    {
+      "project": "configargparse",
+      "source_commit": "3ab2f323abcdd321b6c423f9eb6304ce35681307",
+      "original_git_files": 17,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "e63de6b73c00f4f55abfb51126b47605fc34cbde0bd1ed225f3298206fbf570b",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/configargparse/result.json",
+      "native_result_sha256": "b57b59afc2eabc8b24606484d1a6de811a7943681fdbb6ccc4ba8a8bbb61f206",
+      "main_collected": 169,
+      "counts": {
+        "passed": 164,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 5,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 225,
+      "contract_sha256": "6f76224aec985484812b02df8058cf6cc8b6189f8b1eb06ad84387281ca96af4",
+      "status": "passed"
+    },
+    {
+      "project": "backoff",
+      "source_commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+      "original_git_files": 28,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "3c014e2b31f511c9d8a0acafe44cd0a077e28e1159bc76e4c022c61e72d55296",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/backoff/result.json",
+      "native_result_sha256": "9a17ded5387e36cbb7ec7a5339ac580727dea59bdc759f0bca64e90364b36c61",
+      "main_collected": 123,
+      "counts": {
+        "passed": 123,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "487f0a38d2d1d8d2e55fccbe38887169dd6edf97bf6df2887f332f57014e8137",
+      "status": "passed"
+    },
+    {
+      "project": "bottle",
+      "source_commit": "8ec5fe29420d14998c0d86885083983eaea8b839",
+      "original_git_files": 220,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "6bcfeba518c02f5d22b0be8756d7c73a81a40b8efe4aed937a2840fe9ef1315f",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/bottle/result.json",
+      "native_result_sha256": "3c337db6d38b7dad49e5e8106c75a5293ecf61568d2f6923ad61bf24402d85e9",
+      "main_collected": 382,
+      "counts": {
+        "passed": 382,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "9b9ec75f6c8c0dbe8bd2591cdfc40a05ec8b466ead36b1f3b025c3765f9cd403",
+      "status": "passed"
+    },
+    {
+      "project": "deepdiff",
+      "source_commit": "79e4379278b1cfdd8e9e3dccac364956908e8989",
+      "original_git_files": 183,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "46ae2e7ce0ac8cc79e0cb71d6d0f179d4a9bd1e230239e6bd096677c2fae4c0b",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-004/deepdiff/result.json",
+      "native_result_sha256": "d77396322555e8d66be29eedbc70190a23f176dd2e6d22f583acbc039613077e",
+      "main_collected": 1308,
+      "counts": {
+        "passed": 1264,
+        "failed": 0,
+        "error": 0,
+        "skipped": 44,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "1084cf3553d0f3e1dcf648229bd8d1ca3734c2b0c40f43f01ee40d5cfd90955c",
+      "status": "passed"
+    },
+    {
+      "project": "cerberus",
+      "source_commit": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+      "original_git_files": 65,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE"
+      ],
+      "source_proof_sha256": "3cb5946e818fb4465914d16a89340a66bfaa5af48b1e7d699ccce5b263122531",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/cerberus/result.json",
+      "native_result_sha256": "ebb10a322d0cc790b27dcdbc39f57714c57827f14001912b2dec87be65638d38",
+      "main_collected": 247,
+      "counts": {
+        "passed": 246,
+        "failed": 0,
+        "error": 0,
+        "skipped": 1,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "c460f3e19340b15e1a35901c57bbfb0b5a686382f9358203df1777b2886978f7",
+      "status": "passed"
+    },
+    {
+      "project": "icecream",
+      "source_commit": "05af3e95b0080162813bb017de90966bc75f3b91",
+      "original_git_files": 25,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE.txt"
+      ],
+      "source_proof_sha256": "da3efd9ca471c29945bc977f72495e66be6d20fb722e02b75fa4ce9204a54a11",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/icecream/result.json",
+      "native_result_sha256": "24a6e48110bd2cdd545c2de1de462710d3416e8b107c764cd5ebf003a7630869",
+      "main_collected": 65,
+      "counts": {
+        "passed": 65,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "5e4275072330fd88449507ece8a415c92c1441615c45773a723958cb1371a50f",
+      "status": "passed"
+    },
+    {
+      "project": "dpath",
+      "source_commit": "15759d96a006fef5278de731cd263b4d839094c3",
+      "original_git_files": 34,
+      "generated_library_files": 0,
+      "license_files": [
+        "seed/library/LICENSE.txt"
+      ],
+      "source_proof_sha256": "f2f700b1bc35810fc476793052cbb01f35ccbc172568104058a4e967d415927c",
+      "native_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/dpath/result.json",
+      "native_result_sha256": "b29b00dd516d656ee7c6dae4e451005fbe83c360b95fd45f03dfb6a8842d6659",
+      "main_collected": 79,
+      "counts": {
+        "passed": 79,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "subtests": 0,
+      "contract_sha256": "acd6ce531f415ebd795051acf3b3422e4e78b0abd90a0045d50e499fd68a0148",
+      "status": "passed"
+    }
+  ],
+  "errors": [],
+  "scope": "固定三十仓完整Git字节／执行位、许可存在及实际原生原件一致；不代替业务／mock／正式准入",
+  "real_model_calls": 0,
+  "production_touched": false
+}

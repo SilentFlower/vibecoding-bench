@@ -1,0 +1,285 @@
+{
+  "schema": 2,
+  "project_key": "pydash",
+  "title": "Pydash数据对象工作场景",
+  "category": "深路径与对象变换",
+  "description": "固定真实源码上的缺失协议、字面键、预览隔离、合并取证和嵌套公开字段八项独立只读任务。",
+  "seed_digest": "4963290dd6c841d0bb1e1cbad68d1231d045dc515d9402d75b11839df27e5c37",
+  "environment": "pydash-py312",
+  "source": {
+    "repository": "https://github.com/dgilland/pydash",
+    "commit": "ef6a6427e488e29e827e0e0819f2630ad3ff4cdc",
+    "license_files": [
+      "seed/library/LICENSE.rst"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PD-S01",
+      "title": "外部字段与缺失协议",
+      "goal": "区分存在性、假值和字面路径",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PD-U01",
+            "PD-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PD-U01",
+          "kind": "understand",
+          "goal": "区分缺失字段和已存在的空值零值",
+          "prompt": "Trace the complete sentinel/has lookup controls and give exact identity/existence results. Explain why falsey fallback syntax would answer a different business question. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/lookups.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PD-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/PD-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PD-C01",
+          "kind": "consult",
+          "goal": "为含点的外部字段选择明确路径表示",
+          "prompt": "Recommend an existing path representation for the complete literal-dot field example. Compare both actual results and preserve the external schema without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/lookups.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PD-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/PD-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PD-S02",
+      "title": "补丁预览与对象所有权",
+      "goal": "明确路径结构、原地更新和基线隔离",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PD-U02",
+            "PD-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PD-U02",
+          "kind": "understand",
+          "goal": "解释路径更新的原地副作用和列表创建",
+          "prompt": "Trace the complete two set_ controls, exact shapes and returned identities. Explain bracket-index versus dotted-numeric syntax using the pinned implementation. Do not change project files.",
+          "requires": [],
+          "materials": [
+            "materials/updates.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PD-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/PD-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PD-P01",
+          "kind": "plan",
+          "goal": "规划隔离基线的声明式补丁预览",
+          "prompt": "Plan the complete preview isolation/path-acceptance requirement with current APIs. Identify baseline ownership, a normal copied update and rejection/resource controls. Do not execute untrusted paths or implement a service.",
+          "requires": [],
+          "materials": [
+            "materials/updates.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PD-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/PD-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PD-S03",
+      "title": "合并政策与串扰取证",
+      "goal": "核目标副作用、源复制和列表自定义",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PD-U03",
+            "PD-C02",
+            "PD-D01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "PD-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "PD-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PD-U03",
+          "kind": "understand",
+          "goal": "追踪合并目标、源复制和列表索引",
+          "prompt": "Trace the complete merge reproduction including returned identity, list contents and source after the later result edit. Do not transfer assumptions from other merge libraries or modify files.",
+          "requires": [],
+          "materials": [
+            "materials/merge.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PD-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/PD-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PD-C02",
+          "kind": "consult",
+          "goal": "为标签合并选择已有回调语义",
+          "prompt": "Meet the complete list-concatenation requirement with current merge_with. Explain actual callback arguments, None delegation and the explicit zero control without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/merge.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PD-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/PD-C02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PD-D01",
+          "kind": "diagnose",
+          "goal": "先取对象身份和调用时序再定位预览串扰",
+          "prompt": "Investigate the supplied preview-interference symptom. Request actual construction, merge calls, object identities and order before choosing a cause. Diagnose disclosed evidence only, or close with an evidence plan when unavailable. Do not modify files.",
+          "requires": [],
+          "materials": [
+            "materials/alias-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PD-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "identity-evidence",
+              "when": "The actual construction, calls, object identities and order have not been supplied or declared unavailable, and the answer reasonably requests sufficient evidence.",
+              "materials": [
+                "disclosure/alias.md"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PD-S04",
+      "title": "公开资料投影",
+      "goal": "按明确嵌套白名单生成公开结果",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PD-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PD-C03",
+          "kind": "consult",
+          "goal": "把公开字段白名单落实到嵌套边界",
+          "prompt": "Meet the complete public-profile output requirement using current projection APIs. Compare exact whole-contact/deep-path/omit controls and source ownership; do not claim a generic sanitizer or edit files.",
+          "requires": [],
+          "materials": [
+            "materials/profile.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PD-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/PD-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

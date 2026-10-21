@@ -1,0 +1,131 @@
+{
+  "schema": 1,
+  "id": "configargparse-py312",
+  "adapter": "python-native",
+  "platform": "linux-amd64",
+  "python": "3.12.15",
+  "requirements": [
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==9.1.1",
+    "attrs==26.1.0",
+    "black==26.10.1",
+    "click==8.5.0",
+    "coverage==7.16.2",
+    "mock==5.2.0",
+    "mypy_extensions==1.1.0",
+    "pathspec==1.1.1",
+    "platformdirs==4.13.5",
+    "pytest-cov==7.1.0",
+    "pytest-subtests==0.15.0",
+    "pytokens==0.4.1",
+    "PyYAML==6.0.3",
+    "toml==0.10.2"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+      "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+      "size": 386536
+    },
+    {
+      "path": "artifacts/attrs-26.1.0-py3-none-any.whl",
+      "digest": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+      "size": 67548
+    },
+    {
+      "path": "artifacts/black-26.10.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "b5347d760f0c02bb00dd249384cab71c3bf828b4f68d5b401eb116e0390f147d",
+      "size": 2065235
+    },
+    {
+      "path": "artifacts/click-8.5.0-py3-none-any.whl",
+      "digest": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360",
+      "size": 125251
+    },
+    {
+      "path": "artifacts/coverage-7.16.2-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+      "digest": "5375ebd99038021b35e99dc88255022912c06565d316212f4a576e4b08d30f5d",
+      "size": 258571
+    },
+    {
+      "path": "artifacts/mock-5.2.0-py3-none-any.whl",
+      "digest": "7ba87f72ca0e915175596069dbbcc7c75af7b5e9b9bc107ad6349ede0819982f",
+      "size": 31617
+    },
+    {
+      "path": "artifacts/mypy_extensions-1.1.0-py3-none-any.whl",
+      "digest": "1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505",
+      "size": 4963
+    },
+    {
+      "path": "artifacts/pathspec-1.1.1-py3-none-any.whl",
+      "digest": "a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189",
+      "size": 57328
+    },
+    {
+      "path": "artifacts/platformdirs-4.13.5-py3-none-any.whl",
+      "digest": "53d3ec4280b815c1e0b02edad7f9ee8fda1ba9c0865dd9c2e6e63849ce82fc1e",
+      "size": 32779
+    },
+    {
+      "path": "artifacts/pytest_cov-7.1.0-py3-none-any.whl",
+      "digest": "a0461110b7865f9a271aa1b51e516c9a95de9d696734a2f71e3e78f46e1d4678",
+      "size": 22876
+    },
+    {
+      "path": "artifacts/pytest_subtests-0.15.0-py3-none-any.whl",
+      "digest": "da2d0ce348e1f8d831d5a40d81e3aeac439fec50bd5251cbb7791402696a9493",
+      "size": 9185
+    },
+    {
+      "path": "artifacts/pytokens-0.4.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "24afde1f53d95348b5a0eb19488661147285ca4dd7ed752bbc3e1c6242a304d1",
+      "size": 269779
+    },
+    {
+      "path": "artifacts/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc",
+      "size": 807870
+    },
+    {
+      "path": "artifacts/toml-0.10.2-py2.py3-none-any.whl",
+      "digest": "806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b",
+      "size": 16588
+    }
+  ],
+  "source_commit": "3ab2f323abcdd321b6c423f9eb6304ce35681307",
+  "verification_status": "verified_target_runtime"
+}

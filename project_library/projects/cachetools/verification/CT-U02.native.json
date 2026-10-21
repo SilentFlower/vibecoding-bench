@@ -1,0 +1,17 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CT-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "raw_call_forms_are_distinct": true,
+    "custom_key_normalizes": true,
+    "typed_keys_distinguish": true
+  },
+  "resource_profile": "business"
+}

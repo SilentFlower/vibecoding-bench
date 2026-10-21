@@ -1,0 +1,1 @@
+A documentation build returned output even though a reference looked broken in the browser. The complete reStructuredText, source path, publish API and reporter/exit settings have not been supplied. Investigate before deciding why.

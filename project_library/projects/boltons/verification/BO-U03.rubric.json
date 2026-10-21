@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BO-U03",
+  "source_commit": "4e5faa3d7e4008d89e0d8bf1ea87b6d9a061a16d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explain value is not None retaining 0, False and empty text while dropping None recursively into a new structure. visit True retains an item and False drops it; do not replace this predicate with generic truthiness or claim source mutation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

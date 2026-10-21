@@ -1,0 +1,1 @@
+Plan the two supplied publishing channels, including source trust, enabled extension configuration, one-document state lifecycle, output treatment/allow policy and regression examples. The approved sanitizer and application publication policy are not provided; identify that boundary without inventing a built-in sanitization or safe-mode API. No files may be changed.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TZ-C03",
+  "source_commit": "451af60dec590a6010e2babdbf391ea8f815122f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Existing reduceby with region key, qty accumulator and init0 yields east4,west2 without intermediate lists of original orders. State still scales with distinct keys and accumulator size; unbounded key cardinality may require an explicit window/eviction/external aggregation policy. Do not promise constant memory for arbitrary keys or propose reduceby as missing functionality.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

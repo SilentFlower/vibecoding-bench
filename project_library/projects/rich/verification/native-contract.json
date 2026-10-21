@@ -1,0 +1,4921 @@
+{
+  "baseline_digest": "3dd383836c6859e9765d1e0712170f0f87e9b3961ee816740206e65846aea611",
+  "nodes": [
+    {
+      "id": "test_align.py::test_align_bottom",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_align_center",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_align_center_middle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_align_fit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_align_left",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_align_middle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_align_no_pad",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_align_right",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_align_right_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_align_top",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_align_width",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_bad_align_legal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_measure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_shortcuts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_align.py::test_vertical_center",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_decode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_decode_example",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_decode_issue_2688[Hallo-Hallo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_decode_issue_2688[\\x1b(BHal\\x1b(Jlo-Hallo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_decode_issue_2688[\\x1b(BHallo-Hallo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_decode_issue_2688[\\x1b(JHallo-Hallo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_decode_issue_2688[\\x1b[31mFound 4 errors in 2 files (checked 18 source files)\\x1b(B\\x1b[m\\n-Found 4 errors in 2 files (checked 18 source files)\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_decode_newlines",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[;]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[<]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[=]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ansi.py::test_strip_private_escape_sequences[?]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_bar.py::test_get_pulse_segments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_bar.py::test_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_bar.py::test_measure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_bar.py::test_pulse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_bar.py::test_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_bar.py::test_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_bar.py::test_zero_total",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_block_bar.py::test_measure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_block_bar.py::test_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_block_bar.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_block_bar.py::test_zero_total",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_box.py::test_box_substitute_for_different_box_ascii_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_box.py::test_box_substitute_for_different_box_legacy_windows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_box.py::test_box_substitute_for_same_box",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_box.py::test_get_bottom",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_box.py::test_get_row",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_box.py::test_get_top",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_box.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_box.py::test_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_card.py::test_card_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_cell_len_long_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_cell_len_short_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_chop_cells",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_chop_cells_double_width_boundary",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_chop_cells_mixed_width",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_chop_cells_zero_width[-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_chop_cells_zero_width[\\x1b-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_chop_cells_zero_width[\\x1b\\x1b-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_chop_cells_zero_width[\\x1b\\x1b\\x1b-expected3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_chop_cells_zero_width[\\x1b\\x1b\\x1b\\x1b-expected4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_get_character_cell_size[\\U0001f4a9-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_get_character_cell_size[\\U000e01f0-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_get_character_cell_size[\\u200d-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_get_character_cell_size[\\x00-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_get_character_cell_size[a-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_is_single_cell_widths",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_nerd_font",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_non_printable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_set_cell_size",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_set_cell_size_infinite",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[-expected_spans0-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\U0001f469\\u200d\\U0001f527-expected_spans5-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\U0001f4a9-expected_spans3-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\u200d-expected_spans17-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\u200d\\u200d-expected_spans18-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\u200d\\ufe0f-expected_spans20-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\u267b-expected_spans10-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\u267b\\u267b\\ufe0f-expected_spans12-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\u267b\\ufe0f-expected_spans11-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\u2b07-expected_spans8-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\u2b07\\ufe0f-expected_spans9-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\u308f\\u3055\\u3073-expected_spans4-6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\ufe0f-expected_spans15-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\ufe0f\\ufe0f-expected_spans16-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\x1b-expected_spans13-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\x1b\\ufe0f-expected_spans19-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[\\x1b\\x1b-expected_spans14-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[a-expected_spans1-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[a\\U0001f469\\u200d\\U0001f527-expected_spans6-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[a\\U0001f469\\u200d\\U0001f527b-expected_spans7-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_graphemes[ab-expected_spans2-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[--1--]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[-0--]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[-1--]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f469\\u200d\\U0001f527-0--\\U0001f469\\u200d\\U0001f527]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f469\\u200d\\U0001f527-1- - ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f469\\u200d\\U0001f527-2-\\U0001f469\\u200d\\U0001f527-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f469\\u200d\\U0001f527x-1- - x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f469\\u200d\\U0001f527x-2-\\U0001f469\\u200d\\U0001f527-x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f469\\u200d\\U0001f527x-3-\\U0001f469\\u200d\\U0001f527x-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f4a9-0--\\U0001f4a9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f4a9-1- - ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f4a9-2-\\U0001f4a9-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f4a9\\U0001f4a9-3-\\U0001f4a9 - ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f4a9\\U0001f4a9xxxxxxxxxx-2-\\U0001f4a9-\\U0001f4a9xxxxxxxxxx]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f4a9\\U0001f4a9xxxxxxxxxx-3-\\U0001f4a9 - xxxxxxxxxx]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f4a9\\U0001f4a9xxxxxxxxxx-4-\\U0001f4a9\\U0001f4a9-xxxxxxxxxx]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f4a9x-1- - x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f4a9x-2-\\U0001f4a9-x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[\\U0001f4a9x-3-\\U0001f4a9x-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[a-0--a]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[a-1-a-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[x--1--x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[x-1-x-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[x-2-x-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[xxxxxxxxxxxxxxx\\U0001f4a9\\U0001f4a9-10-xxxxxxxxxx-xxxxx\\U0001f4a9\\U0001f4a9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[xxxxxxxxxxxxxxx\\U0001f4a9\\U0001f4a9-15-xxxxxxxxxxxxxxx-\\U0001f4a9\\U0001f4a9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_split_text[xxxxxxxxxxxxxxx\\U0001f4a9\\U0001f4a9-16-xxxxxxxxxxxxxxx - \\U0001f4a9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_cells.py::test_zwj",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_blend_rgb",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_color_system_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_downgrade",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_from_ansi",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_from_rgb",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_from_triplet",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_get_ansi_codes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_parse_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_parse_rgb_hex",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_parse_success",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_rich",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_system",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_truecolor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color.py::test_windows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color_triplet.py::test_hex",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color_triplet.py::test_normalized",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_color_triplet.py::test_rgb",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_columns.py::test_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_columns_align.py::test_align",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_16color_terminal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_bell",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_brokenpipeerror",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_capture",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_capture_and_record",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_capturing_no_stdout_and_no_stderr_files",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_clear",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_clear_no_terminal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_columns_env",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_console_null_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_console_options_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_console_options_update_height",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_console_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_control",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_detect_color_system",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_dumb_terminal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_export_html",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_export_html_inline",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_export_svg",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_export_svg_specified_unique_id",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_export_text",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_force_color",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_force_color_jupyter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_get_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_get_style_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_get_style_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_get_time",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_height",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_input",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_input_password",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_is_alt_screen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_is_terminal_broken_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_justify_center",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_justify_left",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_justify_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_justify_renderable_center",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_justify_renderable_left",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_justify_renderable_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_justify_renderable_right",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_justify_right",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_kitty_terminal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_lines_env",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_log",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_log_milliseconds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_markup_highlight",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_no_color",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_no_wrap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_out",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_pager",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print_empty_with_end",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print_json",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print_json_data",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print_json_ensure_ascii",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print_json_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print_json_indent_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print_json_with_default_ensure_ascii",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print_multiple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print_newline_start",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print_text",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print_text_multiple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_print_width_zero",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_quiet",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_recording_no_stdout_and_no_stderr_files",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_reenable_highlighting",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_render_broken_renderable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_render_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_render_group",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_render_group_fit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_render_lines_height_minus_vertical_pad_is_negative",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_reset_height",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_save_html",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_save_svg",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_save_text",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_screen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_screen_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_screen_update_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_set_console_title",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_show_cursor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_size",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_size_can_fall_back_to_std_descriptors[False-ValueError-ValueError-ValueError-ValueError-expected_size5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_size_can_fall_back_to_std_descriptors[False-ValueError-ValueError-ValueError-stderr_size4-expected_size4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_size_can_fall_back_to_std_descriptors[False-ValueError-ValueError-stdout_size3-ValueError-expected_size3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_size_can_fall_back_to_std_descriptors[False-ValueError-stdin_size2-ValueError-ValueError-expected_size2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_size_can_fall_back_to_std_descriptors[False-no_descriptor_size1-ValueError-ValueError-ValueError-expected_size1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_size_can_fall_back_to_std_descriptors[True-no_descriptor_size0-ValueError-ValueError-ValueError-expected_size0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_size_properties",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_soft_wrap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_status",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_truecolor_terminal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_tty_compatible",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_tty_interactive",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_unicode_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_update_options_markup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_update_screen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_console.py::test_update_screen_lines",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_constrain.py::test_width_of_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_containers.py::test_lines_justify",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_containers.py::test_lines_rich_console",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_containers.py::test_renderables_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_containers.py::test_renderables_measure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_control.py::test_control",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_control.py::test_control_move",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_control.py::test_control_move_to",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_control.py::test_escape_control_codes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_control.py::test_move_to_column",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_control.py::test_strip_control_codes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_control.py::test_title",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_emoji.py::test_no_emoji",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_emoji.py::test_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_emoji.py::test_replace",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_emoji.py::test_str_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_emoji.py::test_variant",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_emoji.py::test_variant_non_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_file_proxy.py::test_empty_bytes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_file_proxy.py::test_flush",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_file_proxy.py::test_isatty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_file_proxy.py::test_new_lines",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_filesize.py::test_pick_unit_and_suffix",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_filesize.py::test_traditional",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_getfileno.py::test_get_fileno",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_getfileno.py::test_get_fileno_broken",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_getfileno.py::test_get_fileno_missing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[+07-spans13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[+07:00-spans14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[01:45:36-spans22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[01:45:36.123+07:00-spans23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[01:45:36.123+07:00-spans24]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[1721-spans10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[172159+07-spans17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[172159+0700-spans16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[172159-spans11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[17:21-spans9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[17:21:59+07:00-spans15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[2008-08-30 17:21:59-spans18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[2008-08-30+07:00-spans21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[2008-08-30-spans1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[2008-08-30-spans20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[2008-08-30T01:45:36-spans25]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[2008-08-30T01:45:36.123Z-spans26]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[2008-08-spans0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[2008-243-spans3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[2008-W35-6-spans7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[2008-W35-spans5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[20080830 172159-spans19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[20080830-spans2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[2008243-spans4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[2008W35-spans6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[2008W356-spans8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_iso8601_regex[Z-spans12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_json_empty_string_only",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_json_no_indent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_json_string_only",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_json_with_indent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ (-123123-2.1312342342423422e+25j) -spans21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ (123456.4321-1234.5678j) -spans20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ (3+2j) -spans19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ (3.14+2.06j) -spans18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ -spans1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ /foo -spans22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ /foo/bar.html -spans23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ 0xff -spans14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ 1 -spans12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ 1.2 -spans13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ 1e10 -spans15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ 1j -spans16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ 3.14j -spans17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ http://example.org -spans35]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ http://example.org/index.html -spans36]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ http://example.org/index.html#anchor -spans37]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ http://example.org/index.html?param1=value1 -spans39]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ http://example.org/~folder -spans40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ https://example.org -spans34]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[\"\"\"hello\"\"\"-spans47]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[\"\"-spans45]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[\"hello\"-spans46]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex['''hello'''-spans44]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[''-spans42]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex['hello'-spans43]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[( )-spans9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[-spans0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[0-00-1-01-2-02-spans33]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[01-23-45-67-89-AB-spans24]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[01-23-45-FF-FE-67-89-AB-spans25]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[0123.4567.89AB-spans28]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[0123.45FF.FE67.89AB-spans29]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[01:23:45:67:89:AB-spans26]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[01:23:45:FF:FE:67:89:AB-spans27]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[78351748-9b32-4e08-ad3e-7e9ff124d541-spans50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[<Permission.WRITE|READ: 3>-spans8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[<foo: 23>-spans3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[<foo: <bar: 23>>-spans4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[<foo>-spans2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ED-ED-ED-ED-ED-ED-spans31]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[Ed-Ed-Ed-Ed-Ed-Ed-spans32]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[False True None-spans5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[No place like 127.0.0.1-spans41]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[[ ]-spans10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[\\\\'foo'-spans48]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[ed-ed-ed-ed-ed-ed-spans30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[foo=\"bar\"-spans7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[foo=bar-spans6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[https://www.youtube.com/@LinusTechTips-spans38]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[it's no 'string'-spans49]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_highlight_regex[{ }-spans11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_highlighter.py::test_wrong_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_broken_call_attr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_can_handle_special_characters_in_docstrings[\\r-\\\\r]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_can_handle_special_characters_in_docstrings[\\x07-\\\\a]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_can_handle_special_characters_in_docstrings[\\x08-\\\\b]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_can_handle_special_characters_in_docstrings[\\x0b-\\\\v]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_can_handle_special_characters_in_docstrings[\\x0c-\\\\f]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_inspect_builtin_function_except_python311",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_inspect.py::test_inspect_builtin_function_only_python311",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_inspect_coroutine",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_inspect_empty_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_inspect_integer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_inspect_integer_with_methods_python310only",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_inspect.py::test_inspect_integer_with_methods_python311",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_inspect.py::test_inspect_integer_with_methods_python38_and_python39",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_inspect.py::test_inspect_integer_with_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_inspect_module_with_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_inspect_swig_edge_case",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_inspect_text",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_is_one_of_types[Foo-types11-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_is_one_of_types[Foo-types5-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_is_one_of_types[Foo-types7-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_is_one_of_types[Foo-types9-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_is_one_of_types[hi-types0-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_is_one_of_types[hi-types2-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_is_one_of_types[obj10-types10-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_is_one_of_types[obj4-types4-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_is_one_of_types[obj6-types6-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_is_one_of_types[obj8-types8-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_is_one_of_types[str-types1-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_is_one_of_types[str-types3-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_types_mro[Foo-expected_result5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_types_mro[FooSubclass-expected_result7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_types_mro[hi-expected_result2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_types_mro[obj1-expected_result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_types_mro[obj4-expected_result4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_types_mro[obj6-expected_result6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_types_mro[object-expected_result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_types_mro[str-expected_result3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_types_mro_as_strings[Foo-expected_result3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_types_mro_as_strings[FooSubclass-expected_result5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_types_mro_as_strings[hi-expected_result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_types_mro_as_strings[obj2-expected_result2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_types_mro_as_strings[obj4-expected_result4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_object_types_mro_as_strings[str-expected_result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_qualname_in_slots",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_inspect.py::test_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_json.py::test_print_json_data_with_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_jupyter.py::test_jupyter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_jupyter.py::test_jupyter_columns_env",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_jupyter.py::test_jupyter_lines_env",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_layout.py::test_add_split",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_layout.py::test_no_layout",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_layout.py::test_refresh_screen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_layout.py::test_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_layout.py::test_tree",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_layout.py::test_unsplit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live.py::test_growing_display",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live.py::test_growing_display_autorefresh",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live.py::test_growing_display_console_redirect",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live.py::test_growing_display_file_console",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live.py::test_growing_display_overflow_crop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live.py::test_growing_display_overflow_ellipsis",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live.py::test_growing_display_overflow_visible",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live.py::test_growing_display_transient",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live.py::test_live_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live.py::test_live_screen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live.py::test_live_state",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live_render.py::test_position_cursor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live_render.py::test_renderable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live_render.py::test_restore_cursor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_live_render.py::test_rich_console",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_log.py::test_justify",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_log.py::test_log",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_log.py::test_log_caller_frame_info",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_logging.py::test_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_logging.py::test_exception_with_extra_lines",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_logging.py::test_markup_and_highlight",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_logging.py::test_stderr_and_stdout_are_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markdown.py::test_inline_code",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markdown.py::test_inline_code_in_table_cells",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markdown.py::test_inline_styles_in_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markdown.py::test_inline_styles_with_justification",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markdown.py::test_markdown_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markdown.py::test_markdown_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markdown.py::test_partial_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markdown.py::test_table_with_empty_cells",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markdown_no_hyperlinks.py::test_markdown_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_adjoint",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_escape",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_escape_backslash_end",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_escape_escape",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_events",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_events_broken",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_markup_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_markup_escape",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_parse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_parse_link",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_re_match",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_re_no_match",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_render_close",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_render_close_ambiguous",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_render_combine",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_render_escape",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_render_link",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_render_meta",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_render_not_tags",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_markup.py::test_render_overlap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_measure.py::test_clamp",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_measure.py::test_measure_renderables",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_measure.py::test_no_renderable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_measure.py::test_span",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_null_file.py::test_null_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_padding.py::test_expand_false",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_padding.py::test_indent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_padding.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_padding.py::test_rich_console",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_padding.py::test_unpack",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_palette.py::test_rich_cast",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_panel.py::test_console_width",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_panel.py::test_fixed_width",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_panel.py::test_render_panel[panel0-\\u256d\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256e\\n\\u2502Hello, World                                    \\u2502\\n\\u2570\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256f\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_panel.py::test_render_panel[panel1-\\u256d\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256e\\n\\u2502Hello, World\\u2502\\n\\u2570\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256f\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_panel.py::test_render_panel[panel2-\\u256d\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256e\\n\\u2502Hello, World\\u2502\\n\\u2570\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256f\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_panel.py::test_render_panel[panel3-\\u256d\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256e\\n\\u2502Hello,\\u2502\\n\\u2502World \\u2502\\n\\u2570\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256f\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_panel.py::test_render_panel[panel4-\\u256d\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256e\\n\\u2502\\u256d\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256e\\u2502\\n\\u2502\\u2502Hello, World                                  \\u2502\\u2502\\n\\u2502\\u2570\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256f\\u2502\\n\\u2570\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256f\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_panel.py::test_render_panel[panel5-\\u256d\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500 FOO \\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256e\\n\\u2502Hello, World                                    \\u2502\\n\\u2570\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256f\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_panel.py::test_render_panel[panel6-\\u256d\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256e\\n\\u2502Hello, World                                    \\u2502\\n\\u2570\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500 FOO \\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u256f\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_panel.py::test_render_size",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_panel.py::test_title_text",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_panel.py::test_title_text_with_border_color",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_panel.py::test_title_text_with_panel_background",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pick.py::test_pick_bool",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_ansi_in_pretty_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_array",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_attrs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_attrs_broken",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_pretty.py::test_attrs_broken_310",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_attrs_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_broken_getattr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_broken_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_dataclass_no_attribute",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_defaultdict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_deque",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_empty_dataclass",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_empty_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_indent_lines",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_install",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_install_max_depth",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_ipy_display_hook__console_renderables_on_newline",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_ipy_display_hook__multiple_special_reprs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_ipy_display_hook__no_special_repr_methods",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_ipy_display_hook__repr_html",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_ipy_display_hook__special_repr_raises_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_lying_attribute",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_max_depth",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_max_depth_attrs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_max_depth_dataclass",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_max_depth_rich_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_measure_pretty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_newline",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_node",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_pprint",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_pprint_max_items",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_pprint_max_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_pprint_max_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_pretty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_pretty_dataclass",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_pretty_namedtuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_pretty_namedtuple_custom_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_pretty_namedtuple_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_pretty_namedtuple_fields_invalid_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_pretty_namedtuple_length_one_no_trailing_comma",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_pretty_namedtuple_max_depth",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_reference_cycle_attrs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_reference_cycle_container",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_reference_cycle_custom_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_reference_cycle_dataclass",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_reference_cycle_namedtuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_small_width",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_tuple_of_one",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_tuple_rich_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_tuple_rich_repr_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_tuples",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_pretty.py::test_user_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_bar_columns",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_columns",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_compact_time_remaining_column[0-00:00]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_compact_time_remaining_column[4210-1:10:10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_compact_time_remaining_column[59-00:59]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_compact_time_remaining_column[71-01:11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_compact_time_remaining_column[None---:--]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_download_progress_uses_binary_units",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_download_progress_uses_decimal_units",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_expand_bar",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_finished",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_live_is_not_started_if_progress_is_disabled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_live_is_started_if_progress_is_enabled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_no_output_if_progress_is_disabled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_no_output_if_progress_is_disabled_non_interactive",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_open",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_open_text_mode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_progress_create",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_progress_max_refresh",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_progress_track",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_progress_with_none_total_renders_a_pulsing_bar",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_renderable_column",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_reset",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_spinner_column",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_task_create",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_task_ids",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_task_progress_column_speed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_task_start",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_task_zero_total",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_text_column",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_time_elapsed_column",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_time_remaining_column",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_time_remaining_column_elapsed_when_finished",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_track",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_track_thread",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_using_default_columns",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_wrap_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_progress.py::test_wrap_file_task_total",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_prompt.py::test_prompt_confirm_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_prompt.py::test_prompt_confirm_markup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_prompt.py::test_prompt_confirm_no",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_prompt.py::test_prompt_confirm_yes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_prompt.py::test_prompt_int",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_prompt.py::test_prompt_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_prompt.py::test_prompt_str_case_insensitive",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_prompt.py::test_prompt_str_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_protocol.py::test_abc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_protocol.py::test_cast_deep",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_protocol.py::test_cast_recursive",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_protocol.py::test_rich_cast",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_protocol.py::test_rich_cast_container",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_protocol.py::test_rich_cast_fake",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ratio.py::test_ratio_reduce[20-ratios0-maximums0-values0-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ratio.py::test_ratio_reduce[20-ratios1-maximums1-values1-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ratio.py::test_ratio_reduce[20-ratios2-maximums2-values2-result2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ratio.py::test_ratio_reduce[3-ratios3-maximums3-values3-result3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ratio.py::test_ratio_reduce[3-ratios4-maximums4-values4-result4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ratio.py::test_ratio_reduce[3-ratios5-maximums5-values5-result5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_ratio.py::test_ratio_resolve",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_repr.py::test_broken_egg",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_repr.py::test_rich_angular",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_repr.py::test_rich_pretty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_repr.py::test_rich_pretty_angular",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_repr.py::test_rich_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_repr.py::test_rich_repr_auto",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_repr.py::test_rich_repr_auto_angular",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_repr.py::test_rich_repr_positional_only",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rich_print.py::test_get_console",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rich_print.py::test_reconfigure_console",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rich_print.py::test_rich_print",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rich_print.py::test_rich_print_X",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rich_print.py::test_rich_print_json",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rich_print.py::test_rich_print_json_no_truncation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rich_print.py::test_rich_print_json_round_trip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_characters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_rule",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_rule_align",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_rule_center_aligned_title_not_enough_space_for_rule",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_rule_cjk",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_rule_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_rule_just_enough_width_available_for_title[center-\\u2500 \\u2026 \\u2500\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_rule_just_enough_width_available_for_title[left-AB\\u2026 \\u2500\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_rule_just_enough_width_available_for_title[right-\\u2500 AB\\u2026\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_rule_not_enough_space_for_title_text[center-\\u2500\\u2500\\u2500\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_rule_not_enough_space_for_title_text[left-\\u2026 \\u2500\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_rule_not_enough_space_for_title_text[right-\\u2500 \\u2026\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_rule_side_aligned_not_enough_space_for_rule[left]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule.py::test_rule_side_aligned_not_enough_space_for_rule[right]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule_in_table.py::test_rule_in_expanded_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule_in_table.py::test_rule_in_ratio_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule_in_table.py::test_rule_in_unexpanded_table[expand_kwarg0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_rule_in_table.py::test_rule_in_unexpanded_table[expand_kwarg1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_screen.py::test_screen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_adjust_line_length",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_align_bottom",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_align_middle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_align_top",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_apply_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_divide",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_divide_complex",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_divide_edge",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_divide_edge_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_divide_emoji",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_filter_control",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_get_line_length",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_get_shape",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_is_control",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_line",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_remove_color",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_segment_lines_renderable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_segments_renderable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_set_shape",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_simplify",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_and_crop_lines",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_doubles",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[X-1-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[XX-4-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[XY-1-result3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[XYZABC-4-result21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[XYZABC-5-result22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[XYZABC\\U0001f4a9\\U0001f4a9-10-result17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[XYZABC\\U0001f4a9\\U0001f4a9-6-result13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[XYZABC\\U0001f4a9\\U0001f4a9-7-result14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[XYZABC\\U0001f4a9\\U0001f4a9-8-result15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[XYZABC\\U0001f4a9\\U0001f4a9-9-result16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[X\\U0001f4a9Y-2-result6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[X\\U0001f4a9YZ-2-result7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[X\\U0001f4a9\\U0001f4a9Z-2-result8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[X\\U0001f4a9\\U0001f4a9Z-3-result9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[X\\U0001f4a9\\U0001f4a9Z-4-result10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[X\\U0001f4a9\\U0001f4a9Z-5-result11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[X\\U0001f4a9\\U0001f4a9Z-6-result12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[\\U0001f4a9-1-result2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[\\U0001f4a9X-1-result4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[\\U0001f4a9X\\U0001f4a9Y\\U0001f4a9Z\\U0001f4a9A\\U0001f4a9-4-result20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[\\U0001f4a9\\U0001f4a9-1-result5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[\\U0001f4a9\\U0001f4a9\\U0001f4a9\\U0001f4a9\\U0001f4a9-3-result18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[\\U0001f4a9\\U0001f4a9\\U0001f4a9\\U0001f4a9\\U0001f4a9-4-result19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_emoji[a1\\u3042\\uff11\\uff11bcdaef-9-result23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_mixed[segment0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_mixed[segment1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_mixed[segment2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_mixed[segment3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_mixed[segment4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_mixed[segment5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_mixed[segment6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_mixed[segment7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_cells_single",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_lines",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_lines_terminator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_split_lines_terminator_single_line",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_strip_links",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_segment.py::test_strip_styles",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_spinner.py::test_rich_measure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_spinner.py::test_spinner_create",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_spinner.py::test_spinner_markup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_spinner.py::test_spinner_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_spinner.py::test_spinner_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_stack.py::test_stack",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_status.py::test_renderable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_status.py::test_status",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_add",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_ansi_codes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_background_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_bgcolor_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_bool",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_chain",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_clear_meta_and_links",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_clear_meta_and_links_clears_hash",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_color_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_eq",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_from_meta",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_get_html_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_hash",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_iadd",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_link_id",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_meta",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_on",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_parse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_pick_first",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_style_stack",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_test",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_style.py::test_without_color",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_styled.py::test_styled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_ansi_theme",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_background_color_override_includes_padding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_blank_lines",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_from_path",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_from_path_lexer_override",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_from_path_lexer_override_invalid_lexer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_from_path_unknown_lexer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_get_line_color_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_get_number_styles",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_get_style_for_token",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_highlight_background_color",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_option_no_wrap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_padding_plus_wrap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_pygments_syntax_theme",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_pygments_syntax_theme_non_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_python_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_python_render_indent_guides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_python_render_line_range_indent_guides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_python_render_simple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_python_render_simple_indent_guides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_python_render_simple_passing_lexer_instance",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_syntax_guess_lexer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_syntax_highlight_ranges",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_syntax_measure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_syntax.py::test_syntax_padding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_columns_highlight_added_by_add_row",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_get_row_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_init_append_column",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_min_width",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_no_columns",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_not_renderable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_padding_width",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_placement_table_box_elements[False-False-abbbbbcbbbbbbbbbcbbbbcbbbbbd\\n1Dec  2Skywalker2275M2375M 3\\n4May  5Solo     5275M5393M 6\\nijjjjjkjjjjjjjjjkjjjjkjjjjjl\\n7Dec  8Last Jedi8262M81333M9\\nqrrrrrsrrrrrrrrrsrrrrsrrrrrt\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_placement_table_box_elements[False-True-abbbbbcbbbbbbbbbcbbbbcbbbbbd\\n1Dec  2Skywalker2275M2375M 3\\n4May  5Solo     5275M5393M 6\\nijjjjjkjjjjjjjjjkjjjjkjjjjjl\\n4Dec  5Last Jedi5262M51333M6\\nmnnnnnonnnnnnnnnonnnnonnnnnp\\n7MONTH8NICKNAME 8COST8GROSS9\\nqrrrrrsrrrrrrrrrsrrrrsrrrrrt\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_placement_table_box_elements[True-False-abbbbbcbbbbbbbbbcbbbbcbbbbbd\\n1Month2Nickname 2Cost2Gross3\\nefffffgfffffffffgffffgfffffh\\n4Dec  5Skywalker5275M5375M 6\\n4May  5Solo     5275M5393M 6\\nijjjjjkjjjjjjjjjkjjjjkjjjjjl\\n7Dec  8Last Jedi8262M81333M9\\nqrrrrrsrrrrrrrrrsrrrrsrrrrrt\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_placement_table_box_elements[True-True-abbbbbcbbbbbbbbbcbbbbcbbbbbd\\n1Month2Nickname 2Cost2Gross3\\nefffffgfffffffffgffffgfffffh\\n4Dec  5Skywalker5275M5375M 6\\n4May  5Solo     5275M5393M 6\\nijjjjjkjjjjjjjjjkjjjjkjjjjjl\\n4Dec  5Last Jedi5262M51333M6\\nmnnnnnonnnnnnnnnonnnnonnnnnp\\n7MONTH8NICKNAME 8COST8GROSS9\\nqrrrrrsrrrrrrrrrsrrrrsrrrrrt\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_render_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_rich_measure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_section",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_table_show_header_false_substitution[None- 1  2 \\n 3  4 \\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_table_show_header_false_substitution[box1-\\u250c\\u2500\\u2500\\u2500\\u252c\\u2500\\u2500\\u2500\\u2510\\n\\u2502 1 \\u2502 2 \\u2502\\n\\u2502 3 \\u2502 4 \\u2502\\n\\u2514\\u2500\\u2500\\u2500\\u2534\\u2500\\u2500\\u2500\\u2518\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_table_show_header_false_substitution[box2-\\u250c\\u2500\\u2500\\u2500\\u252c\\u2500\\u2500\\u2500\\u2510\\n\\u2502 1 \\u2502 2 \\u2502\\n\\u2502 3 \\u2502 4 \\u2502\\n\\u2514\\u2500\\u2500\\u2500\\u2534\\u2500\\u2500\\u2500\\u2518\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_table_show_header_false_substitution[box3-    \\u2577    \\n  1 \\u2502 2  \\n  3 \\u2502 4  \\n    \\u2575    \\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_table_show_header_false_substitution[box4-    \\u2577    \\n  1 \\u2502 2  \\n  3 \\u2502 4  \\n    \\u2575    \\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_table_show_header_false_substitution[box5-+---+---+\\n| 1 | 2 |\\n| 3 | 4 |\\n+---+---+\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_table.py::test_vertical_align_top",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_add",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_align_center",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_align_left",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_align_right",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_append",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_append_loop_regression",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_append_text",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_append_tokens",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_apply_meta",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_assemble",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_assemble_meta",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_bool",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_cell_len",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_console_width",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_contain",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_detect_indentation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_divide",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_emoji",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_emoji_switch",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_end",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_eq",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_extend_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_fit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_from_ansi",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_from_markup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_get_style_at_offset",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_highlight_regex",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_highlight_regex_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_highlight_words",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_indentation_guides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_join",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_len",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_markup_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_markup_switch",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_no_wrap_no_crop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_on",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_pad",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_pad_left",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_pad_right",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_plain_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_plain_property_setter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_print[.-.\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_print[print_text1-. .\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_print[print_text2-Hello World !\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_print_sep_end[.-.X]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_print_sep_end[print_text1-..X]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_print_sep_end[print_text2-HelloWorld!X]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_render_simple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_right_crop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_rstrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_rstrip_end",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_set_length",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_slice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_soft_wrap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_soft_wrap_styled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_span",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_span_move",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_span_right_crop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_span_split",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_split",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_split_spans",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_strip_control_codes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_styled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_stylize",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_stylize_before",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_stylize_negative_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_tabs_to_spaces",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_tabs_to_spaces_spans[-4--expected_spans0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_tabs_to_spaces_spans[[bold]X\\tY-8-X       Y-expected_spans9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_tabs_to_spaces_spans[[bold]\\U0001f4a9\\U0001f4a9\\U0001f4a9\\U0001f4a9\\t\\U0001f4a9-8-\\U0001f4a9\\U0001f4a9\\U0001f4a9\\U0001f4a9        \\U0001f4a9-expected_spans11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_tabs_to_spaces_spans[[bold]\\U0001f4a9\\t\\U0001f4a9-8-\\U0001f4a9      \\U0001f4a9-expected_spans10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_tabs_to_spaces_spans[[bold]\\tbar-4-    bar-expected_spans6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_tabs_to_spaces_spans[[bold]foo\\tbar-4-foo bar-expected_spans5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_tabs_to_spaces_spans[[red]foo\\tbar\\n[green]egg\\tbaz-8-foo     bar\\negg     baz-expected_spans8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_tabs_to_spaces_spans[\\t-4-    -expected_spans1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_tabs_to_spaces_spans[\\t[bold]bar-4-    bar-expected_spans7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_tabs_to_spaces_spans[\\tbar-4-    bar-expected_spans2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_tabs_to_spaces_spans[foo\\nbar\\nbaz-4-foo\\nbar\\nbaz-expected_spans4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_tabs_to_spaces_spans[foo\\tbar-4-foo bar-expected_spans3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_trim_spans",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_truncate_ellipsis[Hello-1-\\u2026]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_truncate_ellipsis[Hello-10-Hello]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_truncate_ellipsis[Hello-2-H\\u2026]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_truncate_ellipsis[Hello-3-He\\u2026]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_truncate_ellipsis[Hello-4-Hel\\u2026]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_truncate_ellipsis[Hello-5-Hello]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_truncate_ellipsis_pad[Hello-10-Hello     ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_truncate_ellipsis_pad[Hello-3-He\\u2026]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_truncate_ellipsis_pad[Hello-5-Hello]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_4",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_cjk",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_cjk_mixed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_cjk_width_mid_character",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_invalid_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_leading_and_trailing_whitespace",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_long",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_long_multi_codepoint",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_long_word_preceeded_by_word_of_full_line_length",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_long_words",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_long_words_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_long_words_followed_by_other_words",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_long_words_justify_left",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_multi_codepoint",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_multiple_consecutive_spaces",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_overflow",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_overflow_long",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_tabs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_text.py::test_wrap_wrapped_word_length_greater_than_available_width",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_theme.py::test_config",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_theme.py::test_from_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_theme.py::test_inherit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_theme.py::test_read",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_theme.py::test_theme_stack",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_tools.py::test_loop_first",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_tools.py::test_loop_first_last",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_tools.py::test_loop_last",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_tools.py::test_ratio_distribute",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_broken_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_capture",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_caused_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_filename_not_a_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_filename_with_bracket",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_guess_lexer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_guess_lexer_yaml_j2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_handler",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_nested_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_no_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_notes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_print_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_print_exception_locals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_print_exception_no_msg",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_recursive",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_recursive_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_rich_traceback_omit_optional_local_flag[False-4-expected_frame_names1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_rich_traceback_omit_optional_local_flag[True-3-expected_frame_names0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_suppress",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_syntax_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_traceback_console_theme_applies",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_traceback_finely_grained",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_traceback.py::test_traceback_finely_grained_missing",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_tree.py::test_render_ascii",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_tree.py::test_render_double_branch",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_tree.py::test_render_single_branch",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_tree.py::test_render_single_node",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_tree.py::test_render_tree_hide_root_non_win32",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_tree.py::test_render_tree_hide_root_win32",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_tree.py::test_render_tree_non_win32",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_tree.py::test_render_tree_win32",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_tree.py::test_tree_measure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[0-4.1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[1-4.1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[1.0-4.1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[1.0.0-4.1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[17.0.0-17.0.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[17.0.1-17.0.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[17.1.0-17.0.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[18.0.0-17.0.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[4.0.0-4.1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[4.0.2-4.1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[4.1.0-4.1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[4.1.1-4.1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[4.2.1-4.1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[5-5.0.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[5.0-5.0.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[5.0.0-5.0.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[5.0.1-5.0.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[5.1.0-5.1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version[5.1.1-5.1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_load_version_invalid",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_parse_version[1-version_tuple0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_parse_version[1.0-version_tuple1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_parse_version[1.2-version_tuple2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_unicode_data.py::test_parse_version[1.2.3-version_tuple3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test_windows_renderer.py::test_control_carriage_return",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_control_cursor_move_to",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_control_cursor_move_to_column",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_control_cursor_single_cell_movement[10-move_cursor_down]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_control_cursor_single_cell_movement[11-move_cursor_forward]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_control_cursor_single_cell_movement[12-move_cursor_backward]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_control_cursor_single_cell_movement[9-move_cursor_up]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_control_erase_line[0-erase_end_of_line]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_control_erase_line[1-erase_start_of_line]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_control_erase_line[2-erase_line]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_control_hide_cursor",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_control_home",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_control_set_terminal_window_title",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_control_show_cursor",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_text_multiple_segments",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_text_only",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test_windows_renderer.py::test_text_with_style",
+      "kind": "Function",
+      "outcome": "skipped"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ff25ba88c3f21377d4fcb8973c2c082eefab59c318a2e552996438f52e2f9a47",
+      "version": "7.4.4"
+    }
+  ],
+  "project": "rich",
+  "python": "3.12.15",
+  "schema": 1
+}

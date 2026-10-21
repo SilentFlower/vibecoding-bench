@@ -1,0 +1,1 @@
+The same GET route increments only a synthetic observation counter then returns{id:7}. Compare GET and HEAD /orders/7, including callback calls, response bytes and Content-Length. A read endpoint must not perform a business mutation just because the final response body is absent. Recommend current method/handler boundaries without implementing changes.

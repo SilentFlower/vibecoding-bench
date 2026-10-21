@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MI-D01",
+  "source_commit": "4aeb4338ae1407d8da9723e86da99efeb446f719",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The initial symptom is insufficient. Request a sufficient actual loop/options and side-effect/transaction reproduction. Relate only disclosed input, processing and commit evidence to actual pinned APIs, state the supported conclusion and remaining limits, and do not assign a cause before disclosure. If unavailable, insufficient_information is legitimate.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

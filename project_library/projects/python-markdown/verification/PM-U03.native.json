@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PM-U03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "table_requires_explicit_extension": true,
+    "html_xhtml_empty_element_formats": true
+  },
+  "resource_profile": "business"
+}

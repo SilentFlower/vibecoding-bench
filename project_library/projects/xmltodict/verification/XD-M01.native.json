@@ -1,0 +1,25 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "XD-M01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "generator_input_preserved": true,
+    "ordinary_iterators_supported": true,
+    "utf8_boundaries_preserved": true,
+    "whole_document_inputs_preserved": true,
+    "iterator_errors_preserved": true,
+    "callback_stops_iterator": true,
+    "namespace_options_preserved": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

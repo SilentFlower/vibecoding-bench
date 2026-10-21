@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "RH-P02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "hiding_locals_does_not_redact_exception_message": true
+  },
+  "resource_profile": "business"
+}

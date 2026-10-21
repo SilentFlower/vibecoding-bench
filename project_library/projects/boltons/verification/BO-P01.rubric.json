@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BO-P01",
+  "source_commit": "4e5faa3d7e4008d89e0d8bf1ea87b6d9a061a16d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Give a workable current-API plan with positive batch sizes, deliberate short-tail handling and error/commit policy. Separate bounded per-batch storage from growing deduplication state and external side effects; do not claim automatic rollback or end-to-end streaming from one helper.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

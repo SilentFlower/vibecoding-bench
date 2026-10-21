@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PD-U01",
+  "source_commit": "ef6a6427e488e29e827e0e0819f2630ad3ff4cdc",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Existing None,False,0 are returned as actual values; only a missing path returns the explicit sentinel. has(nil) isTrue and has(missing) isFalse. A truthiness-based fallback conflates these states and is not the same as a missing-value contract.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

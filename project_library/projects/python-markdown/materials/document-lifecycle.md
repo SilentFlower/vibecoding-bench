@@ -1,0 +1,1 @@
+Compare reusing the same configured Markdown instance for these separate documents with calling reset between documents and creating separate instances. Explain which state belongs to a document and what the existing API requires; do not change files.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DS-P01",
+  "source_commit": "db592cc041014762bba55fd544e982170831f227",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Define schema and identity policy before import, explicitly validate unknown/required fields, prepare reusable bounded batches, and keep all data writes in a real transaction with errors crossing the rollback boundary. Consider large-file transaction/staging costs and restart/idempotency. Do not treat ensure=False, per-chunk auto-commit or SQLite DDL behavior as a general all-or-nothing guarantee.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

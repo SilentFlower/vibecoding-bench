@@ -1,0 +1,1 @@
+An import preview must show every independent invalid order with structured instance path, keyword and a useful message, without echoing the entire private input. Compare reusable checked-schema validators and iter_errors with the single exception from validate. No code change is requested.

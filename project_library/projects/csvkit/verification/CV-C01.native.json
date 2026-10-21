@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CV-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "delete_empty_rows_uses_projected_cells_and_pads_short_rows": true
+  },
+  "resource_profile": "business"
+}

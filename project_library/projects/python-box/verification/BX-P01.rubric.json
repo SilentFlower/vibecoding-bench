@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BX-P01",
+  "source_commit": "a4c10e977b574114613431394b30412b50aaacce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use explicit get with a missing sentinel/default or ordinary Box missing-key behavior, and avoid auto-creating reads during presence checks. default_box_create_on_get=False returns detached fallbacks without populating the original but still does not validate required values. Define presence, type and allowed-empty business rules separately; do not accept an empty fallback as supplied configuration.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

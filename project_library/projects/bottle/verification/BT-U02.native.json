@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BT-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "query_keeps_repeated_values_while_scalar_access_selects_last": true
+  },
+  "resource_profile": "business"
+}

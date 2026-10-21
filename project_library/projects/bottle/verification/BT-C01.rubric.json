@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BT-C01",
+  "source_commit": "8ec5fe29420d14998c0d86885083983eaea8b839",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With no explicit HEAD route, Bottle falls back to GET and executes the callback again, then suppresses response body bytes while retaining GET-derived Content-Length. An empty HEAD body does not imply the callback was skipped. Keep GET/HEAD callbacks free of business mutations and use an explicitly authorized mutating method with application validation for writes.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

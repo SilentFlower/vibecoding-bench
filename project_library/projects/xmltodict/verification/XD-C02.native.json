@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "XD-C02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "uri_keys_are_observed": true,
+    "existing_namespace_mapping": true
+  },
+  "resource_profile": "business"
+}

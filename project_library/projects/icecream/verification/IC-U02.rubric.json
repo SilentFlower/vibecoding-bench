@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IC-U02",
+  "source_commit": "05af3e95b0080162813bb017de90966bc75f3b91",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "format(value) computes and returns a string containing the prefix and actual expression/value label, such as value:5, and does not call outputFunction. It still formats when enabledFalse; disabling governs debugger(...) output rather than all explicit formatting. Source-label availability depends on actual readable source, not a universal expression-recovery guarantee.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

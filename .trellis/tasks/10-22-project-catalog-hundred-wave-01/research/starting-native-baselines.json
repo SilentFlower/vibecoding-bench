@@ -1,0 +1,94 @@
+{
+  "scope": "起始四仓当前镜像原生基线，尚未完成任务内容／工程目标／产品链模拟",
+  "passed": 4,
+  "real_model_calls": 0,
+  "formal_catalog_changed": false,
+  "projects": [
+    {
+      "project": "cachetools",
+      "source_proof": ".deploy/project-catalog-hundred/stage-01/source-proofs/cachetools.json",
+      "calibration_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/cachetools/result.json",
+      "result_sha256": "02383cbf675c88b061e60f4ce95d8b033619167e4a0d1e518db363206b21cc8c",
+      "contract_sha256": "8c73ed2858f13baeed704ba68b720f9fcd03b33cbb0afe01c3fd61553803b84f",
+      "counts": {
+        "passed": 366,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 366,
+      "subtests": 8,
+      "strict_doctest_count": 0,
+      "python": "3.12.15",
+      "image": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "xmltodict",
+      "source_proof": ".deploy/project-catalog-hundred/stage-01/source-proofs/xmltodict.json",
+      "calibration_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/xmltodict/result.json",
+      "result_sha256": "378d7efbcbc7c8e1caf4114f49c5411a13a07ff10840ea73966301ac8afff931",
+      "contract_sha256": "0c94f4133afc0b032320b91664a1121ce9d385a23a4718b301b816141a7cf0cf",
+      "counts": {
+        "passed": 134,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 134,
+      "subtests": 0,
+      "strict_doctest_count": 0,
+      "python": "3.12.15",
+      "image": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "tabulate",
+      "source_proof": ".deploy/project-catalog-hundred/stage-01/source-proofs/tabulate.json",
+      "calibration_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/tabulate/result.json",
+      "result_sha256": "db280f972fc8959c1ff618f261956b664e52efbb98dc2693c4784b1851be481b",
+      "contract_sha256": "14da9e7badc51dc5b97923963cdf5dadf1cf67cb1629e670888727d1a7c31131",
+      "counts": {
+        "passed": 366,
+        "failed": 0,
+        "error": 0,
+        "skipped": 17,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 383,
+      "subtests": 0,
+      "strict_doctest_count": 17,
+      "python": "3.12.15",
+      "image": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "python-decouple",
+      "source_proof": ".deploy/project-catalog-hundred/stage-01/source-proofs/python-decouple.json",
+      "calibration_result": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/python-decouple/result.json",
+      "result_sha256": "fc58245b37a5ca0ecf0b11d473ca454f7a4b7691616bb26205bd7565e1e1cb17",
+      "contract_sha256": "500fd72d7946926239d236f805cf3c5e39fd567ea0f6bf07e11d769d3e2dcd2f",
+      "counts": {
+        "passed": 67,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "collected": 67,
+      "subtests": 0,
+      "strict_doctest_count": 0,
+      "python": "3.12.15",
+      "image": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    }
+  ],
+  "first_attempt": "初次挂载未预建只读父目录的子挂载点，四仓均未进入业务测试；原始失败保留在calibration/<slug>/result.json",
+  "successful_attempt": "attempt-002"
+}

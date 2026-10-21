@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PA-C03",
+  "source_commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The existing ignore callback and copy_function are passed recursively, and the supplied wrapper copies only keep.txt and same.txt. Reuse actual parameters instead of proposing already-present functionality. Retain target-only data for this merge; a separate mirror/deletion requirement would need explicit business boundaries and is not authorized here.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

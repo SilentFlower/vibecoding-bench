@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PE-P01",
+  "source_commit": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Ordinary CSV writes both None and empty string as an empty cell, so default rereading cannot restore the distinction. Define an explicit missing-value encoding plus collision/escape and receiver schema policy, or choose a format that represents the types. Preserve string identifiers, UTF-8 and quoting, and do not claim an unprovided reversible sentinel convention is built in.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

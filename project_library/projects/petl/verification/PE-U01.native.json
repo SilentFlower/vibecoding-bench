@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PE-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "convert_view_is_lazy_and_reiterates_source": true,
+    "builtin_list_length_hint_adds_a_traversal": true
+  },
+  "resource_profile": "business"
+}

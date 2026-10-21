@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "IT-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "block_and_inline_token_layers_are_distinct": true,
+    "source_maps_are_line_ranges": true
+  },
+  "resource_profile": "business"
+}

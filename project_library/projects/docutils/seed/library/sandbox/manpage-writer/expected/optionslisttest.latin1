@@ -1,0 +1,126 @@
+[4mOptionlistTest[24m(1)           General Commands Manual          [4mOptionlistTest[24m(1)
+
+[1mName[0m
+       OptionlistTest - Test for correct intention/detention of option lists
+
+[1mDESCRIPTION[0m
+       After an option list:
+
+       · a paragraph within the same section must be intented
+
+       · a section header directly following the list must [4mnot[24m be intentend.
+
+       This file tests this.
+
+[1mOPTIONS[0m
+       This line must be in indented.
+
+       [1m-o [4m[22mx[24m   an option
+
+       [1m-b     [22manother
+
+              This option does the following points:
+
+              · one point
+
+              · second point
+
+                   [1m--ccc  [22moption  lists  may be nested, even if this is rarely
+                          used.
+
+       [1m-k     [22mand even another
+
+              This option does the following points:
+
+              · one point
+
+              · second point
+
+       For all other options see [1m--help[22m. This line must be intented.
+
+[1mMORE OPTIONS[0m
+       [1m-o [4m[22mx[24m   an option
+
+       [1m-b     [22manother
+
+       [1m-m [4m[22mMESSAGE[24m, [1m--message=[4m[22mMESSAGE[0m
+              The message to display (beaware of [1m,[22m)
+
+[1mEXAMPLES[0m
+       The "Examples" section header must not be intented. But this  paragraph
+       is indented, as all text in man-pages. This is level 0.
+
+       · Now let's test nested lists.
+
+         Line indented once. This is level 1.
+
+         · Nested item1.
+
+         · Nested item2.
+
+         · Nested item3.
+
+           Line for Nested item 3.
+
+         · Nested item4.
+
+         Paragraph at level 1. Same level as Line indented once.
+
+       This paragraph should be at level 0.
+
+[1memphasize[0m
+       [1mplain text term[0m
+              definition paragraph 1
+
+              definition paragraph 2
+
+       [1mterm with [4m[22memphasis[24m [1min it[0m
+              paragraph 1 should not be preceeded by a blank line
+
+              definition paragraph 2
+
+[1mDEFINITION LIST[0m
+       [1mterm1  [22mDescription  of Term 1 Description of Term 1 Description of Term
+              1 Description of Term 1 Description of Term 1
+
+              Description of Term 1 Description of Term 1 Description of  Term
+              1 Description of Term 1 Description of Term 1
+
+       [1mterm1111111111[0m
+              Description  of Term 1 Description of Term 1 Description of Term
+              1 Description of Term 1 Description of Term 1
+
+              Description of Term 1 Description of Term 1 Description of  Term
+              1 Description of Term 1 Description of Term 1
+
+       [1mterm2  [22mDescription of Term 2
+                 Description  of  Term  2 Description of Term 2 Description of
+                 Term 2 Description of Term 2 Description of Term 2
+
+                 Description of Term 2 Description of Term  2  Description  of
+                 Term 2 Description of Term 2 Description of Term 2
+
+              [1mterm22 [22mDefintions lists may be nested, thus this at level 1.
+
+                     More Description of Term 22. More Description of Term 22.
+                     More Description of Term 22. More Description of Term 22.
+
+              [1mterm23 [22mDefintions lists may be nested, thus this at level 1.
+
+              This para is indented to term2, thus should be at level 1.
+
+              This para is indented to term2, thus should be at level 1.
+
+       [1mterm3  [22mDefintions lists are not nested
+
+              More Description for term3.
+
+       This paragraph should be at level 0 again.
+
+[1mAuthor[0m
+       h.goebel@goebel-consult.de
+
+[1mCopyright[0m
+       public domain
+
+                                  2008-04-29                 [4mOptionlistTest[24m(1)

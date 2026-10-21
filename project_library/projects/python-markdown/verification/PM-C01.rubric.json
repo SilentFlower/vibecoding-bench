@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PM-C01",
+  "source_commit": "b41e0aaf1181f1a8cb200cf5a815aad7c0020d23",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Raw inert HTML is intentionally preserved in ordinary conversion; a Markdown code span escapes the literal markup as code. The renderer does not itself sanitize arbitrary HTML. Trusted article policy may allow intentional markup, while visitor output needs an explicitly approved treatment/allow policy after conversion as appropriate; do not invent built-in safe mode or claim an unprovided sanitizer ran.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

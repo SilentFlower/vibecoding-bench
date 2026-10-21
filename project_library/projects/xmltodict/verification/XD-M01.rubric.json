@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "XD-M01",
+  "source_commit": "6e29fba282e68631034dd2722a413b4e35276584",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Satisfy the public Iterator input contract and actual source-consumption boundaries while retaining full frozen upstream regression. Preserve complete buffers, files, generators, options and failures; no new dependencies, pytest controls or whole-source join/list buffering.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use actual supplied materials and pinned source, respect authorization and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized test file that fail on the pinned original and pass after the enhancement; cite the actual implementation and test files.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

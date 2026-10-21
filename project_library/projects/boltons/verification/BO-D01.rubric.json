@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BO-D01",
+  "source_commit": "4e5faa3d7e4008d89e0d8bf1ea87b6d9a061a16d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Identify callable validation followed by key_func(i) if key else i, conflating a supported falsey callable with no key. Do not blame str.lower, sorting, business case values or unhashability for the complete supplied string reproduction.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

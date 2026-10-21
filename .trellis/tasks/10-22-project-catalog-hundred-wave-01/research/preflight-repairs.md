@@ -1,0 +1,5 @@
+# 当前阶段准备与观察修正
+
+- Agate的AG-P01首次将已完整提供的规划示例放在disclosure路径并作为普通materials引用。真实ProjectLibrary的前缀检查拒绝，JSON Schema／Agate配方及第9模拟批均未能启动。已将该独立规划示例保存为公开materials/dimension-controls.md，诊断任务的披露分支保持独立；结构验证及两仓真实协议检查随后通过。未成形的第9批目录完整移至.deploy/project-catalog-hundred/stage-01/failed-preflights/mock-batch-009-attempt-001，停止仅等待ready的无效watcher后才重建。没有真实执行结果被改写为通过。
+- Docutils的首轮DU-C02观察仅扫描null writer正文，遗漏document.transform_messages的游离原生诊断。读原生Reporter／Messages定义后，同时读取正文、parse_messages和transform_messages；同一case／同一期望在attempt2通过。原业务失败与冻结控制输入保留，未改上游源码。
+- 下一批离线wheel准备曾把pytest-cov5和3同放一次下载请求，pip真实拒绝。已按各仓固定版本分别下载，未放宽依赖版本，也未混装两版到同一环境。

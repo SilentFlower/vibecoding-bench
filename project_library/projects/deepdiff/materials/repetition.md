@@ -1,0 +1,1 @@
+Compare before=[1,1,2],after=[1,2,2]with ignore_order=True,then also report_repetition=True. Inventory quantities require preserving multiplicity even when ordering is irrelevant. Give actual counts and avoid calling both settings the same equality relation. No files may change.

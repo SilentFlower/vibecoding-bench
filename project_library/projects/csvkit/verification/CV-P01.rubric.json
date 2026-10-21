@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CV-P01",
+  "source_commit": "6d19c625214977ab2988e674441ca24638bc12d3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With --query and no --db the utility creates SQLite memory storage, imports the synthetic CSV into its scoped transaction, runs both queries and prints only the final result: region,total with east5 and west1.25. The earlier count result is not also printed; the connection is closed and input remains unchanged. Keep exact trusted SQL/table ownership and use local controls, not production connection strings or an assumed persisted artifact.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -195,19 +195,72 @@ def preflight(values: dict) -> Path:
     return root
 
 
+def _public_source_directory_digest(root: Path) -> str:
+    """核对固定上游夹具目录的全部字节与执行位，拒绝额外文件及链接。
+
+    :param root: 已审查的真实上游目录。
+    :return: 有序完整文件清单摘要。
+    """
+    if root.is_symlink() or not root.is_dir():
+        raise ValueError('固定上游夹具目录不能是链接或缺失')
+    files = []
+    for path in sorted(root.rglob('*')):
+        if path.is_symlink():
+            raise ValueError('固定上游夹具目录包含链接')
+        if path.is_dir():
+            continue
+        if not path.is_file():
+            raise ValueError('固定上游夹具目录包含特殊文件')
+        files.append([str(path.relative_to(root)), hashlib.sha256(path.read_bytes()).hexdigest(),
+            bool(path.stat().st_mode & 0o111)])
+    return hashlib.sha256(json.dumps(files, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
 def source_snapshot_ignore(directory: str, names: list[str]) -> set[str]:
-    """过滤构建快照，仅保留已校验摘要的上游公开测试环境文件。
+    """过滤构建快照，仅保留精确摘要校验的上游公开原件。
 
     :param directory: 当前源码目录。
     :param names: shutil 提供的直接子项名称。
     :return: 仍应排除的名称集合。
     """
     ignored = set(shutil.ignore_patterns('.git','target','node_modules','__pycache__','.env','.env.*','*.log')(directory,names))
-    public = REPO/'project_library/projects/typer/seed/library/.env'
-    if Path(directory).resolve()==public.parent and '.env' in ignored:
-        if public.is_symlink() or hashlib.sha256(public.read_bytes()).hexdigest()!='81b463a540ebc72b1d4afbc954d5247146344f986e7d842a82e032b7e08ecb2f':
-            raise ValueError('固定上游公开测试环境文件摘要不符')
-        ignored.remove('.env')
+    public_files = {
+        'project_library/projects/typer/seed/library/.env': '81b463a540ebc72b1d4afbc954d5247146344f986e7d842a82e032b7e08ecb2f',
+        'project_library/projects/python-decouple/seed/library/tests/autoconfig/env/.env': '5b7f07de0fa0896faddd64c9f23966f5e0b611a3ff515beb3e2c82e3a2452a5b',
+        'project_library/projects/python-decouple/seed/library/tests/autoconfig/env/custom-path/.env': 'b4eea58127083a24664bccf4cf4b278aca8804070a1384bf86ea4403c26af095',
+        'project_library/projects/docutils/seed/library/sandbox/docutils_xml/global.log': 'e9152aa807000109164abc9e29fe616d28fa0c98c82e9321e8cb379cc914e515',
+        'project_library/projects/docutils/seed/library/sandbox/docutils_xml/tag.log': '4865d24221a0494ced07cd65179bec1e913c90f0a4b73af7ae73241b104faaf7',
+        'project_library/projects/docutils/seed/library/sandbox/odf2docutils/global.log': '4655300e0e8b1d7a26fc1208fb40be8f30c8aed07a362cbf26bd67a5890249eb',
+        'project_library/projects/docutils/seed/library/sandbox/odf2docutils/tag.log': '09147df9ccd8e0cdd4ed3143310467058e6ac298803e1346ad8c674a6ef2ab9e',
+        'project_library/projects/docutils/seed/library/sandbox/rst2beamer/feature_requests/alan_isaac_slides_test01_with_docinfo_docutils_v_0_8.log': '1aaf1f44ea4d019009663ec4b6f8c3a5d094a01d7a3f791e290a00a2c6dde7a2',
+        'project_library/projects/docutils/seed/library/sandbox/rst2beamer/feature_requests/alan_isaac_slides_test01_without_beamer_visit_docinfo.log': '8f275578582bae45cc1d1227c094bbf36a3e995b0ce3c89d1e773b32de59b9d5',
+        'project_library/projects/docutils/seed/library/sandbox/rst2beamer/feature_requests/alan_isaac_slides_test01_without_beamer_visit_docinfo_with_latex_docinfo.log': 'a613487a0960d43b2cfd9a9785349788fc1f432c653a47c9e9a190f4245796f8',
+        'project_library/projects/docutils/seed/library/sandbox/rst2graph/global.log': 'fa363951035ff3ce3170fc241e6030144d20de49de488546a1e61c958f12f771',
+        'project_library/projects/docutils/seed/library/sandbox/rst2graph/tag.log': 'd34558be7a4974d8049796e1059717aa325f6a07b31eb4522b5f9c46b608c2b9',
+        'project_library/projects/docutils/seed/library/sandbox/rst2outline/global.log': '292a0ccddb53f5bf3fe72e1436c43d2a4ded4233cbfba06fe0a9253c67e0119b',
+        'project_library/projects/docutils/seed/library/sandbox/rst2outline/tag.log': '463fdf1901ce0c9019170fbe4507649dd246f6f83e17a7c33db874be4a3ad578',
+        'project_library/projects/docutils/seed/library/sandbox/rstdiff/global.log': '06c285535013062c9b3747934e31ed6b9c82b125cf621bff1524ebbe152d152e',
+        'project_library/projects/docutils/seed/library/sandbox/rstdiff/tag.log': 'b35696f8d3b87e8bd1a197a622c8b0e2f4286a9f90b40eb007869d2dadbeed25',
+        'project_library/projects/docutils/seed/library/sandbox/xml2rst/global.log': '3e26aa162b50e46e34c251731e7f62586c6c04b3cc6c6057f2276845f72aa642',
+        'project_library/projects/docutils/seed/library/sandbox/xml2rst/tag.log': 'cd84655f263f61f47c6d6b0c17281c451ce9b98ee33b5682073dd585b65cea8e',
+    }
+    for relative, checksum in public_files.items():
+        public = REPO / relative
+        if Path(directory).resolve() == public.parent and public.name in ignored:
+            if public.is_symlink() or hashlib.sha256(public.read_bytes()).hexdigest() != checksum:
+                raise ValueError('固定上游公开文件摘要不符')
+            ignored.remove(public.name)
+    # 这两处target是固定Git跟踪的测试期望原件，完整清单约束防止放进本地构建产物。
+    public_directories = {
+        'project_library/projects/docutils/seed/library/sandbox/odf2docutils/tests/presentationSimple/target': '00807434398b437e1b5a6afda90894fe3d13d7e7f4e424fcec06ee25fce61b27',
+        'project_library/projects/docutils/seed/library/sandbox/odf2docutils/tests/textSimple/target': 'bf69411b21f4630b72ca45b23da31db1ece7068f839e76167fef3ba807d494a6',
+    }
+    for relative, checksum in public_directories.items():
+        public = REPO / relative
+        if Path(directory).resolve() == public.parent and public.name in ignored:
+            if _public_source_directory_digest(public) != checksum:
+                raise ValueError('固定上游夹具目录摘要不符')
+            ignored.remove(public.name)
     return ignored
 
 

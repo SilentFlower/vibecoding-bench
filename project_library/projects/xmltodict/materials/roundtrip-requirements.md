@@ -1,0 +1,1 @@
+A publishing workflow asks whether parse followed by unparse preserves mixed-content order, whitespace and original namespace prefixes byte for byte. Inspect the supplied mixed-content document and actual model. Distinguish semantic data extraction from lexical document editing. Do not promise lossless XML editing or require a library repair for an unpromised guarantee.

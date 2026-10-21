@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TZ-C04",
+  "source_commit": "451af60dec590a6010e2babdbf391ea8f815122f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "merge uses later precedence and produces A5,B3,C7. merge_with(sum) combines all values for each key and yields A7,B3,C7, leaving both original billing mappings unchanged. Use the latter for the supplied additive rule, without claiming nested recursive merge or changing the business rule to last-write replacement.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

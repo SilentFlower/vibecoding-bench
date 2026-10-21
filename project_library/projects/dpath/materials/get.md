@@ -1,0 +1,1 @@
+For object{a:1,b:2},compare get("missing",default=one_unique_sentinel),get("*",default=the_same_sentinel),and get("/")/get(""). A singular lookup must reject ambiguous matches rather than treat them as absent. No files may change.

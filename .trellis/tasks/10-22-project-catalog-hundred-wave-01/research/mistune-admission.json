@@ -1,0 +1,190 @@
+{
+  "project": "mistune",
+  "stage": "formal_registered_local_verified",
+  "cases": 13,
+  "all_expectations_met": true,
+  "reference_changed_paths": [
+    "library/src/mistune/__main__.py",
+    "library/tests/test_cli.py"
+  ],
+  "regression": {
+    "collected": 1324,
+    "counts": {
+      "passed": 1324,
+      "failed": 0,
+      "error": 0,
+      "skipped": 0,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "doctests": 0,
+    "subtests": 158,
+    "collection_matches_contract": true,
+    "subtests_match_contract": true
+  },
+  "public_tests": {
+    "original": {
+      "candidate_import": true,
+      "public_tests_passed": false,
+      "counts": {
+        "tests": 2,
+        "failed": 2,
+        "errors": 0,
+        "skipped": 0
+      },
+      "failures": [
+        {
+          "test": "test_empty_message_and_piped_document_are_valid",
+          "message": "AssertionError: assert 1 == 0\n +  where 1 = CompletedProcess(args=['/work/python/bin/python', '-m', 'mistune'], returncode=1, stdout='You must specify a message or file\\n', stderr='').returncode"
+        },
+        {
+          "test": "test_empty_message_writes_file_and_wins_over_file_input",
+          "message": "AssertionError: assert 1 == 0\n +  where 1 = CompletedProcess(args=['/work/python/bin/python', '-m', 'mistune', '-m', '', '-o', '/tmp/pytest-of-node/pytest-0/test_empty_message_writes_file0/result.html'], returncode=1, stdout='You must specify a message or file\\n', stderr='').returncode"
+        }
+      ]
+    },
+    "reference": {
+      "candidate_import": true,
+      "public_tests_passed": true,
+      "counts": {
+        "tests": 2,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "failures": []
+    }
+  },
+  "wrong_candidate_actual": {
+    "candidate_import": true,
+    "pipe_and_message_empty_valid": true,
+    "empty_file_preserved": true,
+    "explicit_empty_output_file_written": false,
+    "explicit_empty_message_has_priority": true,
+    "nonempty_and_missing_preserved": true,
+    "interactive_absence_does_not_block": true
+  },
+  "formal_catalog_modified": true,
+  "real_model_calls": 0,
+  "pending": [],
+  "evidence": [
+    {
+      "case": "original-MS-C01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/mistune/attempt-001/original-MS-C01.json",
+      "sha256": "e2d6c8d3e331fe596bb743ec459a3b08f8df256e0dfeb2608456d491734fc3b5"
+    },
+    {
+      "case": "original-MS-C02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/mistune/attempt-001/original-MS-C02.json",
+      "sha256": "55e355971c7d8e46bca2f1f634af85b50a65cfad908b65f61b23181d6f74035f"
+    },
+    {
+      "case": "original-MS-C03",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/mistune/attempt-001/original-MS-C03.json",
+      "sha256": "1ad0c4b1065159524252765a9881297a47582bb83d07281fbed20a62a06ba413"
+    },
+    {
+      "case": "original-MS-D01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/mistune/attempt-001/original-MS-D01.json",
+      "sha256": "1972f080af22ac318e71ca2d7fde088ce4cbeca17a1d47c7d7255d77807acbed"
+    },
+    {
+      "case": "original-MS-M01",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/mistune/attempt-001/original-MS-M01.json",
+      "sha256": "bad2aaabd208e4daf53b8edba4420c92d529f4107d4d257ae0d781345cca2320"
+    },
+    {
+      "case": "original-MS-P01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/mistune/attempt-001/original-MS-P01.json",
+      "sha256": "8d9c185cbffa11f7f2048df3c4c4b3b5894b54297f4fe3fc48c22f2389d9ad09"
+    },
+    {
+      "case": "original-MS-U01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/mistune/attempt-001/original-MS-U01.json",
+      "sha256": "cae3b8f162a281897aca4c8524b907606e46889cffc57d7ca3743bcaf4aed045"
+    },
+    {
+      "case": "original-MS-U02",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/mistune/attempt-001/original-MS-U02.json",
+      "sha256": "ebc7e4b4febb39553c91397ee57bc248d9d40ee3e607d5b347d597141c39e605"
+    },
+    {
+      "case": "public-tests-original",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/mistune/attempt-001/public-tests-original.json",
+      "sha256": "aa29b9307d5a11dfd445ea6446195fa0b300e27f0afae9f3db93adb126768ce7"
+    },
+    {
+      "case": "public-tests-reference",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/mistune/attempt-001/public-tests-reference.json",
+      "sha256": "23ece1f8bdd31d1e0fb3539942b45a8f319d25572ab657d27d59ef1dc9455791"
+    },
+    {
+      "case": "reference-MS-M01",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/mistune/attempt-001/reference-MS-M01.json",
+      "sha256": "23626a1b8c0ee30111ab3a3dc412ff90177f9bf62ccb456c1e500dc5f3af0c82"
+    },
+    {
+      "case": "reference-full-regression",
+      "expected": "passed",
+      "status": "passed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/mistune/attempt-001/reference-full-regression.json",
+      "sha256": "f31d7ef614bbe087df0d0b70cbf1d1e22324154cc157d31311091afc8563c872"
+    },
+    {
+      "case": "wrong-mistune-empty-return",
+      "expected": "failed",
+      "status": "failed",
+      "path": ".deploy/project-catalog-hundred/stage-01/business/mistune/attempt-001/wrong-mistune-empty-return.json",
+      "sha256": "bf0f19ce5f39f1639764bc6781921a75b3f42bf70abfd8e885c3ef043b756cf6"
+    }
+  ],
+  "mock_status": "passed",
+  "formal_version": "real-project-scenarios-v6-en",
+  "formal_digest": "93c4087afd28ae9315a7ac6975767974c720b8e4f10b5e5ad7de0d41252bb56a",
+  "full_delivery_files": 4018,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-004/run-001/evidence/result.json",
+      "sha256": "30e84ec3ed13f4803d47fc4948639eff2f426344c255743c02519aa92c1e8fd3"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-004/run-001/cleanup.json",
+      "sha256": "2f822f36a4601220b4dbe293ba85fb88d501ebf6d46341846384ab48d0727a11"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-004/audit-attempt-001.json",
+      "sha256": "51b4e46c9ab2582162a8dcb75b47c8181c45c8164809526adb6234077e89c6ac"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-01/mock-batch-004/browser/run-001/diagnostics/result.json",
+      "sha256": "d647d5b56093cacce6bd48499083228cb19c9008334463ca4172cbd5f36d35f5"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/delivery-first-eight.json",
+      "sha256": "a4f1da5d4141757840ca5f40fa9bbaa0e65e5901a39889f61f33aeb3a8b18e7e"
+    }
+  ]
+}

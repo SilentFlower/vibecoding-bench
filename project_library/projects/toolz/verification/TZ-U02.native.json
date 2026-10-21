@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TZ-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "default_memoize_requires_hashable_arguments": true,
+    "custom_key_receives_args_kwargs_and_preserves_inputs": true
+  },
+  "resource_profile": "business"
+}

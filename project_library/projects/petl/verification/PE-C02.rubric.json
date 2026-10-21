@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PE-C02",
+  "source_commit": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use an explicit strict/error-accounting policy and actually consume/validate all relevant rows before an irreversible publication or under a real staged/transaction boundary. The header and valid row can be yielded before the bad row raises; constructing a strict view is not validation success and prior external side effects are not undone by iteration.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CB-P01",
+  "source_commit": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "First n0 call fails and has errors; save an owned per-row error/document result then. Second n3 call passes and the validator latest errors is{} with latestdocumentn3, while the saved first errors remain. Use a separate owned validator per work item or serialize reuse and snapshot each result before another call; shared mutable latest-state fields are not a persistent result history or a proven concurrent API.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

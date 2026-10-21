@@ -1,0 +1,301 @@
+{
+  "schema": 2,
+  "project_key": "configargparse",
+  "title": "ConfigArgParse配置入口工作场景",
+  "category": "多来源参数与配置",
+  "description": "固定源码上的来源优先级、受限展示、列表语义、布尔取证、格式保真和流式配置重载八项独立只读任务。",
+  "seed_digest": "f3134bd750c56bb60353aa0b71fcce105caf22ecb949330acc2a06735581f9bc",
+  "environment": "configargparse-py312",
+  "source": {
+    "repository": "https://github.com/bw2/ConfigArgParse",
+    "commit": "3ab2f323abcdd321b6c423f9eb6304ce35681307",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CA-S01",
+      "title": "来源优先级与展示政策",
+      "goal": "解释获胜来源并限定对外可展示字段",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CA-U01",
+            "CA-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CA-U01",
+          "kind": "understand",
+          "goal": "追踪命令行、环境、配置和默认值优先级",
+          "prompt": "Trace all four complete scalar-source controls and give final typed workers values. Explain which source wins without assuming any real process state or changing files.",
+          "requires": [],
+          "materials": [
+            "materials/precedence.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CA-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/CA-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CA-C01",
+          "kind": "consult",
+          "goal": "展示配置来源而不回显受限字段值",
+          "prompt": "Meet the complete support-summary requirement using current source-reporting APIs. Explain what the supplied report actually contains and define application-owned display filtering. Do not expose a raw report, access real credentials or implement changes.",
+          "requires": [],
+          "materials": [
+            "materials/source-report.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_with_limits"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CA-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/CA-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CA-S02",
+      "title": "重复选项与默认列表",
+      "goal": "区分来源覆盖和原生append默认项",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CA-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CA-U02",
+          "kind": "understand",
+          "goal": "区分列表来源覆盖和append默认项",
+          "prompt": "Trace all complete append controls and list exact outputs. Explain source selection separately from the nonempty default list behavior of argparse. Do not change files or claim all lower-priority lists merge.",
+          "requires": [],
+          "materials": [
+            "materials/lists.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CA-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/CA-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CA-S03",
+      "title": "布尔开关取证与选择",
+      "goal": "先取实际定义再选择已有布尔语义",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CA-D01",
+            "CA-C02"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "CA-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "CA-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CA-D01",
+          "kind": "diagnose",
+          "goal": "先取开关定义和输入再定位意外启用",
+          "prompt": "Investigate the supplied enabled-switch symptom. Request the exact argument/action/type definition, parser call and CLI/env/config inputs before deciding the cause. Diagnose only disclosed evidence or close with an evidence plan if unavailable. Do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/boolean-symptom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_no_code_change",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CA-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "argument-evidence",
+              "when": "The argument definition, parser call and actual CLI/environment/config inputs have not been supplied or declared unavailable, and the answer reasonably requests sufficient evidence.",
+              "materials": [
+                "disclosure/boolean.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "CA-C02",
+          "kind": "consult",
+          "goal": "用已有布尔action满足明确开关词汇",
+          "prompt": "Meet the complete opt-in switch requirement with current APIs. Compare actual type=bool and flag controls including true,false,unknown and CLI precedence. No implementation is authorized.",
+          "requires": [],
+          "materials": [
+            "materials/boolean-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CA-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/CA-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CA-S04",
+      "title": "配置格式和内容保真",
+      "goal": "明确节边界及多行值支持",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CA-U03",
+            "CA-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CA-U03",
+          "kind": "understand",
+          "goal": "区分默认节注释和按INI节选配置",
+          "prompt": "Trace the supplied complete INI controls under both current parsers. Give exact selected host values and explain whether default section headings provide namespacing. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/sections.ini",
+            "materials/formats.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CA-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/CA-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CA-C03",
+          "kind": "consult",
+          "goal": "选择能保留多行值的已有配置格式",
+          "prompt": "Meet the complete newline round-trip requirement with existing serializers. Explain default rejection, the simple valid control and YAML result without replacing newlines or inventing multiline support.",
+          "requires": [],
+          "materials": [
+            "materials/formats.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CA-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/CA-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CA-S05",
+      "title": "可重载配置提供者",
+      "goal": "明确创建、关闭和发布配置的责任",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CA-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CA-P01",
+          "kind": "plan",
+          "goal": "规划可重载配置流的创建和关闭责任",
+          "prompt": "Plan the complete synthetic reload-provider requirement using current callable default_config_files support. Give observed invocation/closure/value controls and distinguish parsed validation from application publication. Do not access remote configuration or implement a service.",
+          "requires": [],
+          "materials": [
+            "materials/provider.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CA-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/CA-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

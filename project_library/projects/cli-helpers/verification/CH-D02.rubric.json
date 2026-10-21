@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CH-D02",
+  "source_commit": "e2538b1d338ead4ed803ec0017017bf6779a380b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Locate the class-level registered formatter_args dictionary and in-place update in format_output. A new formatter object still reaches the shared mutated defaults; changing the source row or constructing another instance does not fix that boundary.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DU-C02"
+  ],
+  "python_paths": [
+    "library/docutils",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "unresolved_reference_is_reported_without_default_programmatic_failure": true,
+    "halt_level_controls_failure_even_when_report_level_differs": true
+  },
+  "resource_profile": "business"
+}

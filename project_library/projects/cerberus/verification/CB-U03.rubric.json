@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CB-U03",
+  "source_commit": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default token-only validation fails requiredid; updateTrue token-only passes. updateTrue confirmTrue withouttoken still fails dependencies, while confirmTrue plus token passes. update skips required-field presence checks, not all rules or dependencies of present fields. No stored record is automatically merged into this supplied document.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MI-P01",
+  "source_commit": "4aeb4338ae1407d8da9723e86da99efeb446f719",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Separate iterator batch validation from side-effect atomicity. Offer a bounded-memory staged/validated input or re-readable preflight plus a real storage transaction or explicit publish boundary. Explain limits for irreversible external writes and define recovery/idempotency; strict chunking alone cannot ensure all-or-nothing.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IC-C01",
+  "source_commit": "05af3e95b0080162813bb017de90966bc75f3b91",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Python evaluates costly() before calling the debugger, so it runs once and returns7; disabled debugger emits nothing and passes7 through. Gate the optional work before evaluating it, for example under the component-owned debug condition, or design an explicitly lazy application boundary. disable is an output switch, not lazy argument evaluation or a rollback of side effects.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

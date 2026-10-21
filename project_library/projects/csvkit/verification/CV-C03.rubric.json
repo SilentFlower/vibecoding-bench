@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CV-C03",
+  "source_commit": "6d19c625214977ab2988e674441ca24638bc12d3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The dialect-only invocation with no --db/query/insert emits a CREATE TABLE sales statement, not INSERT statements or a persisted database import. Inspect it as a preview; inferred schema is not a guarantee about future data. Do not add --db, --insert or --overwrite when only a preview is authorized.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AG-U04",
+  "source_commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Sum5, Count()3, Count(amount)2, Count(amount,None)1. East has total2,present1,rows2; west total3,present1,rows1. Sum ignores null amounts, while row and present counts answer different business questions. Groups retain typed results, not merely string counts.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

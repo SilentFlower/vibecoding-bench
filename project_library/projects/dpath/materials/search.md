@@ -1,0 +1,1 @@
+Object{items:[{id:A,hidden:private},{id:B}]};search items/*/id in ordinary mode and yielded=True. An export needs either a declared nested id-only projection or explicit path/value records. Compare exact shapes and verify source hidden data is retained,without claiming a generic sanitizer or copied ownership for every object type.

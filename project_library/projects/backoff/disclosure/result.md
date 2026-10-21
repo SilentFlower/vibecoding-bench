@@ -1,0 +1,1 @@
+Complete synthetic target always raises ValueError. Options are on_exception(constant,ValueError,interval=0,jitter=None,max_tries=2,raise_on_giveup=False,logger=None). Caller directly uses the wrapper return value as a successful result. Both attempts fail and the wrapper returnsNone. No other decorators or services exist.

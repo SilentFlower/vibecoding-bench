@@ -1,0 +1,1 @@
+Schema n={type:integer,coerce:int,min:2,required:True}. For original={n:"2"}, compare fresh Validator.validate with default normalization and normalize=False, observing returned bool,validator.document and original. Separately compare normalized({n:"1"}) and validated({n:"1"}); a business import must publish only a validated document meeting min2. No files may be modified.

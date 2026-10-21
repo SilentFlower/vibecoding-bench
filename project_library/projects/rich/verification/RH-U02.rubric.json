@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "RH-U02",
+  "source_commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "capture.get returns captured newline and the destination StringIO remains empty. capture does not enable recording; export_text requires record=True and rejects this attempt. Use captured text for that local assertion, and deliberately enable/own a record buffer for later artifact exports.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

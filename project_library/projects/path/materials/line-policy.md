@@ -1,0 +1,1 @@
+In a dedicated temporary directory, write the Unicode value "茶\r\nB\rC\n" with write_text(..., encoding="utf-8") using default linesep, explicit linesep=None and explicit "\r\n". The target runtime is Linux. Compare actual bytes. Separately copy b"\x00\xff\r\n\x80\r\x00" using existing binary APIs/chunks. No real file may be read or changed.

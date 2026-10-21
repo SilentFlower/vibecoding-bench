@@ -1,0 +1,1 @@
+Fresh IceCreamDebugger(outputFunction=output.append,noColor=True). For value={n:1}, inspect debugger(value),debugger(value,0),and debugger(), including returned identity and emitted count. A debug wrapper in a data pipeline must not be mistaken for an isolated copied result. Only synthetic local data is supplied; no files may change.

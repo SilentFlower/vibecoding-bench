@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MI-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "strict_yields_complete_batches_before_error": true,
+    "earlier_side_effects_not_rolled_back": true
+  },
+  "resource_profile": "business"
+}

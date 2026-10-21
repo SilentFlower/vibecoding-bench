@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BF-P01",
+  "source_commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The decorator recognizes native async targets and awaits native async callbacks; observed sequence is call1,awaited backoff tries1,call2,thenok. Keep blocking work out of async callbacks and define target timeout/cancellation and side-effect idempotency at the application boundary. Do not claim this creates a transaction or needlessly invent an async retry implementation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

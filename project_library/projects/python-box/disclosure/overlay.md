@@ -1,0 +1,1 @@
+Complete synthetic reproduction: base=Box({"db":{"host":"A","port":5432},"tags":["base"]}); base.update({"db":{"host":"B"}}). The db object afterward contains hostB without port. No merge_update call or other mutation is present.

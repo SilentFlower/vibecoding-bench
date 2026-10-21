@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DP-C02",
+  "source_commit": "15759d96a006fef5278de731cd263b4d839094c3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Ordinary search yields{items:[{id:A},{id:B}]}with the list structure retained. yieldedTrue produces(items/0/id,A)and(items/1/id,B)records. Original hidden data remains. Select the declared schema projection/record form and explicitly control fields; this does not prove arbitrary source isolation,redaction or transaction semantics.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

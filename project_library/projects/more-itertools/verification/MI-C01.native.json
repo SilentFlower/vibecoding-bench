@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MI-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "peek_and_bool_cache_one": true,
+    "negative_index_consumes_remainder": true
+  },
+  "resource_profile": "business"
+}

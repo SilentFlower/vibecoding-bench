@@ -1,0 +1,16 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PE-U03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "duplicate_keys_produce_all_matching_combinations": true,
+    "left_join_preserves_unmatched_row": true
+  },
+  "resource_profile": "business"
+}

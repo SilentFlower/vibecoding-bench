@@ -1,0 +1,1 @@
+Construct Table([("2",),("oops",)],["qty"],TypeTester(limit=1)) and compare full inference. Separately construct a three-row one-shot generator of strings2,3,4 that records pulls, with the same limit1. The team asks whether limiting inference makes construction streaming and guarantees later values fit the guessed type.

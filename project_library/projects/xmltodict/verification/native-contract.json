@@ -1,0 +1,686 @@
+{
+  "baseline_digest": "7d7f5651f2c833c0478450abd75f848b43797919110111efc73d8aaa9aaa3d79",
+  "nodes": [
+    {
+      "id": "tests/test_dicttoxml.py::test_attr_order_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_attrib",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_attrib_and_cdata",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_attribute_values_with_angle_brackets_are_escaped",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_boolean_unparse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_cdata",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_comment_roundtrip_limited",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_empty_dict_vs_empty_list_behavior",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_empty_list_filtering",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_empty_list_filtering_with_short_empty_elements_false",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_fulldoc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_generator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_list_expand_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_multiple_roots",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_multiple_roots_nofulldoc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_namespace_roundtrip_honors_custom_attr_prefix",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_namespace_support",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_nested",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_no_root",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_no_root_nofulldoc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_non_empty_lists_are_not_filtered",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_non_string_attr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_non_string_text_with_attributes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_non_string_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_none_attribute_serializes_as_empty_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_none_text_with_short_empty_elements_and_attributes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_preprocessor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_preprocessor_skipkey",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_pretty_print",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_pretty_print_and_short_empty_elements_consistency",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_pretty_print_element_comments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_pretty_print_top_level_comment_with_int_indent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_pretty_print_with_int_indent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_attribute_name_starting_with_bang",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_attribute_name_starting_with_question",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_attribute_name_with_angle_brackets",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_attribute_name_with_slash",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_attribute_name_with_whitespace",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_malicious_xmlns_prefix",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_names_with_quotes_and_equals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_non_string_names",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_tag_name_starting_with_bang",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_tag_name_starting_with_question",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_tag_name_with_angle_brackets",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_tag_name_with_slash",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_tag_name_with_whitespace",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_xmlns_prefix_starting_with_question_or_bang",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_rejects_xmlns_prefix_with_slash_or_whitespace",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_root",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_semistructured",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_short_empty_elements",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_simple_cdata",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_bytes_in_attributes_and_cdata_use_output_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_bytes_text_node_uses_output_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_bytes_text_node_with_expand_iter_uses_output_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_filters_none_and_empty_comments_in_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_invalid_bytes_comment_replaced_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_invalid_bytes_in_attributes_and_cdata_replaced_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_invalid_bytes_text_node_replaced_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_rejects_comment_ending_with_hyphen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_rejects_comment_with_double_hyphen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_rejects_invalid_bytes_comment_for_encoding_with_strict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_rejects_invalid_bytes_errors_handler",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_rejects_invalid_bytes_in_attributes_and_cdata_for_encoding_with_strict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_rejects_invalid_bytes_text_node_for_encoding_with_strict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_skips_empty_comment",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_skips_none_comment",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_with_bytes_comment_uses_output_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_with_element_comment",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_with_multiple_element_comments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_with_multiple_top_level_comments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_unparse_with_top_level_comment",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_xmlns_dict_honors_custom_attr_prefix",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_xmlns_values_decode_bytes_with_output_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_xmlns_values_reject_invalid_bytes_with_strict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_xmlns_values_replace_invalid_bytes_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicttoxml.py::test_xmlns_values_use_consistent_boolean_coercion",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_attrib",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_attrib_and_cdata",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_comments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_custom_attrib",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_custom_cdata",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_disable_entities_allows_comments_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_disable_entities_false_returns_xmlbomb",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_disable_entities_true_allows_doctype_without_entities",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_disable_entities_true_rejects_xmlbomb",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_encoded_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_external_entity",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_external_entity_with_custom_expat",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_force_cdata",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_force_list_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_force_list_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_force_list_true_applies_to_all_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_keep_whitespace",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_minimal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_namespace_collapse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_namespace_collapse_all",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_namespace_ignore",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_namespace_on_root_without_other_attrs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_namespace_support",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_nested_semi_structured",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_postprocessor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_postprocessor_attribute",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_postprocessor_skip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_selective_force_cdata_backwards_compatibility",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_selective_force_cdata_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_selective_force_cdata_empty_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_selective_force_cdata_nested_elements",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_selective_force_cdata_single_element",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_selective_force_cdata_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_selective_force_cdata_with_attributes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_semi_structured",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_simple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_skip_attrib",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_skip_whitespace",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_streaming",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_streaming_attrs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_streaming_force_cdata_and_cdata_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_streaming_generator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_streaming_interrupt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_streaming_matches_nonstreaming",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_streaming_memory_usage",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_streaming_random_docs_match_nonstreaming",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_streaming_returns_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_streaming_text_postprocessor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_streaming_text_whitespace",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_streaming_text_with_attrs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_streaming_text_with_children",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_streaming_with_comments_and_attrs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_string_vs_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_xmltodict.py::test_unicode",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "xmltodict",
+  "python": "3.12.15",
+  "schema": 1
+}
