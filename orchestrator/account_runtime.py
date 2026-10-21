@@ -19,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from socket import SHUT_WR
 from stat import S_ISREG
+from tempfile import TemporaryDirectory
 from typing import Callable
 from urllib.error import HTTPError
 from urllib.parse import quote, unquote, urlsplit
@@ -1533,8 +1534,12 @@ class AccountRuntime:
         if not marker.exists():
             if (base/'site-packages').exists():
                 shutil.rmtree(base/'site-packages')
-            result = network.exec_run(['python3','-m','pip','install','--disable-pip-version-check','--no-index',
-                '--no-deps','--target',site,'--find-links','/cli/project-python/'+checksum+'/artifacts',*profile['requirements']])
+            # pip --target 会先展开全部依赖，完整项目环境可能超过 network 的 64MiB 临时盘。
+            # 暂存使用现有缓存下的 root 私有目录，成功或失败后清理，不放大角色资源。
+            with TemporaryDirectory(prefix='.pip-install-', dir=base) as temporary:
+                result = network.exec_run(['python3','-m','pip','install','--disable-pip-version-check','--no-index',
+                    '--no-deps','--target',site,'--find-links','/cli/project-python/'+checksum+'/artifacts',*profile['requirements']],
+                    environment={'TMPDIR':'/cli/project-python/'+checksum+'/'+Path(temporary).name})
             if result.exit_code:
                 raise ValueError('候选离线Python依赖准备失败')
             atomic_json(marker,{'profile_digest':checksum,'python':profile['python']})

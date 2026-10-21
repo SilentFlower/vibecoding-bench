@@ -21,6 +21,7 @@ from account_isolation import ROLE_COLUMNS, role_labels
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_PROBE, DMI_DIRECTORIES,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_PROBE, generate_computer_profile, generate_system_profile)
 from physical_features import FEATURE_LABELS, physical_features_summary
+from project_library import digest_json
 import main
 
 
@@ -56,6 +57,143 @@ class AccountRuntimeTests(unittest.TestCase):
         self.addCleanup(environment.stop)
         self.runtime = AccountRuntime(self.client, self.root, self.root, database, self.fingerprint, self.gateway)
         self.addCleanup(self.runtime.heartbeat_pool.shutdown)
+
+    def _scenario_python_fixture(self) -> SimpleNamespace:
+        """准备最小冻结制品与容器替身，不访问网络或真实账号。@return 测试夹具。"""
+        row = self.runtime._row("synthetic", 1)
+        source = self.root / "library/environments/synthetic/wheels/synthetic.whl"
+        source.parent.mkdir(parents=True)
+        source.write_bytes(b"synthetic-wheel")
+        profile = {"python": "3.11.9", "requirements": ["synthetic==1.0"],
+            "artifacts": [{"path": "wheels/synthetic.whl", "digest": "synthetic-digest"}]}
+        library = SimpleNamespace(root=self.root / "library", environments={"synthetic": profile},
+            projects={"synthetic": SimpleNamespace(manifest={"environment": "synthetic"})},
+            _artifact_digest=Mock(return_value="synthetic-digest"))
+        context = {"catalog_release_id": "frozen", "project_key": "synthetic",
+            "scenario_instance_id": 11, "workspace_relative": "projects/synthetic-workspace"}
+        self.runtime.project_iterations = SimpleNamespace(
+            scenarios=SimpleNamespace(context=Mock(return_value=context)), _release=Mock(return_value=library))
+        checksum = digest_json(profile)
+        account_root = self.runtime._root(row)
+        return SimpleNamespace(row=row, source=source, library=library, checksum=checksum,
+            base=account_root / "cli/project-python" / checksum,
+            marker=account_root / "runtime/project-python" / (checksum + ".json"),
+            packages=account_root / "cli/project-python-sessions/11/lib/python3.11/site-packages",
+            virtual_marker=account_root / "runtime/project-python-sessions/11.json",
+            cli=Mock(exec_run=Mock(return_value=SimpleNamespace(exit_code=0, output=b"3.11.9\n"))),
+            network=Mock())
+
+    def test_scenario_python_private_install_publishes_then_reuses_cache(self) -> None:
+        """安装私有暂存先清理再发布，缓存命中不重复安装或分发制品。@return None。"""
+        fixture = self._scenario_python_fixture()
+        temporary_paths = []
+
+        def execute(command, **kwargs):
+            """模拟安装与 venv，检查真实文件上的发布时序。@return 执行结果。"""
+            if command[:4] == ["python3", "-m", "pip", "install"]:
+                temporary = fixture.base / Path(kwargs["environment"]["TMPDIR"]).name
+                self.assertEqual("/cli/project-python/" + fixture.checksum + "/" + temporary.name,
+                    kwargs["environment"]["TMPDIR"])
+                self.assertEqual((os.getuid(), 0o700), (temporary.stat().st_uid, temporary.stat().st_mode & 0o777))
+                self.assertEqual([temporary], list(fixture.base.glob(".pip-install-*")))
+                self.assertFalse(fixture.marker.exists())
+                self.assertEqual(b"synthetic-wheel", (fixture.base / "artifacts/synthetic.whl").read_bytes())
+                (temporary / "unpacked").write_bytes(b"temporary-wheel-contents")
+                temporary_paths.append(temporary)
+                (fixture.base / "site-packages").mkdir()
+                (fixture.base / "site-packages/installed.py").write_bytes(b"installed")
+            else:
+                self.assertEqual(["python3", "-m", "venv", "--without-pip",
+                    "/cli/project-python-sessions/11"], command)
+                self.assertTrue(fixture.marker.exists())
+                self.assertTrue(all(not path.exists() for path in temporary_paths))
+                self.assertFalse(fixture.virtual_marker.exists())
+                fixture.packages.mkdir(parents=True)
+            return SimpleNamespace(exit_code=0, output=b"")
+
+        fixture.network.exec_run.side_effect = execute
+        with patch("account_runtime.role_container", return_value=fixture.network) as role:
+            result = self.runtime.prepare_scenario_python(fixture.row, "run-one", fixture.cli)
+            role.assert_called_once_with(self.runtime, fixture.row, "network")
+            self.assertTrue(fixture.virtual_marker.exists())
+            self.assertEqual("/home/node/projects/synthetic-workspace/library\n"
+                "/home/node/projects/synthetic-workspace/app\n" + result["site"] + "\n",
+                (fixture.packages / "project-source.pth").read_text())
+            self.assertTrue(all(not path.exists() for path in temporary_paths))
+            fixture.source.unlink()
+            fixture.network.exec_run.reset_mock()
+            with patch("account_runtime.shutil.copyfile") as copy:
+                self.assertEqual(result,
+                    self.runtime.prepare_scenario_python(fixture.row, "run-two", fixture.cli))
+            copy.assert_not_called()
+            fixture.network.exec_run.assert_not_called()
+        fixture.library._artifact_digest.assert_called_once_with(fixture.source)
+        self.assertEqual(2, fixture.cli.exec_run.call_count)
+
+    def test_scenario_python_failed_install_cleans_temporary_and_retries_partial_site(self) -> None:
+        """失败不发布缓存证明，重试先移除半成品再发布完整环境。@return None。"""
+        fixture = self._scenario_python_fixture()
+        temporary_paths = []
+        attempts = []
+
+        def execute(command, **kwargs):
+            """让首次 pip 留下半成品后失败，第二次完整安装。@return 执行结果。"""
+            if command[:4] == ["python3", "-m", "pip", "install"]:
+                temporary = fixture.base / Path(kwargs["environment"]["TMPDIR"]).name
+                self.assertTrue(temporary.is_dir())
+                self.assertEqual(0o700, temporary.stat().st_mode & 0o777)
+                self.assertFalse(fixture.marker.exists())
+                self.assertFalse((fixture.base / "site-packages").exists())
+                self.assertTrue(all(not path.exists() for path in temporary_paths))
+                temporary_paths.append(temporary)
+                (temporary / "unpacked").write_bytes(b"temporary-wheel-contents")
+                (fixture.base / "site-packages").mkdir()
+                attempts.append(command)
+                if len(attempts) == 1:
+                    (fixture.base / "site-packages/partial.py").write_bytes(b"partial")
+                    return SimpleNamespace(exit_code=1, output=b"synthetic install failure")
+                (fixture.base / "site-packages/complete.py").write_bytes(b"complete")
+            else:
+                self.assertTrue(fixture.marker.exists())
+                fixture.packages.mkdir(parents=True)
+            return SimpleNamespace(exit_code=0, output=b"")
+
+        fixture.network.exec_run.side_effect = execute
+        with patch("account_runtime.role_container", return_value=fixture.network):
+            with self.assertRaisesRegex(ValueError, "候选离线Python依赖准备失败"):
+                self.runtime.prepare_scenario_python(fixture.row, "run-one", fixture.cli)
+            self.assertFalse(fixture.marker.exists())
+            self.assertFalse(fixture.virtual_marker.exists())
+            self.assertTrue((fixture.base / "site-packages/partial.py").exists())
+            self.assertTrue(all(not path.exists() for path in temporary_paths))
+            self.runtime.prepare_scenario_python(fixture.row, "run-one", fixture.cli)
+        self.assertEqual(2, len(attempts))
+        self.assertFalse((fixture.base / "site-packages/partial.py").exists())
+        self.assertEqual(b"complete", (fixture.base / "site-packages/complete.py").read_bytes())
+        self.assertTrue(fixture.marker.exists())
+        self.assertTrue(fixture.virtual_marker.exists())
+        self.assertTrue(all(not path.exists() for path in temporary_paths))
+
+    def test_scenario_python_exec_exception_cleans_private_install_directory(self) -> None:
+        """Docker 执行异常也清理私有展开目录，不发布任何成功证明。@return None。"""
+        fixture = self._scenario_python_fixture()
+        temporary_paths = []
+
+        def execute(command, **kwargs):
+            """模拟执行通道断开前已写入暂存。@return 不返回，抛出模拟异常。"""
+            temporary = fixture.base / Path(kwargs["environment"]["TMPDIR"]).name
+            (temporary / "unpacked").write_bytes(b"temporary-wheel-contents")
+            temporary_paths.append(temporary)
+            raise OSError("synthetic exec failure")
+
+        fixture.network.exec_run.side_effect = execute
+        with patch("account_runtime.role_container", return_value=fixture.network):
+            with self.assertRaisesRegex(OSError, "synthetic exec failure"):
+                self.runtime.prepare_scenario_python(fixture.row, "run-one", fixture.cli)
+        self.assertEqual(1, len(temporary_paths))
+        self.assertFalse(temporary_paths[0].exists())
+        self.assertFalse(fixture.marker.exists())
+        self.assertFalse(fixture.virtual_marker.exists())
 
     def test_physical_refresh_uses_current_cli_without_changing_identity(self) -> None:
         """显式只读采集保留持久身份，并发布当前代的私有快照。@return None。"""
