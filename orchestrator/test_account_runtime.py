@@ -83,6 +83,63 @@ class AccountRuntimeTests(unittest.TestCase):
             cli=Mock(exec_run=Mock(return_value=SimpleNamespace(exit_code=0, output=b"3.11.9\n"))),
             network=Mock())
 
+    def test_cli_storage_failure_keeps_verified_private_version_available(self) -> None:
+        """去重是可选优化，磁盘缓存故障不能使已验证安装的 CLI 登录失败。@return None。"""
+        row = self.runtime._row('synthetic', 1)
+        row['isolation_version'] = 2
+        container = Mock(labels={'vibebench.isolation-version': '2'})
+        network = Mock(exec_run=Mock(return_value=SimpleNamespace(exit_code=0)))
+        self.runtime._cli_artifact_protocol = 2
+        with patch.object(self.runtime, '_row_for_container', return_value=row), \
+                patch.object(self.runtime, '_network_container', return_value=network), \
+                patch('account_runtime.deduplicate_immutable_tree', side_effect=OSError('synthetic disk failure')) as share:
+            self.runtime._ensure_version(container, '2.1.293')
+        share.assert_called_once_with(self.runtime._root(row) / 'cli/2.1.293', minimum_bytes=1024**2,
+            owner_uid=0, canonical_root=self.root / 'cli-artifacts')
+        self.client.images.get.assert_not_called()
+
+    def test_old_cli_install_protocol_never_shares_programs(self) -> None:
+        """没有原子安装协议的旧镜像继续使用账号私有版本路径。@return None。"""
+        row = self.runtime._row('synthetic', 1)
+        row['isolation_version'] = 2
+        container = Mock(labels={'vibebench.isolation-version': '2'})
+        network = Mock(exec_run=Mock(return_value=SimpleNamespace(exit_code=0)))
+        with patch.object(self.runtime, '_row_for_container', return_value=row), \
+                patch.object(self.runtime, '_network_container', return_value=network), \
+                patch('account_runtime.deduplicate_immutable_tree') as share:
+            self.runtime._ensure_version(container, '2.1.293')
+        share.assert_not_called()
+
+    @unittest.skipUnless(os.geteuid() == 0, '共享程序缓存由 root 维护')
+    def test_verified_cli_preparation_shares_programs_without_sharing_home(self) -> None:
+        """实际准备入口复用两个账号的同字节程序，HOME 身份文件仍独立。@return None。"""
+        self.runtime._cli_artifact_protocol = 2
+        rows = [self.runtime._row('synthetic', 1), self.runtime._row('second-synthetic', None)]
+        containers, programs, identities = [], [], []
+        for index, row in enumerate(rows):
+            row['isolation_version'] = 2
+            root = self.runtime._root(row)
+            program = root / 'cli/2.1.293/node_modules/vendor/program'
+            program.parent.mkdir(parents=True)
+            program.write_bytes(b'static-cli-program' * 65536)
+            program.chmod(0o755)
+            identity = root / 'home/.credentials.json'
+            identity.parent.mkdir(exist_ok=True)
+            identity.write_text('synthetic-private-identity-' + str(index))
+            identity.chmod(0o600)
+            programs.append(program)
+            identities.append(identity)
+            containers.append(Mock(id=str(index), labels={'vibebench.isolation-version': '2'}))
+        network = Mock(exec_run=Mock(return_value=SimpleNamespace(exit_code=0)))
+        with patch.object(self.runtime, '_row_for_container', side_effect=lambda container: rows[int(container.id)]), \
+                patch.object(self.runtime, '_network_container', return_value=network):
+            for container in containers:
+                self.runtime._ensure_version(container, '2.1.293')
+        self.assertEqual(programs[0].stat().st_ino, programs[1].stat().st_ino)
+        self.assertNotEqual(identities[0].stat().st_ino, identities[1].stat().st_ino)
+        self.assertEqual('synthetic-private-identity-0', identities[0].read_text())
+        self.assertEqual('synthetic-private-identity-1', identities[1].read_text())
+
     def test_scenario_python_private_install_publishes_then_reuses_cache(self) -> None:
         """安装私有暂存先清理再发布，缓存命中不重复安装或分发制品。@return None。"""
         fixture = self._scenario_python_fixture()

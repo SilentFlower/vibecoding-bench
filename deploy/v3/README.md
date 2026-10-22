@@ -41,7 +41,24 @@ pull 按 `registry_digest` 固定下载，核对配置 ID后建立清单中的�
 
 首次使用空目录；不复制旧账号有效 RT。每账号 HOME、CA、工作目录、CLI 版本缓存和 Recorder 证据归属保存在 `bench/environments/<环境 ID>`。停止固定容器保留目录和容器，重启服务先对账遗留执行。停止入口按产品及部署标签收口，不 prune Docker、不删除数据或旧网络。
 
-同一部署可重复 `up` 更新自有管理服务，外部资源冲突仍拒绝。需要停机备份的正式升级先 `stop`，再 `backup` 到全新且独立的目录。备份包含持久 HOME、凭据、工作目录、证据、联合镜像清单与 SQLite backup API 快照，目录权限为 0700；运行期间和已有备份目录都拒绝操作。新备份的 SQLite 完整性检查及完成标记成功后，仅保留同一父目录中同部署、同数据根的最近一份完整备份；备份失败保留旧副本，未知、跨部署、未完成目录及目录链接不参与轮换。tmux 等进程留下的 Unix socket 不进入快照，普通文件与符号链接保留；恢复连接由新进程重新创建。备份含账号秘密，应按当前数据目录的权限保管。
+同一部署可重复 `up` 更新自有管理服务，外部资源冲突仍拒绝。需要停机备份的正式升级先 `stop`，再 `backup` 到全新且独立的目录。**默认精简备份**保留数据库、持久 HOME 身份/凭据、工作目录、任务成果、执行/恢复证据与部署配置；仅排除明确的 npm 下载缓存，以及已经证明可按固定来源恢复的 CLI 程序和当前镜像项目内容。缺少可信恢复元数据的旧程序、浏览器、未知 HOME 缓存及历史项目版本仍会保留，不能只按目录名删除。`--full` 显式保存全部可重建程序与缓存。
+
+备份采用 SQLite backup API，保留 WAL 中的事务，目录权限为 0700。`backup-files.json` 保存文件字节摘要、权限/归属、链接、排除范围及依赖恢复来源；CLI 的公开依赖锁、程序摘要与 root 安装回执保留在恢复清单中。新快照必须在独立目录实际复制，校验文件、身份、配置和数据库后，才发布完成标记并轮换同父目录、同部署、同数据根的旧完整或精简副本，仅保留最近一份。失败保留原恢复点，未知、跨部署、未完成目录及目录链接不参与轮换。tmux 等 Unix socket 不进入快照，普通符号链接原样保留，不跟随其目标。精简恢复需按清单重新准备程序依赖；整盘丢失后不保证零下载恢复全部工具。备份含账号秘密，须按当前数据目录权限保管。
+
+```bash
+# 默认精简；只有明确需要完整工具副本时才使用 --full。
+scripts/v3-stack backup --env /absolute/path/v3.env --backup-dir /absolute/path/new-backup
+scripts/v3-stack backup --env /absolute/path/v3.env --backup-dir /absolute/path/new-full-backup --full
+# 可离线复验新格式备份，不需要加载线上配置或调用账号。
+scripts/v3-stack verify-backup --backup-dir /absolute/path/new-backup
+# 先生成维护清单，再停机应用；清单变化后必须重新生成。
+scripts/v3-stack storage --env /absolute/path/v3.env --output /absolute/path/new-storage-plan.json
+scripts/v3-stack stop --env /absolute/path/v3.env
+scripts/v3-stack storage --env /absolute/path/v3.env --apply --source /absolute/path/new-storage-plan.json --output /absolute/path/new-storage-result.json
+scripts/v3-stack up --env /absolute/path/v3.env
+```
+
+备份、维护和 `up` 共用部署级非阻塞磁盘锁，维护时不可同时启动服务。`storage` 只清理本部署精确 `_cacache` 路径，并对冻结项目内容与具有新安装回执的静态 CLI 制品去重；账号 HOME、会话、凭据和候选工作区保持独立。浏览器及旧安装协议 CLI 在无法证明安全时保留，清单会记录原因。新 CLI 在暂存目录安装、验证精确版本、生成回执后原子发布，结束清理下载缓存；同版本遗留暂存会在取得安装锁后收口，缓存回收失败不阻断已验证就绪的程序。同字节且同权限的程序通过管理端私有 `bench/cli-artifacts` 复用，账号没有该缓存的跨账号可写挂载。已完成且通过隔离恢复的同部署备份保存带摘要保护的来源证明，程序及依赖锁未变时可以复用，清缓存后不必重新下载才能生成下一份精简备份。不要对 Docker 卷、其它应用目录或未知账号目录执行全局 prune。
 
 v3 回退先停止当前批次并保留最新停机备份。只在布局/桥协议兼容时，把 env 中两个镜像及清单一起切回已保存的兼容批次，再 check/up；通过“环境与任务”的重建操作替换已停止的旧批次容器，保留环境 ID 和持久 HOME。未完成重建的环境会拒绝发送，不静默混用镜像。数据库或布局不兼容时不能直接回退镜像，需先在独立离线目录核对快照与最新凭据所有者，再安排恢复；没有自动恢复数据库或切回旧版的入口。
 

@@ -29,6 +29,7 @@ from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, ROLE_LABELS, crea
 from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_process_metrics
 from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, validate_features
 from resource_budget import account_limits, isolated_account_limits
+from storage_maintenance import deduplicate_immutable_tree
 from system_profile import (MAX_CPUINFO_BYTES, generate_computer_profile, generate_system_profile,
     render_computer_profile, render_system_profile, validate_computer_profile, validate_system_profile,
     verify_computer_profile, verify_system_profile)
@@ -176,6 +177,7 @@ class AccountRuntime:
 
     def __init__(self, client, data: Path, host_data: Path, database: Callable,
                  fingerprint: Callable, gateway, quota_identity: Callable | None = None) -> None:
+        """初始化固定环境；参数沿用类文档，quota_identity 用于额度身份校验。@return None。"""
         self.client, self.data, self.host_data = client, data, host_data
         self.database, self.fingerprint, self.gateway = database, fingerprint, gateway
         self.quota_identity = quota_identity
@@ -186,6 +188,7 @@ class AccountRuntime:
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,35}", self.deployment):
             raise ValueError("V3_DEPLOYMENT_ID 格式不合法")
         self.image = os.environ["V3_ACCOUNT_IMAGE"]
+        self._cli_artifact_protocol = 0
         self.network = os.environ["V3_NETWORK"]
         self.release_id = os.environ.get("V3_RELEASE", "")
         self.limit = int(os.environ.get("V3_MAX_ACTIVE_ACCOUNTS", "1"))
@@ -650,6 +653,7 @@ class AccountRuntime:
             image_labels = image.attrs["Config"].get("Labels") or {}
             if not self.release_id or image_labels.get("vibebench.product") != "v3" or image_labels.get("vibebench.role") != "account" or image_labels.get("vibebench.release") != self.release_id:
                 raise ValueError("账号镜像角色或构建批次不匹配")
+            self._cli_artifact_protocol = 2 if image_labels.get('vibebench.cli-install-version') == '2' else 0
             if account.get("cc2api_account_id") is not None:
                 configuration = self.gateway._request("GET", f"/admin/runtime/accounts/{account['cc2api_account_id']}/config")
                 if configuration["auth_type"] != "oauth" or (configuration["status"] != "active" and not allow_inactive_login):
@@ -756,11 +760,22 @@ class AccountRuntime:
     def _ensure_version(self, container, version: str) -> None:
         if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9._-]+)?", version):
             raise ValueError("CLI 版本格式不合法")
-        network = (self._network_container(self._row_for_container(container))
-            if container.labels.get("vibebench.isolation-version") == str(ISOLATION_VERSION) else container)
+        row = (self._row_for_container(container)
+            if container.labels.get("vibebench.isolation-version") == str(ISOLATION_VERSION) else None)
+        network = self._network_container(row) if row is not None else container
         result = network.exec_run(["timeout", "--kill-after=5", "180", "/usr/local/bin/v3-cli-version", version])
         if result.exit_code != 0:
             raise ValueError("固定环境 CLI 版本准备失败")
+        if (self._cli_artifact_protocol == 2 and row is not None
+                and row.get('isolation_version') == ISOLATION_VERSION):
+            # 只有暂存安装协议才能保证已共享程序不会被后续安装原地改写。
+            root = self._root(row)
+            try:
+                deduplicate_immutable_tree(root / 'cli' / version, minimum_bytes=1024**2,
+                    owner_uid=0, canonical_root=self.data / 'cli-artifacts')
+            except (OSError, ValueError):
+                # 去重是空间优化；新安装的私有版本已通过验证，不能因缓存故障阻断业务。
+                pass
 
     def _row_for_container(self, container) -> dict:
         connection = self.database()

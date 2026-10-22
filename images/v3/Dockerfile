@@ -105,6 +105,7 @@ ARG V3_PARENT_REV
 ARG V3_GATEWAY_REV
 LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELEASE \
     vibebench.isolation-version="2" \
+    vibebench.cli-install-version="2" \
     vibebench.system-profile-version="1" \
     vibebench.computer-profile-version="1" \
     vibebench.parent-revision=$V3_PARENT_REV vibebench.gateway-revision=$V3_GATEWAY_REV \

@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from stat import S_ISLNK, S_ISREG
 
+from storage_maintenance import deduplicate_immutable_tree
+
 
 PROJECT_KEY = re.compile(r"^[a-z][a-z0-9-]{0,79}$")
 MAX_TREE_BYTES = 128 * 1024 * 1024
@@ -352,6 +354,8 @@ class ProjectLibrary:
                     installed = ProjectLibrary(temporary)
                     if installed.digest != self.digest:
                         raise ValueError('注册期间项目内容发生变化')
+                # 冻结版本只读复用，候选工作区仍由独立字节复制生成，不能链接到基线。
+                deduplicate_immutable_tree(temporary)
                 os.rename(temporary, destination)
             except FileExistsError:
                 shutil.rmtree(temporary)

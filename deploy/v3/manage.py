@@ -28,6 +28,10 @@ COMPOSE = Path(__file__).with_name("compose.yml")
 # 独立部署脚本复用镜像内的纯预算模块，避免预检和容器解释不同单位。
 sys.path.insert(0, str(REPO / "orchestrator"))
 from resource_budget import account_limits, isolated_account_limits
+from storage_assets import essential_exclusions
+from storage_backup import create_backup_data, verify_backup_data
+from storage_cleanup import apply_storage_plan, storage_plan
+from storage_maintenance import acquire_storage_lock, deduplicate_immutable_tree, read_storage_json
 
 
 def command(*arguments: str, capture: bool = False, environment=None) -> str:
@@ -414,6 +418,8 @@ def build(release: str, manifest_path: Path) -> None:
             digest.update(b"\0")
             digest.update(hashlib.sha256(path.read_bytes()).digest())
         source_hash = digest.hexdigest()
+        # 在 COPY 前去重，避免先写入镜像层再删除仍保留完整下层副本。
+        deduplicate_immutable_tree(snapshot / 'project_library')
         images = {}
         for role in ("control", "account"):
             reference = f"vibebench-v3-{role}:v3-{release}"
@@ -932,22 +938,27 @@ def _prune_previous_backups(target: Path, deployment: str, root: Path) -> int:
     return removed
 
 
-def backup(values: dict, destination: Path) -> None:
-    """仅在本部署全部停止后保存持久目录和一致的 SQLite 快照。
+def backup(values: dict, destination: Path, *, full: bool = False,
+           configuration_path: Path | None = None) -> None:
+    """停机后默认精简备份，并在独立目录验证恢复后轮换旧副本。
 
     :param values: 当前部署配置
     :param destination: 全新且与数据根分离的绝对备份目录
+    :param full: 显式保留完整可重建程序与下载缓存。
+    :param configuration_path: 可选的部署环境配置，命令行入口始终传入。
     :return: None；新备份校验成功后只保留同目录、同部署及同数据根的本次备份。
     """
     deployment = values["V3_DEPLOYMENT_ID"]
     root = _owned_root(values, stopped=True)
     target = destination.resolve()
-    if not destination.is_absolute() or target.exists() or target == root or root in target.parents or target in root.parents:
+    if (not destination.is_absolute() or destination != target or target.exists()
+            or target == root or root in target.parents or target in root.parents):
         raise ValueError("备份必须使用数据根以外的全新绝对目录")
     manifest = inspect_images(values)
     target.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
     lock_name = '.v3-backup-'+hashlib.sha256((deployment+':'+str(root)).encode()).hexdigest()[:20]+'.lock'
     descriptor = os.open(target.parent/lock_name,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+    operation_descriptor = None
     try:
         if not S_ISREG(os.fstat(descriptor).st_mode):
             raise ValueError('备份锁必须为普通文件')
@@ -955,42 +966,102 @@ def backup(values: dict, destination: Path) -> None:
             fcntl.flock(descriptor,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except BlockingIOError as error:
             raise ValueError('本部署已有备份操作进行中') from error
+        operation_descriptor = acquire_storage_lock(root)
+        _owned_root(values, stopped=True)
         target.mkdir(mode=0o700)
         try:
-            # tmux 留下的 Unix socket 无法复制或恢复连接；持久文件和符号链接仍完整保留。
-            shutil.copytree(root, target / "data", symlinks=True,
-                ignore=lambda directory, names: [name for name in names
-                    if S_ISSOCK((Path(directory) / name).lstat().st_mode)])
-            for relative in ("gateway/gateway.sqlite", "bench/db.sqlite"):
-                source = root / relative
-                if not source.exists():
-                    continue
-                output = target / "data" / relative
-                for suffix in ("", "-wal", "-shm"):
-                    Path(str(output) + suffix).unlink(missing_ok=True)
-                # 使用 SQLite backup API 而非只复制主文件，保留尚未 checkpoint 的合法事务。
-                with sqlite3.connect("file:" + quote(str(source), safe="/") + "?mode=ro", uri=True) as current:
-                    with sqlite3.connect(output) as snapshot:
-                        current.backup(snapshot)
-                        if snapshot.execute('PRAGMA quick_check').fetchall()!=[('ok',)]:
-                            raise ValueError('备份数据库完整性检查未通过')
-                output.chmod(0o600)
-            (target / "release.json").write_text(json.dumps(manifest, indent=2) + "\n")
+            excluded = {} if full else essential_exclusions(root, manifest,
+                temporary_parent=target.parent, deployment=deployment)
+            configuration = {}
+            if configuration_path is not None:
+                configuration['v3.env'] = configuration_path
+                for name in ('source-revision.txt', 'server-password-override.json'):
+                    candidate = configuration_path.parent / name
+                    if candidate.exists():
+                        configuration[name] = candidate
+            summary = create_backup_data(root, target, excluded=excluded,
+                mode='full' if full else 'essential', configuration=configuration)
+            verified = verify_backup_data(target)
+            _owned_root(values, stopped=True)
+            _write_new_json(target / 'release.json', manifest)
             marker = target/".v3-backup.json"
-            with marker.open('x') as stream:
-                json.dump({"deployment":deployment,"source_root":str(root),"layout_version":manifest["layout_version"],
+            marker_descriptor = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(marker_descriptor, 'w') as stream:
+                json.dump({"schema":2,"mode":summary['mode'],"verified":verified,
+                    "files_manifest_sha256":_file_sha256(target / 'backup-files.json'),
+                    "deployment":deployment,"source_root":str(root),"layout_version":manifest["layout_version"],
                     "bridge_protocol":manifest["bridge_protocol"],"release":manifest["release"],"completed_at":time.time()},stream)
                 stream.write('\n')
                 stream.flush()
                 os.fsync(stream.fileno())
+            for directory in (target, target.parent):
+                durable_directory = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+                try:
+                    os.fsync(durable_directory)
+                finally:
+                    os.close(durable_directory)
         except Exception:
             shutil.rmtree(target)
             raise
         # 必须在新快照完成后才淘汰旧副本；轮换失败也不能删除刚完成的恢复点。
         removed = _prune_previous_backups(target,deployment,root)
-        print('v3 停机备份完成：'+str(target)+'；保留最近 1 份，已移除旧备份 '+str(removed)+' 份')
+        print('v3 '+summary['mode']+' 备份及隔离恢复验证完成：'+str(target)
+            +'；文件字节 '+str(summary['bytes'])+'；保留最近 1 份，已移除旧备份 '+str(removed)+' 份')
     finally:
+        if operation_descriptor is not None:
+            os.close(operation_descriptor)
         os.close(descriptor)
+
+
+def _write_storage_report(descriptor: int, result: dict) -> None:
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    os.ftruncate(descriptor, 0)
+    with os.fdopen(descriptor, 'w', closefd=False) as output:
+        json.dump(result, output, ensure_ascii=False, indent=2)
+        output.write('\n')
+        output.flush()
+        os.fsync(descriptor)
+
+
+def storage(values: dict, *, source: Path | None = None, output: Path | None = None,
+            apply: bool = False) -> dict:
+    """生成或应用本部署维护清单，在清理前独占预留结果文件。
+
+    :param values: 已读取的部署配置。
+    :param source: 应用时使用的既有私有清单。
+    :param output: 可选且必须全新的结果路径。
+    :param apply: False 为只读盘点，True 要求本部署全停机。
+    :return: 精确维护清单或实际执行回执。
+    """
+    root = _owned_root(values, stopped=apply)
+    manifest = inspect_images(values)
+    operation_descriptor = acquire_storage_lock(root) if apply else None
+    output_descriptor = None
+    try:
+        if output is not None:
+            output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            # 必须先取得全新回执路径，不能清理完才发现结果文件已被占用。
+            output_descriptor = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        if apply:
+            if source is None:
+                raise ValueError('应用维护需要已有私有清单')
+            _owned_root(values, stopped=True)
+            result = apply_storage_plan(root, manifest['release'], read_storage_json(source))
+        else:
+            result = storage_plan(root, manifest['release'])
+        if output_descriptor is not None:
+            _write_storage_report(output_descriptor, result)
+        return result
+    except Exception as error:
+        if output_descriptor is not None:
+            _write_storage_report(output_descriptor, {'status': 'failed', 'error_type': type(error).__name__,
+                'free_bytes': shutil.disk_usage(root).free})
+        raise
+    finally:
+        if output_descriptor is not None:
+            os.close(output_descriptor)
+        if operation_descriptor is not None:
+            os.close(operation_descriptor)
 
 
 def main() -> None:
@@ -999,7 +1070,7 @@ def main() -> None:
     :return: None
     """
     parser = argparse.ArgumentParser(description="v3 联合镜像管理")
-    parser.add_argument("action", choices=("build", "publish", "pull", "load", "check", "up", "status", "stop", "backup", "import-offline"))
+    parser.add_argument("action", choices=("build", "publish", "pull", "load", "check", "up", "status", "stop", "backup", "verify-backup", "storage", "import-offline"))
     parser.add_argument("--env", type=Path)
     parser.add_argument("--release")
     parser.add_argument("--manifest", type=Path)
@@ -1007,6 +1078,7 @@ def main() -> None:
     parser.add_argument("--bundle", type=Path)
     parser.add_argument("--namespace", default="ghcr.io/silentflower")
     parser.add_argument("--backup-dir", type=Path)
+    parser.add_argument("--full", action="store_true", help="显式完整备份；默认只保留可验证恢复的关键状态")
     parser.add_argument("--source", type=Path)
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
@@ -1027,9 +1099,23 @@ def main() -> None:
                 parser.error("load 需要 --bundle")
             load_bundle(args.manifest, args.bundle)
         return
+    if args.action == 'verify-backup':
+        if not args.backup_dir:
+            parser.error('验证备份需要 --backup-dir')
+        print(json.dumps(verify_backup_data(args.backup_dir), ensure_ascii=False))
+        return
     if not args.env:
         parser.error("此操作需要 --env")
     values = load_environment(args.env)
+    if args.action == 'storage':
+        if args.apply and not args.source:
+            parser.error('应用维护清单需要 --source')
+        result = storage(values, source=args.source, output=args.output, apply=args.apply)
+        if args.output:
+            print(json.dumps({'status': result.get('status', 'planned'), 'output': str(args.output)}, ensure_ascii=False))
+        else:
+            print(json.dumps(result, ensure_ascii=False))
+        return
     if args.action == "import-offline":
         if not args.source:
             parser.error("import-offline 需要 --source")
@@ -1038,7 +1124,7 @@ def main() -> None:
     if args.action == "backup":
         if not args.backup_dir:
             parser.error("backup 需要 --backup-dir")
-        backup(values, args.backup_dir)
+        backup(values, args.backup_dir, full=args.full, configuration_path=args.env)
         return
     environment = dict(os.environ, **values)
     compose = ["docker", "compose", "--env-file", str(args.env.resolve()), "-f", str(COMPOSE)]
@@ -1048,11 +1134,15 @@ def main() -> None:
             print("v3 版本、数据归属、端口和资源预检通过")
             return
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
-        for child in ("gateway", "bench"):
-            (root / child).mkdir(exist_ok=True, mode=0o700)
-        (root / ".v3-deployment.json").write_text(json.dumps({"deployment": values["V3_DEPLOYMENT_ID"]}))
-        environment.update(values)
-        command(*compose, "up", "-d", environment=environment)
+        operation_descriptor = acquire_storage_lock(root)
+        try:
+            for child in ("gateway", "bench"):
+                (root / child).mkdir(exist_ok=True, mode=0o700)
+            (root / ".v3-deployment.json").write_text(json.dumps({"deployment": values["V3_DEPLOYMENT_ID"]}))
+            environment.update(values)
+            command(*compose, "up", "-d", environment=environment)
+        finally:
+            os.close(operation_descriptor)
     elif args.action == "status":
         status(values)
     else:

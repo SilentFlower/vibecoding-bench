@@ -121,7 +121,7 @@ artifact `v3-release-<run_id>-<run_attempt>` 保存发布清单与同批 gzip �
 
 停机 backup 用 lstat 排除不可复制的 Unix socket，保留普通文件及符号链接和 SQLite backup API 快照；tmux 等连接由新进程重建，不把运行 socket 当作持久数据，也不删除源 socket。真实 socket、WAL 事务、普通文件和符号链接须一并回归。
 
-`backup --backup-dir <全新绝对目录>` 在同父目录对本部署／数据根加非阻塞锁；SQLite `quick_check`、清单及完成标记成功后，才删除该父目录内同部署、同源数据根的旧完整备份，仅留本次一份。新备份失败保留旧副本，轮换失败保留新副本并报错；未知、未完成、跨部署或目录链接不删除。该轮换不清理远端其他路径或 Docker 镜像。
+`backup --backup-dir <全新绝对目录>` 默认精简，`--full` 显式完整；独立恢复验证与持久完成标记成功后，才轮换同父目录、同部署、同数据根的旧完整或精简备份，仅留本次一份。备份、维护及 `up` 共享非阻塞磁盘锁；失败保留原恢复点，轮换失败保留新副本并报错。排除证明、恢复清单与维护边界见下方“精简备份与不可变制品维护”场景，不清理其他路径或 Docker 镜像。
 
 统一 Vue 后台通过受鉴权的 `/runtime/` 桥访问 bench，保留 HTTP/SSE/WS。浏览器桥限定路径/方法，拒绝内部和编码绕过；v3 Cookie 名和 scope 独立，退出撤销服务端会话及旧票据。终端资源打包到镜像，不依赖运行时 CDN。
 
@@ -814,3 +814,64 @@ runtime/physical-features.json = {
 - test_account_runtime.py：只读采集命令与截止/UID、缓存权限、停止/占用不 exec、失败不覆盖、身份和凭据保持。
 - run_local_verification.py --manifest <联合清单> --run-windows-only：实际 CLI 采集 DMI/CPU/内核、cgroup、时区和 locale，核对配置、私有快照及采集前后凭据/指纹摘要。
 - verify_stack.py --manifest <联合清单> --browser --run-boundaries：页面/API/SQLite 与缓存对照、停止不唤醒、来源与旧值、XSS、1280/390px 明暗主题；保持独立 API/CLI 生命周期回归。
+
+## Scenario: v3 精简备份与不可变制品维护
+
+### 1. Scope / Trigger
+
+- 修改 `deploy/v3/manage.py` 的构建、备份或维护入口、`storage_*.py`、CLI 安装脚本及冻结项目安装时适用。减少物理副本，保留账号身份、历史成果与全部逻辑文件；不通过重建账号或重新授权换取空间。
+
+### 2. Signatures
+
+```text
+scripts/v3-stack backup --env <配置> --backup-dir <全新规范绝对目录> [--full]
+scripts/v3-stack verify-backup --backup-dir <新格式备份>
+scripts/v3-stack storage --env <配置> --output <全新私有清单>
+scripts/v3-stack storage --env <配置> --apply --source <清单> --output <全新回执>
+storage_maintenance.acquire_storage_lock(root: Path) -> int
+storage_maintenance.tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: bool = False) -> dict[str, dict]
+storage_maintenance.deduplicate_immutable_tree(root: Path, *, minimum_bytes=4096, owner_uid=None, apply=True, canonical_root=None) -> dict
+storage_backup.verify_backup_data(target: Path) -> dict
+```
+
+### 3. Contracts
+
+- 默认模式 `essential`，显式完整模式 `full`。数据库、HOME 身份/凭据、工作区、成果、恢复证据、未知缓存及历史内容版本保留；命令行备份同时保存配置及存在的宿主来源/密码兼容说明。Unix socket 不复制，普通符号链接原样保存。
+- 仅排除精确 `home/.npm/_cacache`、`cli/.npm-cache/_cacache`，以及已证明恢复来源的程序。CLI 精确版本、公开 npm 依赖锁和程序 SHA256 必须匹配；证明来自 root 私有协议2安装回执、无网络 npm 重建，或同部署/数据根/平台且通过隔离恢复的完成备份。复用旧证明须核对完成标记绑定的恢复清单 SHA256；损坏或来源不明时包含原程序。浏览器恢复来源不足时保留。
+- 当前项目版本只有经同批已核验 control 镜像在隔离目录真实重建且全树字节、权限与归属一致时才可排除，其他版本保留。共享 CLI 缓存只有全部文件被已证明的程序清单覆盖时才可排除。
+- `backup-files.json` 为私有 schema2，包含 `mode/data/configuration/databases/excluded`；文件记录种类、模式、uid/gid、大小/SHA256，链接记录原目标。两库使用 SQLite backup API，保留 WAL 事务，显式关闭连接后盘点，避免清单记录随 GC 消失的 WAL/SHM。
+- `verify-backup` 无需线上 env；仅校验新格式。真实复制到独立目录，恢复权限/归属/链接并核对文件与数据库 `integrity_check`、逻辑摘要。成功返回 `status=passed, files, databases, isolated_restore=true`；不回写生产凭据或数据库。
+- 备份数据文件、目录、恢复清单及发布清单先落盘，再写私有 `.v3-backup.json` schema2：`mode/verified/files_manifest_sha256/deployment/source_root/layout_version/bridge_protocol/release/completed_at`。完成标记和父目录同步后才轮换；未知、跨部署、未完成和目录链接不参与轮换。
+- `storage` 默认只读。schema1 清单以 `source_root/release/plan_sha256` 绑定范围，包含 `caches/content/cli/retained`；缓存条目另绑定设备、inode、逻辑清单摘要及字节数。应用必须全停机，先验证整份清单并独占预留结果文件，再用拒绝链接的目录 fd 收口精确缓存；失败回执包含 `status=failed/error_type/free_bytes`，不冒充清理成功。正常回执含清理路径、去重结果、保留原因及文件系统前后空闲字节。
+- 备份、维护及 `up` 共用 `.v3-storage-maintenance.lock`；非阻塞加锁，要求当前维护用户、0600、普通单链接空文件。读取维护元数据用有界 `O_NOFOLLOW/O_NONBLOCK`，拒绝 FIFO。应用检查本部署全部运行角色，包含验证辅助容器；不处理其他应用、Docker 卷或全局 prune。
+- 账号镜像用 `vibebench.cli-install-version=2` 声明暂存安装协议。安装锁内创建新目录，真实版本校验与 root 私有 `.v3-cli-install.json` 成功后发布 `.ready` 并原子替换；回执 schema1 含 `protocol=2/version/program_sha256/lock_sha256/package_sha256`。失败保留旧程序及原退出码，锁内收口同版本精确命名的遗留暂存；下载缓存回收失败不阻断已验证就绪版本。
+- 管理端只对已核验协议2及隔离布局2的程序复用私有 `bench/cli-artifacts`，大文件下限1MiB；维护入口要求匹配安装回执。旧协议、未知来源或保护不足的程序保留，优化故障沿用已验证私有 CLI，不新增 Docker 查询或改变资源/租约顺序。
+- 去重仅处理同文件系统、可信所有者、文件及父目录无组/其他用户写权限的普通文件；按字节、模式及uid/gid分组，替换前复核，临时硬链接后原子替换。共享缓存0700且独立于账号路径，账号没有跨账号可写挂载；HOME、会话、凭据和候选工作副本不参与。
+- 项目库在构建快照 `COPY` 前和新冻结版本发布前去重，逻辑内容及摘要不变；候选仍独立复制。不能通过在后续镜像层删除文件声称释放下层空间；镜像虚拟大小不与实际文件系统收益相加。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 任一自有角色运行／部署锁已占用 | 拒绝备份或维护，不中断工作 |
+| 备份目标已存在、非规范绝对路径或与数据根重叠 | 拒绝，不覆盖 |
+| 恢复文件/凭据/模式/归属/数据库摘要变化 | 校验失败，保留旧恢复点，不发布半成品 |
+| CLI 来源或旧备份证明无效、浏览器来源不全 | 包含或保留原程序，不扩大排除 |
+| 维护清单过期、路径越界、链接/FIFO或回执已存在 | 删除前拒绝；已有回执不覆盖 |
+| CLI 安装失败、返回错误版本／仅缓存回收失败 | 保留旧程序并报安装错误／就绪程序仍可执行 |
+| 同字节但权限/归属不同、可写父目录或链接 | 不共享 inode，不越界写入 |
+
+### 5. Scenarios and Examples
+
+- 正常：停止本部署全部角色，生成默认精简备份；独立恢复通过后轮换旧副本，再按同发布清单维护，恢复服务并核对历史数据、工具启动和实际空闲变化。
+- 基础：旧 CLI 无安装证明且离线重建失败，仍备份原程序；已有完整备份按原归属参与轮换，新格式才支持 `verify-backup`。需要完整工具副本时显式使用 `--full`。
+- 错误用法：直接删除整个 `.cache`、`cli` 或旧版本，或在完成新恢复验证前删除原全量副本。正确处理：只应用精确清单，来源无法核验的程序保留，成功标记落盘后才轮换。
+- 错误用法：将候选工作区链接到共享依赖，或重装时原地覆盖已共享程序。正确处理：候选复制独立字节，程序写入新暂存目录并原子发布。
+
+### 6. Tests Required
+
+- `deploy/v3/test_manage.py`、`test_storage_backup.py`：默认/完整、WAL事务及GC后日志消失、文件/归属/配置/链接隔离恢复、失败保留旧副本、旧格式轮换、完成来源证明复用与篡改拒绝、回执冲突和活动部署不删除。
+- `orchestrator/test_storage_maintenance.py`：实际inode复用、字节/权限不变、幂等、目标变化、可写父目录及链接不参与、UID1000写入拒绝、缓存损坏/锁占用/FIFO及过期维护清单拒绝。
+- `test_account_runtime.py`、`test_project_scenario_content.py`：两账号实际程序共享而HOME独立、旧协议跳过、缓存故障不阻断、冻结依赖去重及候选修改不污染基线。
+- `deploy/v3/verify_storage.py --account-image <本地账号镜像> --output <全新回执>`：真实无网络Docker验证合成安装、共享、UID1000只读、失败/错版/重装、遗留暂存与缓存故障；不调用真实账号或模型。
+- 构建前后逐文件核对完整项目库、Docker COPY及安装摘要，运行代表性真实离线原生观察。生产另核对身份/历史记录/工具及文件系统空闲增量，保留当前和上一版镜像，不把本地通过宣称为已上线。

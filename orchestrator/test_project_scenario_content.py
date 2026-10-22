@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 import main
 from project_iteration import ProjectIterationManager
-from project_library import ProjectLibrary, snapshot_tree, write_document
+from project_library import ProjectLibrary, materialize_snapshot, snapshot_tree, write_document
 from test_project_iterations import ProjectIterationFixture
 
 
@@ -124,6 +124,33 @@ class ScenarioContentTests(unittest.TestCase):
         artifact.symlink_to(self.path)
         with self.assertRaises(ValueError):
             ProjectLibrary(self.root)
+
+    def test_install_deduplicates_dependencies_but_workspace_stays_independent(self) -> None:
+        """重复离线依赖可复用 inode，候选改动不能回写冻结源码。@return None。"""
+        artifact = self.root / 'environments/python-test/artifacts/test.whl'
+        artifact.write_bytes(b'test-only-offline-dependency' * 512)
+        duplicate = artifact.with_name('copy.whl')
+        duplicate.write_bytes(artifact.read_bytes())
+        profile_path = self.root / 'environments/python-test/profile/profile.json'
+        profile = json.loads(profile_path.read_text())
+        checksum = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        profile['artifacts'] = [{'path': 'artifacts/' + name, 'digest': checksum}
+            for name in ('test.whl', 'copy.whl')]
+        write_document(profile_path, profile)
+        source = ProjectLibrary(self.root)
+        data = Path(self.temporary.name) / 'dedup-data'
+        installed = source.install(data)
+        directory = installed.root / 'environments/python-test/artifacts'
+        self.assertEqual(source.digest, installed.digest)
+        self.assertEqual((directory / 'test.whl').stat().st_ino, (directory / 'copy.whl').stat().st_ino)
+        seed = installed.projects['example'].root / 'seed'
+        snapshot = snapshot_tree(seed, data / 'project-artifacts/objects')
+        workspace = data / 'candidate'
+        materialize_snapshot(snapshot, data / 'project-artifacts/objects', workspace)
+        original = (seed / 'example.py').read_bytes()
+        (workspace / 'example.py').write_text('VALUE = 2\n')
+        self.assertEqual(original, (seed / 'example.py').read_bytes())
+        self.assertEqual(source.digest, ProjectLibrary(installed.root).digest)
 
     def test_duplicate_identity_and_invalid_rounds_rejected(self) -> None:
         """身份不重复，bool 不冒充整数上限。@return None。"""
