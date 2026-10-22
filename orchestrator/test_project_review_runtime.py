@@ -10,10 +10,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from account_isolation import ISOLATION_VERSION
-from account_runtime import AccountRuntime
+from docker.errors import APIError
+
+from account_isolation import ISOLATION_VERSION, role_labels
+from account_runtime import AccountRuntime, RuntimeBusy
 from project_library import read_document, write_document
-from resource_budget import scenario_account_limits
+from project_review_runtime import SERIAL_MODE
+from resource_budget import isolated_account_limits, scenario_account_limits, serial_review_limits
 import main
 
 
@@ -58,6 +61,330 @@ class PrivateReviewTests(unittest.TestCase):
         write_document(self.root/'profiles/synthetic/.credentials.json',self.credentials)
         write_document(self.root/'project-review-private/test/access/.credentials.json',self.credentials)
         self.path=self.root/'project-review-owner-refresh/1.json'
+
+    def _serial_fixture(self, legacy: bool = False) -> SimpleNamespace:
+        """创建带状态变化的容器替身，核真实持久交接和恢复。@param legacy 旧布局。@return 夹具。"""
+        fingerprint={**json.loads(self.row['fingerprint_json']),'mem':'1536m','swap':'2048m'}
+        self.runtime._update(self.row,fingerprint_json=json.dumps(fingerprint),generation=1,
+            isolation_version=ISOLATION_VERSION,container_id='fixed-cli',network_container_id='network',
+            sender_container_id='sender',state='ready')
+        limits=isolated_account_limits('1536m','2048m')
+        if legacy:
+            limits=scenario_account_limits('1536m','2048m')
+            write_document(self.runtime._root(self.row)/'runtime/project-review-layout.json',
+                {'schema':1,'review_capacity':1,'limits':{key:list(value) for key,value in limits.items()},
+                 'cli_nano_cpus':1000000000,'review_nano_cpus':500000000})
+        events=[]
+        roles={role:Mock(id=self.row[column],labels=role_labels(self.runtime,self.row,role),status='running',
+            attrs={'HostConfig':{'Memory':limits[role][0],'MemorySwap':limits[role][1],
+                'NanoCpus':(1000000000 if legacy else 1500000000) if role=='cli' else 250000000,
+                'PidsLimit':(384 if legacy else 512) if role=='cli' else 128}})
+            for role,column in (('cli','container_id'),('network','network_container_id'),('sender','sender_container_id'))}
+        cli=roles['cli']
+
+        def stop(timeout):
+            """模拟已确认的原容器退出。@param timeout 停止截止。@return None。"""
+            events.append('cli-stopped')
+            cli.status='exited'
+
+        def start():
+            """模拟恢复同一个容器。@return None。"""
+            events.append('cli-started')
+            cli.status='running'
+
+        cli.stop.side_effect=stop
+        cli.start.side_effect=start
+        cli.exec_run.return_value=SimpleNamespace(exit_code=0,output=b'{"orphans":[]}')
+        containers={role.id:role for role in roles.values()}
+        self.runtime.client.containers.get.side_effect=lambda identifier:containers[identifier]
+        for name in ('_wait_network','_sender_active','check_system_profile'):
+            self.enterContext(patch.object(self.runtime,name))
+        job=self.runtime.claim(self.row,self.account,'run:review:0')
+        job.update(execution_role='project-review',private_relative='project-review-private/test',
+            review_intent='a'*64,run_id='review',resource_mode=SERIAL_MODE)
+        self.runtime._save_execution(job)
+        return SimpleNamespace(cli=cli,roles=roles,containers=containers,events=events,job=job,
+            layout=self.review.serial_layout(self.row,cli))
+
+    def _private_child(self, fixture: SimpleNamespace) -> Mock:
+        """登记只包含本评审的独立容器。@param fixture 交接夹具。@return 私有容器。"""
+        child=Mock(id='private-review',labels=self.review.labels(fixture.job),status='running')
+
+        def stop(timeout):
+            """记录私有进程空间已退出。@param timeout 停止截止。@return None。"""
+            fixture.events.append('review-stopped')
+            child.status='exited'
+
+        child.stop.side_effect=stop
+        fixture.containers[child.id]=child
+        fixture.job['review_container_id']=child.id
+        self.runtime._save_execution(fixture.job)
+        self.runtime.client.containers.list.return_value=[child]
+        return child
+
+    def test_serial_budget_needs_no_reservation_and_preserves_existing_limits(self) -> None:
+        """普通和旧预留布局都能串行复用，固定配额不被改写。@return None。"""
+        fixture=self._serial_fixture()
+        self.assertEqual((1152*1024**2,1152*1024**2),serial_review_limits('1536m','2048m'))
+        self.assertEqual([1152*1024**2]*2,fixture.layout['limits']['review'])
+        self.assertFalse((self.runtime._root(self.row)/'runtime/project-review-layout.json').exists())
+        self.assertEqual([1152*1024**2,3200*1024**2],fixture.layout['limits']['cli'])
+        self.assertEqual((512*1024**2,)*2,serial_review_limits('896m'))
+        with self.assertRaises(ValueError):
+            serial_review_limits('895m')
+
+    def test_serial_cleanup_stops_review_before_restoring_same_cli(self) -> None:
+        """非共享评审完整清理后恢复原 CLI，网络与发送器不停止。@return None。"""
+        fixture=self._serial_fixture()
+        original=dict(fixture.cli.attrs['HostConfig'])
+        self.review.prepare_serial(fixture.job,fixture.cli,fixture.layout)
+        self.assertEqual('exited',fixture.cli.status)
+        child=self._private_child(fixture)
+        self.review._serial_phase(fixture.job,'review_running',review_container_id=child.id)
+        with self.assertRaises(RuntimeBusy):
+            self.runtime.claim(self.row,self.account,'run:other:0',shared_cli=True)
+        self.runtime.cleanup(fixture.job['token'])
+        self.assertEqual(['cli-stopped','review-stopped','cli-started'],fixture.events)
+        self.assertEqual(original,fixture.cli.attrs['HostConfig'])
+        self.assertIsNone(self.review.serial_state(self.row))
+        self.assertFalse(self.runtime.environment_jobs(self.row['environment_id']))
+        for role in ('network','sender'):
+            fixture.roles[role].stop.assert_not_called()
+            fixture.roles[role].start.assert_not_called()
+
+    def test_serial_unconfirmed_stop_keeps_gate_and_never_starts_review(self) -> None:
+        """暂停或停止结果未知时，交接记录阻止后续执行。@return None。"""
+        fixture=self._serial_fixture()
+        fixture.cli.stop.side_effect=lambda **kwargs:None
+        with self.assertRaisesRegex(ValueError,'尚未停止'):
+            self.review.prepare_serial(fixture.job,fixture.cli,fixture.layout)
+        self.assertEqual('cli_stopping',self.review.serial_state(self.row)['phase'])
+        self.runtime.client.containers.run.assert_not_called()
+        with self.assertRaises(RuntimeBusy):
+            self.runtime.claim(self.row,self.account,'run:other:0')
+
+    def test_serial_orphan_process_is_not_killed_to_make_room(self) -> None:
+        """未知进程需要对账，不能为了评审主动终止旧任务。@return None。"""
+        fixture=self._serial_fixture()
+        fixture.cli.exec_run.return_value=SimpleNamespace(exit_code=0,output=b'{"orphans":[{"pid":123}]}')
+        with self.assertRaisesRegex(ValueError,'未登记进程'):
+            self.review.prepare_serial(fixture.job,fixture.cli,fixture.layout)
+        fixture.cli.stop.assert_not_called()
+        self.assertIsNone(self.review.serial_state(self.row))
+
+    def test_serial_private_stop_failure_cannot_restore_primary_or_release(self) -> None:
+        """评审停止失败时保持原 CLI 停止并保留占用。@return None。"""
+        fixture=self._serial_fixture()
+        self.review.prepare_serial(fixture.job,fixture.cli,fixture.layout)
+        child=self._private_child(fixture)
+        child.stop.side_effect=RuntimeError('模拟私有容器停止失败')
+        with self.assertRaises(RuntimeError):
+            self.runtime.cleanup(fixture.job['token'])
+        fixture.cli.start.assert_not_called()
+        self.assertEqual('exited',fixture.cli.status)
+        self.assertTrue(self.runtime._execution_path(fixture.job).exists())
+        self.assertEqual([fixture.job],self.runtime.environment_jobs(self.row['environment_id']))
+
+    def test_serial_restore_failure_retains_record_then_retries(self) -> None:
+        """恢复失败后原记录可重试，不能提前释放资源占用。@return None。"""
+        fixture=self._serial_fixture()
+        self.review.prepare_serial(fixture.job,fixture.cli,fixture.layout)
+        child=self._private_child(fixture)
+        fixture.cli.start.side_effect=RuntimeError('模拟恢复失败')
+        with self.assertRaises(RuntimeError):
+            self.runtime.cleanup(fixture.job['token'])
+        self.assertEqual('exited',child.status)
+        self.assertEqual('cli_restoring',self.review.serial_state(self.row)['phase'])
+        self.assertTrue(self.runtime._execution_path(fixture.job).exists())
+        fixture.cli.start.side_effect=lambda:setattr(fixture.cli,'status','running')
+        self.runtime.cleanup(fixture.job['token'])
+        self.assertIsNone(self.review.serial_state(self.row))
+        self.assertFalse(self.runtime.environment_jobs(self.row['environment_id']))
+
+    def test_serial_restart_recovers_persisted_nonshared_review(self) -> None:
+        """管理服务丢失内存登记后，从单作业记录收口评审再恢复。@return None。"""
+        fixture=self._serial_fixture()
+        self.review.prepare_serial(fixture.job,fixture.cli,fixture.layout)
+        self._private_child(fixture)
+        self.runtime.jobs.clear()
+        self.runtime.reconcile(self.row['environment_id'])
+        self.assertEqual(['cli-stopped','review-stopped','cli-started'],fixture.events)
+        self.assertFalse(self.runtime._execution_path(fixture.job).exists())
+        self.assertIsNone(self.review.serial_state(self.row))
+        self.assertEqual('ready',self.runtime._row('synthetic',1)['state'])
+
+    def test_serial_wrong_generation_and_changed_limits_refuse_restore(self) -> None:
+        """迟到代次或被改写的容器限额不得自动恢复。@return None。"""
+        fixture=self._serial_fixture()
+        self.review.prepare_serial(fixture.job,fixture.cli,fixture.layout)
+        with self.assertRaisesRegex(ValueError,'代次不符'):
+            self.review.serial_state({**self.row,'generation':self.row['generation']+1})
+        fixture.cli.attrs['HostConfig']['Memory']+=1
+        with self.assertRaisesRegex(ValueError,'配额发生变化'):
+            self.runtime.cleanup(fixture.job['token'])
+        fixture.cli.start.assert_not_called()
+
+    def test_serial_legacy_layout_keeps_original_cli_budget(self) -> None:
+        """旧环境的 CLI 仍为原配额，评审只在停止后借原总预算。@return None。"""
+        fixture=self._serial_fixture(legacy=True)
+        self.assertEqual(640*1024**2,fixture.cli.attrs['HostConfig']['Memory'])
+        self.assertEqual([1152*1024**2]*2,fixture.layout['limits']['review'])
+        self.review.prepare_serial(fixture.job,fixture.cli,fixture.layout)
+        self.runtime.cleanup(fixture.job['token'])
+        self.assertEqual(640*1024**2,fixture.cli.attrs['HostConfig']['Memory'])
+
+    def test_serial_public_cpu_overbudget_is_rejected_before_switch(self) -> None:
+        """公共角色也计入有限 CPU 预算，不能额外叠加评审份额。@return None。"""
+        fixture=self._serial_fixture()
+        fixture.roles['network'].attrs['HostConfig']['NanoCpus']+=1
+        with self.assertRaisesRegex(ValueError,'CPU 限额超过'):
+            self.review.serial_layout(self.row,fixture.cli)
+        fixture.cli.stop.assert_not_called()
+
+    def test_serial_record_without_execution_remains_blocked(self) -> None:
+        """不能只凭孤立切换记录伪造退租和恢复成功。@return None。"""
+        fixture=self._serial_fixture()
+        self.review.prepare_serial(fixture.job,fixture.cli,fixture.layout)
+        self.runtime._execution_path(fixture.job).unlink()
+        self.runtime.jobs.clear()
+        self.runtime.reconcile(self.row['environment_id'])
+        fixture.cli.start.assert_not_called()
+        self.assertIsNotNone(self.review.serial_state(self.row))
+        self.assertIn(self.runtime._row('synthetic',1)['state'],('reconcile','cli_reconcile'))
+        with self.assertRaisesRegex(ValueError,'交接未确认收口'):
+            self.runtime._recover_cli(self.row)
+        fixture.cli.start.assert_not_called()
+
+    def test_missing_switch_record_cannot_release_a_stopped_primary(self) -> None:
+        """交接记录丢失且原 CLI 仍停止时，不能假报已经恢复并清执行记录。@return None。"""
+        fixture=self._serial_fixture()
+        self.review.prepare_serial(fixture.job,fixture.cli,fixture.layout)
+        self._private_child(fixture)
+        self.review.serial_path(self.row).unlink()
+        with self.assertRaisesRegex(ValueError,'无法确认固定 CLI 已恢复'):
+            self.runtime.cleanup(fixture.job['token'])
+        self.assertTrue(self.runtime._execution_path(fixture.job).exists())
+        self.assertEqual('exited',fixture.cli.status)
+        self.assertIn(self.runtime._row('synthetic',1)['state'],('reconcile','cli_reconcile'))
+        fixture.cli.start.assert_not_called()
+
+    def test_api_ensure_does_not_wake_cli_during_serial_review(self) -> None:
+        """API 准备允许访问发送器，但不唤醒已让出资源的固定 CLI。@return None。"""
+        fixture=self._serial_fixture()
+        self.review.prepare_serial(fixture.job,fixture.cli,fixture.layout)
+        self.runtime.release_id='serial-test'
+        self.runtime.client.images.get.return_value.attrs={'Config':{'Labels':{
+            'vibebench.product':'v3','vibebench.role':'account','vibebench.release':'serial-test'}}}
+        with patch.object(self.runtime,'_container',return_value=fixture.cli):
+            row,container=self.runtime.ensure(self.account)
+            self.assertEqual(self.row['container_id'],row['container_id'])
+            self.assertIs(fixture.cli,container)
+            with self.assertRaises(RuntimeBusy):
+                self.runtime.ensure(self.account,'9.9.9')
+        fixture.cli.start.assert_not_called()
+        self.assertEqual('exited',fixture.cli.status)
+
+    def test_busy_account_waits_for_review_without_blocking_business(self) -> None:
+        """尚有 CLI 占用是可重试等待，不能误报评审环境损坏。@return None。"""
+        fixture=self._serial_fixture()
+        result=self.review.admission(self.account)
+        self.assertFalse(result['allowed'])
+        self.assertFalse(result['blocked'])
+        fixture.cli.stop.assert_not_called()
+
+    def test_review_cannot_stop_cli_between_profile_check_and_claim(self) -> None:
+        """评审在普通任务检查时竞争，必须等待并返回可重试忙碌，不能制造409。@return None。"""
+        fixture=self._serial_fixture()
+        self.runtime.release(fixture.job)
+        attempted,finished=threading.Event(),threading.Event()
+        outcomes=[]
+        immediate=[]
+        environment_lock=self.runtime.environment_lock(self.row['environment_id'])
+
+        def compete() -> None:
+            """在画像检查窗口竞争真实认领边界，有界等待避免残留线程。@return None。"""
+            acquired=environment_lock.acquire(blocking=False)
+            immediate.append(acquired)
+            attempted.set()
+            try:
+                if not acquired:
+                    acquired=environment_lock.acquire(timeout=5)
+                    if not acquired:
+                        raise TimeoutError('等待普通任务完成认领超时')
+                job=self.runtime.claim(self.row,self.account,'run:review:0')
+                job.update(execution_role='project-review',private_relative='project-review-private/test',
+                    review_intent='a'*64,run_id='review',resource_mode=SERIAL_MODE)
+                self.runtime._save_execution(job)
+                self.review.prepare_serial(job,fixture.cli,fixture.layout)
+                outcomes.append('review-started')
+            except Exception as error:
+                outcomes.append(error)
+            finally:
+                if acquired:
+                    environment_lock.release()
+                finished.set()
+
+        contender=threading.Thread(target=compete,daemon=True)
+
+        def profile_check(row: dict, container) -> None:
+            """让竞争恰好发生在画像exec之前，旧实现会先停止固定CLI。@param row 环境。@param container CLI。@return None。"""
+            contender.start()
+            self.assertTrue(attempted.wait(5))
+            # 旧实现允许评审直接拿锁并停机，等其动作完成后再观察，避免概率竞态。
+            if immediate[0]:
+                self.assertTrue(finished.wait(5))
+            if container.status != 'running':
+                raise APIError('409: 固定 CLI 已停止，画像exec失败')
+
+        def version_ready(container, version: str) -> None:
+            """版本安装期间竞争方可拿环境锁，仍被已认领作业挡住。@param container CLI。@param version 版本。@return None。"""
+            self.assertTrue(finished.wait(5),'版本安装不应持有环境生命周期锁')
+
+        self.runtime.check_system_profile.side_effect=profile_check
+        try:
+            with patch.object(self.runtime,'ensure',return_value=(self.row,fixture.cli)), \
+                    patch.object(self.runtime,'_ensure_version',side_effect=version_ready):
+                with self.runtime._cli_setup(self.account,'run:ordinary:0','2.1.293',shared_cli=True) as (_,_,job):
+                    self.assertEqual('running',fixture.cli.status)
+                    self.assertTrue(job['claimed'])
+                self.assertTrue(finished.wait(5))
+            self.assertEqual(1,len(outcomes))
+            self.assertIsInstance(outcomes[0],RuntimeBusy)
+            fixture.cli.stop.assert_not_called()
+            self.assertIsNone(self.review.serial_state(self.row))
+        finally:
+            self.runtime.check_system_profile.side_effect=None
+            for current in self.runtime.environment_jobs(self.row['environment_id']):
+                self.runtime.release(current)
+            if contender.ident is not None:
+                contender.join(timeout=5)
+        self.assertFalse(contender.is_alive())
+
+    def test_serial_release_failure_keeps_gate_after_cli_restored(self) -> None:
+        """原 CLI 恢复后退租失败，仍保留本执行记录直到成功重试。@return None。"""
+        fixture=self._serial_fixture()
+        self.review.prepare_serial(fixture.job,fixture.cli,fixture.layout)
+        self._private_child(fixture)
+        with patch.object(self.runtime,'_lease',side_effect=RuntimeError('模拟退租失败')):
+            with self.assertRaises(RuntimeError):
+                self.runtime.cleanup(fixture.job['token'])
+        self.assertEqual('running',fixture.cli.status)
+        self.assertEqual('cli_restoring',self.review.serial_state(self.row)['phase'])
+        self.assertTrue(self.runtime._execution_path(fixture.job).exists())
+        with self.assertRaises(RuntimeBusy):
+            self.runtime.claim(self.row,self.account,'run:other:0',shared_cli=True)
+        self.runtime.cleanup(fixture.job['token'])
+        self.assertIsNone(self.review.serial_state(self.row))
+
+    def test_serial_ownership_on_one_account_does_not_lock_another(self) -> None:
+        """切换记录和占用均按环境隔离，其他账号仍可认领 CLI。@return None。"""
+        fixture=self._serial_fixture()
+        self.review.prepare_serial(fixture.job,fixture.cli,fixture.layout)
+        other_row=self.runtime._row('synthetic-other',2)
+        other=self.runtime.claim(other_row,{'id':2,'name':'synthetic-other'},'run:other:0',shared_cli=True)
+        self.assertTrue(other['claimed'])
+        self.assertEqual([fixture.job],self.runtime.environment_jobs(self.row['environment_id']))
+        self.runtime.release(other)
 
     def test_defer_uses_frozen_run_and_complete_old_identity_does_not_block(self) -> None:
         """当前身份不能替换旧Run；完成的历史待办不阻塞合法新身份。@return None。"""

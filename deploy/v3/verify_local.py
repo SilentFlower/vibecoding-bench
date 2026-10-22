@@ -266,7 +266,8 @@ def verify() -> None:
             "mac": mac, "mem": "4g"}
 
     runtime = AccountRuntime(client, root, Path(os.environ["VERIFY_HOST_ROOT"]) / "data", database, fingerprint, None)
-    row = runtime._row(account["name"], account["id"])
+    scenario_mode=os.environ.get('VERIFY_PROJECT_SCENARIOS_ONLY')=='1'
+    row = runtime._row(account["name"],None if scenario_mode else account["id"])
     cached = runtime._root(row) / "cli" / "9.9.9"
     binary = cached / "node_modules" / ".bin" / "claude"
     binary.parent.mkdir(parents=True)
@@ -281,10 +282,12 @@ def verify() -> None:
         (evidence_root / name).chmod(0o600)
     container = None
     try:
-        scenario_mode=os.environ.get('VERIFY_PROJECT_SCENARIOS_ONLY')=='1'
-        row, container = runtime.ensure(account, "9.9.9",scenario_resources=scenario_mode)
         if scenario_mode:
-            row,container,profile,home=runtime.begin_login('abcdef123456',account,'9.9.9',False)
+            draft={key:value for key,value in account.items() if key != 'id'}
+            row,container,profile,home=runtime.begin_login('abcdef123456',draft,'9.9.9',False)
+            initial={key:row[key] for key in ('environment_id','generation','container_id','fingerprint_json')}
+            assert row['account_id'] is None
+            assert not (runtime._root(row)/'runtime/project-review-layout.json').exists()
             deadline=time.monotonic()+10
             while not (profile/'.credentials.json').exists():
                 if time.monotonic()>deadline:
@@ -293,9 +296,20 @@ def verify() -> None:
             token=runtime.execution_token(container.id,'login:abcdef123456')
             runtime.commit_login(SimpleNamespace(sid='abcdef123456',worker_id=container.id,profile_dir=profile,name=account['name']),1)
             runtime.cleanup(token)
-            from verify_project_scenarios import verify_project_scenarios
+            row=runtime._row(account['name'],1)
+            assert all(row[key]==value for key,value in initial.items())
+            assert row['account_id']==1
+            atomic_json(Path('/verify/scenario-login-flow.json'),{'status':'passed','created_from_login':True,
+                'same_environment':True,'same_cli_container':True,'reserved_review_layout':False,'real_model_calls':0})
+            from verify_project_scenarios import verify_private_recovery, verify_project_scenarios
+            if os.environ.get('VERIFY_SCENARIO_RECOVERY_ONLY')=='1':
+                recovery={'real_model_calls':0}
+                verify_private_recovery(runtime,client,account,row,recovery)
+                atomic_json(Path('/verify/scenario-recovery-only.json'),{'status':'passed',**recovery})
+                return
             verify_project_scenarios(runtime,client,account,row)
             return
+        row, container = runtime.ensure(account, "9.9.9")
         isolation = verify_roles(container, role_container(runtime, row, "sender"), runtime._network_container(row),
             json.loads(row['fingerprint_json']))
         system_profile = json.loads(row['fingerprint_json'])['system_profile']

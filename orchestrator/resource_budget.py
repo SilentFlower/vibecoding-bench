@@ -58,3 +58,14 @@ def scenario_account_limits(memory: str, swap: str = '0') -> dict[str, tuple[int
     limits['cli'] = (ram - review, total - review)
     limits['review'] = (review, review)
     return limits
+
+
+def serial_review_limits(memory: str, swap: str = '0') -> tuple[int, int]:
+    """在固定 CLI 停止后复用其 RAM，额外 swap 仍只属于固定 CLI。
+
+    :param memory: 已固化的账号总 RAM。
+    :param swap: 已固化的账号额外 swap，用于核验原预算。
+    :return: 私有评审的 RAM 与 RAM 加 swap 上限，两者相等。
+    """
+    ram, _ = isolated_account_limits(memory, swap)['cli']
+    return ram, ram

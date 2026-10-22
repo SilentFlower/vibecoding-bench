@@ -1,4 +1,5 @@
 """真实Scheduler、Docker和driver下的场景／私有评审机制验证，不调用模型。"""
+import base64
 import hashlib
 import io
 import json
@@ -12,12 +13,15 @@ from pathlib import Path
 from unittest.mock import patch
 
 import uvicorn
+import requests
 
 import main
-from account_runtime import AccountRuntime, atomic_json
+from account_runtime import AccountRuntime, RuntimeBusy, atomic_json
 from project_iteration import ProjectIterationManager
 from project_library import ProjectLibrary, read_document, snapshot_tree, write_document
 from project_verifier import ProjectVerifier
+from project_review_runtime import SERIAL_MODE, STOPPED_STATES
+from verify_local import write_sender
 
 
 def create_scenario_fixture(root: Path, python: str) -> ProjectLibrary:
@@ -81,7 +85,7 @@ def verify_project_scenarios(runtime, client, account: dict, row: dict) -> None:
     :param runtime: 随机内部网络中的合成账号运行器。
     :param client: Docker SDK。
     :param account: 本次合成账号，不读取已有真实账号。
-    :param row: 已准备静态评审资源的固定环境。
+    :param row: 经首次登录并保存的普通资源环境。
     :return: None；结果只说明机制，不是模型成绩。
     """
     data=runtime.data
@@ -131,22 +135,94 @@ def verify_project_scenarios(runtime, client, account: dict, row: dict) -> None:
 
         stack.enter_context(patch.object(verified,'start_run',side_effect=start))
         evidence={'capacity':main.PER_ACCOUNT_CONCURRENCY,'maximum_holders':0,'review_count':0,'private_checked':False,
-            'candidate_review_overlap':False,'real_model_calls':0}
+            'candidate_review_overlap':False,'real_model_calls':0,'resource_switches':[],
+            'initial_cli_memory':verified._container(row).attrs['HostConfig']['Memory']}
         failures=os.environ.get('VERIFY_SCENARIO_FAILURES')=='1'
-        if failures:
-            collection_type=type(client.containers)
-            original_container_run=collection_type.run
+        original_prepare_serial=verified.reviews.prepare_serial
+        api_stream={}
+        sender_path=verified._sender_config(row)
+        original_sender=read_document(sender_path)
+        stack.callback(write_sender,sender_path,original_sender)
+        session=requests.Session()
+        session.trust_env=False
+        stack.callback(session.close)
 
-            def lost_create_ack(collection,*args,**kwargs):
-                """创建确实成功后丢一次ACK，交原登记和cleanup回收实际容器。"""
-                child=original_container_run(collection,*args,**kwargs)
-                if (collection.client is client and kwargs.get('labels',{}).get('vibebench.role')=='project-review'
-                        and not evidence.get('lost_create_ack')):
-                    evidence['lost_create_ack']=True
-                    raise RuntimeError('本地测试：评审创建完成后ACK丢失')
-                return child
+        def observe_cli_stop(job,cli,layout):
+            """在切换前开启真实发送器长连接，之后核验同一连接仍继续接收。"""
+            if not api_stream and not evidence.get('api_stream_preserved'):
+                configuration=json.loads(json.dumps(original_sender))
+                configuration['allowed_origin']='http://api.anthropic.com:8081'
+                write_sender(sender_path,configuration)
+                binding=configuration['binding']
+                prepared={'account_id':binding['account_id'],'environment_id':row['environment_id'],
+                    'generation':row['generation'],'request_id':str(uuid.uuid4()),
+                    'deadline_unix_ms':int(time.time()*1000)+90000,'method':'POST',
+                    'target_url':'http://api.anthropic.com:8081/v1/v3-stream',
+                    'headers':[['Content-Type','application/json']],'preserve_header_casing':True}
+                response=session.post(binding['endpoint']+'/internal/send',headers={
+                    'Authorization':'Bearer '+binding['secret'],
+                    'x-v3-request':base64.b64encode(json.dumps(prepared).encode()).decode()},
+                    data=b'{}',stream=True,timeout=(5,10))
+                stack.callback(response.close)
+                assert response.status_code==200
+                events=response.iter_lines(chunk_size=1)
+                first=next(events)
+                assert first.startswith(b'data: ')
+                api_stream.update(response=response,events=events,first=json.loads(first[6:]))
+                assert verified._sender_active(row)==1
+            return original_prepare_serial(job,cli,layout)
 
-            stack.enter_context(patch.object(collection_type,'run',new=lost_create_ack))
+        stack.enter_context(patch.object(verified.reviews,'prepare_serial',new=observe_cli_stop))
+        collection_type=type(client.containers)
+        original_container_run=collection_type.run
+
+        def observe_review_create(collection,*args,**kwargs):
+            """在真实创建边界核对固定 CLI 已退出，并可注入一次 ACK 丢失。"""
+            reviewing=collection.client is client and kwargs.get('labels',{}).get('vibebench.role')=='project-review'
+            if reviewing:
+                cli=verified._container(row)
+                cli.reload()
+                assert cli.status in STOPPED_STATES
+                evidence['resource_switches'].append({'phase':'before_review_create','cli_status':cli.status,
+                    'review_memory':kwargs['mem_limit'],'at':time.monotonic()})
+            child=original_container_run(collection,*args,**kwargs)
+            if reviewing and failures and not evidence.get('lost_create_ack'):
+                evidence['lost_create_ack']=True
+                raise RuntimeError('本地测试：评审创建完成后ACK丢失')
+            return child
+
+        stack.enter_context(patch.object(collection_type,'run',new=observe_review_create))
+        container_type=type(verified._container(row))
+        original_start_container=container_type.start
+
+        def observe_cli_restore(container,*args,**kwargs):
+            """在实际恢复边界证明所有私有评审已停止。"""
+            if container.id==row['container_id']:
+                children=client.containers.list(all=True,filters={'label':[
+                    'vibebench.environment='+row['environment_id'],'vibebench.role=project-review']})
+                for child in children:
+                    child.reload()
+                    assert child.status in STOPPED_STATES
+                evidence['resource_switches'].append({'phase':'before_cli_restore','review_stopped':True,'at':time.monotonic()})
+            result=original_start_container(container,*args,**kwargs)
+            if container.id==row['container_id'] and api_stream:
+                restored=time.time()
+                assert verified._sender_active(row)==1
+                for line in api_stream['events']:
+                    if line.startswith(b'data: '):
+                        event=json.loads(line[6:])
+                        if event['time']>=restored:
+                            assert event['index']>api_stream['first']['index']
+                            evidence['api_stream_preserved']=True
+                            evidence['api_stream_events']={'before':api_stream['first']['index'],'after':event['index']}
+                            break
+                assert evidence.get('api_stream_preserved')
+                api_stream['response'].close()
+                api_stream.clear()
+                write_sender(sender_path,original_sender)
+            return result
+
+        stack.enter_context(patch.object(container_type,'start',new=observe_cli_restore))
         seen=set()
         browser_mode=os.environ.get('VERIFY_SCENARIO_BROWSER')=='1'
         batch=None
@@ -176,45 +252,54 @@ def verify_project_scenarios(runtime, client, account: dict, row: dict) -> None:
                         time.sleep(0.2)
                         continue
                     batch=batches[0]
-                jobs=verified.environment_jobs(row['environment_id'])
-                evidence['maximum_holders']=max(evidence['maximum_holders'],len(jobs))
-                assert len(jobs)<=main.PER_ACCOUNT_CONCURRENCY
-                reviews=[job for job in jobs if job.get('execution_role')=='project-review' and job.get('review_container_id')
-                    and job.get('review_phase')=='running' and job.get('process')]
-                candidates=[job for job in jobs if job.get('execution_role')!='project-review']
-                for job in reviews:
-                    child=verified.reviews.container(job)
-                    if job['source'] in seen:
-                        continue
-                    cli=verified._container(row)
-                    cli.reload()
-                    child.reload()
-                    assert child.attrs['HostConfig']['ReadonlyRootfs']
-                    assert child.attrs['HostConfig']['CapDrop']==['ALL']
-                    assert child.attrs['HostConfig']['NetworkMode']=='container:'+row['network_container_id']
-                    assert child.attrs['Config']['User']=='1000:1000'
-                    package=read_document(verified.reviews.root_for_job(job)/'input/package.json')
-                    process_model=child.exec_run(['python3','-c',
-                        "import pathlib;print(next((item.split('=',1)[1] for item in pathlib.Path('/proc/"+str(job['process']['pid'])+"/environ').read_bytes().decode().split(chr(0)) if item.startswith('CLAUDE_MODEL_OVERRIDE=')),''))"])
-                    if process_model.exit_code:
-                        continue
-                    assert process_model.output.decode().strip()==package['resolved_model']=='offline-fixture'
-                    seen.add(job['source'])
-                    evidence['review_count']+=1
-                    private=verified.reviews.root_for_job(job)
-                    assert not any(str(private).startswith(mount['Source']+'/') or str(private)==mount['Source']
-                        for mount in cli.attrs['Mounts'])
-                    assert cli.exec_run(['test','-e','/input/package.json']).exit_code!=0
-                    assert cli.exec_run(['readlink','/proc/self/ns/pid']).output != child.exec_run(['readlink','/proc/self/ns/pid']).output
-                    credentials=json.loads((private/'home/.claude/.credentials.json').read_text())
-                    assert 'refreshToken' not in credentials['claudeAiOauth']
-                    assert 'refreshToken' in json.loads((verified._root(row)/'home/.claude/.credentials.json').read_text())['claudeAiOauth']
-                    limits=json.loads((verified._root(row)/'runtime/project-review-layout.json').read_text())['limits']
-                    assert child.attrs['HostConfig']['Memory']==limits['review'][0]
-                    assert cli.attrs['HostConfig']['Memory']==limits['cli'][0]
-                    evidence['private_checked']=True
-                    evidence['actual_model_pinned']=True
-                    evidence['candidate_review_overlap'] |= bool(candidates)
+                # 观察期间固定生命周期，避免把切换前后的状态拼成同一份证据。
+                with verified.environment_lock(row['environment_id']):
+                    jobs=verified.environment_jobs(row['environment_id'])
+                    evidence['maximum_holders']=max(evidence['maximum_holders'],len(jobs))
+                    assert len(jobs)<=main.PER_ACCOUNT_CONCURRENCY
+                    reviews=[job for job in jobs if job.get('execution_role')=='project-review' and job.get('review_container_id')
+                        and job.get('review_phase')=='running' and job.get('process')]
+                    candidates=[job for job in jobs if job.get('execution_role')!='project-review']
+                    for job in reviews:
+                        child=verified.reviews.container(job)
+                        if job['source'] in seen:
+                            continue
+                        cli=verified._container(row)
+                        cli.reload()
+                        child.reload()
+                        assert child.attrs['HostConfig']['ReadonlyRootfs']
+                        assert child.attrs['HostConfig']['CapDrop']==['ALL']
+                        assert child.attrs['HostConfig']['NetworkMode']=='container:'+row['network_container_id']
+                        assert child.attrs['Config']['User']=='1000:1000'
+                        package=read_document(verified.reviews.root_for_job(job)/'input/package.json')
+                        process_model=child.exec_run(['python3','-c',
+                            "import pathlib;print(next((item.split('=',1)[1] for item in pathlib.Path('/proc/"+str(job['process']['pid'])+"/environ').read_bytes().decode().split(chr(0)) if item.startswith('CLAUDE_MODEL_OVERRIDE=')),''))"])
+                        if process_model.exit_code:
+                            continue
+                        assert process_model.output.decode().strip()==package['resolved_model']=='offline-fixture'
+                        seen.add(job['source'])
+                        evidence['review_count']+=1
+                        private=verified.reviews.root_for_job(job)
+                        host_private=verified.host_data/private.relative_to(verified.data)
+                        assert not any(str(host_private).startswith(mount['Source']+'/') or str(host_private)==mount['Source']
+                            or mount['Source'].startswith(str(host_private)+'/')
+                            for mount in cli.attrs['Mounts'])
+                        assert cli.status in STOPPED_STATES and cli.attrs['State']['Pid']==0
+                        assert child.attrs['State']['Pid']>0 and not candidates
+                        credentials=json.loads((private/'home/.claude/.credentials.json').read_text())
+                        assert 'refreshToken' not in credentials['claudeAiOauth']
+                        assert 'refreshToken' in json.loads((verified._root(row)/'home/.claude/.credentials.json').read_text())['claudeAiOauth']
+                        state=verified.reviews.serial_state(row)
+                        assert state and state['source']==job['source']
+                        assert child.attrs['HostConfig']['Memory']==state['review_limits']['Memory']
+                        assert child.attrs['HostConfig']['MemorySwap']==state['review_limits']['MemorySwap']
+                        assert cli.attrs['HostConfig']['Memory']==evidence['initial_cli_memory']
+                        shared_memory=sum(client.containers.get(row[key]).attrs['HostConfig']['Memory']
+                            for key in ('network_container_id','sender_container_id'))
+                        assert shared_memory+child.attrs['HostConfig']['Memory']==1536*1024**2
+                        evidence['private_checked']=True
+                        evidence['actual_model_pinned']=True
+                        evidence['candidate_review_overlap'] |= bool(candidates)
                 current=manager.batch(batch['id'])
                 if current['status']=='completed':
                     break
@@ -242,7 +327,11 @@ def verify_project_scenarios(runtime, client, account: dict, row: dict) -> None:
             assert not (data/context['workspace_relative']/'app/partial.txt').exists()
             assert evidence['private_checked'] and evidence['review_count']>=5
             if main.PER_ACCOUNT_CONCURRENCY==2:
-                assert evidence['maximum_holders']==2 and evidence['candidate_review_overlap']
+                assert evidence['maximum_holders']==2
+            assert not evidence['candidate_review_overlap']
+            assert evidence['resource_switches']
+            assert evidence['api_stream_preserved']
+            assert read_document(Path('/verify/scenario-login-flow.json'))['created_from_login']
             with main.get_db() as connection:
                 snapshots=[tuple(row) for row in connection.execute('SELECT DISTINCT claude_code_version,claude_effort_level,execution_model FROM runs')]
             assert snapshots==[('9.9.9','high','')]
@@ -287,27 +376,106 @@ def verify_project_scenarios(runtime, client, account: dict, row: dict) -> None:
                 time.sleep(0.1)
 
 
+def verify_cli_preparation_race(runtime, account: dict, row: dict, evidence: dict) -> None:
+    """在真实 Docker 画像检查期间竞争评审，核对普通任务准备不会被停机。
+
+    :param runtime: 本次合成账号运行器。
+    :param account: 唯一合成账号。
+    :param row: 已空闲的原环境。
+    :param evidence: 仅保存机制结论，不作为模型验收。
+    :return: None；检查至认领原子完成，版本安装不持环境锁。
+    """
+    assert not runtime.environment_jobs(row['environment_id'])
+    cli=runtime._container(row)
+    layout=runtime.reviews.serial_layout(row,cli)
+    environment_lock=runtime.environment_lock(row['environment_id'])
+    attempted,finished=threading.Event(),threading.Event()
+    immediate,outcomes=[],[]
+
+    def compete() -> None:
+        """评审在检查窗口竞争实际租约，有界等待防止验证线程残留。@return None。"""
+        acquired=environment_lock.acquire(blocking=False)
+        immediate.append(acquired)
+        attempted.set()
+        try:
+            if not acquired:
+                acquired=environment_lock.acquire(timeout=10)
+                assert acquired,'等待普通 CLI 认领超时'
+            source='preparation-review:'+uuid.uuid4().hex
+            job=runtime.claim(row,account,source)
+            job.update(execution_role='project-review',review_intent=hashlib.sha256(source.encode()).hexdigest(),
+                private_relative='project-review-private/race-'+uuid.uuid4().hex,run_id=source,resource_mode=SERIAL_MODE)
+            runtime._save_execution(job)
+            runtime.reviews.prepare_serial(job,cli,layout)
+            outcomes.append('review-started')
+        except Exception as error:
+            outcomes.append(error)
+        finally:
+            if acquired:
+                environment_lock.release()
+            finished.set()
+
+    contender=threading.Thread(target=compete,daemon=True)
+    original_profile=runtime.check_system_profile
+    original_version=runtime._ensure_version
+
+    def profile_check(current: dict, container) -> None:
+        """只安排线程交错，画像探针仍调用真实 Docker。@param current 环境。@param container CLI。@return None。"""
+        contender.start()
+        assert attempted.wait(10),'评审线程未到达竞争窗口'
+        if immediate[0]:
+            assert finished.wait(10),'评审竞争未结束'
+        original_profile(current,container)
+
+    def version_ready(container, version: str) -> None:
+        """实际安装缓存版本并确认竞争方不被安装锁住。@param container CLI。@param version 版本。@return None。"""
+        original_version(container,version)
+        assert finished.wait(10),'版本安装持有环境生命周期锁'
+
+    try:
+        with patch.object(runtime,'check_system_profile',side_effect=profile_check), \
+                patch.object(runtime,'_ensure_version',side_effect=version_ready):
+            with runtime._cli_setup(account,'preparation-cli:'+uuid.uuid4().hex,'9.9.9',shared_cli=True) as (_,container,job):
+                result=container.exec_run(['python3','-c','print("serial-race-ok")'],user='1000:1000')
+                assert job['claimed'] and result.exit_code==0 and result.output.strip()==b'serial-race-ok'
+        assert len(outcomes)==1 and isinstance(outcomes[0],RuntimeBusy),outcomes
+        assert runtime.reviews.serial_state(row) is None
+        evidence.update(cli_preparation_race_fenced=True,preparation_profile_real_docker=True,
+            review_contender_retryable=True,version_install_lock_released=True)
+    finally:
+        for current in runtime.environment_jobs(row['environment_id']):
+            runtime.release(current)
+        if contender.ident is not None:
+            contender.join(timeout=10)
+    assert not contender.is_alive()
+
+
 def verify_private_recovery(runtime, client, account: dict, row: dict, evidence: dict) -> None:
     """通过真实原租约及创建意图验证重启后running/exited/missing精确收口。
 
     :param runtime: 本次合成账号运行器。
     :param client: 本次Docker客户端。
     :param account: 唯一合成账号。
-    :param row: 已预留评审资源的原环境。
+    :param row: 按串行模式复用资源的原环境。
     :param evidence: 本次机制证据，不能当模型结果。
     :return: None；不修改任何业务任务结论。
     """
+    verify_cli_preparation_race(runtime,account,row,evidence)
     public_ids=[row[key] for key in ('container_id','network_container_id','sender_container_id')]
     expected={**runtime._labels(row),'vibebench.role':'project-review',
         'vibebench.release':runtime.release_id,'vibebench.isolation-version':str(row['isolation_version'])}
 
-    def idle(labels: dict):
-        """在静态预留内创建只属于本测试的闲置私有PID命名空间。"""
+    def idle(labels: dict, layout: dict):
+        """原 CLI 已停止后创建本测试独占的私有 PID 命名空间。"""
+        memory,total=layout['limits']['review']
         return client.containers.run(runtime.image,entrypoint=['python3','-c'],command=['import time;time.sleep(120)'],
             labels=labels,detach=True,user='1000:1000',read_only=True,network_mode='container:'+row['network_container_id'],
-            cap_drop=['ALL'],security_opt=['no-new-privileges:true'],mem_limit='512m',memswap_limit='512m',pids_limit=128)
+            cap_drop=['ALL'],security_opt=['no-new-privileges:true'],mem_limit=memory,memswap_limit=total,pids_limit=128)
 
-    orphan=idle({**expected,'vibebench.review-intent':uuid.uuid4().hex+uuid.uuid4().hex})
+    cli=runtime._container(row)
+    layout=runtime.reviews.serial_layout(row,cli)
+    cli.stop(timeout=5)
+    orphan=idle({**expected,'vibebench.review-intent':uuid.uuid4().hex+uuid.uuid4().hex},layout)
     try:
         assert runtime.reviews.admission(account)['blocked']
         orphan.reload()
@@ -319,14 +487,17 @@ def verify_private_recovery(runtime, client, account: dict, row: dict, evidence:
             orphan.remove(force=True)
         except Exception:
             pass
+        cli.start()
     outcomes=[]
     for state in ('running','exited','missing'):
         source='recovery-fixture:'+uuid.uuid4().hex
-        job=runtime.claim(row,account,source,shared_cli=True)
+        job=runtime.claim(row,account,source)
         job.update(execution_role='project-review',review_intent=hashlib.sha256(source.encode()).hexdigest(),
-            private_relative='project-review-private/recovery-'+uuid.uuid4().hex,review_phase='creating')
+            private_relative='project-review-private/recovery-'+uuid.uuid4().hex,review_phase='creating',
+            run_id=source,resource_mode=SERIAL_MODE)
         runtime._save_execution(job)
-        child=idle(runtime.reviews.labels(job))
+        runtime.reviews.prepare_serial(job,cli,layout)
+        child=idle(runtime.reviews.labels(job),layout)
         job.update(review_container_id=child.id,review_phase='created')
         runtime._save_execution(job)
         if state in ('exited','missing'):
@@ -348,4 +519,30 @@ def verify_private_recovery(runtime, client, account: dict, row: dict, evidence:
         current=client.containers.get(identity)
         current.reload()
         assert current.status=='running'
-    evidence.update(orphan_pool_fenced=True,private_restart_recovered=outcomes,public_roles_preserved=True)
+    source='missing-switch:'+uuid.uuid4().hex
+    job=runtime.claim(row,account,source)
+    job.update(execution_role='project-review',review_intent=hashlib.sha256(source.encode()).hexdigest(),
+        private_relative='project-review-private/recovery-'+uuid.uuid4().hex,review_phase='creating',
+        run_id=source,resource_mode=SERIAL_MODE)
+    runtime._save_execution(job)
+    runtime.reviews.prepare_serial(job,cli,layout)
+    saved_switch=runtime.reviews.serial_state(row)
+    child=idle(runtime.reviews.labels(job),layout)
+    job['review_container_id']=child.id
+    runtime._save_execution(job)
+    runtime.reviews.serial_path(row).unlink()
+    try:
+        runtime.cleanup(job['token'])
+    except ValueError as error:
+        assert '无法确认固定 CLI 已恢复' in str(error)
+    else:
+        raise AssertionError('交接记录缺失时错误释放了仍停止的 CLI')
+    cli.reload()
+    assert cli.status in STOPPED_STATES and runtime._execution_path(job).exists()
+    # 恢复本测试主动删除的原记录，再沿正式清理入口完成收口，不构造新的通过状态。
+    atomic_json(runtime.reviews.serial_path(row),saved_switch)
+    runtime.cleanup(job['token'])
+    cli.reload()
+    assert cli.status=='running' and not runtime._execution_path(job).exists()
+    evidence.update(orphan_pool_fenced=True,private_restart_recovered=outcomes,public_roles_preserved=True,
+        missing_switch_record_fenced=True)

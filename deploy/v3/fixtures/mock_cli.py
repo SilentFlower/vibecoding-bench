@@ -14,6 +14,7 @@ import tty
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
+from uuid import uuid4
 
 home = Path(os.environ["HOME"])
 
@@ -38,7 +39,6 @@ def run_scenario_fixture(plan: dict) -> None:
     os.write(sys.stdout.fileno(),b'\x1b[?2004h')
     buffer=bytearray()
     pasted=False
-    count=0
     while True:
         byte=os.read(sys.stdin.fileno(),1)
         if not byte:
@@ -58,8 +58,8 @@ def run_scenario_fixture(plan: dict) -> None:
         buffer.clear()
         if not prompt.strip():
             continue
-        count+=1
-        identity=f"{plan['session_id']}-{os.getpid()}-{count}"
+        # 容器重启会复用 PID；消息身份须跨进程及 PID 命名空间生命周期保持唯一。
+        identity=f"{plan['session_id']}-{uuid4().hex}"
         user={'type':'user','uuid':identity+'-user','parentUuid':previous,'sessionId':plan['session_id'],
             'timestamp':datetime.now(timezone.utc).isoformat(),'message':{'role':'user','content':prompt}}
         with session.open('a') as output:
@@ -235,7 +235,7 @@ def run_followup_fixture() -> None:
             recorded = f'\n\n<pasted_content id="316b-{input_count}">\n{text}\n</pasted_content id="316b-{input_count}">\n'
         if config.get('unmatched_input') and input_count == 1:
             recorded = 'Unrecognized transport: ' + recorded
-        identity = f"{config['session']}-{os.getpid()}-{input_count}"
+        identity = f"{config['session']}-{uuid4().hex}"
         user = {'type': 'user', 'uuid': identity+'-user', 'parentUuid': previous,
             'timestamp': datetime.now(timezone.utc).isoformat(), 'message': {'role': 'user',
             'content': recorded if input_count == 1 else [{'type': 'text', 'text': recorded}]}}

@@ -12,17 +12,20 @@ from pathlib import Path
 from docker.errors import DockerException, NotFound
 
 from account_isolation import ISOLATION_VERSION, role_container
+from account_runtime import RuntimeBusy, _read_json, atomic_json
 from project_library import read_document, safe_relative, write_document
-from resource_budget import scenario_account_limits
+from resource_budget import isolated_account_limits, scenario_account_limits, serial_review_limits
 from system_profile import SYSTEM_PROFILE_DIRECTORY
 
 
 REVIEW_ROLE = 'project-review'
-REVIEW_JOB_FIELDS = ('execution_role', 'review_container_id', 'private_relative', 'review_intent', 'review_phase')
+SERIAL_MODE = 'serial-v1'
+REVIEW_JOB_FIELDS = ('execution_role', 'review_container_id', 'private_relative', 'review_intent', 'review_phase', 'resource_mode')
+STOPPED_STATES = ('exited', 'dead', 'created')
 
 
 class ProjectReviewRuntime:
-    """让私有评审继续占原账号holder、网络和静态资源预留。
+    """让私有评审串行借用原账号 CLI 资源，保留网络与认证所有者。
 
     :param runtime: 原AccountRuntime；不创建独立队列或凭据所有者。
     """
@@ -203,11 +206,191 @@ class ProjectReviewRuntime:
             return {'allowed':True}
         try:
             with self.runtime.environment_lock(row['environment_id']):
-                self.check_layout(dict(row),self.runtime._container(dict(row)))
+                if self.serial_state(dict(row)) or self.runtime.environment_jobs(row['environment_id']):
+                    return {'allowed':False,'blocked':False,'message':'等待同账号 CLI 释放后进行评审'}
+                self.serial_layout(dict(row),self.runtime._container(dict(row)))
                 self.check_orphans(dict(row))
         except (ValueError,OSError,DockerException) as error:
             return {'allowed':False,'blocked':True,'message':str(error)[:300]}
         return {'allowed':True}
+
+    def pending(self, account_id: int | None) -> bool:
+        """判断有效批次是否有待评审，避免新 CLI 持续插队。
+
+        :param account_id: 原 bench 账号 ID，草稿可为空。
+        :return: 是否应先排空已有 CLI 并推进评审。
+        """
+        if account_id is None or self.runtime.project_iterations is None:
+            return False
+        connection = self.runtime.database()
+        try:
+            return connection.execute('SELECT 1 FROM project_evaluation_jobs j '
+                'JOIN project_scenario_tasks t ON t.id=j.task_id '
+                'JOIN project_scenario_instances s ON s.id=t.scenario_instance_id '
+                'JOIN project_instances i ON i.id=s.instance_id '
+                'JOIN project_iteration_batches b ON b.id=i.batch_id '
+                "WHERE b.account_id=? AND b.status='active' AND b.generation=j.generation "
+                "AND t.status='evaluating' AND j.status IN ('review_ready','review_queued') LIMIT 1",
+                (account_id,)).fetchone() is not None
+        finally:
+            connection.close()
+
+    def serial_path(self, row: dict) -> Path:
+        """定位控制端私有的资源交接记录。@param row 原环境。@return 记录路径。"""
+        return self.runtime._root(row) / 'runtime/project-review-serial.json'
+
+    def serial_state(self, row: dict) -> dict | None:
+        """读取并校验资源交接归属，坏记录不能当成空闲。
+
+        :param row: 当前环境及代次。
+        :return: 合法交接记录；未开始切换时返回 None。
+        """
+        path = self.serial_path(row)
+        if not path.exists() and not path.is_symlink():
+            return None
+        state = _read_json(path)
+        if (not isinstance(state,dict) or state.get('schema') != 1
+                or state.get('environment_id') != row['environment_id']
+                or state.get('environment_generation') != row['generation']
+                or state.get('container_id') != row['container_id']
+                or state.get('phase') not in ('prepared','cli_stopping','cli_stopped','review_running','review_stopping','cli_restoring')
+                or state.get('cli_was_running') is not True
+                or not isinstance(state.get('source'),str) or not state['source']
+                or not isinstance(state.get('run_id'),str) or not state['run_id']
+                or not isinstance(state.get('review_intent'),str) or not re.fullmatch(r'[a-f0-9]{64}',state['review_intent'])
+                or not isinstance(state.get('cli_limits'),dict) or not isinstance(state.get('review_limits'),dict)):
+            raise ValueError('评审资源交接记录与原环境、执行或代次不符')
+        fingerprint = json.loads(row['fingerprint_json'])
+        memory, total = serial_review_limits(fingerprint['mem'],fingerprint.get('swap','0'))
+        if (state['review_limits'].get('Memory') != memory or state['review_limits'].get('MemorySwap') != total
+                or any(type(state['cli_limits'].get(key)) is not int or state['cli_limits'][key] <= 0
+                    for key in ('Memory','MemorySwap','NanoCpus','PidsLimit'))):
+            raise ValueError('评审资源交接记录的有限预算无效')
+        return state
+
+    def _serial_phase(self, job: dict, phase: str, **values) -> dict:
+        state = self.serial_state(job['row'])
+        if state is None or any(state.get(key) != job.get(key) for key in ('source','run_id','review_intent')):
+            raise ValueError('评审资源交接已被其他执行接管')
+        state.update(phase=phase,**values)
+        atomic_json(self.serial_path(job['row']),state)
+        return state
+
+    def serial_layout(self, row: dict, cli) -> dict:
+        """核验原角色实际限额，生成仅能在固定 CLI 停止后使用的评审预算。
+
+        :param row: 原环境。
+        :param cli: 已核验的固定 CLI。
+        :return: 原 CLI 配额及串行评审有限配额。
+        """
+        if row.get('isolation_version') != ISOLATION_VERSION:
+            raise ValueError('旧账号隔离版本须先显式空闲升级')
+        layout = self.check_layout(row,cli)
+        fingerprint = json.loads(row['fingerprint_json'])
+        expected = isolated_account_limits(fingerprint['mem'],fingerprint.get('swap','0'))
+        cpu = layout['cli_nano_cpus']
+        for role in ('network','sender'):
+            current = role_container(self.runtime,row,role)
+            current.reload()
+            config = current.attrs['HostConfig']
+            if (config.get('Memory') != expected[role][0] or config.get('MemorySwap') != expected[role][1]
+                    or type(config.get('NanoCpus')) is not int or config['NanoCpus'] <= 0):
+                raise ValueError('账号公共角色的实际限额与固化预算不符')
+            cpu += config['NanoCpus']
+        if cpu > int(float(os.environ.get('V3_ACCOUNT_CPUS','2'))*1_000_000_000):
+            raise ValueError('账号实际 CPU 限额超过配置预算，拒绝串行交接')
+        layout = {**layout,'limits':{**layout['limits'],
+            'review':list(serial_review_limits(fingerprint['mem'],fingerprint.get('swap','0')))},
+            'review_nano_cpus':layout['cli_nano_cpus']}
+        return layout
+
+    def prepare_serial(self, job: dict, cli, layout: dict) -> None:
+        """先持久化意图并停止空闲固定 CLI，再允许创建私有评审。
+
+        :param job: 已认领非共享 CLI 租约的评审。
+        :param cli: 原固定 CLI。
+        :param layout: 已核验的串行预算。
+        :return: None；停止未知时保留记录与占用。
+        """
+        if self.serial_state(job['row']) is not None:
+            raise ValueError('原评审资源交接尚未收口')
+        cli.reload()
+        if cli.status != 'running':
+            raise ValueError('切换评审前固定 CLI 未处于健康运行状态')
+        observed = cli.exec_run(['python3','-I','/usr/local/bin/v3-cli-control','orphans'])
+        if observed.exit_code or json.loads(observed.output).get('orphans'):
+            raise ValueError('固定 CLI 存在未登记进程，拒绝切换评审')
+        memory, total = layout['limits']['review']
+        state = {'schema':1,'environment_id':job['row']['environment_id'],
+            'environment_generation':job['row']['generation'],'container_id':job['row']['container_id'],
+            'source':job['source'],'run_id':job['run_id'],'review_intent':job['review_intent'],
+            'phase':'prepared','cli_was_running':True,
+            'cli_limits':{key:cli.attrs['HostConfig'][key] for key in ('Memory','MemorySwap','NanoCpus','PidsLimit')},
+            'review_limits':{'Memory':memory,'MemorySwap':total}}
+        atomic_json(self.serial_path(job['row']),state)
+        self._serial_phase(job,'cli_stopping')
+        cli.stop(timeout=5)
+        cli.reload()
+        if cli.status not in STOPPED_STATES:
+            raise ValueError('固定 CLI 尚未停止，不能叠加评审资源')
+        self._serial_phase(job,'cli_stopped')
+
+    def restore_serial(self, job: dict) -> None:
+        """私有评审停净后恢复同一固定 CLI，不修改其身份或限额。
+
+        :param job: 原串行评审。
+        :return: None；恢复未确认时不释放原占用。
+        """
+        mode = job.get('resource_mode')
+        if mode is None and self.serial_state(job['row']) is None:
+            return
+        if mode != SERIAL_MODE:
+            raise ValueError('评审资源模式未知，保留交接和执行记录')
+        state = self.serial_state(job['row'])
+        child = self.container(job,missing_ok=True)
+        if child is not None:
+            child.reload()
+            if child.status not in STOPPED_STATES:
+                raise ValueError('私有评审仍占资源，不能恢复固定 CLI')
+        cli = self.runtime._container(job['row'])
+        cli.reload()
+        if state is None:
+            # 记录可能在退租收尾时已删除，也可能异常丢失；只有原 CLI 实际运行才能放行。
+            if cli.status != 'running':
+                raise ValueError('交接记录缺失，无法确认固定 CLI 已恢复')
+            return
+        if any(cli.attrs['HostConfig'].get(key) != value for key,value in state['cli_limits'].items()):
+            raise ValueError('原固定 CLI 配额发生变化，拒绝自动恢复')
+        self.serial_layout(job['row'],cli)
+        self._serial_phase(job,'cli_restoring')
+        if cli.status in STOPPED_STATES:
+            cli.start()
+            cli.reload()
+        if cli.status != 'running':
+            raise ValueError('固定 CLI 恢复结果未确认')
+        self.runtime._wait_network(job['row'])
+        self.runtime._sender_active(job['row'])
+        self.runtime.check_system_profile(job['row'],cli)
+        self.runtime._update(job['row'],state='ready')
+
+    def clear_serial(self, job: dict) -> None:
+        """完成恢复和退租后删除本执行交接记录。
+
+        :param job: 已完成恢复的原评审。
+        :return: None。
+        """
+        state = self.serial_state(job['row'])
+        if state is None:
+            return
+        if state['phase'] != 'cli_restoring' or state['source'] != job['source']:
+            raise ValueError('评审资源交接尚未完成恢复')
+        path = self.serial_path(job['row'])
+        path.unlink()
+        descriptor = os.open(path.parent,os.O_DIRECTORY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
 
     def check_orphans(self, row: dict) -> None:
         """核对真实评审池和持久创建意图，未知运行实例阻止新准入。
@@ -219,6 +402,12 @@ class ProjectReviewRuntime:
         tracked = {job.get('review_intent') for job in self.runtime.environment_jobs(row['environment_id'])}
         for path in self.runtime._execution_records(row):
             tracked.add(read_document(path).get('review_intent'))
+        single = self.runtime._root(row)/'runtime/execution.json'
+        if single.exists():
+            tracked.add(_read_json(single).get('review_intent'))
+        state = self.serial_state(row)
+        if state:
+            tracked.add(state['review_intent'])
         children = self.runtime.client.containers.list(all=True,filters={'label':[key+'='+value for key,value in expected.items()]})
         for child in children:
             child.reload()
@@ -319,8 +508,16 @@ class ProjectReviewRuntime:
         :return: 已冻结并与真实Docker一致的资源布局。
         """
         path = self.runtime._root(row) / 'runtime/project-review-layout.json'
-        if not path.exists():
-            raise ValueError('现有账号环境尚未预留评审资源，请在空闲时显式重建环境；原任务和历史保留')
+        if not path.exists() and not path.is_symlink():
+            fingerprint = json.loads(row['fingerprint_json'])
+            limits = isolated_account_limits(fingerprint['mem'],fingerprint.get('swap','0'))
+            cli.reload()
+            config = cli.attrs['HostConfig']
+            if (config.get('Memory') != limits['cli'][0] or config.get('MemorySwap') != limits['cli'][1]
+                    or type(config.get('NanoCpus')) is not int or config['NanoCpus'] <= 0 or config.get('PidsLimit') != 512):
+                raise ValueError('固定 CLI 的实际配置与原账号预算不一致')
+            return {'schema':2,'mode':SERIAL_MODE,'limits':{key:list(value) for key,value in limits.items()},
+                'cli_nano_cpus':config['NanoCpus']}
         layout = read_document(path)
         fingerprint = json.loads(row['fingerprint_json'])
         expected = {key: list(value) for key, value in scenario_account_limits(fingerprint['mem'], fingerprint.get('swap', '0')).items()}
@@ -346,7 +543,9 @@ class ProjectReviewRuntime:
             '/usr/local/bin/v3-cli-control','sample'])
         sample = json.loads(result.output)
         fingerprint = json.loads(job['row']['fingerprint_json'])
-        if result.exit_code or sample['memory'] != scenario_account_limits(fingerprint['mem'],fingerprint.get('swap','0'))['review'][0]:
+        expected = (serial_review_limits(fingerprint['mem'],fingerprint.get('swap','0'))[0]
+            if job.get('resource_mode') == SERIAL_MODE else scenario_account_limits(fingerprint['mem'],fingerprint.get('swap','0'))['review'][0])
+        if result.exit_code or sample['memory'] != expected:
             raise ValueError('实际评审内存限制或内核采样不符')
         write_document(self.root_for_job(job)/'runtime/process-metrics.json',{'observed_at':time.time(),'sample':sample})
 
@@ -372,7 +571,7 @@ class ProjectReviewRuntime:
         write_document(root / 'home/.claude.json', identity, mode=0o600, owner=(1000, 1000))
 
     def start_run(self, account: dict, task: dict, run_id: str, worker_env: dict, quota_env: dict) -> tuple[str, str]:
-        """经原shared_cli认领与监督器启动无特权私有评审。
+        """经原非共享 CLI 租约与监督器启动串行隔离评审。
 
         :param account: 原账号。
         :param task: 原Scheduler冻结payload。
@@ -385,18 +584,20 @@ class ProjectReviewRuntime:
         source = worker_env['QUOTA_SOURCE']
         row, cli = runtime.ensure(account, scenario_resources=True)
         with runtime.environment_lock(row['environment_id']):
-            layout = self.check_layout(row, cli)
+            layout = self.serial_layout(row, cli)
             self.check_orphans(row)
             if any(job.get('execution_role') == REVIEW_ROLE for job in runtime.environment_jobs(row['environment_id'])):
-                from account_runtime import RuntimeBusy
                 raise RuntimeBusy('账号独立评审池正在使用，保留共享队列')
+            if runtime._execution_records(row) or (runtime._root(row)/'runtime/execution.json').exists():
+                raise RuntimeBusy('原账号执行记录尚未收口，等待评审')
             # 创建意图必须早于Docker创建，避免ACK丢失后产生第二个私有实例。
             root = self.root_for_run(run_id)
             handle = hashlib.sha256(source.encode()).hexdigest()[:20]
-            job = runtime.claim(row, account, source, shared_cli=True)
+            job = runtime.claim(row, account, source)
             try:
                 job.update(execution_role=REVIEW_ROLE, private_relative=str(root.relative_to(runtime.data)),
-                    review_intent=hashlib.sha256(source.encode()).hexdigest(), review_phase='creating', run_id=run_id, handle=handle)
+                    review_intent=hashlib.sha256(source.encode()).hexdigest(), review_phase='creating', run_id=run_id, handle=handle,
+                    resource_mode=SERIAL_MODE)
                 runtime._save_execution(job)
                 runtime._ensure_version(cli, worker_env['CLAUDE_CODE_VERSION'])
                 runtime.sync_credentials(row, account)
@@ -448,6 +649,7 @@ class ProjectReviewRuntime:
                 shared_context = {'NETWORK_INSPECTION_MODE': 'passthrough', 'QUOTA_SOURCE': ''}
                 runtime._configure_network_context(cli, shared_context, reuse_passthrough=True,
                     require_reuse=len(runtime.environment_jobs(row['environment_id'])) > 1)
+                self.prepare_serial(job,cli,layout)
                 memory, total = layout['limits']['review']
                 child = runtime.client.containers.run(runtime.image, name='bench-project-review-' + job['review_intent'][:16],
                     labels=self.labels(job), detach=True, auto_remove=False, read_only=True, user='1000:1000',
@@ -460,6 +662,7 @@ class ProjectReviewRuntime:
                     log_config={'type': 'json-file', 'config': {'max-size': '2m', 'max-file': '1'}})
                 job.update(review_container_id=child.id, review_phase='created', cwd=cwd, version=worker_env['CLAUDE_CODE_VERSION'])
                 runtime._save_execution(job)
+                self._serial_phase(job,'review_running',review_container_id=child.id)
                 environment = {**worker_env, **runtime.execution_environment(row), 'HOME': '/home/node',
                     'CLAUDE_MODEL_OVERRIDE':package['resolved_model'],
                     'V3_PERSISTENT_HOME': '1', 'USE_SIDECAR_DNS': '1', 'EXTERNAL_OAUTH_REFRESH': '1',
@@ -502,6 +705,8 @@ class ProjectReviewRuntime:
         :param job: 本代私有作业。
         :return: None；未知或仍运行则拒绝假报释放。
         """
+        if job.get('resource_mode') == SERIAL_MODE and self.serial_state(job['row']):
+            self._serial_phase(job,'review_stopping')
         container = self.container(job, missing_ok=True)
         if container is not None:
             container.reload()

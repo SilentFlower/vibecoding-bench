@@ -179,6 +179,13 @@ ProjectVerifier.verify_native(candidate, project_root, specification, environmen
                               *, answer='', regression=False) -> dict
 ProjectScenarios.finish_captured_quota(run_id) -> bool
 observed_model(directory, response, session_id) -> str
+serial_review_limits(memory: str, swap: str = '0') -> tuple[int, int]
+ProjectReviewRuntime.pending(account_id: int | None) -> bool
+ProjectReviewRuntime.serial_state(row: dict) -> dict | None
+ProjectReviewRuntime.serial_layout(row: dict, cli) -> dict
+ProjectReviewRuntime.prepare_serial(job: dict, cli, layout: dict) -> None
+ProjectReviewRuntime.restore_serial(job: dict) -> None
+ProjectReviewRuntime.clear_serial(job: dict) -> None
 _suite_paths(suite: dict) -> tuple[Path, Path]
 _bind_source(project: Path, import_root: Path, cleanup: ExitStack, *, console: bool = False,
              distribution: tuple[str, str] | None = None,
@@ -238,9 +245,26 @@ restore_upstream_checkout_bytes(root: Path) -> list[str]  # deploy/v3/manage.py
 
 **新任务输入与代码依赖接受来源**：未声明 code 依赖的新任务从场景已接受状态开始；尚无接受代码时使用初始基线及启动前冻结的入口材料。旧任务未接受改动封存到交接备份，不进入新任务输入；同任务 ready 标记接续保留当前半成品。code依赖必须对应前置task的passed与accepted_checkpoint_digest，并定位该摘要的passed评测作业。`project-artifacts/task-inputs/<task_id>/code-dependency.json` 保存dependencies作业ID→摘要、base_checkpoint_digest、base_checkpoint_job_id及ready／replacing状态。多依赖须沿评测evidence中的 `parent_code_job_id` 属于同一已接受父链；不能用摘要相同折叠回退后的不同分支，更不能猜测合并。工作区非所需版本时先保存原现场，再从已核对对象物化；交接中断受阻。候选evidence冻结 `parent_code_digest,parent_code_job_id,input_checkpoint_digest`；授权范围验收使用该作业冻结输入，不能使用后来变化的任务checkpoint代替。
 
-**严格释放与接受**：真实父链／输入消费／source/generation核对后定向冻结、封存回答和候选，并先持久waiting_release与complete决定。driver正常退出，精确来源严格释放后才排机械验收；需要评审时经原Scheduler／normal额度和共享CLI租约创建project_review，候选不持名额等待评审。评审结果封存后也须严格释放，CAS核对父generation／状态、最新作业及未收口执行后才接受或披露／有限修正。重复候选／评审通知重放已落决定，不重复freeze；迟到旧代结果不推进。完整输出遇quota／重启只续验收，不再重问；旧Run终态保留。
+**严格释放与接受**：真实父链／输入消费／source/generation核对后定向冻结、封存回答和候选，并先持久waiting_release与complete决定。driver正常退出，精确来源严格释放后才排机械验收；需要评审时经原Scheduler／normal额度及 `claim(shared_cli=False, exclusive=False)` 创建project_review，同账号其他CLI互斥且不排空API，候选不持名额等待评审。评审结果封存后也须严格释放，CAS核对父generation／状态、最新作业及未收口执行后才接受或披露／有限修正。重复候选／评审通知重放已落决定，不重复freeze；迟到旧代结果不推进。完整输出遇quota／重启只续验收，不再重问；旧Run终态保留。
 
-**同实际模型评审**：场景冻结原账号身份、CLI版本、effort和配置execution_model（空串也是合法配置快照）。候选封存时从已核对主assistant精确原生位置读取 `message.model`，存evidence `resolved_model`；私有评审用该值作 `CLAUDE_MODEL_OVERRIDE`，评审结果再核实际原生模型完全一致。禁止因CLI默认／全局设置变化静默换模型，也不调用模型清单探测。评审使用独立session／PID／mount／HOME／input／日志，原账号netns、AT-only副本和唯一刷新所有者；候选无法从其共享目录读取隐藏材料。资源从原账号静态预留512MiB单评审池，CPU按CLI／review／network／sender=4／2／1／1分配，CLI／review的PID为384／128、tmpfs各64MiB，额外swap只归固定CLI；旧已创建环境缺匹配layout时明确拒绝并要求空闲重建，不超分账号预算。
+**同实际模型评审**：场景冻结原账号身份、CLI版本、effort和配置execution_model（空串也是合法配置快照）。候选封存时从已核对主assistant精确原生位置读取 `message.model`，存evidence `resolved_model`；私有评审用该值作 `CLAUDE_MODEL_OVERRIDE`，评审结果再核实际原生模型完全一致。禁止因CLI默认／全局设置变化静默换模型，也不调用模型清单探测。评审使用独立session／PID／mount／HOME／input／日志，原账号netns、AT-only副本和唯一刷新所有者；候选无法从其共享目录读取隐藏材料。
+
+**串行资源交接**：新环境不预留常驻评审份额；`serial_review_limits` 返回普通三角色预算中CLI剩余RAM，MemorySwap与Memory相等，额外swap只归固定CLI。旧schema1预留布局核对原固定CLI的实际限额，仍可借用原账号总预算扣除network/sender后的RAM，固定CLI配置不改写。评审CPU沿原固定CLI的有限NanoCpus，公共角色合计不得超 `V3_ACCOUNT_CPUS`（默认2）；私有容器仍为UID1000、根只读、PID128、tmpfs64MiB。
+
+评审在环境锁内认领非共享CLI并确认无未知进程，先持久意图再停止固定CLI，reload确认为exited/dead/created后才能创建私有容器。清理始终先停止并核验私有容器，再恢复同一固定CLI并核验画像／公共角色，最后退租、删除交接记录及执行记录。网络和sender全程保持，API可继续使用原发送连接。普通CLI从串行状态检查、画像探针到认领连续持同一环境锁，版本安装在锁外；共同认领边界对全部同账号活动批次的当前generation、evaluating且review_ready/review_queued工作优先，paused和旧代不阻新作业。
+
+`runtime/execution.json` 保存非共享评审及 `resource_mode='serial-v1'`；历史无mode评审仍按旧清理路径读取。root私有0600的 `runtime/project-review-serial.json` 用atomic_json/fsync发布：
+
+| 字段 | 归属与边界 |
+| --- | --- |
+| schema、environment_id、environment_generation、container_id | schema=1，绑定原固定CLI及当前环境代次 |
+| source、run_id、review_intent | 绑定本次执行；intent为64位十六进制摘要 |
+| phase、cli_was_running | prepared/cli_stopping/cli_stopped/review_running/review_stopping/cli_restoring；本次负责恢复为true |
+| cli_limits | 原Memory、MemorySwap、NanoCpus、PidsLimit有限正整数快照，恢复前核对实际配置 |
+| review_limits | 本次Memory及MemorySwap有限串行预算 |
+| review_container_id | 创建ACK可用时写入；ACK丢失按原intent标签找回 |
+
+有效交接期间 `ensure` 只提供原API环境，不唤醒固定CLI；CLI准备返回RuntimeBusy等待。恢复失败、未知running孤儿、代次／限额冲突或缺少执行登记保留记录和占用；串行执行仍登记但交接记录丢失时，只有原CLI实际运行且私有容器停净才允许退租。回退前必须停净私有评审并完成原CLI恢复；旧版缺少串行协议，不能删记录或在回退后承诺普通布局仍可评审。
 
 评审包冻结完整已消费当前任务对话、回答、rubric、真实源码事实、程序结果及实际交付candidate_files（逐对象摘要核对），总上限512KiB，超限受阻不截断。输出最多64KiB的单JSON，身份字段为 `job_id/task_id/turn_no/response_digest/basis_digest`；decision限disclose/pass/fail/uncertain，逐criterion恰好一次，证据必须在冻结清单且candidate引用获显式许可，反馈限白名单。程序失败不能被语义覆盖；合法uncertain直接受阻，不重抽。modify仅在native及适用regression通过后接受；声明semantic的交付要求还须评审。
 
@@ -288,6 +312,9 @@ Dynaconf的76份和Flask的一份固定公开.env原件沿既有精确路径／S
 | 缺依赖、跨场景依赖、环、code引用非modify | 内容准入拒绝；未选分支不计本次必要任务分母。 |
 | code依赖无接受作业／父链不一致／交接replacing | 保留现场并受阻，不以当前cwd或相同摘要猜测继承／合并。 |
 | 候选完整但未严格释放、评审未释放 | 保持等待，不能接受、重问或开始相冲突执行；容量1也不持候选holder等待评审。 |
+| 已有CLI／有效交接时的评审准入，或待评审时普通CLI认领 | admission等待且blocked=false／RuntimeBusy，不把竞争标为业务失败；已认领作业可完成。 |
+| 固定CLI停止未确认、未知运行评审或原配额／代次冲突 | 不创建下一私有评审或恢复CLI，保留占用与持久意图。 |
+| 交接记录丢失且固定CLI仍停止 | ValueError，保留执行记录；不能假报恢复或释放。 |
 | 完整候选／评审输出后quota或重启 | 只续收口与验收，保留Run中断事实，不重复模型输入或计量。 |
 | 新source未许可／许可后尾段不明 | 前者有持久证明可结算未投递；后者保留预留并受阻，不盲给新预算。 |
 | 原生准备异常／业务断言或已进入业务后的超时 | error／failed，前者本地有限重试，后者可用有限业务修正。 |
@@ -310,6 +337,8 @@ Dynaconf的76份和Flask的一份固定公开.env原件沿既有精确路径／S
 
 - 正常：创建 `{"account_id":1,"project_keys":["python-frontmatter"],"scenario_entries":{"python-frontmatter":{"FM-S02":"diagnose_only"}}}`，服务端生成policy3和600秒默认；FM-S02按diagnose_only入口选择任务，其余场景使用默认入口。正确无BUG／信息不足／方案可通过而不增加代码checkpoint。
 - 恢复：前两任务passed、第三任务半途timeout时，旧Run保持timeout，新Run复用第三任务session与半成品，消耗原剩余任务预算；若回答已封存则只续原验收，不新建一次业务询问。
+- 串行正常：1536m RAM＋2048m额外swap的新登录保存同环境；network256m／sender128m保持，固定CLI为Memory1152m／MemorySwap3200m。停止CLI后评审使用1152m／1152m，评审停净后恢复原CLI；旧预留CLI640m仍保持原限制。
+- 错误用法：只在画像检查前看一次交接标记，随后无锁调用探针和claim，评审可插入停机产生Docker409。正确处理：状态检查、画像exec及认领共同持环境锁，忙碌沿RuntimeBusy重排队；不要靠吞掉409掩盖竞争。
 - 代码依赖边界：A接受为作业10、B接受为作业11；以后另一作业把源码回退成A相同字节，不能因此声称B与该回退分支有共同接受父链。使用parent_code_job_id逐作业追溯，无共同链则受阻。
 - 错误用法：配置execution_model为空便让评审使用当前全局默认，或给review另开供应商调用；正确做法是沿原Scheduler，冻结候选实际message.model并在review原生日志再次核对。
 - 错误用法：CLI success、问答passed或批次completed都算代码成功；正确做法是分别显示执行、任务、代码接受及收口分布。固定测试／模拟CLI通过不计真实模型完成数。
@@ -329,6 +358,8 @@ Dynaconf的76份和Flask的一份固定公开.env原件沿既有精确路径／S
 - 语言修正：穷举正式首问、分支、材料说明、rubric 与运行时提示，核对英文语义及原授权／验收约束；比较修正前后的中文 `summary(include_steps=True)` 完全相等，新旧内容分别 install／复开仍按各自摘要读取。seed、固定业务输入、原生检查和 wheel 字节保持不变；Unicode 测试夹具与证据原文不作为必须翻译的正式指令。
 - 状态／恢复／父链：`test_project_scenarios.py` 覆盖实际消费认领、澄清不加attempt、3次上限、工作高水位／崩溃预留、review三层预算、候选与review严格释放、完整输出quota／重启只续验收、迟到结果、文件交付进review包、局部轮换／分支激活、代码依赖恢复与不兼容／相同字节回退分支、实际模型漂移不扣业务修正。
 - 协议／用量／私有运行：`test_project_evaluation.py` 覆盖严格单JSON／错误身份／重复项／未知证据／程序失败不能被pass覆盖、合法uncertain、显式candidate证据许可及缓存字段去重／未知；`test_project_review_runtime.py` 覆盖owner刷新身份、创建／停净／缺失／孤儿、清理失败保留holder及资源份额；`test_project_native_verifier.py` 覆盖准备阶段error、业务exit80为failed、清理前不放slot、合法等价程序提取。
+- 串行回归：`test_project_review_runtime.py` 核普通／旧布局不改限额、停止／恢复／退租失败、缺记录及错误代次、同账号竞争与不同账号独立；`test_review_cannot_stop_cli_between_profile_check_and_claim` 固定检查窗口交错，旧实现409、修复后竞争者RuntimeBusy且安装不占环境锁。`test_project_scenarios.py` 核跨活动批次优先及paused／旧代排除。
+- 实际Docker：`run_local_verification.py --manifest <隔离验证清单> --project-scenarios-only --scenario-capacity 1 --scenario-failures` 与容量2的 `--scenario-browser` 核新登录同环境、三阶段预算、无候选／评审重叠、私有挂载及原API流。`--scenario-recovery-only` 核真实画像探针与认领竞争、running/exited/missing恢复及缺交接记录阻断；real_model_calls=0，真实OAuth／模型闭环留到部署后独立验收。
 - 原生内容：`python3 scripts/validate-project-library.py` 仅静态摘要／当前100-426-726；`scripts/validate-project-scenarios.py --project <key> --task <key> --image <隔离账号镜像>` 真实业务，按需 `--candidate/--answer/--entry/--branch/--expect failed`；`--regression-only` 或 `--with-regression` 使用独立回归资源。保留适用工程目标的原版失败／参考通过／错误候选拒绝、原生完整集合与skip/xfail证据，不用宿主旧基线替代。
 - 套件适配：`test_project_native_regression.NativeRegressionTests` 断言 src 叠加恢复原测试／配置、新 pytest hook 拒绝、旧默认不变、父链接与非法路径／模块拒绝、安装库错导入拒绝。目标镜像实际冻结并执行全部节点，再对每个参考候选跑完整适用回归；首批新增原版集合为228／911／81，数字是首批实测记录，不作为后续套件的通用硬编码。
 - 第二批适配：同测试类核dotenv受控src／0755入口与退出清理、拒覆盖／系统venv；子测试保留重复context和失败、未知父节点／非call／未序列化值拒绝。当前镜像四仓完整集合为288、1203、1513（1497通过／16冻结skip）、185主项＋15子项，逐参考完整核对；数值是实测，不能硬抄为未来版本通用分母。Git／Docker导出另核来源全集／双SHA、原执行位和link blob表示，私有mount比较核host路径双向重叠。

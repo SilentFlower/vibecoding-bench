@@ -74,6 +74,7 @@ def main() -> None:
     parser.add_argument('--scenario-capacity', type=int, choices=(1,2), default=2)
     parser.add_argument('--scenario-browser',action='store_true')
     parser.add_argument('--scenario-failures',action='store_true')
+    parser.add_argument('--scenario-recovery-only',action='store_true')
     parser.add_argument("--project-catalog-only", action="store_true")
     parser.add_argument("--evidence-dir", type=Path)
     parser.add_argument("--run-windows-only", action="store_true")
@@ -81,8 +82,10 @@ def main() -> None:
     parser.add_argument("--timed-followups-only", action="store_true")
     parser.add_argument("--quota-completion-only", "--quota-hard-stop-only", dest="quota_completion_only", action="store_true")
     args = parser.parse_args()
-    if (args.scenario_browser or args.scenario_failures) and not args.project_scenarios_only:
+    if (args.scenario_browser or args.scenario_failures or args.scenario_recovery_only) and not args.project_scenarios_only:
         parser.error('场景浏览器及恢复验证只能用于新场景独立验证')
+    if args.scenario_recovery_only and (args.scenario_browser or args.scenario_failures):
+        parser.error('单独资源恢复验证不能与完整场景或浏览器验证组合')
     if bool(args.legacy_control_image) != bool(args.legacy_account_image):
         parser.error("旧布局验证需要同时提供旧 control/account 镜像")
     if args.project_catalog_only and any((args.project_iterations_only,args.project_scheduling_only,
@@ -147,6 +150,7 @@ def main() -> None:
                     'VERIFY_PROJECT_SCENARIOS_ONLY':'1' if args.project_scenarios_only else '0',
                     'VERIFY_SCENARIO_BROWSER':'1' if args.scenario_browser else '0',
                     'VERIFY_SCENARIO_FAILURES':'1' if args.scenario_failures else '0',
+                    'VERIFY_SCENARIO_RECOVERY_ONLY':'1' if args.scenario_recovery_only else '0',
                     'V3_INTERNAL_TOKEN':service_token,'WEBUI_DIR':'/source/webui',
                     'PER_ACCOUNT_CONCURRENCY':str(args.scenario_capacity) if args.project_scenarios_only else os.environ.get('PER_ACCOUNT_CONCURRENCY','2'),
                     "VERIFY_PROJECT_CATALOG_ONLY": "1" if args.project_catalog_only else "0",

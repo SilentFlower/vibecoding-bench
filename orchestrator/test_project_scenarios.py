@@ -6,11 +6,13 @@ import time
 import unittest
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from project_iteration import ProjectIterationManager
 from project_library import ProjectLibrary, snapshot_tree, write_document
 from project_scenarios import initialize_scenario_schema, normalized_scenario_policy
+from project_review_runtime import ProjectReviewRuntime
 from test_project_iterations import ProjectIterationFixture
 from test_project_iterations import ROOT
 from test_project_scenario_content import scenario_fixture
@@ -143,6 +145,45 @@ class ScenarioStateTests(ProjectIterationFixture):
         for value in (None, True, '600', 60.0, 59):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 normalized_scenario_policy({'timeout_sec': value}, 1, 2)
+
+    def test_review_priority_uses_current_account_batch_and_generation(self) -> None:
+        """仅当前有效待评审阻止新 CLI，旧代和已暂停批次不会占住账号。@return None。"""
+        task_id=self.tasks[0]['id']
+        _,source_id=self.execution(task_id,1)
+        job_id=self.job(task_id,source_id)
+        review=ProjectReviewRuntime(SimpleNamespace(database=self.scenario_manager.database,
+            project_iterations=self.scenario_manager))
+        self.sql("UPDATE project_scenario_tasks SET status='evaluating' WHERE id=?",(task_id,))
+        self.sql("UPDATE project_evaluation_jobs SET status='review_ready' WHERE id=?",(job_id,))
+        self.assertTrue(review.pending(1))
+        self.assertFalse(review.pending(2))
+        self.sql("UPDATE project_iteration_batches SET status='paused' WHERE id=?",(self.batch['id'],))
+        self.assertFalse(review.pending(1))
+        self.sql("UPDATE project_iteration_batches SET status='active',generation=2 WHERE id=?",(self.batch['id'],))
+        self.assertFalse(review.pending(1))
+        self.sql("UPDATE project_iteration_batches SET generation=1 WHERE id=?",(self.batch['id'],))
+        self.assertTrue(review.pending(1))
+        self.sql("UPDATE project_evaluation_jobs SET status='passed' WHERE id=?",(job_id,))
+        self.assertFalse(review.pending(1))
+
+    def test_review_priority_finds_another_active_batch_on_same_account(self) -> None:
+        """另一个活动批次的待评审也优先，暂停该批次后不再占用。@return None。"""
+        second=self.scenario_manager.create_batch(1,'第二批次',policy={})
+        self.scenario_manager.transition(second['id'],'start')
+        task=self.sql('SELECT t.id FROM project_scenario_tasks t '
+            'JOIN project_scenario_instances s ON s.id=t.scenario_instance_id '
+            'JOIN project_instances i ON i.id=s.instance_id WHERE i.batch_id=? ORDER BY t.id',
+            (second['id'],))[0]
+        _,source_id=self.execution(task['id'],1)
+        job_id=self.job(task['id'],source_id)
+        self.sql("UPDATE project_scenario_tasks SET status='evaluating' WHERE id=?",(task['id'],))
+        self.sql("UPDATE project_evaluation_jobs SET status='review_ready' WHERE id=?",(job_id,))
+        review=ProjectReviewRuntime(SimpleNamespace(database=self.scenario_manager.database,
+            project_iterations=self.scenario_manager))
+        self.assertTrue(review.pending(1))
+        self.assertFalse(review.pending(2))
+        self.sql("UPDATE project_iteration_batches SET status='paused' WHERE id=?",(second['id'],))
+        self.assertFalse(review.pending(1))
 
     def test_dependency_readiness_is_not_array_prefix(self) -> None:
         """第一和第二项独立就绪，第三项只依赖第一项。@return None。"""

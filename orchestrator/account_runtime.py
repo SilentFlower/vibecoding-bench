@@ -638,7 +638,7 @@ class AccountRuntime:
         :param allow_inactive_login: 仅显式重授权允许读取非 active OAuth 配置
         :param allow_login_recovery: 仅恢复原登录提交可进入本地保存门禁
         :param preserve_proxy: 指标读取只核对权威代理，不回写账号代理字段
-        :param scenario_resources: 只在尚未创建角色时静态预留评审资源，现存容器保持原限额
+        :param scenario_resources: 提前核验项目串行评审预算，新旧固定容器均保持原限额
         :return: 环境记录与 Docker container
         """
         with self._account_lock(account):
@@ -665,6 +665,11 @@ class AccountRuntime:
             root = self._root(row)
             if (root / "runtime/credential-handoff.json").exists():
                 raise ValueError("解绑凭据交接尚未完成，请再次解绑完成交接")
+            if self.reviews.serial_state(row):
+                # 发送器仍可服务 API；任何 CLI 准备均须等原评审完成资源交接。
+                if version is not None:
+                    raise RuntimeBusy("等待评审完成并恢复账号 CLI")
+                return row, self._container(row)
             root.mkdir(parents=True, exist_ok=True, mode=0o700)
             for name in ("home", "projects", "workspaces", "flows", "controls", "ca", "cli", "runtime"):
                 (root / name).mkdir(exist_ok=True, mode=0o700)
@@ -720,14 +725,6 @@ class AccountRuntime:
                         self._update(row, state="cli_reconcile")
                 if not any(present):
                     self._make_room(row)
-                    if scenario_resources:
-                        from resource_budget import scenario_account_limits
-                        fingerprint = json.loads(row['fingerprint_json'])
-                        cpu = int(float(os.environ.get('V3_ACCOUNT_CPUS', '2')) * 1_000_000_000)
-                        atomic_json(root / 'runtime/project-review-layout.json', {
-                            'schema': 1, 'review_capacity': 1,
-                            'limits': scenario_account_limits(fingerprint['mem'], fingerprint.get('swap', '0')),
-                            'cli_nano_cpus': cpu * 4 // 8, 'review_nano_cpus': cpu * 2 // 8})
                     deployment_key = hashlib.sha256(self.deployment.encode()).hexdigest()[:12]
                     name = f"v3-{deployment_key}-account-{row['environment_id']}"
                     create_environment(self, row, account, name, atomic_json)
@@ -751,6 +748,9 @@ class AccountRuntime:
         if version is not None:
             self.check_system_profile(row, container)
             self._ensure_version(container, version)
+        if scenario_resources:
+            with self.environment_lock(row['environment_id']):
+                self.reviews.serial_layout(row,container)
         return row, container
 
     def _ensure_version(self, container, version: str) -> None:
@@ -1029,6 +1029,11 @@ class AccountRuntime:
         :return: 本代执行句柄
         """
         with self.environment_lock(row["environment_id"]):
+            if self.reviews.serial_state(row):
+                raise RuntimeBusy("等待评审资源交接完成")
+            if (not exclusive and self.reviews.pending(row.get('account_id'))
+                    and not (source.startswith('run:') and self.reviews.is_review(source.split(':',2)[1]))):
+                raise RuntimeBusy("同账号待评审优先，等待已有 CLI 释放")
             if source.startswith(('run:','continue:')):
                 refresh=self.reviews.owner_refresh_state({**account,'id':row['account_id']})
                 if refresh and refresh['status'] in ('waiting','refreshing'):
@@ -1138,7 +1143,7 @@ class AccountRuntime:
             "generation": job["row"]["generation"]}
         for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before", "statusline_before", "statusline_command",
                 "version", "process", "process_permitted", "run_id", "settings_override", "network_inspection_mode",
-                "execution_role", "review_container_id", "private_relative", "review_intent", "review_phase"):
+                "execution_role", "review_container_id", "private_relative", "review_intent", "review_phase", "resource_mode"):
             if key in job:
                 execution[key] = job[key]
         atomic_json(self._execution_path(job), execution)
@@ -1177,6 +1182,7 @@ class AccountRuntime:
                         child.reload()
                         if child.status == 'running':
                             raise ValueError('私有评审容器仍在运行，不能释放共享holder')
+                    self.reviews.restore_serial(job)
                 else:
                     self._restore_cli_quota(job)
                 if (job.get('execution_role') != 'project-review' and row.get("account_id") is not None
@@ -1187,6 +1193,8 @@ class AccountRuntime:
                         self._local_oauth(current)
                         atomic_json(self.data / "profiles" / row["name"] / ".credentials.json", current)
                 self._lease(job, "release")
+                if job.get('resource_mode') == 'serial-v1':
+                    self.reviews.clear_serial(job)
                 self._execution_path(job).unlink(missing_ok=True)
                 released = True
                 if row["state"] == "cli_reconcile" and not job.get("shared_cli"):
@@ -1261,9 +1269,13 @@ class AccountRuntime:
                    shared_cli: bool = False, scenario_resources: bool = False):
         row, container = self.ensure(account, allow_inactive_login=allow_inactive_login,
             allow_login_recovery=source.startswith("login:"), scenario_resources=scenario_resources)
-        self.check_system_profile(row, container)
-        shared_cli = shared_cli and row.get("isolation_version") == ISOLATION_VERSION and not exclusive
-        job = self.claim(row, account, source, idle_only, exclusive, shared_cli)
+        with self.environment_lock(row["environment_id"]):
+            # 检查至认领必须连续持锁，否则评审可在画像 exec 前停止尚未认领的 CLI。
+            if self.reviews.serial_state(row):
+                raise RuntimeBusy("等待评审结束后恢复账号 CLI")
+            self.check_system_profile(row, container)
+            shared_cli = shared_cli and row.get("isolation_version") == ISOLATION_VERSION and not exclusive
+            job = self.claim(row, account, source, idle_only, exclusive, shared_cli)
         try:
             self._ensure_version(container, version)
             with self.environment_lock(row["environment_id"]):
@@ -1671,7 +1683,7 @@ class AccountRuntime:
             state = self.client.api.exec_inspect(job["exec"])
             if not state.get("Running"):
                 return int(state.get("ExitCode") if state.get("ExitCode") is not None else -1)
-            if job.get("shared_cli") and job.get("handle"):
+            if (job.get("shared_cli") or job.get('execution_role') == 'project-review') and job.get("handle"):
                 result = self._process_result(job)
                 if result is not None and not result.get("cleaned"):
                     raise ValueError("本执行子进程未能完成定向收口")
@@ -1708,7 +1720,7 @@ class AccountRuntime:
             raise ValueError("不支持的 CLI 作业控制操作")
         job = self.job_for_container(token)
         proof = job.get("process")
-        if not job.get("shared_cli") or not isinstance(proof, dict):
+        if (not job.get("shared_cli") and job.get('execution_role') != 'project-review') or not isinstance(proof, dict):
             raise ValueError("本执行缺少独立监督进程证明")
         container = self.reviews.container(job) if job.get('execution_role') == 'project-review' else self._container(job["row"])
         answer = container.exec_run(["python3", "-I", "/usr/local/bin/v3-cli-control", operation,
@@ -1789,7 +1801,7 @@ class AccountRuntime:
                 raise ValueError("重授权提交结果尚未确认，必须先对账")
             container = self.reviews.container(job, missing_ok=True) if job.get('execution_role') == 'project-review' else self._container(job["row"])
             try:
-                if job.get("shared_cli"):
+                if job.get("shared_cli") or job.get('execution_role') == 'project-review':
                     if job.get('execution_role') == 'project-review':
                         if container is not None:
                             container.reload()
@@ -2587,6 +2599,8 @@ class AccountRuntime:
             "created_at": time.time(), "credential_restore": "禁止恢复历史凭据，沿用最新合法所有者"})
 
     def _recover_cli(self, row: dict) -> None:
+        if self.reviews.serial_state(row):
+            raise ValueError("评审资源交接未确认收口，禁止单独唤醒 CLI")
         if self.environment_jobs(row["environment_id"]) or (self._root(row) / "runtime/execution.json").exists():
             raise ValueError("CLI 执行尚未确认收口")
         roles = {role: role_container(self, row, role) for role in ROLE_COLUMNS}
@@ -2800,7 +2814,9 @@ class AccountRuntime:
                         job = {"row": row, "account": {"cc2api_account_id": execution.get("account_id")},
                             "source": execution["source"], "lease": lease, "exclusive": False, "claimed": True,
                             "token": self.execution_token(row["container_id"] or row["environment_id"], execution["source"])}
-                        for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before", "statusline_before", "statusline_command"):
+                        for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before", "statusline_before", "statusline_command",
+                                "process", "process_permitted", "run_id", "version", "execution_role", "review_container_id",
+                                "private_relative", "review_intent", "review_phase", "resource_mode"):
                             if key in execution:
                                 job[key] = execution[key]
                         with self.environment_lock(row["environment_id"]):
@@ -2810,7 +2826,7 @@ class AccountRuntime:
                                 self._register_job(job)
                             if container:
                                 container.reload()
-                            if container and container.status == "running":
+                            if job.get('execution_role') == 'project-review' or container and container.status == "running":
                                 self.cleanup(job["token"])
                                 self._update(row, state=settled_state or "ready")
                             else:
@@ -2828,6 +2844,8 @@ class AccountRuntime:
                     record.unlink()
                     self._update(row, state=settled_state or "stopped")
                 else:
+                    if self.reviews.serial_state(row):
+                        raise ValueError("存在没有执行登记的评审资源交接，需定向对账")
                     # 管理服务重启不应截断账号内已接受的 API/SSE；只有遗留 CLI 执行才收口容器。
                     connection = self.database()
                     try:
@@ -2912,7 +2930,7 @@ class AccountRuntime:
                     "lease_lock": threading.RLock()}
                 for key in ("exec", "handle", "tmux", "tmux_socket", "process", "process_permitted",
                         "run_id", "version", "settings_override", "network_inspection_mode",
-                        "execution_role", "review_container_id", "private_relative", "review_intent", "review_phase"):
+                        "execution_role", "review_container_id", "private_relative", "review_intent", "review_phase", "resource_mode"):
                     if key in execution:
                         job[key] = execution[key]
                 jobs.append(job)
