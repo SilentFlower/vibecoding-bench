@@ -1,0 +1,38 @@
+{
+  "id": "project-catalog-hundred-wave-03",
+  "name": "project-catalog-hundred-wave-03",
+  "title": "百项目扩容第3阶段：30项目真实场景内容包",
+  "description": "将pypika、arrow、charset-normalizer、injector、loguru、pyparsing、markdownify、pyrsistent、feedgen、sortedcontainers、wtforms、python-constraint、feedparser、portion、textdistance、humanize、bidict、tablib、chardet、natsort、transitions、html5lib、pendulum、python-liquid、python-statemachine、webcolors、wrapt、funcy、collective-icalendar、sqlglot逐仓转为真实场景内容包，阶段内小批制作与验收，覆盖母任务剩余九十仓目标的一部分；本次auto-loop仅本地提交。",
+  "status": "in_progress",
+  "dev_type": "backend",
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-22",
+  "completedAt": null,
+  "closeout": {
+    "status": "pending",
+    "closedAt": null,
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "10-22-project-catalog-hundred",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-10-22T05:29:59Z",
+    "completedSteps": [],
+    "partialStep": "auto-loop blocked: source-unavailable",
+    "nextStep": "auto-loop 已阻断；确认后运行 python3 ./.trellis/scripts/auto_loop.py retry-blocked --run-id auto-20261021191233 --task .trellis/tasks/10-22-project-catalog-hundred-wave-03",
+    "notes": "run_id=auto-20261021191233; task=.trellis/tasks/10-22-project-catalog-hundred-wave-03; status=completed_with_blocked; reason=source-unavailable; summary=第三阶段29仓已完成正式本地准入，新增116场景175任务；累计99项目421场景718任务，84320原生主项、525产品路径、8303页面检查与31780文件Git/Docker交付通过，证据见research/available-verification-summary.json。第30仓SQLGlot固定gitlink sqlglot-integration-tests@8cbf013a7b0bd1871abce4ebb543560d0e554799无法获取，公开404、匿名git退出128且本地对象缺失；R1/R8不满足，不能缩小固定范围、伪造Check-All或提交整阶段完成，待提供该固定源码或可用只读镜像。"
+  }
+}

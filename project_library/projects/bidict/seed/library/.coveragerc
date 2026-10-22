@@ -1,0 +1,18 @@
+[run]
+branch = True
+core = sysmon
+# Uncomment out the following once it's supported by the sysmon core (https://github.com/coveragepy/coveragepy/issues/2150):
+# dynamic_context = test_function
+parallel = True
+patch = subprocess
+source =
+  bidict
+  tests
+
+[report]
+precision = 1
+show_missing = True
+# Don't show files in the report that are 100% covered:
+skip_covered = True
+exclude_also =
+  @.*overload

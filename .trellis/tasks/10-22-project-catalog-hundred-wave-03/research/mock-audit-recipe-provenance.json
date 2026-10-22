@@ -1,0 +1,17 @@
+{
+  "source": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/audit_mock.py",
+  "source_sha256": "5182bb73d558bcebc559050b9c235ff0b98d848182a94428426b6383dfb81a0b",
+  "adaptation": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/audit_mock.py",
+  "adaptation_sha256": "bbb0b390b26f5b8bf52776e07bfd37ffeead9eddd5e32b58899244ed06dc6006",
+  "change": "只把完整子项合同判定交给兼容旧列表和SQLGlot完整摘要的受控审计函数；全部其他原审计条件保持",
+  "original_source_unchanged": true,
+  "product_evidence_changed": false,
+  "helper_source_sha256": {
+    "sqlglot_subtest_audit.py": "2c07f23db62641b8a4f19d4c38ae08eb2277c16e84676ccc087dd0e5c35b4261",
+    "test_sqlglot_subtest_audit.py": "cabd6a241e83c94fb85d8caa96c44dcc1975200333ae49c467a57478b83226ab"
+  },
+  "tests": {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sqlglot-audit-adapter-tests.json",
+    "sha256": "f115734987c015cfd8c946c61a88fa9cba30a128034096c0bd990abd141247e5"
+  }
+}

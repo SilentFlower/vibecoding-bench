@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "NS-U02",
+  "source_commit": "e9a3a2a307580a1f2be8c57bba50fba45789ada0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default integer token order is p1.2,p1.9,p1.10;FLOAT treats1.10 as1.1 and gives p1.10,p1.2,p1.9. FLOAT interprets1e2 as100,placing v1e2 last;NOEXP instead gives v1e2,v3,v20. Select a typed version contract or measurement grammar explicitly;FLOAT is not semantic-version precedence.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,41 @@
+{
+  "scope": "宿主业务诊断；不替代镜像原生准入",
+  "rows": [
+    {
+      "task": "AR-U01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"relative_month_shift_clamps_but_absolute_replacement_validates\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "AR-U02",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"span_bounds_choose_microsecond_end_or_next_midnight\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "AR-C01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"monthly_range_preserves_the_original_day_anchor\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "AR-C02",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"timezone_conversion_and_relabeling_have_different_instants\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "AR-P01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"civil_day_partition_durations_follow_the_pinned_timezone_rules\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "AR-D01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"first\": \"2026-10-25T02:30:00+02:00\", \"second\": \"2026-10-25T02:30:00+01:00\", \"ambiguous\": true, \"first_fold\": 0, \"second_fold\": 1, \"utc_first\": \"2026-10-25T00:30:00+00:00\", \"utc_second\": \"2026-10-25T01:30:00+00:00\", \"difference_sec\": 3600.0}\n",
+      "stderr": ""
+    }
+  ]
+}

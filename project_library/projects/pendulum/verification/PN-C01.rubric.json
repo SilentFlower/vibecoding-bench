@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PN-C01",
+  "source_commit": "e06dacedc4cdea90fa1286b3965d180ab94cf251",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "in_timezone yields07:00-05:00 at the same instant. set retains12:00 wall fields with the new zone,shifting the instant by+5 hours. Choose conversion for an already known instant and a separately validated interpretation policy for local wall input;do not use set as an instant-preserving conversion.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

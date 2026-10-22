@@ -1,0 +1,1233 @@
+{
+  "baseline_digest": "aea70e23dc747e7169a40686edb7856a05e1e966bb077e0cf399499a29cd71b3",
+  "nodes": [
+    {
+      "id": "tests/test_const.py::TestBounds::test_comparisons",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_const.py::TestBounds::test_non_Boolean",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_const.py::TestBounds::test_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_const.py::TestInfinities::test_equalities",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_const.py::TestInfinities::test_infinities_are_hashable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_const.py::TestInfinities::test_infinities_are_singletons",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_const.py::TestInfinities::test_ninf_is_lower",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_const.py::TestInfinities::test_pinf_is_greater",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_as_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_clear",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_combine_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_combine_equal_closed_upper_bounds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_combine_equal_open_upper_bounds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_combine_missing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_combine_nonempty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_combine_one_interval_over_many",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_combine_pass_interval",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_combine_shared_endpoint_sweep",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_containment",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_copy_and_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_delete_empty_interval",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_delete_interval",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_delete_interval_out_of_bound",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_delete_missing_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_delete_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_find",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_find_on_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_init_repeating_values[1000]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_init_repeating_values[100]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_init_repeating_values[10]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_issue_39",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_iterators",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_iterators_on_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_or_ior",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_pop_interval",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_pop_missing_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_pop_missing_with_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_pop_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_popitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_popitem_with_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_setdefault_with_intervals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_setdefault_with_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_last_value_wins[fully-covered-by-later]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_last_value_wins[non-hashable-values-around-hashable-value]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_last_value_wins[same-bound-with-different-openness]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_last_value_wins[same-interval-repeated]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_last_value_wins[single-value-between-intervals]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_last_value_wins[touching-intervals]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_last_value_wins[unbounded-intervals]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_last_value_wins_with_existing_content",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_last_value_wins_with_mixed_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_last_value_wins_with_nested_intervals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_last_value_wins_with_non_hashable_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_last_value_wins_with_overlapping_intervals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_last_value_wins_with_single_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_with_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_with_intervaldict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_with_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_with_itself",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_with_mapping",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_update_with_non_hashable_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_views",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_with_intervals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dict.py::TestIntervalDict::test_with_single_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_discrete.py::TestCharInterval::test_empty_and_singletons",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_discrete.py::TestCharInterval::test_merge",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_discrete.py::TestCreateAPI::test_dict_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_discrete.py::TestCreateAPI::test_helper_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_discrete.py::TestCreateAPI::test_io",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_discrete.py::TestCreateAPI::test_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_discrete.py::TestIntInterval::test_adjacent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_discrete.py::TestIntInterval::test_empty_and_singletons",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_discrete.py::TestIntInterval::test_merge",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_doc.py::test_readme",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_func.py::TestIterate::test_default_parameters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_func.py::TestIterate::test_empty_intervals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_func.py::TestIterate::test_open_intervals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_func.py::TestIterate::test_reversed_iteration",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_func.py::TestIterate::test_reversed_iteration_with_open_intervals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_func.py::TestIterate::test_with_base",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_func.py::TestIterate::test_with_gaps",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_func.py::TestIterate::test_with_step",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestHelpers::test_bounds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestHelpers::test_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestHelpers::test_with_infinities",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestInterval::test_bounds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestInterval::test_bounds_on_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestInterval::test_bounds_on_union",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestInterval::test_creation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestInterval::test_creation_issue_19",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestInterval::test_enclosure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestInterval::test_hash_with_hashable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestInterval::test_hash_with_unhashable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestInterval::test_is_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestInterval::test_merge_consecutive",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalAdjacent::test_adjacent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalAdjacent::test_contained",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalAdjacent::test_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalAdjacent::test_non_adjacent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalAdjacent::test_nonatomic_interval",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalAdjacent::test_overlapping",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalAdjacent::test_reversed_adjacent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalAdjacent::test_same_bounds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalApply::test_apply",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalApply::test_apply_on_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalApply::test_apply_on_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalApply::test_apply_with_incorrect_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComparison::test_edge_cases",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComparison::test_equalities[i10-i20-i30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComparison::test_equalities[i11-i21-i31]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComparison::test_inequalities[i10-i20-i30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComparison::test_inequalities[i11-i21-i31]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComparison::test_with_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComparison::test_with_empty_and_infinities",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComparison::test_with_intervals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComparison::test_with_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComplement::test_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComplement::test_identity[i0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComplement::test_identity[i1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComplement::test_identity[i2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComplement::test_identity[i3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComplement::test_nonempty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComplement::test_proxy_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComplement::test_singleton",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalComplement::test_union",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalContainment::test_issue_41",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalContainment::test_proxy_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalContainment::test_with_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalContainment::test_with_empty_intervals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalContainment::test_with_infinities",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalContainment::test_with_intervals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalContainment::test_with_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalContainment::test_with_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalDifference::test_proxy_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalDifference::test_with_disjoint",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalDifference::test_with_invalid_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalDifference::test_with_itself[i0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalDifference::test_with_itself[i1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalDifference::test_with_itself[i2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalDifference::test_with_itself[i3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalDifference::test_with_itself[i4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalDifference::test_with_itself[i5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalDifference::test_with_larger",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalDifference::test_with_overlap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalDifference::test_with_smaller",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIntersection::test_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIntersection::test_intersect_benchmark[10000]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIntersection::test_intersect_benchmark[1000]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIntersection::test_intersect_benchmark[100]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIntersection::test_intersect_benchmark[10]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIntersection::test_proxy_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIntersection::test_with_adjacent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIntersection::test_with_containment",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIntersection::test_with_invalid_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIntersection::test_with_itself",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIntersection::test_with_overlap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIntersection::test_with_union",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIteration::test_containment",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIteration::test_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIteration::test_indexes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIteration::test_length",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIteration::test_missing_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIteration::test_order",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalIteration::test_slices",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalOverlaps::test_overlaps",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalOverlaps::test_overlaps_benchmark[10000]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalOverlaps::test_overlaps_benchmark[1000]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalOverlaps::test_overlaps_benchmark[100]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalOverlaps::test_overlaps_benchmark[10]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalOverlaps::test_overlaps_with_edge_cases",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalOverlaps::test_overlaps_with_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalOverlaps::test_overlaps_with_incompatible_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalOverlaps::test_overlaps_with_itself",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalOverlaps::test_overlaps_with_nonoverlaping",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalReplace::test_replace_bounds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalReplace::test_replace_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalReplace::test_replace_values_on_infinities",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalReplace::test_replace_with_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalReplace::test_replace_with_union",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalUnion::test_atomic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalUnion::test_issue_12",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalUnion::test_issue_13",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalUnion::test_issue_38",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalUnion::test_proxy_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalUnion::test_with_adjacent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalUnion::test_with_containment",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalUnion::test_with_disjoint",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalUnion::test_with_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalUnion::test_with_invalid_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalUnion::test_with_itself",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestIntervalUnion::test_with_overlap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestRepr::test_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestRepr::test_infinities",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestRepr::test_simple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestRepr::test_singleton",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interval.py::TestRepr::test_union",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestDataIdentity::test_identity",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromData::test_bounds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromData::test_empty_interval",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromData::test_open_intervals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromData::test_parameters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromData::test_singleton",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromData::test_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromData::test_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_bounds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_conv_is_required",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_full_match",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_infinities",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_invalid_strings[ ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_invalid_strings[)1,2]]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_invalid_strings[1 | [0,1]]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_invalid_strings[1)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_invalid_strings[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_invalid_strings[[0,1] | 1 | [2,3]]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_invalid_strings[[0,1] | 1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_invalid_strings[[0,1] | ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_invalid_strings[[0,1] || [2,3]]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_invalid_strings[[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_invalid_strings[|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_parameters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_singleton",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestFromString::test_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestStringIdentity::test_identity",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestToData::test_bounds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestToData::test_empty_interval",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestToData::test_open_intervals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestToData::test_parameters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestToData::test_singleton",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestToData::test_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestToData::test_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestToString::test_bound_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestToString::test_bounds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestToString::test_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestToString::test_infinities",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestToString::test_parameters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestToString::test_singleton",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_io.py::TestToString::test_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "pytest-cov",
+      "module": "pytest_cov.plugin",
+      "module_sha256": "7cc8a14b8cc8effa886c40fdfa058459d89686d62c53fea6721750e722a60f40",
+      "version": "7.1.0"
+    },
+    {
+      "distribution": "pytest-benchmark",
+      "module": "pytest_benchmark.plugin",
+      "module_sha256": "9185f4049d310155e2dd3100f03fec8f35dab99eca5e0224f2f7d9cc7d015744",
+      "version": "5.3.0"
+    }
+  ],
+  "project": "portion",
+  "python": "3.12.15",
+  "schema": 1
+}

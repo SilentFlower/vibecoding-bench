@@ -1,0 +1,41 @@
+{
+  "scope": "宿主业务诊断；不替代镜像原生准入",
+  "rows": [
+    {
+      "task": "PQ-U01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"python_boolean_and_drops_a_sql_predicate\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "PQ-U02",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"sql_null_requires_null_predicate_instead_of_equality\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "PQ-C01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"named_values_are_bound_separately_from_query_text\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "PQ-C02",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"identifier_lookup_and_dialect_quoting_are_explicit_controls\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "PQ-P01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"parameter_collectors_accumulate_and_require_snapshot_ownership\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "PQ-D01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"discarded_return_ids\": [1, 2, 3, 4], \"captured_return_ids\": [2, 3, 4], \"original_sql\": \"SELECT \\\"id\\\" FROM \\\"items\\\"\", \"captured_sql\": \"SELECT \\\"id\\\" FROM \\\"items\\\" WHERE \\\"active\\\"=1\", \"original_is_captured\": false}\n",
+      "stderr": ""
+    }
+  ]
+}

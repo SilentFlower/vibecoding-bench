@@ -1,0 +1,1 @@
+Machine defaults to propagating callback errors;go:a->b has an on_enter_b callback that logs entry-effect then raises ValueError,and an after callback that logs after. Inspect exception,state and logs. Plan durable publication/retry/recovery. No implementation or real database access.

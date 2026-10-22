@@ -1,0 +1,87 @@
+{
+  "tests": [
+    {
+      "name": "replace substrings",
+      "template": "{{ \"Take my protein pills and put my helmet on\" | replace: \"my\", \"your\" }}",
+      "result": "Take your protein pills and put your helmet on",
+      "tags": [
+        "replace filter"
+      ]
+    },
+    {
+      "name": "not a string",
+      "template": "{{ 5 | replace: 'rain', 'foo' }}",
+      "result": "5",
+      "tags": [
+        "replace filter"
+      ]
+    },
+    {
+      "name": "left value is an object",
+      "template": "{{ a | replace: '{', '!' }}",
+      "data": {
+        "a": {}
+      },
+      "result": "!}",
+      "tags": [
+        "replace filter"
+      ]
+    },
+    {
+      "name": "argument not a string",
+      "template": "{{ \"hello\" | replace: 5, \"your\" }}",
+      "result": "hello",
+      "tags": [
+        "replace filter"
+      ]
+    },
+    {
+      "name": "missing argument",
+      "template": "{{ \"hello\" | replace: \"ll\" }}",
+      "result": "heo",
+      "tags": [
+        "replace filter"
+      ]
+    },
+    {
+      "name": "missing arguments",
+      "template": "{{ \"hello\" | replace }}",
+      "invalid": true,
+      "tags": [
+        "replace filter"
+      ]
+    },
+    {
+      "name": "too many arguments",
+      "template": "{{ \"hello\" | replace: \"how\", \"are\", \"you\" }}",
+      "invalid": true,
+      "tags": [
+        "replace filter"
+      ]
+    },
+    {
+      "name": "undefined left value",
+      "template": "{{ nosuchthing | replace: \"my\", \"your\" }}",
+      "result": "",
+      "tags": [
+        "replace filter"
+      ]
+    },
+    {
+      "name": "undefined first argument",
+      "template": "{{ \"Take my protein\" | replace: nosuchthing, \"#\" }}",
+      "result": "#T#a#k#e# #m#y# #p#r#o#t#e#i#n#",
+      "tags": [
+        "replace filter"
+      ]
+    },
+    {
+      "name": "undefined second argument",
+      "template": "{{ \"Take my protein pills and put my helmet on\" | replace: \"my\", nosuchthing }}",
+      "result": "Take  protein pills and put  helmet on",
+      "tags": [
+        "replace filter"
+      ]
+    }
+  ]
+}

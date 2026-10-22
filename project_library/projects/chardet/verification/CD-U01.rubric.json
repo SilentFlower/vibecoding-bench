@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CD-U01",
+  "source_commit": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The ASCII-only input is reported ascii/confidence1,but ascii,UTF8 andcp1252 all decode those same bytes identically. This is compatible evidence,not unique original-encoding provenance or a calibrated probability about a source system.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

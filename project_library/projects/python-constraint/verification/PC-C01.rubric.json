@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PC-C01",
+  "source_commit": "d91ba03d1fd6acc30d64fd9d513dc0523f697b5b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "MinConflicts with zero steps returnsNone even though default search finds x1. Its loop budget can expire without a solution certificate. Report solver/step policy and distinguish not_found/unknown from proven unsatisfiable;use an appropriate complete method when proof is required rather than reinterpret heuristicNone.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

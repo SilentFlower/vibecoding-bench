@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FG-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "dates_require_explicit_timezone_instead_of_guessing_source_zone": true
+  },
+  "resource_profile": "business"
+}

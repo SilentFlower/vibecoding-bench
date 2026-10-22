@@ -1,0 +1,29 @@
+{
+  "FG-U01": {
+    "candidate_import": true,
+    "default_prepend_and_explicit_append_have_different_document_order": true
+  },
+  "FG-U02": {
+    "candidate_import": true,
+    "rss_projects_last_alternate_and_enclosure_while_atom_keeps_all_links": true
+  },
+  "FG-C01": {
+    "candidate_import": true,
+    "dates_require_explicit_timezone_instead_of_guessing_source_zone": true
+  },
+  "FG-P01": {
+    "candidate_import": true,
+    "explicit_feed_and_entry_dates_make_the_supplied_build_reproducible": true
+  },
+  "FG-D01": {
+    "candidate_import": true,
+    "inline_error": "base64 encoded content is not supported at the moment. Pull requests adding support are welcome.",
+    "external_content": {
+      "src": "https://example.test/blob"
+    }
+  },
+  "FG-M01": {
+    "candidate_import": true,
+    "atom_entry_preserves_all_supported_nonempty_link_attributes": false
+  }
+}

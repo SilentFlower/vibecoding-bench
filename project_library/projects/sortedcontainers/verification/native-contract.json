@@ -1,0 +1,1852 @@
+{
+  "baseline_digest": "54955200eded0d5deaf85a916d77472882fc7317eb5e9eca8a6ba72f714052c0",
+  "nodes": [
+    {
+      "id": "docs/introduction.rst::introduction.rst",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/__init__.py::sortedcontainers",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sorteddict.py::sortedcontainers.sorteddict.SortedDict.__delitem__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sorteddict.py::sortedcontainers.sorteddict.SortedDict.__init__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sorteddict.py::sortedcontainers.sorteddict.SortedDict.__setitem__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sorteddict.py::sortedcontainers.sorteddict.SortedDict.peekitem",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sorteddict.py::sortedcontainers.sorteddict.SortedDict.pop",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sorteddict.py::sortedcontainers.sorteddict.SortedDict.popitem",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sorteddict.py::sortedcontainers.sorteddict.SortedDict.setdefault",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sorteddict.py::sortedcontainers.sorteddict.SortedItemsView.__getitem__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sorteddict.py::sortedcontainers.sorteddict.SortedKeysView.__getitem__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sorteddict.py::sortedcontainers.sorteddict.SortedValuesView.__getitem__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sorteddict.py::sortedcontainers.sorteddict._view_delitem",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.__add__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.__contains__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.__init__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.__mul__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.add",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.bisect_key_left",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.bisect_key_right",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.bisect_left",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.bisect_right",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.count",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.discard",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.index",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.irange",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.irange_key",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.remove",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedKeyList.update",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.__add__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.__contains__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.__delitem__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.__getitem__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.__iadd__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.__imul__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.__init__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.__mul__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.__new__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.add",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.bisect_left",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.bisect_right",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.count",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.discard",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.index",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.irange",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.islice",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.pop",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.remove",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedlist.py::sortedcontainers.sortedlist.SortedList.update",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.__contains__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.__delitem__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.__getitem__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.__init__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.add",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.count",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.difference",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.difference_update",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.discard",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.intersection",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.intersection_update",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.pop",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.remove",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.symmetric_difference",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.symmetric_difference_update",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.union",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/sortedcontainers/sortedset.py::sortedcontainers.sortedset.SortedSet.update",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/benchmark_splits_fill.py::tests.benchmark_splits_fill",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/issue_147.py::tests.issue_147.SortedDictSub.__init__",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/sortedcollection.py::tests.sortedcollection.SortedCollection",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_bisect",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_bisect_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_bisect_key2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_clear",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_contains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_copy_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_delitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_eq",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_fromkeys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_get",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_getitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_iloc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_index_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_init_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_init_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_init_kwargs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_ior",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_irange",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_irange_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_islice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_items",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_items_view_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_itemsview",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_iter_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_iterkeys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_keysview",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_len",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_notgiven",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_or",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_or_not_implemented",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_peekitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_peekitem2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_pickle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_pop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_pop2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_popitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_popitem2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_popitem3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_ref_counts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_repr_recursion",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_repr_subclass",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_reversed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_reversed_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_ror",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_ror_not_implemented",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_setdefault",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_setitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_update2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_values_view_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sorteddict.py::test_valuesview",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_add",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_bisect",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_bisect_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_bisect_key_left",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_bisect_key_right",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_bisect_left",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_bisect_right",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_check",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_contains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_copy_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_count",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_delete",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_delitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_delitem_slice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_discard",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_eq",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_ge",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_getitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_getitem_indexerror1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_getitem_indexerror2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_getitem_indexerror3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_getitem_slice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_getitem_slice_big",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_getitem_slicezero",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_gt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_imul",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_index_valueerror1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_index_valueerror10",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_index_valueerror2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_index_valueerror3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_index_valueerror4",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_index_valueerror5",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_index_valueerror6",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_index_valueerror7",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_index_valueerror8",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_index_valueerror9",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_irange",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_irange_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_islice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_key2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_le",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_len",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_lt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_mul",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_ne",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_new",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_new_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_op_add",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_pop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_pop_indexerror1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_pop_indexerror2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_remove",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_remove_valueerror1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_remove_valueerror2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_remove_valueerror3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_remove_valueerror4",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_remove_valueerror5",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_repr_recursion",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_repr_subclass",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_reverse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_reversed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_modulo.py::test_update_order_consistency",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_add",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_alias",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_bisect",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_bisect_left",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_bisect_right",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_check",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_contains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_copy_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_count",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_delete",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_delitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_delitem_slice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_discard",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_eq",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_getitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_getitem_indexerror1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_getitem_indexerror2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_getitem_indexerror3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_getitem_slice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_getitem_slice_big",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_getitem_slicezero",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_gt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_gte",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_identity",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_imul",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_index_valueerror1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_index_valueerror2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_index_valueerror3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_index_valueerror4",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_index_valueerror5",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_index_valueerror6",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_irange",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_islice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_len",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_lt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_lte",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_mul",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_op_add",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_pickle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_pop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_pop_indexerror1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_pop_indexerror2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_remove",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_remove_valueerror1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_remove_valueerror2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_remove_valueerror3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_reverse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_reversed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedkeylist_negate.py::test_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_add",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_bisect",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_bisect_left",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_bisect_right",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_build_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_check",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_contains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_copy_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_count",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_delete",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_delitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_delitem_slice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_discard",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_eq",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_ge",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_getitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_getitem_indexerror1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_getitem_indexerror2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_getitem_indexerror3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_getitem_slice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_getitem_slice_big",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_getitem_slicezero",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_gt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_imul",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_index_valueerror1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_index_valueerror2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_index_valueerror3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_index_valueerror4",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_index_valueerror5",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_index_valueerror6",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_index_valueerror7",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_irange",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_islice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_le",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_len",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_lt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_mul",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_ne",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_op_add",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_pickle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_pop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_pop_indexerror1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_pop_indexerror2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_pop_indexerror3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_remove",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_remove_valueerror1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_remove_valueerror2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_remove_valueerror3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_repr_recursion",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_repr_subclass",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_reverse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_reversed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedlist.py::test_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_add",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_and",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_bisect",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_bisect_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_clear",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_contains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_copy_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_count",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_delitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_delitem_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_delitem_slice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_difference",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_difference_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_discard",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_eq",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_getitem",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_getitem_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_getitem_slice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_init_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_intersection",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_intersection_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_ior",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_irange",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_irange_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_isdisjoint",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_islice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_issubset",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_issuperset",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_isub",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_le_ge",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_len",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_lt_gt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_ne",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_or",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_pickle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_pop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_remove",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_repr_recursion",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_reversed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_sub",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_symmetric_difference",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_symmetric_difference_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_union",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coverage_sortedset.py::test_xor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stress_sorteddict.py::test_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stress_sorteddict.py::test_stress",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stress_sortedkeylist.py::test_stress",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stress_sortedlist.py::test_stress",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stress_sortedset.py::test_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stress_sortedset.py::test_stress",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "pytest-cov",
+      "module": "pytest_cov.plugin",
+      "module_sha256": "7cc8a14b8cc8effa886c40fdfa058459d89686d62c53fea6721750e722a60f40",
+      "version": "7.1.0"
+    }
+  ],
+  "project": "sortedcontainers",
+  "python": "3.12.15",
+  "schema": 1
+}

@@ -1,0 +1,60 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "wrapt",
+      "attempt": 2,
+      "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-002/wrapt/result.json",
+      "result_sha256": "db2f5275652bfc1e93e5afce311f8ebddca70fa4e9186eb29fad89159e9b90a3",
+      "main_collected": 1418,
+      "counts": {
+        "passed": 1412,
+        "failed": 0,
+        "error": 0,
+        "skipped": 6,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 43,
+      "collection_skip_count": 0,
+      "xml_testcases": 1418,
+      "xml_skipped": 6,
+      "runner_sha256": "fa81331076a0898262b83f8c7d35554064794d17fd219439546d7ed99997bb84",
+      "contract_sha256": "bd964e9459c23edf25611d05b943090f515a5e5500bb4222d8ea1536472f07d9",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 360,
+        "memory_mb": 768,
+        "pids_limit": 128
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成",
+      "native_build": {
+        "command": [
+          "/work/python/bin/python",
+          "setup.py",
+          "build_ext",
+          "--inplace",
+          "--force"
+        ],
+        "returncode": 0,
+        "elapsed_sec": 2.929706091003027,
+        "inputs": {
+          "setup.py": "40c416e6f9560559ada491066c1696bfff6cc40bcb3710b200caedb7db1bce6d",
+          "pyproject.toml": "4dfaebafcfc4a9f2d4eeacb1ca9dda2c00786ab304231df77c2c0dc03fb6727f",
+          "src/wrapt/_wrappers.c": "aba424d1af4b8a49edae0217e3c35b635233586269c155c2a2eeec995b4654ba",
+          "src/wrapt/__init__.py": "ab6b1fa49f41d558419d51032e5968f1b6c5d43867fe08b588fc9fb20690cb07"
+        },
+        "extension": "src/wrapt/_wrappers.cpython-312-x86_64-linux-gnu.so",
+        "extension_sha256": "91dd89764118374564d301e1313bff1e5720105321738ccf9d619b250459622c",
+        "implementation_installed": false,
+        "force_rebuilt_from_candidate": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PP-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "ordered_choice_does_not_reconsider_a_success_for_whole_input": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,28 @@
+{
+  "MD-U01": {
+    "candidate_import": true,
+    "strip_removes_tag_conversion_and_preserves_children": true
+  },
+  "MD-U02": {
+    "candidate_import": true,
+    "header_inference_reclassifies_the_first_data_row": true
+  },
+  "MD-C01": {
+    "candidate_import": true,
+    "inline_image_policy_depends_on_parent_tag": true
+  },
+  "MD-C02": {
+    "candidate_import": true,
+    "code_language_callback_falls_back_and_whitespace_is_explicit": true
+  },
+  "MD-P01": {
+    "candidate_import": true,
+    "cli_defaults_and_print_newline_require_an_explicit_export_profile": true
+  },
+  "MD-D01": {
+    "candidate_import": true,
+    "first": "**paid**",
+    "reused_after_option_change": "**paid**",
+    "fresh_with_strip": "paid"
+  }
+}

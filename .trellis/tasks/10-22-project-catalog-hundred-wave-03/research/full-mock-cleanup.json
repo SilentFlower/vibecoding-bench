@@ -1,0 +1,239 @@
+{
+  "status": "passed",
+  "mock_runs": 19,
+  "successful_mock_runs": 15,
+  "failed_or_incomplete_runs_retained": 4,
+  "remaining_stage_calibration_containers": 0,
+  "items": [
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-001/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-001/run-001/cleanup.json",
+        "sha256": "cc8e2b1db771a0738b75674a10e304fd4c99872ef4358c2b93bfd82dbaa92362"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-002/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-002/run-001/cleanup.json",
+        "sha256": "88537df90aabf3ee29234d470572d6a2321d12152632509d359bcbb4147a25f8"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-003/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-003/run-001/cleanup.json",
+        "sha256": "4a868445cf3a14188ce8a2f18b45a65012b46bb9c406123bbaa193b4a0dd9ca4"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-004/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-004/run-001/cleanup.json",
+        "sha256": "c212c9acefc074f8ceba7bd881fe5ee5f3a0c59591eb0c40b5807981abbd6451"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-005/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-005/run-001/cleanup.json",
+        "sha256": "a98340f78855ac7662973cb552987c3c8dbbc1ca0de1e21fb60e2b66def0bd00"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-006/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-006/run-001/cleanup.json",
+        "sha256": "58f2bbaee6ba90f404cd15d51cc2e4716aae208c9ffd245335e4298d6913b4df"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-007/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-007/run-001/cleanup.json",
+        "sha256": "abcfac8ed16cb038188f286559c1572572d75a3b885c2fde074d637bff81c738"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-008/run-001",
+      "business_result": "failed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-008/run-001/cleanup.json",
+        "sha256": "de461dcae6d09c638edd3f8de1752079fab8765d330be8eb9809ab8f53a41ad0"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-008-retry-002/run-001",
+      "business_result": "failed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-008-retry-002/run-001/cleanup.json",
+        "sha256": "1fdbbc380e1c444b6fd8a787daa403c32266a850b0ec480f551dbf0f7e77e1c2"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-008-retry-003/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-008-retry-003/run-001/cleanup.json",
+        "sha256": "521aeaeac1f4f54a88062ff6ab8cc4159b1e9452d7ce2355884ff6e84161d40a"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-009/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-009/run-001/cleanup.json",
+        "sha256": "9abfc66f8fe1b42307396e1bbe6e64f284c97d8a82697ab1e4bf3526f8e8aee1"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-010/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-010/run-001/cleanup.json",
+        "sha256": "5a85210076ab8e71e486a56d6b85b7a3a483e9a515f40b0e57b869d9b7630ee5"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-011/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-011/run-001/cleanup.json",
+        "sha256": "15b7f2e7bc2e4c5357cb49b7812c8b395b6b0298151b9ad48ad486c0c8d469a8"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-012/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-012/run-001/cleanup.json",
+        "sha256": "4f8838f9947aea602586792bd04fca402f8efe5084d409b1c295fe3781700072"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-013/run-001",
+      "business_result": "failed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-013/run-001/cleanup.json",
+        "sha256": "9b633a83e0a5590612f27d333d578bb433d40d686a0459bb1aa0ed46122ec055"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-013-retry-002/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-013-retry-002/run-001/cleanup.json",
+        "sha256": "9d2f3ff373284737872887d25afa15e9af9e7a977ee1c6554d75e8de0373809d"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-014-final-three/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-014-final-three/run-001/cleanup.json",
+        "sha256": "c0a1a98baabba33b8431fdd360448b0d478b540abfa3e452115d136cf88a3b72"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-015-retry-002-sqlglot/run-001",
+      "business_result": "passed",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-015-retry-002-sqlglot/run-001/cleanup.json",
+        "sha256": "eac2fbcb87c700c3b204ccc0c71ec2f7a3f1c4c4fae17cf6f17d26dcbcdafab7"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    },
+    {
+      "run": ".deploy/project-catalog-hundred/stage-03/mock-batch-015-sqlglot/run-001",
+      "business_result": "incomplete_terminated",
+      "cleanup": {
+        "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-015-sqlglot/run-001/cleanup.json",
+        "sha256": "9775e41bfcd0f55e21bd790d2c286c68fff81c31dab953a003428e9ce4ace99f"
+      },
+      "remaining_containers": 0,
+      "remaining_networks": 0,
+      "runtime_removed": true,
+      "token_removed": true
+    }
+  ],
+  "real_model_calls": 0,
+  "production_touched": false
+}

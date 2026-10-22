@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "NS-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "float_and_exponent_flags_are_not_semantic_version_ordering": true
+  },
+  "resource_profile": "business"
+}

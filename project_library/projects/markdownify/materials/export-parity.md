@@ -1,0 +1,1 @@
+The HTML file contains only <a href="https://example.test">https://example.test</a>. Compare markdownify(html),main([file]),and main(["--autolinks","--default-title",file]) from markdownify.main. Plan reproducible library/CLI exports by tracing the actual argparse defaults,flag actions and print newline. Preserve existing behavior;this task authorizes no CLI or library patch.

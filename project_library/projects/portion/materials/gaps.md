@@ -1,0 +1,1 @@
+d maps closedopen(9,10) to open. Compare d[closedopen(9,12)] with d.get(closedopen(9,12),"missing"),including returned domains/point11 and original d after both calls. Advise whether an export should expose explicit missing gaps or only covered data. No implementation.

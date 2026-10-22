@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FG-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "rss_projects_last_alternate_and_enclosure_while_atom_keeps_all_links": true
+  },
+  "resource_profile": "business"
+}

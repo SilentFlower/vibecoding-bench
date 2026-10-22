@@ -1,0 +1,1 @@
+Compare parse("2026-10-22") with exact=True and parse("12:30:00",exact=True). Inspect returned types and default timezone/time imputation. Plan separate date,local-time and instant fields plus validation/publication errors. No implementation.

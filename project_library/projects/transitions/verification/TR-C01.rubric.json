@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TR-C01",
+  "source_commit": "bd42b38f3627e6bca7274fb4d9af2e105f75da7c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Synchronous mode returns False and stays a;queued mode returns True but also stays a. Queued True indicates accepted processing,not proof a guard passed or state changed. Confirm actual state/transition outcome through explicit completion evidence;do not equate the Boolean return with a completed business operation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

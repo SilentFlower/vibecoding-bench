@@ -1,0 +1,11 @@
+{
+  "status": "actual_product_protocol_failure_retained",
+  "actual_result": {
+    "path": ".deploy/project-catalog-hundred/stage-03/business/sqlglot/attempt-001/reference-full-regression.json",
+    "sha256": "d2d567c81415f7cadd58cf1ad0c95b36ae9d46dc7df230aad1d86a247d6f98fd"
+  },
+  "source_evidence": "ProjectVerifier.verify_native保留2MiB日志与2MiB结果上限，完整子项JSON超过该大小；旧报告准备标记丢失，输出体积与日志轮转是根因依据",
+  "action": "保持既有边界；全部实际子项独立压缩归档，标准输出只带数量、全量摘要及原件身份。新合同和实际产品入口均重新验证。",
+  "old_control_snapshot": ".deploy/project-catalog-hundred/stage-03/dependency-preparation/sqlglot-stdout-size-001",
+  "global_limits_changed": false
+}

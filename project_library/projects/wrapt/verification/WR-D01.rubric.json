@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WR-D01",
+  "source_commit": "6b4e844950213118b19e613248d2bc9469eb731e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use consumed import-order evidence to distinguish an already loaded module from a future deferred import. Missing evidence supports insufficient_information;do not delete unrelated sys.modules entries,reload modules or promise import hooks are always deferred.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

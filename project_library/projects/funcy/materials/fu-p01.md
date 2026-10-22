@@ -1,0 +1,1 @@
+A local @retry(3,errors=ValueError,timeout=0) callback appends an effect marker before raising ValueError on its first two calls and succeeding on its third. Inspect markers and plan an idempotent request/retry contract. Do not call services or implement anything.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WC-C01",
+  "source_commit": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The functions clip to255,0,128 and emit #ff0080 instead of rejecting the out-of-range channels. Clipping is normalization,not proof input was valid. Validate channel types/ranges separately if rejection is required,and preserve raw input and the chosen normalization policy for error reporting.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

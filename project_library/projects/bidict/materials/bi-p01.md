@@ -1,0 +1,1 @@
+Start b=bidict(a=1,b=2). A generator logs each yield to events and yields ("c",3),("d",2). Call b.putall(generator). Plan retry/publication and external-effect handling based on the actual failure/rollback contract. No implementation.

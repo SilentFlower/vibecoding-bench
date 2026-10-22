@@ -1,0 +1,1 @@
+Compare fresh StateChart and StateMachine definitions with one pending->done event when send("unknown") is called. Advise strict command validation versus tolerant event handling for this pinned version. No implementation.

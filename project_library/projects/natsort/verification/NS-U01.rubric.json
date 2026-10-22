@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "NS-U01",
+  "source_commit": "e9a3a2a307580a1f2be8c57bba50fba45789ada0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default unsigned parsing gives v2,v-3,v-10;SIGNED gives v-10,v-3,v2. Choose whether the business identifier embeds signed numbers or uses a separator. Natural order is controlled by this parsing contract,not an automatically correct domain order.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

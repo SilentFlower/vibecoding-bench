@@ -1,0 +1,3212 @@
+{
+  "baseline_digest": "801f95a1f6b8c6d16a41ee34e4081f03ad19d66c4ab87933277f3d34cd6a3be6",
+  "nodes": [
+    {
+      "id": "tests/bag_test.py::test_add",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_add_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_and",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_contains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_count_duplicate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_count_non_existent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_count_unique",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_empty_bag",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_empty_truthiness",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_eq_different_order",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_eq_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_eq_same_order",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_hash_in_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_iter_duplicates",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_iter_multiple_elements",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_length_duplicates",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_length_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_length_multiple_elements",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_length_unique",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_literalish_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_neq",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_not_contains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_or",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_pbag_is_unorderable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_remove_final",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_remove_nonexistent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_remove_nonfinal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_repr_elements",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_repr_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_sub",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_supports_hash",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_supports_weakref",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/bag_test.py::test_update_no_elements",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_breaking_invariant",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_create_checked_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_create_non_checked_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_custom_serialization",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_default_serialization",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_evolver_returns_same_instance_when_no_updates",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_instantiate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_instantiate_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_invalid_key_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_invalid_value_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_map_with_no_types_or_invariants",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_multi_level_serialization",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_pickling",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_supports_weakref",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_type_check_with_string_specification",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_map_test.py::test_type_creation_with_string_specification",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_set_test.py::test_add",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_set_test.py::test_breaking_invariant",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_set_test.py::test_create",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_set_test.py::test_custom_serialization",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_set_test.py::test_default_serialization",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_set_test.py::test_evolver_returns_same_instance_when_no_updates",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_set_test.py::test_instantiate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_set_test.py::test_invalid_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_set_test.py::test_multi_level_serialization",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_set_test.py::test_pickling",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_set_test.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_set_test.py::test_supports_weakref",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_append",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_breaking_invariant",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_check_with_string_specification",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_create_base_case",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_create_of_nested_structure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_create_with_generator_iterator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_create_with_instance_of_checked_pvector_returns_the_argument",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_create_with_string_specification",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_evolver_returns_same_instance_when_no_updates",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_extend",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_instantiate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_invalid_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_invariant_must_be_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_invariants_are_inherited",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_multiple_allowed_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_multiple_optional_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_pickling",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_serialize_custom_serializer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_serialize_default_case",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_supports_weakref",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_type_information_is_inherited",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/checked_vector_test.py::test_type_spec_must_be_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_can_create_nested_structures_from_dict_and_serialize_back_to_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_can_remove_optional_member",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_can_serialize_with_custom_serializer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_cannot_construct_with_undeclared_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_cannot_construct_with_wrong_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_cannot_construct_without_mandatory_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_cannot_remove_mandatory_member",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_cannot_remove_non_existing_member",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_create_ignore_extra",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_create_ignore_extra_false",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_create_ignore_extra_true",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_diamond_inherited_global_invariants",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_direct_assignment_not_possible",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_direct_delete_not_possible",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_enum_key_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_evolve_pclass_instance",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_evolver_supports_chained_set_and_remove",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_evolver_supports_dot_notation_for_setting_and_getting_elements",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_evolver_with_evolution_to_same_element_returns_original_instance",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_evolver_with_one_way_factory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_evolver_without_evolution_returns_original_instance",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_field_invariant_must_hold",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_global_invariant_check",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_implements_proper_equality_based_on_equality_of_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_inherited_global_invariants",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_initial_value_set_when_not_present_in_arguments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_invariant_checks_lazy_initial_value_for_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_invariant_checks_static_initial_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_is_hashable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_lazy_invariant_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_multiple_global_invariants",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_multiple_invariants_on_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_pickle_with_one_way_factory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_set_does_trigger_factories",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_set_doesnt_trigger_other_factories",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_string_as_type_specifier",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_supports_lazy_initial_value_for_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_supports_nested_transformation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_supports_pickling",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_supports_pickling_with_typed_container_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_supports_weakref",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_supports_weakref_with_multi_level_inheritance",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_type_checks_lazy_initial_value_for_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/class_test.py::test_value_can_be_overridden_in_subclass_new",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_append",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_append_with_maxlen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_appendleft",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_appendleft_with_maxlen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_basic_right_and_left",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_comparison",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_construction_with_invalid_maxlen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_construction_with_maxlen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_count",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_empty_indexing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_extend",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_extend_with_maxlen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_extendleft",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_extendleft_with_maxlen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_hashing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_indexing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_indexing_invalid_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_indexing_out_of_range",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_left_on_empty_deque",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_literalish",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_one_element_indexing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_pickling",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_pop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_pop_empty_deque_returns_empty_deque",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_pop_multiple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_pop_with_negative_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_popleft",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_popleft_multiple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_remove",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_remove_element_missing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_reverse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_right_on_empty_deque",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_rotate_left",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_rotate_right",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_set_maxlen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_slicing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/deque_test.py::test_supports_weakref",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/field_test.py::test_enum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/field_test.py::test_pvector_field_enum_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_freeze_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_freeze_defaultdict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_freeze_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_freeze_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_freeze_nonstrict_no_recurse_in_pmap_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_freeze_nonstrict_no_recurse_in_pvectors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_freeze_recurse_in_defaultdict_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_freeze_recurse_in_dictionary_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_freeze_recurse_in_lists",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_freeze_recurse_in_pmap_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_freeze_recurse_in_pvectors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_freeze_recurse_in_tuples",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_freeze_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_mutant_decorator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_thaw_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_thaw_can_handle_subclasses_of_persistent_base_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_thaw_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_thaw_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_thaw_non_strict_no_recurse_in_dict_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_thaw_non_strict_no_recurse_in_lists",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_thaw_recurse_in_dict_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_thaw_recurse_in_lists",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_thaw_recurse_in_mapping_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_thaw_recurse_in_tuples",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_thaw_recurse_in_vectors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/freeze_test.py::test_thaw_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/hypothesis_vector_test.py::PVectorBuilderTests::runTest",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/hypothesis_vector_test.py::PVectorEvolverBuilderTests::runTest",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/hypothesis_vector_test.py::test_setup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/immutable_object_test.py::test_assign_non_existing_attribute",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/immutable_object_test.py::test_basic_instantiation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/immutable_object_test.py::test_basic_replace",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/immutable_object_test.py::test_cannot_modify_member",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/immutable_object_test.py::test_cannot_replace_frozen_member",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/immutable_object_test.py::test_derived_class_with_new",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/immutable_object_test.py::test_instantiate_object_with_no_members",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_comparison",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_comparison_with_other_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_cons",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_cons_empty_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_contains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_count",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_first_and_rest",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_first_illegal_on_empty_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_hashing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_index_invalid_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_index_item_not_found",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_index_out_of_range",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_indexing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_indexing_on_empty_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_inequality",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_instantiate_large_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_iteration",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_len",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_literalish_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_mcons",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_pickling_empty_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_pickling_non_empty_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_remove",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_remove_missing_element",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_rest_return_self_on_empty_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_reverse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_slicing_drop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_slicing_drop_out_of_range",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_slicing_take",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_slicing_take_out_of_range",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_split",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_split_empty_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_split_no_split_occurred",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_supports_weakref",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/list_test.py::test_truthiness",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_access_non_existing_element",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_addition",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_bitmap_indexed_iteration",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_copy_returns_reference_to_self",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_dot_access_of_non_existing_element_raises_attribute_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_empty_initialization",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_empty_truthiness",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_equal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_equal_to_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_equal_with_different_bucket_sizes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_equal_with_different_insertion_order",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_evolver_remove_element",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_evolver_remove_element_not_present",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_evolver_set_with_reallocation_edge_case",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_evolver_simple_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_evolver_update_with_relocation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_get_non_existing_raises_key_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_hash",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_hash_collision_is_correctly_resolved",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_initialization_with_many_elements",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_initialization_with_one_element",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_initialization_with_two_elements",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_insert_and_get_many_elements",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_instance_of_hashable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_instance_of_map",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_iteration_with_many_elements",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_literalish_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_map_does_not_hash_values_on_second_hash_invocation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_not_equal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_not_equal_to_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_overwrite_existing_element",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_pickling_empty_map",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_pickling_non_empty_map",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_pmap_removal_with_broken_classes_deriving_from_namedtuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_pmap_unorderable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_remove_non_existing_element_raises_key_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_same_hash_when_content_the_same_but_underlying_vector_size_differs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_set_with_relocation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_supports_weakref",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_transform_base_case",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_transform_levels_missing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_transform_nested_maps",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_union_operator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_update_no_arguments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_update_one_argument",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_update_with",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_update_with_multiple_arguments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/map_test.py::test_various_iterations",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_all_invariant_errors_reported",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_cannot_assign_undeclared_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_cannot_assign_wrong_type_to_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_cannot_construct_with_fields_of_wrong_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_cannot_construct_with_undeclared_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_correct_assignment",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_create",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_create_ignore_extra",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_create_ignore_extra_false",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_create_ignore_extra_true",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_create_ignore_extra_true_sequence_hierarchy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_direct_assignment_not_possible",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_enum_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_factory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_factory_must_be_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_field_invariant_must_hold",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_global_invariant_must_hold",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_global_invariants_are_inherited",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_global_invariants_must_be_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_ignore_extra_for_pvector_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_initial_must_be_of_correct_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_initial_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_invariant_must_be_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_nested_create_serialize",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_nested_record_construction",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_nested_serialize",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pickle_with_one_way_factory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pickling",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_checked_map_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_checked_map_key_multiple_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_checked_map_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_checked_map_value_multiple_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_create_from_nested_serialized_data",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_default_non_optional",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_explicit_non_optional",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_factory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_initial_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_invariant",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_mandatory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_name_multiple_string_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_name_multiple_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_name_string_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pmap_field_optional",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_precord_factory_method_is_idempotent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pset_field_checked_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pset_field_checked_vector_multiple_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pset_field_custom_initial",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pset_field_default_non_optional",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pset_field_explicit_non_optional",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pset_field_factory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pset_field_initial_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pset_field_mandatory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pset_field_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pset_field_name_string_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pset_field_optional",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pset_field_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pset_multiple_string_types_field_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pset_multiple_types_field_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_field_checked_vector",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_field_checked_vector_multiple_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_field_create_from_nested_serialized_data",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_field_custom_initial",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_field_default_non_optional",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_field_explicit_non_optional",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_field_factory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_field_initial_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_field_mandatory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_field_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_field_name_string_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_field_optional",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_field_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_multiple_string_types_field_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_pvector_multiple_types_field_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_remove",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_remove_non_existing_member",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_serialize",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_serializer_must_be_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_set_multiple_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_single_type_spec",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_support_record_inheritance",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_supports_lazy_initial_value_for_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_supports_pickling_with_typed_container_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_supports_weakref",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_transform_without_update_returns_same_precord",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/record_test.py::test_type_specification_must_be_a_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/regression_test.py::test_segfault_issue_52",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_contains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_contains_elements_that_it_was_initialized_with",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_copy_returns_reference_to_self",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_discard",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_empty_truthiness",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_evolver_len",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_evolver_no_update_produces_same_pset",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_evolver_simple_add",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_evolver_simple_remove",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_is_disjoint",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_is_immutable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_is_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_key_is_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_literalish_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_pickling_empty_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_pickling_non_empty_map",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_remove_when_not_present",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_supports_hash",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_supports_set_comparisons",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_supports_set_operations",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_supports_weakref",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/set_test.py::test_update_no_elements",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/toolz_test.py::test_get_in",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_broken_predicate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_callable_command",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_discard_does_not_insert_nodes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_discard_multiple_elements_in_pvector",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_key_value_predicate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_mixed_vector_and_map",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_multiple_transformations",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_new_elements_created_when_missing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_no_transformation_returns_the_same_structure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_ny_predicated_matches_any_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_predicate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_predicate_no_match",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_remove",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_remove_pclass",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_remove_pvector",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_rex_predicate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_rex_with_non_string_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_transform_insert_empty_pmap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_vector_insert_map_one_step_beyond_end",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/transform_test.py::test_vector_predicate_callable_command",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_access_with_negative_index[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_access_with_negative_index[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_addition[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_addition[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_append_followed_by_delete[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_append_followed_by_delete[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_append_when_root_overflows[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_append_when_root_overflows[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_append_works_and_does_not_affect_original_outside_tail[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_append_works_and_does_not_affect_original_outside_tail[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_append_works_and_does_not_affect_original_within_tail[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_append_works_and_does_not_affect_original_within_tail[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_boolean_conversion[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_boolean_conversion[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_different_vectors_different_sizes[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_different_vectors_different_sizes[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_different_vectors_same_size[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_different_vectors_same_size[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_equal_vectors[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_equal_vectors[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_lt_gt[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_lt_gt[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_same_vectors[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_same_vectors[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_with_list[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_with_list[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_with_non_iterable[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_with_non_iterable[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_with_other_type_of_object[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_compare_with_other_type_of_object[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_contains[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_contains[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_count[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_count[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_delete_index[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_delete_index[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_delete_index_malformed[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_delete_index_malformed[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_delete_index_out_of_bounds[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_delete_index_out_of_bounds[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_delete_of_non_existing_element[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_delete_of_non_existing_element[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_delete_slice[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_delete_slice[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_empty_initialization[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_empty_initialization[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_empty_repr[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_empty_repr[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_empty_truthiness[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_empty_truthiness[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_append[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_append[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_assign_and_read_with_negative_indices[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_assign_and_read_with_negative_indices[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_deallocate_dirty_evolver[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_deallocate_dirty_evolver[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_delete_by_index[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_delete_by_index[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_delete_function_by_index[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_delete_function_by_index[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_delete_function_by_index_multiple_times[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_delete_function_by_index_multiple_times[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_delete_function_invalid_index[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_delete_function_invalid_index[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_extend[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_extend[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_is_dirty[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_is_dirty[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_len[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_len[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_multi_level_multi_update_in_tree[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_multi_level_multi_update_in_tree[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_no_update[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_no_update[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_non_integral_access[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_non_integral_access[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_non_integral_assignment[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_non_integral_assignment[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_out_of_bounds_access[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_out_of_bounds_access[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_out_of_bounds_assignment[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_out_of_bounds_assignment[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_returns_itself_on_evolving_operations[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_returns_itself_on_evolving_operations[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_set_followed_by_delete[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_set_followed_by_delete[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_set_out_of_range[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_set_out_of_range[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_simple_update_in_tail[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_simple_update_in_tail[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_simple_update_in_tree[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_simple_update_in_tree[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_simple_update_just_outside_vector[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_simple_update_just_outside_vector[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_with_no_updates_returns_same_pvector[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_evolver_with_no_updates_returns_same_pvector[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_failing_repr[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_failing_repr[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_get_evolver_referents[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_get_evolver_referents[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/vector_test.py::test_index[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_index[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_index_error_negative[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_index_error_negative[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_index_error_positive[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_index_error_positive[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_index_not_found[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_index_not_found[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_index_not_found_with_limits[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_index_not_found_with_limits[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_initialization_with_one_element[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_initialization_with_one_element[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_insert_beyond_end[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_insert_beyond_end[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_insert_with_index_from_the_end[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_insert_with_index_from_the_end[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_insert_with_too_negative_index[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_insert_with_too_negative_index[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_is_hashable[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_is_hashable[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_is_sequence[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_is_sequence[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_iterable[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_iterable[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_iteration[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_iteration[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_literalish_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_long_extend[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_long_extend[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_mset_basic_assignments[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_mset_basic_assignments[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_mset_index_out_of_range[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_mset_index_out_of_range[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_mset_odd_number_of_arguments[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_mset_odd_number_of_arguments[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_multi_level_sequence[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_multi_level_sequence[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_multi_level_sequence_from_iterator[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_multi_level_sequence_from_iterator[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_no_dependencies_between_evolvers_from_the_same_pvector[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_no_dependencies_between_evolvers_from_the_same_pvector[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_non_empty_repr[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_non_empty_repr[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_pickling_empty_vector[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_pickling_empty_vector[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_pickling_non_empty_vector[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_pickling_non_empty_vector[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_pvectors_produced_from_the_same_evolver_do_not_interfere[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_pvectors_produced_from_the_same_evolver_do_not_interfere[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_python_no_c_extension_with_environment_variable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_random_insert_outside_tail[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_random_insert_outside_tail[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_random_insert_within_tail[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_random_insert_within_tail[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_refuses_to_hash_when_members_are_unhashable[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_refuses_to_hash_when_members_are_unhashable[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_remove[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_remove[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_remove_first_only[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_remove_first_only[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_remove_index_out_of_bounds[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_remove_index_out_of_bounds[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_repeat[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_repeat[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_repr_when_contained_object_contains_reference_to_self[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_repr_when_contained_object_contains_reference_to_self[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_reverse[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_reverse[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_short_extend[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_short_extend[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_slice_identity[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_slice_identity[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_slicing_no_range_but_step[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_slicing_no_range_but_step[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_slicing_range[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_slicing_range[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_slicing_range_with_step[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_slicing_range_with_step[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_slicing_reverse[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_slicing_reverse[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_slicing_zero_length_range[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_slicing_zero_length_range[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_sorted[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_sorted[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_supports_weakref[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_supports_weakref[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_transform_base_case[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_transform_base_case[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_transform_index_error_out_range[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_transform_index_error_out_range[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_transform_index_error_wrong_type[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_transform_index_error_wrong_type[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_transform_nested_vectors[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_transform_nested_vectors[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_transform_non_setable_type[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_transform_non_setable_type[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_transform_when_appending[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_transform_when_appending[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_transform_zero_key_length[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_transform_zero_key_length[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_vector_insert_one_step_beyond_end[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_vector_insert_one_step_beyond_end[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_zero_extend[pvectorc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/vector_test.py::test_zero_extend[pyrsistent._pvector]",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "hypothesis",
+      "module": "_hypothesis_pytestplugin",
+      "module_sha256": "5b8df643a5394e86bfe608b710ff2534ac74f7192f4f81faa091356ad426f182",
+      "version": "6.170.5"
+    }
+  ],
+  "project": "pyrsistent",
+  "python": "3.12.15",
+  "schema": 1
+}

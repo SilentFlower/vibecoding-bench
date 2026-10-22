@@ -1,0 +1,41 @@
+{
+  "scope": "宿主业务诊断；不替代镜像原生准入",
+  "rows": [
+    {
+      "task": "LG-U01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"record_extra_precedence_and_context_exit_are_distinct\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "LG-U02",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"lazy_values_skip_global_level_but_run_before_sink_filters\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "LG-C01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"opt_calls_replace_options_instead_of_merging_previous_values\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "LG-C02",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"catch_logging_does_not_by_itself_preserve_failure_signaling\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "LG-P01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"async_sink_completion_requires_awaiting_in_the_owning_loop\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "LG-D01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"error\": \"ValueError\", \"old_sink\": \"\", \"first_sink\": \"after failed replacement\\n\", \"second_sink\": \"\", \"old_handler_missing\": true}\n",
+      "stderr": ""
+    }
+  ]
+}

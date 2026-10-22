@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IC-C01",
+  "source_commit": "3ecf079acba0e592ea6a40c456514984c8657852",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "One attendee is scalar;adding another appends into a list rather than replacing it. Lookup is case insensitive and the first value retains its own ROLE parameter. Normalize scalar/list handling at the caller boundary while preserving each participant and parameters;do not overwrite the first attendee or flatten parameterized properties into one string.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

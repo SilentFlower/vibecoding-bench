@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "HU-U01",
+  "source_commit": "785e5dcc0d0308ad0dff3f6cc0faa7085ad0375b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The outputs are 1.0 kB, 1000 Bytes, 1.0 KiB and 1.0K. Decimal uses1000; binary/GNU use1024, with distinct suffix/spacing, and GNU takes precedence over binary. Select an explicit display convention; do not relabel decimal and binary quantities as interchangeable.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

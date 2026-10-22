@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WF-U02",
+  "source_commit": "af18fd6a7595d374aa707ff97b73df0dcc462ec2",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Without formdata the original True is retained and raw_data isNone. With the empty submitted wrapper raw_data is[] and BooleanField sets dataFalse. The empty submission represents an unchecked input rather than a request to keep the initial object state.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

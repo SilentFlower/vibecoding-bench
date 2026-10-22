@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "WR-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "legacy_objectproxy_iterable_detection_can_overstate_wrapped_capability": true
+  },
+  "resource_profile": "business"
+}

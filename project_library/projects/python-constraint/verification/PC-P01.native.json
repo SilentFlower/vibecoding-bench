@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PC-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "duration_aware_half_open_nonoverlap_differs_from_all_different_start_times": true
+  },
+  "resource_profile": "business"
+}

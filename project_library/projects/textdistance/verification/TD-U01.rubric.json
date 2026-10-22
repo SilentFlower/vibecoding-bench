@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TD-U01",
+  "source_commit": "d6a68d61088a40eef5c88191ccf79323dbf34850",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "guide/guied costs2 under Levenshtein and1 under the supplied Damerau model because adjacent transposition is a distinct operation there. Choose the model from intended typo behavior;neither value proves semantic equivalence or universal algorithm superiority.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

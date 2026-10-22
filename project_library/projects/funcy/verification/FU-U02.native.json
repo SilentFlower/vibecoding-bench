@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FU-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "keep_discards_all_falsey_values_including_valid_zero_and_false": true
+  },
+  "resource_profile": "business"
+}

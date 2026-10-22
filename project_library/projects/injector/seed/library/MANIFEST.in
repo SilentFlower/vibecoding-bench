@@ -1,0 +1,15 @@
+include *.py
+include *.toml
+include requirements-*.in
+include *.txt
+include CHANGES
+include COPYING
+include README.md
+include mypy.ini
+include pytest.ini
+recursive-include docs *.html
+recursive-include docs *.py
+recursive-include docs *.rst
+recursive-include docs Makefile
+exclude .readthedocs.yaml
+exclude .coveragerc

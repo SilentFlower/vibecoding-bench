@@ -1,0 +1,39 @@
+{
+  "WF-U01": {
+    "candidate_import": true,
+    "required_input_and_truthy_converted_data_are_distinct": true
+  },
+  "WF-U02": {
+    "candidate_import": true,
+    "missing_checkbox_submission_is_not_the_initial_object_value": true
+  },
+  "WF-C01": {
+    "candidate_import": true,
+    "submitted_input_requires_a_multivalue_getlist_protocol": true
+  },
+  "WF-C02": {
+    "candidate_import": true,
+    "optional_checks_raw_submission_instead_of_validating_all_initial_values": true
+  },
+  "WF-P01": {
+    "candidate_import": true,
+    "validation_does_not_make_sequential_object_population_atomic": true
+  },
+  "WF-D01": {
+    "candidate_import": true,
+    "filter_list_length": 2,
+    "validator_list_length": 2,
+    "filtered_values": [
+      "x!",
+      "x!!"
+    ],
+    "calls": [
+      "filter",
+      "filter",
+      "filter",
+      "validate",
+      "validate",
+      "validate"
+    ]
+  }
+}

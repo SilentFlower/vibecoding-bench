@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BI-C02",
+  "source_commit": "299fedc89f1d70d5d41cf7922564b376d3e2d435",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both copies retain only a:1 when the original gains b:2. copy is an independent mutable map; frozenbidict has no item assignment and is hashable by items. The supplied scalar keys/values are immutable; do not generalize to a recursive deep freeze or to safe mutation of user-defined hash/equality state.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

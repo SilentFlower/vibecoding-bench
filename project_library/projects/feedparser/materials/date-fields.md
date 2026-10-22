@@ -1,0 +1,1 @@
+Parse local RSS bytes whose one item has pubDate Thu, 22 Oct 2026 09:00:00 +0200. Inspect published,published_parsed[:6],"updated" in item,dict.__contains__(item,"updated"),then explicitly access item.updated while recording its warning. Explain UTC tuple conversion and compatibility lookup versus actual stored key. No edits.

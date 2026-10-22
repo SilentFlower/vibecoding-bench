@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "WC-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "hex_normalization_and_html5_simple_validation_have_distinct_input_contracts": true
+  },
+  "resource_profile": "business"
+}

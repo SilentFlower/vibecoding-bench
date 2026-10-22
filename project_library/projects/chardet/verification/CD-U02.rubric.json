@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CD-U02",
+  "source_commit": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "BOM detection sets doneTrue and UTF-8-SIG immediately. Later feed is ignored and close retains that result,while strict decoding the complete concatenated stream rejectsFF. Early prediction completion does not validate every later byte;retain complete-byte decoding/error checks separately.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

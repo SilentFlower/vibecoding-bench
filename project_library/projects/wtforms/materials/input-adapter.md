@@ -1,0 +1,1 @@
+QuantityForm has count=IntegerField(). Compare formdata={"count":"3"} with an explicitly defined multi-value wrapper whose getlist("count") returns ["3"]. Explain exact input-protocol rejection,accepted raw_data/data,and how formdata differs from data prefill before planning a JSON adapter. No implementation.

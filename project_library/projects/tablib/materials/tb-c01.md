@@ -1,0 +1,1 @@
+Create Dataset(("=1+1",),headers=["note"]). Inspect exported XLSX A2 with escape=False/default and escape=True using openpyxl. Advise an explicit formula/text policy for an untrusted report. Do not launch a spreadsheet or implement changes.

@@ -1,0 +1,1 @@
+For rule=Word(nums),compare rule.parse_string("12 trailing") with parse_all=True,and the complete valid control"12". A quantity import must explicitly decide whether trailing material is acceptable. Explain actual tokens and errors without editing files or pretending prefix success establishes complete-record validation.

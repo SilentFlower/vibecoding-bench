@@ -1,0 +1,1 @@
+Fix when=datetime(2026,1,1,12). Compare naturaltime(60,future=True,when=when), naturaltime(timedelta(seconds=60),future=True,when=when) and naturaltime(when+timedelta(seconds=60),when=when). Explain tense and reproducibility. No edits.

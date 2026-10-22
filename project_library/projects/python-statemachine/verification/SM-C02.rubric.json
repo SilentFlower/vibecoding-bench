@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SM-C02",
+  "source_commit": "ec5d8173f740b37941818df13727db9d64ef498d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "machine.events is the framework read-only bound-event property;assignment raises AttributeError. The separately supplied domain model.events list can hold domain-audit while the framework property still lists finish. Keep business state in an explicit domain model or non-conflicting declared field,inspect reserved names before integration,and do not alter framework properties. The list is not a durable audit service.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

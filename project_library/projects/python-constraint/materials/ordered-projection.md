@@ -1,0 +1,1 @@
+Problem has a domain[1] and b domain[2]. Compare getSolutionsOrderedList(["a"]) with getSolutionsOrderedList(["b","a"]). Trace the exact current branch for a one-name order and explain the actual result shape. Do not promise that this pinned helper projects a single requested column. No source patch.

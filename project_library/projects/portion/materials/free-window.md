@@ -1,0 +1,1 @@
+The work window is[9,17);busy is[9,11)|[13,14). Plan free=window-busy under half-open semantics. Verify exact free components,their intersection with busy,their union with busy clipped to the window,and membership at11/13/17. Actual dates,zones and duration measurement are outside this synthetic integer model and need explicit business rules before real use. No implementation.

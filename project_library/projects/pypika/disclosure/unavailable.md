@@ -1,0 +1,1 @@
+The calling code,query construction order,returned object usage,generated SQL and complete synthetic table/results cannot be supplied. There is no complete reproduction to distinguish a discarded return,changed predicate or database/data difference.

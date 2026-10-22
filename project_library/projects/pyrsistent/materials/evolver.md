@@ -1,0 +1,1 @@
+original=pmap({"tea":1});staging=original.evolver();staging["tea"]=2;first=staging.persistent();staging["tea"]=3;second=staging.persistent(). Explain original,first,second and staging after all calls. A draft editor must own the mutable evolver and explicitly publish snapshots. No edits or thread-safety guarantees.

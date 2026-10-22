@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FG-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "explicit_feed_and_entry_dates_make_the_supplied_build_reproducible": true
+  },
+  "resource_profile": "business"
+}

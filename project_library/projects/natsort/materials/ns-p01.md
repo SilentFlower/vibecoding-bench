@@ -1,0 +1,1 @@
+labels=["part10","part2","part1"] and amounts=[100,20,10] describe aligned rows. Inspect index_natsorted(labels) and apply that exact permutation with order_by_index to both sequences,including iter=True. Plan validation and publication. No implementation.

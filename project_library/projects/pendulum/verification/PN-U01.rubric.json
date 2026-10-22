@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PN-U01",
+  "source_commit": "e06dacedc4cdea90fa1286b3965d180ab94cf251",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The first addition clips to February28;another month reaches March28. A single two-month addition from January31 reaches March31,and the original stays January31. Calendar month addition with clipping is not associative. Preserve the intended original day/short-month policy when calculating scheduled dates;do not infer repeated calls retain a hidden31st-day anchor.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

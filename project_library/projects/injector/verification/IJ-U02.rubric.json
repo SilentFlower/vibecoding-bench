@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IJ-U02",
+  "source_commit": "5daed12510fafc0bf73b6ef18d2884f78cd5e210",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Direct Service() still raises TypeError for its missing name;the inject decorator declares bindings without replacing normal Python argument requirements. Service(direct) uses its explicit value. create_object obtains provided from the Injector,while additional_kwargs explicit wins. Use the documented construction boundary rather than claim the decorator alone performs a call or a global lookup.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

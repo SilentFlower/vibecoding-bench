@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "H5-U02",
+  "source_commit": "fd4f032bc090d44fb11a84b352dad7cbee0a4745",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "div context gives only text A;table context yields tbody/tr/td;tbody context yields tr/td. The same fragment is interpreted by different insertion modes. Use the actual embedding container explicitly and test that context;parseFragment is not context-independent XML parsing.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

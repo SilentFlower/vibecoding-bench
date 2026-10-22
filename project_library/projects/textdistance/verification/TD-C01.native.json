@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TD-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "word_bag_multiplicity_and_set_semantics_are_explicit_choices": true
+  },
+  "resource_profile": "business"
+}

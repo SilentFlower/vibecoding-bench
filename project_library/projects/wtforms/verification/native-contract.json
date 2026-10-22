@@ -1,0 +1,2701 @@
+{
+  "baseline_digest": "eff5d879af44263520fb138b1788adba42fabba40d399b9e0d37c8b2ea79f92b",
+  "nodes": [
+    {
+      "id": "tests/fields/test_boolean.py::test_defaults",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_boolean.py::test_rendering",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_boolean.py::test_with_model_data",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_boolean.py::test_with_postdata",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_boolean.py::test_with_postdata_and_model",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_button.py::test_button_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_button.py::test_button_field_default_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_button.py::test_button_field_label_markup_at_declaration",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_button.py::test_button_field_label_markup_at_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_button.py::test_button_field_label_override",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_button.py::test_button_field_label_str_is_escaped",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_button.py::test_button_field_not_pressed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_button.py::test_button_field_render_kw",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_button.py::test_button_field_with_empty_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_button.py::test_button_field_with_postdata",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_color.py::test_color_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_custom.py::test_default_impls",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_custom.py::test_processing_failure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_date.py::test_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_date.py::test_failure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_date.py::test_invalid_value_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_date.py::test_invalid_value_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetime.py::test_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetime.py::test_datetimefield_subclasses_do_not_warn",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetime.py::test_datetimefield_warns",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetime.py::test_invalid_value_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetime.py::test_invalid_value_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetime.py::test_microseconds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetime.py::test_multiple_formats",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetimelocal.py::test_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetimelocal.py::test_microseconds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetimelocal.py::test_separators",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetimelocal.py::test_tz_attaches_tzinfo_on_submit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetimelocal.py::test_tz_callable_resolved_lazily",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetimelocal.py::test_tz_callable_returning_none_falls_back_to_naive",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetimelocal.py::test_tz_converts_aware_data_at_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetimelocal.py::test_tz_naive_data_rendered_unchanged",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetimelocal.py::test_tz_none_keeps_legacy_naive_behavior",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_datetimelocal.py::test_tz_round_trip_through_utc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_decimal.py::test_decimal_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_decimal.py::test_invalid_value_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_decimal.py::test_invalid_value_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_decimal.py::test_quantize",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_defaults.py::test_defaults",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_defaults.py::test_unset_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_field.py::test_check_validators",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_field.py::test_custom_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_field.py::test_htmlstring",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_field.py::test_meta_attribute",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_field.py::test_post",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_field.py::test_pre_stop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_field.py::test_process_formdata",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_field.py::test_render_kw",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_field.py::test_render_special",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_field.py::test_required_flag",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_field.py::test_str_coerce",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_field.py::test_unbound_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_field.py::test_unicode_coerce",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_file.py::test_file_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_file.py::test_file_field_without_file_input",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_file.py::test_multiple_file_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_filters.py::test_extra",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_filters.py::test_failure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_filters.py::test_inline",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_filters.py::test_working",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_flags.py::test_assignment",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_flags.py::test_existing_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_flags.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_flags.py::test_underscore_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_flags.py::test_unset",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_float.py::test_float_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_float.py::test_invalid_value_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_float.py::test_invalid_value_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_form.py::test_choices_callback_in_subform_can_read_parent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_form.py::test_formdata",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_form.py::test_iteration",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_form.py::test_no_validators_or_filters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_form.py::test_populate_missing_obj",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_form.py::test_populate_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_form.py::test_post_process_mutation_propagates_top_down",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_form.py::test_post_process_propagates_through_field_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_form.py::test_post_process_propagates_through_form_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_form.py::test_post_process_runs_once_per_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_form.py::test_separator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_form.py::test_widget",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_form.py::test_with_obj",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_hidden.py::test_hidden_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_html5.py::test_min_max",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_html5.py::test_minlength_maxlength",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_html5.py::test_pattern",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_html5.py::test_pattern_disabled_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_html5.py::test_simple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_integer.py::test_integer_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_integer.py::test_invalid_value_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_integer.py::test_invalid_value_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_label.py::test_auto_label",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_label.py::test_escaped_label_text",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_label.py::test_label",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_label.py::test_override_for",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_add_entry_routes_through_meta_bind_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_append_entry_runs_choices_callback",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_custom_separator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_enclosed_subform",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_enclosed_subform_custom_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_enclosed_subform_list_separator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_enclosed_subform_mixed_separators",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_enclosed_subform_uniform_separators",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_entry_index_attribute_reflects_position",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_entry_management",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_entry_management_by_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_entry_management_by_index_with_subforms",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_form",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_formdata_index_drives_entry_order",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_formdata_with_sparse_indices_keeps_entry_obj_alignment",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_gap_compacted_through_formdata_round_trip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_insert_entry_runs_choices_callback",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_min_max_entries",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_no_filters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_process_prefilled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_process_resets_last_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_list.py::test_validators",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_month.py::test_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_month.py::test_failure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_password.py::test_password_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_radio.py::test_callable_choices",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_radio.py::test_radio_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_radio.py::test_radio_field_label_for_can_be_overridden",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_radio.py::test_render_kw_preserved",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_radio.py::test_required_flag",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_radio.py::test_required_validator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_radio.py::test_text_coercion",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_callable_choices",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_callable_choices_receives_form_and_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_choice_shortcut",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_choice_shortcut_post",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_choices_can_be_none_when_choice_validation_is_disabled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_default_coerce",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_defaults",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_dict_choices_deprecation_with_choice_object",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_dict_choices_deprecation_with_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_dict_mixed_flat_and_optgroup_choices",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_dict_str_dict_optgroup_choices",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_dict_str_str_flat_choices",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_dont_validate_choices",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_empty_choice[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_empty_choice[choices0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_choices_by_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_choices_custom_label",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_choices_default_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_choices_dunder_str_label",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_choices_inherited_dunder_str_label",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_choices_intenum_label",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_choices_invalid_by",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_choices_str_mixin_label",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_choices_strenum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_coerce_accepts_member",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_coerce_by_name_round_trip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_coerce_intenum_value_round_trip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_coerce_invalid",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_coerce_invalid_by",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_enum_coerce_value_round_trip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_has_groups_false_without_optgroup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_has_groups_true_with_any_optgroup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_invalid_choice_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_invalid_value_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_invalid_value_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_iter_choices_tuple_unpacking",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_iter_groups_items_unpack_as_3_2_tuples",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_iter_groups_override_yielding_tuples_keeps_working",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_iter_groups_preserves_order",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_iterable_options",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_legacy_subclass_yielding_3_tuples_keeps_working",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_legacy_subclass_yielding_tuples_keeps_working",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_optgroup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_optgroup_option_render_kw",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_optgroup_shortcut",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_option_render_kw",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_option_subfields_carry_parent_form",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_render_kw_preserved",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_required_validator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_requried_flag",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_select_field_coerce_passed_through",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_select_field_copies_choices",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_select_field_enum_class_as_coerce",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_select_field_enum_renders_selected",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_self_choices_preserves_user_supplied_shape",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_tuple_choices_deprecation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_validate_choices",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_validate_choices_when_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_validate_choices_when_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_value_coercion",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_select.py::test_with_data",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_callable_choices",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_can_supply_coercable_values_as_options",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_choice_shortcut",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_choices_can_be_none_when_choice_validation_is_disabled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_coerce_fail",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_defaults",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_dont_validate_choices",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_empty_choice[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_empty_choice[choices0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_invalid_choice_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_invalid_choice_message_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_invalid_value_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_invalid_value_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_optgroup_option_render_kw",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_option_render_kw",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_render_kw_preserved",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_required_validator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_requried_flag",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_select_multiple_enum_by_name_round_trip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_select_multiple_enum_intenum_round_trip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_select_multiple_enum_value_round_trip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_validate_choices_when_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_validate_choices_when_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_selectmultiple.py::test_with_data",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_string.py::test_string_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_submit.py::test_submit_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_textarea.py::test_textarea_field",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_time.py::test_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_time.py::test_invalid_value_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_time.py::test_invalid_value_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_week.py::test_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_week.py::test_invalid_data",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_week.py::test_invalid_value_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/fields/test_week.py::test_invalid_value_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_csrf.py::test_dummy_csrf_base_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_csrf.py::test_dummy_csrf_basic_impl",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_csrf.py::test_dummy_csrf_no_populate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_csrf.py::test_dummy_csrf_off",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_csrf.py::test_dummy_csrf_rename",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_csrf.py::test_session_csrf_detailed_expected_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_csrf.py::test_session_csrf_no_time_limit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_csrf.py::test_session_csrf_various_failures",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_csrf.py::test_session_csrf_with_time_limit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_callable_choices_receives_form_and_field[data-is-none]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_callable_choices_receives_form_and_field[with-data]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_choice_choices_render_value_and_label",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_choice_render_kw_on_option",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_default_widget_is_datalist_widget",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_dict_shorthand_choices_render_value_and_label",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_email_field_compatible",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_enum_datalist",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_field_datalist_empty_for_string_ref",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_field_datalist_empty_when_absent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_field_without_datalist_has_no_list_attr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_inline_callable_datalist_per_fieldlist_entry",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_inline_datalist_form_prefix_propagates",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_inline_datalist_in_fieldlist_renders_per_entry",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_inline_datalist_in_fieldlist_unique_ids_per_entry",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_inline_datalist_in_formfield_subform",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_none_choices_renders_empty_datalist",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_render_kw_on_datalist",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_render_kwargs_override_render_kw",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_render_kwargs_passed_to_datalist_attributes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_str_choices_render_options",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_string_reference_emits_list_attr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_widget_preserved_through_clone",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_widget_receives_field_for_callable_choices",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_widget_replaces_default_rendering",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_datalist.py::test_zero_arg_callable_choices",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_baseform_contains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_baseform_data_proxy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_baseform_errors_proxy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_baseform_field_adding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_baseform_field_removal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_baseform_formdata_wrapper_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_baseform_populate_obj",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_baseform_prefixes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_data_arg",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_delattr_idempotency",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_empty_formdata",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_errors_access_during_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_field_adding_disabled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_field_removal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_form_level_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_form_meta_class_meta_reassign",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_form_meta_monkeypatch",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_form_meta_subclassing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_meta_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_meta_missing_diamond",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_ordered_fields",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_validate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_form.py::test_validate_with_extra",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_core_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_core_defaults",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_core_fallback",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_core_ngettext",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_core_override_languages",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_failure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_gettext",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_python3_nowrap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_translations_ngettext",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_translations_validator_translation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_us_translation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_locale_babel.py::test_formatting",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_locale_babel.py::test_parsing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_locale_babel.py::test_typeerror",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_webob.py::test_automatic_wrapping",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_webob.py::test_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_webob.py::test_filled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_aria_prefix",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_checkbox_input",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_checkbox_input_kwarg_overrides_data",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_color_input",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_data_prefix",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_hidden_input",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_html_marking",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_input_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_listwidget",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_number",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_password_input",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_quoting",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_quoting_markup_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_radio_input",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_radio_input_kwarg_overrides_checked",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_range",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_render_option",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_select",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_select_dispatches_to_legacy_no_kwargs_signature",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_select_dispatches_to_legacy_render_option_signature",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_select_mixed_grouped_and_ungrouped_choices",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_tablewidget",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_text_input",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_widgets.py::test_textarea",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_anyof.py::test_any_of_values_formatter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_anyof.py::test_anyof_passes[2-test_list1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_anyof.py::test_anyof_passes[b-test_list0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_anyof.py::test_anyof_raisses[6-test_list1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_anyof.py::test_anyof_raisses[d-test_list0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_anyof.py::test_none_multiple_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_data_required.py::test_data_required",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_data_required.py::test_data_required_clobber",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_data_required.py::test_data_required_messages[validator0-This field is required.]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_data_required.py::test_data_required_messages[validator1-foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_data_required.py::test_data_required_raises[ ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_data_required.py::test_data_required_raises[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_data_required.py::test_data_required_raises[\\t\\t]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_data_required.py::test_data_required_raises[]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_data_required.py::test_required_passes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_data_required.py::test_required_stops_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_field_flags_are_set_date[None-max_v1-None-max_flag1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_field_flags_are_set_date[min_v0-max_v0-min_flag0-max_flag0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_field_flags_are_set_date[min_v2-None-min_flag2-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_passes[None-max_v3-test_v3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_passes[min_v0-max_v0-test_v0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_passes[min_v1-max_v1-test_v1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_passes[min_v2-None-test_v2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_passes_with_callable_bounds[None-_dt_max-test_v3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_passes_with_callable_bounds[None-_dt_max-test_v4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_passes_with_callable_bounds[_d_min-_d_max-test_v1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_passes_with_callable_bounds[_dt_min-None-test_v2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_passes_with_callable_bounds[_dt_min-_dt_max-test_v0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_raises[None-max_v6-test_v6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_raises[min_v0-max_v0-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_raises[min_v1-max_v1-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_raises[min_v2-max_v2-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_raises[min_v3-max_v3-test_v3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_raises[min_v4-max_v4-test_v4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_raises[min_v5-None-test_v5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_date_range.py::test_date_range_sets_widget_attrs_using_field_format",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_disabled.py::test_disabled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_default_test_environment_respects_global",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_explicit_test_environment_false_overrides_global",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_invalid_email_raises[  ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_invalid_email_raises[@bar.dk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_invalid_email_raises[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_invalid_email_raises[]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_invalid_email_raises[bar.dk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_invalid_email_raises[fo o@bar.co]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_invalid_email_raises[foo.@bar.co]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_invalid_email_raises[foo@.bar.ab]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_invalid_email_raises[foo@]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_invalid_email_raises[foo@bar.ab12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_invalid_email_raises[foo@bar]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_invalid_email_raises[foo@foo@bar.co]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_invalid_email_raises[foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_invalid_email_raises_granular_message[foo@]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_test_environment_accepts_test_domains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_test_environment_rejects_test_domains_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_valid_email_passes[123@bar.dk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_valid_email_passes[foo@456.dk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_valid_email_passes[foo@b\\xfccher.\\u4e2d\\u56fd]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_valid_email_passes[foo@bar.dk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_email.py::test_valid_email_passes[foo@bar456.info]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_equal_to.py::test_equal_to_passes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_equal_to.py::test_equal_to_raises[bad_value-foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_equal_to.py::test_equal_to_raises[test-invalid_field_name]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_input_required.py::test_input_required",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_input_required.py::test_input_required_error_message[validator0-This field is required.]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_input_required.py::test_input_required_error_message[validator1-foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_input_required.py::test_input_required_raises",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_bad_ip4address_raises[127.0.0.abc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_bad_ip4address_raises[1278.0.0.1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_bad_ip4address_raises[147.230.1000.25]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_bad_ip4address_raises[2001:718::::]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_bad_ip4address_raises[900.200.100.75]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_bad_ip4address_raises[abc.0.0.1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_bad_ip6address_raises[1:2:3:4:5:6:7:8:9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_bad_ip6address_raises[2001:718:1C01:1111::1111]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_bad_ip6address_raises[2001:718:1C01:1111::]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_bad_ip6address_raises[abc.0.0.1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_bad_ip6address_raises[abcd:1234::123::1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_bad_ip6address_raises[abcd::1ffff]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_good_ip6address_passes[2001:718:1C01:1111::1111]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_good_ip6address_passes[2001:718:1C01:1111::]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_good_ip6address_passes[::1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_good_ip6address_passes[abcd:ef::42:1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_good_ip6address_passes[dead:beef:0:0:0:0:42:1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_ip4address_passes[127.0.0.1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_ip4address_passes[147.230.23.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_ip4address_passes[147.230.23.25]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_ipaddress.py::test_ip_address_raises_on_bad_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_lazy_proxy.py::test_lazy_proxy_fixture",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_lazy_proxy.py::test_lazy_proxy_raises",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_length.py::test_bad_length_init_raises[-1--1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_length.py::test_bad_length_init_raises[5-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_length.py::test_bad_length_raises[-1-5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_length.py::test_bad_length_raises[7--1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_length.py::test_correct_length_passes[-1-6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_length.py::test_correct_length_passes[2-6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_length.py::test_correct_length_passes[6--1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_length.py::test_correct_length_passes[6-6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_length.py::test_length_messages[validator0-2 and 5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_length.py::test_length_messages[validator1-at least 8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_length.py::test_length_messages[validator2-longer than 5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_length.py::test_length_messages[validator3-between 2 and 5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_length.py::test_length_messages[validator4-exactly 5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_mac_address.py::test_bad_mac_raises[00:00:00:00:00]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_mac_address.py::test_bad_mac_raises[01:23:45:67:89:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_mac_address.py::test_bad_mac_raises[01:23:45:67:89:gh]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_mac_address.py::test_bad_mac_raises[123:23:45:67:89:00]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_mac_address.py::test_valid_mac_passes[01:23:45:67:ab:CD]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_noneof.py::test_none_of_multiple_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_noneof.py::test_none_of_passes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_noneof.py::test_none_of_raises",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_callable_bounds[<lambda>-<lambda>-7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_callable_bounds[<lambda>-None-7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_callable_bounds[None-<lambda>-70]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_callable_bounds_stored_in_field_flags",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_nan[nan1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_nan[nan]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_passes[5-10-7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_passes[5-None-7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_passes[None-100-70]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_raises[5-10--5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_raises[5-10-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_raises[5-10-12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_raises[5-10-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_raises[5-None-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_number_range.py::test_number_range_raises[None-100-500]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_optional.py::test_input_optional_passes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_optional.py::test_input_optional_raises[   -   ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_optional.py::test_input_optional_raises[-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_optional.py::test_input_optional_raises[\\t-\\t]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_readonly.py::test_readonly",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_readonly.py::test_readonly_with_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_default_matcher_is_re_match",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_html_pattern_callable_returning_bool",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_html_pattern_callable_returning_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_html_pattern_disabled_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_html_pattern_string_overrides_source",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_html_pattern_true_emits_python_source",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_pattern_method_as_matcher",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_regex_passes[\\\\w+-fullmatch-abcd-abcd]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_regex_passes[\\\\w+-search-  abcd  -abcd]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_regex_passes[^a-match-ABcd-A]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_regex_passes[^a-match-abcd-a]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_regex_passes[^abcd$-fullmatch-abcd-abcd]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_regex_passes[bc-search-abcd-bc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_regex_raises[\\\\w+-fullmatch-abc!]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_regex_raises[^a-match-ABC]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_regex_raises[^a-match-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_regex_raises[^abcd$-fullmatch-foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_regex_raises[bc-search-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_regex_raises[bc-search-xyz]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_regexp.py::test_regexp_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_bad_url_raises[foobar.dk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_bad_url_raises[http://-foobar.dk/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_bad_url_raises[http://127.0.0/asdf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_bad_url_raises[http://foobar-.dk/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_bad_url_raises[http://foobar.12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_bad_url_raises[http://foobar.d]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_bad_url_raises[http://foobar]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_bad_url_raises[http://localhost:abc/a]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_custom_schemes_allowlist",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_invalid_port_raises[http://example.com:99999/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_invalid_port_raises[http://example.com:abc/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_non_http_schemes_rejected_by_default[data:text/plain,foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_non_http_schemes_rejected_by_default[file:///etc/passwd]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_non_http_schemes_rejected_by_default[ftp://example.com/file.txt]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_non_http_schemes_rejected_by_default[javascript://example.com/%0aalert(1)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_schemes_none_disables_allowlist",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_userinfo_passes_with_allow_userinfo[http://usern@me:p@ssword@foobar.dk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_userinfo_passes_with_allow_userinfo[http://username:password@foobar.dk:1234/path?query=parm]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_userinfo_passes_with_allow_userinfo[http://username:password@foobar.dk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_userinfo_passes_with_allow_userinfo[http://username@foobar.dk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_userinfo_rejected_by_default[http://usern@me:p@ssword@foobar.dk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_userinfo_rejected_by_default[http://username:password@foobar.dk:1234/path?query=parm]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_userinfo_rejected_by_default[http://username:password@foobar.dk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_userinfo_rejected_by_default[http://username@foobar.dk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_notld_passes[http://foobar/path?query=param&foo=faa]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_notld_passes[http://foobar:1234/path?query=param&foo=faa]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_notld_passes[http://foobar:5000?query=param&foo=faa]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_notld_passes[http://foobar?query=param&foo=faa]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_notld_passes[http://foobar]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_notld_passes[http://localhost/foobar]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_passes[http://192.168.0.1/foobar]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_passes[http://192.168.0.1:9000/fake]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_passes[http://\\u0645\\u062b\\u0627\\u0644.\\u0625\\u062e\\u062a\\u0628\\u0627\\u0631/foo.com]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_passes[http://\\u0909\\u0926\\u093e\\u0939\\u0930\\u0923.\\u092a\\u0930\\u0940\\u0915\\u094d\\u0937\\u093e/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_passes[http://\\uc2e4\\ub840.\\ud14c\\uc2a4\\ud2b8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_passes[http://foo--bar.dk/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_passes[http://foo-bar.dk/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_passes[http://foo_bar.dk/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_passes[http://foobar.dk/]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_passes[http://foobar.dk/path?query=param&foo=faa]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_passes[http://foobar.dk/path?query=param]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_passes[http://foobar.dk?query=param]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_passes[http://foobar.dk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_url.py::test_valid_url_passes[http://foobar.museum/foobar]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_uuid.py::test_bad_uuid_raises[2bc1c94f 0deb-43e9-92a1-4775189ec9f8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_uuid.py::test_bad_uuid_raises[2bc1c94f-0deb-43e9-92a1-4775189ec9f]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_uuid.py::test_bad_uuid_raises[2bc1c94f-deb-43e9-92a1-4775189ec9f8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_uuid.py::test_bad_uuid_raises[gbc1c94f-0deb-43e9-92a1-4775189ec9f8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_uuid.py::test_bad_uuid_type_raises[123]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_uuid.py::test_bad_uuid_type_raises[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_uuid.py::test_bad_uuid_type_raises[uuid_val2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_uuid.py::test_valid_uuid_passes[2bc1c94f-0deb-43e9-92a1-4775189ec9f8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_uuid.py::test_valid_uuid_passes[2bc1c94f0deb43e992a14775189ec9f8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_uuid.py::test_valid_uuid_passes[uuid_val2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_validators.py::test_raise_exceptions[IndexError]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_validators.py::test_raise_exceptions[ValueError]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/validators/test_validators.py::test_raise_exceptions[ZeroDivisionError]",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "wtforms",
+  "python": "3.12.15",
+  "schema": 1
+}

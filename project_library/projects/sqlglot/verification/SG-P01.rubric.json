@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SG-P01",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both supplied local paths return coffee/1 then tea/5. Plan fixed dialect/schema/input identity,parameterized loading,explicit output order,and expected rows/types. Include empty input,NULLs,duplicate names and set-operation counterexamples in a future regression matrix;distinguish this finite successful report from a universal cross-dialect guarantee.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

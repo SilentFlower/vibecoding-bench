@@ -1,0 +1,1 @@
+Plan a finite local report for rows tea/2,coffee/1,tea/3 with columns product,quantity. Use SELECT product,SUM(quantity) AS total FROM orders GROUP BY product ORDER BY product. Compare SQLGlot Python execution with PostgreSQL-to-SQLite conversion executed in an in-memory SQLite database. No implementation or external service.

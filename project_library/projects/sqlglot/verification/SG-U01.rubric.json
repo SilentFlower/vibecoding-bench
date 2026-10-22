@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SG-U01",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The pinned parser returns SELECT missing FROM orders successfully. This proves a syntactic AST was produced, not table/column existence, database permissions, successful execution or SQL safety. Schema-aware checks and the actual database contract are separate.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

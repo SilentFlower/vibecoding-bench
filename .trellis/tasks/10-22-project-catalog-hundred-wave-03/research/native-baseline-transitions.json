@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "transitions",
+      "attempt": 3,
+      "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-003/transitions/result.json",
+      "result_sha256": "640e1fbffe13db79ce5c7c4158e463197f3f86df5dd2c0b607ea7754ec0c7c86",
+      "main_collected": 3214,
+      "counts": {
+        "passed": 2923,
+        "failed": 0,
+        "error": 0,
+        "skipped": 291,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 3214,
+      "xml_skipped": 291,
+      "runner_sha256": "2c90ed4ab14dea240523454193de4d1405a7bae45b442d0a9f06a5dc48daea42",
+      "contract_sha256": "2ed7fb4072b005b68bcc090be0b60e050ebb9740c4d01c35b7e208368d1fffe0",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 360,
+        "memory_mb": 768,
+        "pids_limit": 128
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    }
+  ]
+}

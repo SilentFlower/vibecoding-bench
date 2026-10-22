@@ -1,0 +1,12 @@
+{
+  "status": "passed",
+  "command": ".deploy/project-iteration-repairs/venv/bin/python -m unittest discover -s .trellis/tasks/10-22-project-catalog-hundred-wave-03/research -p test_sqlglot_subtest_audit.py -q",
+  "exit_code": 0,
+  "actual_output": "----------------------------------------------------------------------\nRan 6 tests in 1.630s\n\nOK\n",
+  "scope": "真实产品结果、旧列表、错误摘要和数量、缺失证明、原件损坏、控制器变化及链接拒绝",
+  "source_sha256": {
+    "audit_mock.py": "bbb0b390b26f5b8bf52776e07bfd37ffeead9eddd5e32b58899244ed06dc6006",
+    "sqlglot_subtest_audit.py": "ea28f9d8a6daa24f7406461802f4eb4f9242b6bec21d435b04fd0f96884ecd9f",
+    "test_sqlglot_subtest_audit.py": "79a1d57f380334a087d1b5711147e96b85ea3fbb516e4ca2ee36445e40904f3f"
+  }
+}

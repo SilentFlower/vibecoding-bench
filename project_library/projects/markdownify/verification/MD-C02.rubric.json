@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MD-C02",
+  "source_commit": "bc98c9e134ec55b2853716ab859754f061cb7054",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "A None callback falls back to configured text;the class callback chooses python. Default strip_pre removes boundary blank lines but preserves the two-space indentation. strip_pre=None retains the original boundary newlines plus fence framing newlines. Choose content-preservation policy explicitly;do not claim None callback clears the configured language.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

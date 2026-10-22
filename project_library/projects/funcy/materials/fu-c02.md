@@ -1,0 +1,1 @@
+A generator logs and yields0,1,2,3. Split with funcy.split(lambda value:value%2==0,source). Exhaust the passed iterator first,inspect the source log,then consume the failed iterator. Advise a long-stream consumption strategy. No edits.

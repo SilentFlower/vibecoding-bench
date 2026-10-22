@@ -1,0 +1,20 @@
+{
+  "status": "passed",
+  "argv": [
+    "/root/project/vibecoding-bench/.deploy/project-iteration-repairs/venv/bin/python",
+    "scripts/validate-project-library.py"
+  ],
+  "exit_code": 0,
+  "elapsed_sec": 4.716701,
+  "logs": {
+    "stdout": {
+      "path": ".deploy/project-catalog-hundred/stage-03/final-structure-stdout.log",
+      "sha256": "8a1c8df7d10571a8632e8c883477c791d2f5ff925509e449e535d6561ee349d5"
+    },
+    "stderr": {
+      "path": ".deploy/project-catalog-hundred/stage-03/final-structure-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "scope": "当前99项目结构与离线材料校验，不代替第30仓来源或整阶段Check-All"
+}

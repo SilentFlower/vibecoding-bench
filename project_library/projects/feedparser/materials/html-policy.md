@@ -1,0 +1,1 @@
+The RSS description contains CDATA <script>alert(1)</script><b>Visible</b>. Compare default parse and sanitize_html=False using explicit local streams. Explain actual summary text and advise downstream rendering policy and source preservation. Do not claim general browser/application safety from this single conversion or change global parser defaults. No implementation.

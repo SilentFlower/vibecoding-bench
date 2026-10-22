@@ -1,0 +1,1 @@
+detect(b"\xfe\xff\x00\x00") returns a detected unusual UCS4 label. Inspect that exact label and codecs.lookup(label). Advise an explicit supported-decoder/error boundary;do not rename it to UTF-32 without proving its octet order. No edits.

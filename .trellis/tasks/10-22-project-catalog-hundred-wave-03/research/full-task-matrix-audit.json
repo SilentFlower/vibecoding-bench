@@ -1,0 +1,687 @@
+{
+  "status": "passed",
+  "scope": "三十仓真实草稿任务矩阵、固定任务表及结构准入复核；模拟、正式登记和模型效果分别记录",
+  "projects": 30,
+  "totals": {
+    "scenarios": 121,
+    "tasks": 183,
+    "modifications": 3,
+    "branches": 28,
+    "entries": 149,
+    "native_tasks": 155,
+    "business_cases": 170
+  },
+  "kinds": {
+    "understand": 63,
+    "consult": 59,
+    "plan": 30,
+    "diagnose": 28,
+    "modify": 3
+  },
+  "dependency_kinds": {},
+  "unique_global_task_ids": 183,
+  "unique_prompts": 183,
+  "items": [
+    {
+      "project": "arrow",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/arrow-plan.md",
+        "sha256": "c9fa933e3cfe7de5da7d44a4156534734b47f51651a4217f928b98cc9290a7e5"
+      },
+      "manifest_sha256": "87d13fabebb3263fce3466387d8e0aba09679a865963f1cd7ccb2b2f0718e165"
+    },
+    {
+      "project": "bidict",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/bidict-plan.md",
+        "sha256": "cb88e58d7919b59f6f5b6f5b7bd0e626583b2778fe884f172c900d587e834851"
+      },
+      "manifest_sha256": "45772052dd0f9eadef2ffe10530b8a17de845dc1a5b52d11870ba1fb45581807"
+    },
+    {
+      "project": "chardet",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/chardet-plan.md",
+        "sha256": "45eba4a9e04fdb688386365f5685149bc95c073d7343ac4944fcc933fc374f10"
+      },
+      "manifest_sha256": "3066cc6f9387e161442cd70aa36e0b3e80ab050098c252a277228151260f4a8f"
+    },
+    {
+      "project": "charset-normalizer",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/charset-normalizer-plan.md",
+        "sha256": "577a32d5bdd0b5ead9ad74fdc586fef2602e4d157c60597d811a8d23f892d7e2"
+      },
+      "manifest_sha256": "478220e92cd775b384796d3b94aa79722f9e24513c16bf63c5fb3ebea9647782"
+    },
+    {
+      "project": "collective-icalendar",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/collective-icalendar-plan.md",
+        "sha256": "ff4ac817f0d24fce8da27bc139478b5b40f595a69c68cc320673bc865fa3817f"
+      },
+      "manifest_sha256": "9bb7f2d76c6b141d351fc95550b49c0e28ed0f76ec9eb5c313228e9e411ee602"
+    },
+    {
+      "project": "feedgen",
+      "scenarios": 5,
+      "tasks": 7,
+      "modifications": 1,
+      "branches": 1,
+      "entries": 6,
+      "native_tasks": 6,
+      "business_cases": 11,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1,
+        "modify": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/feedgen-plan.md",
+        "sha256": "6ec4cca2f6b61f3dea53fcc7765e8e4c36b3bd7839d8ac06145a648f2f43afd0"
+      },
+      "manifest_sha256": "5661c71fefafa2ae27cccf2c190e01dc5df64c5eac6224042311301cb9d5e929"
+    },
+    {
+      "project": "feedparser",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/feedparser-plan.md",
+        "sha256": "817b18b73c07b87f0f240eff425da91de5c5aad0565eef8eda3a88399634a211"
+      },
+      "manifest_sha256": "c2e81fe6921b7eca76e4dbb76adf88453574b606da7d3c30cd54629225273256"
+    },
+    {
+      "project": "funcy",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/funcy-plan.md",
+        "sha256": "246a2a20cf22197e16c19c49a3a09c2a9705f5b3d5280051bda8a4c0261c923e"
+      },
+      "manifest_sha256": "00a28b6b2de71bf221cae89309015759e2d581fee3a4ac8bebc5da54332411d6"
+    },
+    {
+      "project": "html5lib",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/html5lib-plan.md",
+        "sha256": "f6e160b82bf58abf877c367d9c5d63d2e856f094cba0921f07b050615af05591"
+      },
+      "manifest_sha256": "d9facd3f64a3bb8e51abe38a32b7ec4f0232223a4b39d04b556ff9a5103dcd09"
+    },
+    {
+      "project": "humanize",
+      "scenarios": 4,
+      "tasks": 7,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 6,
+      "business_cases": 6,
+      "kinds": {
+        "understand": 3,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/humanize-plan.md",
+        "sha256": "82f851ea4c2d091474500131ba05b993c1d4600c80735590fe1e02d6a5e6ac94"
+      },
+      "manifest_sha256": "3c59b91b2e99cb950d6f3d6d370f0b8e7244daac0f07440a793968ea096de67e"
+    },
+    {
+      "project": "injector",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/injector-plan.md",
+        "sha256": "2acd19096eeef8fa86e6f5ec6e7c8e7d2de6274d69629bc6fa39d5a04fee2275"
+      },
+      "manifest_sha256": "6565d89db8c4290cfa2c864908adfbf4ba851bb946594e51176b6c77bb9bfb48"
+    },
+    {
+      "project": "loguru",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/loguru-plan.md",
+        "sha256": "5e7a831fa5b34ccb0baed73674103e25f8dec428d3740b51753863596dc0dd5b"
+      },
+      "manifest_sha256": "714ba1e4ace1a31a863ac546eff0b4fff49724a6acd0c09fcf7ade03adde7f99"
+    },
+    {
+      "project": "markdownify",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/markdownify-plan.md",
+        "sha256": "b086e734ae571a2038e30b62fc5212cdcf185ad148a02c3996ea43b189c69f43"
+      },
+      "manifest_sha256": "9741521f881f0b5c4067d02987c5219c0c41e399b277ce5c5fec23daab95129f"
+    },
+    {
+      "project": "natsort",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/natsort-plan.md",
+        "sha256": "7a566f69463e5096993d415d3e21d87b1b5c7400ba4ae644a55d3036811b5767"
+      },
+      "manifest_sha256": "61c00e050337cb9c4dd0b69e318f4003e666c17320dfc0e09cb648b9ae29d300"
+    },
+    {
+      "project": "pendulum",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pendulum-plan.md",
+        "sha256": "76bb88d21dbf9589be841418092947df3407a3faa884775fa5e3073b0f50822d"
+      },
+      "manifest_sha256": "522d309136abed5583e7a987eb4020f38e778e2824bccab02fd0a1b1d5d5007e"
+    },
+    {
+      "project": "portion",
+      "scenarios": 3,
+      "tasks": 5,
+      "modifications": 0,
+      "branches": 0,
+      "entries": 3,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/portion-plan.md",
+        "sha256": "490f9f26179e304b4a58fb648f0c15bd1f2042b820b80e25592e184ff79afc57"
+      },
+      "manifest_sha256": "b06268f37862e8b2a0d302314eb2cdd6d6c7d9757235d8b454525fe73e787000"
+    },
+    {
+      "project": "pyparsing",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pyparsing-plan.md",
+        "sha256": "138ae5982a0bb4f3821ed29897a3b0a72df83d6b8f110784cd0e5ccb39a5ba5a"
+      },
+      "manifest_sha256": "fafd0b07f1e2c7be25b4c771addf6c7740f755401ce300dc468f07db893f0229"
+    },
+    {
+      "project": "pypika",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pypika-plan.md",
+        "sha256": "4db5e0856ea6d7290d7a6c425d8012e976682328cbf1cb322f40e1781bc0eb77"
+      },
+      "manifest_sha256": "5277622d073a14c0354bda095c3063b7ad1c75fcfed29e482df570176ec2561d"
+    },
+    {
+      "project": "pyrsistent",
+      "scenarios": 3,
+      "tasks": 5,
+      "modifications": 0,
+      "branches": 0,
+      "entries": 3,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pyrsistent-plan.md",
+        "sha256": "5e9c5f0c4fa8310a8dd09d3f2ed395957158347bf40d5cca3492b4043bf48732"
+      },
+      "manifest_sha256": "f199803a0e4c162bfe1380115566c38780695e8226bd973f5a11a948069ff766"
+    },
+    {
+      "project": "python-constraint",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-constraint-plan.md",
+        "sha256": "94c9117e5bd2061787f99f379dacd8e556455c8864add7076ad377eaa3c363b0"
+      },
+      "manifest_sha256": "179b90975051139367d6a3b2e6a655e6b7efdd4ea7d9baf751510d42cf29d373"
+    },
+    {
+      "project": "python-liquid",
+      "scenarios": 4,
+      "tasks": 7,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 6,
+      "business_cases": 6,
+      "kinds": {
+        "understand": 3,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-liquid-plan.md",
+        "sha256": "3ad4c8f1d1c042e8451c2da507e6fe0f2fa580ef8c2f181180ca5dcf2f50af81"
+      },
+      "manifest_sha256": "46b9047db79c7123791c5510c983939b213eb754a1dd9aad021df9f81bd3e0a3"
+    },
+    {
+      "project": "python-statemachine",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-statemachine-plan.md",
+        "sha256": "3bcc9ff232b2b02e1694e09717a873cae5540e95bb4377e237657ae0181e0f38"
+      },
+      "manifest_sha256": "7cff6ebadace2eda1f06b78a8c46f5141edff8415d3ad0e093378b31298f797b"
+    },
+    {
+      "project": "sortedcontainers",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sortedcontainers-plan.md",
+        "sha256": "70838f4710eda32e8f31871fda7c6c8cda976aa2bbd1a0449a42de79825e8526"
+      },
+      "manifest_sha256": "63eb88fd288d399ea6598e1373d12157ac1477a14942ef742ebd2ec83d0ad922"
+    },
+    {
+      "project": "sqlglot",
+      "scenarios": 5,
+      "tasks": 8,
+      "modifications": 1,
+      "branches": 1,
+      "entries": 6,
+      "native_tasks": 7,
+      "business_cases": 12,
+      "kinds": {
+        "understand": 3,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1,
+        "modify": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sqlglot-plan.md",
+        "sha256": "c8039ef91153fbfcfeaf00cae51cf7a1d180e02de0b909216f34466d118bec25"
+      },
+      "manifest_sha256": "ca3941e51a8e6d4c1ead7fc519015ed25fc09c1c8fc82868335c6ad9a2f67aa0"
+    },
+    {
+      "project": "tablib",
+      "scenarios": 5,
+      "tasks": 6,
+      "modifications": 1,
+      "branches": 1,
+      "entries": 6,
+      "native_tasks": 5,
+      "business_cases": 10,
+      "kinds": {
+        "understand": 2,
+        "consult": 1,
+        "plan": 1,
+        "modify": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/tablib-plan.md",
+        "sha256": "07840a30d47207c726806dd689f34e2c5d018cc442b904ecb2de96ab3c073cb3"
+      },
+      "manifest_sha256": "86e5c51d9a5aa0e05518a8a0fb39e6143390d711b2ffb759c79a68aaed84c88a"
+    },
+    {
+      "project": "textdistance",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/textdistance-plan.md",
+        "sha256": "bfb1a98b83437c0b82b2e7519eb47126064aeb5b53764d7d862f12a506a5e465"
+      },
+      "manifest_sha256": "e979f8e21f2952b6df030f7f0d669f1848455830a2bc41703f00560e1b2f7fb3"
+    },
+    {
+      "project": "transitions",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/transitions-plan.md",
+        "sha256": "0c761f6da348f56443b6d793fd842c31caabbce77dcf8c15247214f92b354e48"
+      },
+      "manifest_sha256": "45d31b3f02df88eafa13040edc09bedb0f14c61cf53c8d1ef235049f90e33eb5"
+    },
+    {
+      "project": "webcolors",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/webcolors-plan.md",
+        "sha256": "0557b9ea181e366ba65aeb5e6c24947fdae915269257e0ee3282551041220947"
+      },
+      "manifest_sha256": "775f22e91cf3935d7eccb2a35f4b47f5a5534e270d7c375145855e4d55dbd698"
+    },
+    {
+      "project": "wrapt",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/wrapt-plan.md",
+        "sha256": "5d4edae1efa834b9083d2df38fb1827a47f8b6674017245c7dc7992bdaa9c962"
+      },
+      "manifest_sha256": "731e2e587b0e8b12a4a0f1d4432c95bf828bfd441bbb9ebae32baaa8aa1ecf45"
+    },
+    {
+      "project": "wtforms",
+      "scenarios": 4,
+      "tasks": 6,
+      "modifications": 0,
+      "branches": 1,
+      "entries": 5,
+      "native_tasks": 5,
+      "business_cases": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "dependencies": [],
+      "plan": {
+        "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/wtforms-plan.md",
+        "sha256": "9d50bb5aeef31c559cf2e7ce862034049b81eda44bf68547db0472a67b9ad05a"
+      },
+      "manifest_sha256": "6ce643f5aa94e6ee9ca7c29c55eb74cc18a84927cce231a785a6e40ef8b2e72d"
+    }
+  ]
+}

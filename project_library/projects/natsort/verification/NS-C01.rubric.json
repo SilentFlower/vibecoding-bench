@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "NS-C01",
+  "source_commit": "e9a3a2a307580a1f2be8c57bba50fba45789ada0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default gives Folder (1)/,Folder (10)/,Folder/;PATH gives Folder/ first,then numbered siblings,using path components. Select PATH for the supplied display contract and test extensions and nested paths. Sorting strings does not resolve paths,verify existence or enforce a safe filesystem boundary.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

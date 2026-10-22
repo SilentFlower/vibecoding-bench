@@ -1,0 +1,1 @@
+mapping=SortedDict({3:"A",1:"Z",2:"B",4:"Y"});view=mapping.values();snapshot=list(view);del mapping.keys()[1:3]. Explain snapshot,the live view and final mapping items after the complete sequence. Values are ordered by keys,not by their own alphabetic order. Deletion uses sorted rank positions. No edits.

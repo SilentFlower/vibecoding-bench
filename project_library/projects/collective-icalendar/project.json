@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "collective-icalendar",
+  "title": "Icalendar日程接入工作场景",
+  "category": "日期、属性与重复日程",
+  "description": "全天结束边界、TEXT转义、参与者参数、时间表示、重复日程方案及时长表示诊断。",
+  "seed_digest": "0657a14b9155f1780a48cde12f0a6a78807a2e1ec78228b7f8984aa35a9118d1",
+  "environment": "collective-icalendar-py312",
+  "source": {
+    "repository": "https://github.com/collective/icalendar",
+    "commit": "3ecf079acba0e592ea6a40c456514984c8657852",
+    "license_files": [
+      "seed/library/LICENSE.rst"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "IC-S01",
+      "title": "日历值语义",
+      "goal": "保留日期类型和文本内容",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IC-U01",
+            "IC-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IC-U01",
+          "kind": "understand",
+          "goal": "解释全天事件的日期和结束边界",
+          "prompt": "Create Event with DTSTART=date(2026,10,22). Inspect inferred end,then add DTEND=date(2026,10,23),serialize/reparse and inspect native date type and duration. Explain inclusive start/non-inclusive end from the supplied Event contract. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/ic-u01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IC-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/IC-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "IC-U02",
+          "kind": "understand",
+          "goal": "解释日历TEXT的转义与往返",
+          "prompt": "Set SUMMARY to the exact literal \"计划,项目;路径\\test\" followed by a newline and \"说明\". Serialize Event to bytes and reparse. Explain Unicode,comma,semicolon,backslash,newline and CRLF handling. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/ic-u02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IC-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/IC-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "IC-S02",
+      "title": "日程接入咨询",
+      "goal": "明确参与者和时间表示",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IC-C01",
+            "IC-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IC-C01",
+          "kind": "consult",
+          "goal": "保留多个参与者及各自参数",
+          "prompt": "Add a vCalAddress mailto:a@example.invalid with ROLE=REQ-PARTICIPANT as attendee,then add mailto:b@example.invalid using ATTENDEE. Compare property shape before/after,case-insensitive lookup and serialized/reparsed per-value parameters. Advise an import representation. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/ic-c01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IC-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/IC-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "IC-C02",
+          "kind": "consult",
+          "goal": "区分浮动时间、命名时区和UTC",
+          "prompt": "Serialize/reparse DTSTART for2026-10-22 09:00 as naive datetime,Europe/Berlin aware datetime and UTC aware datetime. Compare content-line forms and decoded offsets. Advise cross-user scheduling input. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/ic-c02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IC-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/IC-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "IC-S03",
+      "title": "重复日程方案",
+      "goal": "界定展开、例外和身份",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IC-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IC-P01",
+          "kind": "plan",
+          "goal": "规划重复日程的展开与身份",
+          "prompt": "A synthetic Calendar holds one VEVENT with UID=recurrence-local-001,UTC DTSTART2026-01-01 09:00,RRULE FREQ=DAILY;COUNT=3 and fixed DTSTAMP. Compare walk(\"VEVENT\") count with the rule count. Plan occurrence display/import,windowing,exception identity and validation. No implementation or real calendar access.",
+          "requires": [],
+          "materials": [
+            "materials/ic-p01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IC-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/IC-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "IC-S04",
+      "title": "结束表示诊断",
+      "goal": "核对实际属性修改顺序",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IC-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "IC-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IC-D01",
+          "kind": "diagnose",
+          "goal": "诊断设置时长后DTEND为何消失",
+          "prompt": "A calendar export loses an explicit DTEND after editing duration. Request complete property mutation order,typed start/end/duration and serialized before/after controls. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IC-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "duration-representation",
+              "when": "Mutation order,typed values and before/after controls have not been supplied or declared unavailable and are reasonably requested.",
+              "materials": [
+                "disclosure/duration-setter.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

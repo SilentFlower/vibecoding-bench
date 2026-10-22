@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "WC-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "percentage_conversion_quantizes_and_named_reverse_lookup_loses_alias_spelling": true
+  },
+  "resource_profile": "business"
+}

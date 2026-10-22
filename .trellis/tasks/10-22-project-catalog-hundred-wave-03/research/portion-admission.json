@@ -1,0 +1,138 @@
+{
+  "project": "portion",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+  "source_file_count": 26,
+  "license_files": [
+    "seed/library/LICENSE.txt"
+  ],
+  "scenarios": 3,
+  "unique_tasks": 5,
+  "modify_tasks": 0,
+  "non_modify_tasks": 5,
+  "native_baseline": {
+    "project": "portion",
+    "attempt": 1,
+    "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/portion/result.json",
+    "result_sha256": "464226b13e4d5a42fa8224b288c46d88b99bbeba142fae7de91f6d02d93e1ad9",
+    "main_collected": 241,
+    "counts": {
+      "passed": 230,
+      "failed": 0,
+      "error": 0,
+      "skipped": 11,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "subtest_count": 0,
+    "collection_skip_count": 0,
+    "xml_testcases": 241,
+    "xml_skipped": 11,
+    "runner_sha256": "4142098c7cd0e2c9f184a12de1d6209ce9ac61c318ef469e21c6fe362556b479",
+    "contract_sha256": "c7b426ffb555759e70d0b6c17e7182aff584f86d0e4c2168121a544f6582c236",
+    "business": {
+      "timeout_sec": 30,
+      "memory_mb": 256,
+      "pids_limit": 64
+    },
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+  },
+  "verified_unique_native_cases": 5,
+  "native_evidence": [
+    {
+      "case": "original-PT-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/portion/attempt-002/original-PT-C01.json",
+      "sha256": "f449a3ef5641256fb6a42b987201a5677c40ac5e64d8155de3d7c23daf0a97b3",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PT-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/portion/attempt-002/original-PT-C02.json",
+      "sha256": "a6c0720b709ebd45f5b21e8f24c3dd569d72144364012837a42312eb13ac116f",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PT-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/portion/attempt-002/original-PT-P01.json",
+      "sha256": "b5eabe3bcf4727bf4c98a82692e3196424d5302766255697340c3adb49bc65ec",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PT-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/portion/attempt-002/original-PT-U01.json",
+      "sha256": "46ce89f8385ce5fa70fd73ae4a12b0ab952a5c3736b1b3132d12c0f1b04b5631",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PT-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/portion/attempt-002/original-PT-U02.json",
+      "sha256": "80074132919f129aa2ddb91965d4a72068025d70a7b57a23ebc5b16f30d78dab",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-03/business/portion/attempt-001/summary.json",
+      "sha256": "95d194bef273aeb9fc2649749b34c7f8f12ec7c5dac2e73a79f0d7f7ac4d1424",
+      "passed": false
+    },
+    {
+      "attempt": 2,
+      "summary": ".deploy/project-catalog-hundred/stage-03/business/portion/attempt-002/summary.json",
+      "sha256": "3aa8a967451965a884a5e8607076b01ff33de6eb71aaab3cd27397ea90174b7a",
+      "passed": true
+    }
+  ],
+  "additional_original_native": [],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v31-en",
+  "formal_digest": "422f5e592ae1701f026ec77427c846db1f425a14649137f13b5e91833f8da012",
+  "full_delivery_files": 27068,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-007/run-001/evidence/result.json",
+      "sha256": "445a6ffa0e23259794a0d141e72694a95272f15ca160587b296d039e6c652e14"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-007/run-001/cleanup.json",
+      "sha256": "abcfac8ed16cb038188f286559c1572572d75a3b885c2fde074d637bff81c738"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-007-audit.json",
+      "sha256": "68aacc5a9f9810c29561ce81577d6f47d420ead9d74becaebf94c0aa8e3ba9b8"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-007/browser/run-001/diagnostics/result.json",
+      "sha256": "97121419488fd81812a6c8f9cb6ac68f737aea0b0b1026ac2300f045488dc21e"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/delivery-first-fourteen.json",
+      "sha256": "265330fbf15c5f07223b1374f17cb76da9826106ac10b420acfa998adf63ade6"
+    }
+  ]
+}

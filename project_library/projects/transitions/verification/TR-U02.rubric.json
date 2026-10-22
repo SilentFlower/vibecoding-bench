@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TR-U02",
+  "source_commit": "bd42b38f3627e6bca7274fb4d9af2e105f75da7c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The first enabled transition wins:True reaches b;False skips it and reaches c. Registration order is business priority,so an unconditional earlier transition would shadow later candidates. Guards should be side-effect aware and fallback placement explicit;this does not evaluate all targets or merge outcomes.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

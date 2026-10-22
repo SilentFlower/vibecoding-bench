@@ -1,0 +1,14 @@
+{
+  "unused_frozen_bundle": "mock-batch-014",
+  "executed": false,
+  "replacement": "mock-batch-014-final-three",
+  "projects": [
+    "wrapt",
+    "pendulum",
+    "collective-icalendar"
+  ],
+  "reason": "SQLGlot固定来源受阻，最后三个可访问项目同组验证；沿原两许可并发，不把单项目分组误当已覆盖两许可机制",
+  "source_evidence": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/freeze_mock_batch.py支持实际可变项目清单，formal_scenarios.py核两holder上限",
+  "task_tree_changed": false,
+  "authorization_changed": false
+}

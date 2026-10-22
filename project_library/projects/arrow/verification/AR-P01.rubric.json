@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AR-P01",
+  "source_commit": "2224255c4acc594d734cef0bbc83360452a67983",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The pinned Paris spring/autumn local days span23 and25 physical hours by UTC timestamps. Retain the chosen zone/rule provenance,derive next local midnight using calendar semantics and pair UTC boundaries with an application-owned start<=event<end predicate. Test endpoint events belong to exactly one partition and normal-day controls;do not add fixed86400 seconds or assume span tuple/subtraction itself enforces physical duration or storage policy.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

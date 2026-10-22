@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CD-P01",
+  "source_commit": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both latin1 andcp1252 produce Café and round-trip the exact supplied bytes,so those controls cannot select original encoding. Preserve immutable original bytes and source metadata,detector version/settings/chunking,label/confidence and uncertainty;record strict decoding outcomes and normalized text separately. Define unsupported/error/manual policies without treating confidence or roundtrip as source provenance.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

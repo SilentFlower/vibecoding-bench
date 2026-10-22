@@ -1,0 +1,25 @@
+{
+  "scope": "任务冻结前的实际宿主复现；须在目标镜像再验",
+  "items": [
+    {
+      "text": "Café €",
+      "raw_hex": "efbbbf436166c3a920e282ac",
+      "encoding": "shift_jis_2004",
+      "bom": false,
+      "matches_text": false,
+      "raw_preserved": true,
+      "output_has_bom": false,
+      "strict_decode": true
+    },
+    {
+      "text": "The café serves tea every morning. Prices are shown in euros: €5. The café serves tea every morning. Prices are shown in euros: €5. The café serves tea every morning. Prices are shown in euros: €5. The café serves tea every morning. Prices are shown in euros: €5. The café serves tea every morning. Prices are shown in euros: €5. The café serves tea every morning. Prices are shown in euros: €5. ",
+      "raw_hex": "efbbbf54686520636166c3a92073657276657320746561206576657279206d6f726e696e672e20507269636573206172652073686f776e20696e206575726f733a20e282ac352e2054686520636166c3a92073657276657320746561206576657279206d6f726e696e672e20507269636573206172652073686f776e20696e206575726f733a20e282ac352e2054686520636166c3a92073657276657320746561206576657279206d6f726e696e672e20507269636573206172652073686f776e20696e206575726f733a20e282ac352e2054686520636166c3a92073657276657320746561206576657279206d6f726e696e672e20507269636573206172652073686f776e20696e206575726f733a20e282ac352e2054686520636166c3a92073657276657320746561206576657279206d6f726e696e672e20507269636573206172652073686f776e20696e206575726f733a20e282ac352e2054686520636166c3a92073657276657320746561206576657279206d6f726e696e672e20507269636573206172652073686f776e20696e206575726f733a20e282ac352e20",
+      "encoding": "utf_8",
+      "bom": true,
+      "matches_text": true,
+      "raw_preserved": true,
+      "output_has_bom": false,
+      "strict_decode": true
+    }
+  ]
+}

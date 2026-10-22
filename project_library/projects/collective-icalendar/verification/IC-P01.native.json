@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "IC-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "walking_a_recurring_event_returns_the_stored_component_not_expanded_occurrences": true
+  },
+  "resource_profile": "business"
+}

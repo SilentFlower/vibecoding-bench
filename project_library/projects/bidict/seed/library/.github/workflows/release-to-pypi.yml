@@ -1,0 +1,32 @@
+name: release to pypi.org
+
+"on":
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+
+jobs:
+  main:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - name: install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
+      - name: build distributions
+        # This uv is the flake's, which is also the build backend: uv build uses its own
+        # built-in uv_build whenever that uv satisfies pyproject.toml's [build-system]
+        # requires, and only fetches uv_build from PyPI otherwise. Either way, that floor
+        # is what keeps a too-old backend from writing the wheel's RECORD (#406).
+        run: nix develop .#build --command uv build
+      - name: check distributions
+        run: nix develop .#build --command ./check_dist
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+permissions:
+  contents: read

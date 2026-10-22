@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "webcolors",
+  "title": "Webcolors主题颜色工作场景",
+  "category": "颜色规范、校验与往返数据",
+  "description": "命名范围、简写和严格格式、通道裁剪、历史恢复、量化与别名策略及注册表诊断。",
+  "seed_digest": "239d7479796697ce2d335bd05dbe01337ad53097d1df6df836464df61b73cf44",
+  "environment": "webcolors-py312",
+  "source": {
+    "repository": "https://github.com/ubernostrum/webcolors",
+    "commit": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "WC-S01",
+      "title": "颜色输入合同",
+      "goal": "按规范选择表示",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "WC-U01",
+            "WC-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WC-U01",
+          "kind": "understand",
+          "goal": "解释命名颜色的规范范围",
+          "prompt": "Compare name_to_hex(\"orange\",spec=\"html4\") and spec=\"css21\";also name_to_hex(\"GRAY\",spec=\"css3\"). Explain membership and case normalization. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/wc-u01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WC-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/WC-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "WC-U02",
+          "kind": "understand",
+          "goal": "区分简写归一化与严格颜色格式",
+          "prompt": "Compare normalize_hex(\"#AbC\"), html5_parse_simple_color(\"#abc\") and html5_parse_simple_color(\"#aabbcc\"). Explain the accepted representations. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/wc-u02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WC-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/WC-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "WC-S02",
+      "title": "颜色校验咨询",
+      "goal": "区分归一化与严格拒绝",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "WC-C01",
+            "WC-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WC-C01",
+          "kind": "consult",
+          "goal": "明确通道越界时的拒绝策略",
+          "prompt": "Compare normalize_integer_triplet((300,-5,128)) and rgb_to_hex((300,-5,128)). Advise a strict theme-upload validation contract without implementing it.",
+          "requires": [],
+          "materials": [
+            "materials/wc-c01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WC-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/WC-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "WC-C02",
+          "kind": "consult",
+          "goal": "避免历史兼容算法接受无效颜色",
+          "prompt": "Compare html5_parse_legacy_color(\"chucknorris\") with html5_parse_simple_color(\"chucknorris\"). Advise whether legacy parsing should validate new theme settings. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/wc-c02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WC-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/WC-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "WC-S03",
+      "title": "颜色存储方案",
+      "goal": "保留原值、精度与别名",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "WC-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WC-P01",
+          "kind": "plan",
+          "goal": "规划颜色规范化与原始值保存",
+          "prompt": "Convert (\"30%\",\"50%\",\"70%\") to integer RGB and back to percentages. Compare aqua/cyan to hex and reverse #00ffff to a name. Plan theme storage,display and audit fields with explicit precision/alias policy. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/wc-p01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WC-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/WC-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "WC-S04",
+      "title": "颜色注册表诊断",
+      "goal": "核对真实往返路径",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "WC-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "WC-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WC-D01",
+          "kind": "diagnose",
+          "goal": "诊断CSS4颜色往返不一致",
+          "prompt": "A named-color roundtrip rejects rebeccapurple. Request pinned version,exact forward/reverse calls,spec and exception before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WC-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "css4-forward-registry",
+              "when": "Exact pinned version,calls,spec and exception have not been supplied or declared unavailable and are reasonably requested.",
+              "materials": [
+                "disclosure/css4-registry.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

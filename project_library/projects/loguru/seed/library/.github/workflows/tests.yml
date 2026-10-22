@@ -1,0 +1,85 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  schedule:
+  - cron: 0 0 * * 0
+
+jobs:
+  tests:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+        - ubuntu-22.04
+        python-version:
+        - '3.7'
+        - '3.8'
+        - '3.9'
+        - '3.10'
+        - '3.11'
+        - '3.12'
+        - '3.13'
+        - '3.14'
+        - 3.15-dev
+        - pypy-3.12
+        allow-failure:
+        - false
+        include:
+        - os: ubuntu-22.04
+          python-version: '3.5'
+          allow-failure: false
+          container: python:3.5-slim
+        - os: ubuntu-22.04
+          python-version: '3.6'
+          allow-failure: false
+          container: python:3.6-slim
+        - os: windows-2022
+          python-version: '3.12'
+          allow-failure: false
+        - os: macos-15
+          python-version: '3.12'
+          allow-failure: false
+    runs-on: ${{ matrix.os }}
+    # Some versions of Python are not longer supported by GitHub Actions.
+    # For those, we use a container image and skip the setup-python step.
+    # It will be empty and ignored for the other matrix entries.
+    container: ${{ matrix.container }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+    - name: Set up Python
+      if: ${{ matrix.container == null }}
+      uses: actions/setup-python@v7
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install tox
+    - name: Run tests
+      run: |
+        tox -e tests
+      continue-on-error: ${{ matrix.allow-failure }}
+    - name: Upload coverage data
+      uses: actions/upload-artifact@v7
+      with:
+        name: coverage-${{ matrix.python-version }}-${{ matrix.os }}
+        path: coverage.xml
+      continue-on-error: ${{ matrix.allow-failure }}
+  push-coverage-to-codecov:
+    runs-on: ubuntu-22.04
+    needs: tests
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+    - name: Download artifacts
+      uses: actions/download-artifact@v8
+    - name: Upload to Codecov
+      uses: codecov/codecov-action@v7
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        verbose: true
+        fail_ci_if_error: true

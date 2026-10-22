@@ -1,0 +1,122 @@
+# This name appears as the text in the build badge: https://github.com/jab/bidict/actions/workflows/test.yml/badge.svg
+name: tests
+
+"on":
+  workflow_dispatch:
+    inputs:
+      hypothesis_profile:
+        type: choice
+        description: (optional)
+        options:
+        - less-examples
+        - more-examples
+  schedule:
+    - cron: "15 16 * * *"
+  push:
+    branches:
+      - main
+      - dev
+      - deps
+  pull_request:
+    branches:
+      - main
+
+# A push to a pull request supersedes any run still in progress for an earlier push, so cancel
+# that run rather than make the new one wait for it. Each run for any other event gets a group
+# of its own, so always runs to completion.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FORCE_COLOR: "1"
+
+jobs:
+  test-all:
+    name: ${{ matrix.python }}
+    runs-on: ubuntu-24.04
+    continue-on-error: ${{ matrix.allow_failure || false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: "3.15"
+            shell: test315
+            # TODO: Drop allow_failure once 3.15 is stable:
+            allow_failure: true
+          - python: "3.14"
+            shell: test314
+            enable_coverage: true
+          - python: "3.13"
+            shell: test313
+          - python: "3.12"
+            shell: test312
+          - python: "3.11"
+            shell: test311
+            # bidict/_typing.py's `typing`/`typing_extensions` imports branch on python<3.12
+            enable_coverage: true
+          - python: "pypy-3.11"
+            shell: testPyPy311
+    steps:
+      - name: check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - name: install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
+      - name: cache the Nix store
+        uses: DeterminateSystems/magic-nix-cache-action@908b263ff629f4cc17666315b7fd3ec127c6244d
+        with:
+          # Use only the GitHub Actions cache; we don't authenticate to FlakeHub, and leaving it
+          # enabled makes the action log a noisy (non-fatal) "Cannot find netrc credentials for
+          # https://api.flakehub.com/" error before falling back to the GHA cache.
+          use-flakehub: false
+          use-gha-cache: true
+      - name: set hypothesis profile
+        # Both choices are profiles bidict registers in tests/conftest.py, so no run lands on
+        # hypothesis's built-in `default`, whose wall-clock deadline fails tests for being slow
+        # on their first call. Using less-examples here also stops CI, which gates merges, from
+        # generating fewer examples than a plain local `pytest` does.
+        run: |
+          hypothesis_profile=${{ github.event.inputs.hypothesis_profile || (github.event_name == 'schedule' && 'more-examples' || 'less-examples') }}
+          echo PYTEST_ADDOPTS="$PYTEST_ADDOPTS --hypothesis-profile=$hypothesis_profile" >> "$GITHUB_ENV"
+      - name: cache .hypothesis dir
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: .hypothesis
+          key: hypothesis|${{ runner.os }}|${{ matrix.python }}
+      - name: maybe enable coverage
+        if: matrix.enable_coverage
+        run: |
+          echo RUN_PYTEST_CMD="coverage run -m pytest" >> "$GITHUB_ENV"
+      - name: run ty and pytest
+        run: |
+          nix develop .#${{ matrix.shell }} --command bash -c "
+            set -euo pipefail
+            ty check
+            \${RUN_PYTEST_CMD:-pytest}
+          "
+      - name: combine and show any collected coverage
+        if: matrix.enable_coverage
+        run: |
+          nix develop .#${{ matrix.shell }} --command bash -c '
+            coverage combine
+            coverage debug data
+            coverage report
+            coverage xml
+          '
+      - name: maybe upload to Codecov  # https://github.com/codecov/codecov-action
+        if: matrix.enable_coverage
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          # Upload only the report written above. coverage.py is on PATH only inside the Nix shell,
+          # so the action can't generate a report itself, and its search of the workspace for
+          # coverage files matches the Nix shell venvs' `coverage-3.x` scripts instead.
+          files: coverage.xml
+          disable_search: true
+          verbose: true
+          fail_ci_if_error: false  # https://github.com/codecov/codecov-action/issues/557
+
+
+permissions:
+  contents: read

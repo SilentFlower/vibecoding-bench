@@ -1,0 +1,1 @@
+Convert exactly <table><tr><td>tea</td><td>3</td></tr><tr><td>book</td><td>8</td></tr></table> under default options and table_infer_header=True. The supplier says both rows are products,not a header. Explain the actual Markdown rows and advise an appropriate header policy. No edits.

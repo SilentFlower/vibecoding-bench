@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TB-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "csv_headers_and_cell_values_are_explicit_text_contracts": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,1 @@
+Create two FeedGenerator instances. Add first,second,third by add_entry().id(name) on one and add_entry(order="append").id(name) on the other. Inspect IDs returned by entry(). Explain actual order before choosing a document listing policy. No edits.

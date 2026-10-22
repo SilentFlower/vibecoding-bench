@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "libraries": [
+    {
+      "path": "artifacts/gettext-libs/libgettextsrc-0.21.so",
+      "sha256": "6d823bbf8985429464b6155373983a0d30b7cf6b646f4c7321d1bf8f72f63081"
+    },
+    {
+      "path": "artifacts/gettext-libs/libgettextlib-0.21.so",
+      "sha256": "8afb21358ea53bcd669dc09d881b33d04f1662f484610b117f72c6bd3d37358d"
+    }
+  ]
+}

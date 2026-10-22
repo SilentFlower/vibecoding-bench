@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SG-U03",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "There are two output positions but one mapping key x. At this fixed commit its expression is orders.quantity AS x. A name-keyed mapping cannot faithfully identify both duplicate output positions. Require unique aliases for this workflow or design a separately authorized positional contract;do not invent an existing positional lineage API.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,173 @@
+{
+  "project": "pendulum",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "e06dacedc4cdea90fa1286b3965d180ab94cf251",
+  "source_file_count": 290,
+  "license_files": [
+    "seed/library/LICENSE",
+    "seed/app/babel-2.18-LICENSE.txt",
+    "seed/app/babel-2.18-LICENSE.unicode.txt",
+    "seed/app/rust-licenses/heck-0.5.0/LICENSE-APACHE",
+    "seed/app/rust-licenses/heck-0.5.0/LICENSE-MIT",
+    "seed/app/rust-licenses/libc-0.2.190/LICENSE-APACHE",
+    "seed/app/rust-licenses/libc-0.2.190/LICENSE-MIT",
+    "seed/app/rust-licenses/once_cell-1.21.4/LICENSE-APACHE",
+    "seed/app/rust-licenses/once_cell-1.21.4/LICENSE-MIT",
+    "seed/app/rust-licenses/portable-atomic-1.15.0/LICENSE-APACHE",
+    "seed/app/rust-licenses/portable-atomic-1.15.0/LICENSE-MIT",
+    "seed/app/rust-licenses/proc-macro2-1.0.107/LICENSE-APACHE",
+    "seed/app/rust-licenses/proc-macro2-1.0.107/LICENSE-MIT",
+    "seed/app/rust-licenses/pyo3-0.29.3/LICENSE-APACHE",
+    "seed/app/rust-licenses/pyo3-0.29.3/LICENSE-MIT",
+    "seed/app/rust-licenses/pyo3-0.29.3/pyo3-runtime/LICENSE-APACHE",
+    "seed/app/rust-licenses/pyo3-0.29.3/pyo3-runtime/LICENSE-MIT",
+    "seed/app/rust-licenses/pyo3-build-config-0.29.3/LICENSE-APACHE",
+    "seed/app/rust-licenses/pyo3-build-config-0.29.3/LICENSE-MIT",
+    "seed/app/rust-licenses/pyo3-ffi-0.29.3/LICENSE-APACHE",
+    "seed/app/rust-licenses/pyo3-ffi-0.29.3/LICENSE-MIT",
+    "seed/app/rust-licenses/pyo3-macros-0.29.3/LICENSE-APACHE",
+    "seed/app/rust-licenses/pyo3-macros-0.29.3/LICENSE-MIT",
+    "seed/app/rust-licenses/pyo3-macros-backend-0.29.3/LICENSE-APACHE",
+    "seed/app/rust-licenses/pyo3-macros-backend-0.29.3/LICENSE-MIT",
+    "seed/app/rust-licenses/quote-1.0.47/LICENSE-APACHE",
+    "seed/app/rust-licenses/quote-1.0.47/LICENSE-MIT",
+    "seed/app/rust-licenses/syn-2.0.119/LICENSE-APACHE",
+    "seed/app/rust-licenses/syn-2.0.119/LICENSE-MIT",
+    "seed/app/rust-licenses/target-lexicon-0.13.5/LICENSE",
+    "seed/app/rust-licenses/unicode-ident-1.0.26/LICENSE-APACHE",
+    "seed/app/rust-licenses/unicode-ident-1.0.26/LICENSE-MIT",
+    "seed/app/rust-licenses/unicode-ident-1.0.26/LICENSE-UNICODE"
+  ],
+  "scenarios": 4,
+  "unique_tasks": 6,
+  "modify_tasks": 0,
+  "non_modify_tasks": 6,
+  "native_baseline": {
+    "project": "pendulum",
+    "attempt": 1,
+    "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/pendulum/result.json",
+    "result_sha256": "d1944b518d35e227194b801921a652a7ae6cb9f74f0a2c0879a67380a3a141bc",
+    "main_collected": 1874,
+    "counts": {
+      "passed": 1871,
+      "failed": 0,
+      "error": 0,
+      "skipped": 3,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "subtest_count": 0,
+    "collection_skip_count": 0,
+    "xml_testcases": 1874,
+    "xml_skipped": 3,
+    "runner_sha256": "4acca1633aea0ca25b4b8ced785d1b234c769e0d7223c4395cec519ed1391f14",
+    "contract_sha256": "5d3ed8026621d61a288b1617f1a159e0c0e9223fc9c7d3a347bf3d28a5c9bcd1",
+    "business": {
+      "timeout_sec": 30,
+      "memory_mb": 256,
+      "pids_limit": 64
+    },
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 768,
+      "pids_limit": 128
+    },
+    "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+  },
+  "verified_unique_native_cases": 5,
+  "native_evidence": [
+    {
+      "case": "original-PN-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pendulum/attempt-001/original-PN-C01.json",
+      "sha256": "3e0c747c863c8172f32464d34c5722af077c06797b4aa35201ff84f0bf3c7207",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PN-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pendulum/attempt-001/original-PN-C02.json",
+      "sha256": "633ac6aae4cb4cc38756637668a87cfd56e30ee599fde585002f815f90636655",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PN-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pendulum/attempt-001/original-PN-P01.json",
+      "sha256": "9a1e6ca8b3b3855cfe1effff28e85d0cf077d0600bfdc61ca331da8701b3a603",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PN-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pendulum/attempt-001/original-PN-U01.json",
+      "sha256": "ecf86d58fbccfede8e4d57e95cb3d58ba5079a3b935d6b6a66ca48fb510e7f9b",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PN-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pendulum/attempt-001/original-PN-U02.json",
+      "sha256": "2d2b6e67bb0756c164ed06b7ff989adfc726722ed628bbb95e9a1b75a06c3129",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-03/business/pendulum/attempt-001/summary.json",
+      "sha256": "3aa8a967451965a884a5e8607076b01ff33de6eb71aaab3cd27397ea90174b7a",
+      "passed": true
+    }
+  ],
+  "additional_original_native": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/additional-native/attempt-002/pendulum/result.json",
+      "sha256": "2cf3be7ace33022adffe0d7c9a3fd398b9b7c397fb4dab2d4748a53ad805adf4",
+      "library_digest": "082faee2a01b1c084e3f03971bdd2e9a000c155ed3ebe38b1db97c287a86c5df",
+      "collected": 1874,
+      "passed": 1871,
+      "scope": "固定原版额外官方集合；不是可修改候选回归"
+    }
+  ],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v35-en",
+  "formal_digest": "59c2eb3fb24872d5df860274d747efa4b1b7040d3b665f0ae8d7b6384dc9f5a6",
+  "full_delivery_files": 31139,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-014-final-three/run-001/evidence/result.json",
+      "sha256": "c25498a254da2cc675d1fa21e25c72baffa1ee3f2538c77b066f7dd4192cb359"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-014-final-three/run-001/cleanup.json",
+      "sha256": "c0a1a98baabba33b8431fdd360448b0d478b540abfa3e452115d136cf88a3b72"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-014-final-three-audit.json",
+      "sha256": "37fbbd088037a5718e9b83d728999d4ac6221ce8a69397230d5fe04b410b7f2b"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-014-final-three/browser/run-001/diagnostics/result.json",
+      "sha256": "935ba99308670b173e3fc2b6890c8ec23048a994f039643722ff2c5cde436f15"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/delivery-twenty-seven-local.json",
+      "sha256": "db2ef85f2c0d03324603928e4a0f44a3bceab413e19b2f31a5088afd44f5d5ef"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Inspect SELECT 1 AS n UNION SELECT 2 AS n INTERSECT SELECT 3 AS n read as postgres and generated for sqlite. Compare executing the raw generated SQL,adding direct parentheses around the INTERSECT operand,and using SELECT 1 AS n UNION SELECT * FROM (SELECT 2 AS n INTERSECT SELECT 3 AS n). Recommend a bounded migration control;no library edits.

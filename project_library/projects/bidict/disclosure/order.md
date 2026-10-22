@@ -1,0 +1,1 @@
+Pinned OrderedBidict x=[("a",1),("b",2)] and y=[("b",2),("a",1)] yield x==y True, list(x.items())!=list(y.items()) True, and x.equals_order_sensitive(y) False. They are distinct objects and no mutation occurs during comparison. The business report needs to detect reordered associations.

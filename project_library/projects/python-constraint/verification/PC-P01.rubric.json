@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PC-P01",
+  "source_commit": "d91ba03d1fd6acc30d64fd9d513dc0523f697b5b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use the existing callable a+2<=b or b+1<=a with explicit argument order. Exact pairs are(9,11),(10,9),(11,9),(11,10),matching brute force. Different start times alone incorrectly admit overlapping9/10;touching9/11 is legal under the declared half-open policy. Own time units,durations,capacity and validation cases before extending the model;this is not a new built-in NoOverlap or optimization feature.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

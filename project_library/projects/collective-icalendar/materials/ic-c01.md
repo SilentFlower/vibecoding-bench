@@ -1,0 +1,1 @@
+Add a vCalAddress mailto:a@example.invalid with ROLE=REQ-PARTICIPANT as attendee,then add mailto:b@example.invalid using ATTENDEE. Compare property shape before/after,case-insensitive lookup and serialized/reparsed per-value parameters. Advise an import representation. No implementation.

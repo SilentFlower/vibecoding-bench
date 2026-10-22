@@ -1,0 +1,36 @@
+{
+  "PC-U01": {
+    "candidate_import": true,
+    "finite_schedule_solutions_are_sets_without_a_ranking_contract": true
+  },
+  "PC-U02": {
+    "candidate_import": true,
+    "single_name_order_does_not_project_the_solution_in_this_revision": true
+  },
+  "PC-C01": {
+    "candidate_import": true,
+    "heuristic_none_is_not_a_certificate_of_unsatisfiability": true
+  },
+  "PC-C02": {
+    "candidate_import": true,
+    "multi_variable_domains_must_be_reusable_instead_of_a_shared_single_pass_generator": true
+  },
+  "PC-P01": {
+    "candidate_import": true,
+    "duration_aware_half_open_nonoverlap_differs_from_all_different_start_times": true
+  },
+  "PC-D01": {
+    "candidate_import": true,
+    "weighted_solutions": [],
+    "brute_force_solutions": [
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        2
+      ]
+    ]
+  }
+}

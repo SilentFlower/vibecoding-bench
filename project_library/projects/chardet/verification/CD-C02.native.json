@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CD-C02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "a_detected_encoding_label_may_not_name_a_python_codec": true
+  },
+  "resource_profile": "business"
+}

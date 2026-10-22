@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MD-U01",
+  "source_commit": "bc98c9e134ec55b2853716ab859754f061cb7054",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Stripping strong preserves its child content and nested em conversion,producing Hello paid *today*. Default script conversion removes its text,but strip=[script] bypasses that converter and exposes window.secret=7. strip selects tag-conversion suppression,not subtree deletion;own content omission separately.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

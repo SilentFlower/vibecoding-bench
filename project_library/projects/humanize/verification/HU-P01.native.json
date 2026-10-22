@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "HU-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "thread_local_translation_state_is_shared_between_async_tasks": true
+  },
+  "resource_profile": "business"
+}

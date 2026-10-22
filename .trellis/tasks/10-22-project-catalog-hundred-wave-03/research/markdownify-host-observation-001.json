@@ -1,0 +1,20 @@
+{
+  "MD-U01": {
+    "error": "ModuleNotFoundError:No module named 'bs4'"
+  },
+  "MD-U02": {
+    "error": "ModuleNotFoundError:No module named 'bs4'"
+  },
+  "MD-C01": {
+    "error": "ModuleNotFoundError:No module named 'bs4'"
+  },
+  "MD-C02": {
+    "error": "ModuleNotFoundError:No module named 'bs4'"
+  },
+  "MD-P01": {
+    "error": "ModuleNotFoundError:No module named 'bs4'"
+  },
+  "MD-D01": {
+    "error": "ModuleNotFoundError:No module named 'bs4'"
+  }
+}

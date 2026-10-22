@@ -1,0 +1,11 @@
+iniconfig==2.3.1
+packaging==26.3
+pluggy==1.7.0
+py-cpuinfo2==10.1.1
+Pygments==2.21.0
+pytest==9.1.1
+pytest-benchmark==5.3.0
+python-dateutil==2.9.0.post0
+six==1.17.0
+time-machine==3.5.1
+tzdata==2026.5

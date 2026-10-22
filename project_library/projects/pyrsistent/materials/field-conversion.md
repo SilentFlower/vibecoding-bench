@@ -1,0 +1,1 @@
+Declare Item(PClass) with count=field(type=int,mandatory=True),and ConvertedItem(PClass) with count=field(type=int,mandatory=True,factory=int). Compare Item(count="3"),ConvertedItem(count="3"),and Item(count=3). Advise explicit input conversion and handling invalid conversion/type evidence. Type declaration alone must not be described as coercion. No edits.

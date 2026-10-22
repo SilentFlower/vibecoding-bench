@@ -1,0 +1,178 @@
+{
+  "schema": 2,
+  "project_key": "pyrsistent",
+  "title": "Pyrsistent状态快照工作场景",
+  "category": "不可变状态与记录验收",
+  "description": "嵌套不可变范围、可变草稿与持久快照、字段转换、未知字段和跨字段验收。",
+  "seed_digest": "3245ace7a29b96d30129f7d9b4ad4bf8e2b014070f7874da196a0813497b2193",
+  "environment": "pyrsistent-py312",
+  "source": {
+    "repository": "https://github.com/tobgu/pyrsistent",
+    "commit": "0c0b7aec8cd25b1d2d8ba07b10acdefd0f38f2c7",
+    "license_files": [
+      "seed/library/LICENSE.mit"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PS-S01",
+      "title": "状态和快照边界",
+      "goal": "分清嵌套值和可变草稿",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PS-U01",
+            "PS-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PS-U01",
+          "kind": "understand",
+          "goal": "界定嵌套状态的不可变范围",
+          "prompt": "Explain the exact map/freeze/mutation controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/nested-state.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PS-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/PS-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PS-U02",
+          "kind": "understand",
+          "goal": "追踪编辑草稿和已发布快照",
+          "prompt": "Explain all evolver and snapshot states after the complete sequence. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/evolver.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PS-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/PS-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PS-S02",
+      "title": "输入记录合同",
+      "goal": "显式转换并决定未知字段",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PS-C01",
+            "PS-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PS-C01",
+          "kind": "consult",
+          "goal": "选择记录字段的显式转换边界",
+          "prompt": "Advise type checking versus the actual factory controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/field-conversion.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PS-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/PS-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PS-C02",
+          "kind": "consult",
+          "goal": "决定未知字段的兼容策略",
+          "prompt": "Advise the exact strict/ignore-extra behavior and loss of unmodeled currency. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/extra-fields.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PS-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/PS-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PS-S03",
+      "title": "整体更新验收",
+      "goal": "只发布完整有效区间",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PS-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PS-P01",
+          "kind": "plan",
+          "goal": "规划区间字段的整体提交与验收",
+          "prompt": "Plan complete range-edit validation and publication from all supplied controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/range-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PS-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/PS-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

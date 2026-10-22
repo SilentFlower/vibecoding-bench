@@ -1,0 +1,288 @@
+{
+  "baseline_digest": "d928534c774d889047cab8a50c4ca493594a7b17f6b631b70f9a48c7fd9b6594",
+  "nodes": [
+    {
+      "id": "tests/test_compilation.py::test_if_compiled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_constraint.py::test_abc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_constraint.py::test_coins",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_constraint.py::test_constraint_without_variables",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_constraint.py::test_einstein",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_constraint.py::test_multipliers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_constraint.py::test_pruning_constraint",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_constraint.py::test_queens",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_constraint.py::test_rooks",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_constraint.py::test_studentdesks",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_doctests.py::TestReadmeDoctests::test_readme_code_blocks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples.py::test_crosswords",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples.py::test_seisseisdoze",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples.py::test_sendmoremoney",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples.py::test_sudoku",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples.py::test_twotwofour",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples.py::test_xsum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_compile_non_numeric",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_compile_to_constraints",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_compile_to_constraints_picklable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_extract_operators",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_is_or_evals_to_number",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::test_parse_restrictions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_problem.py::test_addVariable_string_constraint",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_problem.py::test_addVariable_string_constraints",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_problem.py::test_addVariable_support_domain_subclasses",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_solvers.py::test_backtracking_solvers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_solvers.py::test_min_conflicts_solver",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_solvers.py::test_mixed_type_constraints",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_solvers.py::test_negative_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_solvers.py::test_parallel_solver",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_solvers.py::test_parallel_solver_process_mode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_solvers.py::test_recursive_backtracking_solver",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_solvers.py::test_solvers_consistency",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_some_not_in_set.py::test_empty_constraint",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_some_not_in_set.py::test_exact",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_some_not_in_set.py::test_forwardcheck",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_some_not_in_set.py::test_forwardcheck_empty_domain",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_some_not_in_set.py::test_forwardcheck_exact",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_some_not_in_set.py::test_no_overlap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_some_not_in_set.py::test_some_overlap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_some_not_in_set.py::test_too_much_overlap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_toml_file.py::test_authors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_toml_file.py::test_license",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_toml_file.py::test_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_toml_file.py::test_project_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_toml_file.py::test_read",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_toml_file.py::test_readme",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_toml_file.py::test_versioning",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_util_benchmark.py::test_dedispersion",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_util_benchmark.py::test_hotspot",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_util_benchmark.py::test_microhh",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "pytest-cov",
+      "module": "pytest_cov.plugin",
+      "module_sha256": "7cc8a14b8cc8effa886c40fdfa058459d89686d62c53fea6721750e722a60f40",
+      "version": "7.1.0"
+    },
+    {
+      "distribution": "pytest-benchmark",
+      "module": "pytest_benchmark.plugin",
+      "module_sha256": "9185f4049d310155e2dd3100f03fec8f35dab99eca5e0224f2f7d9cc7d015744",
+      "version": "5.3.0"
+    }
+  ],
+  "project": "python-constraint",
+  "python": "3.12.15",
+  "schema": 1
+}

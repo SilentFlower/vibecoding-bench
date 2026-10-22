@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CD-C01",
+  "source_commit": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Feeding a new document after completion without reset keeps the prior UTF-8-SIG result because done stops processing. reset clears state and the new plain text is detected ascii. Use a fresh detector or reset between independent documents and finalize each one explicitly.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

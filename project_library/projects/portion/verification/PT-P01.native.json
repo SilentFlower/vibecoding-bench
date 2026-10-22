@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PT-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "free_schedule_is_the_declared_window_minus_busy_intervals": true
+  },
+  "resource_profile": "business"
+}

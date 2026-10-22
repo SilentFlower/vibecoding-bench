@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "arrow",
+  "title": "Arrow时间导入与报表工作场景",
+  "category": "日期锚点、时区与区间",
+  "description": "相对日期、区间精度、月锚点、时区导入、日报分区和重复钟点诊断六项任务。",
+  "seed_digest": "619dfb275eb2c21802cc68803fe7daf7ed4fcdce583f938f29db7136b5bc47e3",
+  "environment": "arrow-py312",
+  "source": {
+    "repository": "https://github.com/arrow-py/arrow",
+    "commit": "2224255c4acc594d734cef0bbc83360452a67983",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "AR-S01",
+      "title": "日期和区间语义",
+      "goal": "核真实移动和端点",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AR-U01",
+            "AR-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AR-U01",
+          "kind": "understand",
+          "goal": "区分月末相对移动与绝对替换",
+          "prompt": "Explain all complete month movement and validation controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/month-movement.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AR-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/AR-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "AR-U02",
+          "kind": "understand",
+          "goal": "明确日报区间端点的精度",
+          "prompt": "Explain actual day endpoints and the application filter decision from the complete controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/day-ends.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AR-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/AR-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AR-S02",
+      "title": "业务时间选择",
+      "goal": "持有日期锚点与导入语义",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AR-C01",
+            "AR-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AR-C01",
+          "kind": "consult",
+          "goal": "选择月度业务日期锚点",
+          "prompt": "Advise the month anchor policy using the two complete four-date controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/month-anchor.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AR-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/AR-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "AR-C02",
+          "kind": "consult",
+          "goal": "选择时间导入的转换或重新标注",
+          "prompt": "Advise which existing operation matches each incoming-time contract,with actual ISO and timestamp controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/timezone-import.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AR-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/AR-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AR-S03",
+      "title": "民用日报分区",
+      "goal": "按固定时区推导UTC边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AR-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AR-P01",
+          "kind": "plan",
+          "goal": "规划夏令时日报的唯一分区",
+          "prompt": "Plan report partition ownership and boundary verification from the actual pinned-zone controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/day-partition-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AR-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/AR-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AR-S04",
+      "title": "重复钟点诊断",
+      "goal": "先核时区与事件发生证据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AR-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "AR-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AR-D01",
+          "kind": "diagnose",
+          "goal": "先核时区证据再解释重复本地钟点",
+          "prompt": "Two imported event times appear to collapse to one local clock. Request the complete call,source offsets or fold,zone/rule source and exported timestamps before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AR-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-time-reproduction",
+              "when": "The complete call,source offset or fold,zone/rule source and timestamps have not been supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/ambiguous-events.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

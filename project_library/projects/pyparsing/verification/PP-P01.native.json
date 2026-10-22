@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PP-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "source_spans_must_name_tab_and_character_vs_byte_coordinates": true
+  },
+  "resource_profile": "business"
+}

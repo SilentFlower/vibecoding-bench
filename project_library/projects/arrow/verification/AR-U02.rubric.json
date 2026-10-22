@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AR-U02",
+  "source_commit": "2224255c4acc594d734cef0bbc83360452a67983",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both spans start2026-10-22T00:00:00+00:00. Default [) represents the excluded end by the previous microsecond,23:59:59.999999;bounds=[] gives next-day midnight2026-10-23T00:00:00+00:00. Explain the actual returned values and choose the database comparison separately;do not claim the tuple enforces SQL half-open filtering.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

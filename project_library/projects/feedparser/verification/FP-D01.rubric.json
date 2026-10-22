@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FP-D01",
+  "source_commit": "a22c5521cbb109871f1a2318948581901bd47e26",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use only actually supplied source/date/parse and raw-key evidence. Request missing controls;when complete,trace the exact date mapping and distinguish real fields from compatibility accessors or unsupported mapping. Missing evidence supports insufficient_information. No patch,remote fetch or guessed date is authorized.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

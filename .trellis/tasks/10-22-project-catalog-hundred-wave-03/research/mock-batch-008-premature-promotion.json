@@ -1,0 +1,7 @@
+{
+  "status": "not_promoted",
+  "at": "2026-10-22T04:00:19.882239+00:00",
+  "reason": "progress completed后浏览器/资源清理仍未完成，误提前调用晋升入口；在读取必需result.json前即拒绝，未写正式文件",
+  "action": "等待实际harness和浏览器完成后复核cleanup/result，再重新晋升",
+  "formal_mutation_from_failed_attempt": false
+}

@@ -1,0 +1,1 @@
+Use @wrapt.decorator trace(wrapped,instance,args,kwargs) recording then calling wrapped(*args,**kwargs). Decorate Service.calculate(self,x:int,y:int=2)->int returning x+y. Compare service.calculate(3),Service.calculate(service,4),records,inspect.signature(bound method) and __wrapped__. No edits.

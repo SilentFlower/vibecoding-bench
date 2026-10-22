@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CN-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "normalized_output_rewrites_the_declared_encoding_without_replacing_raw": true
+  },
+  "resource_profile": "business"
+}

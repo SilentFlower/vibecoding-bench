@@ -1,0 +1,1 @@
+Model already has go=lambda:"business". Machine(model,states=["a","b"],initial="a",auto_transitions=False) then add_transition("go","a","b"). model.go() returns "business" and remains a. model.trigger("go") then reaches b. Machine._checked_assignment preserves pre-existing model attributes under the default model_override=False. No guard or asynchronous queue is configured.

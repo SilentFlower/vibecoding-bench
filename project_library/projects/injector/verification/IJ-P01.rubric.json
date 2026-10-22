@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IJ-P01",
+  "source_commit": "5daed12510fafc0bf73b6ef18d2884f78cd5e210",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both interleaved coroutines on one thread share the same threadlocal FlowContext before and after their yield;two simultaneously live worker threads receive distinct contexts. ThreadLocalScope is per-thread,not per async request. Choose and describe explicit request objects/containers or an application-owned Scope with logical context ownership,entry/exit,child-task inheritance and exception cleanup. Test overlapping async requests and nested/error cases;do not claim an existing automatic request scope or change library locking. Equivalent complete designs are valid.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

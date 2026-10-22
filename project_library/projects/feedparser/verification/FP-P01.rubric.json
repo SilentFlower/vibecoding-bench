@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FP-P01",
+  "source_commit": "a22c5521cbb109871f1a2318948581901bd47e26",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "This pinned JSON parser stores content as a dict,raw category as[tag],and raw enclosures directly. Ordinary tags/category lookups require tags and fail;enclosures requires links and fails despite that raw stored field. Inspect actual per-format structures,normalize content/tags/attachments explicitly into an owned archive schema,retain raw provenance and failures,and test equivalent RSS/Atom/JSON controls. A uniform parser return wrapper alone does not establish identical field shapes.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

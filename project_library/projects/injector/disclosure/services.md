@@ -1,0 +1,1 @@
+Define class Service with an @inject constructor __init__(self,name:str) that stores self.name. Define @singleton class CachedService(Service). A helper constructs a new Injector and binds str to a supplied synthetic name. Use no real configuration,network or service process. All controls are read-only with respect to the supplied library.

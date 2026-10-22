@@ -1,0 +1,25 @@
+{
+  "status": "failed_not_admitted",
+  "projects": [
+    "transitions",
+    "python-statemachine"
+  ],
+  "actual_error": "OperationalError: database is locked",
+  "completed_stages": 1,
+  "action": "保留失败和清理原件；当前并行组结束后，用同一冻结内容完整重跑；不改业务期望或平台数据库实现",
+  "evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-013/run-001/evidence/result.json",
+      "sha256": "bd041498f29f86447f367b0d01eff2696f06cbc682653fb0c80c94137d233e68"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-013/run-001/runner.log",
+      "sha256": "8cc80dfb5960875cef8eff167c52065fe1c55b0046db9a822f65413859ee0d16"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-013/run-001/cleanup.json",
+      "sha256": "9b633a83e0a5590612f27d333d578bb433d40d686a0459bb1aa0ed46122ec055"
+    }
+  ],
+  "formal_registered": false
+}

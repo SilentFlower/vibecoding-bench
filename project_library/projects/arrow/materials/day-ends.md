@@ -1,0 +1,1 @@
+For Arrow(2026,10,22,10,15),compare span("day") with span("day",bounds="[]"). State both actual endpoints and precision. A database report needs an explicitly chosen interval predicate;do not say the returned tuple automatically installs an SQL filter or that the default second endpoint is next midnight. No edits.

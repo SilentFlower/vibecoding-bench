@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BI-D01",
+  "source_commit": "299fedc89f1d70d5d41cf7922564b376d3e2d435",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use actual comparison evidence to distinguish mapping equality from order-sensitive equality. The inherited == ignores order, while equals_order_sensitive checks it. Missing material supports insufficient_information; do not diagnose data loss or modify comparison semantics without evidence.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

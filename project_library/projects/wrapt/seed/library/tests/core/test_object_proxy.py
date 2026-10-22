@@ -1,0 +1,2940 @@
+import re
+import sys
+import types
+import unittest
+
+is_pypy = "__pypy__" in sys.builtin_module_names
+
+import wrapt
+
+OBJECTS_CODE = """
+class TargetBaseClass:
+    "documentation"
+
+class Target(TargetBaseClass):
+    "documentation"
+
+def target():
+    "documentation"
+    pass
+"""
+
+objects = types.ModuleType("objects")
+exec(OBJECTS_CODE, objects.__dict__, objects.__dict__)
+
+
+class TestAttributeAccess(unittest.TestCase):
+
+    def test_init_not_called(self):
+        a = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+        b = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+
+        # Pre-init access should raise AttributeError, not ValueError.
+
+        with self.assertRaises(AttributeError):
+            a.__wrapped__
+
+        with self.assertRaises(AttributeError):
+            a + b
+
+        # hasattr should return False, not raise.
+
+        self.assertFalse(hasattr(a, "__wrapped__"))
+
+    def test_init_called_wrapped_deleted(self):
+        # Post-init deletion of __wrapped__ should raise
+        # WrapperNotInitializedError (a ValueError, not AttributeError)
+        # so it is not silently swallowed by hasattr/getattr patterns.
+        # We use a LazyObjectProxy to reach a state where __init__ was
+        # called (init_called=True) but __wrapped__ is not set, by
+        # removing the factory before __wrapped__ is accessed.
+
+        a = wrapt.LazyObjectProxy(lambda: 42)
+
+        del a.__wrapped_factory__
+
+        # Removing the class-level __wrapped_factory__ is necessary to
+        # observe the post-init / pre-wrapped state, but the attribute
+        # must be restored so later tests in the suite that construct a
+        # LazyObjectProxy do not see it missing.
+
+        restore = []
+        for cls in type(a).__mro__:
+            if "__wrapped_factory__" in cls.__dict__:
+                restore.append((cls, cls.__dict__["__wrapped_factory__"]))
+                delattr(cls, "__wrapped_factory__")
+                break
+
+        try:
+            with self.assertRaises(wrapt.WrapperNotInitializedError):
+                a.__wrapped__
+
+            with self.assertRaises(ValueError):
+                a.__wrapped__
+        finally:
+            for cls, attr in restore:
+                setattr(cls, "__wrapped_factory__", attr)
+
+    def test_attributes(self):
+        def function1(*args, **kwargs):
+            return args, kwargs
+
+        function2 = wrapt.BaseObjectProxy(function1)
+
+        self.assertEqual(function2.__wrapped__, function1)
+
+    def test_get_wrapped(self):
+        def function1(*args, **kwargs):
+            return args, kwargs
+
+        function2 = wrapt.BaseObjectProxy(function1)
+
+        self.assertEqual(function2.__wrapped__, function1)
+
+        function3 = wrapt.BaseObjectProxy(function2)
+
+        self.assertEqual(function3.__wrapped__, function1)
+
+    def test_set_wrapped(self):
+        def function1(*args, **kwargs):
+            return args, kwargs
+
+        function2 = wrapt.BaseObjectProxy(function1)
+
+        self.assertEqual(function2, function1)
+        self.assertEqual(function2.__wrapped__, function1)
+        self.assertEqual(function2.__name__, function1.__name__)
+
+        self.assertEqual(function2.__qualname__, function1.__qualname__)
+
+        function2.__wrapped__ = None
+
+        self.assertFalse(hasattr(function1, "__wrapped__"))
+
+        self.assertEqual(function2, None)
+        self.assertEqual(function2.__wrapped__, None)
+        self.assertFalse(hasattr(function2, "__name__"))
+
+        self.assertFalse(hasattr(function2, "__qualname__"))
+
+        def function3(*args, **kwargs):
+            return args, kwargs
+
+        function2.__wrapped__ = function3
+
+        self.assertEqual(function2, function3)
+        self.assertEqual(function2.__wrapped__, function3)
+        self.assertEqual(function2.__name__, function3.__name__)
+
+        self.assertEqual(function2.__qualname__, function3.__qualname__)
+
+    def test_delete_wrapped(self):
+        def function1(*args, **kwargs):
+            return args, kwargs
+
+        function2 = wrapt.BaseObjectProxy(function1)
+
+        def run(*args):
+            del function2.__wrapped__
+
+        self.assertRaisesRegex(
+            TypeError, "can't delete __wrapped__ attribute", run, ()
+        )
+
+    def test_proxy_attribute(self):
+        def function1(*args, **kwargs):
+            return args, kwargs
+
+        function2 = wrapt.BaseObjectProxy(function1)
+
+        function2._self_variable = True
+
+        self.assertFalse(hasattr(function1, "_self_variable"))
+        self.assertTrue(hasattr(function2, "_self_variable"))
+
+        self.assertEqual(function2._self_variable, True)
+
+        del function2._self_variable
+
+        self.assertFalse(hasattr(function1, "_self_variable"))
+        self.assertFalse(hasattr(function2, "_self_variable"))
+
+        self.assertEqual(getattr(function2, "_self_variable", None), None)
+
+    def test_wrapped_attribute(self):
+        def function1(*args, **kwargs):
+            return args, kwargs
+
+        function2 = wrapt.BaseObjectProxy(function1)
+
+        function2.variable = True
+
+        self.assertTrue(hasattr(function1, "variable"))
+        self.assertTrue(hasattr(function2, "variable"))
+
+        self.assertEqual(function2.variable, True)
+
+        del function2.variable
+
+        self.assertFalse(hasattr(function1, "variable"))
+        self.assertFalse(hasattr(function2, "variable"))
+
+        self.assertEqual(getattr(function2, "variable", None), None)
+
+    def test_attribute_lookup_modified(self):
+        class Object:
+            @property
+            def value(self):
+                return "value"
+
+        class WrappedObject(wrapt.BaseObjectProxy):
+            @property
+            def value(self):
+                return 2 * self.__wrapped__.value
+
+        self.assertEqual(WrappedObject(Object()).value, "valuevalue")
+
+    def test_attribute_lookup_value_exception(self):
+        class Object:
+            @property
+            def value(self):
+                return "value"
+
+        class WrappedObject(wrapt.BaseObjectProxy):
+            @property
+            def value(self):
+                raise ValueError("value-error")
+
+        try:
+            WrappedObject(Object()).value == "value"
+
+        except ValueError as e:
+            pass
+
+        else:
+            raise RuntimeError("should not fail here")
+
+    def test_attribute_lookup_attribute_exception(self):
+        class Object:
+            @property
+            def value(self):
+                return "value"
+
+        class WrappedObject(wrapt.BaseObjectProxy):
+            @property
+            def value(self):
+                raise AttributeError("attribute-error")
+
+        # Raising of an AttributeError in this case is a sort of odd situation
+        # because the exception results in it being determined there was no
+        # wrapper for the value attribute and so it returns the original value
+        # instead and robs the wrapper of the chance to return an alternate
+        # value.
+
+        self.assertEqual(WrappedObject(Object()).value, "value")
+
+
+class TestNamingObjectProxy(unittest.TestCase):
+
+    def test_class_object_name(self):
+        # Test preservation of class __name__ attribute.
+
+        target = objects.Target
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(wrapper.__name__, target.__name__)
+
+    def test_class_object_qualname(self):
+        # Test preservation of class __qualname__ attribute.
+
+        target = objects.Target
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        try:
+            __qualname__ = target.__qualname__
+        except AttributeError:
+            pass
+        else:
+            self.assertEqual(wrapper.__qualname__, __qualname__)
+
+    def test_class_module_name(self):
+        # Test preservation of class __module__ attribute.
+
+        target = objects.Target
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(wrapper.__module__, target.__module__)
+
+    def test_class_doc_string(self):
+        # Test preservation of class __doc__ attribute.
+
+        target = objects.Target
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(wrapper.__doc__, target.__doc__)
+
+    def test_instance_module_name(self):
+        # Test preservation of instance __module__ attribute.
+
+        target = objects.Target()
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(wrapper.__module__, target.__module__)
+
+    def test_instance_doc_string(self):
+        # Test preservation of instance __doc__ attribute.
+
+        target = objects.Target()
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(wrapper.__doc__, target.__doc__)
+
+    def test_function_object_name(self):
+        # Test preservation of function __name__ attribute.
+
+        target = objects.target
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(wrapper.__name__, target.__name__)
+
+    def test_function_object_qualname(self):
+        # Test preservation of function __qualname__ attribute.
+
+        target = objects.target
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        try:
+            __qualname__ = target.__qualname__
+        except AttributeError:
+            pass
+        else:
+            self.assertEqual(wrapper.__qualname__, __qualname__)
+
+    def test_function_module_name(self):
+        # Test preservation of function __module__ attribute.
+
+        target = objects.target
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(wrapper.__module__, target.__module__)
+
+    def test_function_doc_string(self):
+        # Test preservation of function __doc__ attribute.
+
+        target = objects.target
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(wrapper.__doc__, target.__doc__)
+
+
+class TestTypeObjectProxy(unittest.TestCase):
+
+    def test_class_of_class(self):
+        # Test preservation of class __class__ attribute.
+
+        target = objects.Target
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(wrapper.__class__, target.__class__)
+
+        self.assertTrue(isinstance(wrapper, type(target)))
+
+    def test_class_of_instance(self):
+        # Test preservation of instance __class__ attribute.
+
+        target = objects.Target()
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(wrapper.__class__, target.__class__)
+
+        self.assertTrue(isinstance(wrapper, objects.Target))
+        self.assertTrue(isinstance(wrapper, objects.TargetBaseClass))
+
+    def test_class_of_function(self):
+        # Test preservation of function __class__ attribute.
+
+        target = objects.target
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(wrapper.__class__, target.__class__)
+
+        self.assertTrue(isinstance(wrapper, type(target)))
+
+
+class TestDirObjectProxy(unittest.TestCase):
+
+    def test_dir_of_class(self):
+        # Test preservation of class __dir__ attribute.
+
+        target = objects.Target
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(dir(wrapper), dir(target))
+
+    def test_vars_of_class(self):
+        # Test preservation of class __dir__ attribute.
+
+        target = objects.Target
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(vars(wrapper), vars(target))
+
+    def test_dir_of_instance(self):
+        # Test preservation of instance __dir__ attribute.
+
+        target = objects.Target()
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(dir(wrapper), dir(target))
+
+    def test_vars_of_instance(self):
+        # Test preservation of instance __dir__ attribute.
+
+        target = objects.Target()
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(vars(wrapper), vars(target))
+
+    def test_dir_of_function(self):
+        # Test preservation of function __dir__ attribute.
+
+        target = objects.target
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(dir(wrapper), dir(target))
+
+    def test_vars_of_function(self):
+        # Test preservation of function __dir__ attribute.
+
+        target = objects.target
+        wrapper = wrapt.BaseObjectProxy(target)
+
+        self.assertEqual(vars(wrapper), vars(target))
+
+
+class TestCallingObject(unittest.TestCase):
+
+    def test_function_no_args(self):
+        _args = ()
+        _kwargs = {}
+
+        def function(*args, **kwargs):
+            return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(function)
+
+        result = wrapper()
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_function_args(self):
+        _args = (1, 2)
+        _kwargs = {}
+
+        def function(*args, **kwargs):
+            return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(function)
+
+        result = wrapper(*_args)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_function_kwargs(self):
+        _args = ()
+        _kwargs = {"one": 1, "two": 2}
+
+        def function(*args, **kwargs):
+            return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(function)
+
+        result = wrapper(**_kwargs)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_function_args_plus_kwargs(self):
+        _args = (1, 2)
+        _kwargs = {"one": 1, "two": 2}
+
+        def function(*args, **kwargs):
+            return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(function)
+
+        result = wrapper(*_args, **_kwargs)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_instancemethod_no_args(self):
+        _args = ()
+        _kwargs = {}
+
+        class Class:
+            def function(self, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class().function)
+
+        result = wrapper()
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_instancemethod_args(self):
+        _args = (1, 2)
+        _kwargs = {}
+
+        class Class:
+            def function(self, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class().function)
+
+        result = wrapper(*_args)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_instancemethod_kwargs(self):
+        _args = ()
+        _kwargs = {"one": 1, "two": 2}
+
+        class Class:
+            def function(self, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class().function)
+
+        result = wrapper(**_kwargs)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_instancemethod_args_plus_kwargs(self):
+        _args = (1, 2)
+        _kwargs = {"one": 1, "two": 2}
+
+        class Class:
+            def function(self, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class().function)
+
+        result = wrapper(*_args, **_kwargs)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_instancemethod_via_class_no_args(self):
+        _args = ()
+        _kwargs = {}
+
+        class Class:
+            def function(self, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class.function)
+
+        result = wrapper(Class())
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_instancemethod_via_class_args(self):
+        _args = (1, 2)
+        _kwargs = {}
+
+        class Class:
+            def function(self, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class.function)
+
+        result = wrapper(Class(), *_args)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_instancemethod_via_class_kwargs(self):
+        _args = ()
+        _kwargs = {"one": 1, "two": 2}
+
+        class Class:
+            def function(self, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class.function)
+
+        result = wrapper(Class(), **_kwargs)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_instancemethod_via_class_args_plus_kwargs(self):
+        _args = (1, 2)
+        _kwargs = {"one": 1, "two": 2}
+
+        class Class:
+            def function(self, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class.function)
+
+        result = wrapper(Class(), *_args, **_kwargs)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_classmethod_no_args(self):
+        _args = ()
+        _kwargs = {}
+
+        class Class:
+            @classmethod
+            def function(cls, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class().function)
+
+        result = wrapper()
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_classmethod_args(self):
+        _args = (1, 2)
+        _kwargs = {}
+
+        class Class:
+            @classmethod
+            def function(cls, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class().function)
+
+        result = wrapper(*_args)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_classmethod_kwargs(self):
+        _args = ()
+        _kwargs = {"one": 1, "two": 2}
+
+        class Class:
+            @classmethod
+            def function(cls, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class().function)
+
+        result = wrapper(**_kwargs)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_classmethod_args_plus_kwargs(self):
+        _args = (1, 2)
+        _kwargs = {"one": 1, "two": 2}
+
+        class Class:
+            @classmethod
+            def function(cls, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class().function)
+
+        result = wrapper(*_args, **_kwargs)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_classmethod_via_class_no_args(self):
+        _args = ()
+        _kwargs = {}
+
+        class Class:
+            @classmethod
+            def function(cls, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class.function)
+
+        result = wrapper()
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_classmethod_via_class_args(self):
+        _args = (1, 2)
+        _kwargs = {}
+
+        class Class:
+            @classmethod
+            def function(cls, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class.function)
+
+        result = wrapper(*_args)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_classmethod_via_class_kwargs(self):
+        _args = ()
+        _kwargs = {"one": 1, "two": 2}
+
+        class Class:
+            @classmethod
+            def function(cls, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class.function)
+
+        result = wrapper(**_kwargs)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_classmethod_via_class_args_plus_kwargs(self):
+        _args = (1, 2)
+        _kwargs = {"one": 1, "two": 2}
+
+        class Class:
+            @classmethod
+            def function(cls, *args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class.function)
+
+        result = wrapper(*_args, **_kwargs)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_staticmethod_no_args(self):
+        _args = ()
+        _kwargs = {}
+
+        class Class:
+            @staticmethod
+            def function(*args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class().function)
+
+        result = wrapper()
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_staticmethod_args(self):
+        _args = (1, 2)
+        _kwargs = {}
+
+        class Class:
+            @staticmethod
+            def function(*args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class().function)
+
+        result = wrapper(*_args)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_staticmethod_kwargs(self):
+        _args = ()
+        _kwargs = {"one": 1, "two": 2}
+
+        class Class:
+            @staticmethod
+            def function(*args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class().function)
+
+        result = wrapper(**_kwargs)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_staticmethod_args_plus_kwargs(self):
+        _args = (1, 2)
+        _kwargs = {"one": 1, "two": 2}
+
+        class Class:
+            @staticmethod
+            def function(*args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class().function)
+
+        result = wrapper(*_args, **_kwargs)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_staticmethod_via_class_no_args(self):
+        _args = ()
+        _kwargs = {}
+
+        class Class:
+            @staticmethod
+            def function(*args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class.function)
+
+        result = wrapper()
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_staticmethod_via_class_args(self):
+        _args = (1, 2)
+        _kwargs = {}
+
+        class Class:
+            @staticmethod
+            def function(*args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class.function)
+
+        result = wrapper(*_args)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_staticmethod_via_class_kwargs(self):
+        _args = ()
+        _kwargs = {"one": 1, "two": 2}
+
+        class Class:
+            @staticmethod
+            def function(*args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class.function)
+
+        result = wrapper(**_kwargs)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+    def test_staticmethod_via_class_args_plus_kwargs(self):
+        _args = (1, 2)
+        _kwargs = {"one": 1, "two": 2}
+
+        class Class:
+            @staticmethod
+            def function(*args, **kwargs):
+                return args, kwargs
+
+        wrapper = wrapt.CallableObjectProxy(Class.function)
+
+        result = wrapper(*_args, **_kwargs)
+
+        self.assertEqual(result, (_args, _kwargs))
+
+
+class TestCallingObjectAuto(unittest.TestCase):
+
+    def test_function_no_args(self):
+        _args = ()
+        _kwargs = {}
+
+        def function(*args, **kwargs):
+            return args, kwargs
+
+        wrapper = wrapt.AutoObjectProxy(function)
+
+        self.assertTrue(callable(wrapper))
+
+        result = wrapper()
+
+        self.assertEqual(result, (_args, _kwargs))
+
+
+class TestIterObjectProxy(unittest.TestCase):
+
+    def test_iteration(self):
+        items = [1, 2]
+
+        wrapper = wrapt.ObjectProxy(items)
+
+        result = [x for x in wrapper]
+
+        self.assertEqual(result, items)
+
+
+class TestContextManagerObjectProxy(unittest.TestCase):
+
+    def test_context_manager(self):
+        class Class:
+            def __enter__(self):
+                return self
+
+            def __exit__(*args, **kwargs):
+                return
+
+        instance = Class()
+
+        wrapper = wrapt.BaseObjectProxy(instance)
+
+        with wrapper:
+            pass
+
+    def test_async_context_manager(self):
+        class Class:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(*args, **kwargs):
+                return
+
+        instance = Class()
+
+        wrapper = wrapt.BaseObjectProxy(instance)
+
+        async def run():
+            async with wrapper:
+                pass
+
+        import asyncio
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(run())
+        loop.close()
+
+
+class TestEqualityObjectProxy(unittest.TestCase):
+
+    def test_object_hash(self):
+        def function1(*args, **kwargs):
+            return args, kwargs
+
+        function2 = wrapt.BaseObjectProxy(function1)
+
+        self.assertEqual(hash(function2), hash(function1))
+
+    def test_mapping_key(self):
+        def function1(*args, **kwargs):
+            return args, kwargs
+
+        function2 = wrapt.BaseObjectProxy(function1)
+
+        table = dict()
+        table[function1] = True
+
+        self.assertTrue(table.get(function2))
+
+        table = dict()
+        table[function2] = True
+
+        self.assertTrue(table.get(function1))
+
+    def test_comparison(self):
+        one = wrapt.BaseObjectProxy(1)
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy(3)
+
+        self.assertTrue(two > 1)
+        self.assertTrue(two >= 1)
+        self.assertTrue(two < 3)
+        self.assertTrue(two <= 3)
+        self.assertTrue(two != 1)
+        self.assertTrue(two == 2)
+        self.assertTrue(two != 3)
+
+        self.assertTrue(2 > one)
+        self.assertTrue(2 >= one)
+        self.assertTrue(2 < three)
+        self.assertTrue(2 <= three)
+        self.assertTrue(2 != one)
+        self.assertTrue(2 == two)
+        self.assertTrue(2 != three)
+
+        self.assertTrue(two > one)
+        self.assertTrue(two >= one)
+        self.assertTrue(two < three)
+        self.assertTrue(two <= three)
+        self.assertTrue(two != one)
+        self.assertTrue(two == two)
+        self.assertTrue(two != three)
+
+
+class TestAsNumberObjectProxy(unittest.TestCase):
+
+    def test_nonzero(self):
+        true = wrapt.BaseObjectProxy(True)
+        false = wrapt.BaseObjectProxy(False)
+
+        self.assertTrue(true)
+        self.assertFalse(false)
+
+        self.assertTrue(bool(true))
+        self.assertFalse(bool(false))
+
+        self.assertTrue(not false)
+        self.assertFalse(not true)
+
+    def test_int(self):
+        one = wrapt.BaseObjectProxy(1)
+
+        self.assertEqual(int(one), 1)
+
+    def test_float(self):
+        one = wrapt.BaseObjectProxy(1)
+
+        self.assertEqual(float(one), 1.0)
+
+    def test_add(self):
+        one = wrapt.BaseObjectProxy(1)
+        two = wrapt.BaseObjectProxy(2)
+
+        self.assertEqual(one + two, 1 + 2)
+        self.assertEqual(1 + two, 1 + 2)
+        self.assertEqual(one + 2, 1 + 2)
+
+    def test_add_uninitialized_args(self):
+        result = object()
+
+        one = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+        two = wrapt.BaseObjectProxy(2)
+
+        try:
+            assert one + two == result
+        except AttributeError:
+            pass
+
+        one = wrapt.BaseObjectProxy(1)
+        two = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+
+        try:
+            assert one + two == result
+        except AttributeError:
+            pass
+
+    def test_sub(self):
+        one = wrapt.BaseObjectProxy(1)
+        two = wrapt.BaseObjectProxy(2)
+
+        self.assertEqual(one - two, 1 - 2)
+        self.assertEqual(1 - two, 1 - 2)
+        self.assertEqual(one - 2, 1 - 2)
+
+    def test_sub_uninitialized_args(self):
+        result = object()
+
+        one = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+        two = wrapt.BaseObjectProxy(2)
+
+        try:
+            assert one - two == result
+        except AttributeError:
+            pass
+
+        one = wrapt.BaseObjectProxy(1)
+        two = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+
+        try:
+            assert one - two == result
+        except AttributeError:
+            pass
+
+    def test_mul(self):
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy(3)
+
+        self.assertEqual(two * three, 2 * 3)
+        self.assertEqual(2 * three, 2 * 3)
+        self.assertEqual(two * 3, 2 * 3)
+
+    def test_mul_uninitialized_args(self):
+        result = object()
+
+        two = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+        three = wrapt.BaseObjectProxy(3)
+
+        try:
+            assert two * three == result
+        except AttributeError:
+            pass
+
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+
+        try:
+            assert two * three == result
+        except AttributeError:
+            pass
+
+    def test_div(self):
+        # On Python 2 this will pick up div and on Python
+        # 3 it will pick up truediv.
+
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy(3)
+
+        self.assertEqual(two / three, 2 / 3)
+        self.assertEqual(2 / three, 2 / 3)
+        self.assertEqual(two / 3, 2 / 3)
+
+    def test_div_uninitialized_args(self):
+        result = object()
+
+        two = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+        three = wrapt.BaseObjectProxy(3)
+
+        try:
+            assert two / three == result
+        except AttributeError:
+            pass
+
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+
+        try:
+            assert two / three == result
+        except AttributeError:
+            pass
+
+    def test_floordiv(self):
+        two = wrapt.BaseObjectProxy(2)
+        four = wrapt.BaseObjectProxy(4)
+
+        self.assertEqual(four // two, 4 // 2)
+        self.assertEqual(4 // two, 4 // 2)
+        self.assertEqual(four // 2, 4 // 2)
+
+    def test_floordiv_uninitialized_args(self):
+        result = object()
+
+        two = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+        four = wrapt.BaseObjectProxy(4)
+
+        try:
+            assert two // four == result
+        except AttributeError:
+            pass
+
+        two = wrapt.BaseObjectProxy(2)
+        four = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+
+        try:
+            assert two // four == result
+        except AttributeError:
+            pass
+
+    def test_mod(self):
+        two = wrapt.BaseObjectProxy(2)
+        four = wrapt.BaseObjectProxy(4)
+
+        self.assertEqual(four % two, 4 % 2)
+        self.assertEqual(4 % two, 4 % 2)
+        self.assertEqual(four % 2, 4 % 2)
+
+    def test_mod_uninitialized_args(self):
+        result = object()
+
+        two = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+        four = wrapt.BaseObjectProxy(4)
+
+        try:
+            assert two % four == result
+        except AttributeError:
+            pass
+
+        two = wrapt.BaseObjectProxy(2)
+        four = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+
+        try:
+            assert two % four == result
+        except AttributeError:
+            pass
+
+    def test_divmod(self):
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy(3)
+
+        self.assertEqual(divmod(three, two), divmod(3, 2))
+        self.assertEqual(divmod(3, two), divmod(3, 2))
+        self.assertEqual(divmod(three, 2), divmod(3, 2))
+
+    def test_divmod_uninitialized_args(self):
+        result = object()
+
+        two = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+        three = wrapt.BaseObjectProxy(3)
+
+        try:
+            assert divmod(two, three) == result
+        except AttributeError:
+            pass
+
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+
+        try:
+            assert divmod(two, three) == result
+        except AttributeError:
+            pass
+
+    def test_pow(self):
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy(3)
+
+        self.assertEqual(three**two, pow(3, 2))
+        self.assertEqual(3**two, pow(3, 2))
+        self.assertEqual(three**2, pow(3, 2))
+
+        self.assertEqual(pow(three, two), pow(3, 2))
+        self.assertEqual(pow(3, two), pow(3, 2))
+        self.assertEqual(pow(three, 2), pow(3, 2))
+
+        # Only PyPy implements __rpow__ for ternary pow().
+        # Note: No longer test for this as pypy 3.9+ seems
+        # to have been updated to not support ternary pow()
+        # in same way.
+
+        # if is_pypy:
+        #     self.assertEqual(pow(three, two, 2), pow(3, 2, 2))
+        #     self.assertEqual(pow(3, two, 2), pow(3, 2, 2))
+
+        self.assertEqual(pow(three, 2, 2), pow(3, 2, 2))
+
+    def test_pow_modulo_proxy_raises(self):
+        # Regression test for #108. Passing a proxy as the modulo
+        # argument to pow() previously segfaulted with the C extension
+        # because ternary_op would recurse back into the proxy nb_power
+        # slot indefinitely. A proxy modulo is not supported and must
+        # raise TypeError consistently across implementations.
+
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy(3)
+        five = wrapt.BaseObjectProxy(5)
+
+        self.assertRaises(TypeError, pow, 2, 3, five)
+        self.assertRaises(TypeError, pow, three, 3, five)
+        self.assertRaises(TypeError, pow, 2, two, five)
+        self.assertRaises(TypeError, pow, three, two, five)
+
+    def test_pow_uninitialized_args(self):
+        result = object()
+
+        two = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+        three = wrapt.BaseObjectProxy(3)
+
+        try:
+            assert three**two == result
+        except AttributeError:
+            pass
+
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+
+        try:
+            assert three**two == result
+        except AttributeError:
+            pass
+
+    def test_lshift(self):
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy(3)
+
+        self.assertEqual(three << two, 3 << 2)
+        self.assertEqual(3 << two, 3 << 2)
+        self.assertEqual(three << 2, 3 << 2)
+
+    def test_lshift_uninitialized_args(self):
+        result = object()
+
+        two = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+        three = wrapt.BaseObjectProxy(3)
+
+        try:
+            assert three << two == result
+        except AttributeError:
+            pass
+
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+
+        try:
+            assert three << two == result
+        except AttributeError:
+            pass
+
+    def test_rshift(self):
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy(3)
+
+        self.assertEqual(three >> two, 3 >> 2)
+        self.assertEqual(3 >> two, 3 >> 2)
+        self.assertEqual(three >> 2, 3 >> 2)
+
+    def test_rshift_uninitialized_args(self):
+        result = object()
+
+        two = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+        three = wrapt.BaseObjectProxy(3)
+
+        try:
+            assert three >> two == result
+        except AttributeError:
+            pass
+
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+
+        try:
+            assert three >> two == result
+        except AttributeError:
+            pass
+
+    def test_and(self):
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy(3)
+
+        self.assertEqual(three & two, 3 & 2)
+        self.assertEqual(3 & two, 3 & 2)
+        self.assertEqual(three & 2, 3 & 2)
+
+    def test_and_uninitialized_args(self):
+        result = object()
+
+        two = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+        three = wrapt.BaseObjectProxy(3)
+
+        try:
+            assert three & two == result
+        except AttributeError:
+            pass
+
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+
+        try:
+            assert three & two == result
+        except AttributeError:
+            pass
+
+    def test_xor(self):
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy(3)
+
+        self.assertEqual(three ^ two, 3 ^ 2)
+        self.assertEqual(3 ^ two, 3 ^ 2)
+        self.assertEqual(three ^ 2, 3 ^ 2)
+
+    def test_xor_uninitialized_args(self):
+        result = object()
+
+        two = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+        three = wrapt.BaseObjectProxy(3)
+
+        try:
+            assert three ^ two == result
+        except AttributeError:
+            pass
+
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+
+        try:
+            assert three ^ two == result
+        except AttributeError:
+            pass
+
+    def test_or(self):
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy(3)
+
+        self.assertEqual(three | two, 3 | 2)
+        self.assertEqual(3 | two, 3 | 2)
+        self.assertEqual(three | 2, 3 | 2)
+
+    def test_or_uninitialized_args(self):
+        result = object()
+
+        two = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+        three = wrapt.BaseObjectProxy(3)
+
+        try:
+            assert three | two == result
+        except AttributeError:
+            pass
+
+        two = wrapt.BaseObjectProxy(2)
+        three = wrapt.BaseObjectProxy.__new__(wrapt.BaseObjectProxy, None)
+
+        try:
+            assert three | two == result
+        except AttributeError:
+            pass
+
+    def test_iadd(self):
+        value = wrapt.BaseObjectProxy(1)
+        one = wrapt.BaseObjectProxy(1)
+
+        value += 1
+        self.assertEqual(value, 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+        value += one
+        self.assertEqual(value, 3)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+    def test_isub(self):
+        value = wrapt.BaseObjectProxy(1)
+        one = wrapt.BaseObjectProxy(1)
+
+        value -= 1
+        self.assertEqual(value, 0)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+        value -= one
+        self.assertEqual(value, -1)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+    def test_imul(self):
+        value = wrapt.BaseObjectProxy(2)
+        two = wrapt.BaseObjectProxy(2)
+
+        value *= 2
+        self.assertEqual(value, 4)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+        value *= two
+        self.assertEqual(value, 8)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+    def test_idiv(self):
+        # On Python 2 this will pick up div and on Python
+        # 3 it will pick up truediv.
+
+        value = wrapt.BaseObjectProxy(2)
+        two = wrapt.BaseObjectProxy(2)
+
+        value /= 2
+        self.assertEqual(value, 2 / 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+        value /= two
+        self.assertEqual(value, 2 / 2 / 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+    def test_ifloordiv(self):
+        value = wrapt.BaseObjectProxy(2)
+        two = wrapt.BaseObjectProxy(2)
+
+        value //= 2
+        self.assertEqual(value, 2 // 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+        value //= two
+        self.assertEqual(value, 2 // 2 // 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+    def test_imod(self):
+        value = wrapt.BaseObjectProxy(10)
+        two = wrapt.BaseObjectProxy(2)
+
+        value %= 2
+        self.assertEqual(value, 10 % 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+        value %= two
+        self.assertEqual(value, 10 % 2 % 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+    def test_ipow(self):
+        value = wrapt.BaseObjectProxy(10)
+        two = wrapt.BaseObjectProxy(2)
+
+        value **= 2
+        self.assertEqual(value, 10**2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+        value **= two
+        self.assertEqual(value, 10**2**2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+    def test_ilshift(self):
+        value = wrapt.BaseObjectProxy(256)
+        two = wrapt.BaseObjectProxy(2)
+
+        value <<= 2
+        self.assertEqual(value, 256 << 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+        value <<= two
+        self.assertEqual(value, 256 << 2 << 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+    def test_irshift(self):
+        value = wrapt.BaseObjectProxy(2)
+        two = wrapt.BaseObjectProxy(2)
+
+        value >>= 2
+        self.assertEqual(value, 2 >> 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+        value >>= two
+        self.assertEqual(value, 2 >> 2 >> 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+    def test_iand(self):
+        value = wrapt.BaseObjectProxy(1)
+        two = wrapt.BaseObjectProxy(2)
+
+        value &= 2
+        self.assertEqual(value, 1 & 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+        value &= two
+        self.assertEqual(value, 1 & 2 & 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+    def test_ixor(self):
+        value = wrapt.BaseObjectProxy(1)
+        two = wrapt.BaseObjectProxy(2)
+
+        value ^= 2
+        self.assertEqual(value, 1 ^ 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+        value ^= two
+        self.assertEqual(value, 1 ^ 2 ^ 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+    def test_ior(self):
+        value = wrapt.BaseObjectProxy(1)
+        two = wrapt.BaseObjectProxy(2)
+
+        value |= 2
+        self.assertEqual(value, 1 | 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+        value |= two
+        self.assertEqual(value, 1 | 2 | 2)
+
+        self.assertTrue(isinstance(value, wrapt.BaseObjectProxy))
+
+    def test_ior_list_self(self):
+        value = wrapt.BaseObjectProxy([])
+
+        try:
+            value |= value
+        except TypeError:
+            pass
+
+    def test_neg(self):
+        value = wrapt.BaseObjectProxy(1)
+
+        self.assertEqual(-value, -1)
+
+    def test_pos(self):
+        value = wrapt.BaseObjectProxy(1)
+
+        self.assertEqual(+value, 1)
+
+    def test_abs(self):
+        value = wrapt.BaseObjectProxy(-1)
+
+        self.assertEqual(abs(value), 1)
+
+    def test_invert(self):
+        value = wrapt.BaseObjectProxy(1)
+
+        self.assertEqual(~value, ~1)
+
+    def test_oct(self):
+        value = wrapt.BaseObjectProxy(20)
+
+        self.assertEqual(oct(value), oct(20))
+
+    def test_hex(self):
+        value = wrapt.BaseObjectProxy(20)
+
+        self.assertEqual(hex(value), hex(20))
+
+    def test_index(self):
+        class Class:
+            def __index__(self):
+                return 1
+
+        value = wrapt.BaseObjectProxy(Class())
+        items = [0, 1, 2]
+
+        self.assertEqual(items[value], items[1])
+
+
+class TestAsSequenceObjectProxy(unittest.TestCase):
+
+    def test_length(self):
+        value = wrapt.BaseObjectProxy(list(range(3)))
+
+        self.assertEqual(len(value), 3)
+
+    def test_contains(self):
+        value = wrapt.BaseObjectProxy(list(range(3)))
+
+        self.assertTrue(2 in value)
+        self.assertFalse(-2 in value)
+
+    def test_getitem(self):
+        value = wrapt.BaseObjectProxy(list(range(3)))
+
+        self.assertEqual(value[1], 1)
+
+    def test_setitem(self):
+        value = wrapt.BaseObjectProxy(list(range(3)))
+        value[1] = -1
+
+        self.assertEqual(value[1], -1)
+
+    def test_delitem(self):
+        value = wrapt.BaseObjectProxy(list(range(3)))
+
+        self.assertEqual(len(value), 3)
+
+        del value[1]
+
+        self.assertEqual(len(value), 2)
+        self.assertEqual(value[1], 2)
+
+    def test_getslice(self):
+        value = wrapt.BaseObjectProxy(list(range(5)))
+
+        self.assertEqual(value[1:4], [1, 2, 3])
+
+    def test_setslice(self):
+        value = wrapt.BaseObjectProxy(list(range(5)))
+
+        value[1:4] = reversed(value[1:4])
+
+        self.assertEqual(value[1:4], [3, 2, 1])
+
+    def test_delslice(self):
+        value = wrapt.BaseObjectProxy(list(range(5)))
+
+        del value[1:4]
+
+        self.assertEqual(len(value), 2)
+        self.assertEqual(value, [0, 4])
+
+
+class TestAsMappingObjectProxy(unittest.TestCase):
+
+    def test_length(self):
+        value = wrapt.BaseObjectProxy(dict.fromkeys(range(3), False))
+
+        self.assertEqual(len(value), 3)
+
+    def test_contains(self):
+        value = wrapt.BaseObjectProxy(dict.fromkeys(range(3), False))
+
+        self.assertTrue(2 in value)
+        self.assertFalse(-2 in value)
+
+    def test_getitem(self):
+        value = wrapt.BaseObjectProxy(dict.fromkeys(range(3), False))
+
+        self.assertEqual(value[1], False)
+
+    def test_setitem(self):
+        value = wrapt.BaseObjectProxy(dict.fromkeys(range(3), False))
+        value[1] = True
+
+        self.assertEqual(value[1], True)
+
+    def test_delitem(self):
+        value = wrapt.BaseObjectProxy(dict.fromkeys(range(3), False))
+
+        self.assertEqual(len(value), 3)
+
+        del value[1]
+
+        self.assertEqual(len(value), 2)
+
+
+class TestObjectRepresentationObjectProxy(unittest.TestCase):
+
+    def test_str(self):
+        value = wrapt.BaseObjectProxy(10)
+
+        self.assertEqual(str(value), str(10))
+
+        value = wrapt.BaseObjectProxy((10,))
+
+        self.assertEqual(str(value), str((10,)))
+
+        value = wrapt.BaseObjectProxy([10])
+
+        self.assertEqual(str(value), str([10]))
+
+        value = wrapt.BaseObjectProxy({10: 10})
+
+        self.assertEqual(str(value), str({10: 10}))
+
+    def test_repr(self):
+        number = 10
+        value = wrapt.BaseObjectProxy(number)
+
+        self.assertNotEqual(repr(value).find("ObjectProxy at"), -1)
+
+    def test_format(self):
+        value = 1
+
+        proxy = wrapt.BaseObjectProxy(1)
+
+        self.assertEqual(f"{proxy:0>3}", f"{value:0>3}")
+
+
+class TestDerivedClassCreation(unittest.TestCase):
+
+    def test_derived_new(self):
+
+        class DerivedObjectProxy(wrapt.BaseObjectProxy):
+
+            def __new__(cls, wrapped):
+                instance = super(DerivedObjectProxy, cls).__new__(cls, wrapped)
+                return instance
+
+            def __init__(self, wrapped):
+                super(DerivedObjectProxy, self).__init__(wrapped)
+
+        def function():
+            pass
+
+        obj = DerivedObjectProxy(function)
+
+        self.assertIsInstance(obj, DerivedObjectProxy)
+        self.assertIs(obj.__wrapped__, function)
+
+    def test_derived_setattr(self):
+
+        class DerivedObjectProxy(wrapt.BaseObjectProxy):
+
+            def __init__(self, wrapped):
+                self._self_attribute = True
+                super(DerivedObjectProxy, self).__init__(wrapped)
+
+        def function():
+            pass
+
+        obj = DerivedObjectProxy(function)
+
+    def test_derived_missing_init(self):
+
+        class DerivedObjectProxy(wrapt.BaseObjectProxy):
+
+            def __init__(self, wrapped):
+                self.__wrapped__ = wrapped
+
+        def function():
+            pass
+
+        obj = DerivedObjectProxy(function)
+
+        self.assertEqual(function, obj)
+        self.assertEqual(function, obj.__wrapped__)
+
+
+class DerivedClassAttributes(unittest.TestCase):
+
+    def test_setup_class_attributes(self):
+
+        def function():
+            pass
+
+        class DerivedObjectProxy(wrapt.BaseObjectProxy):
+            pass
+
+        obj = DerivedObjectProxy(function)
+
+        DerivedObjectProxy.ATTRIBUTE = 1
+
+        self.assertEqual(obj.ATTRIBUTE, 1)
+        self.assertFalse(hasattr(function, "ATTRIBUTE"))
+
+        del DerivedObjectProxy.ATTRIBUTE
+
+        self.assertFalse(hasattr(DerivedObjectProxy, "ATTRIBUTE"))
+        self.assertFalse(hasattr(obj, "ATTRIBUTE"))
+        self.assertFalse(hasattr(function, "ATTRIBUTE"))
+
+    def test_override_class_attributes(self):
+
+        def function():
+            pass
+
+        class DerivedObjectProxy(wrapt.BaseObjectProxy):
+            ATTRIBUTE = 1
+
+        obj = DerivedObjectProxy(function)
+
+        self.assertEqual(DerivedObjectProxy.ATTRIBUTE, 1)
+        self.assertEqual(obj.ATTRIBUTE, 1)
+
+        obj.ATTRIBUTE = 2
+
+        self.assertEqual(DerivedObjectProxy.ATTRIBUTE, 1)
+
+        self.assertEqual(obj.ATTRIBUTE, 2)
+        self.assertFalse(hasattr(function, "ATTRIBUTE"))
+
+        del DerivedObjectProxy.ATTRIBUTE
+
+        self.assertFalse(hasattr(DerivedObjectProxy, "ATTRIBUTE"))
+        self.assertEqual(obj.ATTRIBUTE, 2)
+        self.assertFalse(hasattr(function, "ATTRIBUTE"))
+
+    def test_class_properties(self):
+
+        def function():
+            pass
+
+        class DerivedObjectProxy(wrapt.BaseObjectProxy):
+            def __init__(self, wrapped):
+                super(DerivedObjectProxy, self).__init__(wrapped)
+                self._self_attribute = 1
+
+            @property
+            def ATTRIBUTE(self):
+                return self._self_attribute
+
+            @ATTRIBUTE.setter
+            def ATTRIBUTE(self, value):
+                self._self_attribute = value
+
+            @ATTRIBUTE.deleter
+            def ATTRIBUTE(self):
+                del self._self_attribute
+
+        obj = DerivedObjectProxy(function)
+
+        self.assertEqual(obj.ATTRIBUTE, 1)
+
+        obj.ATTRIBUTE = 2
+
+        self.assertEqual(obj.ATTRIBUTE, 2)
+        self.assertFalse(hasattr(function, "ATTRIBUTE"))
+
+        del obj.ATTRIBUTE
+
+        self.assertFalse(hasattr(obj, "ATTRIBUTE"))
+        self.assertFalse(hasattr(function, "ATTRIBUTE"))
+
+        obj.ATTRIBUTE = 1
+
+        self.assertEqual(obj.ATTRIBUTE, 1)
+
+        obj.ATTRIBUTE = 2
+
+        self.assertEqual(obj.ATTRIBUTE, 2)
+        self.assertFalse(hasattr(function, "ATTRIBUTE"))
+
+        del obj.ATTRIBUTE
+
+        self.assertFalse(hasattr(obj, "ATTRIBUTE"))
+        self.assertFalse(hasattr(function, "ATTRIBUTE"))
+
+
+class OverrideAttributeAccess(unittest.TestCase):
+
+    def test_attr_functions(self):
+
+        def function():
+            pass
+
+        proxy = wrapt.BaseObjectProxy(function)
+
+        self.assertTrue(hasattr(proxy, "__getattr__"))
+        self.assertTrue(hasattr(proxy, "__setattr__"))
+        self.assertTrue(hasattr(proxy, "__delattr__"))
+
+    def test_override_getattr(self):
+
+        def function():
+            pass
+
+        accessed = []
+
+        class DerivedObjectProxy(wrapt.BaseObjectProxy):
+            def __getattr__(self, name):
+                accessed.append(name)
+                try:
+                    __getattr__ = super(DerivedObjectProxy, self).__getattr__
+                except AttributeError as e:
+                    raise RuntimeError(str(e))
+                return __getattr__(name)
+
+        function.attribute = 1
+
+        proxy = DerivedObjectProxy(function)
+
+        self.assertEqual(proxy.attribute, 1)
+
+        self.assertTrue("attribute" in accessed)
+
+
+class CallableFunction(unittest.TestCase):
+
+    def test_proxy_hasattr_call(self):
+        proxy = wrapt.BaseObjectProxy(None)
+
+        self.assertFalse(hasattr(proxy, "__call__"))
+
+    def test_proxy_getattr_call(self):
+        proxy = wrapt.BaseObjectProxy(None)
+
+        self.assertEqual(getattr(proxy, "__call__", None), None)
+
+    def test_proxy_is_callable(self):
+        proxy = wrapt.BaseObjectProxy(None)
+
+        self.assertFalse(callable(proxy))
+
+    def test_callable_proxy_hasattr_call(self):
+        proxy = wrapt.CallableObjectProxy(None)
+
+        self.assertTrue(hasattr(proxy, "__call__"))
+
+    def test_callable_proxy_getattr_call(self):
+        proxy = wrapt.CallableObjectProxy(None)
+
+        self.assertTrue(getattr(proxy, "__call__", None), None)
+
+    def test_callable_proxy_is_callable(self):
+        proxy = wrapt.CallableObjectProxy(None)
+
+        self.assertTrue(callable(proxy))
+
+
+class SpecialMethods(unittest.TestCase):
+
+    def test_class_bytes(self):
+        class Class:
+            def __bytes__(self):
+                return b"BYTES"
+
+        instance = Class()
+
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(bytes(instance), bytes(proxy))
+
+    def test_int_bytes(self):
+        # bytes(proxy) should behave like bytes() on the wrapped object even
+        # when it has no __bytes__ (e.g. an int, where bytes(n) yields a
+        # zero-filled buffer of length n).
+        instance = 3
+
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(bytes(instance), bytes(proxy))
+
+    def test_index_bytes(self):
+        # An object with __index__() but no __bytes__ converts like an int,
+        # yielding a zero-filled buffer.
+        class Class:
+            def __index__(self):
+                return 2
+
+        instance = Class()
+
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(bytes(instance), bytes(proxy))
+
+    def test_buffer_bytes(self):
+        # An object supporting the buffer protocol but no __bytes__.
+        instance = bytearray(b"abcd")
+
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(bytes(instance), bytes(proxy))
+
+    def test_iterable_bytes(self):
+        # An iterable of ints, converted element by element.
+        instance = [1, 2, 3]
+
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(bytes(instance), bytes(proxy))
+
+    def test_str_bytes(self):
+        # bytes() on a str without an encoding raises TypeError, and the
+        # proxy should match rather than fall back to some other conversion.
+        instance = "abcd"
+
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        with self.assertRaises(TypeError):
+            bytes(proxy)
+
+    def test_str_format(self):
+        instance = "abcd"
+
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(format(instance, ""), format(proxy, ""))
+
+    def test_list_reversed(self):
+        instance = [1, 2]
+
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(list(reversed(instance)), list(reversed(proxy)))
+
+    def test_complex(self):
+        instance = 1.0 + 2j
+
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(complex(instance), complex(proxy))
+
+    def test_decimal_complex(self):
+        import decimal
+
+        instance = decimal.Decimal(123)
+
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(complex(instance), complex(proxy))
+
+    def test_fractions_round(self):
+        import fractions
+
+        instance = fractions.Fraction("1/2")
+
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(round(instance), round(proxy))
+        self.assertEqual(round(instance, 3), round(proxy, 3))
+        self.assertEqual(round(instance, ndigits=3), round(proxy, ndigits=3))
+
+    def test_math_integral_protocol_methods(self):
+        import math
+
+        class Instance:
+            def __trunc__(self):
+                return "truncated"
+
+            def __floor__(self):
+                return "floored"
+
+            def __ceil__(self):
+                return "ceiled"
+
+        instance = Instance()
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(math.trunc(proxy), "truncated")
+        self.assertEqual(math.floor(proxy), "floored")
+        self.assertEqual(math.ceil(proxy), "ceiled")
+
+    def test_float_trunc(self):
+        import math
+
+        instance = 1.7
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(math.trunc(instance), math.trunc(proxy))
+        self.assertEqual(math.trunc(instance), 1)
+
+    def test_negative_float_trunc(self):
+        import math
+
+        instance = -1.7
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(math.trunc(instance), math.trunc(proxy))
+        self.assertEqual(math.trunc(instance), -1)
+
+    def test_fractions_trunc(self):
+        import fractions
+        import math
+
+        instance = fractions.Fraction("7/3")
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(math.trunc(instance), math.trunc(proxy))
+        self.assertEqual(math.trunc(instance), 2)
+
+    def test_float_floor(self):
+        import math
+
+        instance = 1.7
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(math.floor(instance), math.floor(proxy))
+        self.assertEqual(math.floor(instance), 1)
+
+    def test_negative_float_floor(self):
+        import math
+
+        instance = -1.7
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(math.floor(instance), math.floor(proxy))
+        self.assertEqual(math.floor(instance), -2)
+
+    def test_fractions_floor(self):
+        import fractions
+        import math
+
+        instance = fractions.Fraction("7/3")
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(math.floor(instance), math.floor(proxy))
+        self.assertEqual(math.floor(instance), 2)
+
+    def test_float_ceil(self):
+        import math
+
+        instance = 1.7
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(math.ceil(instance), math.ceil(proxy))
+        self.assertEqual(math.ceil(instance), 2)
+
+    def test_negative_float_ceil(self):
+        import math
+
+        instance = -1.7
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(math.ceil(instance), math.ceil(proxy))
+        self.assertEqual(math.ceil(instance), -1)
+
+    def test_fractions_ceil(self):
+        import fractions
+        import math
+
+        instance = fractions.Fraction("7/3")
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(math.ceil(instance), math.ceil(proxy))
+        self.assertEqual(math.ceil(instance), 3)
+
+    def test_math_integral_protocol_methods_override_float(self):
+        # The __floor__() and __ceil__() methods of the wrapped object must
+        # take precedence over any __float__() fallback in math.floor() and
+        # math.ceil(), the same as if the wrapped object was used directly.
+
+        import math
+
+        class Instance:
+            def __float__(self):
+                return 3.5
+
+            def __trunc__(self):
+                return "truncated"
+
+            def __floor__(self):
+                return "floored"
+
+            def __ceil__(self):
+                return "ceiled"
+
+        instance = Instance()
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(math.trunc(proxy), math.trunc(instance))
+        self.assertEqual(math.floor(proxy), math.floor(instance))
+        self.assertEqual(math.ceil(proxy), math.ceil(instance))
+
+    def test_math_float_fallback(self):
+        # An object which only provides __float__() still works with
+        # math.floor() and math.ceil() via the proxy, the same as it does
+        # when used directly, and math.trunc() fails the same way for both.
+
+        import math
+
+        class Instance:
+            def __float__(self):
+                return 3.5
+
+        instance = Instance()
+        proxy = wrapt.BaseObjectProxy(instance)
+
+        self.assertEqual(math.floor(proxy), math.floor(instance))
+        self.assertEqual(math.ceil(proxy), math.ceil(instance))
+
+        self.assertRaises(TypeError, math.trunc, instance)
+        self.assertRaises(TypeError, math.trunc, proxy)
+
+
+class TestArgumentUnpacking(unittest.TestCase):
+
+    def test_self_keyword_argument_on_dict(self):
+        # A dict when given self as keyword argument uses it to create item in
+        # the dict and no attempt is made to use a positional argument.
+
+        d = wrapt.CallableObjectProxy(dict)(self="self")
+
+        self.assertEqual(d, dict(self="self"))
+
+    def test_self_positional_argument_on_class_init(self):
+        class Object:
+            def __init__(self, *args, **kwargs):
+                self._args = args
+                self._kwargs = kwargs
+
+        o = Object("arg1")
+
+        self.assertEqual(o._args, ("arg1",))
+        self.assertEqual(o._kwargs, {})
+
+        o = wrapt.CallableObjectProxy(Object)("arg1")
+
+        self.assertEqual(o._args, ("arg1",))
+        self.assertEqual(o._kwargs, {})
+
+    def test_self_keyword_argument_on_class_init_1(self):
+        class Object:
+            def __init__(self, *args, **kwargs):
+                self._args = args
+                self._kwargs = kwargs
+
+        with self.assertRaises(TypeError) as e:
+            Object(self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+        with self.assertRaises(TypeError) as e:
+            wrapt.CallableObjectProxy(Object)(self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+    def test_self_keyword_argument_on_class_init_2(self):
+        class Object:
+            def __init__(self, *args, **kwargs):
+                self._args = args
+                self._kwargs = kwargs
+
+        with self.assertRaises(TypeError) as e:
+            Object(arg1="arg1", self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+        with self.assertRaises(TypeError) as e:
+            wrapt.CallableObjectProxy(Object)(arg1="arg1", self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+    def test_self_keyword_argument_on_class_init_renamed(self):
+        class Object:
+            def __init__(_self, *args, **kwargs):
+                _self._args = args
+                _self._kwargs = kwargs
+
+        o = Object(self="self")
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, dict(self="self"))
+
+        o = wrapt.CallableObjectProxy(Object)(self="self")
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, dict(self="self"))
+
+    def test_self_keyword_argument_on_class_init_overloaded_1(self):
+        class Object:
+            def __init__(_self, self, *args, **kwargs):
+                _self._self = self
+                _self._args = args
+                _self._kwargs = kwargs
+
+        o = Object(self="self")
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, {})
+        self.assertEqual(o._self, "self")
+
+        o = wrapt.CallableObjectProxy(Object)(self="self")
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, {})
+        self.assertEqual(o._self, "self")
+
+    def test_self_keyword_argument_on_class_init_overloaded_2(self):
+        class Object:
+            def __init__(_self, self, *args, **kwargs):
+                _self._self = self
+                _self._args = args
+                _self._kwargs = kwargs
+
+        with self.assertRaises(TypeError) as e:
+            Object(_self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument '_self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+        with self.assertRaises(TypeError) as e:
+            wrapt.CallableObjectProxy(Object)(_self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument '_self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+
+class TestArgumentUnpackingPartial(unittest.TestCase):
+
+    def test_self_keyword_argument_on_dict_1(self):
+        # A dict when given self as keyword argument uses it to create item in
+        # the dict and no attempt is made to use a positional argument.
+
+        wrapper = wrapt.partial(dict, arg1="arg1")
+
+        d = wrapper(self="self")
+
+        self.assertEqual(d, dict(self="self", arg1="arg1"))
+
+    def test_self_keyword_argument_on_dict_2(self):
+        # A dict when given self as keyword argument uses it to create item in
+        # the dict and no attempt is made to use a positional argument.
+
+        wrapper = wrapt.partial(dict, self="self")
+
+        d = wrapper(arg1="arg1")
+
+        self.assertEqual(d, dict(self="self", arg1="arg1"))
+
+    def test_self_positional_argument_on_class_init_1(self):
+        class Object:
+            def __init__(self, *args, **kwargs):
+                self._args = args
+                self._kwargs = kwargs
+
+        o = Object("arg1")
+
+        self.assertEqual(o._args, ("arg1",))
+        self.assertEqual(o._kwargs, {})
+
+        wrapper = wrapt.partial(Object, "arg1")
+
+        o = wrapper()
+
+        self.assertEqual(o._args, ("arg1",))
+        self.assertEqual(o._kwargs, {})
+
+    def test_self_positional_argument_on_class_init_2(self):
+        class Object:
+            def __init__(self, *args, **kwargs):
+                self._args = args
+                self._kwargs = kwargs
+
+        o = Object("arg1")
+
+        self.assertEqual(o._args, ("arg1",))
+        self.assertEqual(o._kwargs, {})
+
+        wrapper = wrapt.partial(Object)
+
+        o = wrapper("arg1")
+
+        self.assertEqual(o._args, ("arg1",))
+        self.assertEqual(o._kwargs, {})
+
+    def test_self_keyword_argument_on_class_init_1a(self):
+        class Object:
+            def __init__(self, *args, **kwargs):
+                self._args = args
+                self._kwargs = kwargs
+
+        with self.assertRaises(TypeError) as e:
+            Object(self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+        wrapper = wrapt.partial(Object, self="self")
+
+        with self.assertRaises(TypeError) as e:
+            o = wrapper()
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+    def test_self_keyword_argument_on_class_init_1b(self):
+        class Object:
+            def __init__(self, *args, **kwargs):
+                self._args = args
+                self._kwargs = kwargs
+
+        with self.assertRaises(TypeError) as e:
+            Object(self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+        wrapper = wrapt.partial(Object)
+
+        with self.assertRaises(TypeError) as e:
+            o = wrapper(self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+    def test_self_keyword_argument_on_class_init_2a(self):
+        class Object:
+            def __init__(self, *args, **kwargs):
+                self._args = args
+                self._kwargs = kwargs
+
+        with self.assertRaises(TypeError) as e:
+            Object(arg1="arg1", self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+        wrapper = wrapt.partial(Object, arg1="arg1", self="self")
+
+        with self.assertRaises(TypeError) as e:
+            o = wrapper()
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+    def test_self_keyword_argument_on_class_init_2b(self):
+        class Object:
+            def __init__(self, *args, **kwargs):
+                self._args = args
+                self._kwargs = kwargs
+
+        with self.assertRaises(TypeError) as e:
+            Object(arg1="arg1", self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+        wrapper = wrapt.partial(Object)
+
+        with self.assertRaises(TypeError) as e:
+            o = wrapper(arg1="arg1", self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+    def test_self_keyword_argument_on_class_init_renamed_1(self):
+        class Object:
+            def __init__(_self, *args, **kwargs):
+                _self._args = args
+                _self._kwargs = kwargs
+
+        o = Object(self="self")
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, dict(self="self"))
+
+        wrapper = wrapt.partial(Object, self="self")
+
+        o = wrapper()
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, dict(self="self"))
+
+    def test_self_keyword_argument_on_class_init_renamed_2(self):
+        class Object:
+            def __init__(_self, *args, **kwargs):
+                _self._args = args
+                _self._kwargs = kwargs
+
+        o = Object(self="self")
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, dict(self="self"))
+
+        wrapper = wrapt.partial(Object)
+
+        o = wrapper(self="self")
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, dict(self="self"))
+
+    def test_self_keyword_argument_on_class_init_overloaded_1a(self):
+        class Object:
+            def __init__(_self, self, *args, **kwargs):
+                _self._self = self
+                _self._args = args
+                _self._kwargs = kwargs
+
+        o = Object(self="self")
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, {})
+        self.assertEqual(o._self, "self")
+
+        wrapper = wrapt.partial(Object, self="self")
+
+        o = wrapper()
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, {})
+        self.assertEqual(o._self, "self")
+
+    def test_self_keyword_argument_on_class_init_overloaded_1b(self):
+        class Object:
+            def __init__(_self, self, *args, **kwargs):
+                _self._self = self
+                _self._args = args
+                _self._kwargs = kwargs
+
+        o = Object(self="self")
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, {})
+        self.assertEqual(o._self, "self")
+
+        wrapper = wrapt.partial(Object)
+
+        o = wrapper(self="self")
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, {})
+        self.assertEqual(o._self, "self")
+
+    def test_self_keyword_argument_on_class_init_overloaded_2a(self):
+        class Object:
+            def __init__(_self, self, *args, **kwargs):
+                _self._self = self
+                _self._args = args
+                _self._kwargs = kwargs
+
+        with self.assertRaises(TypeError) as e:
+            Object(_self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument '_self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+        wrapper = wrapt.partial(Object, _self="self")
+
+        with self.assertRaises(TypeError) as e:
+            o = wrapper()
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument '_self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+    def test_self_keyword_argument_on_class_init_overloaded_2b(self):
+        class Object:
+            def __init__(_self, self, *args, **kwargs):
+                _self._self = self
+                _self._args = args
+                _self._kwargs = kwargs
+
+        with self.assertRaises(TypeError) as e:
+            Object(_self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument '_self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+        wrapper = wrapt.partial(Object)
+
+        with self.assertRaises(TypeError) as e:
+            o = wrapper(_self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument '_self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+
+class TestArgumentUnpackingWrapperBase(unittest.TestCase):
+
+    def test_self_keyword_argument_on_dict(self):
+        # A dict when given self as keyword argument uses it to create item in
+        # the dict and no attempt is made to use a positional argument.
+
+        def wrapper(wrapped, instance, args, kwargs):
+            return wrapped(*args, **kwargs)
+
+        d = wrapt.FunctionWrapper(dict, wrapper)(self="self")
+
+        self.assertEqual(d, dict(self="self"))
+
+    def test_self_positional_argument_on_class_init(self):
+        def wrapper(wrapped, instance, args, kwargs):
+            return wrapped(*args, **kwargs)
+
+        class Object:
+            def __init__(self, *args, **kwargs):
+                self._args = args
+                self._kwargs = kwargs
+
+        o = Object("arg1")
+
+        self.assertEqual(o._args, ("arg1",))
+        self.assertEqual(o._kwargs, {})
+
+        o = wrapt.FunctionWrapper(Object, wrapper)("arg1")
+
+        self.assertEqual(o._args, ("arg1",))
+        self.assertEqual(o._kwargs, {})
+
+    def test_self_keyword_argument_on_class_init_1(self):
+        def wrapper(wrapped, instance, args, kwargs):
+            return wrapped(*args, **kwargs)
+
+        class Object:
+            def __init__(self, *args, **kwargs):
+                self._args = args
+                self._kwargs = kwargs
+
+        with self.assertRaises(TypeError) as e:
+            Object(self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+        with self.assertRaises(TypeError) as e:
+            wrapt.FunctionWrapper(Object, wrapper)(self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+    def test_self_keyword_argument_on_class_init_2(self):
+        def wrapper(wrapped, instance, args, kwargs):
+            return wrapped(*args, **kwargs)
+
+        class Object:
+            def __init__(self, *args, **kwargs):
+                self._args = args
+                self._kwargs = kwargs
+
+        with self.assertRaises(TypeError) as e:
+            Object(arg1="arg1", self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+        with self.assertRaises(TypeError) as e:
+            wrapt.FunctionWrapper(Object, wrapper)(arg1="arg1", self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument 'self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+    def test_self_keyword_argument_on_class_init_renamed(self):
+        def wrapper(wrapped, instance, args, kwargs):
+            return wrapped(*args, **kwargs)
+
+        class Object:
+            def __init__(_self, *args, **kwargs):
+                _self._args = args
+                _self._kwargs = kwargs
+
+        o = Object(self="self")
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, dict(self="self"))
+
+        o = wrapt.FunctionWrapper(Object, wrapper)(self="self")
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, dict(self="self"))
+
+    def test_self_keyword_argument_on_class_init_overloaded_1(self):
+        def wrapper(wrapped, instance, args, kwargs):
+            return wrapped(*args, **kwargs)
+
+        class Object:
+            def __init__(_self, self, *args, **kwargs):
+                _self._self = self
+                _self._args = args
+                _self._kwargs = kwargs
+
+        o = Object(self="self")
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, {})
+        self.assertEqual(o._self, "self")
+
+        o = wrapt.FunctionWrapper(Object, wrapper)(self="self")
+
+        self.assertEqual(o._args, ())
+        self.assertEqual(o._kwargs, {})
+        self.assertEqual(o._self, "self")
+
+    def test_self_keyword_argument_on_class_init_overloaded_2(self):
+        def wrapper(wrapped, instance, args, kwargs):
+            return wrapped(*args, **kwargs)
+
+        class Object:
+            def __init__(_self, self, *args, **kwargs):
+                _self._self = self
+                _self._args = args
+                _self._kwargs = kwargs
+
+        with self.assertRaises(TypeError) as e:
+            Object(_self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument '_self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+        with self.assertRaises(TypeError) as e:
+            wrapt.FunctionWrapper(Object, wrapper)(_self="self")
+
+        self.assertNotEqual(
+            re.match(
+                ".*got multiple values for (keyword )?argument '_self'.*",
+                str(e.exception),
+            ),
+            None,
+        )
+
+
+class TestArgumentUnpackingBoundFunctionWrapper(unittest.TestCase):
+
+    def test_self_keyword_argument_on_classmethod(self):
+        def wrapper(wrapped, instance, args, kwargs):
+            return wrapped(*args, **kwargs)
+
+        class Object:
+            @classmethod
+            def function(cls, self, *args, **kwargs):
+                return self, args, kwargs
+
+            function = wrapt.FunctionWrapper(function, wrapper)
+
+        result = Object().function(self="self")
+
+        self.assertEqual(result, ("self", (), {}))
+
+    def test_self_keyword_argument_on_instancemethod(self):
+        def wrapper(wrapped, instance, args, kwargs):
+            return wrapped(*args, **kwargs)
+
+        class Object:
+            def function(_self, self, *args, **kwargs):
+                return self, args, kwargs
+
+            function = wrapt.FunctionWrapper(function, wrapper)
+
+        result = Object().function(self="self")
+
+        self.assertEqual(result, ("self", (), {}))
+
+
+class TestArgumentUnpackingDecorator(unittest.TestCase):
+
+    def test_self_keyword_argument_on_function(self):
+        @wrapt.decorator
+        def wrapper(wrapped, instance, args, kwargs):
+            return wrapped(*args, **kwargs)
+
+        @wrapper
+        def function(self, *args, **kwargs):
+            return self, args, kwargs
+
+        result = function(self="self")
+
+        self.assertEqual(result, ("self", (), {}))
+
+        result = function("self")
+
+        self.assertEqual(result, ("self", (), {}))
+
+    def test_self_keyword_argument_on_classmethod(self):
+        @wrapt.decorator
+        def wrapper(wrapped, instance, args, kwargs):
+            return wrapped(*args, **kwargs)
+
+        class Object:
+            @wrapper
+            @classmethod
+            def function(cls, self, *args, **kwargs):
+                return self, args, kwargs
+
+        result = Object().function(self="self")
+
+        self.assertEqual(result, ("self", (), {}))
+
+        result = Object().function("self", arg1="arg1")
+
+        self.assertEqual(result, ("self", (), dict(arg1="arg1")))
+
+    def test_self_keyword_argument_on_instancemethod(self):
+        @wrapt.decorator
+        def wrapper(wrapped, instance, args, kwargs):
+            return wrapped(*args, **kwargs)
+
+        class Object:
+            @wrapper
+            def function(_self, self, *args, **kwargs):
+                return self, args, kwargs
+
+        result = Object().function(self="self", arg1="arg1")
+
+        self.assertEqual(result, ("self", (), dict(arg1="arg1")))
+
+        result = Object().function("self", arg1="arg1")
+
+        self.assertEqual(result, ("self", (), dict(arg1="arg1")))
+
+
+class TestOverridingSpecialAttributes(unittest.TestCase):
+
+    def test_overriding_class_attribute(self):
+        class Object1:
+            pass
+
+        class Object2(Object1):
+            pass
+
+        o1 = Object1()
+
+        self.assertEqual(o1.__class__, type(o1))
+
+        o2 = Object2()
+
+        self.assertEqual(o2.__class__, type(o2))
+
+        o2.__class__ = type(o1)
+
+        self.assertEqual(o2.__class__, type(o1))
+
+
+class TestClassGetItem(unittest.TestCase):
+
+    def test_class_getitem(self):
+        class Meta(type):
+            def __getitem__(cls, key):
+                return key
+
+        class Object(metaclass=Meta):
+            pass
+
+        self.assertEqual(Object["key"], "key")
+
+        proxy = wrapt.BaseObjectProxy(Object)
+
+        self.assertEqual(proxy["key"], "key")
+
+
+if __name__ == "__main__":
+    unittest.main()

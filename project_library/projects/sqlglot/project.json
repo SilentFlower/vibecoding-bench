@@ -1,0 +1,296 @@
+{
+  "schema": 2,
+  "project_key": "sqlglot",
+  "title": "SQLGlot查询与血缘工作场景",
+  "category": "SQL解析、转换与报表血缘",
+  "description": "公开主仓的解析边界、转换对照、空表方案、重复输出名、血缘诊断和图渲染修复。",
+  "seed_digest": "da2111c04ccd5d9e1d8aed50e2c109a74d5672b5f6c9d0b3ef7948e486150631",
+  "environment": "sqlglot-py312",
+  "source": {
+    "repository": "https://github.com/tobymao/sqlglot",
+    "commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/tests/fixtures/jsonpath/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "SG-S01",
+      "title": "解析边界",
+      "goal": "区分语法、语句批次与执行合同",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SG-U01",
+            "SG-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SG-U01",
+          "kind": "understand",
+          "goal": "区分SQL解析与数据库校验",
+          "prompt": "Parse SELECT missing FROM orders without a schema. Explain what a successful parse proves about syntax, table existence, column validity, execution permissions and safety. No edits and no external database.",
+          "requires": [],
+          "materials": [
+            "materials/sg-u01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SG-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/SG-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SG-U02",
+          "kind": "understand",
+          "goal": "解释单语句接口的批次结果",
+          "prompt": "Compare parse_one(\"SELECT 1; SELECT 2\") with parse of the same text. Explain the returned shapes and a caller boundary that requires exactly one statement. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/sg-u02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SG-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/SG-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SG-S02",
+      "title": "方言与输入兼容",
+      "goal": "用实际执行对照转换和空表行为",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SG-C01",
+            "SG-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SG-C01",
+          "kind": "consult",
+          "goal": "保留跨方言集合运算语义",
+          "prompt": "Inspect SELECT 1 AS n UNION SELECT 2 AS n INTERSECT SELECT 3 AS n read as postgres and generated for sqlite. Compare executing the raw generated SQL,adding direct parentheses around the INTERSECT operand,and using SELECT 1 AS n UNION SELECT * FROM (SELECT 2 AS n INTERSECT SELECT 3 AS n). Recommend a bounded migration control;no library edits.",
+          "requires": [],
+          "materials": [
+            "materials/sg-c01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SG-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/SG-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SG-C02",
+          "kind": "consult",
+          "goal": "处理空本地表的类型推断",
+          "prompt": "Execute SELECT quantity FROM orders using Table(columns=[\"quantity\"],rows=[]) with no schema,then with schema={\"orders\":{\"quantity\":\"INT\"}}. Recommend the smallest compatible caller change;no library edits.",
+          "requires": [],
+          "materials": [
+            "materials/sg-c02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SG-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/SG-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SG-S03",
+      "title": "报表与输出合同",
+      "goal": "规划有限报表并核对重复输出名",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SG-P01",
+            "SG-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SG-P01",
+          "kind": "plan",
+          "goal": "规划可复现的本地报表对照",
+          "prompt": "Plan a finite local report for rows tea/2,coffee/1,tea/3 with columns product,quantity. Use SELECT product,SUM(quantity) AS total FROM orders GROUP BY product ORDER BY product. Compare SQLGlot Python execution with PostgreSQL-to-SQLite conversion executed in an in-memory SQLite database. No implementation or external service.",
+          "requires": [],
+          "materials": [
+            "materials/sg-p01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SG-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/SG-P01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SG-U03",
+          "kind": "understand",
+          "goal": "解释重复输出名的血缘损失",
+          "prompt": "Call lineage(None,\"SELECT quantity AS x, quantity + 1 AS x FROM orders\",schema={\"orders\":{\"quantity\":\"INT\"}}). Compare the two select positions with the returned mapping. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/sg-u03.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SG-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/SG-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SG-S04",
+      "title": "筛选影响诊断",
+      "goal": "区分值来源与筛选影响",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SG-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "SG-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SG-D01",
+          "kind": "diagnose",
+          "goal": "诊断筛选列未进入值血缘",
+          "prompt": "A report has a filter column missing from the displayed lineage. Request the exact SQL,schema,requested output and observed node names. Diagnose the existing contract without edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SG-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "filter-lineage-evidence",
+              "when": "Exact SQL,schema,requested output and observed node names have not been supplied or declared unavailable and are reasonably requested.",
+              "materials": [
+                "disclosure/filter-lineage.md"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SG-S05",
+      "title": "血缘展示修复",
+      "goal": "保持原查询和有效高亮",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SG-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SG-M01",
+          "kind": "modify",
+          "goal": "修复血缘图展示污染原SQL",
+          "prompt": "Implement the supplied bounded lineage rendering repair and public regression tests. Only the two authorized files may change.",
+          "requires": [],
+          "materials": [
+            "materials/render-repair.md"
+          ],
+          "allowed_paths": [
+            "library/sqlglot/lineage.py",
+            "app/test_lineage_render.py"
+          ],
+          "outcomes": [
+            "repaired_and_regression_verified"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SG-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/SG-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

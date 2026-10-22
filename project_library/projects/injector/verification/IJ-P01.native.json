@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "IJ-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "thread_local_scope_does_not_isolate_coroutines_on_one_thread": true
+  },
+  "resource_profile": "business"
+}

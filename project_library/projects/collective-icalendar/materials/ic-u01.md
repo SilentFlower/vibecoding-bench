@@ -1,0 +1,1 @@
+Create Event with DTSTART=date(2026,10,22). Inspect inferred end,then add DTEND=date(2026,10,23),serialize/reparse and inspect native date type and duration. Explain inclusive start/non-inclusive end from the supplied Event contract. No edits.

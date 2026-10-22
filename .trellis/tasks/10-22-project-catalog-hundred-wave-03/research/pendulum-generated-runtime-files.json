@@ -1,0 +1,30 @@
+{
+  "project": "pendulum",
+  "source_commit": "e06dacedc4cdea90fa1286b3965d180ab94cf251",
+  "files": [
+    {
+      "path": "src/pendulum/_pendulum.cpython-312-x86_64-linux-gnu.so",
+      "sha256": "5e50844f8163618656057bc38518bd5c02c47f6943ddbf1ebb655c579749fcc4",
+      "size": 463960,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100755",
+      "representation": "preserved-upstream-generated-runtime-file"
+    }
+  ],
+  "file_count": 1,
+  "origin": {
+    "installation_result": ".deploy/github-100-research/resume-core/pendulum/installation-result.json",
+    "installation_result_sha256": "0333f8e68d9c36618bf656dc61f7f192c27cd2f3e595c6fd77f99071d185bdca",
+    "install_log_sha256": "cc4da03c190a21e48b7be7d5a5e37c89365f0564d5a2e13b7fd767f1c69ad1e0",
+    "build_input_sha256": {
+      "pyproject.toml": "1f371e17986e9f92ff761c5448793043f38411bc8a9c1ec00eeacf3334e3c8ee",
+      "rust/Cargo.toml": "8f4aaee74a62613e80f2f3455d5192813d377f25ccdc0a4158513272197b1ed6",
+      "rust/Cargo.lock": "2461c2eb5524976d9767745c92f22958e7a28e07cf0324b4d1b1c8d283c1ec32"
+    },
+    "abi": "CPython3.12-linux-x86_64",
+    "version": "3.3.0"
+  },
+  "rebuilt_in_current_run": false,
+  "scope": "只读场景固定原版Rust运行原件；当前目标镜像完整扩展及Python集合另验，不是修改候选重新构建合同"
+}

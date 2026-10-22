@@ -1,0 +1,22 @@
+{
+  "PT-U01": {
+    "candidate_import": true,
+    "interval_components_and_endpoint_membership_are_not_durations": true
+  },
+  "PT-U02": {
+    "candidate_import": true,
+    "overlapping_interval_assignment_replaces_values_on_the_overlap": true
+  },
+  "PT-C01": {
+    "candidate_import": true,
+    "range_get_fills_gaps_without_mutating_the_original_mapping": true
+  },
+  "PT-C02": {
+    "candidate_import": true,
+    "iteration_step_and_direction_need_an_application_progress_contract": true
+  },
+  "PT-P01": {
+    "candidate_import": true,
+    "free_schedule_is_the_declared_window_minus_busy_intervals": true
+  }
+}

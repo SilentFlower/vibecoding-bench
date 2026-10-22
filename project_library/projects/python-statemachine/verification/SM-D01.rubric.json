@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SM-D01",
+  "source_commit": "ec5d8173f740b37941818df13727db9d64ef498d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use consumed version/signature/class-policy evidence to explain constructor kwargs versus the current class attribute. Missing evidence supports insufficient_information. Propose a separately scoped class/caller migration with tests,not a package patch or a claim the option took effect.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

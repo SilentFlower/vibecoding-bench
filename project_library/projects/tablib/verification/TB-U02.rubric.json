@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TB-U02",
+  "source_commit": "966876c76a6378557c1951badc1665b4d1375875",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Indexed storage remains (\"A\",2), while .dict projects qty as \"002\" and CSV exports that formatted text. _package applies callbacks to copied rows, so exporting does not convert stored qty into a string. Keep computation/validation against typed source values and treat formatting callbacks as an output policy.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

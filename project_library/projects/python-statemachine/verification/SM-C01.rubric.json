@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SM-C01",
+  "source_commit": "ec5d8173f740b37941818df13727db9d64ef498d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "StateChart tolerates the unknown event,returns None and retains its state;StateMachine raises TransitionNotAllowed and retains state. Select the actual class/class-attribute policy deliberately and validate incoming command identity when required. Tolerance is not proof a business operation occurred;do not generalize defaults between the two classes.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

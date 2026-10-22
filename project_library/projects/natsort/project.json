@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "natsort",
+  "title": "Natsort产品清单工作场景",
+  "category": "数值解析、路径与稳定重排",
+  "description": "符号、浮点和指数语义、路径清单、字节名称、并列数据重排及前导零平局诊断。",
+  "seed_digest": "5b79124b7ccf9c5c26cc20c6eece73ae8acb6bc590dc8fee2f4b376a454b2506",
+  "environment": "natsort-py312",
+  "source": {
+    "repository": "https://github.com/SethMMorton/natsort",
+    "commit": "e9a3a2a307580a1f2be8c57bba50fba45789ada0",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "NS-S01",
+      "title": "数值解析策略",
+      "goal": "按标识语法选择排序",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "NS-U01",
+            "NS-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "NS-U01",
+          "kind": "understand",
+          "goal": "解释标识中的负号策略",
+          "prompt": "Compare natsorted([\"v-3\",\"v2\",\"v-10\"]) with alg=ns.SIGNED. Explain whether the hyphen is punctuation or a numeric sign. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/ns-u01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/NS-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/NS-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "NS-U02",
+          "kind": "understand",
+          "goal": "区分数值和版本号排序",
+          "prompt": "Compare default and ns.FLOAT on [\"p1.10\",\"p1.2\",\"p1.9\"]. Compare ns.FLOAT and ns.FLOAT|ns.NOEXP on [\"v1e2\",\"v20\",\"v3\"]. Explain a version-list versus measurement-list choice. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/ns-u02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/NS-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/NS-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "NS-S02",
+      "title": "文件清单策略",
+      "goal": "明确路径与字节边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "NS-C01",
+            "NS-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "NS-C01",
+          "kind": "consult",
+          "goal": "选择文件清单的路径排序策略",
+          "prompt": "Compare default and ns.PATH on [\"Folder/\",\"Folder (1)/\",\"Folder (10)/\"] on the supplied Linux platform. Advise folder-component ordering without inspecting or changing real files.",
+          "requires": [],
+          "materials": [
+            "materials/ns-c01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/NS-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/NS-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "NS-C02",
+          "kind": "consult",
+          "goal": "明确字节文件名的解码边界",
+          "prompt": "Compare natsorted([b\"f10\",b\"f2\"]) with natsorted([\"f10\",\"f2\"]). Advise an explicit text/byte filename strategy and failure policy. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/ns-c02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/NS-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/NS-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "NS-S03",
+      "title": "并列数据方案",
+      "goal": "共享一份冻结排列",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "NS-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "NS-P01",
+          "kind": "plan",
+          "goal": "规划并列字段的一致重排",
+          "prompt": "labels=[\"part10\",\"part2\",\"part1\"] and amounts=[100,20,10] describe aligned rows. Inspect index_natsorted(labels) and apply that exact permutation with order_by_index to both sequences,including iter=True. Plan validation and publication. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/ns-p01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/NS-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/NS-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "NS-S04",
+      "title": "稳定平局诊断",
+      "goal": "核对实际输入与键",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "NS-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "NS-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "NS-D01",
+          "kind": "diagnose",
+          "goal": "诊断前导零平局的顺序变化",
+          "prompt": "A report says a1 and a01 change relative order between runs. Request exact input order,algorithm flags,key and output controls before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/NS-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "equal-natural-keys",
+              "when": "Exact input/key/flags and output controls have not been supplied or declared unavailable and are reasonably requested.",
+              "materials": [
+                "disclosure/ties.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

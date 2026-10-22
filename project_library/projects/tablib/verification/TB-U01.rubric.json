@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TB-U01",
+  "source_commit": "966876c76a6378557c1951badc1665b4d1375875",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default headers consume the first row, leaving qty values \"2\" and \"\" as strings. headers=False retains (\"sku\",\"qty\") as the first data row. CSV parsing does not validate numeric quantity or convert blank to None. Define a separate typed schema and missing-value policy.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

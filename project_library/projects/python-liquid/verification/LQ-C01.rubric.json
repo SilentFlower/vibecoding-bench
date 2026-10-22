@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "LQ-C01",
+  "source_commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default autoescape=False emits the raw string;explicit True emits &lt;b&gt;A&amp;B&lt;/b&gt;. Choose escaping for the actual output context,keep untrusted values plain,and separately review safe/Markup values,custom filters and URL/attribute consumers. This fixed output probe is not a complete sandbox or a promise that every browser context is safe.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

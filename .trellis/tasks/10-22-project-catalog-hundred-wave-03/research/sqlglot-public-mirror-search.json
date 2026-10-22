@@ -1,0 +1,6 @@
+{
+  "status": "queried",
+  "query": "https://api.github.com/search/repositories?q=sqlglot-integration-tests+in%3Aname+fork%3Atrue&per_page=50",
+  "total_count": 0,
+  "repositories": []
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PS-U02",
+  "source_commit": "0c0b7aec8cd25b1d2d8ba07b10acdefd0f38f2c7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Original remains tea1,first remains tea2,second is tea3 and staging currently reads3. The mutable evolver can continue after publication while earlier persistent snapshots retain their contents. Own the staging lifetime and capture the returned snapshot;no concurrency or arbitrary-value immutability guarantee follows.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

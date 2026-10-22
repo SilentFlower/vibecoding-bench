@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "LQ-D01",
+  "source_commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use consumed logical-parser evidence to explain the actual association and propose a separately tested template decomposition. Missing evidence supports insufficient_information;do not assume Python precedence or promise unsupported parentheses.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

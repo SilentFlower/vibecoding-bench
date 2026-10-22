@@ -1,0 +1,41 @@
+{
+  "scope": "宿主业务诊断；不替代镜像原生准入",
+  "rows": [
+    {
+      "task": "IJ-U01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"no_scope_constructs_while_singleton_caches_per_injector\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "IJ-U02",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"constructor_injection_requires_the_injector_call_boundary\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "IJ-C01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"auto_binding_can_construct_default_values_instead_of_configuration\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "IJ-C02",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"multibinding_aggregation_and_duplicate_key_policy_are_explicit\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "IJ-P01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"thread_local_scope_does_not_isolate_coroutines_on_one_thread\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "IJ-D01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"original_name\": \"old\", \"later_name\": \"old\", \"cached_identity_preserved\": true, \"current_dependency\": \"new\", \"new_unscoped_service\": \"new\", \"fresh_container_service\": \"new\"}\n",
+      "stderr": ""
+    }
+  ]
+}

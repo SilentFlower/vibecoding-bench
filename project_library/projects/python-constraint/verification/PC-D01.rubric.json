@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PC-D01",
+  "source_commit": "d91ba03d1fd6acc30d64fd9d513dc0523f697b5b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use only actually consumed complete model and independent controls. Request missing evidence,then trace the actual bound/pruning branch and distinguish implementation behavior from the mathematical model when established. Suggest a tested caller-level alternative/control within scope. Missing evidence supports insufficient_information;no patch or guessed real model is authorized.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

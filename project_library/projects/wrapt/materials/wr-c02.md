@@ -1,0 +1,1 @@
+Use @wrapt.decorator(enabled=lambda:flag["value"]) around a target returning value+1;the wrapper records audit then calls the target. Compare calls with flag False then True. Advise instrumentation enablement and side-effect boundaries. No implementation.

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FU-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "map_defers_work_and_is_consumed_while_lmap_eagerly_materializes": true
+  },
+  "resource_profile": "business"
+}

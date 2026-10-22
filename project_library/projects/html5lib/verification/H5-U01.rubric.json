@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "H5-U01",
+  "source_commit": "fd4f032bc090d44fb11a84b352dad7cbee0a4745",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The parser creates html/head/body,places outside before the table by foster parenting,and inserts tbody around tr. Extract from the recovered DOM rather than assuming source nesting. Recovery is a defined HTML tree-building behavior,not proof of source validity or lossless formatting preservation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

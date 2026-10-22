@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AR-U01",
+  "source_commit": "2224255c4acc594d734cef0bbc83360452a67983",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Relative shift(months=1) clamps Jan31 to2026-02-28 and leaves the original Jan31. Absolute replace(month=2) rejects the invalid February31 with ValueError;singular shift(month=1) also rejects its unsupported frame. Distinguish errors and valid existing APIs rather than claim mutation or a missing month feature.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

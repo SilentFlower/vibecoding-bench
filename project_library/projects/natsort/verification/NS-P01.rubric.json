@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "NS-P01",
+  "source_commit": "e9a3a2a307580a1f2be8c57bba50fba45789ada0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The permutation is[2,1,0],yielding labels part1,part2,part10 and amounts10,20,100 without mutating source. Freeze one input snapshot,validate equal lengths and identity alignment,and apply the same permutation to all fields before publishing. Prefer typed records when feasible;do not sort each column independently or reuse indices after source mutation. iter=True produces a lazy iterator,so consume within the frozen lifetime.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PT-U01",
+  "source_commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The first union excludes10 and has two atomic components. The second includes10 and normalizes to one[9,11) component. len(closed(0,100)) is1 because len counts atomic interval components,not numerical width or elapsed duration.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

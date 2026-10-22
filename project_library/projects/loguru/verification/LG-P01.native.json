@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "LG-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "async_sink_completion_requires_awaiting_in_the_owning_loop": true
+  },
+  "resource_profile": "business"
+}

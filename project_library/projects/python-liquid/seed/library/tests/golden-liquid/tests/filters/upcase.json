@@ -1,0 +1,36 @@
+{
+  "tests": [
+    {
+      "name": "make lower case",
+      "template": "{{ \"hello\" | upcase }}",
+      "result": "HELLO",
+      "tags": [
+        "upcase filter"
+      ]
+    },
+    {
+      "name": "not a string",
+      "template": "{{ 5 | upcase }}",
+      "result": "5",
+      "tags": [
+        "upcase filter"
+      ]
+    },
+    {
+      "name": "unexpected argument",
+      "template": "{{ \"hello\" | upcase: 5 }}",
+      "invalid": true,
+      "tags": [
+        "upcase filter"
+      ]
+    },
+    {
+      "name": "undefined left value",
+      "template": "{{ nosuchthing | upcase }}",
+      "result": "",
+      "tags": [
+        "upcase filter"
+      ]
+    }
+  ]
+}

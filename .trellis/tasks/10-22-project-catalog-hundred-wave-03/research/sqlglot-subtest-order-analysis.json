@@ -1,0 +1,22 @@
+{
+  "status": "verified_representation_difference",
+  "original_full_runs": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-002/sqlglot/result.json",
+      "sha256": "85a7d6811b4adb06fb9e57bbdb915bcde28f0708b3a06e8a142eceb621fa5661"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-003/sqlglot/result.json",
+      "sha256": "76292fb7c84a5912ab01fd0220c4f6f6d63b9fa52afced0b9dbdadafe7b38afd"
+    }
+  ],
+  "full_normalized_records_equal": true,
+  "normalized_contract": {
+    "format": "sqlglot-subtests-v1",
+    "count": 21780,
+    "sha256": "6d7faa76dd32a3eff3b0839c1f2e0e556e6cf1c8ed853cee1b94b9db84e3f0d3"
+  },
+  "preserved_original_control": ".deploy/project-catalog-hundred/stage-03/dependency-preparation/sqlglot-subtest-order-001",
+  "policy": "逐父项保留全部上下文、结果与重复次数；只去除观察序号，并仅规范化固定test_convert中PointClass默认repr地址；SQL十六进制字面与其他上下文保持原值。原始顺序与地址随压缩原件保存。",
+  "business_attempt_001": "保留11条业务正反例及公开测试成功、累计回归冻结比较失败原件；新合同建立后仅重跑累计回归"
+}

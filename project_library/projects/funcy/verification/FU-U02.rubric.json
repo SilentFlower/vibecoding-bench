@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FU-U02",
+  "source_commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "keep retains only[2,\"ok\"],discarding all falsey values including0,False and empty text. An explicit non-None predicate retains[0,False,\"\"];choose it if only None means missing. Do not silently remove valid zero quantities or explicit negative flags under a generic cleanup label.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

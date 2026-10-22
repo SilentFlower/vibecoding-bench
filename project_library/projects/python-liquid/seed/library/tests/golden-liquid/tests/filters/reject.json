@@ -1,0 +1,437 @@
+{
+  "tests": [
+    {
+      "name": "array of strings, default value",
+      "template": "{% assign b = a | reject: 'c' %}{% for obj in b %}{{ obj }}, {% endfor %}",
+      "data": {
+        "a": [
+          "x",
+          "y",
+          "cat"
+        ]
+      },
+      "result": "x, y, ",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "array containing null, default value",
+      "template": "{{ a | reject: 'c' }}",
+      "data": {
+        "a": [
+          "x",
+          "y",
+          "cat",
+          null
+        ]
+      },
+      "result": "",
+      "tags": [
+        "reject filter"
+      ]
+    },
+    {
+      "name": "array containing an int, default value",
+      "template": "{{ a | reject: 'c' }}",
+      "data": {
+        "a": [
+          "x",
+          "y",
+          "cat",
+          1
+        ]
+      },
+      "invalid": true,
+      "tags": [
+        "reject filter"
+      ]
+    },
+    {
+      "name": "array of hashes, default value",
+      "template": "{% assign b = a | reject: 'title' %}{% for obj in b %}{% for itm in obj %}({{ itm[0] }},{{ itm[1] }}), {% endfor %}{% endfor %}",
+      "data": {
+        "a": [
+          {
+            "title": "foo"
+          },
+          {
+            "title": false
+          },
+          {
+            "title": null
+          },
+          {
+            "heading": "baz"
+          }
+        ]
+      },
+      "result": "(title,false), (title,), (heading,baz), ",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "array of hashes, explicit nil",
+      "template": "{% assign b = a | reject: 'title', nil %}{% for obj in b %}{% for itm in obj %}({{ itm[0] }},{{ itm[1] }}), {% endfor %}{% endfor %}",
+      "data": {
+        "a": [
+          {
+            "title": "foo"
+          },
+          {
+            "title": false
+          },
+          {
+            "title": null
+          },
+          {
+            "heading": "baz"
+          }
+        ]
+      },
+      "result": "(title,false), (title,), (heading,baz), ",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "array of hashes, explicit false",
+      "template": "{% assign b = a | reject: 'title', false %}{% for obj in b %}{% for itm in obj %}({{ itm[0] }},{{ itm[1] }}), {% endfor %}{% endfor %}",
+      "data": {
+        "a": [
+          {
+            "title": false
+          },
+          {
+            "title": "bar"
+          },
+          {
+            "title": null
+          },
+          {
+            "heading": "baz"
+          }
+        ]
+      },
+      "result": "(title,bar), (title,), (heading,baz), ",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "array of hashes, explicit true",
+      "template": "{% assign b = a | reject: 'title', true %}{% for obj in b %}{% for itm in obj %}({{ itm[0] }},{{ itm[1] }}), {% endfor %}{% endfor %}",
+      "data": {
+        "a": [
+          {
+            "title": true
+          },
+          {
+            "title": "bar"
+          },
+          {
+            "title": null
+          }
+        ]
+      },
+      "result": "(title,bar), (title,), ",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "array of hashes, string value",
+      "template": "{% assign b = a | reject: 'title', 'bar' %}{% for obj in b %}{% for itm in obj %}({{ itm[0] }},{{ itm[1] }}), {% endfor %}{% endfor %}",
+      "data": {
+        "a": [
+          {
+            "title": "foo"
+          },
+          {
+            "title": "bar"
+          },
+          {
+            "title": null
+          },
+          {
+            "heading": "baz"
+          }
+        ]
+      },
+      "result": "(title,foo), (title,), (heading,baz), ",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "array of hashes, missing property",
+      "template": "{% assign b = a | reject: 'title', 'bar' %}{% for obj in b %}{% for itm in obj %}({{ itm[0] }},{{ itm[1] }}), {% endfor %}{% endfor %}",
+      "data": {
+        "a": [
+          {
+            "heading": "foo"
+          },
+          {
+            "title": "bar"
+          },
+          {
+            "title": null
+          }
+        ]
+      },
+      "result": "(heading,foo), (title,), ",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "missing argument",
+      "template": "{% assign b = a | reject %}{% for obj in b %}{{ obj }}, {% endfor %}",
+      "data": {
+        "a": [
+          "x",
+          "y",
+          "cat"
+        ]
+      },
+      "invalid": true,
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "too many arguments",
+      "template": "{% assign b = a | reject: 'x', 'y', 'z' %}{% for obj in b %}{{ obj }}, {% endfor %}",
+      "invalid": true,
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "input is undefined",
+      "template": "{% assign b = nosuchthing | reject: 'c' %}{% for obj in b %}{{ obj }}, {% endfor %}",
+      "result": "",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "first argument is undefined",
+      "template": "{% assign b = a | reject: nosuchthing %}{% for obj in b %}{{ obj }}, {% endfor %}",
+      "data": {
+        "a": [
+          "x",
+          "y",
+          "cat"
+        ]
+      },
+      "result": "",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "second argument is undefined",
+      "template": "{% assign b = a | reject: 'title', nosuchthing %}{% for obj in b %}{% for itm in obj %}({{ itm[0] }},{{ itm[1] }}), {% endfor %}{% endfor %}",
+      "data": {
+        "a": [
+          {
+            "title": "foo"
+          },
+          {
+            "title": "bar"
+          },
+          {
+            "title": null
+          }
+        ]
+      },
+      "result": "(title,), ",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "input is a hash, default value",
+      "template": "{% assign b = h | reject: 'bar' %}{% for obj in b %}{{ obj }}, {% endfor %}",
+      "data": {
+        "h": {
+          "foo": 1,
+          "bar": 2,
+          "baz": 3
+        }
+      },
+      "result": "",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "input is a hash, default value, no match",
+      "template": "{% assign b = h | reject: 'barbar' %}{% for obj in b %}{% for itm in obj %}({{ itm[0] }},{{ itm[1] }}), {% endfor %}{% endfor %}",
+      "data": {
+        "h": {
+          "foo": 1,
+          "bar": 2,
+          "baz": 3
+        }
+      },
+      "result": "(foo,1), (bar,2), (baz,3), ",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "input is a hash, default value, nil match",
+      "template": "{% assign b = h | reject: 'bar' %}{% for obj in b %}{% for itm in obj %}({{ itm[0] }},{{ itm[1] }}), {% endfor %}{% endfor %}",
+      "data": {
+        "h": {
+          "foo": 1,
+          "bar": null,
+          "baz": 3
+        }
+      },
+      "result": "(foo,1), (bar,), (baz,3), ",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "input is a hash, explicit nil match",
+      "template": "{% assign b = h | reject: 'bar', nil %}{% for obj in b %}{% for itm in obj %}({{ itm[0] }},{{ itm[1] }}), {% endfor %}{% endfor %}",
+      "data": {
+        "h": {
+          "foo": 1,
+          "bar": null,
+          "baz": 3
+        }
+      },
+      "result": "(foo,1), (bar,), (baz,3), ",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "input is a hash, int value, no match",
+      "template": "{% assign b = h | reject: 'bar', 1 %}{% for obj in b %}{% for itm in obj %}({{ itm[0] }},{{ itm[1] }}), {% endfor %}{% endfor %}",
+      "data": {
+        "h": {
+          "foo": 1,
+          "bar": 2,
+          "baz": 3
+        }
+      },
+      "result": "(foo,1), (bar,2), (baz,3), ",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "input is a hash, int value, match",
+      "template": "{% assign b = h | reject: 'bar', 2 %}{% for obj in b %}{% for itm in obj %}({{ itm[0] }},{{ itm[1] }}), {% endfor %}{% endfor %}",
+      "data": {
+        "h": {
+          "foo": 1,
+          "bar": 2,
+          "baz": 3
+        }
+      },
+      "result": "",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "nested array of hashes gets flattened",
+      "template": "{% assign b = a | reject: 'title', 'bar' %}{% for obj in b %}{% for itm in obj %}({{ itm[0] }},{{ itm[1] }}), {% endfor %}{% endfor %}",
+      "data": {
+        "a": [
+          [
+            {
+              "title": "foo"
+            },
+            {
+              "title": "bar"
+            }
+          ],
+          [
+            [
+              {
+                "title": null
+              }
+            ]
+          ]
+        ]
+      },
+      "result": "(title,foo), (title,), ",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "string input becomes a single element array, substring match",
+      "template": "{% assign b = s | reject: 'oo' %}{% for obj in b %}{{ obj }}, {% endfor %}",
+      "data": {
+        "s": "foobar"
+      },
+      "result": "",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    },
+    {
+      "name": "string input becomes a single element array, no match",
+      "template": "{% assign b = s | reject: 'xx' %}{% for obj in b %}{{ obj }}, {% endfor %}",
+      "data": {
+        "s": "foobar"
+      },
+      "result": "foobar, ",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "reject filter"
+      ]
+    }
+  ]
+}

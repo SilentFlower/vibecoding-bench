@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SG-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "set_precedence_requires_an_explicit_executable_sqlite_boundary": true
+  },
+  "resource_profile": "business"
+}

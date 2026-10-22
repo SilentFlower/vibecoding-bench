@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SG-C02",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The pinned automatic inference indexes the first row and raises IndexError for the empty table. Supplying the explicit INT schema yields an empty result successfully. Preserve column names/types as an ingestion contract and pass that schema;do not manufacture a row,swallow arbitrary failures or claim an empty SELECT must return NULL.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

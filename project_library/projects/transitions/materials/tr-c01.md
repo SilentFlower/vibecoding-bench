@@ -1,0 +1,1 @@
+For separate Machine instances with queued=False and queued=True,register go:a->b with an always-false guard and auto_transitions=False. Compare trigger return value and final state. Advise how a UI should confirm a transition. No implementation.

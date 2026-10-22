@@ -1,0 +1,1 @@
+Parse SELECT missing FROM orders without a schema. Explain what a successful parse proves about syntax, table existence, column validity, execution permissions and safety. No edits and no external database.

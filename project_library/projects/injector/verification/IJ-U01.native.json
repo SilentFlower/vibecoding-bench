@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "IJ-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "no_scope_constructs_while_singleton_caches_per_injector": true
+  },
+  "resource_profile": "business"
+}

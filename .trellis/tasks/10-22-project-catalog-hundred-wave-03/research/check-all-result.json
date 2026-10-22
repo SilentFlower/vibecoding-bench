@@ -1,0 +1,189 @@
+{
+  "status": "strict-pass",
+  "recorded_at": "2026-10-22T07:33:14.942200+00:00",
+  "task": ".trellis/tasks/10-22-project-catalog-hundred-wave-03",
+  "run_id": "auto-20261021191233",
+  "check_profile": {
+    "context": "auto-loop",
+    "requested_depth": "auto",
+    "effective_depth": "full",
+    "confidence": "high",
+    "reasons": [
+      "新增30仓及原生候选绑定、扩展构建和私有子项合同跨独立行为边界",
+      "公开主仓范围按用户明确增量决定核对，旧内容/历史/产品链/完整交付须全量映射"
+    ]
+  },
+  "route": {
+    "mode": "check-all-inline",
+    "source": "route-prefs"
+  },
+  "requirements": [
+    {
+      "id": "R1",
+      "status": "passed",
+      "evidence": [
+        "full-evidence-audit.json",
+        "sqlglot-public-source-scope.json"
+      ],
+      "assertion": "固定三十仓、完整公开Git对象8005个、许可与来源一致；用户确认的唯一可选私有测试未验证边界明确"
+    },
+    {
+      "id": "R2",
+      "status": "passed",
+      "evidence": [
+        "full-task-matrix-audit.json"
+      ],
+      "assertion": "121场景183独立任务，理解63、咨询59、方案30、诊断28、修改3；非修改180，不按重试或路径增加任务"
+    },
+    {
+      "id": "R3",
+      "status": "passed",
+      "evidence": [
+        "full-task-matrix-audit.json",
+        "full-evidence-audit.json"
+      ],
+      "assertion": "逐仓任务表完整、材料与授权可达，170业务控制满足独立期望；阶段内不存在伪造answer/code依赖"
+    },
+    {
+      "id": "R4",
+      "status": "passed",
+      "evidence": [
+        "full-evidence-audit.json",
+        "focused-checks-sqlglot.json",
+        "sqlglot-audit-adapter-tests.json"
+      ],
+      "assertion": "当前镜像完整适用主集合85820、子项24183分列；候选导入与三修改原版/参考/错误候选/公开测试/完整回归有原件，旧列表和新摘要兼容"
+    },
+    {
+      "id": "R5",
+      "status": "passed",
+      "evidence": [
+        "full-verification-summary.json"
+      ],
+      "assertion": "15组567路径含18条既有控制重跑，三组SQLGlot修改各1500主项/21780子项真实通过；页面8960检查/494截图，API/SQLite与角色、用量及材料消费一致"
+    },
+    {
+      "id": "R6",
+      "status": "passed",
+      "evidence": [
+        "full-static-checks.json"
+      ],
+      "assertion": "英文首问/分支/私有rubric及中文展示逐项核对，Icalendar原始Unicode字面例外保真；参考及rubric不在seed，只读不接受代码"
+    },
+    {
+      "id": "R7",
+      "status": "passed",
+      "evidence": [
+        "delivery-thirty-local.json",
+        "full-static-checks.json"
+      ],
+      "assertion": "32188文件Git沿同生产函数恢复后与Docker COPY字节/权限一致；原22622文件不变，历史读取既有回归通过；原始Dateutil CRLF检出差异不冒充相等"
+    },
+    {
+      "id": "R8",
+      "status": "passed",
+      "evidence": [
+        "execution-progress.json",
+        "full-mock-cleanup.json",
+        "full-verification-summary.json"
+      ],
+      "assertion": "三十仓均正式本地准入，失败原件保留，19轮模拟及校准容器已核清理；母任务仍独立最终集成"
+    }
+  ],
+  "dimensions": {
+    "planning_implementation": "passed",
+    "assumptions": "passed",
+    "completeness_and_conventions": "passed"
+  },
+  "assumption_dimensions": {
+    "api_contract": "N/A：公开API/DTO和数据库schema未改变",
+    "component_context": "N/A：未修改组件生命周期或交互实现",
+    "data_history": "passed：旧七十仓及已冻结私有副本保持，列表默认不变，只有SQLGlot使用新增私有摘要表示",
+    "data_flow": "passed：完整原生观察→冻结合同→真实ProjectVerifier→Scheduler/driver及独立评审→SQLite结果→页面/API对账"
+  },
+  "verification": {
+    "project_unit_tests": 153,
+    "native_adapter_subset_included": 48,
+    "deployment_management_tests": 30,
+    "final_catalog_regression_repeated_after_registration": 1,
+    "audit_adapter_tests": 6,
+    "python_sources_parsed": 110,
+    "primary_native_main": 85820,
+    "subtests_separate": 24183,
+    "business_paths": 170,
+    "mock_paths": 567,
+    "existing_control_replay_paths": 18,
+    "browser_checks": 8960,
+    "screenshots": 494
+  },
+  "evidence": [
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/full-verification-summary.json",
+      "sha256": "b9369e7e389229372c6ba75c15bfd601bf576669f4a57f8f5eb256067ab31737"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/full-evidence-audit.json",
+      "sha256": "4a4fe9a51aec97128436a7576a1577b375185753a71d1241d07412331c6508c4"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/full-task-matrix-audit.json",
+      "sha256": "de5376a6fd7b93330c7f06850c8b981dfd6978bf6ac161bea358893181fa7249"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/full-static-checks.json",
+      "sha256": "3947fce64663378ebe4d193867291735d9c26c0df45089f977c68b228d4735ed"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/focused-checks-sqlglot.json",
+      "sha256": "12623c749799fbb408ac87a748d0e6fe3f5085896c2cd5c3542dbe0f2ab97e0b"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sqlglot-audit-adapter-tests.json",
+      "sha256": "f115734987c015cfd8c946c61a88fa9cba30a128034096c0bd990abd141247e5"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-audit-recipe-provenance.json",
+      "sha256": "7d9a8e7b1567cbb84e45bd44c773c2bfab137c6d366842d0b4736ae8ea4180c9"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/full-python-syntax-check.json",
+      "sha256": "be806140305ee34d948ffae28e0dbcaec347dbdd3946810c52f9743cf10a86d2"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/full-mock-cleanup.json",
+      "sha256": "5d1ee44a580302daf28e40a1707533497260b5c4982e885fa3784d30ba3f47e5"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/delivery-thirty-local.json",
+      "sha256": "a62eddeb2b15d239e62902ae2994b321687429d00388a5751b019a08b3c00d15"
+    }
+  ],
+  "source_sha256": {
+    "orchestrator/project_native_regression.py": "b921fcda4178ea5a0c0c562c281a51aebc2f826a9e8d3a02147481ccd6c04473",
+    "orchestrator/test_project_native_regression.py": "286e597cbc8051e09a212dece8d9c44839028894631c5ed3acf23dccf2c95e10",
+    "orchestrator/account_runtime.py": "ddd9685802108ffcb9d66e67356bb9b42115d68eaea070b718f21144a2426684",
+    "orchestrator/project_verifier.py": "238198d16836e407259db582be26c1c7da895a643fa7d4de76f67c81db6734dc"
+  },
+  "documentation_sync": {
+    "planning_and_brief": "DEC-0002精确声明后同步用户确认范围及真实实施状态，四份文件均已复核",
+    "automatic_doc_remediation": [],
+    "spec_update": "由下一run_spec_update同步新增私有合同及当前实测统计"
+  },
+  "findings": {
+    "CHK": [],
+    "FBK": [],
+    "DOC": []
+  },
+  "blocking_partial_verification": [],
+  "unverified_outside_approved_scope": [
+    "SQLGlot可选私有外部集成测试",
+    "未运行的其他平台/编译矩阵",
+    "真实模型质量与成本",
+    "生产部署"
+  ],
+  "post_release_verification": [],
+  "real_model_calls": 0,
+  "real_oauth_calls": 0,
+  "pushed": false,
+  "deployed": false
+}

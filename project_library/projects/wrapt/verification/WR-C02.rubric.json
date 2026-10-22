@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WR-C02",
+  "source_commit": "6b4e844950213118b19e613248d2bc9469eb731e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both calls return2 for input1,while only the enabled call records audit. A callable enabled policy can select instrumentation dynamically for this ordinary function control. Define a consistent policy/lifecycle and test bound-method timing separately;disabling instrumentation does not disable the underlying business call or authorize skipping required business validation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,1 @@
+On a valid entry compare published(datetime(2026,10,22)),published("2026-10-22T09:00:00"),and published("2026-10-22T09:00:00+02:00"). Inspect exact rejection and accepted Atom value/RSS pubDate. A supplier must state timezone meaning;do not silently attach the host zone. No edits.

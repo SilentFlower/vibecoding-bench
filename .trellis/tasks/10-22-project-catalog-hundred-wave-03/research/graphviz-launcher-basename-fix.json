@@ -1,0 +1,7 @@
+{
+  "previous_launcher_sha256": "3570d0f1dab998de50ec74869674bfa7d02a66e2a7c99ce256c794e878a22ac9",
+  "launcher_sha256": "3cbf7364530b024e0e42ae53c49e307fb5ccbb9198d343a4c7d8720632fe123a",
+  "original_binary_path": "artifacts/graphviz-bin/original/dot",
+  "reason": "Graphviz按argv[0]默认选择布局引擎；保留原dot文件名，不强加-K参数改变调用语义",
+  "original_binary_sha256": "419049c248ab2b4830da209e93ae98a5bdb9580e12057f547bb31c0a336153da"
+}

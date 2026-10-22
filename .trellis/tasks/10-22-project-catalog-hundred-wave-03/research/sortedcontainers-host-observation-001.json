@@ -1,0 +1,32 @@
+{
+  "SC-U01": {
+    "candidate_import": true,
+    "sorted_list_multiplicity_and_set_uniqueness_are_different_contracts": true
+  },
+  "SC-U02": {
+    "candidate_import": true,
+    "ordered_views_are_live_and_rank_deletion_changes_the_mapping": true
+  },
+  "SC-C01": {
+    "candidate_import": true,
+    "neighbor_queries_require_distinct_bisect_sides_and_edge_guards": true
+  },
+  "SC-C02": {
+    "candidate_import": true,
+    "mutating_a_stored_sort_key_does_not_refresh_the_cached_index": true
+  },
+  "SC-P01": {
+    "candidate_import": true,
+    "pagination_needs_a_stable_tie_breaker_and_explicit_snapshot_policy": true
+  },
+  "SC-D01": {
+    "candidate_import": true,
+    "error": "TypeError",
+    "length": 3,
+    "contains_x": true,
+    "iteration": [
+      1,
+      2
+    ]
+  }
+}

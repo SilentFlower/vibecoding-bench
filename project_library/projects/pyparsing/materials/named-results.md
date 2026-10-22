@@ -1,0 +1,1 @@
+Parse"tea book" with OneOrMore(Word(alphas)("item")) and separately OneOrMore(Word(alphas)("item*")),both parse_all=True. Compare as_list(),as_dict() and the named lookup. Explain which projection preserves all repeated named values;do not say the token stream itself lost tea. No edits.

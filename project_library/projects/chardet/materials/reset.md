@@ -1,0 +1,1 @@
+On one detector,feed UTF8 BOM+hello and close. Without resetting,feed plain text and close again. Then reset(),feed plain text and close. Advise the lifetime for independent imported documents and inspect every result. No implementation.

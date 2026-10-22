@@ -1,0 +1,44 @@
+{
+  "project": "sqlglot",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "user_approved": true,
+  "user_reply": "可以拿继续",
+  "approved_scope": "保留SQLGlot固定公开主仓、完整公开测试及许可；当前镜像重跑公开主仓全部适用测试。私有集成测试明确未验证，不作为本轮任务或准入通过项。原一百项目集合保持。",
+  "excluded_submodule": {
+    "path": "sqlglot-integration-tests",
+    "commit": "8cbf013a7b0bd1871abce4ebb543560d0e554799",
+    "repository": "git@github.com:fivetran/sqlglot-integration-tests.git",
+    "status": "unavailable_optional_private_tests_unverified"
+  },
+  "upstream_evidence": [
+    {
+      "path": ".deploy/github-100-research/resume-app/sqlglot/source/.gitmodules",
+      "sha256": "3d6e9b4048fa8ea8006aa7b30acb8928d2e6bd1fc5286c3baa7f13070dd1a589"
+    },
+    {
+      "path": ".deploy/github-100-research/resume-app/sqlglot/source/Makefile",
+      "sha256": "20fe6b614540c869ad2d67c419d628a047e9912b77b738848d4fa6a4817f4ee9"
+    },
+    {
+      "path": ".deploy/github-100-research/resume-app/sqlglot/source/tests/test_integration_loader.py",
+      "sha256": "51c681ba409ccbcf81b619977aefee53472fc7ce7ebe69c8f8d20b6f7cdf1159"
+    },
+    {
+      "path": ".deploy/github-100-research/resume-app/sqlglot/source/tests/sqlglot/__init__.py",
+      "sha256": "087d586afb310a1212b4584f833854ce5ab88512f69116325373b80e9a9988b1"
+    },
+    {
+      "path": ".deploy/github-100-research/resume-app/sqlglot/source/tests/helpers.py",
+      "sha256": "3e60e402106039cd121968b44ace160cb05099c7faf3e616ddbd639a47cbb615"
+    },
+    {
+      "path": ".deploy/github-100-research/resume-app/sqlglot/source/pyproject.toml",
+      "sha256": "ad29ac5fbe3393567134cee2e060480f146206d01536ce63c55df0027793309a"
+    }
+  ],
+  "default_loader_preserved": true,
+  "set_skip_integration": false,
+  "public_main_tests_required": true,
+  "private_tests_counted_as_passed": false,
+  "old_source_blocker_retained": "sqlglot-source-blocker.json"
+}

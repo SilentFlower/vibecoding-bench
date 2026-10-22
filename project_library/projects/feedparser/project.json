@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "feedparser",
+  "title": "Feedparser本地订阅验收工作场景",
+  "category": "容错、字段与内容归档",
+  "description": "容错验收、日期事实、HTML处理、相对资源、跨格式方案和日期诊断。",
+  "seed_digest": "a3718cee7f475eb11e6af28a43b8c3dc88954909949cfb9d41e526bccf2a16e9",
+  "environment": "feedparser-py312",
+  "source": {
+    "repository": "https://github.com/kurtmckee/feedparser",
+    "commit": "a22c5521cbb109871f1a2318948581901bd47e26",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "FP-S01",
+      "title": "解析结果与日期事实",
+      "goal": "分清容错和真实字段",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FP-U01",
+            "FP-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FP-U01",
+          "kind": "understand",
+          "goal": "区分容错解析和业务可用性",
+          "prompt": "Explain every supplied malformed/empty input control. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/recovery.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FP-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/FP-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "FP-U02",
+          "kind": "understand",
+          "goal": "核真实日期字段和历史兼容访问",
+          "prompt": "Explain UTC parsed values,stored-key checks and warning lookup. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/date-fields.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FP-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/FP-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FP-S02",
+      "title": "HTML归档策略",
+      "goal": "明确呈现与相对基准",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FP-C01",
+            "FP-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FP-C01",
+          "kind": "consult",
+          "goal": "选择HTML内容归档和呈现策略",
+          "prompt": "Advise actual summary conversion and downstream responsibility. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/html-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FP-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/FP-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "FP-C02",
+          "kind": "consult",
+          "goal": "保留本地订阅的相对资源基准",
+          "prompt": "Advise both local-content URI controls and provenance. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/relative-content.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FP-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/FP-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FP-S03",
+      "title": "跨格式规范化",
+      "goal": "保留原始结构与来源",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FP-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FP-P01",
+          "kind": "plan",
+          "goal": "规划跨格式订阅字段规范化",
+          "prompt": "Plan normalization using actual raw storage and accessor controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/normalization-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FP-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/FP-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FP-S04",
+      "title": "日期映射诊断",
+      "goal": "核完整输入和访问方式",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FP-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "FP-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FP-D01",
+          "kind": "diagnose",
+          "goal": "诊断订阅修改日期缺失",
+          "prompt": "An archived JSON item appears to lose its modification date. Request complete source bytes,content type,calls,raw keys and accessors before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FP-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-json-date",
+              "when": "Complete feed bytes,content type,calls,raw key inspections and accessors have not been supplied or declared unavailable,and are reasonably requested.",
+              "materials": [
+                "disclosure/modified-date.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

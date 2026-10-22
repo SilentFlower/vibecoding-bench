@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "LQ-U03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "include_shares_local_assignments_while_render_has_an_isolated_partial_scope": true
+  },
+  "resource_profile": "business"
+}

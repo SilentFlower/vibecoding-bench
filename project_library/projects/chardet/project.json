@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "chardet",
+  "title": "Chardet5.2字节检测工作场景",
+  "category": "检测状态、解码与归档证据",
+  "description": "ASCII歧义、提前完成、重置、codec兼容、原件归档和分块诊断。",
+  "seed_digest": "ad1a1c33ffa172ee6517f0e89bf45e85d8e2cd9d26b337096f0b5d4aa26d4172",
+  "environment": "chardet-py312",
+  "source": {
+    "repository": "https://github.com/chardet/chardet",
+    "commit": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CD-S01",
+      "title": "检测结果的含义",
+      "goal": "明确置信和完整字节验收",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CD-U01",
+            "CD-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CD-U01",
+          "kind": "understand",
+          "goal": "界定ASCII检测置信度",
+          "prompt": "Explain actual detection and all strict decoding controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/ascii.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CD-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/CD-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CD-U02",
+          "kind": "understand",
+          "goal": "区分检测完成和全流字节有效",
+          "prompt": "Explain every early-done and whole-stream decoding result. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/early-done.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CD-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/CD-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CD-S02",
+      "title": "检测生命周期与解码",
+      "goal": "重置状态并核codec",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CD-C01",
+            "CD-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CD-C01",
+          "kind": "consult",
+          "goal": "明确跨文档检测器的重置",
+          "prompt": "Advise actual reused/reset detector controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/reset.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CD-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/CD-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CD-C02",
+          "kind": "consult",
+          "goal": "处理检测标签与解码器不兼容",
+          "prompt": "Advise the exact detected label and Python codec lookup failure. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/codec-label.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CD-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/CD-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CD-S03",
+      "title": "文本归档方案",
+      "goal": "保留原件和编码歧义",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CD-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CD-P01",
+          "kind": "plan",
+          "goal": "规划保留编码歧义的文本归档",
+          "prompt": "Plan separate original-byte,encoding-evidence and decoded-text records. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/archive-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CD-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/CD-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CD-S04",
+      "title": "分块检测诊断",
+      "goal": "核完整字节和状态证据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CD-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "CD-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CD-D01",
+          "kind": "diagnose",
+          "goal": "诊断分块检测与整份结果不同",
+          "prompt": "Whole-input and chunked encoding detection disagree. Request original bytes,boundaries,version/reset/feed/close order and complete controls before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CD-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-chunked-bom",
+              "when": "Complete original bytes,chunk boundaries,version/reset/feed/close order and whole-input control have not been supplied or declared unavailable,and are reasonably requested.",
+              "materials": [
+                "disclosure/chunked-bom.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

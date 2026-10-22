@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FU-C02",
+  "source_commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The first branch yields0,2 but advances the shared source through all four inputs,buffering1,3 for the second branch. Lazy split therefore does not guarantee bounded memory when branches progress unevenly. Consume with a coordinated bounded policy or explicitly spool bounded inputs;do not claim independent source scans or constant memory.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

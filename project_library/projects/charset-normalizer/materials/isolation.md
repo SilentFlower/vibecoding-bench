@@ -1,0 +1,1 @@
+Use raw="café".encode("cp1252"). Compare from_bytes(raw,cp_isolation=["utf_8"]).best() with the isolated cp1252 result and raw.decode("cp1252"). The source format contract may explicitly state cp1252;otherwise the bytes alone are only detection evidence. Advise caller handling of no candidate rather than declaring the payload binary or silently deleting it. No edits.

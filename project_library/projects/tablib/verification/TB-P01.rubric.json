@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TB-P01",
+  "source_commit": "966876c76a6378557c1951badc1665b4d1375875",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "extend delegates row by row;the first row is retained before the second raises InvalidDimensions. Final data contains A/2 and B/3. Plan to validate/materialize the finite batch or build a separate Dataset and publish only on complete success. Preserve input identity and conflict/error evidence so retries do not duplicate accepted prefixes;do not claim existing transactional extend.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

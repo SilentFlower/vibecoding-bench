@@ -1,0 +1,937 @@
+{
+  "baseline_digest": "faf3a976054a0e42eb3c502555081f0398ef69f009d9db52a97a7ebb9db180d2",
+  "nodes": [
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_column_delete",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_column_select",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_column_sort",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_export",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_export_options",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_format_detect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_formatter_support_kwargs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_import_mac_os_lf",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_import_set",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_import_set_commas_embedded",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_import_set_ragged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_import_set_semicolon_with_spaces",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_import_set_semicolons",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_import_set_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_import_set_with_newlines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_import_set_with_spaces",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_import_set_with_unicode_str",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_csv_stream_export",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CSVTests::test_unicode_csv",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CliTests::test_cli_export_github",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CliTests::test_cli_export_grid",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::CliTests::test_cli_export_simple",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::DBFTests::test_dbf_export_set",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::DBFTests::test_dbf_format_detect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::DBFTests::test_dbf_import_set",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::DocTests::test_rst_formatter_doctests",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::HTMLTests::test_html_databook_export",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::HTMLTests::test_html_databook_export_escaped",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::HTMLTests::test_html_dataset_export",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::HTMLTests::test_html_export_none_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::HTMLTests::test_html_import",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::HTMLTests::test_html_import_no_headers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::HTMLTests::test_html_import_no_table",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::HTMLTests::test_html_import_table_id",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::JSONTests::test_json_export",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::JSONTests::test_json_format_detect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::JSONTests::test_json_import_book",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::JSONTests::test_json_import_set",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::JSONTests::test_json_list_of_lists",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::JiraTests::test_jira_export",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::JiraTests::test_jira_export_empty_dataset",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::JiraTests::test_jira_export_no_headers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::JiraTests::test_jira_export_none_and_empty_values",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::LatexTests::test_latex_escaping",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::LatexTests::test_latex_export",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::LatexTests::test_latex_export_caption",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::LatexTests::test_latex_export_empty_dataset",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::LatexTests::test_latex_export_no_headers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::LatexTests::test_latex_export_none_values",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::ODSTests::test_ods_export_dates",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::ODSTests::test_ods_export_display",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::ODSTests::test_ods_export_import_boolean",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::ODSTests::test_ods_export_import_set",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::ODSTests::test_ods_import_book",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::ODSTests::test_ods_import_set_ragged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::ODSTests::test_ods_import_set_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::ODSTests::test_ods_unknown_value_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::RSTTests::test_empty_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::RSTTests::test_rst_export_set",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::RSTTests::test_rst_force_grid",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::SQLFormatTests::test_sql_date_and_timestamp_literals",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::SQLFormatTests::test_sql_microseconds_and_default_table",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::SQLFormatTests::test_sql_no_headers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::SQLFormatTests::test_sql_regular_literals",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TSVTests::test_tsv_export",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TSVTests::test_tsv_format_detect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TSVTests::test_tsv_import_set",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_add_callable_column",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_add_column",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_add_column_no_data_no_headers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_add_column_no_data_with_headers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_add_column_with_header_and_data_exists",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_add_column_with_header_and_headers_only_exist",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_add_column_with_header_ignored",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_auto_format_detect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_book_export_no_exceptions",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_book_import_from_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_book_unsupported_export",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_book_unsupported_loading",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_column_stacking",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_column_stacking_headerless",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_data_slicing",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_databook_add_sheet_accepts_dataset_subclasses",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_databook_add_sheet_accepts_only_dataset_instances",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_databook_formatter_support_kwargs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_databook_formatter_with_new_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_dataset_import_from_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_datetime_append",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_delete",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_delitem_str_key_no_headers_raises",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_empty_append",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_empty_append_with_headers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_empty_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_formatters",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_formatters_all_cols",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_get",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_get_col",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_getitem_str_key_no_headers_raises",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_header_slicing",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_pickle_unpickle_dataset",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_remove_duplicates",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_row_append",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_row_contains",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_row_has_tag",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_row_has_tags",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_row_lpush",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_row_no_tag",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_row_pickle_unpickle",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_row_repr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_row_slicing",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_row_stacking",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_separator_append",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_set_headers_with_incorrect_dimension",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_sorting",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_stack_rejects_non_dataset",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_str_no_columns",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_subset",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_transpose",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_transpose_empty_dataset",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_transpose_multiple_headers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_transpose_with_no_headers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_unicode_append",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_unicode_renders_markdown_table",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_unknown_format",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::TablibTestCase::test_wipe",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSTests::test_book_import_from_stream",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSTests::test_xls_bad_chars_sheet_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSTests::test_xls_book_date_import",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSTests::test_xls_book_import_with_errors",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSTests::test_xls_date_import",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSTests::test_xls_export_with_dates",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSTests::test_xls_format_detect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSTests::test_xls_import_with_errors",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSTests::test_xlsx_import_set_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_bad_chars_sheet_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_bad_dimensions",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_book_column_width_adaptive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_book_column_width_integer",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_book_column_width_none",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_book_column_width_value_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_cell_values",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_column_width_adaptive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_column_width_integer",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_column_width_none",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_column_width_value_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_export_book_escape_formulae",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_export_book_escape_formulae_in_header",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_export_set_escape_formulae",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_export_set_escape_formulae_in_header",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_export_set_escape_formulae_keeps_inner_equals",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_format_detect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_import_book_ragged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_import_set",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_import_set_ragged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_import_set_skip_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_raise_ValueError_on_cell_write_during_export",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::XLSXTests::test_xlsx_wrong_char",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::YAMLTests::test_yaml_export",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::YAMLTests::test_yaml_export_preserves_column_order",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::YAMLTests::test_yaml_format_detect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::YAMLTests::test_yaml_import_book",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::YAMLTests::test_yaml_import_set",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib.py::YAMLTests::test_yaml_load",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_fields.py::DbfFieldDefTestCompareCase::test_compare__eq__",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_fields.py::DbfFieldDefTestCompareCase::test_compare__ge__",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_fields.py::DbfFieldDefTestCompareCase::test_compare__gt__",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_fields.py::DbfFieldDefTestCompareCase::test_compare__le__",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_fields.py::DbfFieldDefTestCompareCase::test_compare__lt__",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_fields.py::DbfFieldDefTestCompareCase::test_compare__ne__",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_utils.py::InvalidValueTestCase::test_sanity",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_utils.py::UtilsGetDateTestCase::test_getDate_datetime_date",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_utils.py::UtilsGetDateTestCase::test_getDate_datetime_datetime",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_utils.py::UtilsGetDateTestCase::test_getDate_datetime_string_yymmdd",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_utils.py::UtilsGetDateTestCase::test_getDate_datetime_string_yyyy_mm_dd",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_utils.py::UtilsGetDateTestCase::test_getDate_datetime_timestamp",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_utils.py::UtilsGetDateTestCase::test_getDate_none",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_utils.py::UtilsGetDateTimeTestCase::test_getDateTime_datetime_date",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_utils.py::UtilsGetDateTimeTestCase::test_getDateTime_datetime_datetime",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_utils.py::UtilsGetDateTimeTestCase::test_getDateTime_datetime_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_utils.py::UtilsGetDateTimeTestCase::test_getDateTime_datetime_timestamp",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_utils.py::UtilsGetDateTimeTestCase::test_getDateTime_none",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_utils.py::UtilsUnzfillTestCase::test_unzfill_with_nul",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tablib_dbfpy_packages_utils.py::UtilsUnzfillTestCase::test_unzfill_without_nul",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "pytest-cov",
+      "module": "pytest_cov.plugin",
+      "module_sha256": "7cc8a14b8cc8effa886c40fdfa058459d89686d62c53fea6721750e722a60f40",
+      "version": "7.1.0"
+    }
+  ],
+  "project": "tablib",
+  "python": "3.12.15",
+  "schema": 1
+}

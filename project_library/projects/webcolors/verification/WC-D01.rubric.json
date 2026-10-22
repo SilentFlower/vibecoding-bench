@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WC-D01",
+  "source_commit": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use consumed fixed-source evidence to distinguish unsupported specification from an inconsistent forward registry. Missing controls support insufficient_information. A source repair requires its own authorization;do not invent a public CSS4 constant or claim this pinned implementation already supports the forward lookup.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

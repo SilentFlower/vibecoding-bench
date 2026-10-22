@@ -1,0 +1,1 @@
+OptionalQuantity has count=IntegerField(validators=[Optional(),NumberRange(min=0)]). Compare construction with data={"count":-1} and no formdata,against submitted multi-value count=["-1"]. Inspect raw_data,data and validate(). Advise explicit object/domain validation ownership;do not describe the existing Optional raw-input contract as an all-source range check. No edits.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AR-C01",
+  "source_commit": "2224255c4acc594d734cef0bbc83360452a67983",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Arrow.range month preserves original day31 where possible: Jan31,Feb28,Mar31,Apr30. Repeated shift starts Jan31,Feb28,Mar28,Apr28 because each new date becomes the next anchor. Choose the business rule explicitly and use the existing appropriate mechanism;do not claim sequential clamping and original anchoring are equivalent or invent a new iterator requirement.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

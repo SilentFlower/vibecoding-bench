@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "python-statemachine",
+  "title": "Python状态机领域集成工作场景",
+  "category": "状态值、校验与异步就绪",
+  "description": "领域字段、条件与校验器、未知事件、保留名称、异步激活方案及旧配置迁移诊断。",
+  "seed_digest": "7da46014ea40c7a318951de64d1b321ee77eb1aacea148f2c3c7a949a95f248a",
+  "environment": "python-statemachine-py312",
+  "source": {
+    "repository": "https://github.com/fgmacedo/python-statemachine",
+    "commit": "ec5d8173f740b37941818df13727db9d64ef498d",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "SM-S01",
+      "title": "领域状态合同",
+      "goal": "区分值和验证协议",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SM-U01",
+            "SM-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SM-U01",
+          "kind": "understand",
+          "goal": "解释领域状态值和存储字段",
+          "prompt": "Declare StateMachine pending=State(initial=True,value=\"new\"),done=State(final=True,value=\"ok\"),finish=pending.to(done). Bind SimpleNamespace(status=\"new\") with state_field=\"status\". Compare configuration_values and model.status before/after finish. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/sm-u01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SM-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/SM-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SM-U02",
+          "kind": "understand",
+          "goal": "区分条件与校验器的失败协议",
+          "prompt": "For separate StateMachine definitions with pending initial and done final,attach a callback returning False as cond=\"check\" or validators=\"check\" on finish. Compare outcome,state and exceptions. No other callbacks are installed. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/sm-u02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SM-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/SM-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SM-S02",
+      "title": "框架集成咨询",
+      "goal": "明确事件策略及名称所有权",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SM-C01",
+            "SM-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SM-C01",
+          "kind": "consult",
+          "goal": "明确未知事件的兼容策略",
+          "prompt": "Compare fresh StateChart and StateMachine definitions with one pending->done event when send(\"unknown\") is called. Advise strict command validation versus tolerant event handling for this pinned version. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/sm-c01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SM-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/SM-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SM-C02",
+          "kind": "consult",
+          "goal": "避免领域数据覆盖框架事件属性",
+          "prompt": "Use the supplied one-event StateMachine with domain model SimpleNamespace(status=\"new\",events=[]),state_field=\"status\". Compare attempting machine.events=[] with appending to machine.model.events. Advise naming/ownership for an audit list. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/sm-c02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SM-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/SM-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SM-S03",
+      "title": "异步就绪方案",
+      "goal": "等待真正完成后发布",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SM-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SM-P01",
+          "kind": "plan",
+          "goal": "规划异步状态机的就绪发布",
+          "prompt": "A StateChart has pending initial,done final,finish=pending.to(done),and async on_finish returning42. Inside a running event loop,inspect configuration_values immediately after construction,after await activate_initial_state(),and after await finish(). Plan UI/service readiness and error handling;no implementation.",
+          "requires": [],
+          "materials": [
+            "materials/sm-p01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SM-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/SM-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SM-S04",
+      "title": "版本迁移诊断",
+      "goal": "核当前构造与类策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SM-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "SM-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SM-D01",
+          "kind": "diagnose",
+          "goal": "诊断旧构造参数未改变事件策略",
+          "prompt": "A migration passes allow_event_without_transition=True to a StateMachine constructor but an unknown event still raises. Request pinned version,complete constructor,class attributes and exact send/exception controls. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SM-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "class-policy-migration",
+              "when": "Pinned version,constructor,class policy and event/exception controls have not been supplied or declared unavailable and are reasonably requested.",
+              "materials": [
+                "disclosure/class-policy.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

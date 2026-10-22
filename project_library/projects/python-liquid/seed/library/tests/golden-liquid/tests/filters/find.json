@@ -1,0 +1,196 @@
+{
+  "tests": [
+    {
+      "name": "array of strings, default value",
+      "template": "{{ a | find: 'z' }}",
+      "data": {
+        "a": [
+          "x",
+          "y",
+          "z"
+        ]
+      },
+      "result": "z",
+      "tags": [
+        "find filter"
+      ]
+    },
+    {
+      "name": "array of strings, substring match, default value",
+      "template": "{{ a | find: 'oo' }}",
+      "data": {
+        "a": [
+          "x",
+          "y",
+          "zoo"
+        ]
+      },
+      "result": "zoo",
+      "tags": [
+        "find filter"
+      ]
+    },
+    {
+      "name": "array of strings, default value, no match",
+      "template": "{{ a | find: 'foo' }}",
+      "data": {
+        "a": [
+          "x",
+          "y",
+          "zoo"
+        ]
+      },
+      "result": "",
+      "tags": [
+        "find filter"
+      ]
+    },
+    {
+      "name": "mixed array, default value",
+      "template": "{{ a | find: 'z' }}",
+      "data": {
+        "a": [
+          "x",
+          null,
+          "z",
+          false,
+          true
+        ]
+      },
+      "result": "",
+      "tags": [
+        "find filter"
+      ]
+    },
+    {
+      "name": "string input, default value, match",
+      "template": "{{ a | find: 'z' }}",
+      "data": {
+        "a": "zoo"
+      },
+      "result": "zoo",
+      "tags": [
+        "find filter"
+      ]
+    },
+    {
+      "name": "string input, string value, match",
+      "template": "{{ a | find: 'z', 'z' }}",
+      "data": {
+        "a": "zoo"
+      },
+      "result": "zoo",
+      "tags": [
+        "find filter"
+      ]
+    },
+    {
+      "name": "string input, string value, no match",
+      "template": "{{ a | find: 'z', 'y' }}",
+      "data": {
+        "a": "zoo"
+      },
+      "result": "",
+      "tags": [
+        "find filter"
+      ]
+    },
+    {
+      "name": "hash input, default value, match",
+      "template": "{% assign b = a | find: 'z' %}{{ b.z }}",
+      "data": {
+        "a": {
+          "z": 42
+        }
+      },
+      "result": "42",
+      "tags": [
+        "assign tag",
+        "find filter"
+      ]
+    },
+    {
+      "name": "hash input, default value, no match",
+      "template": "{% assign b = a | find: 'foo' %}{{ b }}",
+      "data": {
+        "a": {
+          "z": 42
+        }
+      },
+      "result": "",
+      "tags": [
+        "assign tag",
+        "find filter"
+      ]
+    },
+    {
+      "name": "hash input, int value, match",
+      "template": "{% assign b = a | find: 'z', 42 %}{{ b.z }}",
+      "data": {
+        "a": {
+          "z": 42
+        }
+      },
+      "result": "42",
+      "tags": [
+        "assign tag",
+        "find filter"
+      ]
+    },
+    {
+      "name": "hash input, explicit nil, match",
+      "template": "{% assign b = a | find: 'z', nil %}{{ b.z }}",
+      "data": {
+        "a": {
+          "z": null
+        }
+      },
+      "result": "",
+      "tags": [
+        "assign tag",
+        "find filter"
+      ]
+    },
+    {
+      "name": "array of hashes, int value, match",
+      "template": "{% assign b = a | find: 'z', 42 %}{{ b.foo }}",
+      "data": {
+        "a": [
+          {
+            "x": 99
+          },
+          {
+            "z": 42,
+            "foo": "bar"
+          }
+        ]
+      },
+      "result": "bar",
+      "tags": [
+        "assign tag",
+        "find filter"
+      ]
+    },
+    {
+      "name": "array of hashes, with a nil",
+      "template": "{% assign b = a | find: 'z', 42 %}{{ b.foo }}",
+      "data": {
+        "a": [
+          {
+            "x": 99
+          },
+          null,
+          {
+            "z": 42,
+            "foo": "bar"
+          }
+        ]
+      },
+      "result": "",
+      "tags": [
+        "assign tag",
+        "find filter"
+      ]
+    }
+  ]
+}

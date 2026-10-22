@@ -1,0 +1,1 @@
+Declare StateMachine pending=State(initial=True,value="new"),done=State(final=True,value="ok"),finish=pending.to(done). Bind SimpleNamespace(status="new") with state_field="status". Compare configuration_values and model.status before/after finish. No edits.

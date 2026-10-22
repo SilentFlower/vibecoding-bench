@@ -1,0 +1,1 @@
+Exact input "<p>x". HTMLParser().parse recovers the paragraph and errors=[((1,3),"expected-doctype-but-got-start-tag",{"name":"p"})]. HTMLParser(strict=True).parse raises ParseError:Unexpected start tag (p). Expected DOCTYPE. No byte decoding or other wrapper is involved. The report only needs paragraph extraction from this supplied fragment-like input.

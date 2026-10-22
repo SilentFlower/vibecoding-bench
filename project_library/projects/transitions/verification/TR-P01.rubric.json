@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TR-P01",
+  "source_commit": "bd42b38f3627e6bca7274fb4d9af2e105f75da7c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The exception propagates after state assignment:state is b,entry-effect remains and after does not run. The in-memory machine does not roll back state or arbitrary effects. Plan explicit durable transition/effect ownership,operation identity,completion/error records and recovery/compensation tested at each callback boundary. Do not blindly retry based on the old state or claim atomic database/external effects.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

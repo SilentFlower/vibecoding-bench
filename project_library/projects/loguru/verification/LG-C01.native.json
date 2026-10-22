@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "LG-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "opt_calls_replace_options_instead_of_merging_previous_values": true
+  },
+  "resource_profile": "business"
+}

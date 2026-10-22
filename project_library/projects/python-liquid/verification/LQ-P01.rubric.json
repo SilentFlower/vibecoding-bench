@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "LQ-P01",
+  "source_commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The two-item control yields12;the three-item control raises LoopIterationLimitError;the default loop limit is None. Plan explicit loop/output/namespace/context and external process time/memory budgets,restricted template loaders and reviewed filters,plus failure handling without publishing partial reports. Test nested/recursive/oversized cases against actual configured limits. A loop limit alone is not a complete sandbox or application authorization boundary.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

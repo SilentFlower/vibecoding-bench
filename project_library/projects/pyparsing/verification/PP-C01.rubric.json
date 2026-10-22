@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PP-C01",
+  "source_commit": "810199f89bf916590426e1c5cb3d612584f11a2f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The | MatchFirst chooses short a first;without parse_all that prefix succeeds. End checking then fails on b with parse_allTrue rather than retrying the earlier successful alternative. Longer-first | or the actual ^ longest-match Or both accept ab here. Choose based on the grammar rule and preserve validation/action semantics;do not claim ^ supplies a general backtracking or performance guarantee.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

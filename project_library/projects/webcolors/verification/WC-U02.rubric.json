@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WC-U02",
+  "source_commit": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "normalize_hex expands/lowercases #AbC to #aabbcc. HTML5 simple parsing requires exactly # plus six ASCII hex digits and rejects #abc;the full form yields170,187,204. Pick the input contract explicitly;these functions do not parse arbitrary CSS rgba(),alpha hex or keywords.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

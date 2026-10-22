@@ -1,0 +1,32 @@
+[
+  {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/verify_delivery.py",
+    "source": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/verify_delivery.py",
+    "source_sha256": "367c1e6edc6df20259fbf011ce811d786e9a6f77b4d6bd04836531c01cdb61b0",
+    "sha256": "6c85afbb8813c4e001d3c5ea0dffab77d8bf670b440b7141966001dd6dca97da",
+    "adaptation": "第三阶段输出和70项目基线；旧来源证明按3、2、1阶段查找，旧生成物核原凭证；本阶段生成物按逐项目精确路径、来源SHA及执行位验证",
+    "previous_sha256": [
+      "ec93cc61850f505b340826189d6e186e721dd302c084ac102cceb6f532b99a81"
+    ]
+  },
+  {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/promote_verified_batch.py",
+    "source": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/promote_verified_batch.py",
+    "source_sha256": "0fa895ebda9b7319d6bafa1b58f6c77a21f623da521d2b1ad54b6d8345bcb10e",
+    "sha256": "0a94a4100dae817aafcedce344e8534e4bcae6484e4691ac3532e48176d83bd1",
+    "adaptation": "沿已提交原件增加可选精确新增项目选择；已有控制必须保持当前正式字节，不重复注册或改写准入",
+    "previous_sha256": [
+      "0fa895ebda9b7319d6bafa1b58f6c77a21f623da521d2b1ad54b6d8345bcb10e"
+    ]
+  },
+  {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/finalize_mock_admission.py",
+    "source": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/finalize_mock_admission.py",
+    "source_sha256": "b6e0f7daddc706a0949b2ce9214297fe427dada5e3690a05f1b36fdef7bcda12",
+    "sha256": "bdcb66d4750c89d15dd968a64bde9d16d627f81fc0ff67a097cb6fdc59854ccc",
+    "adaptation": "沿已提交原件增加可选精确新增项目选择；已有控制必须保持当前正式字节，不重复注册或改写准入",
+    "previous_sha256": [
+      "b6e0f7daddc706a0949b2ce9214297fe427dada5e3690a05f1b36fdef7bcda12"
+    ]
+  }
+]

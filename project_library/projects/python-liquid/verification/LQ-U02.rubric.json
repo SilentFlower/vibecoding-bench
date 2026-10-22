@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "LQ-U02",
+  "source_commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Outputs are0|0,fallback|false,fallback|fallback,fallback|fallback. Numeric zero is retained;allow_false preserves explicit False,but empty strings and nil still use the fallback. Define per-field nil/false/empty policy instead of treating default as a generic Python-or or validation function.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

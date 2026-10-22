@@ -1,0 +1,24 @@
+{
+  "project": "tablib",
+  "source_commit": "966876c76a6378557c1951badc1665b4d1375875",
+  "files": [
+    {
+      "path": "src/tablib/_version.py",
+      "sha256": "ef2c679c8788fc56658a0e80d6fd236a6235aedaaa17be2c7f37dedf2840a4a1",
+      "size": 561,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    }
+  ],
+  "file_count": 1,
+  "origin": {
+    "metadata": ".deploy/github-100-research/resume-main/tablib/venv/lib/python3.12/site-packages/tablib-0.1.dev1+g966876c76.dist-info/METADATA",
+    "metadata_sha256": "e5fe41297600ca743567f4364a9e8499540af7e767126464ed6bc0b83b05c794",
+    "version": "0.1.dev1+g966876c76",
+    "pyproject_sha256": "77463fc2066dcc25693ae2713f86aa2327b2e77bb456cf1d36bf11e12bd7ddbc"
+  },
+  "rebuilt_in_current_run": false,
+  "scope": "原固定源码历史实际构建原件，逐元数据/输入和SHA保留；不是Git文件或本轮重新构建声明"
+}

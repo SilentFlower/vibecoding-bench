@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SC-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "sorted_list_multiplicity_and_set_uniqueness_are_different_contracts": true
+  },
+  "resource_profile": "business"
+}

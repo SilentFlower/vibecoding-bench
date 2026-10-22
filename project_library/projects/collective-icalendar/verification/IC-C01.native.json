@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "IC-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "repeated_properties_preserve_multiple_values_and_per_value_parameters": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PT-C01",
+  "source_commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Indexing returns only covered[9,10). Range get fills[10,12) with missing in a returned IntervalDict,so11 reads missing there. The original remains only[9,10) and does not contain11. Choose whether to present gaps explicitly;the default fill is not evidence of an existing stored state.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

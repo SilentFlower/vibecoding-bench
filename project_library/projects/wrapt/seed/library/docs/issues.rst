@@ -1,0 +1,1192 @@
+Known Issues
+============
+
+The following known issues exist.
+
+@classmethod.\_\_get\_\_()
+--------------------------
+
+Prior to Python 3.9 the ``@classmethod`` decorator assumes in the
+implementation of its ``__get__()`` method that the wrapped function
+is always a normal function. It doesn't entertain the idea that the
+wrapped function could actually be a descriptor, the result of a
+nested decorator. This is an issue because it means that the complete
+descriptor binding protocol is not performed on anything which is
+wrapped by the ``@classmethod`` decorator.
+
+The consequence of this is that when ``@classmethod`` is used to wrap a
+decorator implemented using ``@wrapt.decorator``, that ``__get__()`` isn't
+called on the latter. The result is that it is not possible in the latter
+to properly identify the decorator as being bound to a class method and
+it will instead be identified as being associated with a normal function,
+with the class type being passed as the first argument.
+
+The behaviour of the Python ``@classmethod`` was reported in the issue
+(http://bugs.python.org/issue19072). Prior to Python 3.9, which is where
+the Python interpreter was fixed, the only solution is the recommendation
+that decorators implemented using ``@wrapt.decorator`` always be placed
+outside of ``@classmethod`` and never inside.
+
+Unfortunately, in Python 3.13 this change in Python was reverted back to the
+old behaviour because various third party code relied on the broken behaviour
+and even though technically not correct, it was deemed safer to revert the fix.
+The original warning thus applies.
+
+Using decorated class with super()
+----------------------------------
+
+In the implementation of a decorated class, if needing to use a reference
+to the class type with super, it is necessary to access the original
+wrapped class and use it instead of the decorated class.
+
+::
+
+    @mydecorator
+    class Derived(Base):
+
+        def __init__(self):
+            super(Derived.__wrapped__, self).__init__()
+
+If using Python 3, one can simply use ``super()`` with no arguments and
+everything will work fine.
+
+::
+
+    @mydecorator
+    class Derived(Base):
+
+        def __init__(self):
+            super().__init__()
+
+
+Deriving from decorated class
+-----------------------------
+
+If deriving from a decorated class, it is necessary to access the original
+wrapped class and use it as the base class.
+
+::
+
+    @mydecorator
+    class Base:
+        pass
+
+    class Derived(Base.__wrapped__):
+        pass
+
+In doing this, the functionality of any decorator on the base class is not
+inherited. If creation of a derived class needs to also be mediated via the
+decorator, the decorator would need to be applied to the derived class also.
+
+In this case of trying to decorate a base class in a class hierarchy, it
+may turn out to be more appropriate to use a meta class instead of trying
+to decorate the base class.
+
+Note that as of Python 3.7 and wrapt 1.12.0, accessing the true type of the
+base class using ``__wrapped__`` is not required. Such code though will not
+work for versions of Python older than Python 3.7.
+
+Using issubclass() on abstract classes
+--------------------------------------
+
+If a class hierarchy has a base class which uses the ``abc.ABCMeta``
+metaclass, and a decorator is applied to a class in the hierarchy, use of
+``issubclass()`` with classes where the decorator is applied will result in
+an exception of:
+
+::
+
+    TypeError: issubclass() arg 1 must be a class
+
+This is due to what can be argued as being a bug in The Python standard
+library and has been reported (https://bugs.python.org/issue44847).
+
+Using issubclass() and isinstance() with proxied types
+-------------------------------------------------------
+
+When wrapping a class (type) object with ``BaseObjectProxy``, the
+``issubclass()`` and ``isinstance()`` checks work correctly when the
+proxy appears on the **right** side of the check:
+
+::
+
+    import wrapt
+
+    class Base:
+        pass
+
+    class Child(Base):
+        pass
+
+    proxy = wrapt.BaseObjectProxy(Base)
+
+    issubclass(Child, proxy)       # True
+    isinstance(Child(), proxy)     # True
+
+This works because Python calls ``__subclasscheck__`` or
+``__instancecheck__`` on the proxy, and ``BaseObjectProxy`` delegates these
+to the wrapped type.
+
+There are several cases that **cannot** be fixed when the proxy appears
+on the **left** side of the check:
+
+1. ``issubclass(proxy, WrappedClass)`` returns ``False`` when testing
+   against the same class the proxy wraps. This is because CPython's
+   ``issubclass()`` first performs an identity check (``proxy is
+   WrappedClass``), which fails since the proxy is not the actual class.
+   It then walks ``proxy.__bases__`` looking for the class, but a class
+   is not in its own ``__bases__``. Checking against *ancestors* of the
+   wrapped class works correctly since they are found via the
+   ``__bases__`` walk.
+
+   ::
+
+       proxy = wrapt.BaseObjectProxy(Child)
+
+       issubclass(proxy, Base)    # True — Base is in Child.__bases__
+       issubclass(proxy, Child)   # False — identity check fails
+
+2. ``issubclass(proxy, ABCClass)`` raises ``TypeError`` when the
+   right-hand class uses ``abc.ABCMeta`` as its metaclass. The C-level
+   ``__subclasscheck__`` in ``ABCMeta`` strictly requires its argument
+   to be a real class. This is the same limitation described in the
+   `Using issubclass() on abstract classes`_ section above.
+
+3. ``isinstance(proxy, typing.Dict)`` and other ``typing`` generic
+   aliases return ``False`` when the proxy wraps a matching value. This
+   happens because ``typing._BaseGenericAlias.__instancecheck__`` is
+   implemented using ``type(obj)`` rather than ``obj.__class__``.
+   Because ``type()`` returns the concrete C-level type, it sees
+   ``BaseObjectProxy`` instead of the wrapped object's class, and the check
+   fails. This is a known CPython issue
+   (https://github.com/python/cpython/issues/89949).
+
+   ::
+
+       from typing import Dict
+       import wrapt
+
+       proxy = wrapt.BaseObjectProxy({1: 2})
+
+       isinstance(proxy, dict)    # True — default __instancecheck__ uses __class__
+       isinstance(proxy, Dict)    # False — typing uses type(obj)
+
+   The workaround is to check against the origin type instead::
+
+       import typing
+
+       isinstance(proxy, typing.get_origin(Dict))    # True
+
+   Note that the newer parameterised generic syntax (``dict[str, int]``)
+   does not support ``isinstance()`` checks at all — with or without a
+   proxy — and raises ``TypeError``.
+
+More generally, any ``__instancecheck__`` or ``__subclasscheck__``
+implementation that calls ``type(obj)`` instead of inspecting
+``obj.__class__`` will see ``BaseObjectProxy`` rather than the wrapped
+type. The same applies to C-level type-check macros such as
+``PyTuple_Check`` or ``PyDict_Check``, which inspect the internal
+``ob_type`` field directly. Code paths that rely on these C-level
+checks — for example, the C-accelerated JSON encoder in the standard
+library — will not recognise a proxied object as the type it wraps::
+
+    import json
+    import wrapt
+
+    proxy = wrapt.BaseObjectProxy((1, 2, 3))
+
+    json.dumps(proxy)    # TypeError — C encoder does not see a tuple
+
+This is an inherent limitation of the transparent proxy pattern: the
+proxy can override ``__class__`` at the Python level, but it cannot
+change the object's C-level type.
+
+Deriving from BaseObjectProxy alongside an ABCMeta-based class
+--------------------------------------------------------------
+
+A custom proxy that derives from both ``BaseObjectProxy`` and a second base
+class whose metaclass is ``abc.ABCMeta`` will fail when used with
+``isinstance()`` or ``issubclass()``::
+
+    from abc import ABC
+    from wrapt import BaseObjectProxy
+
+    class Base(ABC):
+        pass
+
+    class Proxy(BaseObjectProxy, Base):
+        pass
+
+    isinstance(1, Proxy)
+    # TypeError: descriptor '__subclasscheck__' for '_wrappers.ObjectProxy'
+    # objects doesn't apply to a 'type' object
+
+Under the pure Python implementation of ``BaseObjectProxy`` (used when the
+C extension is not available, including on PyPy or when
+``WRAPT_DISABLE_EXTENSIONS`` is set in the environment), the failure
+surfaces earlier, at the ``class Proxy(...)`` statement itself, with a
+different message::
+
+    TypeError: metaclass conflict: the metaclass of a derived class
+    must be a (non-strict) subclass of the metaclasses of all its bases
+
+The pure Python ``BaseObjectProxy`` carries a custom metaclass, used to
+make type-level access to ``__module__`` and ``__doc__`` return strings
+rather than property objects, whereas the C extension's ``BaseObjectProxy``
+has plain ``type`` as its metaclass. When a second base class with
+``ABCMeta`` as its metaclass is mixed in, the pure Python build cannot
+find a common metaclass and aborts class creation. The C build
+proceeds and only fails later at the first ``isinstance()`` call. The
+underlying problem is the same in both cases; only the point at which
+it surfaces differs.
+
+The same failure occurs when the second base class is one of the
+abstract base classes exported from ``collections.abc`` (for example
+``Hashable``, ``Iterable``, ``Container``), since they too use
+``ABCMeta`` as their metaclass.
+
+The cause is the way ``BaseObjectProxy`` implements ``__instancecheck__``
+and ``__subclasscheck__``. These are defined as instance methods on the
+proxy class so that a ``BaseObjectProxy`` instance can appear on the right
+hand side of an ``isinstance()`` or ``issubclass()`` check and have the
+check delegate to the wrapped type. They rely on ``self`` being a real
+proxy instance, and the C extension enforces this at the descriptor
+level.
+
+When ``BaseObjectProxy`` is mixed in as a base class alongside an
+``ABCMeta``-based class, those methods are inherited as ordinary
+instance methods on the resulting class. Unlike the default
+``type.__instancecheck__``, ``ABCMeta.__instancecheck__`` performs its
+work by calling ``cls.__subclasscheck__(...)`` via normal attribute
+access on the class. That attribute access finds the inherited
+``__subclasscheck__`` from ``BaseObjectProxy`` and invokes it with a class
+as the first argument. The C descriptor sees that the first argument is
+not a ``BaseObjectProxy`` instance and raises the ``TypeError`` shown
+above.
+
+Mixing ``BaseObjectProxy`` with one of these abstract base classes at
+runtime is almost always the wrong approach to begin with.
+``BaseObjectProxy`` is designed to be used as a single base class, with
+derived classes overriding only the specific methods that need to
+change. Adding a second, unrelated base class brings in extra
+protocol-level behaviour which interacts poorly with what
+``BaseObjectProxy`` already does internally.
+
+The usual motivation for adding an abstract base class such as
+``Hashable`` to the base list is to satisfy a static type checker which
+has been told to expect the proxy to be declared as a subtype of that
+abstract base class. At runtime the inheritance is typically redundant.
+The abstract base classes in ``collections.abc`` use a structural
+``__subclasshook__`` (``Hashable`` is satisfied by anything that
+defines ``__hash__``, ``Iterable`` by anything that defines
+``__iter__``, and so on), and ``BaseObjectProxy`` already defines those
+methods where appropriate, forwarding to the wrapped object. So
+``isinstance(proxy, Hashable)`` is already ``True`` for an
+``BaseObjectProxy`` instance without any explicit inheritance::
+
+    from collections.abc import Hashable
+    import wrapt
+
+    isinstance(wrapt.BaseObjectProxy("s"), Hashable)    # True
+
+The runtime inheritance from the abstract base class adds nothing
+useful in this case, and brings in the ``ABCMeta`` metaclass which then
+collides with ``BaseObjectProxy`` as described above.
+
+The recommended approach is to keep the runtime class hierarchy clean
+and present the type-checker-required relationship using typing
+constructs rather than runtime inheritance. When the annotation site is
+under your own control, the cleanest option is to define a
+``typing.Protocol`` that captures the required structural shape and use
+that as the annotation, instead of inheriting from an abstract base
+class. ``BaseObjectProxy`` will structurally satisfy such a ``Protocol``
+through the dunder methods it already forwards, with no inheritance and
+no runtime change at all.
+
+When the annotation site is not under your own control and demands a
+nominal subtype of a specific abstract base class, the class can be
+declared twice in the same file, guarded by ``typing.TYPE_CHECKING``::
+
+    from typing import TYPE_CHECKING
+
+    from wrapt import BaseObjectProxy
+
+    if TYPE_CHECKING:
+        from collections.abc import Hashable
+
+        class Proxy(BaseObjectProxy, Hashable):
+            ...
+    else:
+        class Proxy(BaseObjectProxy):
+            pass
+
+``TYPE_CHECKING`` is ``False`` at runtime and ``True`` during static
+analysis, and both mypy and pyright honour this. The type checker sees
+the multi-base version, which satisfies whatever annotation required
+``Hashable`` to appear in the inheritance chain. The Python interpreter
+only ever executes the ``else`` branch, so at runtime ``Proxy`` is a
+plain ``BaseObjectProxy`` subclass with no ``ABCMeta`` in the picture and
+the original ``TypeError`` does not occur.
+
+The same trick generalises to any case where the view of a class
+presented to a static type checker needs to differ from the runtime
+class hierarchy. If several such declarations need to be maintained
+together it can be cleaner to lift them into a sibling ``.pyi`` stub
+file, which the type checker will honour in preference to the ``.py``
+source. For a single case the inline ``TYPE_CHECKING`` form is usually
+enough.
+
+Using the json module with BaseObjectProxy
+------------------------------------------
+
+Serialising a ``BaseObjectProxy`` with the standard library ``json`` module
+does not work reliably, even when the wrapped object is a type that
+``json`` natively supports. The reason is the same C-level type check
+issue described in the preceding section: the C-accelerated encoder
+that ``json.dumps()`` uses by default inspects the internal ``ob_type``
+field of each value rather than calling ``isinstance()``, and therefore
+does not recognise a proxied ``dict``, ``list``, ``tuple``, ``str``,
+``int``, ``float`` or ``bool`` as the type it wraps.
+
+For example, the following raises ``TypeError`` from the C encoder,
+even though the proxy wraps a plain ``dict``::
+
+    import json
+    import wrapt
+
+    proxy = wrapt.BaseObjectProxy({"b": "123"})
+
+    json.dumps({"a": proxy})    # TypeError: ... is not JSON serializable
+
+The ``json`` module falls back to its pure Python encoder in a handful
+of cases, most notably when ``indent`` is supplied. The pure Python
+encoder uses ``isinstance()`` checks, which ``BaseObjectProxy`` satisfies
+for the wrapped type, so the same call succeeds if ``indent`` is
+passed::
+
+    json.dumps({"a": proxy}, indent=4)    # works, pure Python encoder
+
+Relying on ``indent`` as a way to force a working encoder is fragile
+(it is an implementation detail of the standard library and affects
+output formatting), so it should not be treated as a real fix.
+
+The supported approach is to supply a ``default`` fallback to
+``json.dumps()`` that unwraps any ``BaseObjectProxy`` instance. The
+``default`` callable is invoked by the encoder for any value it does
+not otherwise know how to serialise, and its return value is then
+encoded in place of the original::
+
+    import json
+    import wrapt
+
+    def unwrap_proxy(obj):
+        if isinstance(obj, wrapt.BaseObjectProxy):
+            to_json = getattr(obj, "__to_json__", None)
+            if to_json is not None:
+                return to_json()
+            return obj.__wrapped__
+        raise TypeError(
+            f"Object of type {obj.__class__.__name__} is not JSON serializable"
+        )
+
+    json.dumps({"a": proxy}, default=unwrap_proxy)
+
+This pattern also gives derived proxy classes a place to contribute
+extra state to the serialised form. A subclass that wants its own
+attributes to appear alongside the wrapped value can define a
+``__to_json__()`` method (the name is a local convention, not something
+recognised by the ``json`` module) that returns the representation to
+encode::
+
+    class Tagged(wrapt.BaseObjectProxy):
+        def __init__(self, wrapped, metadata):
+            super().__init__(wrapped)
+            self._self_metadata = metadata
+
+        def __to_json__(self):
+            result = dict(self.__wrapped__)
+            result["_metadata"] = self._self_metadata
+            return result
+
+The ``default`` callback is only consulted for values the encoder
+cannot otherwise handle. When ``indent`` is supplied and the pure
+Python encoder is in use, a ``BaseObjectProxy`` around a ``dict`` or
+``list`` is recognised directly via ``isinstance()`` and walked
+structurally, so ``__to_json__()`` will not be called in that case.
+Code that needs the ``__to_json__()`` hook to run consistently should
+therefore avoid combining ``indent`` with a proxy over a JSON
+container type, or should apply the unwrapping itself before calling
+``json.dumps()``.
+
+The underlying limitation cannot be fixed in ``wrapt``. The C encoder
+in the standard library is deliberately written against concrete
+C-level types for performance, and a transparent proxy has no way to
+present itself as a different C-level type. Any code path that
+similarly bypasses ``isinstance()`` in favour of C-level type-check
+macros will exhibit the same behaviour.
+
+Serialising a BaseObjectProxy
+-----------------------------
+
+Attempting to pickle an instance of ``BaseObjectProxy`` (or any subclass of
+``BaseObjectProxy``) that does not override ``__reduce__`` will fail
+with ``NotImplementedError``::
+
+    import pickle
+    import wrapt
+
+    proxy = wrapt.BaseObjectProxy({"a": 1})
+
+    pickle.dumps(proxy)
+    # NotImplementedError: object proxy must define __reduce__()
+
+The object proxy base classes intentionally define ``__reduce__`` such
+that it raises ``NotImplementedError``. This is because there is no
+generic implementation that would correctly capture both the wrapped
+object and any additional state a proxy subclass may add on top of it.
+The user is therefore required to define ``__reduce__`` on their own
+proxy subclass, indicating how its data should be saved and restored.
+
+The same restriction applies to third party serialisers such as
+``dill`` which build on the standard library pickle protocol. They use
+``__reduce__`` in the same way as ``pickle`` and do not bypass the
+``NotImplementedError`` raised by the base proxy's ``__reduce__``.
+Defining ``__reduce__`` on a proxy subclass therefore makes it
+serialisable with both ``pickle`` and ``dill``. Note, however, that
+when using ``dill`` with a ``BaseObjectProxy`` subclass the dump must
+be made with ``byref=True`` so that the proxy class is referenced by
+its import path rather than serialised by value. The proxy base class
+is a C extension type and cannot be reconstructed from a serialised
+class body.
+
+See the "Serialising an Object Proxy" section in :doc:`examples` for a
+worked example of a proxy subclass that implements ``__reduce__`` so
+that it can be pickled and unpickled, along with notes on using the
+same subclass with ``dill``.
+
+Serialising a Decorated Function
+--------------------------------
+
+A function or method decorated with ``@wrapt.decorator`` cannot be
+serialised with ``pickle`` or ``dill`` as is. Decorators built with
+``@wrapt.decorator`` are implemented using ``FunctionWrapper``, which
+is itself a subclass of the object proxy base class, and so inherits
+the same ``__reduce__`` that raises ``NotImplementedError``::
+
+    import dill
+    import wrapt
+
+    @wrapt.decorator
+    def trace(wrapped, instance, args, kwargs):
+        return wrapped(*args, **kwargs)
+
+    @trace
+    def add(a, b):
+        return a + b
+
+    dill.dumps(add, byref=True)
+    # NotImplementedError: object proxy must define __reduce__()
+
+The same error is raised by ``pickle.dumps(add)``. This is not a
+special case; it is the same underlying limitation described in the
+preceding section, surfacing through ``FunctionWrapper``.
+
+Making ``@wrapt.decorator`` and ``FunctionWrapper`` themselves
+serialisable in a general way is not something **wrapt** provides, and
+is not recommended. ``FunctionWrapper`` carries additional state such
+as optional adapter functions, enabled/disabled flags and descriptor
+protocol integration. A fully general ``__reduce__`` implementation
+covering all of that is substantially more involved than a typical
+application needs, and tying the serialised form to all of it creates
+a compatibility surface that is awkward to evolve.
+
+The recommended approach, when decorator serialisation is genuinely
+required, is to build a small decorator factory of your own based on
+a ``FunctionWrapper`` subclass that defines ``__reduce__`` for only
+the state the factory actually uses. See the "Serialising a Decorator"
+section in :doc:`examples` for a worked example of this pattern,
+including the ``byref=True`` requirement when using ``dill`` with a
+``FunctionWrapper`` subclass.
+
+Before doing that, consider whether decorator serialisation is really
+needed at all. In most applications decorated functions are rebuilt
+from source at import time and only plain values travel through the
+serialisation boundary, so the issue does not arise.
+
+hasattr() on BaseObjectProxy and pre-defined dunder methods
+-----------------------------------------------------------
+
+Although ``BaseObjectProxy`` is described as a transparent object proxy, in
+practice it always defines a large number of Python "dunder" (double
+underscore) methods on the proxy class itself, regardless of whether the
+wrapped object defines the equivalent method. As a result, ``hasattr()``
+checks for these dunder methods on the proxy always return ``True``,
+even when the same check against the wrapped object directly would
+return ``False``::
+
+    import wrapt
+
+    hasattr(wrapt.BaseObjectProxy(1), "__contains__")    # True
+    hasattr(1, "__contains__")                       # False
+
+This is a deliberate design trade-off rather than a bug.
+
+For most Python special methods, the interpreter looks up the method on
+the **type** of the object, not on the instance. That is how operators
+such as ``x in obj``, ``len(obj)``, ``-obj``, ``obj + 1`` and so on are
+dispatched internally. For these operations to delegate correctly to
+the wrapped object, the corresponding dunder method must be defined on
+the proxy class. A proxy class that did not define ``__contains__``,
+``__len__``, ``__add__`` and the rest could not forward those
+operations at all, regardless of what the wrapped object supports.
+
+The obvious alternative, generating a custom proxy class per wrapped
+object whose dunder methods exactly mirror those of the wrapped type,
+is not free. Constructing a fresh class for every proxy instance adds
+meaningful memory and construction-time overhead, which is a problem
+when proxies are used pervasively (for example, when decorating every
+function and method in a large codebase). ``BaseObjectProxy`` is intended
+to be cheap enough to use in that setting, so it instead defines a
+fixed set of dunder methods on a single shared class.
+
+For the dunder methods that ``BaseObjectProxy`` pre-defines, this is
+usually harmless in practice. Code that wants to use one of these
+features, such as arithmetic, containment, length, comparison, hashing,
+attribute access, subscripting or the context-manager protocol, almost
+always just *uses* the feature directly. If the wrapped object does
+not implement the corresponding dunder method, the shim on
+``BaseObjectProxy`` will delegate through to ``self.__wrapped__`` and an
+``AttributeError`` will be raised from there, which is the same
+exception Python would raise for an object that didn't define the
+method in the first place. Code that simply does ``len(obj)``,
+``a in b`` or ``x + y`` therefore behaves correctly whether or not the
+argument is a proxy.
+
+The cases where this becomes a problem are the dunder methods whose
+*existence* is itself meaningful, typically methods that Python
+introspection APIs or user code probe for explicitly rather than just
+invoking. The most common examples are:
+
+* ``__call__``, probed by ``callable(obj)``.
+* ``__iter__`` and ``__next__``, probed by code that distinguishes
+  iterables from iterators, or that wants to decide whether an object
+  can be iterated.
+* ``__aiter__``, ``__anext__`` and ``__await__``, the async
+  counterparts of the above, probed by async frameworks when deciding
+  how to drive an object.
+* Descriptor protocol methods ``__get__``, ``__set__``, ``__delete__``
+  and ``__set_name__``, whose mere presence on a class attribute
+  changes how Python treats that attribute.
+* ``__length_hint__``, consulted by built-ins as an optimisation hint;
+  its presence implies the object can cheaply estimate its length.
+* ``__fspath__``, whose presence on the type is what marks an object as
+  path-like for ``os.fspath()`` and ``isinstance(obj, os.PathLike)``.
+  See the `Wrapping path-like objects and os.PathLike`_ section below.
+* ``__buffer__`` and ``__release_buffer__``, whose presence on the type
+  is what marks an object as bytes-like for the buffer protocol. See
+  the `Wrapping bytes-like objects and the buffer protocol`_ section
+  below.
+
+If ``BaseObjectProxy`` defined these unconditionally, ``callable(proxy)``
+would always be ``True`` even when wrapping a non-callable, every
+proxy would appear to be iterable, and every proxy attribute on a
+class body would silently behave as a descriptor. To avoid those
+incorrect answers, these specific methods are **not** defined on
+``BaseObjectProxy`` by default. The trade-off is that if you want a
+proxy around a callable (or an iterable, or an awaitable, and so on)
+to itself be recognised as callable/iterable/awaitable, you have to
+opt in.
+
+The one exception is the legacy ``ObjectProxy`` class, which is
+retained for backward compatibility and does define ``__iter__``
+unconditionally. Every ``ObjectProxy`` instance therefore appears to
+be iterable even when the wrapped object is not, which is exactly the
+problem described above. This is why ``BaseObjectProxy`` should be used
+in preference to ``ObjectProxy``. See the "Special Object Methods"
+section of the "Proxies and Wrappers" document for the background.
+
+There are two ways to opt in:
+
+1. Define a derived proxy class that implements the required dunder
+   methods explicitly. This is the preferred approach when you know at
+   the point of wrapping what kind of object you are wrapping, and is
+   the cheapest in terms of runtime cost. For example, to wrap a
+   callable so that ``callable(proxy)`` returns ``True``::
+
+       class CallableProxy(wrapt.BaseObjectProxy):
+           def __call__(self, *args, **kwargs):
+               return self.__wrapped__(*args, **kwargs)
+
+   Equivalent subclasses can be defined for iterators, async
+   iterators, awaitables and descriptors, adding only the dunder
+   methods actually required.
+
+2. Use ``AutoObjectProxy`` when the type of the wrapped object is not
+   known statically, or varies. ``AutoObjectProxy`` inspects the
+   wrapped object at construction time and dynamically creates a
+   subclass that defines exactly those problematic dunder methods
+   (``__call__``, ``__iter__``, ``__next__``, ``__aiter__``,
+   ``__anext__``, ``__await__``, ``__length_hint__``, ``__fspath__``,
+   ``__get__``, ``__set__``, ``__delete__``, ``__set_name__``) that the
+   wrapped object actually supports::
+
+       import wrapt
+
+       proxy = wrapt.AutoObjectProxy(lambda: 42)
+       callable(proxy)    # True
+
+       proxy = wrapt.AutoObjectProxy(42)
+       callable(proxy)    # False
+
+   The cost is that ``AutoObjectProxy`` generates a **new class per
+   wrapped object**. That is significantly more expensive, in both
+   time and memory, than using a pre-defined proxy class, and the
+   generated classes are not deduplicated. ``AutoObjectProxy`` is
+   therefore intended for situations where the flexibility is genuinely
+   needed, typically a small number of long-lived proxies over objects
+   of varying types, rather than as a drop-in replacement for
+   ``BaseObjectProxy``.
+
+The short version is that ``BaseObjectProxy`` chooses a fixed set of
+pre-defined dunder methods as a compromise between transparency and
+efficiency. The dunder methods whose presence is benign in practice
+are defined unconditionally; the dunder methods whose presence would
+give incorrect answers to introspection are left off, and opt-in is
+provided via subclassing or ``AutoObjectProxy``. Code that relies on
+``hasattr(proxy, "__some_dunder__")`` producing the same answer as
+``hasattr(wrapped, "__some_dunder__")`` will therefore see mismatches
+for the pre-defined set, and should either test the wrapped object
+directly (via ``proxy.__wrapped__``) or use the feature and handle any
+resulting ``AttributeError`` rather than probing for it.
+
+Wrapping path-like objects and os.PathLike
+------------------------------------------
+
+The ``__fspath__()`` special method defined by the ``os.PathLike``
+protocol is one of the dunder methods whose *existence* is meaningful,
+as described in the preceding section, and so is not defined by the
+base object proxy. Wrapping a path-like object such as a
+``pathlib.Path`` with ``BaseObjectProxy`` therefore produces a proxy which
+cannot be used where a path is expected, and it fails in a way which
+can be confusing::
+
+    import os
+    import pathlib
+    import wrapt
+
+    proxy = wrapt.BaseObjectProxy(pathlib.Path("/path/to/file"))
+
+    isinstance(proxy, os.PathLike)    # True
+    os.fspath(proxy)                  # TypeError
+
+    open(wrapt.BaseObjectProxy("/path/to/file"))    # TypeError
+
+The inconsistency between the two results has a specific cause. The
+``isinstance()`` check is dispatched through
+``ABCMeta.__instancecheck__``, which consults the instance
+``__class__`` attribute. The proxy forwards ``__class__`` to the
+wrapped object, so the check sees the wrapped ``Path`` type, which
+does provide ``__fspath__()``, and the answer accurately reflects the
+wrapped object. The ``os.fspath()`` function and the many standard
+library functions which accept paths (the builtin ``open()``, most of
+``os``, ``os.path``, ``shutil`` and so on) instead perform the lookup
+of ``__fspath__()`` on the actual type of the object at the C level,
+where the ``__class__`` forwarding does not apply. The proxy type does
+not define the method, so a ``TypeError`` is raised. The proxy thus
+claims to be path-like when asked, but fails when used as a path.
+
+The reason ``__fspath__()`` is not simply defined on the base proxy is
+that its presence on the type is precisely what code uses to classify
+an object as path-like. A very common idiom is::
+
+    def process(f):
+        if isinstance(f, (str, os.PathLike)):
+            f = open(f)
+        ...
+
+If the base proxy defined ``__fspath__()``, every object proxy would
+satisfy ``isinstance(obj, os.PathLike)`` regardless of what it
+wrapped, and code using this idiom would misclassify a proxy around a
+file object, or any other non-path object, then fail attempting to use
+it as a path. This is the same trade-off described in the preceding
+section for ``__call__()`` and ``__iter__()``.
+
+If a proxy around a path-like object needs to be usable as a path, the
+recommended approach is a derived proxy class which adds the method
+explicitly::
+
+    class PathProxy(wrapt.BaseObjectProxy):
+        def __fspath__(self):
+            return os.fspath(self.__wrapped__)
+
+This is cheap, and the proxy will only claim to be path-like when you
+have declared that it should.
+
+Alternatively, ``AutoObjectProxy`` includes ``__fspath__()`` in the set
+of dunder methods it detects on the wrapped object and adds to the
+per-instance class it generates, so a proxy it creates around a
+path-like object works with ``os.fspath()`` and functions which accept
+paths. Be aware, however, of the memory cost described in the
+preceding section: ``AutoObjectProxy`` creates a **new class for every
+proxy instance**. Path-like objects are frequently created in large
+numbers, and creating a distinct class per wrapped path can add up to
+significant memory overhead. ``AutoObjectProxy`` is only appropriate
+when a process holds a small number of such proxies. For anything
+high-frequency, use a derived proxy class with an explicit
+``__fspath__()`` method as shown above.
+
+Wrapping bytes-like objects and the buffer protocol
+----------------------------------------------------
+
+The buffer protocol is the mechanism through which ``memoryview()``,
+the ``bytes()`` and ``bytearray()`` constructors, binary file
+``write()``, ``struct``, ``socket``, ``hashlib`` and many other
+consumers of "bytes-like" objects obtain direct access to an object's
+underlying memory. Historically the protocol existed only at the C
+level, so a pure Python class could not participate in it at all.
+Since Python 3.12 a class can implement it by defining the
+``__buffer__()`` and ``__release_buffer__()`` special methods, which
+Python wires into the same C-level type slots that the builtin types
+use.
+
+Like ``__fspath__()`` described in the preceding section, the mere
+presence of the protocol on a type is used to classify objects. C code
+checks whether the type slot is populated before using an object as a
+buffer, raising the familiar ``TypeError: a bytes-like object is
+required`` when it is not, and on Python 3.12+ the
+``collections.abc.Buffer`` abstract base class performs a structural
+check for ``__buffer__()``. The base object proxy therefore does not
+implement the protocol, and wrapping a bytes-like object exhibits the
+same confusing inconsistency as for path-like objects, and for the
+same reason. The ``isinstance()`` check consults the delegated
+``__class__`` and reflects the wrapped object, while actual use looks
+up the protocol on the actual type of the proxy at the C level and
+fails::
+
+    import collections.abc
+    import wrapt
+
+    proxy = wrapt.BaseObjectProxy(bytearray(b"data"))
+
+    isinstance(proxy, collections.abc.Buffer)    # True (Python 3.12+)
+    memoryview(proxy)                            # TypeError
+
+Note that unlike the other presence-sensitive dunder methods,
+``__buffer__()`` and ``__release_buffer__()`` are not included in the
+set which ``AutoObjectProxy`` detects and adds. They only work at all
+on Python 3.12+, so support would be version dependent, and bytes-like
+objects such as I/O buffers and arrays are the classic example of
+objects created in large numbers, where the per-instance class created
+by ``AutoObjectProxy`` is inappropriate due to memory overhead.
+
+If a proxy around a bytes-like object needs to be usable as a buffer,
+on Python 3.12+ define a derived proxy class which delegates the
+protocol explicitly::
+
+    class BufferProxy(wrapt.BaseObjectProxy):
+        def __buffer__(self, flags):
+            return self.__wrapped__.__buffer__(flags)
+
+        def __release_buffer__(self, view):
+            view.release()
+
+A proxy of this type supports read and write access through
+``memoryview()``, and exporter side effects such as a ``bytearray``
+refusing to be resized while a view is outstanding work correctly
+through the proxy.
+
+Note that ``__release_buffer__()`` releases the view it is given
+rather than delegating to the wrapped object. Immutable exporters such
+as ``bytes`` define ``__buffer__()`` but not ``__release_buffer__()``,
+since they have no locking or cleanup to perform, so blind delegation
+would raise ``AttributeError`` for them. Releasing the passed view is
+the pattern shown in the Python data model documentation and works for
+any wrapped object.
+
+On Python versions before 3.12 there is no way for a pure Python class
+to participate in the buffer protocol, so this recipe does not work
+there and a proxy around a bytes-like object cannot be passed to
+buffer consumers at all. Unwrap the proxy at the boundary instead,
+passing ``proxy.__wrapped__`` to the consumer.
+
+\_\_qualname\_\_ snapshot vs live-read divergence
+--------------------------------------------------
+
+The Python and C implementations of ``BaseObjectProxy`` handle the
+``__qualname__`` attribute differently. CPython does not allow
+``__qualname__`` to be overridden via a Python property — it must be an
+actual string object stored on the instance. To work around this, the
+pure-Python ``BaseObjectProxy.__init__`` copies the wrapped object's
+``__qualname__`` into the proxy's instance dictionary at construction
+time using ``object.__setattr__()``. This creates a *snapshot* of the
+value.
+
+The C extension, by contrast, uses a ``PyGetSetDef`` descriptor to
+live-read ``__qualname__`` from the wrapped object on every access.
+C-level getset descriptors operate below the layer where CPython
+enforces the "must be a real string" restriction, so this works without
+issue.
+
+The practical consequence is that if the wrapped object's ``__qualname__``
+is mutated *directly* (not through the proxy) after wrapping, the two
+implementations diverge::
+
+    import wrapt
+
+    def foo(): pass
+
+    proxy = wrapt.BaseObjectProxy(foo)
+    foo.__qualname__ = "Changed"
+
+    # Pure-Python: proxy.__qualname__ returns the original value (snapshot)
+    # C extension: proxy.__qualname__ returns "Changed" (live-read)
+
+This only matters when code mutates ``__qualname__`` on the wrapped
+object after the proxy has been constructed. Setting ``__qualname__``
+*through* the proxy (``proxy.__qualname__ = "new"``) updates both the
+wrapped object and the local snapshot in the Python implementation, so
+both implementations agree in that case.
+
+Free-threaded Python (PEP 703)
+------------------------------
+
+The C extension declares ``Py_mod_gil = Py_MOD_GIL_NOT_USED`` on Python
+3.13 and later, which allows it to be loaded into a free-threaded build
+without the runtime re-enabling the GIL on import. This declaration is
+sound for the way **wrapt** is used in the overwhelming majority of
+applications: a decorator is applied to a function or class at import
+time, the resulting wrapper or proxy is published once, and from then on
+it is only *read* (called, introspected, used as a descriptor) from
+multiple threads. That pattern is safe on free-threaded builds.
+
+Earlier releases did **not**, however, guarantee safety when a single
+proxy or wrapper instance was **mutated** from one thread while another
+thread concurrently read from or called it. In particular, the
+following operations could in the worst case corrupt memory and crash
+the interpreter on free-threaded builds when the same instance was
+shared across threads:
+
+* Assigning to ``__wrapped__`` (or any other proxy attribute) on an
+  ``BaseObjectProxy`` while another thread is calling, iterating, or
+  performing attribute access on the same proxy.
+
+* Reassigning fields on a ``FunctionWrapper`` (such as the ``enabled``
+  callable, the ``wrapper`` function, or the bound instance) after
+  construction, while another thread is invoking the wrapper.
+
+* Replacing the captured ``args`` or ``kwargs`` on a
+  ``PartialCallableObjectProxy`` while another thread is calling it.
+
+As of wrapt 2.4.0, the C extension serialises its internal field
+updates using per-object critical sections on free-threaded builds.
+Two threads which concurrently mutate the same field of the same
+instance, for example both assigning to ``__wrapped__`` or both
+applying an in-place operator such as ``+=``, can no longer cause the
+previous value to be released twice, which in earlier releases could
+crash the interpreter. The outcome of such a race is now simply that
+one of the updates is lost, matching the behaviour of the pure Python
+implementation, where concurrent attribute assignment has always been
+a last writer wins race rather than a crash.
+
+The attribute getters which expose internal fields, namely
+``__wrapped__`` on the object proxies and the ``_self_`` accessors on
+function wrappers, also acquire the reference they return inside the
+same critical sections, so directly reading one of these attributes is
+safe even while another thread concurrently replaces the field.
+
+All other internal uses of these fields during calls, operators and
+delegation likewise acquire a strong reference to the field value for
+the duration of the operation, rather than retaining a raw field
+pointer which a concurrent mutation could invalidate. Taken together,
+these measures mean that mutating a shared proxy or wrapper from one
+thread while another thread reads from or calls the same instance can
+no longer corrupt memory or crash the interpreter.
+
+What concurrent mutation does not provide is consistency. Fields are
+protected individually, not as a group, so a reader racing a writer
+may observe a torn view of multiple fields which are updated together,
+and competing updates can be lost. This is the same behaviour as the
+pure Python implementation, where attribute assignment provides no
+cross-attribute atomicity either.
+
+The recommended pattern on free-threaded builds is therefore still the
+same as the pattern on GIL builds: construct the proxy or wrapper
+once, publish it, and treat it as immutable thereafter. Concurrent
+readers and concurrent calls are fully supported. Concurrent mutation
+of a shared instance is now memory safe, but remains subject to the
+consistency caveats above, so applications which need readers to see
+a consistent view across a mutation should still serialise access
+externally (for example, with a ``threading.Lock`` held across both
+the write and any concurrent read).
+
+Introspecting the BaseObjectProxy instance \_\_dict\_\_
+-------------------------------------------------------
+
+``BaseObjectProxy`` replaces ``__dict__`` with a property that delegates to
+the wrapped object. This means that ``vars(proxy)`` returns the wrapped
+object's ``__dict__`` rather than the proxy's own instance dictionary::
+
+    import wrapt
+
+    class Target:
+        def __init__(self, name):
+            self.name = name
+
+    class MyProxy(wrapt.BaseObjectProxy):
+        def __init__(self, wrapped):
+            super().__init__(wrapped)
+            self._self_tag = "example"
+
+    target = Target("test")
+    proxy = MyProxy(target)
+
+    vars(proxy)       # {'name': 'test'} — no '_self_tag'
+
+This is by design — the proxy is meant to be transparent — but it makes
+it difficult to introspect what attributes are stored on the proxy
+instance itself.
+
+To allow introspection of the proxy's own instance dictionary,
+``BaseObjectProxy`` exposes it as ``__self_dict__``::
+
+    proxy.__self_dict__    # {'_self_tag': 'example', ...}
+
+This returns the live instance dictionary of the proxy, so any
+``_self_`` attributes set on the proxy will appear there. Mutations to
+the returned dictionary are reflected on the proxy.
+
+If the combined view of the wrapped object's ``__dict__`` together with
+the proxy's own ``_self_`` attributes is desired as the result of
+``vars()``, a derived ``BaseObjectProxy`` can override ``__dict__`` with its
+own property::
+
+    class IntrospectableProxy(wrapt.BaseObjectProxy):
+        def __init__(self, wrapped):
+            super().__init__(wrapped)
+            self._self_tag = "example"
+            self._self_count = 0
+
+        @property
+        def __dict__(self):
+            result = self.__wrapped__.__dict__.copy()
+            result.update(self.__self_dict__)
+            return result
+
+    target = Target("test")
+    proxy = IntrospectableProxy(target)
+
+    vars(proxy)       # includes 'name' from target and '_self_tag', '_self_count'
+
+Note that because the result is a copy, modifying the dictionary returned
+by ``vars()`` in this case will not affect either the proxy or the
+wrapped object.
+
+Ternary ``pow()`` with BaseObjectProxy
+--------------------------------------
+
+The three-argument form of the builtin ``pow()`` function does not accept
+a ``BaseObjectProxy`` in every argument position.
+
+The base may be a ``BaseObjectProxy``, and when it is, the exponent may be
+one as well. The ``__pow__`` method on ``BaseObjectProxy`` unwraps ``self``
+and, if it is also a proxy, the exponent, before delegating to
+``pow()``. If the base is not a proxy but the exponent is, Python calls
+the ``__pow__`` method of the base's type first, and unlike the two
+argument form, the three argument form has no reflected ``__rpow__``
+fallback, so the proxy never gets a chance to unwrap itself and a
+``TypeError`` is raised.
+
+The modulo argument is never unwrapped. If the C extension's
+``nb_power`` slot invoked ``PyNumber_Power`` with a proxy modulo, the
+CPython ternary operator fallback would end up calling back into the
+proxy's ``nb_power`` slot indefinitely, overflowing the C stack, so the
+slot returns ``NotImplemented`` for a proxy modulo instead. The pure
+Python implementation does not unwrap modulo either, so that behaviour
+is the same across the pure Python implementation, the C extension and
+PyPy. A proxy passed as the modulo argument therefore always results in
+a ``TypeError``.
+
+The practical consequence is that callers should ensure the base is an
+``BaseObjectProxy`` whenever the exponent is, and should unwrap the modulo
+argument themselves where necessary.
+
+::
+
+    import wrapt
+
+    base = wrapt.BaseObjectProxy(2)
+    exponent = wrapt.BaseObjectProxy(3)
+    modulo = wrapt.BaseObjectProxy(5)
+
+    # Supported: base only, or base and exponent, as proxies.
+    pow(base, 3, 5)
+    pow(base, exponent, 5)
+
+    # Not supported: exponent is a proxy but base is not.
+    pow(2, exponent.__wrapped__, 5)
+
+    # Not supported: unwrap the modulo yourself.
+    pow(base, exponent, modulo.__wrapped__)
+
+pytest setup_class/teardown_class hooks
+----------------------------------------
+
+Decorators implemented using ``@wrapt.decorator`` are silently bypassed
+when applied to the ``setup_class`` or ``teardown_class`` xunit-style
+hooks that ``pytest`` recognises on test classes. The decorator is never
+invoked when ``pytest`` runs the hook, even though the same decorator
+applied to a regular test method, or to ``setup_method`` /
+``teardown_method``, works correctly.
+
+The following test illustrates the problem::
+
+    import wrapt
+
+    @wrapt.decorator
+    def pass_through(wrapped, instance, args, kwargs):
+        return wrapped(*args, foo=1, **kwargs)
+
+    class TestMyClass:
+        @pass_through
+        @classmethod
+        def setup_class(cls, **kwargs):
+            cls.kwargs = kwargs
+
+        def test_something(self):
+            assert self.kwargs == {'foo': 1}
+
+When this is run under ``pytest``, ``test_something`` fails with
+``kwargs`` equal to ``{}`` rather than ``{'foo': 1}``. The
+``pass_through`` decorator is never called. Replacing its body with a
+``raise`` confirms that the wrapper is not entered at all.
+
+The cause is specific to how ``pytest`` invokes the class-level xunit
+hooks. For these hooks, ``pytest`` does not use normal attribute access
+on the class. Instead, it retrieves the attribute statically, then
+extracts the underlying function object by reading ``__func__`` directly
+(via an internal helper ``_pytest.compat.getimfunc``), and finally calls
+that function with the class as an explicit first argument. The
+equivalent of::
+
+    cls.setup_class()        # normal, goes through descriptor protocol
+
+is replaced by::
+
+    func = setup_class.__func__    # reach past the descriptor
+    func(cls)                     # call the raw function directly
+
+Reading ``__func__`` off a ``@classmethod`` (or ``@staticmethod``)
+returns the underlying plain function, that is, the original function
+supplied to the method decorator. When a ``@wrapt.decorator`` has been applied
+on top of the ``@classmethod``, ``wrapt``'s wrapper object sits between
+the classmethod descriptor and the caller, and its behaviour is
+delivered via the descriptor binding protocol. By reading ``__func__``
+and calling the result directly, ``pytest`` bypasses the descriptor
+binding protocol entirely, and with it any decorator that relies on
+that protocol to inject itself into the call.
+
+The same shortcut is taken for ``teardown_class``, and analogous
+behaviour applies to the ``setup_class`` / ``teardown_class`` forms
+whether the method is declared with ``@classmethod``, as a plain
+function taking ``cls``, or as a zero-argument function. By contrast,
+``setup_method`` and ``teardown_method`` are invoked by ``pytest`` via
+normal attribute access on the instance, so the descriptor protocol is
+honoured and ``@wrapt.decorator`` wrappers on those hooks work
+correctly.
+
+This is believed to be an issue in ``pytest`` rather than in ``wrapt``.
+The Python descriptor binding protocol is the language-defined mechanism
+for invoking methods, including ``@classmethod`` and ``@staticmethod``,
+and decorators, proxies and other wrappers legitimately rely on it to
+interpose on calls. Code that reaches past that protocol by extracting
+``__func__`` and calling it directly will skip any wrapping applied via
+the descriptor protocol, regardless of whether the wrapper is from
+``wrapt`` or implemented by some other means. If ``pytest`` were to
+follow normal Python practice, invoking the hook via attribute access on
+the class and allowing the descriptor protocol to deliver the correctly
+bound callable, the problem would not arise.
+
+It is likely that the ``__func__`` extraction in ``pytest`` is a
+historical shortcut rather than a considered design decision. Pytest
+supports three different ways of declaring the class-level xunit hooks,
+namely as a ``@classmethod``, as a plain function taking ``cls``, or as
+a zero-argument function, and the ``__func__`` trick normalises all
+three into a single uniform dispatch: always call the underlying plain
+function with ``cls`` as an explicit argument. This was probably the
+shortest path that worked across older versions of Python, and it has
+remained in place ever since because it handles the common cases. The
+same uniformity could be achieved today without reaching past the
+descriptor protocol, for example by dispatching through normal
+attribute access and using ``inspect.signature`` to decide how many
+arguments to pass, but the original code has never been revisited to
+match more current practice.
+
+Until this is addressed upstream in ``pytest``, the practical workaround
+is to avoid applying ``@wrapt.decorator`` directly on top of
+``@classmethod`` or ``@staticmethod`` for the ``setup_class`` and
+``teardown_class`` hooks. The decorated behaviour can instead be moved
+into an ordinary helper method that the hook calls, or into a
+``setup_method`` / ``teardown_method`` hook, both of which are dispatched
+through normal attribute access and therefore honour decorators applied
+via ``@wrapt.decorator``.
+
+
+
+Signature of PartialCallableObjectProxy over a bound method
+-----------------------------------------------------------
+
+``inspect.signature()`` applied to a ``PartialCallableObjectProxy``, or to
+the result of ``wrapt.partial()``, reports the signature of the wrapped
+callable with the bound positional and keyword arguments removed, in the
+same way as it does for ``functools.partial``. There is one case where
+this does not hold, which is when the callable being wrapped is itself an
+already bound method.
+
+::
+
+    import inspect
+    import functools
+    import wrapt
+
+    class Database:
+        def query(self, sql, *args, timeout=None):
+            pass
+
+    db = Database()
+
+    inspect.signature(functools.partial(db.query, "SELECT 1"))
+    # <Signature (*args, timeout=None)>
+
+    inspect.signature(wrapt.partial(db.query, "SELECT 1"))
+    # <Signature (sql, *args, timeout=None)>
+
+For the ``wrapt`` proxy the parameter filled by the bound argument is
+still present. This happens because ``inspect.signature()`` first checks
+whether the object it was given is an instance of ``types.MethodType``,
+before it looks for a ``__signature__`` attribute. An object proxy
+reports the class of the object it wraps, so for a proxy around a bound
+method that check succeeds. ``inspect`` then reads the ``__func__``
+attribute, which the proxy also forwards to the bound method, takes the
+signature of the underlying function, and removes only its first
+parameter. The ``__signature__`` attribute of the proxy, which would
+give the correct result, is never consulted.
+
+This cannot be corrected within ``wrapt``. Not reporting the class of the
+wrapped object would break the fundamental contract of an object proxy,
+and returning a different object from ``__func__`` would mislead the
+many other consumers of that attribute in order to satisfy one. The
+appropriate fix is for ``inspect`` to consult ``__signature__`` before
+relying on the class of the object.
+
+Partials over a plain function are unaffected, including the partial
+created by ``FunctionWrapper`` when a wrapped method is called via the
+class with the instance passed explicitly, since in that case the
+wrapped callable is the plain function and the instance is one of the
+bound arguments. Where the signature of a partial over a bound method is
+needed, pass the underlying function and the instance instead of the
+bound method.
+
+::
+
+    inspect.signature(wrapt.partial(Database.query, db, "SELECT 1"))
+    # <Signature (*args, timeout=None)>

@@ -1,0 +1,1 @@
+Feed one UniversalDetector with codecs.BOM_UTF8+b"hello";inspect done/result. Feed a later b"\xff" and close(). Separately strict-decode the entire concatenated bytes as utf-8-sig. Explain detector early stopping versus complete-stream validation. No edits.

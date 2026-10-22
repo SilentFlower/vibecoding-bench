@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PN-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "calendar_months_and_approximate_duration_seconds_are_not_interchangeable": true
+  },
+  "resource_profile": "business"
+}

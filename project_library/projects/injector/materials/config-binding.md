@@ -1,0 +1,1 @@
+Compare permissive Injector().get(Service) with Injector(auto_bind=False) after explicitly binding Service to its class but not binding str. Then bind str to configured and retry the strict container. Distinguish constructor success,automatic default values and business configuration validation. No edits or real application configuration.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CN-D01",
+  "source_commit": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use only actually consumed evidence. Request missing call and before/after logger state before choosing a cause. With a complete delivered reproduction,trace the actual input validation/sampling and explain setup/cleanup paths,distinguish caller input from persistent logging effects,and advise valid arguments plus recovery of caller-owned state without removing unrelated handlers or claiming concurrency guarantees. Unavailable evidence supports insufficient_information;no patch is authorized.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

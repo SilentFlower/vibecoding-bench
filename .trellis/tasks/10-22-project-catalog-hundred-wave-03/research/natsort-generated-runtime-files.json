@@ -1,0 +1,24 @@
+{
+  "project": "natsort",
+  "source_commit": "e9a3a2a307580a1f2be8c57bba50fba45789ada0",
+  "files": [
+    {
+      "path": "natsort/_version.py",
+      "sha256": "a4da5298aaed9676ec30cb65f1ab5c9e808ddc1fe3a0c31f6efd880bd44a2ead",
+      "size": 568,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    }
+  ],
+  "file_count": 1,
+  "origin": {
+    "metadata": ".deploy/github-100-research/resume-core/natsort/venv/lib/python3.12/site-packages/natsort-8.4.1.dev72+ge9a3a2a30.dist-info/METADATA",
+    "metadata_sha256": "96c99f8a79f8e7480f1d3e9d9148ea595c62216d7f6f2392b6b5d8e333b450bd",
+    "version": "8.4.1.dev72+ge9a3a2a30",
+    "pyproject_sha256": "78859ecb131b5e0850f0ec75dc89f953c49262d6f4c3b70fa2e51aa96aa3365e"
+  },
+  "rebuilt_in_current_run": false,
+  "scope": "原固定源码历史实际构建原件，逐元数据/输入和SHA保留；不是Git文件或本轮重新构建声明"
+}

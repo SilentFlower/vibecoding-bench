@@ -1,0 +1,1 @@
+Compare Hamming(external=False) and Hamming(truncate=True,external=False) on ab/abc. Also compare default Hamming and Levenshtein on ab/xab. Advise fixed-position comparison versus edit alignment and whether ignoring unmatched suffixes is acceptable. No edits.

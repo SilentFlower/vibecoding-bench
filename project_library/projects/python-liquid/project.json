@@ -1,0 +1,255 @@
+{
+  "schema": 2,
+  "project_key": "python-liquid",
+  "title": "Liquid商户模板工作场景",
+  "category": "语言语义、数据与渲染边界",
+  "description": "真值、默认值、片段作用域、转义、缺失字段、资源方案及复合条件诊断。",
+  "seed_digest": "c49ffb26fbf60a5849638362cb01940b23fc9a7038ed5ded51b4f9a8e7612330",
+  "environment": "python-liquid-py312",
+  "source": {
+    "repository": "https://github.com/jg-rp/liquid",
+    "commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/tests/golden-liquid/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "LQ-S01",
+      "title": "模板语言语义",
+      "goal": "正确处理值与片段",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "LQ-U01",
+            "LQ-U02",
+            "LQ-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "LQ-U01",
+          "kind": "understand",
+          "goal": "解释Liquid条件真值",
+          "prompt": "Render {% if x %}yes{% else %}no{% endif %} for x=0,\"\",[],False,None with the supplied Environment defaults. Compare the intended business meaning with Python truthiness. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/lq-u01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/LQ-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/LQ-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "LQ-U02",
+          "kind": "understand",
+          "goal": "解释默认值过滤器的空值策略",
+          "prompt": "Render {{ x | default: \"fallback\" }}|{{ x | default: \"fallback\", allow_false: true }} for x=0,False,\"\",None. Explain why this filter differs from a plain if. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/lq-u02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/LQ-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/LQ-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "LQ-U03",
+          "kind": "understand",
+          "goal": "解释模板片段的变量作用域",
+          "prompt": "DictLoader provides p=\"{{ x }}{% assign x = 'inner' %}\". Compare templates that assign x=\"outer\",then include \"p\" or render \"p\",then output |{{ x }}. No other globals or named arguments are supplied. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/lq-u03.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/LQ-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/LQ-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "LQ-S02",
+      "title": "报告输出策略",
+      "goal": "明确转义与缺失数据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "LQ-C01",
+            "LQ-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "LQ-C01",
+          "kind": "consult",
+          "goal": "选择HTML输出的转义策略",
+          "prompt": "Compare Environment() with Environment(autoescape=True) when rendering {{ x }} and plain context x=\"<b>A&B</b>\". Advise a browser-output policy without displaying or executing the value. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/lq-c01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/LQ-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/LQ-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "LQ-C02",
+          "kind": "consult",
+          "goal": "选择模板缺失数据处理方式",
+          "prompt": "Render A{{ user.name }}B with no user data using default undefined and StrictUndefined. Advise report validation/error handling and optional-field policy. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/lq-c02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/LQ-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/LQ-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "LQ-S03",
+      "title": "受控渲染方案",
+      "goal": "界定资源和数据访问",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "LQ-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "LQ-P01",
+          "kind": "plan",
+          "goal": "规划有资源边界的模板渲染",
+          "prompt": "Set env.loop_iteration_limit=2 and render {% for x in xs %}{{ x }}{% endfor %} for xs=[1,2] and [1,2,3]. Inspect the default limit and other defined Environment limits. Plan finite rendering budgets,loader isolation and error publication;no implementation or real-service access.",
+          "requires": [],
+          "materials": [
+            "materials/lq-p01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/LQ-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/LQ-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "LQ-S04",
+      "title": "条件表达式诊断",
+      "goal": "核实际语言规则",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "LQ-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "LQ-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "LQ-D01",
+          "kind": "diagnose",
+          "goal": "诊断复合条件与预期不一致",
+          "prompt": "A compound Liquid condition differs from a Python-style expectation. Request the complete expression,actual inputs,parser flags and branch output before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/LQ-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "logical-association",
+              "when": "Exact expression,inputs,flags and output controls have not been supplied or declared unavailable and are reasonably requested.",
+              "materials": [
+                "disclosure/logical.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FG-U01",
+  "source_commit": "97260abb1793eb164c458c10b493690beb413f6d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default add_entry prepends,so the first feed is third,second,first. Explicit append gives first,second,third. Choose the existing insertion order required by the document list;neither order implies sorting by publication time.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

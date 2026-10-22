@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PN-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "timezone_conversion_preserves_the_instant_while_set_reinterprets_wall_fields": true
+  },
+  "resource_profile": "business"
+}

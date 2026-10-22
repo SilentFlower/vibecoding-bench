@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PP-U01",
+  "source_commit": "810199f89bf916590426e1c5cb3d612584f11a2f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default parse_string accepts the12 prefix and returns[12 as a string] despite trailing text. parse_allTrue rejects that supplied dirty record with ParseException,and the complete12 control succeeds. Explicit parse_all or an appropriate StringEnd is needed when the whole record must match;prefix acceptance is an existing API choice,not complete quantity validation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

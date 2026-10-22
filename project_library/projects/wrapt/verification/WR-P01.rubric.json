@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WR-P01",
+  "source_commit": "6b4e844950213118b19e613248d2bc9469eb731e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Results are9 with both layers,6 after removing inner while preserving outer,and3 after removing outer. Save the actual returned wrapper identity handle;do not pass the callback function or reset the attribute to an old snapshot that discards others. Pair install/removal in a controlled lifecycle,handle missing/replaced/non-spliceable layers explicitly,and test nested/inherited/deferred cases relevant to the caller. This plan does not authorize process-wide monkeypatching.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

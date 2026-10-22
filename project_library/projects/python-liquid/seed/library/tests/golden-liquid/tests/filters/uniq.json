@@ -1,0 +1,157 @@
+{
+  "tests": [
+    {
+      "name": "array of strings",
+      "template": "{{ a | uniq | join: '#' }}",
+      "data": {
+        "a": [
+          "a",
+          "b",
+          "b",
+          "a"
+        ]
+      },
+      "result": "a#b",
+      "tags": [
+        "join filter",
+        "uniq filter"
+      ]
+    },
+    {
+      "name": "array of things",
+      "template": "{{ a | uniq | join: '#' }}",
+      "data": {
+        "a": [
+          "a",
+          "b",
+          1,
+          1
+        ]
+      },
+      "result": "a#b#1",
+      "tags": [
+        "join filter",
+        "uniq filter"
+      ]
+    },
+    {
+      "name": "empty array",
+      "template": "{{ a | uniq | join: '#' }}",
+      "data": {
+        "a": []
+      },
+      "result": "",
+      "tags": [
+        "join filter",
+        "uniq filter"
+      ]
+    },
+    {
+      "name": "unhashable items",
+      "template": "{{ a | uniq | join: '#' }}",
+      "data": {
+        "a": [
+          "a",
+          "b",
+          [],
+          {},
+          {}
+        ]
+      },
+      "result": "a#b#{}",
+      "tags": [
+        "join filter",
+        "uniq filter"
+      ]
+    },
+    {
+      "name": "left value is not an array",
+      "template": "{{ a | uniq | join: '#' }}",
+      "data": {
+        "a": 123
+      },
+      "result": "123",
+      "tags": [
+        "join filter",
+        "uniq filter"
+      ]
+    },
+    {
+      "name": "left value is undefined",
+      "template": "{{ nosuchthing | uniq | join: '#' }}",
+      "result": "",
+      "tags": [
+        "join filter",
+        "uniq filter"
+      ]
+    },
+    {
+      "name": "too many arguments",
+      "template": "{{ nosuchthing | uniq: 'foo', 'bar' }}",
+      "invalid": true,
+      "tags": [
+        "uniq filter"
+      ]
+    },
+    {
+      "name": "array of objects with key property",
+      "template": "{% assign x = a | uniq: 'title' %}{% for obj in x %}{% for i in obj %}({{ i[0] }},{{ i[1] }}){% endfor %}{% endfor %}",
+      "data": {
+        "a": [
+          {
+            "title": "foo",
+            "name": "a"
+          },
+          {
+            "title": "foo",
+            "name": "b"
+          },
+          {
+            "title": "bar",
+            "name": "c"
+          }
+        ]
+      },
+      "result": "(title,foo)(name,a)(title,bar)(name,c)",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "uniq filter"
+      ]
+    },
+    {
+      "name": "array of objects with missing key property",
+      "template": "{% assign x = a | uniq: 'title' %}{% for obj in x %}{% for i in obj %}({{ i[0] }},{{ i[1] }}){% endfor %}{% endfor %}",
+      "data": {
+        "a": [
+          {
+            "title": "foo",
+            "name": "a"
+          },
+          {
+            "title": "foo",
+            "name": "b"
+          },
+          {
+            "title": "bar",
+            "name": "c"
+          },
+          {
+            "heading": "bar",
+            "name": "c"
+          },
+          {
+            "heading": "baz",
+            "name": "d"
+          }
+        ]
+      },
+      "result": "(title,foo)(name,a)(title,bar)(name,c)(heading,bar)(name,c)",
+      "tags": [
+        "assign tag",
+        "for tag",
+        "uniq filter"
+      ]
+    }
+  ]
+}

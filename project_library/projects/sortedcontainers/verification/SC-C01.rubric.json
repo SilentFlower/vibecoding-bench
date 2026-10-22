@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SC-C01",
+  "source_commit": "3ac358631f58c1347f1d6d2d92784117db0f38ed",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "For3,strict predecessor is1 via left-1 and successor5 via right. For4,floor3 and ceiling5 straddle its left insertion point. Probe0 gives left0,probe6 gives right=len,and empty gives0;guard missing sides explicitly instead of returning the opposite endpoint or indexing beyond length.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

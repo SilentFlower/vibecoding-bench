@@ -1,0 +1,919 @@
+{
+  "status": "passed_static_language_boundary",
+  "scope": "中文展示字段和英文首问／私有rubric的静态边界；不把字符扫描替代业务审查或实际页面验证",
+  "projects": 29,
+  "tasks": 175,
+  "literal_data_exceptions": [
+    {
+      "project": "collective-icalendar",
+      "task": "IC-U02",
+      "reason": "英文指令要求精确保留Unicode日历业务字面，中文仅属于原始输入数据",
+      "prompt_sha256": "4218717acfa4d3148bba617b5cf596849f8bfca484570d24ac5e7e09ef2d4d26"
+    }
+  ],
+  "items": [
+    {
+      "project": "arrow",
+      "tasks": 6,
+      "manifest_sha256": "87d13fabebb3263fce3466387d8e0aba09679a865963f1cd7ccb2b2f0718e165",
+      "rubrics": [
+        {
+          "task": "AR-U01",
+          "sha256": "e32caac593890feee0261086fb8d173622223c3ad274270cc76c7f29bb967895"
+        },
+        {
+          "task": "AR-U02",
+          "sha256": "e6d6cba8e9baa76637fa4cb5eb500925f72f97c42229be102baaf13d6ea2efa4"
+        },
+        {
+          "task": "AR-C01",
+          "sha256": "0e9b1bace3578400172d224aeade64b057a88038b9dd8a101859319149c1bf7e"
+        },
+        {
+          "task": "AR-C02",
+          "sha256": "cdf69dc630c80a2c6cfb91f6a6f50ba2db370e471681e405a9fb573e8696eabe"
+        },
+        {
+          "task": "AR-P01",
+          "sha256": "9bfc10a326b2be09cad36945c66b731a4d8589a1607a9644c7e62abf42afd239"
+        },
+        {
+          "task": "AR-D01",
+          "sha256": "77b3714a7621b42d3c55122276feecd787d1a68c79286c2c55102dd020b48249"
+        }
+      ]
+    },
+    {
+      "project": "bidict",
+      "tasks": 6,
+      "manifest_sha256": "45772052dd0f9eadef2ffe10530b8a17de845dc1a5b52d11870ba1fb45581807",
+      "rubrics": [
+        {
+          "task": "BI-U01",
+          "sha256": "d5b809867ec7c26366d6bd556022d372c4e021ee3742102b873852ed60a4f407"
+        },
+        {
+          "task": "BI-U02",
+          "sha256": "07b56c9e8c72f03c8b5367dc4e4cc77ffeaae030890e81c5d9c1393a475291ac"
+        },
+        {
+          "task": "BI-C01",
+          "sha256": "8d32985a72f21e8459ec355f3edacacd4ac9b38408ac5aac804851cac1bcacdc"
+        },
+        {
+          "task": "BI-C02",
+          "sha256": "304eda0843c9c34cf987fcafc2206fd83604012d82e673859b9ec7f3d961645f"
+        },
+        {
+          "task": "BI-P01",
+          "sha256": "2bed1c65ac65233f424c0be53ffed773a5a8290b248e02bc3edc9a42454afcbb"
+        },
+        {
+          "task": "BI-D01",
+          "sha256": "7388a3ec82ed9810cd4cf9dd85843e3ed213558d59c7a6ea6105047dc4198a7e"
+        }
+      ]
+    },
+    {
+      "project": "chardet",
+      "tasks": 6,
+      "manifest_sha256": "3066cc6f9387e161442cd70aa36e0b3e80ab050098c252a277228151260f4a8f",
+      "rubrics": [
+        {
+          "task": "CD-U01",
+          "sha256": "b9f4def565c1376b78d427efe9dfa073f1ea124f30a5c50093d7a3ffe228d284"
+        },
+        {
+          "task": "CD-U02",
+          "sha256": "e2b371645cb88b72f1064c55771f5f96a297ba590c0fdd70a843010e1ece6eb8"
+        },
+        {
+          "task": "CD-C01",
+          "sha256": "f38a3e906ba366e66ee3d1551a9c45e703263f2717d0b022fc2455723409006d"
+        },
+        {
+          "task": "CD-C02",
+          "sha256": "cd8cb9fa0e51dd04a6ee1e928ca3c4dea352475eebf420b43d880acf4d7763ef"
+        },
+        {
+          "task": "CD-P01",
+          "sha256": "1eb30e7bdba91f47701e7d4f47c0f29f71faed04f0510e144f758d3bbbe9deb5"
+        },
+        {
+          "task": "CD-D01",
+          "sha256": "303deb552f534f6badda0682e81997105b8fc50834f752b4e13c3d73b0638dff"
+        }
+      ]
+    },
+    {
+      "project": "charset-normalizer",
+      "tasks": 6,
+      "manifest_sha256": "478220e92cd775b384796d3b94aa79722f9e24513c16bf63c5fb3ebea9647782",
+      "rubrics": [
+        {
+          "task": "CN-U01",
+          "sha256": "cd3396e47f285a9e775912fd306b2ee53fd4ae531b7c6da3ba28cb7a49a8076b"
+        },
+        {
+          "task": "CN-U02",
+          "sha256": "1a0c1010ea266c74a25e0cb5bfb0303ac793e68f1e4b93f20693fb0ef00d6ad4"
+        },
+        {
+          "task": "CN-C01",
+          "sha256": "690437e4e95ee974a3821a66923ae84c54aeb3564ea3c24fe3d618ad779c8b0f"
+        },
+        {
+          "task": "CN-C02",
+          "sha256": "e7623cd8ddf92c571bfa7671c9874280dc0133c541f24f54abdbf3381bab373a"
+        },
+        {
+          "task": "CN-P01",
+          "sha256": "3f07127579131f9ca710fe7dc930542632d5147c0652efdb1e4a0cb68c8ed051"
+        },
+        {
+          "task": "CN-D01",
+          "sha256": "10d1f05b91eff6f847109818d928a2aa9177465786cc2d351cd6c746e7ac5402"
+        }
+      ]
+    },
+    {
+      "project": "collective-icalendar",
+      "tasks": 6,
+      "manifest_sha256": "9bb7f2d76c6b141d351fc95550b49c0e28ed0f76ec9eb5c313228e9e411ee602",
+      "rubrics": [
+        {
+          "task": "IC-U01",
+          "sha256": "68fc46fff3ae34a5d987fef71360dac4182b827e20fc0d29b9a27e4d25ec37f9"
+        },
+        {
+          "task": "IC-U02",
+          "sha256": "76e1e9f58ad2eb2c01a6a782bf44567d8299f1ebc0ffe17c137e9146fdb8eb3c"
+        },
+        {
+          "task": "IC-C01",
+          "sha256": "f2a2dd61030bc3a824008e096941324cdc0c97506f5be9dfc802658e9f571858"
+        },
+        {
+          "task": "IC-C02",
+          "sha256": "794efde734529a7b7528cad5781638b0625b74d97b01e17a4be72f34b120cd4a"
+        },
+        {
+          "task": "IC-P01",
+          "sha256": "6c07fdc1713ac4188327c0c355fc67a6c3c34d70b6186d837c28758bff2da00c"
+        },
+        {
+          "task": "IC-D01",
+          "sha256": "67bda81ecedb20d4942b99a7d459708ee6b89261006031487d387df62617d684"
+        }
+      ]
+    },
+    {
+      "project": "feedgen",
+      "tasks": 7,
+      "manifest_sha256": "5661c71fefafa2ae27cccf2c190e01dc5df64c5eac6224042311301cb9d5e929",
+      "rubrics": [
+        {
+          "task": "FG-U01",
+          "sha256": "729334842af1a3509ae82a0bc4e420ed0932ca7d7c4dfb74a87ae05e85abbbf0"
+        },
+        {
+          "task": "FG-U02",
+          "sha256": "368c7e6af5954a9e598882de6f0e6954b6f1812c419da5aea80fc079c39ceef1"
+        },
+        {
+          "task": "FG-C01",
+          "sha256": "9700b497f7bdb2ae0d9a4dcc39ab9a7fdd422dee4b5788fa761ec4161ea30237"
+        },
+        {
+          "task": "FG-C02",
+          "sha256": "27bb6d29286b58e6cbaef6db72d1612c0996f7dbc2bbcdc44276a5f851179a22"
+        },
+        {
+          "task": "FG-P01",
+          "sha256": "679f9247c1413edfd8d9c11fd34855d195858af4f9fe0053f4ceabf0d3292af8"
+        },
+        {
+          "task": "FG-D01",
+          "sha256": "cd928d6573fdea1719f529a8a0de329dbfd0c0057d0b9bce52c0ee48e8eda482"
+        },
+        {
+          "task": "FG-M01",
+          "sha256": "25c95607d8c50aaa8f95d02b1eb138fe4a6e3636c255c08c5797b2c63292f932"
+        }
+      ]
+    },
+    {
+      "project": "feedparser",
+      "tasks": 6,
+      "manifest_sha256": "c2e81fe6921b7eca76e4dbb76adf88453574b606da7d3c30cd54629225273256",
+      "rubrics": [
+        {
+          "task": "FP-U01",
+          "sha256": "fc370305caca11cacdacfd08d45b95feb92b9f015d1f7516722894c053c87da5"
+        },
+        {
+          "task": "FP-U02",
+          "sha256": "6dc54e9acb38f4d72f34fee8500a1317fc146ccc663c7d786e6007a3eeaa98fb"
+        },
+        {
+          "task": "FP-C01",
+          "sha256": "687d9435efe16fa5b43d6f8a448d0b35502b6d88a2073f402fda28d2339dec3e"
+        },
+        {
+          "task": "FP-C02",
+          "sha256": "bab1772afde1a7bf1b15378d56343b57110680a82d2673d6da1cc5c574ba101c"
+        },
+        {
+          "task": "FP-P01",
+          "sha256": "f2b21127984c197b40cac36bd8c0f7a11a70dc67133c9a5fbb6fa0fafdca499a"
+        },
+        {
+          "task": "FP-D01",
+          "sha256": "55f5fb63f3d882e15ef1f51ddfcf88d47e596be27ed08221931bde17c7f04795"
+        }
+      ]
+    },
+    {
+      "project": "funcy",
+      "tasks": 6,
+      "manifest_sha256": "00a28b6b2de71bf221cae89309015759e2d581fee3a4ac8bebc5da54332411d6",
+      "rubrics": [
+        {
+          "task": "FU-U01",
+          "sha256": "4536671bfa73920b085615865b0ee5e8a302c54c66e8f04cbb23069c10318838"
+        },
+        {
+          "task": "FU-U02",
+          "sha256": "7fb1f75658f05c71def934a2df3eef8e8128afe805fda3915744c2b66451d1e5"
+        },
+        {
+          "task": "FU-C01",
+          "sha256": "d2e2308c8ce5054e51ef8905d5db81ab71c69150ffe14103397fd341a42e8cf9"
+        },
+        {
+          "task": "FU-C02",
+          "sha256": "b2408b8599593ac383e758ffff863f903d37591d4b1a216bcaf5644b0cdc7141"
+        },
+        {
+          "task": "FU-P01",
+          "sha256": "cf775f73b7c6e2fcce4a5e3d54208342d2a1a3939959e1f5b1cb1a0e9f441dc2"
+        },
+        {
+          "task": "FU-D01",
+          "sha256": "70fb12b39cdec5f9f9686930c7afb3b9967e90b2e2bf055dd1ae7f812c6c3f95"
+        }
+      ]
+    },
+    {
+      "project": "html5lib",
+      "tasks": 6,
+      "manifest_sha256": "d9facd3f64a3bb8e51abe38a32b7ec4f0232223a4b39d04b556ff9a5103dcd09",
+      "rubrics": [
+        {
+          "task": "H5-U01",
+          "sha256": "8267cab211a857ac92dd6936ea8742d1df246b319600f3652afee72c5fe68cf5"
+        },
+        {
+          "task": "H5-U02",
+          "sha256": "74c36b181ba7c76a5ff2250dc99965195f42a3ec0c2d0767660d269d739f7abc"
+        },
+        {
+          "task": "H5-C01",
+          "sha256": "4a9e9a290a03117237b844c65817e778f114f86f47d7f9a4c8b663fc054efa25"
+        },
+        {
+          "task": "H5-C02",
+          "sha256": "3411caaac24939c327a1385ab095ec8b71d72457ee2880b5d1c8ce19279a47b7"
+        },
+        {
+          "task": "H5-P01",
+          "sha256": "77aae3c613a37ae1b35fc31bc6ab91e5708bb32fb71bab4c598960f56d88c6eb"
+        },
+        {
+          "task": "H5-D01",
+          "sha256": "84a1ca6c2589cb24fe33f248ecf05ad9a680843211f7fdc6c197caa9e627e20d"
+        }
+      ]
+    },
+    {
+      "project": "humanize",
+      "tasks": 7,
+      "manifest_sha256": "3c59b91b2e99cb950d6f3d6d370f0b8e7244daac0f07440a793968ea096de67e",
+      "rubrics": [
+        {
+          "task": "HU-U01",
+          "sha256": "ac9e6775bfbe842cdc35107d2fb429224de7ea59990efa614269fdbe754da7c9"
+        },
+        {
+          "task": "HU-C02",
+          "sha256": "9575da77c3054cd3a5efaa2e4cb0e5c8e09357a8e9d7ede1d41babc8b58494ea"
+        },
+        {
+          "task": "HU-U02",
+          "sha256": "d97b66359bf506dec8e118a6e69c975d7d5c10c1e6c3d9c2930c390841fed054"
+        },
+        {
+          "task": "HU-U03",
+          "sha256": "edf850c7f457c2b80f41a0f4698115e27bd705f525ab90e60cfa896edf1e0a2c"
+        },
+        {
+          "task": "HU-C01",
+          "sha256": "ee088df8aa4a22c9b35c606026899e789939c622c67d7e6c26c5331167966e2d"
+        },
+        {
+          "task": "HU-P01",
+          "sha256": "43fd016908b8e7e1457629b358b30865a27ebfb52609c355cfbdf25786b53371"
+        },
+        {
+          "task": "HU-D01",
+          "sha256": "b0d7ff668442bc9c1130d8be565339f1a5f8ae43e67d5e49a241e0c609818b39"
+        }
+      ]
+    },
+    {
+      "project": "injector",
+      "tasks": 6,
+      "manifest_sha256": "6565d89db8c4290cfa2c864908adfbf4ba851bb946594e51176b6c77bb9bfb48",
+      "rubrics": [
+        {
+          "task": "IJ-U01",
+          "sha256": "5461ed7f65be3bf2fe87c4bfe54ed81c48d18f056d05de553867932422fc9bd0"
+        },
+        {
+          "task": "IJ-U02",
+          "sha256": "fb1da5bf67d8212a92b6b0c9e8f0e673fb2437afa1ae7496de63c14f018b3102"
+        },
+        {
+          "task": "IJ-C01",
+          "sha256": "7fc41faa863f401fa9c764643959c0d96644441c8da875e044ec528ab0b11c5f"
+        },
+        {
+          "task": "IJ-C02",
+          "sha256": "a0865ba8f922b63e6ece045a768af6ce2d5e7f34c024662e7c66fdae4bd381c4"
+        },
+        {
+          "task": "IJ-P01",
+          "sha256": "fc73128fefaef4e296b31c3deb13a4910bd24e6b93c887f10bd5e7428b4d6dc8"
+        },
+        {
+          "task": "IJ-D01",
+          "sha256": "94e8a86b06ceeea8cc2f90942aa0f2f09b4ef7b738e50c0b185a1972422b7f8a"
+        }
+      ]
+    },
+    {
+      "project": "loguru",
+      "tasks": 6,
+      "manifest_sha256": "714ba1e4ace1a31a863ac546eff0b4fff49724a6acd0c09fcf7ade03adde7f99",
+      "rubrics": [
+        {
+          "task": "LG-U01",
+          "sha256": "7edca1c1187ca01c9eaef326c0506d17c133cb9d01a599e52854710c2b5b3bf5"
+        },
+        {
+          "task": "LG-U02",
+          "sha256": "851a8f97aed0e1ef9b491bac0c14289fc268f83c15c2e52b93fca9e0301e380d"
+        },
+        {
+          "task": "LG-C01",
+          "sha256": "84356e2a52d204ea923df8b74e8e4fe7366de83c71632ceeefafa2ac5c272af6"
+        },
+        {
+          "task": "LG-C02",
+          "sha256": "1a0ea68e32e68f8e31a53648fe51ba987f75b1296dd63736e4aebf93a186e0dd"
+        },
+        {
+          "task": "LG-P01",
+          "sha256": "f09ec7ccf16ae4a8d8f118939d62e9f93c904d340b6439553de27be8010d937e"
+        },
+        {
+          "task": "LG-D01",
+          "sha256": "c7577026f36bce89294683517b4391ac809ab3fec32de93d0323aac636fcb16a"
+        }
+      ]
+    },
+    {
+      "project": "markdownify",
+      "tasks": 6,
+      "manifest_sha256": "9741521f881f0b5c4067d02987c5219c0c41e399b277ce5c5fec23daab95129f",
+      "rubrics": [
+        {
+          "task": "MD-U01",
+          "sha256": "e2c0ea2317db23d13bb2d971305a870423c33957cf7c4b25ac29a160036eea4a"
+        },
+        {
+          "task": "MD-U02",
+          "sha256": "5730bfa4aa2add5c1cb8bfdd34939009c324c978f010a35704112f8e3ca122cc"
+        },
+        {
+          "task": "MD-C01",
+          "sha256": "8fa49a93a7a1a46fc09444650c3ffbfb03cefca022d7638ca7231a86b277aea1"
+        },
+        {
+          "task": "MD-C02",
+          "sha256": "81236b2f3ac75e46985baf4c9990d9dfcb8ef8beefab9b9df1f0dcfa9ca1407e"
+        },
+        {
+          "task": "MD-P01",
+          "sha256": "5fa9cab3bc36a2b01d4b0290025b1d8c31fc523257159b9596353f0c76122812"
+        },
+        {
+          "task": "MD-D01",
+          "sha256": "041c95aae6e46ec31a5b6586d31d39bed6de645f7005e0a94d8fe6cca43ecb1a"
+        }
+      ]
+    },
+    {
+      "project": "natsort",
+      "tasks": 6,
+      "manifest_sha256": "61c00e050337cb9c4dd0b69e318f4003e666c17320dfc0e09cb648b9ae29d300",
+      "rubrics": [
+        {
+          "task": "NS-U01",
+          "sha256": "4bc9ca28d8def3b638a60d9fec3fddab7ea6f9b72b11397ce4f7b2dcdad953ec"
+        },
+        {
+          "task": "NS-U02",
+          "sha256": "7255cd753d14f322e4c3e9b2897c62a234314eeb2bb24ae77a3cde6abe001a91"
+        },
+        {
+          "task": "NS-C01",
+          "sha256": "bc3ec583d360ae6685c4119d6e775015f57287ce6caf3a10b95f4d5a22ceed8b"
+        },
+        {
+          "task": "NS-C02",
+          "sha256": "d5ae7da1041be70cec1085befb7a1fe54e5725dd16c58e019d9574a4a1c7571f"
+        },
+        {
+          "task": "NS-P01",
+          "sha256": "62f28831a1c92e381f63e3168a5d5513fa8612d233264f2e2f1f1699bf12713f"
+        },
+        {
+          "task": "NS-D01",
+          "sha256": "e6b8c946ebad57fe6badce9abeb7e485664b857621981a4f00ad39f3d328a70d"
+        }
+      ]
+    },
+    {
+      "project": "pendulum",
+      "tasks": 6,
+      "manifest_sha256": "522d309136abed5583e7a987eb4020f38e778e2824bccab02fd0a1b1d5d5007e",
+      "rubrics": [
+        {
+          "task": "PN-U01",
+          "sha256": "63610343a7f411d75f7815b9561cf29dba3b4915213254a9384141f4bbe36749"
+        },
+        {
+          "task": "PN-U02",
+          "sha256": "985dbd32d0bb8351347a7f79a061049e675ee7df327bbc63b973656a5776b736"
+        },
+        {
+          "task": "PN-C01",
+          "sha256": "bf1a66a38c6a69853b5cfdeb6c889e6996ac46e114d3e2594561dd2d4a0f1b1e"
+        },
+        {
+          "task": "PN-C02",
+          "sha256": "dc2ff65d01387ab0b4f16bf27580273721885e1d8988b559cae0128b9da1da3a"
+        },
+        {
+          "task": "PN-P01",
+          "sha256": "a3df2d5444d63891f420f0b4a7fa01f81c4182c61a9773726f4fe9df2d7db119"
+        },
+        {
+          "task": "PN-D01",
+          "sha256": "807313914c1e78bcd3f3b15765a20f12eff6b6f86dd8bce67857228867b151a5"
+        }
+      ]
+    },
+    {
+      "project": "portion",
+      "tasks": 5,
+      "manifest_sha256": "b06268f37862e8b2a0d302314eb2cdd6d6c7d9757235d8b454525fe73e787000",
+      "rubrics": [
+        {
+          "task": "PT-U01",
+          "sha256": "a9535e8aac7e5a48f8afa69a353fd7e68cc797ce83b932d4fbba7b9b44d8ee17"
+        },
+        {
+          "task": "PT-U02",
+          "sha256": "48acb876bfc52304602b62c89d68f2eb68bbe6214b3512a65f16dba395641322"
+        },
+        {
+          "task": "PT-C01",
+          "sha256": "6167ef6d62b478b95a8974ec311fbf37555cf8ec6ade68c1a7d403de71ffe7ac"
+        },
+        {
+          "task": "PT-C02",
+          "sha256": "b40e3e3de4d3b0b5467b8cbece1a9f271d02bd002d1e0cf84e1f0f57125afae2"
+        },
+        {
+          "task": "PT-P01",
+          "sha256": "4e762f7c92e4efa385162fb991653d4f8d660b8deabe57b339da3a79b38cb702"
+        }
+      ]
+    },
+    {
+      "project": "pyparsing",
+      "tasks": 6,
+      "manifest_sha256": "fafd0b07f1e2c7be25b4c771addf6c7740f755401ce300dc468f07db893f0229",
+      "rubrics": [
+        {
+          "task": "PP-U01",
+          "sha256": "d5b8254bf568323ad21ca7f2773e725c52194674b4557ab0aa4e61418c098b02"
+        },
+        {
+          "task": "PP-U02",
+          "sha256": "e05718eb709cbc944f276bf50f482e0f94dceadd2bb52a63f3350d0f74961099"
+        },
+        {
+          "task": "PP-C01",
+          "sha256": "bed0f42cf5a6de01259d8c7632013e6025cab1a08b74af51127dd266e636ecad"
+        },
+        {
+          "task": "PP-C02",
+          "sha256": "f58f3ebeee812d1c3015415574345028c8ae5f0f2788ba5530401372f5cc7bf5"
+        },
+        {
+          "task": "PP-P01",
+          "sha256": "f56b789fd6dc590b5ddacfffcab02624a7c66b552b56b9d265041712ef691b79"
+        },
+        {
+          "task": "PP-D01",
+          "sha256": "327abf4488224bd7864e580083355b937784f68eb626cd026de4c8711bd64416"
+        }
+      ]
+    },
+    {
+      "project": "pypika",
+      "tasks": 6,
+      "manifest_sha256": "5277622d073a14c0354bda095c3063b7ad1c75fcfed29e482df570176ec2561d",
+      "rubrics": [
+        {
+          "task": "PQ-U01",
+          "sha256": "35fe224d53e45da0f7d6bbc5313e9d4901eaf665d591a3218c0eba7c8faf6095"
+        },
+        {
+          "task": "PQ-U02",
+          "sha256": "1d29f50f1dea3490400d7af234f0f8c206ae542e555e2e48125fe1787e90898d"
+        },
+        {
+          "task": "PQ-C01",
+          "sha256": "ea99e81c0d311064d52268e04fb703b9cf35cc13f934dde963c99273243700cf"
+        },
+        {
+          "task": "PQ-C02",
+          "sha256": "c9d146b772301d744415caa3f6f77a666dbbf1775d556a07130af88f5fea833c"
+        },
+        {
+          "task": "PQ-P01",
+          "sha256": "f550915dcd3c3076c593ad5bcde3674ee0ae8638cd8eae111a2466b7070bc889"
+        },
+        {
+          "task": "PQ-D01",
+          "sha256": "c397c3b5a59cc0557a3f1e98fd32998f0bc2f7aec3ff7e1c1e3d74bab557f951"
+        }
+      ]
+    },
+    {
+      "project": "pyrsistent",
+      "tasks": 5,
+      "manifest_sha256": "f199803a0e4c162bfe1380115566c38780695e8226bd973f5a11a948069ff766",
+      "rubrics": [
+        {
+          "task": "PS-U01",
+          "sha256": "188b49884eef9f485e87d0775131afd2515bf3e5dc4203f5548150ff81159df7"
+        },
+        {
+          "task": "PS-U02",
+          "sha256": "861499ffe5b97a7c851d34b9724265786b8538b681a6ecb3f3777d09968905f6"
+        },
+        {
+          "task": "PS-C01",
+          "sha256": "74cb6bd23b98dad508cdaab78e0c6dbdc2a93c44f61d1b8915fcbee22e429c02"
+        },
+        {
+          "task": "PS-C02",
+          "sha256": "2fe75decb57cb94799131ec31eb0bd09e7a19ccec163eeb7321279bdf2acd1b5"
+        },
+        {
+          "task": "PS-P01",
+          "sha256": "9e93552a865e5669225ae5683e6848bed712c3d90a038b1874ed9b6d4a48e89c"
+        }
+      ]
+    },
+    {
+      "project": "python-constraint",
+      "tasks": 6,
+      "manifest_sha256": "179b90975051139367d6a3b2e6a655e6b7efdd4ea7d9baf751510d42cf29d373",
+      "rubrics": [
+        {
+          "task": "PC-U01",
+          "sha256": "d07f9b986bcf4404bca8a005f070dee8b967b49c9d67b94b5fda6b0fd6c079ec"
+        },
+        {
+          "task": "PC-U02",
+          "sha256": "c29b27d099cf1418a2735f9a37578630ac9638568b26c26466b843802981d253"
+        },
+        {
+          "task": "PC-C01",
+          "sha256": "16553a1e447e92581b8fc7f013acf93327f4811c04aced8ca058d0473221cb79"
+        },
+        {
+          "task": "PC-C02",
+          "sha256": "c06c09047f446ccc7e891dcb320916250d89d15bb69d633c86ed366fc2a0db7a"
+        },
+        {
+          "task": "PC-P01",
+          "sha256": "7ce77280d1337a2a2c096392150258ab01051862c48adad170d1a997f011f703"
+        },
+        {
+          "task": "PC-D01",
+          "sha256": "eb0bc8ae562affa1fb55fc5781b31c1dce1080475eee49922294ed200f9ace95"
+        }
+      ]
+    },
+    {
+      "project": "python-liquid",
+      "tasks": 7,
+      "manifest_sha256": "46b9047db79c7123791c5510c983939b213eb754a1dd9aad021df9f81bd3e0a3",
+      "rubrics": [
+        {
+          "task": "LQ-U01",
+          "sha256": "70babbd7aa98bf31310a44833e7b3a49c1ee74207e4e316ff569fc65ebd57c47"
+        },
+        {
+          "task": "LQ-U02",
+          "sha256": "f727101fb52ed477fbf74460b0a4076387593eaeab28dd7ef24b3d441e640a18"
+        },
+        {
+          "task": "LQ-U03",
+          "sha256": "0cc6eb8fd486f4fbe9b5bab58b28c7ba038d4aa87bbfd74af35ef22f9b157efd"
+        },
+        {
+          "task": "LQ-C01",
+          "sha256": "8409a229d9cc66462e1526cc8119c0f889c42c38e9b0afb8b3f768c0af716dbb"
+        },
+        {
+          "task": "LQ-C02",
+          "sha256": "da8bfae5d2594dfc1561e21a78d281f86e63bdbbeba669ece7d1bbbe57197132"
+        },
+        {
+          "task": "LQ-P01",
+          "sha256": "f8231a6f99a89d38a839b521965b331dfa50c83890523feeeafed7a7153817e3"
+        },
+        {
+          "task": "LQ-D01",
+          "sha256": "da21cf595808503fb9e4ef25e0a25617418ab30a9d72223c085794a103187ed7"
+        }
+      ]
+    },
+    {
+      "project": "python-statemachine",
+      "tasks": 6,
+      "manifest_sha256": "7cff6ebadace2eda1f06b78a8c46f5141edff8415d3ad0e093378b31298f797b",
+      "rubrics": [
+        {
+          "task": "SM-U01",
+          "sha256": "477c3d3f7878c1beb0b1c55dca716bd06ea5c52f9f69d6cae089c3644b8bd3f8"
+        },
+        {
+          "task": "SM-U02",
+          "sha256": "69652dd544342c68e1c06d374dac37ba8d90d7632515e8b5adeb144f8d45e4c7"
+        },
+        {
+          "task": "SM-C01",
+          "sha256": "a6fe249470932027a281c024c450d798e7236623f68a714c00b43036519da227"
+        },
+        {
+          "task": "SM-C02",
+          "sha256": "35f7d24dea1d45071545bf60f407f237e01e738af513dd20dd8b2ff7aa03423c"
+        },
+        {
+          "task": "SM-P01",
+          "sha256": "9c77f6e64db9e840b9087f94973e3b0e1e9b4e285adfe99f331001750e30e014"
+        },
+        {
+          "task": "SM-D01",
+          "sha256": "782740c76316588d37f136087fcb868a940fe726c12e23ed8e7a908a1274a9e9"
+        }
+      ]
+    },
+    {
+      "project": "sortedcontainers",
+      "tasks": 6,
+      "manifest_sha256": "63eb88fd288d399ea6598e1373d12157ac1477a14942ef742ebd2ec83d0ad922",
+      "rubrics": [
+        {
+          "task": "SC-U01",
+          "sha256": "7a4e4c8aacb9e2206a65f48c027c571548c6b4cf7d21dd2bc4271e072e3020d0"
+        },
+        {
+          "task": "SC-U02",
+          "sha256": "4dd69851e5a273318209fe3edfcf35ee16fe1b54164c2b675a5a1af72ff73204"
+        },
+        {
+          "task": "SC-C01",
+          "sha256": "da437e2766304368cf2ff74c556e4f4268d55fe81b0e762dfd39f03af94a7a85"
+        },
+        {
+          "task": "SC-C02",
+          "sha256": "deb70bcceb84f8e21e17971ba096239d58d42e19ada4729f90f8e5b81de64f92"
+        },
+        {
+          "task": "SC-P01",
+          "sha256": "fd2271de06b151e5f06f25bb795906157834a5ca6283fa3cebe6df55aec33a8c"
+        },
+        {
+          "task": "SC-D01",
+          "sha256": "833e695509fdfd9327e5a264d539a23307d4511f383196135e4d39fec9b33265"
+        }
+      ]
+    },
+    {
+      "project": "tablib",
+      "tasks": 6,
+      "manifest_sha256": "86e5c51d9a5aa0e05518a8a0fb39e6143390d711b2ffb759c79a68aaed84c88a",
+      "rubrics": [
+        {
+          "task": "TB-U01",
+          "sha256": "00884d43942486695b999f12d6a3a69a19dae015d0a5116112f99bedabc95a0a"
+        },
+        {
+          "task": "TB-U02",
+          "sha256": "922a7ed1faff022a23273c2938451e2ab13909f3271d25066206815b32083852"
+        },
+        {
+          "task": "TB-C01",
+          "sha256": "91898acd7e2b14070a48eaa3ea89b9256635b2e6f46ab5eb892539d5d2ce9d93"
+        },
+        {
+          "task": "TB-P01",
+          "sha256": "875b4d185c7febe023506c29234e139b6f00eafd2a4b3a33ac3d05f69f3c01f7"
+        },
+        {
+          "task": "TB-M01",
+          "sha256": "7ea4b8ee95eeb8d9f469b9dd8bcc8f85a7366345161873e3bc269b39e0ab223d"
+        },
+        {
+          "task": "TB-D01",
+          "sha256": "1298fcaf34a1440b316365a1d3558abcc6b8a1e73151cf178c102a0c16a5db0c"
+        }
+      ]
+    },
+    {
+      "project": "textdistance",
+      "tasks": 6,
+      "manifest_sha256": "e979f8e21f2952b6df030f7f0d669f1848455830a2bc41703f00560e1b2f7fb3",
+      "rubrics": [
+        {
+          "task": "TD-U01",
+          "sha256": "330657ce9433cc88d20999b8b0379070e3069cac7b0ddac0c06b5ad76aa62ea7"
+        },
+        {
+          "task": "TD-U02",
+          "sha256": "21547208982da6ed1451408eabbe123e7323529c2ff0656b8108d9f08638cc97"
+        },
+        {
+          "task": "TD-C01",
+          "sha256": "daeb0bb116541af7907dc36ae638da5e8795b2b52a409b611915d2a55b29f25c"
+        },
+        {
+          "task": "TD-C02",
+          "sha256": "f1f2238e44aa93057a29b85c3b23d3753a0372642373a8e8481c6498dcdc538f"
+        },
+        {
+          "task": "TD-P01",
+          "sha256": "4c831e272a0b406b719db60a9c8d6ceeae272154f61e1ad564b07b3ea1a5ca89"
+        },
+        {
+          "task": "TD-D01",
+          "sha256": "8fc584c4b22040d9b2d7429864b029cc89ba8bb36fc962f84c84f114ea6a17f8"
+        }
+      ]
+    },
+    {
+      "project": "transitions",
+      "tasks": 6,
+      "manifest_sha256": "45d31b3f02df88eafa13040edc09bedb0f14c61cf53c8d1ef235049f90e33eb5",
+      "rubrics": [
+        {
+          "task": "TR-U01",
+          "sha256": "492edac848a74c4b925e884345a68df3745a8989fb08e3c61431c9a13a8146c4"
+        },
+        {
+          "task": "TR-U02",
+          "sha256": "e3b9cb3c8dd1b7c72046cee9796927c627c2fb6d29bafd2260f33dbdf6a38a2d"
+        },
+        {
+          "task": "TR-C01",
+          "sha256": "3d9e2406050f7c8923ffb2a62499f12664c0b685203260943cb2ba0b1df25f80"
+        },
+        {
+          "task": "TR-C02",
+          "sha256": "9ce95c6f7cd8d36665b648df93ebca2a6bd72735625a7f94ac1a3470be8f514b"
+        },
+        {
+          "task": "TR-P01",
+          "sha256": "eeeeda8e80d289fa0ff3294a44ca72963b25374ce70663adb6ed04535d220937"
+        },
+        {
+          "task": "TR-D01",
+          "sha256": "08bf7b06c17f66734044ed26bbe3932f7c6bf1038216e135f11b17b843a3e6a8"
+        }
+      ]
+    },
+    {
+      "project": "webcolors",
+      "tasks": 6,
+      "manifest_sha256": "775f22e91cf3935d7eccb2a35f4b47f5a5534e270d7c375145855e4d55dbd698",
+      "rubrics": [
+        {
+          "task": "WC-U01",
+          "sha256": "630c2cb4fec17e24f8a83c00008e26fdd21d4c7a7f02c67462cc98b346b500af"
+        },
+        {
+          "task": "WC-U02",
+          "sha256": "ac316a555a2cff47dba71f856b91deef5abacb2def2eeaeca5da41485fb64f58"
+        },
+        {
+          "task": "WC-C01",
+          "sha256": "8ec5acc23c30b52ccab2b37b944424d1172fd6090b8e55461710fb34f834db1b"
+        },
+        {
+          "task": "WC-C02",
+          "sha256": "10a625e0e7b8cb0d4c3b81a2b47464885dc938652b94843458146cce40961434"
+        },
+        {
+          "task": "WC-P01",
+          "sha256": "02c8941ae97deebc2101eefa94a2fec152d9ac10dfa5455dc1bcf2a74e9699bb"
+        },
+        {
+          "task": "WC-D01",
+          "sha256": "2a417d70f1f8f50ebbfea00ad7b5b38fa0750b6ed8d2f6f87dc4f459b1e53699"
+        }
+      ]
+    },
+    {
+      "project": "wrapt",
+      "tasks": 6,
+      "manifest_sha256": "731e2e587b0e8b12a4a0f1d4432c95bf828bfd441bbb9ebae32baaa8aa1ecf45",
+      "rubrics": [
+        {
+          "task": "WR-U01",
+          "sha256": "a366572936f133adebcfe2d02f03843140ad9cbf6216eaea10eeffd7fbc506b6"
+        },
+        {
+          "task": "WR-U02",
+          "sha256": "9ed96279ba415f786609c486d1588e194720500b835878b29b0a2f6b6d5daaf4"
+        },
+        {
+          "task": "WR-C01",
+          "sha256": "8a5d6396d56fdfb537b34872e854f883ab84aad968c22a83ae22f2c670f58547"
+        },
+        {
+          "task": "WR-C02",
+          "sha256": "82f211c7b1f3218f614994053f1e4cc99a9cbcc32d723a31356347c1f7a081ee"
+        },
+        {
+          "task": "WR-P01",
+          "sha256": "10c7032a81dd4d674a0486e9963384c4fdf73423cc60b7dbc7a1157dac7c1655"
+        },
+        {
+          "task": "WR-D01",
+          "sha256": "9ecfc7ccc0268d7c607d00c9847cb7a77c459bc648990d26ad4741938ff237aa"
+        }
+      ]
+    },
+    {
+      "project": "wtforms",
+      "tasks": 6,
+      "manifest_sha256": "6ce643f5aa94e6ee9ca7c29c55eb74cc18a84927cce231a785a6e40ef8b2e72d",
+      "rubrics": [
+        {
+          "task": "WF-U01",
+          "sha256": "f2ca01173b554025d3b801342f10b75faae29858bac9293eff95bee7b188b7a3"
+        },
+        {
+          "task": "WF-U02",
+          "sha256": "ee9d3f1f73cb37cafe965b4707d260d835d1577798ebaee716c12be215c40652"
+        },
+        {
+          "task": "WF-C01",
+          "sha256": "9573db02fc2d1f3a5a7e47539e75de51f50f0a870788aea738448dcf9b8ad4ef"
+        },
+        {
+          "task": "WF-C02",
+          "sha256": "18edfb5f928ec494f57ff446013dd764cb5c79266988e267a0f3e554bfc63786"
+        },
+        {
+          "task": "WF-P01",
+          "sha256": "03adf0b61254c4d1f5ae6bf5cf19350ce6c83caa26e44e16364cbba13c3fed32"
+        },
+        {
+          "task": "WF-D01",
+          "sha256": "546c12c3613cbf81b3947657c69a63a7febf42c9805c01f40f93c5f8df9e0ca6"
+        }
+      ]
+    }
+  ]
+}

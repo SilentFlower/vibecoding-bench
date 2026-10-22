@@ -1,0 +1,350 @@
+{
+  "project": "humanize",
+  "source_commit": "785e5dcc0d0308ad0dff3f6cc0faa7085ad0375b",
+  "files": [
+    {
+      "path": "src/humanize/_version.py",
+      "sha256": "477d43f6912c8e77ea8c0f03859ed762115173d98c88da2fc5ea788c518f382d",
+      "size": 528,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/ar/LC_MESSAGES/humanize.mo",
+      "sha256": "f9a1c4065a569609e1388bd776ca85dffd19d951a91cb37e26e38c2a32488968",
+      "size": 5490,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/bn_BD/LC_MESSAGES/humanize.mo",
+      "sha256": "9c1ef526c0c7dcaca7dacb968d45ea09c06b1695ef3c2b1ac3579f5f71892336",
+      "size": 4041,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/ca_ES/LC_MESSAGES/humanize.mo",
+      "sha256": "bdea89c061c4cf2993fa8b6df273e8a409b6499e30b68df2251cd4f09197206f",
+      "size": 3345,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/da_DK/LC_MESSAGES/humanize.mo",
+      "sha256": "312d387e73f437050f7b9e6fdb23370c440059eec0e51f00f0fe6488b452b436",
+      "size": 3474,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/de_DE/LC_MESSAGES/humanize.mo",
+      "sha256": "be34bba033c60c6acd35dafb67935cce7a599dba4b63a28aadc8e21480357a96",
+      "size": 3356,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/el_GR/LC_MESSAGES/humanize.mo",
+      "sha256": "e53108c348e10f7f424e950873ee09060ebf53f34605cb03f5efc9d2f47627cb",
+      "size": 3559,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/eo/LC_MESSAGES/humanize.mo",
+      "sha256": "422b9d094f1b4dd7b0a635d9731d6755f38cb6049f9455bf548d873237f96e5f",
+      "size": 3345,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/es_ES/LC_MESSAGES/humanize.mo",
+      "sha256": "e6b4a95348267d39843ec36036938966c5adac2f5ae6371878e0f4886d10ec65",
+      "size": 3530,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/eu/LC_MESSAGES/humanize.mo",
+      "sha256": "41b13ffb6a67713dba9bf4039f51cfda62832aadce4b3e8d42af8d19a6133e16",
+      "size": 3098,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/fa_IR/LC_MESSAGES/humanize.mo",
+      "sha256": "e36075c83a581ddae73157afd35684aff05a2e5abe80cbe1d7b09f8d33351c12",
+      "size": 4010,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/fi_FI/LC_MESSAGES/humanize.mo",
+      "sha256": "e6595e305847b8fd9d920d3505ec31acb70f58113e5bc09d08d59299ed44d642",
+      "size": 3369,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/fr_FR/LC_MESSAGES/humanize.mo",
+      "sha256": "6784869a0e49e5c08bc5f10ea3bb3e107db048e04f6ed1efdc154ee81dd4738c",
+      "size": 4168,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/he_IL/LC_MESSAGES/humanize.mo",
+      "sha256": "b96ca36d347a69e7bf0721dfb1db214023a2ea8585f31dcf52da0bea97a63f85",
+      "size": 3868,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/hu_HU/LC_MESSAGES/humanize.mo",
+      "sha256": "3720cdcaffe88867f0f92d703638b50887093ab537a34ae9921c93072e1a5594",
+      "size": 3342,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/id_ID/LC_MESSAGES/humanize.mo",
+      "sha256": "ea497a5a1e113893831539086e157a510d89293d629d09fd943c547847a9513c",
+      "size": 3005,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/it_IT/LC_MESSAGES/humanize.mo",
+      "sha256": "db611fe99f8571b72b37923c6d554dc478a2c7afabbd762253e88d6d8c1fc42c",
+      "size": 3274,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/ja_JP/LC_MESSAGES/humanize.mo",
+      "sha256": "41a582cbac5eb9d8c71212599ab4ad160860f8b6b1f4a0b9e496e1886f00144f",
+      "size": 2457,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/ko_KR/LC_MESSAGES/humanize.mo",
+      "sha256": "32e01daa85aa206a495eb06f7193e5defcd3a9846e16cfba693eca208c54bf46",
+      "size": 1996,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/lv/LC_MESSAGES/humanize.mo",
+      "sha256": "4bbe1d571d8f8cf25276262ba531d7d32f21079bc9300624147bddbd2e360d1e",
+      "size": 3813,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/nb/LC_MESSAGES/humanize.mo",
+      "sha256": "3c3f5d9542ecafa5fc1b0dc20880827cc93e5b66163721e17c2164f1d8893f89",
+      "size": 3521,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/nl_NL/LC_MESSAGES/humanize.mo",
+      "sha256": "a54cf09868977201207a936a4b82ab44b6c99c21b6b8d75975fcc2bbf1c5489c",
+      "size": 3258,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/pl_PL/LC_MESSAGES/humanize.mo",
+      "sha256": "4da35bb87175d02e098cb1534bda88149a9d2c0b7583f8cb3f37cf4c95e84ca2",
+      "size": 3753,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/pt_BR/LC_MESSAGES/humanize.mo",
+      "sha256": "4cea39f94489b876bb7da345f3679472b29b172ef9882d6df4a36735859e7b71",
+      "size": 3452,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/pt_PT/LC_MESSAGES/humanize.mo",
+      "sha256": "005a13cac55cf3da3610ca292278243bbbddbd8990139066733696375b23408d",
+      "size": 3403,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/ru_RU/LC_MESSAGES/humanize.mo",
+      "sha256": "8be828d5ad578d247e3e9587065a4eb2dec386863e5e52d30cffa968527af326",
+      "size": 4538,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/si_LK/LC_MESSAGES/humanize.mo",
+      "sha256": "0d6b7a20dfbe04934cbf2f0f5d6aae11f0d304d77e77873e8853ee000df9fac3",
+      "size": 3281,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/sk_SK/LC_MESSAGES/humanize.mo",
+      "sha256": "d3f99d5983d9845b0fa71e61584530795e7f302b88817248844d20048eeac356",
+      "size": 3540,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/sl_SI/LC_MESSAGES/humanize.mo",
+      "sha256": "b1c7fc2506f63821d1b992c38da697e12b5ad44d69edf7f85c6a971391ae24ff",
+      "size": 3979,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/sv_SE/LC_MESSAGES/humanize.mo",
+      "sha256": "29cf4aa338d671af43dcf117e40a3ab4dbe8b5ee6268719b8ea5809b8fe1407b",
+      "size": 3448,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/tlh/LC_MESSAGES/humanize.mo",
+      "sha256": "c19e6e78f4f545be712833d4d0c3705926cbbba3ea0b16cbc051f973be327bf1",
+      "size": 2923,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/tr_TR/LC_MESSAGES/humanize.mo",
+      "sha256": "995ca7e652644ba19566024bedc8254839277dadc033c860ed48eed292004596",
+      "size": 3457,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/uk_UA/LC_MESSAGES/humanize.mo",
+      "sha256": "d4382adf946422517f7d416f57d91ac971196680fb71e46c5620b0794b2b6523",
+      "size": 4188,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/uz/LC_MESSAGES/humanize.mo",
+      "sha256": "3168dbf3f1213c3b0950f2c69766af902da27cfd75f52989d87e6218fee2a5a4",
+      "size": 3506,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/vi_VN/LC_MESSAGES/humanize.mo",
+      "sha256": "4424c5103f754c77793a8a809d77fa4dd9477454cc7d318c598f74e97686b6df",
+      "size": 3100,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/zh_CN/LC_MESSAGES/humanize.mo",
+      "sha256": "fe6d40b9c50d4211af9511166c870620b2c6acee44ea26fbe86bf241a5304dd4",
+      "size": 3067,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    },
+    {
+      "path": "src/humanize/locale/zh_HK/LC_MESSAGES/humanize.mo",
+      "sha256": "79b3878adf041fa9f481de87ef432340d85efe88f3f52d73d0f80dd99548d1f3",
+      "size": 3341,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    }
+  ],
+  "file_count": 37,
+  "origin": {
+    "metadata": ".deploy/github-100-research/resume-app/humanize/venv/lib/python3.12/site-packages/humanize-0.1.dev1.dist-info/METADATA",
+    "metadata_sha256": "f68a4958072758d612e259bb8642d6f0fe873de1859a2fdb799cf6cc5b1411e1",
+    "version": "0.1.dev1",
+    "pyproject_sha256": "5d103b70ae346da85a8545d339ed1da083d2463f1822d7d44a42d2204c488396",
+    "translation_preparation": ".deploy/github-100-research/resume-app/humanize/translation-preparation.json",
+    "translation_preparation_sha256": "2d93af6c35ebc136f215a815570329aef8739ac768ca39c9374e3303e87ee9b9"
+  },
+  "rebuilt_in_current_run": false,
+  "scope": "原固定源码历史实际构建原件，逐元数据/输入和SHA保留；不是Git文件或本轮重新构建声明"
+}

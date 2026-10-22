@@ -1,0 +1,1 @@
+Execute SELECT quantity FROM orders using Table(columns=["quantity"],rows=[]) with no schema,then with schema={"orders":{"quantity":"INT"}}. Recommend the smallest compatible caller change;no library edits.

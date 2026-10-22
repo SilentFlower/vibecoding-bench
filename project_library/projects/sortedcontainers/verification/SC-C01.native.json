@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SC-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "neighbor_queries_require_distinct_bisect_sides_and_edge_guards": true
+  },
+  "resource_profile": "business"
+}

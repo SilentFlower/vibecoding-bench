@@ -1,0 +1,1 @@
+Item has only count=field(type=int,mandatory=True). Input is {"count":3,"currency":"EUR"}. Compare Item.create(input) and Item.create(input,ignore_extra=True),including serialize() and the unchanged input. Advise a deliberate schema evolution policy for the currency field;do not claim ignored fields are retained or validated. No edits.

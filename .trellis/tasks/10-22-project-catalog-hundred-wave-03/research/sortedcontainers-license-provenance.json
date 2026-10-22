@@ -1,0 +1,12 @@
+{
+  "file": ".deploy/project-catalog-hundred/stage-03/drafts/projects/sortedcontainers/seed/app/THIRD_PARTY_LICENSES.txt",
+  "sha256": "8c1703dfe1da17293992c2b6daba6f597aa4e01e5588b01d476371130e799ff8",
+  "original_file": "seed/library/tests/sortedcollection.py",
+  "license": "MIT",
+  "author": "Raymond Hettinger",
+  "primary_recipe": "https://code.activestate.com/recipes/577197-sortedcollection/",
+  "upstream_confirmation": "seed/library/docs/performance.rst",
+  "mit_text_source": ".deploy/project-catalog-hundred/stage-03/drafts/projects/markdownify/seed/library/LICENSE",
+  "mit_text_source_sha256": "fae8b42db142dabf03b0c5c495831a5d11b9649ead0cf0bd4ab4f52294b263be",
+  "scope": "补充归属与MIT全文；原上游文件、作者及链接保持原字节，不声称该补充文件原本由上游跟踪"
+}

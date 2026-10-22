@@ -1,0 +1,1 @@
+Use raw="café café café".encode("cp1252") and from_bytes(raw,cp_isolation=["cp1252","latin_1"]). Inspect the actual result count,best text,has_submatch and could_be_from_charset. A supplier audit must distinguish the returned leading candidate from proof of the originating code page. No edits or claim that coherence is a calibrated probability.

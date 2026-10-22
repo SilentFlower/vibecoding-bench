@@ -1,0 +1,431 @@
+Injector Change Log
+===================
+
+0.25.0
+------
+
+- Dropped support for Python 3.8 and 3.9. Python 3.10+ is now required.
+- Use the SPDX license identifier `BSD-3-Clause` in package metadata.
+
+0.24.0
+------
+
+- Fixed a regression with Python 3.13 where annotated types might not have the `__metadata__` attribute. Thanks to Kamyar Ghajar.
+- More flexible covariant types for multibinds.
+
+0.23.0
+------
+
+Added:
+
+- Allow injecting Annotated types into classes, thanks to Filip Nešťák.
+- Fixed Annotated type support in `@provider` methods, thanks to Satwik Agrawal.
+- `multibind()` now accepts types and providers, not just instances. Thanks to Eiríkur Torfason.
+
+Backwards incompatible:
+
+- Changed so that the `scope` provided to `multibind()` applies to the individual bound types, within the collection. Previously the scope was applied to the collection, the `list` or `dict` instance. Thanks to Eiríkur Torfason.
+
+0.22.0
+------
+
+Date: 2024-07-08
+
+Added:
+
+- Added support for injecting `PEP 593 <https://peps.python.org/pep-0593/>`_
+  `Annotated <https://docs.python.org/3/library/typing.html#typing.Annotated>`_
+
+Removed:
+
+- Dropped Python 3.7 support
+
+0.21.0
+------
+
+- Improved the documentation, thanks to jonathanmach and Jakub Wilk
+- Fixed a thread-safety regression
+- Improved the type annotations, thanks to David Pärsson
+- Fixed singleton scope behavior with parent/child injectors, thanks to David Pärsson
+- Stopped using a deprecated test function, thanks to ljnsn
+
+0.20.1
+------
+
+- Added support for PEP 604 union types (Python 3.10+), thanks to David Pärsson 
+- Fixed building with pypandoc 1.8+, thanks to Søren Fuglede Jørgensen
+
+0.20.0
+------
+
+- Fixed handling of Union combined with Annotated, thanks to Tobias Nilsson
+- Fixed AssitedBuilder/child Injector interaction, thanks to Erik Cederberg
+- Made get_bindings() and injections work even if a injectee's return type
+  annotation is a forward reference that can't be resolved
+
+Backwards incompatible:
+
+- Dropped Python 3.6 support
+
+0.19.0
+------
+
+- Added the license to the source distribution, thanks to Joshua Adelman
+- Added Python 3.9 and 3.10 support, this includes fixing Python 3.10 compatibility, thanks to Torge Matthies
+- Improved the documentation, thanks to Takahiro Kojima
+- Improved the source distribution so that it can be used to build and install wheels, thanks to Janusz Skonieczny
+- Added requirements files for easier development, thanks to Greg Eremeev
+
+Backwards incompatible:
+
+- Removed Python 3.5 support
+
+0.18.4
+------
+
+- Fixed a bug where only one of multiple NoInject annotations was interpreted
+
+0.18.3
+------
+
+- Fixed Python 3.5.3 compatibility
+
+0.18.2
+------
+
+- Added remaining type hints to the codebase so that the client code can have better static typing safety
+- Fixed UnsatisfiedRequirement string representation (this time for real)
+- Added forward return type reference support to provider methods
+
+0.18.1
+------
+
+- Fixed UnsatisfiedRequirement instantiation (trying to get its string representation would fail)
+- Fixed injecting a subclass of a generic type on Python versions older than 3.7.0
+- Fixed regression that caused BoundKey injection failure
+
+0.18.0
+------
+
+- Added new public :func:`get_bindings <injector.get_bindings>` function to see what parameters will be injected
+  into a function
+- Added new generic types using a draft implementation of `PEP 593 <https://www.python.org/dev/peps/pep-0593/>`_:
+  :data:`Inject <injector.Inject>` and :data:`NoInject <injector.NoInject>`. Those serve as additional ways to
+  declare (non)injectable parameters while :func:`inject <injector.inject>` won't go away any time soon
+  :func:`noninjectable <injector.noninjectable>` may be removed once `NoInject` is cofirmed to work.
+
+Backwards incompatible:
+
+- Removed previously deprecated `Key`, `BindingKey`, `SequenceKey` and `MappingKey` pseudo-types
+
+0.17.0
+------
+
+- Added support for using `typing.Dict` and `typing.List` in multibindings. See :meth:`multibind <injector.Binder.multibind>`.
+- Added multibinding-specific :func:`provider <injector.provider>` variant: :func:`multiprovider <injector.multiprovider>`
+- Deprecated using :func:`provider <injector.provider>` for multibindings
+- Fixed failure to provide a default value to a `NewType`-aliased type with auto_bind enabled
+- Deprecated :func:`Key <injector.Key>`, :func:`SequenceKey <injector.SequenceKey>` and
+  :func:`MappingKey <injector.MappingKey>` – use real types or type aliases instead
+- Deprecated using single-item lists and dictionaries for multibindings - use real types or type aliases instead
+
+Technically backwards incompatible:
+
+- typing.List and typing.Dict specializations are now explicitly disallowed as :meth:`bind <injector.Binder.bind>`
+  interfaces and types returned by :func:`provider <injector.provider>`-decorated methods
+
+0.16.2
+------
+
+- (Re)added support for decorating classes themselves with :func:`@inject <injector.inject>`. This is the same
+  as decorating their constructors. Among other things this gives us
+  `dataclasses <https://docs.python.org/3/library/dataclasses.html>`_ integration.
+
+0.16.1
+------
+
+- Reuploaded to fix incorrectly formatted project description
+
+0.16.0
+------
+
+- Added support for overriding injectable parameters with positional arguments (previously only
+  possible with keyword arguments)
+- Fixed crashes caused by typed self in method signatures
+- Improved typing coverage
+
+Backwards incompatible:
+
+- Dropped Python 3.4 support
+- Removed previously deprecated constructs: with_injector, Injector.install_into, Binder.bind_scope
+- Dependencies are no longer injected into Module.configure and raw module functions (previously
+  deprecated)
+- Removed unofficial support for injecting into parent class constructors
+
+0.15.0
+------
+
+- Added type information for Injector.create_object() (patch #101 thanks to David Pärsson)
+- Made the code easier to understand (patch #105 thanks to Christian Clauss)
+- Opted the package into distributing type information and checking it (PEP 561)
+
+0.14.1
+------
+
+- Fixed regression that required all noninjectable parameters to be typed
+
+0.14.0
+------
+
+- Added NewType support
+- Added type hints
+
+Backwards incompatible:
+
+- Passing invalid parameter names to @noninjectable() will now result in an error
+- Dropped Python 3.3 support
+
+0.13.4
+------
+
+- Deprecated with_injector. There's no one migration path recommended, it depends on
+  a particular case.
+- Deprecated install_into.
+
+0.13.3
+------
+
+- Fixed a bug with classes deriving from PyQt classes not being able to be
+  instantiated manually (bug #75, patch #76 thanks to David Pärsson)
+
+0.13.2
+------
+
+- Fixed a bug with values shared between Injectors in a hierarchy (bugs #52 and #72)
+- Binding scopes explicitly (``Binder.bind_scope``) is no longer necessary and ``bind_scope`` is a no-op now.
+
+0.13.1
+------
+
+- Improved some error messages
+
+0.13.0
+------
+
+Backwards incompatible:
+
+- Dropped Python 3.2 support
+- Dropped Injector use_annotations constructor parameter. Whenever @inject is
+  used parameter annotations will be used automatically.
+- Dropped Python 2 support (this includes PyPy)
+- Removed @provides decorator, use @provider instead
+- Removed support for passing keyword arguments to @inject
+
+0.12.0
+------
+
+- Fixed binding inference in presence of * and ** arguments (previously Injector
+  would generate extra arguments, now it just ignores them)
+- Improved error reporting
+- Fixed compatibility with newer typing versions (that includes the one
+  bundled with Python 3.6)
+
+Technically backwards incompatible:
+
+- Forward references as PEP 484 understands them are being resolved now when
+  Python 3-style annotations are used. See
+  https://www.python.org/dev/peps/pep-0484/#forward-references for details.
+
+  Optional parameters are treated as compulsory for the purpose of injection.
+
+0.11.1
+------
+
+- 0.11.0 packages uploaded to PyPI are broken (can't be installed), this is
+  a fix-only release.
+
+0.11.0
+------
+
+* The following way to declare dependencies is introduced and recommended
+  now:
+
+  .. code-block:: python
+
+    class SomeClass:
+        @inject
+        def __init__(self, other: OtherClass):
+            # ...
+
+  The following ways are still supported but are deprecated and will be
+  removed in the future:
+
+  .. code-block:: python
+
+    # Python 2-compatible style
+    class SomeClass
+        @inject(other=OtherClass)
+        def __init__(self, other):
+            # ...
+
+    # Python 3 style without @inject-decoration but with use_annotations
+    class SomeClass:
+        def __init__(self, other: OtherClass):
+            # ...
+
+    injector = Injector(use_annotations=True)
+    # ...
+
+* The following way to declare Module provider methods is introduced and
+  recommended now:
+
+  .. code-block:: python
+
+    class MyModule(Module):
+        @provider
+        def provide_something(self, dependency: Dependency) -> Something:
+            # ...
+
+  @provider implies @inject.
+
+  Previously it would look like this:
+
+  .. code-block:: python
+
+    class MyModule(Module):
+        @provides(Something)
+        @inject
+        def provide_something(self, dependency: Dependency):
+            # ...
+
+  The :func:`~injector.provides` decorator will be removed in the future.
+
+* Added a :func:`~injector.noninjectable` decorator to mark parameters as not injectable
+  (this serves as documentation and a way to avoid some runtime errors)
+
+
+Backwards incompatible:
+
+* Removed support for decorating classes with :func:`@inject <injector.inject>`. Previously:
+
+  .. code-block:: python
+
+    @inject(something=Something)
+    class Class:
+        pass
+
+  Now:
+
+  .. code-block:: python
+
+    class Class:
+        @inject
+        def __init__(self, something: Something):
+            self.something = something
+
+* Removed support for injecting partially applied functions, previously:
+
+  .. code-block:: python
+
+    @inject(something=Something)
+    def some_function(something):
+        pass
+
+
+    class Class:
+        @inject(function=some_function)
+        def __init__(self, function):
+            # ...
+
+  Now you need to move the function with injectable dependencies to a class.
+
+* Removed support for getting :class:`AssistedBuilder(callable=...) <injector.AssistedBuilder>`
+* Dropped Python 2.6 support
+* Changed the way :class:`~injector.AssistedBuilder` and :class:`~injector.ProviderOf` are used.
+  Previously:
+
+  .. code-block:: python
+
+    builder1 = injector.get(AssistedBuilder(Something))
+    # or: builder1 = injector.get(AssistedBuilder(interface=Something))
+    builder2 = injector.get(AssistedBuilder(cls=SomethingElse))
+    provider = injector.get(ProviderOf(SomeOtherThing))
+
+  Now:
+
+  .. code-block:: python
+
+    builder1 = injector.get(AssistedBuilder[Something])
+    builder2 = injector.get(ClassAssistedBuilder[cls=SomethingElse])
+    provider = injector.get(ProviderOf[SomeOtherThing])
+
+* Removed support for injecting into non-constructor methods
+
+0.10.1
+------
+
+- Fixed a false positive bug in dependency cycle detection (AssistedBuilder can be
+  used to break dependency cycles now)
+
+0.10.0
+------
+
+- :meth:`injector.Provider.get()` now requires an :class:`injector.Injector` instance as
+  its parameter
+- deprecated injecting arguments into modules (be it functions/callables,
+  :class:`~injector.Module` constructors or :meth:`injector.Module.configure` methods)
+- removed `extends` decorator
+- few classes got useful __repr__ implementations
+- fixed injecting ProviderOf and AssistedBuilders when :class:`injector.Injector`
+  auto_bind is set to False (previously would result in `UnsatisfiedRequirement`
+  error)
+- fixed crash occurring when Python 3-function annotation use is enabled and
+  __init__ method has a return value annotation ("injector.UnknownProvider:
+  couldn't determine provider for None to None"), should also apply to free
+  functions as well
+
+0.9.1
+-----
+- Bug fix release.
+
+0.9.0
+-----
+
+- Child :class:`~injector.Injector` can rebind dependancies bound in parent Injector (that changes :class:`~injector.Provider` semantics), thanks to Ilya Orlov
+- :class:`~injector.CallableProvider` callables can be injected into, thanks to Ilya Strukov
+- One can request :class:`~injector.ProviderOf` (Interface) and get a :class:`~injector.BoundProvider` which can be used to get an implementation of Interface when needed
+
+0.8.0
+-----
+
+- Binding annotations are removed. Use :func:`~injector.Key` to create unique types instead.
+
+
+0.7.9
+-----
+
+- Fixed regression with injecting unbound key resulting in None instead of raising an exception
+
+
+0.7.8
+-----
+
+- Exception is raised when :class:`~injector.Injector` can't install itself into a class instance due to __slots__ presence
+- Some of exception messages are now more detailed to make debugging easier when injection fails
+- You can inject functions now - :class:`~injector.Injector` provides a wrapper that takes care of injecting dependencies into the original function
+
+0.7.7
+-----
+
+- Made :class:`~injector.AssistedBuilder` behave more explicitly: it can build either innstance of a concrete class (``AssistedBuilder(cls=Class)``) or it will follow Injector bindings (if exist) and construct instance of a class pointed by an interface (``AssistedBuilder(interface=Interface)``). ``AssistedBuilder(X)`` behaviour remains the same, it's equivalent to ``AssistedBuilder(interface=X)``
+
+0.7.6
+-----
+
+- Auto-convert README.md to RST for PyPi.
+
+0.7.5
+-----
+
+- Added a ChangeLog!
+- Added support for using Python3 annotations as binding types.

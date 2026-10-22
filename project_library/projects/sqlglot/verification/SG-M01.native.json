@@ -1,0 +1,21 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SG-M01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "rendering_preserves_ast_and_parent_links": true,
+    "highlights_target_and_remains_repeatable": true,
+    "shared_sources_and_root_expression_remain_valid": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

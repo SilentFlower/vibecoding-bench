@@ -1,0 +1,1 @@
+Use short=Literal("a"),long=Literal("ab") and the input"ab". Compare short|long with and without parse_all=True,long|short with parse_all=True,and short^long with parse_all=True. Advise ordered-first versus longest selection for a command grammar. Include the actual failing control;do not claim end-of-input checking retries every successful alternative. No implementation.

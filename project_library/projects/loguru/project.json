@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "loguru",
+  "title": "Loguru结构化日志工作场景",
+  "category": "上下文、调用策略与收尾",
+  "description": "字段优先级、惰性时点、选项重置、异常信号、异步收尾和配置诊断六项任务。",
+  "seed_digest": "7e42fa9a37f1536355e285df08b8a38f6f8af68c626e26fca91b14626ec15bf7",
+  "environment": "loguru-py312",
+  "source": {
+    "repository": "https://github.com/Delgan/loguru",
+    "commit": "bce5dfd3b435b1d1658507d7e095ad7a9919bf1c",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "LG-S01",
+      "title": "日志记录阶段",
+      "goal": "核字段和惰性处理顺序",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "LG-U01",
+            "LG-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "LG-U01",
+          "kind": "understand",
+          "goal": "追踪结构化日志的字段优先级",
+          "prompt": "Explain the three complete record extra maps and context restoration. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/extra-layers.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/LG-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/LG-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "LG-U02",
+          "kind": "understand",
+          "goal": "解释惰性日志与过滤器的调用时点",
+          "prompt": "Explain the complete lazy callback counter and filtered output controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/lazy-filter.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/LG-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/LG-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "LG-S02",
+      "title": "日志调用策略",
+      "goal": "保持选项与业务失败信号",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "LG-C01",
+            "LG-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "LG-C01",
+          "kind": "consult",
+          "goal": "保持消息与附加字段的选项策略",
+          "prompt": "Advise actual opt option composition from all three complete controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/options.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/LG-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/LG-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "LG-C02",
+          "kind": "consult",
+          "goal": "明确记录异常后的业务失败信号",
+          "prompt": "Advise the business return/exception contract from the complete catch controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/failure-signaling.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/LG-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/LG-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "LG-S03",
+      "title": "异步日志收尾",
+      "goal": "持有sink和事件循环生命周期",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "LG-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "LG-P01",
+          "kind": "plan",
+          "goal": "规划异步日志任务的有界收尾归属",
+          "prompt": "Plan producer,sink and loop shutdown ordering from the actual event-gated controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/async-shutdown.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/LG-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/LG-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "LG-S04",
+      "title": "日志配置诊断",
+      "goal": "核完整替换与失败现场",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "LG-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "LG-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "LG-D01",
+          "kind": "diagnose",
+          "goal": "先核配置与输出再解释替换失败",
+          "prompt": "After a logging configuration replacement fails,the old output disappears and only some new output works. Request complete handler setup/order,the exception and each sink observation before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/LG-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-handler-reproduction",
+              "when": "The complete handler configuration/order,exception and old/new output observations have not been supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/partial-configuration.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

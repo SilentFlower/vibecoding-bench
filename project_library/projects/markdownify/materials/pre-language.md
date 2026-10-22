@@ -1,0 +1,1 @@
+The exact HTML is <pre class="language-python"> followed by newline,two spaces,print(1),two newlines,and </pre>. Compare code_language="text" with a callback returning None,then with a callback returning element["class"][0][9:]. Compare the default strip_pre with strip_pre=None. Explain fallback language,indentation and boundary-newline preservation. No implementation.

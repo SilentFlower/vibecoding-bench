@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TB-C01",
+  "source_commit": "966876c76a6378557c1951badc1665b4d1375875",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default export writes =1+1 as an XLSX formula cell;the supplied reader only observes its type and does not execute it. escape=True removes the leading equals sign, yielding plain text1+1, so the policy is lossy and leaves source storage unchanged. Choose/validate formula handling for the actual consumer;do not claim universal spreadsheet sanitization or that importing a file executes formulas.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

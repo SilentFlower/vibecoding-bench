@@ -1,0 +1,60 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "pyrsistent",
+      "attempt": 5,
+      "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-005/pyrsistent/result.json",
+      "result_sha256": "1bdcd12caa91147e1eccfeffa021a024f64d601b968bec0c4c73bcceb36ddce1",
+      "main_collected": 638,
+      "counts": {
+        "passed": 637,
+        "failed": 0,
+        "error": 0,
+        "skipped": 1,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 638,
+      "xml_skipped": 1,
+      "runner_sha256": "fb4d87610fda41602c4c0c00fc3550fb23060f6eb5b05a52db6ec9c924c77692",
+      "contract_sha256": "cc8031d1a1538e8727d4e74cee3cd6f1cc7a30009b30219cde0541705c294ac2",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成",
+      "native_build": {
+        "command": [
+          "/work/python/bin/python",
+          "setup.py",
+          "build_ext",
+          "--inplace",
+          "--force"
+        ],
+        "returncode": 0,
+        "elapsed_sec": 1.0697265509952558,
+        "inputs": {
+          "setup.py": "2fb616a34abf9a5c2d0d372e0c0c83995d3d6b1ccfd9ddc3b87575f87844b3a0",
+          "setup.cfg": "20aeffedf3390e2a3eb2bbcfaa38c681d5f8f3d7fcfad8b1c3382018d9c52bbb",
+          "pvectorcmodule.c": "9b2ae5a48474dd1380aa60c2d1f0e6a0534af43637970310454551cb27f1422b",
+          "_pyrsistent_version.py": "500b93622285e35c936be946f8b0fd51402b857738699e9b26cffab06ab606e5"
+        },
+        "extension": "pvectorc.cpython-312-x86_64-linux-gnu.so",
+        "extension_sha256": "72ad3fc525ef4cc71a307b5bda953b28c3c77d096464b5ae72b6d7f40a938c10",
+        "implementation_installed": false,
+        "force_rebuilt_from_candidate": true
+      }
+    }
+  ]
+}

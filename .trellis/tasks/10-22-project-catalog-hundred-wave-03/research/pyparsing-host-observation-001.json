@@ -1,0 +1,41 @@
+{
+  "scope": "宿主业务诊断；不替代镜像原生准入",
+  "rows": [
+    {
+      "task": "PP-U01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"whole_input_acceptance_requires_an_explicit_end_check\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "PP-U02",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"named_result_overwrite_and_all_matches_are_different_views\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "PP-C01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"ordered_choice_does_not_reconsider_a_success_for_whole_input\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "PP-C02",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"parse_action_replacement_and_append_require_deliberate_rule_copies\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "PP-P01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"source_spans_must_name_tab_and_character_vs_byte_coordinates\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "PP-D01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"error\": \"Packrat and Bounded Recursion are not compatible\", \"left_recursion_control\": [\"1\", \"+\", \"2\", \"+\", \"3\"]}\n",
+      "stderr": ""
+    }
+  ]
+}

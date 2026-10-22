@@ -1,0 +1,24 @@
+{
+  "project": "collective-icalendar",
+  "source_commit": "3ecf079acba0e592ea6a40c456514984c8657852",
+  "files": [
+    {
+      "path": "src/icalendar/_version.py",
+      "sha256": "477d43f6912c8e77ea8c0f03859ed762115173d98c88da2fc5ea788c518f382d",
+      "size": 528,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    }
+  ],
+  "file_count": 1,
+  "origin": {
+    "metadata": ".deploy/github-100-research/resume-text/collective-icalendar/venv/lib/python3.12/site-packages/icalendar-0.1.dev1.dist-info/METADATA",
+    "metadata_sha256": "9937ddbeb4ea6af2ee798a4e182ff0c9d41729f91867e4f0e8b418180e55a72c",
+    "version": "0.1.dev1",
+    "pyproject_sha256": "4e748147a360a9ff5fe5f56dd90885443b2690fdf63f5a01e32de3e0a2d5f052"
+  },
+  "rebuilt_in_current_run": false,
+  "scope": "原固定源码历史实际构建原件，逐元数据/输入和SHA保留；不是Git文件或本轮重新构建声明"
+}

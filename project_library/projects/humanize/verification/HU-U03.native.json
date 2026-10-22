@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "HU-U03"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "tense_depends_on_the_input_type_and_fixed_reference": true
+  },
+  "resource_profile": "business"
+}

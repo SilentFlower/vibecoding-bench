@@ -1,0 +1,1 @@
+Set env.loop_iteration_limit=2 and render {% for x in xs %}{{ x }}{% endfor %} for xs=[1,2] and [1,2,3]. Inspect the default limit and other defined Environment limits. Plan finite rendering budgets,loader isolation and error publication;no implementation or real-service access.

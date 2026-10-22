@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AR-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "relative_month_shift_clamps_but_absolute_replacement_validates": true
+  },
+  "resource_profile": "business"
+}

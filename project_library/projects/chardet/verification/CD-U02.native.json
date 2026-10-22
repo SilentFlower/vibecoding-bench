@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CD-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "early_detector_done_does_not_validate_the_complete_byte_stream": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "H5-P01",
+  "source_commit": "fd4f032bc090d44fb11a84b352dad7cbee0a4745",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The control normalizes wrapper elements,quotes and entity text;its second serialization matches the first but neither preserves the input bytes. Freeze parser/builder/serializer options and compare intended DOM/text invariants,plus idempotence over a relevant malformed/Unicode/table corpus. Preserve raw source and errors separately. One successful control is not proof of general losslessness,HTML validity or safe rendering.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AR-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "span_bounds_choose_microsecond_end_or_next_midnight": true
+  },
+  "resource_profile": "business"
+}

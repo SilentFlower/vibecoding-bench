@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FP-C01",
+  "source_commit": "a22c5521cbb109871f1a2318948581901bd47e26",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default summary retains<b>Visible</b> and removes the supplied script and body;disabled sanitization retains script markup. Decide how to preserve source and render content downstream,keep explicit per-call settings,and do not infer universal browser/application safety or authorize disabling protection globally.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

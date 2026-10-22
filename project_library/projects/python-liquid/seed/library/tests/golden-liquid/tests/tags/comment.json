@@ -1,0 +1,126 @@
+{
+  "tests": [
+    {
+      "name": "don't render comments",
+      "template": "{% comment %}foo{% endcomment %}",
+      "result": "",
+      "tags": [
+        "comment tag"
+      ]
+    },
+    {
+      "name": "respect whitespace control in comments",
+      "template": "\n{%- comment %}foo{% endcomment -%}\t \r",
+      "result": "",
+      "tags": [
+        "comment tag"
+      ]
+    },
+    {
+      "name": "don't render comments with nested tags",
+      "template": "{% comment %}{% if true %}{{ title }}{% endif %}{% endcomment %}",
+      "result": "",
+      "tags": [
+        "comment tag"
+      ]
+    },
+    {
+      "name": "comment inside liquid tag",
+      "template": "{% liquid\n    if 1 != 1\n    comment\n    else\n    echo 123\n    endcomment\n    endif\n%}",
+      "result": "",
+      "tags": [
+        "comment tag",
+        "if tag",
+        "liquid tag"
+      ]
+    },
+    {
+      "name": "fully formed nested tags are not parsed",
+      "template": "{% comment %}    {% if true %}    {% if ... %}    {%- for ? -%}    {% while true %}    {%    unless if    %}    {% endcase %}{% endcomment %}",
+      "result": "",
+      "tags": [
+        "comment tag"
+      ]
+    },
+    {
+      "name": "fully formed nested output markup is not parsed",
+      "template": "{% comment %}{{ ! }}  {% endcomment %}",
+      "result": "",
+      "tags": [
+        "comment tag"
+      ]
+    },
+    {
+      "name": "incomplete nested tags are a syntax error",
+      "template": "{% comment %}{% assign foo = '1'{% endcomment %}",
+      "invalid": true,
+      "tags": [
+        "comment tag"
+      ]
+    },
+    {
+      "name": "incomplete nested output markup is a syntax error",
+      "template": "{% comment %}{{ {%- endcomment %}",
+      "invalid": true,
+      "tags": [
+        "comment tag"
+      ]
+    },
+    {
+      "name": "closing tag delimiters are not parsed",
+      "template": "{% comment %} %} %}{% endcomment %}",
+      "result": "",
+      "tags": [
+        "comment tag"
+      ]
+    },
+    {
+      "name": "closing output delimiters are not parsed",
+      "template": "{% comment %} }} }} {%- endcomment %}",
+      "result": "",
+      "tags": [
+        "comment tag"
+      ]
+    },
+    {
+      "name": "nested comment blocks",
+      "template": "{% comment %}    {% comment %}    {% comment %}{%    endcomment     %}    {% endcomment %}{% endcomment %}",
+      "result": "",
+      "tags": [
+        "comment tag"
+      ]
+    },
+    {
+      "name": "nested comment blocks, with nested tags",
+      "template": "{% comment %}    {% comment %}    {% comment %}{% if true %}hello{%endif%}{%    endcomment     %}    {% endcomment %}{% endcomment %}",
+      "result": "",
+      "tags": [
+        "comment tag"
+      ]
+    },
+    {
+      "name": "unbalanced nested comment blocks",
+      "template": "{% comment %}    {% comment %}    {% comment %}    {% endcomment %}{% endcomment %}",
+      "invalid": true,
+      "tags": [
+        "comment tag"
+      ]
+    },
+    {
+      "name": "nested raw block",
+      "template": "{% comment %}    {% raw %}    {% endcomment %}    {% endraw %}{% endcomment %}",
+      "result": "",
+      "tags": [
+        "comment tag"
+      ]
+    },
+    {
+      "name": "unbalanced nested raw tag",
+      "template": "{% comment %}    {% raw %} ! {% endcomment %}",
+      "invalid": true,
+      "tags": [
+        "comment tag"
+      ]
+    }
+  ]
+}

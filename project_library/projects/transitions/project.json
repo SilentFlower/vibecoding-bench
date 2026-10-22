@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "transitions",
+  "title": "Transitions工单流转工作场景",
+  "category": "事件、回调与失败边界",
+  "description": "内部与自循环、守卫优先级、队列返回值、事件参数、回调失败方案及方法绑定诊断。",
+  "seed_digest": "aeb34bc7b17a873d82504e6532268b3e0f59d0080ae9440b6ac343fb3a6aa04a",
+  "environment": "transitions-py312",
+  "source": {
+    "repository": "https://github.com/pytransitions/transitions",
+    "commit": "bd42b38f3627e6bca7274fb4d9af2e105f75da7c",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TR-S01",
+      "title": "状态流转语义",
+      "goal": "明确回调与优先级",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TR-U01",
+            "TR-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TR-U01",
+          "kind": "understand",
+          "goal": "解释初始、内部与自循环回调",
+          "prompt": "Use Machine(model,states=[state a with on_enter/on_exit log callbacks],initial=\"a\",auto_transitions=False). Compare initialization,an internal a->None event and a reflexive a->a event,each with an after callback. Explain the logs;no edits.",
+          "requires": [],
+          "materials": [
+            "materials/tr-u01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TR-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/TR-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TR-U02",
+          "kind": "understand",
+          "goal": "解释同事件的候选优先级",
+          "prompt": "Register review:a->b with a Boolean guard,then review:a->c unconditionally;disable auto transitions. Compare separate initial models with guard True and False. Explain ordering and fallback. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/tr-u02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TR-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/TR-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TR-S02",
+      "title": "工作流集成咨询",
+      "goal": "确认结果与回调参数",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TR-C01",
+            "TR-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TR-C01",
+          "kind": "consult",
+          "goal": "正确解释排队触发的返回值",
+          "prompt": "For separate Machine instances with queued=False and queued=True,register go:a->b with an always-false guard and auto_transitions=False. Compare trigger return value and final state. Advise how a UI should confirm a transition. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/tr-c01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TR-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/TR-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TR-C02",
+          "kind": "consult",
+          "goal": "明确回调参数集成合同",
+          "prompt": "Configure send_event=True on Machine with go:a->b and an after callback record(event). Trigger model.go(ticket=\"T-1\"). Inspect event.event.name,transition source/dest,state.name and kwargs. Advise callback signatures and correlation handling. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/tr-c02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TR-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/TR-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TR-S03",
+      "title": "持久业务方案",
+      "goal": "界定异常和副作用",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TR-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TR-P01",
+          "kind": "plan",
+          "goal": "规划回调失败后的状态和副作用处理",
+          "prompt": "Machine defaults to propagating callback errors;go:a->b has an on_enter_b callback that logs entry-effect then raises ValueError,and an after callback that logs after. Inspect exception,state and logs. Plan durable publication/retry/recovery. No implementation or real database access.",
+          "requires": [],
+          "materials": [
+            "materials/tr-p01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TR-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/TR-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TR-S04",
+      "title": "模型绑定诊断",
+      "goal": "取得实际方法与事件证据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TR-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "TR-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TR-D01",
+          "kind": "diagnose",
+          "goal": "诊断模型同名方法未触发流转",
+          "prompt": "A model.go() call returns a business value without changing state. Request the original model attributes,Machine setup,event registration and generic trigger control before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TR-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "preexisting-model-method",
+              "when": "Model attributes,Machine setup,event registration and generic trigger control have not been supplied or declared unavailable and are reasonably requested.",
+              "materials": [
+                "disclosure/name-collision.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

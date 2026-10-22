@@ -1,0 +1,178 @@
+{
+  "schema": 2,
+  "project_key": "portion",
+  "title": "Portion区间排程工作场景",
+  "category": "端点、覆盖状态与空闲窗口",
+  "description": "区间归并、覆盖映射、缺口查询、迭代进展和空闲时段方案。",
+  "seed_digest": "98648094fcc03c5479bd8d14538da9666a2f70da494fbd885facf0676acbd8f2",
+  "environment": "portion-py312",
+  "source": {
+    "repository": "https://github.com/AlexandreDecan/portion",
+    "commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PT-S01",
+      "title": "区间与覆盖语义",
+      "goal": "明确端点和状态归并",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PT-U01",
+            "PT-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PT-U01",
+          "kind": "understand",
+          "goal": "区分端点缺口与区间长度",
+          "prompt": "Explain all supplied endpoint/membership/len controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/endpoints.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PT-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/PT-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PT-U02",
+          "kind": "understand",
+          "goal": "追踪重叠覆盖后的状态区间",
+          "prompt": "Explain point values,grouped open interval and mapping length. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/overlap.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PT-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/PT-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PT-S02",
+      "title": "查询与迭代策略",
+      "goal": "显式处理缺口和推进",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PT-C01",
+            "PT-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PT-C01",
+          "kind": "consult",
+          "goal": "选择区间查询的缺口表示",
+          "prompt": "Advise complete range indexing/get results and original-state preservation. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/gaps.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PT-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/PT-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PT-C02",
+          "kind": "consult",
+          "goal": "明确区间迭代的进展要求",
+          "prompt": "Advise all finite zero/positive/reverse-step controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/iteration.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PT-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/PT-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PT-S03",
+      "title": "空闲时段方案",
+      "goal": "核集合与业务边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PT-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PT-P01",
+          "kind": "plan",
+          "goal": "规划工作窗口内的空闲时段",
+          "prompt": "Plan the supplied difference and boundary acceptance. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/free-window.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PT-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/PT-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Compare addVariables(["a","b"],(value for value in [1,2])) with a new problem using the materialized list[1,2]. Inspect the exact generator failure and complete list-control solutions. Advise ownership of a reusable domain;do not assume a single-pass iterator can supply both variables or that failure undoes earlier additions. No implementation.

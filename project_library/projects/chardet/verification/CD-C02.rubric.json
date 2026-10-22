@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CD-C02",
+  "source_commit": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The exact label is X-ISO-10646-UCS-4-3412;codecs.lookup raises LookupError. A recognized detection label need not name an available Python codec. Preserve bytes/label and report unsupported decoding or use an explicitly verified order-aware decoder;do not substitute ordinary UTF32 without proof.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

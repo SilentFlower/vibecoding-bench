@@ -1,0 +1,1 @@
+For separate StateMachine definitions with pending initial and done final,attach a callback returning False as cond="check" or validators="check" on finish. Compare outcome,state and exceptions. No other callbacks are installed. No edits.

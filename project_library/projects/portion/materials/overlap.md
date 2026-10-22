@@ -1,0 +1,1 @@
+d=IntervalDict();d[closedopen(9,12)]="open";d[closedopen(10,11)]="meeting". Inspect point values9/10/11,find("open") and len(d). Explain replacement on overlap and grouping by equal values,without interpreting len as covered duration or individual source records. No edits.

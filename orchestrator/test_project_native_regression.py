@@ -1,5 +1,6 @@
 """固定原生集合的实现路径、控制恢复与候选导入回归。"""
 from contextlib import ExitStack
+import gzip
 import hashlib
 from importlib.util import find_spec
 from importlib.metadata import PathDistribution
@@ -18,6 +19,142 @@ import project_native_regression as regression
 
 class NativeRegressionTests(unittest.TestCase):
     """验证 src 布局适配不会放宽原版测试和实际导入的约束。"""
+
+    def test_large_subtest_evidence_keeps_full_data_outside_stdout(self) -> None:
+        """大集合完整归档且返回包有界，避免日志轮转丢准备标记。@return None。"""
+        rows = [{'parent_nodeid': 'original', 'ordinal': index, 'outcome': 'passed',
+            'context': {'msg': 'SELECT ' + 'x,' * 100, 'kwargs': {}}, 'when': 'call'}
+            for index in range(10000)]
+        self.assertGreater(len(json.dumps(rows)), 2 * 1024 * 1024)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            metadata = regression._subtest_evidence(root, rows)
+            raw = gzip.decompress((root / metadata['file']).read_bytes())
+            self.assertEqual(json.loads(raw), rows)
+            self.assertEqual(metadata['count'], 10000)
+            self.assertEqual(metadata['observed_order_sha256'], hashlib.sha256(raw).hexdigest())
+            self.assertLess(len(json.dumps(metadata)), 1024)
+            with self.assertRaises(ValueError):
+                regression._subtest_evidence(root, rows)
+
+    def test_sqlglot_subtest_multiset_keeps_duplicates_and_literal_hex(self) -> None:
+        """规范化已核顺序及对象地址，仍拒绝丢项、改结果或改SQL字面。@return None。"""
+        parent = 'tests.test_expressions.TestExprs.test_convert'
+        rows = [{'parent_nodeid': parent, 'ordinal': 1, 'when': 'call', 'outcome': 'passed',
+            'context': {'msg': '<tests.test_expressions.TestExprs.test_convert.<locals>.PointClass object at 0x1234>', 'kwargs': {}}},
+            {'parent_nodeid': 'other', 'ordinal': 1, 'when': 'call', 'outcome': 'passed',
+                'context': {'msg': 'SELECT 0x1234', 'kwargs': {}}}]
+        rows.append({**rows[1], 'ordinal': 2})
+        frozen = regression._subtest_contract(rows, 'sqlglot-subtests-v1')
+        moved = [{**rows[2], 'ordinal': 1}, {**rows[0], 'context': {
+            'msg': '<tests.test_expressions.TestExprs.test_convert.<locals>.PointClass object at 0x5678>', 'kwargs': {}}},
+            {**rows[1], 'ordinal': 2}]
+        self.assertEqual(regression._subtest_contract(moved, 'sqlglot-subtests-v1'), frozen)
+        for variation in [rows[:-1], [{**rows[0], 'outcome': 'failed'}, *rows[1:]],
+                [rows[0], {**rows[1], 'context': {'msg': 'SELECT 0x5678', 'kwargs': {}}}, rows[2]]]:
+            self.assertNotEqual(regression._subtest_contract(variation, 'sqlglot-subtests-v1'), frozen)
+
+    def test_large_subtest_digest_keeps_count_order_context_and_outcome(self) -> None:
+        """大集合摘要冻结完整上下文、顺序和结果，旧列表格式保持。@return None。"""
+        rows = [{'parent_nodeid': 'original', 'ordinal': index, 'when': 'call',
+            'context': {'msg': str(index), 'kwargs': {'sql': 'SELECT ' + str(index)}},
+            'outcome': 'passed'} for index in range(1, 4)]
+        frozen = regression._subtest_contract(rows, 'sha256-v1')
+        self.assertEqual(frozen['count'], 3)
+        self.assertEqual(len(frozen['sha256']), 64)
+        self.assertIs(regression._subtest_contract(rows), rows)
+        for variation in [rows[:-1], list(reversed(rows)),
+                [{**rows[0], 'outcome': 'failed'}, *rows[1:]],
+                [{**rows[0], 'context': {'msg': 'changed', 'kwargs': {}}}, *rows[1:]]]:
+            self.assertNotEqual(regression._subtest_contract(variation, 'sha256-v1'), frozen)
+        with self.assertRaises(ValueError):
+            regression._subtest_contract(rows, 'unknown')
+
+    def test_process_pool_limits_only_defaults_and_restores_after_error(self) -> None:
+        """默认并发受控，显式原参数保真且异常退出恢复构造器。@return None。"""
+        calls = []
+
+        def initialize(pool, max_workers=None, *args, **kwargs) -> None:
+            """记录原构造输入。@param pool 原对象。@param max_workers 并发。@param args 原参数。@param kwargs 原参数。@return None。"""
+            calls.append((max_workers, args, kwargs))
+
+        with patch.object(regression.ProcessPoolExecutor, '__init__', initialize):
+            with self.assertRaisesRegex(RuntimeError, 'expected'):
+                with regression._process_pool_workers(2):
+                    regression.ProcessPoolExecutor.__init__(object())
+                    regression.ProcessPoolExecutor.__init__(object(), 4, 'original', initializer='fixture')
+                    raise RuntimeError('expected')
+            self.assertIs(regression.ProcessPoolExecutor.__init__, initialize)
+        self.assertEqual(calls, [(2, (), {}), (4, ('original',), {'initializer': 'fixture'})])
+        for workers in (0, -1, True, '2'):
+            with self.assertRaises(ValueError), regression._process_pool_workers(workers):
+                pass
+
+    def test_fixed_fixture_symlink_keeps_baseline_and_rejects_external_target(self) -> None:
+        """私有测试链接只恢复固定内部目标，原快照保持普通blob且拒绝越界。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            baseline, project = root / 'baseline', root / 'project'
+            for tree in (baseline, project):
+                (tree / 'fixtures/etc').mkdir(parents=True)
+                (tree / 'fixtures/zone').write_bytes(b'original timezone fixture')
+                (tree / 'fixtures/etc/localtime').write_text('../zone')
+            before = regression._files(baseline)
+            suite = {'fixture_aliases': [('fixtures/etc/localtime', '../zone')],
+                'fixture_symlink_semantics': True}
+            restored = regression._fixture_aliases(baseline, project, suite)
+            self.assertTrue((project / 'fixtures/etc/localtime').is_symlink())
+            self.assertEqual((project / 'fixtures/etc/localtime').read_bytes(), b'original timezone fixture')
+            self.assertEqual(restored[0]['materialization'], 'private-controlled-relative-symlink')
+            self.assertEqual(regression._files(baseline), before)
+            self.assertFalse((baseline / 'fixtures/etc/localtime').is_symlink())
+            (root / 'outside').write_bytes(b'external data')
+            for tree in (baseline, project):
+                if (tree / 'fixtures/etc/localtime').is_symlink():
+                    (tree / 'fixtures/etc/localtime').unlink()
+                (tree / 'fixtures/etc/localtime').write_text('../../../outside')
+            suite['fixture_aliases'] = [('fixtures/etc/localtime', '../../../outside')]
+            with self.assertRaisesRegex(ValueError, '越界'):
+                regression._fixture_aliases(baseline, project, suite)
+            self.assertFalse((project / 'fixtures/etc/localtime').is_symlink())
+
+    def test_extra_native_source_uses_candidate_but_keeps_build_controls(self) -> None:
+        """额外C实现来自候选，构建控制和原测试仍来自原版。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ['baseline', 'candidate']:
+                (root / name / 'pyrsistent').mkdir(parents=True)
+                (root / name / 'pyrsistent/__init__.py').write_text('VALUE = 1\n')
+                (root / name / '_pyrsistent_version.py').write_text("__version__ = '0.21.0'\n")
+            (root / 'baseline/pvectorcmodule.c').write_text('/* original */\n')
+            (root / 'candidate/pvectorcmodule.c').write_text('/* candidate */\n')
+            (root / 'baseline/setup.py').write_text('ORIGINAL_BUILD = True\n')
+            (root / 'candidate/setup.py').write_text('raise RuntimeError("untrusted")\n')
+            (root / 'baseline/test_original.py').write_text('def test_original():\n    assert True\n')
+            report = regression._overlay(root / 'baseline', root / 'candidate', root / 'runtime',
+                regression.SUITES['pyrsistent'])
+            self.assertEqual((root / 'runtime/pvectorcmodule.c').read_text(), '/* candidate */\n')
+            self.assertEqual((root / 'runtime/setup.py').read_text(), 'ORIGINAL_BUILD = True\n')
+            self.assertTrue((root / 'runtime/test_original.py').is_file())
+            self.assertEqual(set(report['extra_implementation_files']), {'pvectorcmodule.c', '_pyrsistent_version.py'})
+
+    def test_extra_native_source_rejects_missing_links_and_pytest_injection(self) -> None:
+        """额外实现不能缺失、沿链接或注入测试控制，未知路径也不能进入。@return None。"""
+        for variation in ['missing', 'link', 'hook', 'unknown']:
+            with self.subTest(variation=variation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                for name in ['baseline', 'candidate']:
+                    (root / name / 'sample').mkdir(parents=True)
+                    (root / name / 'sample/__init__.py').write_text('VALUE = 1\n')
+                (root / 'baseline/extra.py').write_text('VALUE = 1\n')
+                if variation == 'link':
+                    (root / 'candidate/extra.py').symlink_to(root / 'baseline/extra.py')
+                elif variation == 'hook':
+                    (root / 'candidate/extra.py').write_text('pytest_plugins = []\n')
+                suite = {'package': 'sample', 'overlay': True,
+                    'extra_implementation_files': ['../extra.py' if variation == 'unknown' else 'extra.py']}
+                with self.assertRaises(regression.CandidateViolation):
+                    regression._overlay(root / 'baseline', root / 'candidate', root / 'runtime', suite)
 
     def test_src_overlay_restores_baseline_tests_and_controls(self) -> None:
         """候选只替换实现，删除测试和改写配置不能缩减原版集合。@return None。"""
@@ -935,6 +1072,39 @@ class NativeRegressionTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, '二进制后缀'):
                     regression._simplejson_mode(root, 'c')
 
+    def test_compiled_suite_rejects_python_module_in_native_slot(self) -> None:
+        """多模块编译入口不能以同名Python源码冒充实际产物。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            package_path, native_path = root / '__init__.py', root / 'native.py'
+            package_path.write_text('')
+            native_path.write_text('')
+            modules = {'sample': SimpleNamespace(__file__=str(package_path)),
+                'sample.native': SimpleNamespace(__file__=str(native_path))}
+            state = {'control': {'project': str(root), 'package': 'sample', 'documents': {},
+                'native_modules': ['sample.native']}, 'errors': [], 'imports': {}}
+            with patch.object(regression, '_state', return_value=state), \
+                    patch.object(regression.importlib, 'import_module', side_effect=modules.__getitem__):
+                with self.assertRaisesRegex(ValueError, '二进制扩展'):
+                    regression.pytest_sessionstart(None)
+            self.assertTrue(state['errors'])
+
+    def test_unchanged_readonly_docs_are_preserved_but_drift_is_rejected(self) -> None:
+        """扩展只读示例相同时无需重写，变化时不能静默当成恢复成功。@return None。"""
+        class ReadOnlyDocument:
+            """模拟Cython导出的只读文档对象。"""
+
+            @property
+            def __doc__(self):
+                """返回不可改写的原版示例。@return 原版文本。"""
+                return '>>> original()\n1'
+
+        document = ReadOnlyDocument()
+        regression._restore_document(document, '>>> original()\n1')
+        with self.assertRaises(AttributeError):
+            regression._restore_document(document, '>>> altered()\n2')
+        self.assertEqual(document.__doc__, '>>> original()\n1')
+
     def test_dynamic_parameter_names_keep_all_real_cases_and_reject_wrong_code(self) -> None:
         """动态参数显示名变化不漏原测试，实际错误候选仍由完整用例拒绝。@return None。"""
         with tempfile.TemporaryDirectory() as directory:
@@ -1090,6 +1260,18 @@ class NativeRegressionTests(unittest.TestCase):
 
             with patch.object(regression, '_OFFLINE_ROOT', root):
                 self.assertEqual(regression._system_libraries(specification())[0]['sha256'], row['sha256'])
+                other = root / 'artifacts/gettext-libs'
+                other.mkdir()
+                (other / 'libsample.so.1').write_bytes(binary.read_bytes())
+                other_manifest = other / 'manifest.json'
+                other_row = {**row, 'path': 'artifacts/gettext-libs/libsample.so.1'}
+                other_manifest.write_text(json.dumps({'schema': 1, 'libraries': [other_row]}))
+                self.assertEqual(regression._system_libraries(('artifacts/gettext-libs/manifest.json',
+                    hashlib.sha256(other_manifest.read_bytes()).hexdigest()))[0]['sha256'], row['sha256'])
+                other_manifest.write_text(json.dumps({'schema': 1, 'libraries': [row]}))
+                with self.assertRaisesRegex(ValueError, '目录不一致'):
+                    regression._system_libraries(('artifacts/gettext-libs/manifest.json',
+                        hashlib.sha256(other_manifest.read_bytes()).hexdigest()))
                 binary.write_bytes(b'changed')
                 with self.assertRaises(ValueError):
                     regression._system_libraries(specification())

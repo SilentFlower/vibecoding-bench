@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TD-P01",
+  "source_commit": "d6a68d61088a40eef5c88191ccf79323dbf34850",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both pairs have one edit,but the single-character pair scores0 and the length10 pair0.9. Define normalization,algorithm/backend,length/language and tie policy,then evaluate precision/recall and review handling against suitable labeled business examples. Retain source and failure evidence;these arithmetic scores are not calibrated match probabilities or an established production threshold.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

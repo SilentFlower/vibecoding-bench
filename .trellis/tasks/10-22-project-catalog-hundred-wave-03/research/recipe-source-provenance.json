@@ -1,0 +1,44 @@
+[
+  {
+    "target": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/prepare_fixed_sources.py",
+    "source": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/prepare_fixed_sources.py",
+    "source_sha256": "3de3f015f91da2acbef77f693fed3bea9ea7f92bd7c1ce70a16dabc157727418",
+    "scope": "本阶段冻结实验配方；运输核心复用已提交版本，只调整本阶段路径、来源/依赖配置"
+  },
+  {
+    "target": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/calibrate_starting_sources.py",
+    "source": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/calibrate_starting_sources.py",
+    "source_sha256": "776f34fa3a045a48491f8789bef16c34044b99d2cda06a7782d72ddce8bccb3d",
+    "scope": "本阶段冻结实验配方；运输核心复用已提交版本，只调整本阶段路径、来源/依赖配置"
+  },
+  {
+    "target": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/freeze_native_baselines.py",
+    "source": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/freeze_native_baselines.py",
+    "source_sha256": "910c548bbde2a4f7e2019fc04356dada567573033df2b1e25a564ec2afc028e2",
+    "scope": "本阶段冻结实验配方；运输核心复用已提交版本，只调整本阶段路径、来源/依赖配置"
+  },
+  {
+    "target": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/download_fixed_dependencies.py",
+    "source": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/download_fixed_dependencies.py",
+    "source_sha256": "c84378a3fde1113c298abea45f41a22f844bc2c87bb427414b747a1809cf5ce6",
+    "scope": "本阶段冻结实验配方；运输核心复用已提交版本，只调整本阶段路径、来源/依赖配置"
+  },
+  {
+    "target": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/draft_content.py",
+    "source": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/draft_content.py",
+    "source_sha256": "b37c838ab06fe72907ee7fb414ccf3a2419cc06947a1335443385084b9f71575",
+    "scope": "冻结相同schema2序列化核心；业务问题/材料/验收逐仓独立提供"
+  },
+  {
+    "target": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/verify_draft_native.py",
+    "source": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/verify_draft_native.py",
+    "source_sha256": "ebee0e5b78ef0898b408bd001436bde92e5267df49b1b2ed8e49a55d690647f7",
+    "scope": "本阶段冻结业务验证与原件对账配方，独立任务与期望不由辅助脚本生成"
+  },
+  {
+    "target": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/write_native_admission.py",
+    "source": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/write_native_admission.py",
+    "source_sha256": "8d19d6416851afc7e3d1ebe8ec3e1c34609be504666079f7b2583fba4f9231ae",
+    "scope": "本阶段冻结业务验证与原件对账配方，独立任务与期望不由辅助脚本生成"
+  }
+]

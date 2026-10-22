@@ -1,0 +1,1 @@
+Default Environment renders {% if false and true or true %}yes{% else %}no{% endif %} as no. No custom values/tags/operators are present. Logical binary expressions associate from right to left: false and (true or true). The default logical_parentheses flag is False. The report author expected the Python expression (False and True) or True to be True.

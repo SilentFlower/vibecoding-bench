@@ -1,0 +1,1 @@
+Wrap SimpleNamespace(name="first") in BaseObjectProxy;assign proxy.name="second" and proxy._self_note="local". Compare wrapped identity and attributes. Also compare isinstance(ObjectProxy(1),int) with type(proxy) is int for that numeric proxy. No edits.

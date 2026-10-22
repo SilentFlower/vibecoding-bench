@@ -1,0 +1,1 @@
+Compare Europe/Paris2026-10-25 02:30 with fold0 and fold1 by timestamps. Construct Europe/Paris2026-03-29 02:30 with raise_on_unknown_times=True. Advise scheduling input and retained evidence. No edits.

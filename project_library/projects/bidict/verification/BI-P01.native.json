@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BI-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "bulk_rollback_does_not_undo_consumption_or_external_side_effects": true
+  },
+  "resource_profile": "business"
+}

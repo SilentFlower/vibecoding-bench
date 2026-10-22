@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "textdistance",
+  "title": "Textdistance文档匹配工作场景",
+  "category": "编辑模型、分数与匹配策略",
+  "description": "颠倒成本、归一化、词袋、截断比较、阈值方案和工具诊断。",
+  "seed_digest": "8b04820a0172865e2a9e53535fb84fdf2b29e56f3cd884281677b95b36290fd0",
+  "environment": "textdistance-py312",
+  "source": {
+    "repository": "https://github.com/life4/textdistance",
+    "commit": "d6a68d61088a40eef5c88191ccf79323dbf34850",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TD-S01",
+      "title": "距离模型与分数",
+      "goal": "明确操作和归一化",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TD-U01",
+            "TD-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TD-U01",
+          "kind": "understand",
+          "goal": "选择文档名颠倒的编辑模型",
+          "prompt": "Explain both complete transposition controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/transposition.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/TD-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TD-U02",
+          "kind": "understand",
+          "goal": "解释编辑数与归一化分数",
+          "prompt": "Explain both raw/normalized controls and the denominator. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/score-scale.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/TD-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TD-S02",
+      "title": "文本比较策略",
+      "goal": "选择词频、位置和长度政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TD-C01",
+            "TD-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TD-C01",
+          "kind": "consult",
+          "goal": "明确词频和集合相似度策略",
+          "prompt": "Advise word-bag/set/order semantics using every control. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/word-bag.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/TD-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TD-C02",
+          "kind": "consult",
+          "goal": "避免截断比较掩盖文档后缀",
+          "prompt": "Advise actual suffix and shift controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/hamming.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/TD-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TD-S03",
+      "title": "候选复核方案",
+      "goal": "基于真实数据确定阈值",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TD-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TD-P01",
+          "kind": "plan",
+          "goal": "规划文档候选分数与复核阈值",
+          "prompt": "Plan the score/length-aware acceptance study without inventing a validated threshold. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/threshold-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/TD-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TD-S04",
+      "title": "比较工具诊断",
+      "goal": "取得完整接口证据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TD-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "TD-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TD-D01",
+          "kind": "diagnose",
+          "goal": "诊断组合词工具的调用失败",
+          "prompt": "A word-combination comparison helper raises unexpectedly. Request exact metric construction,complete call,exception and small controls before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TD-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-helper-interface",
+              "when": "Exact metric construction/backend,complete helper call,exception and small controls have not been supplied or declared unavailable,and are reasonably requested.",
+              "materials": [
+                "disclosure/helper-interface.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

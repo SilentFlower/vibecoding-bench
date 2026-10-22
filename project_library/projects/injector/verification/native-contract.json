@@ -1,0 +1,747 @@
+{
+  "baseline_digest": "57364020d1feac17734467580669cb54f17490451a9d6beea6594a6dbe95b589",
+  "nodes": [
+    {
+      "id": "README.md::README.md",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector/__init__.py::injector.BoundKey",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector/__init__.py::injector.CallableProvider",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector/__init__.py::injector.InstanceProvider",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector/__init__.py::injector.ProviderOf",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector/__init__.py::injector.SingletonScope",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector/__init__.py::injector.get_bindings",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector/__init__.py::injector.inject",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector/__init__.py::injector.is_decorated_with_inject",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector/__init__.py::injector.noninjectable",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector/__init__.py::injector.provider",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::TestThreadSafety::test_injection_is_thread_safe",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::TestThreadSafety::test_singleton_scope_is_thread_safe",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_a_bound_decorated_singleton_is_created_as_close_to_the_root_where_it_exists_when_auto_bind_is_disabled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_a_decorated_singleton_is_created_as_close_to_the_root_where_dependencies_fulfilled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_a_decorated_singleton_is_shared_among_child_injectors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_a_decorated_singleton_is_shared_between_parent_and_child_injectors_when_child_creates_it_first",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_a_decorated_singleton_is_shared_between_parent_and_child_injectors_when_parent_creates_it_first",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_a_decorated_singleton_should_not_override_a_child_provider",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_a_decorated_singleton_should_not_override_explicit_binds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_annotated_class_integration_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_annotated_instance_integration_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_annotated_integration_with_annotated",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_annotated_meta_separate_bindings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_annotated_non_comparable_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_annotated_origin_separate_bindings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_annotation_based_injection_works_in_provider_methods",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_assisted_builder_injection_is_safe_to_use_with_child_injectors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_assisted_builder_injection_is_safe_to_use_with_multiple_injectors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_assisted_builder_uses_bindings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_assisted_builder_uses_concrete_class_when_specified",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_assisted_builder_works_when_got_directly_from_injector",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_assisted_builder_works_when_injected",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_assisted_building_is_supported",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_auto_bind",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_auto_bind_with_newtype",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_binder_does_not_have_a_binding_for_an_unbound_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_binder_has_binding_for_explicitly_bound_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_binder_has_implicit_binding_for_implicitly_bound_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_binder_install",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_binder_provider_for_method_with_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_binder_provider_for_method_with_class_to_specific_subclass",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_binder_provider_for_method_with_explicit_provider",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_binder_provider_for_method_with_instance",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_binder_provider_for_type_with_metaclass",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_binding_a_singleton_to_a_child_injector_does_not_affect_the_parent_injector",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_binding_an_instance_regression",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_call_error_str_representation_handles_single_arg",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_call_to_method_with_legitimate_call_error_raises_type_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_callable_provider_injection",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_can_create_instance_with_untyped_noninjectable_argument",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_can_inject_dataclass_with_literal_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_child_injector_inherits_parent_bindings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_child_injector_overrides_parent_bindings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_child_injector_rebinds_arguments_for_parent_scope",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_child_scope",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_class_assisted_builder_of_partially_injected_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_class_assisted_builder_of_partially_injected_class_old",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_configure_multiple_modules",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_custom_scope",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_custom_scopes_work_as_expected_with_child_injectors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_cyclic_dependencies",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_dataclass_annotated_parameter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_dataclass_integration_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_decorator_works_for_function_with_no_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_dependency_cycle_can_be_worked_broken_by_assisted_building",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_explicitly_passed_parameters_override_injectable_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_forward_references_in_annotations_are_handled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_get_bindings_for_pep_604",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_get_bindings_noinject_with_default_should_behave_identically",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_get_bindings_of_nested_inject_annotations",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_get_bindings_of_nested_noinject_inject_annotation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_get_bindings_of_nested_noinject_inject_annotation_and_inject_decorator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_get_bindings_with_an_invalid_forward_reference_return_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_get_default_injected_instances",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_gets_bindings_for_annotated_type_with_inject_decorator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_gets_bindings_inject_with_redundant_inject_annotation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_gets_bindings_of_annotated_type_with_inject_annotation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_gets_bindings_of_inject_annotation_with_new_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_gets_bindings_of_new_type_with_inject_annotation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_gets_bindings_with_inject_annotation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_gets_bindings_with_inject_decorator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_gets_multiple_bindings_with_inject_annotation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_gets_multiple_bindings_with_inject_decorator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_gets_no_bindings_for_multiple_noinject_annotations",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_gets_no_bindings_for_noinject_annotation_only",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_gets_no_bindings_without_injection",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_implicit_injection_fails_when_annotations_are_missing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_implicit_injection_for_python3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_inject_and_provide_coexist_happily",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_inject_annotation_with_annotated_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_inject_annotation_with_nested_annotated_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_inject_decorated_singleton_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_inject_decorator_does_not_break_manual_construction_of_pyqt_objects",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_inject_direct",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_inject_named_interface",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_inject_singleton",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_inject_with_missing_dependency",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_injecting_an_auto_bound_decorated_singleton_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_injecting_interface_implementation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_injecting_into_method_of_object_that_is_falseish_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_injecting_undecorated_class_with_missing_dependencies_raises_the_right_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_injection_works_in_presence_of_return_value_annotation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_instantiate_injected_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_method_decorator_is_wrapped",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_module_class_gets_instantiated",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_module_provider",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_module_provider_keeps_annotated_types_and_new_types_separate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_module_provider_with_annotated",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_more_useful_exception_is_raised_when_parameters_type_is_any",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_multibind",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_multibind_dict_of_plugins",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_multibind_dict_scopes_apply_to_the_bound_items",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_multibind_dict_scopes_apply_to_the_bound_items_in_the_multibound_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_multibind_dict_types_use_their_own_bound_providers_and_scopes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_multibind_list_of_plugins",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_multibind_list_scopes_apply_to_the_bound_items",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_multibind_list_scopes_apply_to_the_bound_items_in_the_multibound_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_multibind_list_scopes_apply_to_the_bound_items_not_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_multibind_scopes_does_not_apply_to_the_type_globally",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_multibind_types_are_not_affected_by_the_bound_type_provider",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_multibind_types_are_not_affected_by_the_bound_type_scope",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_multibinding_to_non_generic_type_raises_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_newtype_integration_with_annotated",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_newtype_integration_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_newtype_with_injection_annotation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_noinject_annotation_with_annotated_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_only_gets_bindings_without_noinject_annotation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_only_gets_injectable_bindings_without_noninjectable_decorator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_optionals_are_ignored_for_now",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_provider_and_scope_decorator_collaboration",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_providerof",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_providerof_cannot_be_bound",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_providerof_is_safe_to_use_with_multiple_injectors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_providers_arent_called_for_dependencies_that_are_already_provided",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_raises_when_noninjectable_arguments_defined_with_invalid_arguments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_regular_bind_and_provider_dont_work_with_multibind",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_scopes_are_only_bound_to_root_injector",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_special_interfaces_work_with_auto_bind_disabled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_that_injection_is_lazy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_things_dont_break_in_presence_of_args_or_kwargs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_threadlocal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_transitive_injection",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_transitive_injection_with_missing_dependency",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "injector_test.py::test_using_an_assisted_builder_with_a_provider_raises_an_injector_error",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "pytest-cov",
+      "module": "pytest_cov.plugin",
+      "module_sha256": "7cc8a14b8cc8effa886c40fdfa058459d89686d62c53fea6721750e722a60f40",
+      "version": "7.1.0"
+    }
+  ],
+  "project": "injector",
+  "python": "3.12.15",
+  "schema": 1
+}

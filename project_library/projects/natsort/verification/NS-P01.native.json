@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "NS-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "one_frozen_index_permutation_preserves_parallel_record_alignment": true
+  },
+  "resource_profile": "business"
+}

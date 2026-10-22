@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PT-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "overlapping_interval_assignment_replaces_values_on_the_overlap": true
+  },
+  "resource_profile": "business"
+}

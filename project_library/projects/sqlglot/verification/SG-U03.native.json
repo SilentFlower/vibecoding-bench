@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SG-U03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "duplicate_output_aliases_collapse_in_name_keyed_lineage": true
+  },
+  "resource_profile": "business"
+}

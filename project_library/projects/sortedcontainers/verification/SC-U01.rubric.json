@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SC-U01",
+  "source_commit": "3ac358631f58c1347f1d6d2d92784117db0f38ed",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "SortedList returns1,2,3,3 while SortedSet returns1,2,3. Choose ordered multiplicity or set uniqueness according to the order contract;sorting alone does not authorize dropping repeated product lines.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

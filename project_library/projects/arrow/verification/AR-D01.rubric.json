@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AR-D01",
+  "source_commit": "2224255c4acc594d734cef0bbc83360452a67983",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use only actually delivered evidence. Request missing call/timezone/offset and output controls before choosing a cause. After a complete consumed reproduction,explain the actual ambiguous wall clock and the two occurrence/UTC controls using the pinned API;do not infer which occurrence a real offset-free input denotes. Ask for event offset/occurrence or an explicit business policy. Unavailable evidence supports insufficient_information;no library patch is authorized.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

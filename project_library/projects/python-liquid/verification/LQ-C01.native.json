@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "LQ-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "html_autoescaping_must_be_explicitly_selected_for_plain_context_values": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,1 @@
+Parse local BytesIO containing <rss version="2.0"><channel><title>News</title><item><title>One</title><description>A & B</description></item></channel></rss>,and separately an empty BytesIO. Inspect bozo,exception and recovered entries. Explain what syntax recovery and empty success do and do not establish for business acceptance. No edits.

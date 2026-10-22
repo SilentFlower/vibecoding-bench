@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WR-U02",
+  "source_commit": "6b4e844950213118b19e613248d2bc9469eb731e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Normal name assignment reaches the wrapped object;_self_ prefixed state belongs to the proxy and is absent from the wrapped object. __wrapped__ is the original object. Numeric ObjectProxy passes isinstance(...,int) but its concrete type is a proxy,so identity,type and delegated behavior are distinct. Choose explicit introspection and state ownership;do not treat a proxy as a deep copy.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

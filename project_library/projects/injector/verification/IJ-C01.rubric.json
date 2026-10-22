@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IJ-C01",
+  "source_commit": "5daed12510fafc0bf73b6ef18d2884f78cd5e210",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Permissive auto binding constructs str as an empty string and therefore a Service without meaningful configured data. With Service explicitly bound and auto_bindFalse,the missing str raises UnsatisfiedRequirement;binding it explicitly to configured restores construction. Choose explicit configuration objects/values and business validation;do not mistake successful construction or a type annotation for validated configuration.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

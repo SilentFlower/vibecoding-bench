@@ -1,0 +1,92 @@
+{
+  "status": "passed",
+  "all_success_and_failed_runs_cleaned": 17,
+  "items": [
+    {
+      "bundle": "mock-batch-001",
+      "deployment": "mock-formal-2d598f33edba",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-002",
+      "deployment": "mock-formal-57e1ea1bc42e",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-003",
+      "deployment": "mock-formal-cf04e59e911d",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-004",
+      "deployment": "mock-formal-1c5307488a15",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-005",
+      "deployment": "mock-formal-006094231d63",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-006",
+      "deployment": "mock-formal-f80a608a8a19",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-007",
+      "deployment": "mock-formal-8ee6d2b94b3a",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-008",
+      "deployment": "mock-formal-128df69e5d0e",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-008-retry-002",
+      "deployment": "mock-formal-2ba63450c09d",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-008-retry-003",
+      "deployment": "mock-formal-657a8ae957a0",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-009",
+      "deployment": "mock-formal-6202b06e2203",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-010",
+      "deployment": "mock-formal-2ea61f5c37b9",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-011",
+      "deployment": "mock-formal-6c8489af819c",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-012",
+      "deployment": "mock-formal-795c8fc692d0",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-013",
+      "deployment": "mock-formal-5e8b40d7d56d",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-013-retry-002",
+      "deployment": "mock-formal-6bacf309127e",
+      "status": "cleaned_confirmed"
+    },
+    {
+      "bundle": "mock-batch-014-final-three",
+      "deployment": "mock-formal-f1d22590c776",
+      "status": "cleaned_confirmed"
+    }
+  ],
+  "scope": "只核本阶段随机部署及其原生验证身份，不操作其他容器／网络"
+}

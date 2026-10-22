@@ -1,0 +1,1 @@
+A synthetic Calendar holds one VEVENT with UID=recurrence-local-001,UTC DTSTART2026-01-01 09:00,RRULE FREQ=DAILY;COUNT=3 and fixed DTSTAMP. Compare walk("VEVENT") count with the rule count. Plan occurrence display/import,windowing,exception identity and validation. No implementation or real calendar access.

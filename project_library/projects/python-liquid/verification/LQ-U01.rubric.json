@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "LQ-U01",
+  "source_commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Liquid treats0,empty string and empty list as truthy;False and None are falsey. Results are yes,yes,yes,no,no. Write an explicit emptiness/value predicate when business logic needs one;do not translate Python if behavior mechanically or treat zero inventory as missing.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

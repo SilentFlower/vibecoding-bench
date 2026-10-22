@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CN-C02",
+  "source_commit": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Current output uses errors=replace,so ASCII output is Caf? ? ?,not silently ignored characters or lossless text. The original decoded string remains Café — €,and strict ASCII encoding raises UnicodeEncodeError. Select and document whether destination loss is acceptable or must fail;do not rely on the stale ignored wording or call a normalized replacement lossless. Existing strict encoding is an available alternative.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

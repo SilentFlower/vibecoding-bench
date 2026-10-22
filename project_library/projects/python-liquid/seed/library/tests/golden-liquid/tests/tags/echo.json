@@ -1,0 +1,199 @@
+{
+  "tests": [
+    {
+      "name": "render a string literal",
+      "template": "{% echo 'hello' %}",
+      "result": "hello",
+      "tags": [
+        "echo tag"
+      ]
+    },
+    {
+      "name": "render an integer literal",
+      "template": "{% echo 123 %}",
+      "result": "123",
+      "tags": [
+        "echo tag"
+      ]
+    },
+    {
+      "name": "render a float literal",
+      "template": "{% echo 1.23 %}",
+      "result": "1.23",
+      "tags": [
+        "echo tag"
+      ]
+    },
+    {
+      "name": "render a variable from the global namespace",
+      "template": "{% echo product.title %}",
+      "data": {
+        "product": {
+          "title": "foo"
+        }
+      },
+      "result": "foo",
+      "tags": [
+        "echo tag"
+      ]
+    },
+    {
+      "name": "render a variable from the local namespace",
+      "template": "{% assign name = 'Brian' %}{% echo name %}",
+      "result": "Brian",
+      "tags": [
+        "assign tag",
+        "echo tag"
+      ]
+    },
+    {
+      "name": "render an undefined variable",
+      "template": "{% echo age %}",
+      "result": "",
+      "tags": [
+        "echo tag"
+      ]
+    },
+    {
+      "name": "render an undefined property",
+      "template": "{% echo product.age %}",
+      "data": {
+        "product": {
+          "title": "foo"
+        }
+      },
+      "result": "",
+      "tags": [
+        "echo tag"
+      ]
+    },
+    {
+      "name": "access an array item by index",
+      "template": "{% echo product.tags[1] %}",
+      "data": {
+        "product": {
+          "tags": [
+            "sports",
+            "garden"
+          ]
+        }
+      },
+      "result": "garden",
+      "tags": [
+        "echo tag"
+      ]
+    },
+    {
+      "name": "access an array item by negative index",
+      "template": "{% echo product.tags[-2] %}",
+      "data": {
+        "product": {
+          "tags": [
+            "sports",
+            "garden"
+          ]
+        }
+      },
+      "result": "sports",
+      "tags": [
+        "echo tag"
+      ]
+    },
+    {
+      "name": "access array item by index stored in a local variable",
+      "template": "{% assign i = 1 %}{% echo product.tags[i] %}",
+      "data": {
+        "product": {
+          "tags": [
+            "sports",
+            "garden"
+          ]
+        }
+      },
+      "result": "garden",
+      "tags": [
+        "assign tag",
+        "echo tag"
+      ]
+    },
+    {
+      "name": "render a global identifier with a filter",
+      "template": "{% echo product.title | upcase %}",
+      "data": {
+        "product": {
+          "title": "foo"
+        }
+      },
+      "result": "FOO",
+      "tags": [
+        "echo tag",
+        "upcase filter"
+      ]
+    },
+    {
+      "name": "dump an array from the global context",
+      "template": "{% echo product.tags %}",
+      "data": {
+        "product": {
+          "tags": [
+            "sports",
+            "garden"
+          ]
+        }
+      },
+      "result": "sportsgarden",
+      "tags": [
+        "echo tag"
+      ]
+    },
+    {
+      "name": "assign a variable the value of an existing variable",
+      "template": "{% capture some %}hello{% endcapture %}{% assign other = some %}{% assign some = 'foo' %}{% echo some %}-{% echo other %}",
+      "result": "foo-hello",
+      "tags": [
+        "assign tag",
+        "capture tag",
+        "echo tag"
+      ]
+    },
+    {
+      "name": "traverse variables with bracketed identifiers",
+      "template": "{% echo site.data.menu[include.menu][include.locale] %}",
+      "data": {
+        "site": {
+          "data": {
+            "menu": {
+              "foo": {
+                "bar": "it works!"
+              }
+            }
+          }
+        },
+        "include": {
+          "menu": "foo",
+          "locale": "bar"
+        }
+      },
+      "result": "it works!",
+      "tags": [
+        "echo tag"
+      ]
+    },
+    {
+      "name": "access an undefined variable by index",
+      "template": "{% echo nosuchthing[0] %}",
+      "result": "",
+      "tags": [
+        "echo tag"
+      ]
+    },
+    {
+      "name": "nothing to echo",
+      "template": "{% echo %}",
+      "result": "",
+      "tags": [
+        "echo tag"
+      ]
+    }
+  ]
+}

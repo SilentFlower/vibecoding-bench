@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "NS-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "signed_numeric_parsing_changes_the_identifier_order": true
+  },
+  "resource_profile": "business"
+}

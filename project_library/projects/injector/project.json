@@ -1,0 +1,236 @@
+{
+  "schema": 2,
+  "project_key": "injector",
+  "title": "Injector对象装配工作场景",
+  "category": "配置、对象生命周期与聚合",
+  "description": "容器归属、构造注入、有效配置、插件聚合、异步请求和更新诊断六项任务。",
+  "seed_digest": "017fc90fb9b0367e8ad811410b45e33fcff674e69f4ed23224b384d243235912",
+  "environment": "injector-py312",
+  "source": {
+    "repository": "https://github.com/python-injector/injector",
+    "commit": "5daed12510fafc0bf73b6ef18d2884f78cd5e210",
+    "license_files": [
+      "seed/library/COPYING"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "IJ-S01",
+      "title": "对象装配与生命周期",
+      "goal": "核调用边界和容器归属",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IJ-U01",
+            "IJ-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IJ-U01",
+          "kind": "understand",
+          "goal": "明确普通对象与单例的容器归属",
+          "prompt": "Explain the complete lifetime controls with actual identities and configuration names. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/services.md",
+            "materials/lifetime.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IJ-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/IJ-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "IJ-U02",
+          "kind": "understand",
+          "goal": "解释构造器注入的实际调用边界",
+          "prompt": "Explain all complete direct and Injector construction controls,including argument precedence. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/services.md",
+            "materials/constructor.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IJ-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/IJ-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "IJ-S02",
+      "title": "配置与插件绑定",
+      "goal": "显式选择有效值和聚合策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IJ-C01",
+            "IJ-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IJ-C01",
+          "kind": "consult",
+          "goal": "区分自动构造与有效业务配置",
+          "prompt": "Advise explicit configuration binding from the complete permissive/strict controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/services.md",
+            "materials/config-binding.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IJ-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/IJ-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "IJ-C02",
+          "kind": "consult",
+          "goal": "选择插件与配置聚合的覆盖和归属",
+          "prompt": "Advise actual multibinding aggregation,duplicate-key and object ownership behavior from every supplied control. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/services.md",
+            "materials/aggregation.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IJ-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/IJ-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "IJ-S03",
+      "title": "异步请求归属",
+      "goal": "独立定义逻辑请求对象生命周期",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IJ-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IJ-P01",
+          "kind": "plan",
+          "goal": "规划异步请求的对象隔离边界",
+          "prompt": "Plan request-owned dependency lifetime and cleanup using the real coroutine/thread identity controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/request-scope-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IJ-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/IJ-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "IJ-S04",
+      "title": "配置更新诊断",
+      "goal": "先核完整作用域和身份",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IJ-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "IJ-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IJ-D01",
+          "kind": "diagnose",
+          "goal": "先核装配与身份再解释配置未生效",
+          "prompt": "Some resolved services keep old configuration after a rebinding. Request complete bindings,scope declarations,resolution/rebinding order,object identities and values before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IJ-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-rebinding-reproduction",
+              "when": "The complete bindings,scope declarations,resolution/rebinding sequence and identity/value controls have not been supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/rebinding.md",
+                "disclosure/services.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

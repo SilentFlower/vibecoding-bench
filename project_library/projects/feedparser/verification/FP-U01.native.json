@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FP-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "bozo_status_and_recovered_entries_require_separate_acceptance": true
+  },
+  "resource_profile": "business"
+}

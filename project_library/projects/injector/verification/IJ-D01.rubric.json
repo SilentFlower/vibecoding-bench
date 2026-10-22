@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IJ-D01",
+  "source_commit": "5daed12510fafc0bf73b6ef18d2884f78cd5e210",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use only actually delivered setup and identity evidence. Request missing sequence/scope controls before choosing a cause. Once complete evidence is consumed,trace actual binding resolution and existing-object scope lifetime,contrast current dependency/new-object controls,and advise application-owned initialization or recreation without inventing automatic invalidation. Unavailable evidence supports insufficient_information;no library repair is authorized.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

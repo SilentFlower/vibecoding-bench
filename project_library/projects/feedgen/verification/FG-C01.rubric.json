@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FG-C01",
+  "source_commit": "97260abb1793eb164c458c10b493690beb413f6d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both naive datetime and offset-free string raise ValueError Datetime object has no timezone info. The aware string preserves09:00+02:00 and RSS emits Thu,22 Oct2026 09:00:00 +0200. Obtain source timezone meaning explicitly rather than guess the host zone;this API validates awareness instead of inferring it.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

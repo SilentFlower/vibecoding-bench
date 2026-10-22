@@ -1,0 +1,61 @@
+# 第三阶段可信原生入口合同
+
+本阶段只增加固定三十仓的必要套件及实际候选绑定，之前七十仓源码、环境及私有脚本保持。沿已提交可信runner的离线隔离、完整逐节点合同、真实subtest／doctest及原始skip口径；不能按历史数量直接放行。未实际校准的条目保持未完成。
+
+## 起始四仓
+
+- PyPika：完整pypika/tests，包内测试从固定原版恢复；真实subtest另列，不把JUnit聚合数当主项。setup.py及真实__version__固定PyPika 0.51.1，仅在私有venv绑定分发元数据，候选来自真实根包。
+- Arrow：保留tox.ini原99%分支覆盖率和完整tests，加载实际pytest-cov／pytest-mock；只把报告与coverage数据重定向到私有可写路径，不降低门槛或改测试。
+- Charset Normalizer：src布局，读取pyproject固定normalizer=charset_normalizer.cli:cli_detect并排他创建真实源码入口。原生包含大样本及真实subtest，pytest9.0.3按原约束冻结；默认纯Python，不把未启用的Cython矩阵计为通过。大样本回归资源先沿历史2GiB/当前上限内实际重测，业务单列。
+- Injector：完整默认pytest.ini的模块／README doctest及90%分支覆盖率，加载真实pytest-cov。setup.py为legacy，不猜不存在的project元数据表；分发版本来自实际0.24.0常量。
+
+## 制作与证据
+
+运输、校准及对账辅助脚本保留已提交前批实现的快照来源与SHA，按本阶段固定清单配置；这是可复跑实验配方的版本封存，不更新前批原件。逐仓业务代码、问答材料与验收必须按实际类和签名重新编写，不能复制通用业务任务凑数。
+
+全部绑定规划保持，新增事实写本阶段逐仓任务表与准入原件；全部三十仓完整原生、独立业务、真实产品链、页面/API/SQLite及Git/Docker交付通过后才记录本阶段实施完成。
+
+## 第二组原生事实
+
+- Markdownify按真实pyproject绑定1.2.3元数据与markdownify.main:main，完整默认83项通过。
+- Pyparsing沿tox完整tests与examples/tiny/tests，matplotlib及diagrams依赖完整保留，真实2089子项单列。首次512MiB在21%时OOM，原件保留；768MiB回归重测2175主项与2089子项通过，127.369064秒，业务仍256MiB。docs/CONTRIBUTING.md仅按已核Git链接blob目标文本封存，原CONTRIBUTING.md完整保留。
+- Loguru默认原tests包含mypy YAML与原覆盖率，768MiB／600秒回归。首次PID64在原test_complete_from_multiple_child_processes同时创建100进程时第60次启动失败，已有59个等待同一barrier；并非类型用例本身都损坏。失败终端、XML与逐阶段报告已落盘，精确核容器归属后中止不可能完成的barrier，由原配方清理留证。后续仅本仓回归PID128（沿上游测试实际需要），业务仍PID64，不增加账号配额或删100进程控制。另一个真实轮转时钟用例失败单独保留，重跑完整集合查实际结果，不以放宽断言处理。
+- Pyrsistent完整保留MIT和内嵌_toolz.py的BSD归属；三个链接仅保留目标文本。C扩展pvectorc在本次/work从实际候选pvectorcmodule.c强制构建；setup.py/setup.cfg与原测试来自固定baseline，额外允许叠加的C／版本文件须为固定原路径，拒缺失／链接／越界和pytest控制注入。真实扩展路径／SHA与默认pvector绑定在原生进程核实。最终主集合为637通过／1原skip；完整80项包doctest另在独立进程实际通过，不能混跑触发上游reload递归，也不把未跑部分当通过。新增两项定向测试与旧适配当时共41项通过；旧七十仓私有runner不改。
+
+## 后续原生边界与实际证据
+
+- Python-Constraint从本次实际候选五个Python实现通过原cythonize_build.py构建五个Cython扩展，完整原测试52项通过。可信配置和原测试不从候选覆盖；五个实际扩展后缀、路径和SHA都核验。只读业务显式使用Python实现，完整Cython入口独立保留。
+- WTForms完整537项与34个已核PO对应MO；Humanize完整856项及36个翻译MO、实际SCM版本模块。Humanize翻译更新原测试需要真实gettext三程序及对应Debian12库；保留官方包、许可和完整对应源码，不替换目标镜像。共享库只接受各自固定清单及同目录普通文件，逐SHA拒绝链接、越界和混目录。
+- Bidict完整1236项包含8个doctest；原文档需要实际pyproject的Author-email，不能省略成空白分发元数据。三个文档链接仅在私有测试树复制原目标内容。Tablib、Natsort、Icalendar的真实SCM版本生成物分别保留，明确不是Git文件或本轮重新生成声明。
+- HTML5lib完整30618主项（23563通过、6038 skip、1017 xfail）；固定html5lib-tests子模块86文件全部导出。Liquid完整3598主项（3526通过、72 skip）及165真实子项，golden-liquid固定子模块121文件全部导出。完整集合、原始skip和子项各自记账。
+- Transitions完整3214主项（2923通过、291原条件skip）。Python-Statemachine完整3125主项（2973通过、26 skip、126 xfail），49个DoctestItem已含，其中原发布文档2.0.0.md主动跳过旧构造参数示例；只按这一精确原身份允许跳过，不改其原文本。补齐原文档Mermaid依赖后才校准最终合同。
+- Graphviz只读制品来自已留证Debian12依赖镜像；保留工具、插件、共享库、各包版权以及15个对应源码包的完整发布原件与Debian补丁。pydot会清除GVBINDIR，固定启动器恢复插件定位；原二进制保留原名dot，避免argv[0]被解释为不同布局引擎，不擅自强加-K参数。来源原件归入逐成员SHA核对的tar以满足现有每环境256制品上限，未提高平台限制。原失败、原件SHA及最终成功轮次分别保留。
+- Wrapt从实际候选src/wrapt/_wrappers.c强制构建C扩展，核默认BaseObjectProxy实际绑定扩展ObjectProxy，完整1418主项为1412通过／6 skip，43真实子项另列；独立Python模式为1410通过／8 skip及同43子项。mypy沿实际安装wheel的原console-script，不创建冲突启动器。
+- Pendulum只读内容保留同固定源码历史实际构建的Rust原件，明确rebuilt_in_current_run=false；本轮不声称已记录历史编译器或重构建Rust。当前镜像完整Rust入口1874主项（1871通过、3 skip），实际helpers/parser绑定该扩展；独立PENDULUM_EXTENSIONS=0同完整1874项通过并单独核Python函数所属模块。固定库overlay=false，不能以修改源文件而复用未重构建扩展。Cargo.lock锁定的14个crate逐校验和保留完整源码及30份随附许可。
+- Pendulum两条时区fixture需要is_symlink及目标名语义；正式快照仍为原Git链接blob文本，仅在独占私有测试树内、核真实目标普通文件及SHA后恢复原相对链接。拒绝任何外部目标、链接父目录或变化文本；不创建候选或正式快照链接。
+
+截至已实现范围，29仓完整主原生执行为84320项：76033通过、6537原skip、1750原xfail；2403真实子项另列。Pyrsistent80 doctest、Natsort15 doctest、Wrapt1418项Python模式和Pendulum1874项Python模式另列，不重复冒充独立任务。业务与工程正反／公开控制共158条实际路径。最终以逐仓原件及汇总脚本重算为准。
+
+## SQLGlot公开主仓范围与历史阻塞
+
+此前因固定私有子模块不可取得而记录source-unavailable，原始404、git退出128及未准入收据保持。用户随后确认保留SQLGlot完整公开主仓，把可选私有集成测试明确列为未验证，继续完成百项目；批准依据及原生loader、Makefile原字节见sqlglot-public-source-scope.json。原三十仓和一百仓固定集合不替换。
+
+公开主仓固定67961afbed7c986dfe26ab82db89a25814c1bdcb的361个Git blob完整导出；CLAUDE.md按原Git链接文本封存，实际目标保留。保留MIT与jsonpath夹具BSD许可。私有gitlink sqlglot-integration-tests@8cbf013a7b0bd1871abce4ebb543560d0e554799只记录身份，不伪造其内容、许可或测试通过；原loader和tests不修改，不设置SKIP_INTEGRATION。其他子模块仍按既有完整导出规则。
+
+可信runner沿原默认unittest发现及模块doctest，逐主项与真实subTest冻结；实际候选导入和完整原版控制保持。仅将未指定的ProcessPoolExecutor默认并发设为2，显式参数不变，退出恢复构造器。原生完整集合与资源重新实测，历史1500项不直接作为本轮通过证据。版本模块保留固定源码历史SCM生成原件，明确不是Git文件或本轮重建。
+
+### SQLGlot当前镜像实测与大集合运输
+
+最终原版校准attempt-005完整1500主项及21780子项全部通过，0 skip／xfail／失败，118.150427秒；内存3072MiB、360秒、PID128，未OOM且容器已删除。reference-full-regression在业务attempt-002和最终attempt-003分别实际通过，同一冻结主集合与完整子集合均匹配；后者113.010098秒。公开TPC-H／TPC-DS沿原入口执行，缺失的可选私有测试没有被计入通过；SQLGlotC／其他平台矩阵不在本次已验证范围。
+
+原始子项合同超过现有4MiB JSON上限，真实产品日志还有2MiB上限。保持这些上限，SQLGlot显式使用私有sqlglot-subtests-v1表示：冻结完整主节点以及全部子项数量与SHA；不采样、不折叠重复项。原生观察全部记录仍先经既有身份／阶段／上下文校验，每个真实结果都必须为合法通过、原skip或xfail，随后完整摘要必须一致。旧套件继续使用原有逐条列表，旧七十仓及已冻结前29仓的私有runner不更新。
+
+已核原测试遍历无序DATE_UNITS集合，另有唯一PointClass默认repr携带进程地址。规范化只移除观察顺序ordinal，按完整父节点／上下文／阶段／结果排序保留多重集，并且仅在tests.test_expressions.TestExprs.test_convert的完整PointClass默认repr匹配时替换地址。不得改写SQL中的十六进制字面、其他msg或kwargs；丢项、重复次数变化、父项变化、失败或真实上下文变化仍改变合同。原生两次无修改运行的完整记录差异与对照见sqlglot-subtest-order-analysis.json。
+
+最终主合同212244字节，全部21780条原始观察另保存在私有native-subtests-attempt-005.json.gz，压缩306247字节、展开4676624字节，原顺序与地址都保留，SHA及全量摘要核对见sqlglot-subtest-contract-attempt-005.json。运行输出仅返回有界元数据，完整逐条原件写入独立证据；原件拒绝覆盖。此前完整子列表写stdout导致产品日志轮转、准备标记丢失的失败另存sqlglot-native-stdout-analysis.json，不能称为业务断言失败，也不扩大平台传输上限。
+
+最初256MiB业务配置的独立校准曾通过，但第一轮产品链有四个实际OOM事件，证据见sqlglot-mock-business-oom-analysis.json；未取得可用的运行内存峰值，不据此虚构精确根因或峰值。最终仅SQLGlot业务配置在既有允许范围内设为512MiB／30秒／PID64，全部12条业务、原版／参考／错误候选／六项公开测试及完整参考回归在attempt-003重跑并满足独立期望。原准入、配方、失败产品链和当时256MiB配置完整保留；平台全局上限、其他项目、账号预算和回归资源不变。最终产品链使用新冻结批次另行验收，原失败批次不冒充通过。
+
+全三十仓主原生执行现为85820项：77533通过、6537原skip、1750原xfail，失败、error、新XPASS和未执行均为0；24183真实子项另列。额外原版doctest及双模式沿前述独立口径保留。全批独立业务／工程路径170条，其中SQLGlot新增12条；全量固定公开Git对象8005个。来源、离线制品、逐项原件与摘要已由audit_full_evidence.py重新复核，最终产品链／页面及Git／Docker交付仍由各自真实收据证明。
+
+第三阶段的独立产品链审计器从第二阶段已提交原件封存，只扩展子项合同读取：旧列表继续逐条相等；SQLGlot须校验完整压缩原件、原始观察SHA、每个父节点与出现次数、冻结控制器SHA、全量规范化摘要、产品实际数量及匹配证明。全部原有主节点、XML、角色、用量、材料消费、接受代码和清理检查保持。首次旧格式审计失败原件留存；新适配的六项测试覆盖真实产品结果、原件／摘要／数量／控制器篡改和链接拒绝。冻结控制器从已核字节直接加载，不读取或写入pyc缓存，测试核整个私有输入文件全集及字节不变；配方来源及SHA见mock-audit-recipe-provenance.json。

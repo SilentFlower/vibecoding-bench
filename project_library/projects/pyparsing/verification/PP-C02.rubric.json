@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PP-C02",
+  "source_commit": "810199f89bf916590426e1c5cb3d612584f11a2f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "set_parse_action replaces the earlier integer conversion,so its copied rule repeats the original string5 and yields string55. add_parse_action retains int conversion first and yields integer10. The original independent rule still yields integer5. Copy before specializing a reusable rule and deliberately choose replacement versus composition;these copies do not promise deep cloning of arbitrary external closure state.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

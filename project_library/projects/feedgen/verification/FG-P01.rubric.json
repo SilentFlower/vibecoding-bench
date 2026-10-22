@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FG-P01",
+  "source_commit": "97260abb1793eb164c458c10b493690beb413f6d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With all supplied feed/entry dates,contents,order and options explicit,both actual Atom and RSS byte pairs match. feed.updated also sets RSS lastBuildDate,while entry published controls pubDate. Constructors otherwise use current time. Pin those inputs and source/dependencies/export policy,retain source time provenance and compare artifacts;do not overwrite historical publication dates or claim a new clock API.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

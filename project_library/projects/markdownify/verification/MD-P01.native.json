@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MD-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "cli_defaults_and_print_newline_require_an_explicit_export_profile": true
+  },
+  "resource_profile": "business"
+}

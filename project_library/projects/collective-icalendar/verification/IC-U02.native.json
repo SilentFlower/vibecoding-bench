@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "IC-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "calendar_text_escaping_roundtrips_the_actual_unicode_and_delimiters": true
+  },
+  "resource_profile": "business"
+}

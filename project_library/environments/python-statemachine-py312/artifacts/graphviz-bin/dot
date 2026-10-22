@@ -1,0 +1,5 @@
+#!/bin/sh
+# 为清理环境的调用方恢复固定插件定位。
+GVBINDIR=/offline/artifacts/graphviz-libs
+export GVBINDIR
+exec /offline/artifacts/graphviz-bin/original/dot "$@"

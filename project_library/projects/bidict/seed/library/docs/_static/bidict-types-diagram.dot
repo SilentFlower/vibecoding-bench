@@ -1,0 +1,47 @@
+// Copyright 2009-2026 Joshua Bronson. All rights reserved.
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+// See build-bidict-types-diagram for how to generate a PNG from this file.
+
+digraph G {
+  dpi=300
+  node [fontsize="12", shape="box"]
+
+  subgraph bidicts {
+    node [fontname="Operator Mono SSm Lig Book"]
+
+    bidict [label="bidict.bidict"]
+    frozenbidict [label="bidict.frozenbidict"]
+    OrderedBidict [label="bidict.OrderedBidict"]
+
+    { rank=same bidict frozenbidict OrderedBidict }
+  }
+
+  subgraph ABCs {
+    node [fillcolor="#EFEFEF", color="#666666", fontcolor="#333333", style="filled,rounded", fontname="Operator Mono SSm Lig Book Italic", fontsize="10"]
+    Mapping [label="collections.abc.Mapping"]
+    MutableMapping [label="collections.abc.MutableMapping"]
+    Hashable [label="collections.abc.Hashable"]
+
+    MutableMapping -> Mapping
+
+    { rank=same Mapping MutableMapping Hashable }
+
+    BidirectionalMapping [label="bidict.BidirectionalMapping"]
+    MutableBidirectionalMapping [label="bidict.MutableBidirectionalMapping"]
+
+    { rank=same BidirectionalMapping MutableBidirectionalMapping }
+
+    BidirectionalMapping -> Mapping
+    MutableBidirectionalMapping -> BidirectionalMapping
+    MutableBidirectionalMapping -> MutableMapping
+  }
+
+  bidict -> { MutableBidirectionalMapping }
+  OrderedBidict -> { MutableBidirectionalMapping }
+  frozenbidict -> { BidirectionalMapping, Hashable }
+}

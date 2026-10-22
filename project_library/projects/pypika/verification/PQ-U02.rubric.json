@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PQ-U02",
+  "source_commit": "465fb9ae12f7727d28785d087b64e6226da5714e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The pinned equality emits =null,which selects no rows under SQL NULL semantics. isnull emits IS NULL and returns1,3,4. Do not say Python None comparison is automatically rewritten or call this empty result proof of missing rows. Use the actual table and native API.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

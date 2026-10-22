@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SC-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "ordered_views_are_live_and_rank_deletion_changes_the_mapping": true
+  },
+  "resource_profile": "business"
+}

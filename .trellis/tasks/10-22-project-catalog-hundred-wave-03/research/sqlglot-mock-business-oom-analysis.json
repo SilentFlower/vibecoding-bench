@@ -1,0 +1,66 @@
+{
+  "scope": "第一轮产品链真实256MiB容器OOM，原生业务独立轮次曾通过；保留差异，不能算产品链通过",
+  "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-015-sqlglot",
+  "verifier_identity": "186b8b63836d5b4e2d74cc2860f5f6b559201a2d1ff5672000360ec5499b87b9",
+  "events": [
+    {
+      "time": 1792651086,
+      "action": "oom",
+      "container": "9473fb34741d4210594dde2827f0e7a303a4741cf483aea99d41ad64794528f9",
+      "name": "bench-project-native-40b26484fefd",
+      "exit_code": null
+    },
+    {
+      "time": 1792651086,
+      "action": "die",
+      "container": "9473fb34741d4210594dde2827f0e7a303a4741cf483aea99d41ad64794528f9",
+      "name": "bench-project-native-40b26484fefd",
+      "exit_code": "247"
+    },
+    {
+      "time": 1792651120,
+      "action": "oom",
+      "container": "0ea85707aad1000500bab07b9c753bfd55db9c7acf338fef892a7bea2ff8f933",
+      "name": "bench-project-native-141ef273849f",
+      "exit_code": null
+    },
+    {
+      "time": 1792651120,
+      "action": "die",
+      "container": "0ea85707aad1000500bab07b9c753bfd55db9c7acf338fef892a7bea2ff8f933",
+      "name": "bench-project-native-141ef273849f",
+      "exit_code": "247"
+    },
+    {
+      "time": 1792651151,
+      "action": "oom",
+      "container": "5f89736f38d874525a1dd9f87f9873d0018d4ff7fcc27a3b440e4c746a2d266d",
+      "name": "bench-project-native-e5f025ee6c0b",
+      "exit_code": null
+    },
+    {
+      "time": 1792651151,
+      "action": "die",
+      "container": "5f89736f38d874525a1dd9f87f9873d0018d4ff7fcc27a3b440e4c746a2d266d",
+      "name": "bench-project-native-e5f025ee6c0b",
+      "exit_code": "247"
+    },
+    {
+      "time": 1792651183,
+      "action": "oom",
+      "container": "764a53a9fd5ac39e2a82ec93cd5ee52f63beb2248cc5f5b86aacfca5b90acc29",
+      "name": "bench-project-native-5de61e679fe9",
+      "exit_code": null
+    },
+    {
+      "time": 1792651183,
+      "action": "die",
+      "container": "764a53a9fd5ac39e2a82ec93cd5ee52f63beb2248cc5f5b86aacfca5b90acc29",
+      "name": "bench-project-native-5de61e679fe9",
+      "exit_code": "247"
+    }
+  ],
+  "running_samples": [],
+  "global_limits_changed": false,
+  "account_quota_changed": false
+}

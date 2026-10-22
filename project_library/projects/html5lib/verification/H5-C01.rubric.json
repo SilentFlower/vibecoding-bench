@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "H5-C01",
+  "source_commit": "fd4f032bc090d44fb11a84b352dad7cbee0a4745",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default parsing/serialization retains the script and onclick attribute;sanitize defaults False. Tree recovery and serialization therefore do not establish safe rendering. Choose a maintained,explicit allowlist and URL/attribute policy with consumer-specific tests and defense in depth. The supplied control only observes strings,does not execute browser code,and does not justify universal sanitization claims or modifying this package.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

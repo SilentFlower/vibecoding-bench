@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PC-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "finite_schedule_solutions_are_sets_without_a_ranking_contract": true
+  },
+  "resource_profile": "business"
+}

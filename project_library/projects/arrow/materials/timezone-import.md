@@ -1,0 +1,1 @@
+Start with Arrow(2026,10,22,12) in UTC. Compare .to("+02:00") and .replace(tzinfo="+02:00") by wall-clock ISO value and timestamp. The import form must state whether the incoming clock already denotes a UTC instant or is a local clock needing annotation. Explain both existing operations and preserve the original;no files or real event data are changed.

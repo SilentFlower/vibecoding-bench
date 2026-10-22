@@ -1,0 +1,132 @@
+{
+  "project": "webcolors",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+  "source_file_count": 39,
+  "license_files": [
+    "seed/library/LICENSE"
+  ],
+  "scenarios": 4,
+  "unique_tasks": 6,
+  "modify_tasks": 0,
+  "non_modify_tasks": 6,
+  "native_baseline": {
+    "project": "webcolors",
+    "attempt": 1,
+    "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/webcolors/result.json",
+    "result_sha256": "374fd7edce0fb5d2058a95612d5acfdbe6482d03b344bceca07a851be4aa1a24",
+    "main_collected": 475,
+    "counts": {
+      "passed": 475,
+      "failed": 0,
+      "error": 0,
+      "skipped": 0,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "subtest_count": 0,
+    "collection_skip_count": 0,
+    "xml_testcases": 475,
+    "xml_skipped": 0,
+    "runner_sha256": "3e719ee08e402118d8612c1beecc0bbc705d3b90ff230eaaef6cc9ab10a847e3",
+    "contract_sha256": "0007a03933b74c138e8b8a9a4119734a9fd1c5e7c82e684f07d4b5ebcc2ea536",
+    "business": {
+      "timeout_sec": 30,
+      "memory_mb": 256,
+      "pids_limit": 64
+    },
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+  },
+  "verified_unique_native_cases": 5,
+  "native_evidence": [
+    {
+      "case": "original-WC-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/webcolors/attempt-001/original-WC-C01.json",
+      "sha256": "7b347208c67af90c50adc3311afb8920bf123e47d51b0ac5572d5ba42f0e33aa",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-WC-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/webcolors/attempt-001/original-WC-C02.json",
+      "sha256": "1994023059756a98a2894ef011f13cc8443d6ccdb84da254a303fd74fafc2008",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-WC-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/webcolors/attempt-001/original-WC-P01.json",
+      "sha256": "109592435f5332c29d683aa3d6afd6a70bf967de5de10138f41a6d792fea8114",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-WC-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/webcolors/attempt-001/original-WC-U01.json",
+      "sha256": "8771a5ef402e6ec72707e73d1eaffeb462ac97fb0309ea264836e4b89137b983",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-WC-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/webcolors/attempt-001/original-WC-U02.json",
+      "sha256": "d14a4bcc088ce204350b0ebf0e7ee2af9a7c4a2bd6ba9628be00c7225f22c36e",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-03/business/webcolors/attempt-001/summary.json",
+      "sha256": "3aa8a967451965a884a5e8607076b01ff33de6eb71aaab3cd27397ea90174b7a",
+      "passed": true
+    }
+  ],
+  "additional_original_native": [],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v34-en",
+  "formal_digest": "3f996ac60a1d4e7260bb4045418c3382b2a5f64c6d68202ebf1193f30d7b9b6c",
+  "full_delivery_files": 28471,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-012/run-001/evidence/result.json",
+      "sha256": "edfd95b7da75c51c68cb687a3eb81d1e777647f34df27a902bdff42a2b9f3a08"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-012/run-001/cleanup.json",
+      "sha256": "4f8838f9947aea602586792bd04fca402f8efe5084d409b1c295fe3781700072"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-012-audit.json",
+      "sha256": "32ccf80c73105ebfdab1072ba30d8909548a4cf500c8f3a6f62b2c53487d234a"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-012/browser/run-001/diagnostics/result.json",
+      "sha256": "1da4b4993230b37c9ea7d20637f1d4324bad43befadb098d40afbe0011971647"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/delivery-twenty-two-local.json",
+      "sha256": "039f7f941753c95b717a29eda6f1ccb53d63cec242d4c35cde36aa5740c1a391"
+    }
+  ]
+}

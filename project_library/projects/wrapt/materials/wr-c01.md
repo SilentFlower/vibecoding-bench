@@ -1,0 +1,1 @@
+Compare isinstance(...,collections.abc.Iterable) and actual list consumption for ObjectProxy(1) and BaseObjectProxy(1). Advise a protocol-compatible proxy choice without adding methods or changing code.

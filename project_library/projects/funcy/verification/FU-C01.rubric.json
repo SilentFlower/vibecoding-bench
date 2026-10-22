@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FU-C01",
+  "source_commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The explicit key retains the first id2 record and then id1 in input order;it does not sort,merge or keep the latest duplicate. Choose a business-approved conflict policy and explicit hashable identity key,retain conflict evidence if payload differences matter,and bound seen-set memory for large streams. Do not replace itemgetter with a string shorthand without checking its actual interpretation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

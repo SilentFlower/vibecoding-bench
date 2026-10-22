@@ -1,0 +1,125 @@
+{
+  "schema": 1,
+  "id": "pyparsing-py312",
+  "adapter": "python-native",
+  "platform": "linux-amd64",
+  "python": "3.12.15",
+  "requirements": [
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==9.1.1",
+    "contourpy==1.4.0",
+    "cycler==0.12.1",
+    "fonttools==4.67.0",
+    "Jinja2==3.1.6",
+    "kiwisolver==1.5.1",
+    "MarkupSafe==3.0.4",
+    "matplotlib==3.11.2",
+    "numpy==2.5.4",
+    "pillow==13.0.0",
+    "python-dateutil==2.9.0.post0",
+    "railroad-diagrams==3.0.1",
+    "six==1.17.0"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 300,
+    "memory_mb": 768,
+    "pids_limit": 64
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+      "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+      "size": 386536
+    },
+    {
+      "path": "artifacts/contourpy-1.4.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "875f42444c9cf48d56f724f2637e60d0f73b3b12c9041e1484580a233edf9591",
+      "size": 383243
+    },
+    {
+      "path": "artifacts/cycler-0.12.1-py3-none-any.whl",
+      "digest": "85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30",
+      "size": 8321
+    },
+    {
+      "path": "artifacts/fonttools-4.67.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+      "digest": "eb3c98cac93aac4b9f6e3ce2008325340b234cc9b0338ca6b513f31962a1e278",
+      "size": 5408233
+    },
+    {
+      "path": "artifacts/jinja2-3.1.6-py3-none-any.whl",
+      "digest": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67",
+      "size": 134899
+    },
+    {
+      "path": "artifacts/kiwisolver-1.5.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+      "digest": "34633ecf50d16187ab8e5528b7a2530f2feb4e23f300db4672538b51cfc5cd38",
+      "size": 1477929
+    },
+    {
+      "path": "artifacts/markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "8e124f974786f831d6043728e38296969d3579db8896fe004682f5758e613581",
+      "size": 22985
+    },
+    {
+      "path": "artifacts/matplotlib-3.11.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+      "digest": "df4f7784aca81a94f254c0a2767d592ee25f407e488f5fa7203e51093fb6ca27",
+      "size": 9860353
+    },
+    {
+      "path": "artifacts/numpy-2.5.4-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "fbde6962867ee75b48b0ee29b2b9372ec5d617799dbaf38e82dc0596f2f7738a",
+      "size": 16727283
+    },
+    {
+      "path": "artifacts/pillow-13.0.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "42d63be3af4f9b951b199b0a9d23365d37ab14687e6d77b74940432c8515c4ca",
+      "size": 7144542
+    },
+    {
+      "path": "artifacts/python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+      "digest": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
+      "size": 229892
+    },
+    {
+      "path": "artifacts/railroad_diagrams-3.0.1-py3-none-any.whl",
+      "digest": "d414ff2439ed53345950e197938097548721b5d097926fafeaabc2bb069b44f9",
+      "size": 15012
+    },
+    {
+      "path": "artifacts/six-1.17.0-py2.py3-none-any.whl",
+      "digest": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+      "size": 11050
+    }
+  ],
+  "source_commit": "810199f89bf916590426e1c5cb3d612584f11a2f",
+  "verification_status": "verified_target_runtime"
+}

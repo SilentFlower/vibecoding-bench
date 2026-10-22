@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PQ-P01",
+  "source_commit": "465fb9ae12f7727d28785d087b64e6226da5714e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "NamedParameter accumulates values and increments placeholders across serializations;get_parameters returns its live dictionary. The retained reference grows from param1 to param1/param2 while a copied first snapshot remains unchanged. Prefer a fresh collector per independent export and freeze SQL with a copied/serialized matching parameter map;test two exports and subsequent mutation. Do not invent reset,deep immutability or driver-independent execution guarantees.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

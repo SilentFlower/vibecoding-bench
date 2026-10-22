@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PS-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "evolver_is_mutable_and_published_snapshots_are_independent": true
+  },
+  "resource_profile": "business"
+}

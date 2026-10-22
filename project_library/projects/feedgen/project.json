@@ -1,0 +1,274 @@
+{
+  "schema": 2,
+  "project_key": "feedgen",
+  "title": "Feedgen文档订阅工作场景",
+  "category": "RSS/Atom语义与序列化",
+  "description": "顺序、格式投影、日期、来源、归档、内容诊断和链接修复七项任务。",
+  "seed_digest": "95adae5e21c66cd84c7ed9cc536bbbaed9a15957361830d6b249c57560a6dddd",
+  "environment": "feedgen-py312",
+  "source": {
+    "repository": "https://github.com/lkiesow/python-feedgen",
+    "commit": "97260abb1793eb164c458c10b493690beb413f6d",
+    "license_files": [
+      "seed/library/license.bsd",
+      "seed/library/license.lgpl"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "FG-S01",
+      "title": "条目顺序与格式投影",
+      "goal": "核清单与链接实际语义",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FG-U01",
+            "FG-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FG-U01",
+          "kind": "understand",
+          "goal": "解释导入文档的条目顺序",
+          "prompt": "Explain both complete entry-order controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/order.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FG-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/FG-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "FG-U02",
+          "kind": "understand",
+          "goal": "区分RSS和Atom的链接投影",
+          "prompt": "Explain the complete per-format link and enclosure controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/format-projection.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FG-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/FG-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FG-S02",
+      "title": "输入与来源合同",
+      "goal": "明确时区和完整来源对",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FG-C01",
+            "FG-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FG-C01",
+          "kind": "consult",
+          "goal": "明确订阅日期的时区来源",
+          "prompt": "Advise date input using all actual failure/success controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/date-input.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FG-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/FG-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "FG-C02",
+          "kind": "consult",
+          "goal": "避免来源信息的部分更新被忽略",
+          "prompt": "Advise exact source getter/setter behavior and the supported metadata scope. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/source-update.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FG-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/FG-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FG-S03",
+      "title": "可复现订阅归档",
+      "goal": "固定真实输入与输出策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FG-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FG-P01",
+          "kind": "plan",
+          "goal": "规划可复现的订阅归档构建",
+          "prompt": "Plan reproducible local RSS/Atom artifacts from the complete controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/reproducible-build.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FG-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/FG-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FG-S04",
+      "title": "内容导出诊断",
+      "goal": "先取得完整内容和异常",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FG-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "FG-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FG-D01",
+          "kind": "diagnose",
+          "goal": "先核内容类型再解释导出失败",
+          "prompt": "A document entry fails during Atom export after changing its content. Request exact content/type/export calls,the exception and a complete valid-entry control before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FG-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-content-reproduction",
+              "when": "Exact content/type/export calls,exception and complete valid-entry controls have not been supplied or declared unavailable,and are reasonably requested.",
+              "materials": [
+                "disclosure/nontext-content.md"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FG-S05",
+      "title": "Atom链接修复",
+      "goal": "保留单一根因下的全部元数据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FG-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FG-M01",
+          "kind": "modify",
+          "goal": "修复Atom条目链接元数据丢失",
+          "prompt": "Implement the narrowly authorized link metadata repair and meaningful public regressions. Preserve all original controls and run the full applicable original regression.",
+          "requires": [],
+          "materials": [
+            "materials/link-repair.md",
+            "materials/public-test-example.py"
+          ],
+          "allowed_paths": [
+            "library/feedgen/entry.py",
+            "app/test_atom_link.py"
+          ],
+          "outcomes": [
+            "implemented_with_public_regression_tests"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FG-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/FG-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

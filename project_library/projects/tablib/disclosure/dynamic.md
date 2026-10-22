@@ -1,0 +1,1 @@
+Start Dataset(("A",2),headers=["sku","qty"]);insert_col(0,lambda row:row[1]*10,header="score");append(("B",3)). Headers are ["score","sku","qty"],old row(20,"A",2),new row("B",3,30). _dynamic_columns is registered at self.width before insertion,not normalized insertion index0. This is a separate source defect;only diagnose,do not extend the mapping-import authorization.

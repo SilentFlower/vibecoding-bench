@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MD-U02",
+  "source_commit": "bc98c9e134ec55b2853716ab859754f061cb7054",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default output creates an empty two-cell header and preserves tea/3 and book/8 as data rows. table_infer_header=True puts tea/3 before the separator and therefore reclassifies it as the Markdown header. Given the explicit supplier contract,do not infer a header from its first product;use default or a separately justified supplied header.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

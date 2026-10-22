@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PN-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "month_clipping_makes_repeated_addition_differ_from_a_single_combined_addition": true
+  },
+  "resource_profile": "business"
+}

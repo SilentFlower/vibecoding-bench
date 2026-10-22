@@ -1,0 +1,1 @@
+A local order contains product quantities [3,1,3,2]. Compare list(SortedList(values)) and list(SortedSet(values)). Explain ordered multiplicity versus uniqueness before choosing a representation;do not discard a repeated order line by calling it a sort operation. No edits.

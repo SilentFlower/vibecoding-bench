@@ -1,0 +1,22 @@
+{
+  "status": "failed_not_admitted",
+  "failed_checks": [
+    {
+      "passed": false,
+      "description": "TD-D01 的 candidate 出现本批未计划的中断：['failed']"
+    }
+  ],
+  "actual_failed_runs": [
+    {
+      "id": "ec0e1d39cb09",
+      "status": "failed",
+      "error": "database is locked",
+      "exit_code": null,
+      "role": "candidate",
+      "task_id": 30
+    }
+  ],
+  "browser_result": ".deploy/project-catalog-hundred/stage-03/mock-batch-008-retry-002/browser/run-001/diagnostics/result.json",
+  "browser_result_sha256": "ca03e62e2b449c311786e7b38dc199794b8ec6d475f89a348e4f2a28987b24c5",
+  "action": "保留全部失败与页面原件；本轮不准入，结束并清理后在较低并行负载下以同一内容完整重跑，不放宽结果或修改平台数据库"
+}

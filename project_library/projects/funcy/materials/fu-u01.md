@@ -1,0 +1,1 @@
+A convert callback records its argument and doubles it. Create funcy.map(convert,[1,2,3]),inspect calls,consume one item,then the rest and repeat consumption. Compare funcy.lmap(convert,[4,5]). Explain evaluation and one-shot behavior. No edits.

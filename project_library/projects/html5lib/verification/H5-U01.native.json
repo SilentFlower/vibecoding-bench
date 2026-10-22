@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "H5-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "html_table_recovery_moves_text_and_inserts_tbody": true
+  },
+  "resource_profile": "business"
+}

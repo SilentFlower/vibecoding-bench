@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "WR-C02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "dynamic_decorator_enablement_changes_instrumentation_without_changing_the_target_result": true
+  },
+  "resource_profile": "business"
+}

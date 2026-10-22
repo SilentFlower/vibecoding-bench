@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PQ-C01",
+  "source_commit": "465fb9ae12f7727d28785d087b64e6226da5714e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use a fresh NamedParameter and separate its actual dictionary from SQL when calling the matching driver. O'Reilly stays an unquoted raw parameter value and returns4;the supplied SQL-like value returns no rows and never becomes query structure. Match paramstyle to the driver,do not interpolate formatted values or claim parameters bind identifiers. No library patch is required.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

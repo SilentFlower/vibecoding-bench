@@ -1,0 +1,73 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "pyparsing",
+      "attempt": 2,
+      "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-002/pyparsing/result.json",
+      "result_sha256": "901cff3d7ca3f6c50f5fda58b264b49614537672ec1ae003897cc67fa453c14b",
+      "main_collected": 2175,
+      "counts": {
+        "passed": 2175,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 2089,
+      "collection_skip_count": 0,
+      "xml_testcases": 2175,
+      "xml_skipped": 0,
+      "runner_sha256": "834a3705c301b60167179f0083deeb0618d71e578d0dd7399a98320c182f81e9",
+      "contract_sha256": "6720c50640ee7b3575dc969902a2d9517b4870a9b8fcdadc68cf94c6609b92db",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 300,
+        "memory_mb": 768,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    },
+    {
+      "project": "markdownify",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/markdownify/result.json",
+      "result_sha256": "e3e77adc8e64e557175b3b2db60d8ced5230a76226d84718a414cbbea67d793d",
+      "main_collected": 83,
+      "counts": {
+        "passed": 83,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 83,
+      "xml_skipped": 0,
+      "runner_sha256": "834a3705c301b60167179f0083deeb0618d71e578d0dd7399a98320c182f81e9",
+      "contract_sha256": "41f98e236739ea9883a79ebee862b5ae086c4183df0120f933f7a9805853b531",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    }
+  ]
+}

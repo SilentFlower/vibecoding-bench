@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "LQ-U03",
+  "source_commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "include renders outer and changes the caller local x to inner,so outer|inner. render uses an isolated partial scope with no caller local x and does not change caller x,so |outer. Pass named data explicitly for reusable render snippets;do not call include/render equivalent or infer all globals are inaccessible.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

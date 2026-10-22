@@ -1,0 +1,9 @@
+// vim: set ft=json5
+{
+    "editor.formatOnSaveMode": "modificationsIfAvailable",
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+    "files.trimTrailingWhitespace": true,
+    "python.defaultInterpreterPath": ".venv/bin/python",
+    "python.testing.pytestEnabled": true,
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AR-C02",
+  "source_commit": "2224255c4acc594d734cef0bbc83360452a67983",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "to(+02) yields14:00+02 and preserves the original UTC timestamp. replace(tzinfo=+02) yields12:00+02 and denotes an instant7200 seconds earlier. One converts an established instant,the other annotates/relabels the same wall clock. Choose from supplied import semantics,not assumptions;the original is unchanged.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

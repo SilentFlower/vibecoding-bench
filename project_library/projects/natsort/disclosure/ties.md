@@ -1,0 +1,1 @@
+No custom key or flags:input["a2","a1","a01"] gives["a1","a01","a2"];input["a01","a1","a2"] gives["a01","a1","a2"]. Default generated natural keys for a1/a01 are equal. Separate control natsorted(["x1","x01","x001"],alg=ns.PRESORT) gives["x001","x01","x1"],while default preserves the input tie order. There is no source mutation or locale flag.

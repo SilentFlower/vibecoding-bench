@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "funcy-py312",
+  "adapter": "python-native",
+  "platform": "linux-amd64",
+  "python": "3.12.15",
+  "requirements": [
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==7.4.3",
+    "whatever==0.7"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-7.4.3-py3-none-any.whl",
+      "digest": "0d009c083ea859a71b76adf7c1d502e4bc170b80a8ef002da5806527b9591fac",
+      "size": 325075
+    },
+    {
+      "path": "artifacts/whatever-0.7-py3-none-any.whl",
+      "digest": "4a862efbb11a88e9b162e88a59a5eb8b1e656df6c39c6e818f7902bf1d27d728",
+      "size": 5267
+    }
+  ],
+  "source_commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+  "verification_status": "verified_target_runtime"
+}

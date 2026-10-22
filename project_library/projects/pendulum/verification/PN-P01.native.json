@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PN-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "exact_parsing_preserves_date_and_time_types_instead_of_inventing_an_instant": true
+  },
+  "resource_profile": "business"
+}

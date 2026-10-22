@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "LQ-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "liquid_truthiness_differs_from_python_for_zero_and_empty_containers": true
+  },
+  "resource_profile": "business"
+}

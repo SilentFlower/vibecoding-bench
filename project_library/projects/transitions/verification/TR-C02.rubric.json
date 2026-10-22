@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TR-C02",
+  "source_commit": "bd42b38f3627e6bca7274fb4d9af2e105f75da7c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The callback receives EventData,not raw ticket keyword arguments. After transition it reports go,a,b,b and kwargs ticket T-1. Choose one consistent send_event contract and explicitly read correlation data;do not assume an after callback record(ticket) receives the string or that the wrapper persists durable audit records.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PQ-C02",
+  "source_commit": "465fb9ae12f7727d28785d087b64e6226da5714e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Table.select is an existing method;field(\"select\") or [\"select\"] obtains the field explicitly. Actual MySQLQuery emits backticks while PostgreSQLQuery emits double quotes for order/select. Choose real dialect and an explicit allowed-column map;neither arbitrary attribute existence nor value placeholders validate report-column authorization. These are serialized controls,not proven backend executions.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

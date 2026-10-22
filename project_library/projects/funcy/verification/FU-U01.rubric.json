@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FU-U01",
+  "source_commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "map initially calls nothing;next yields2 and records1;remaining consumption gives4,6 and records2,3. The exhausted iterator yields nothing on a second pass. lmap immediately records4,5 and returns[8,10]. Choose an explicit materialization boundary when later steps need replay or failure detection;do not infer work completed when the iterator was constructed.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

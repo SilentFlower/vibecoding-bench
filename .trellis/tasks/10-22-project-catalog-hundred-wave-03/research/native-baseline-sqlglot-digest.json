@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "sqlglot",
+      "attempt": 3,
+      "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-003/sqlglot/result.json",
+      "result_sha256": "76292fb7c84a5912ab01fd0220c4f6f6d63b9fa52afced0b9dbdadafe7b38afd",
+      "main_collected": 1500,
+      "counts": {
+        "passed": 1500,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 21780,
+      "collection_skip_count": 0,
+      "xml_testcases": 1500,
+      "xml_skipped": 0,
+      "runner_sha256": "58fe0fc17a90bdeca6d93687267e07fba1545b7d58e9c2dc3f305e2d2b640762",
+      "contract_sha256": "7720a2de07989c4c062d59dd3c667245d0011d6e1b3fc255692137f63d2f7601",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 360,
+        "memory_mb": 3072,
+        "pids_limit": 128
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    }
+  ]
+}

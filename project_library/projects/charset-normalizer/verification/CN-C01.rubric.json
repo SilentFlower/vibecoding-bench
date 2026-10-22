@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CN-C01",
+  "source_commit": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "UTF-8 isolation yields an empty result and bestNone for these cp1252 bytes,while the cp1252 control and strict known-format decoding give café. The restricted failure does not establish binary data. Guard bestNone,preserve the raw input and choose decoding from an explicit trusted source contract or retain uncertainty;do not silently discard the record or assume an unreported source encoding.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

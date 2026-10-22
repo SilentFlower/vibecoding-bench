@@ -1,0 +1,16 @@
+{
+  "project": "sqlglot",
+  "status": "blocked_source_incomplete",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "submodule_path": "sqlglot-integration-tests",
+  "submodule_commit": "8cbf013a7b0bd1871abce4ebb543560d0e554799",
+  "declared_repository": "git@github.com:fivetran/sqlglot-integration-tests.git",
+  "anonymous_https_repository": "https://github.com/fivetran/sqlglot-integration-tests.git",
+  "public_page_status": 404,
+  "anonymous_git_ls_remote_exit": 128,
+  "anonymous_git_message": "Repository not found",
+  "local_commit_available": false,
+  "local_commit_error": "fatal: Not a valid object name 8cbf013a7b0bd1871abce4ebb543560d0e554799^{commit}\n",
+  "formal_registered": false,
+  "scope": "父仓完整Gitlink不能匿名取得；不能按主仓原生已完成的历史事实冒称子模块齐全，不改变固定范围"
+}

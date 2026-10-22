@@ -1,0 +1,1 @@
+Create independent Injectors configured with alpha and beta. Resolve Service twice in the first,resolve CachedService repeatedly in the first,and resolve CachedService in the second. Explain actual object identities and names,ordinary NoScope versus singleton scope,and the boundary of the same-container claim. No edits.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IC-U01",
+  "source_commit": "3ecf079acba0e592ea6a40c456514984c8657852",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "DATE serializes with VALUE=DATE and reparses as date. The default end for this start-only date event is the next date;an explicit October23 DTEND describes one day October22 because end is exclusive. Preserve date type and matching DATE end semantics;do not turn it into a midnight UTC instant or count the end date as another occupied day.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

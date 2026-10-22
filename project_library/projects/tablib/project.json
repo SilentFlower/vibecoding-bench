@@ -1,0 +1,249 @@
+{
+  "schema": 2,
+  "project_key": "tablib",
+  "title": "Tablib商品表工作场景",
+  "category": "表格导入、导出与字段对齐",
+  "description": "CSV值类型、输出格式器、公式策略、批量失败边界、真实字段错位修复及派生列诊断。",
+  "seed_digest": "439d40837853f736e747980b1e5bbd203f4ada2b1af7a8bb5ca80f3375b5ac79",
+  "environment": "tablib-py312",
+  "source": {
+    "repository": "https://github.com/jazzband/tablib",
+    "commit": "966876c76a6378557c1951badc1665b4d1375875",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TB-S01",
+      "title": "数据与展示",
+      "goal": "保留类型及输出边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TB-U01",
+            "TB-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-U01",
+          "kind": "understand",
+          "goal": "解释CSV表头与文本值",
+          "prompt": "Load the literal CSV sku,qty\\nA,2\\nB,\\n with format=\"csv\". Compare default headers with headers=False on sku,qty\\nA,2\\n. Explain value types and missing cells;no edits.",
+          "requires": [],
+          "materials": [
+            "materials/tb-u01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TB-U02",
+          "kind": "understand",
+          "goal": "解释导出格式器与原始单元格",
+          "prompt": "Create Dataset((\"A\",2),headers=[\"sku\",\"qty\"]) and add_formatter(\"qty\",lambda value:f\"{value:03}\"). Compare indexed cells, .dict and CSV export,then indexed cells again. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/tb-u02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TB-S02",
+      "title": "报告导出策略",
+      "goal": "明确公式处理",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TB-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-C01",
+          "kind": "consult",
+          "goal": "明确电子表格公式导出策略",
+          "prompt": "Create Dataset((\"=1+1\",),headers=[\"note\"]). Inspect exported XLSX A2 with escape=False/default and escape=True using openpyxl. Advise an explicit formula/text policy for an untrusted report. Do not launch a spreadsheet or implement changes.",
+          "requires": [],
+          "materials": [
+            "materials/tb-c01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TB-S03",
+      "title": "批量导入方案",
+      "goal": "避免部分追加重复",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TB-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-P01",
+          "kind": "plan",
+          "goal": "规划批量追加的失败发布边界",
+          "prompt": "Start Dataset((\"A\",2),headers=[\"sku\",\"qty\"]). Call extend([(\"B\",3),(\"C\",)]). Inspect final state and plan a robust finite-batch import/retry boundary. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/tb-p01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TB-S04",
+      "title": "商品字段对齐修复",
+      "goal": "按真实字段名导入",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TB-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-M01",
+          "kind": "modify",
+          "goal": "修复商品字典记录的字段错位",
+          "prompt": "Implement the supplied bounded mapping-import repair and public regressions. Only the two authorized files may change.",
+          "requires": [],
+          "materials": [
+            "materials/dict-alignment.md"
+          ],
+          "allowed_paths": [
+            "library/src/tablib/core.py",
+            "app/test_dict_import.py"
+          ],
+          "outcomes": [
+            "repaired_and_regression_verified"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TB-S05",
+      "title": "派生列诊断",
+      "goal": "明确独立缺陷范围",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TB-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "TB-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-D01",
+          "kind": "diagnose",
+          "goal": "诊断首列派生字段的后续错位",
+          "prompt": "An inserted computed column is aligned for existing rows but not later appends. Request exact insertion position/callback,headers,input shape and before/after rows. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TB-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "dynamic-column-position",
+              "when": "Exact insertion/callback,headers,input shape and row controls have not been supplied or declared unavailable and are reasonably requested.",
+              "materials": [
+                "disclosure/dynamic.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

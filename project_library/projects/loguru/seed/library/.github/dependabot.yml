@@ -1,0 +1,18 @@
+version: 2
+updates:
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: quarterly
+  labels: []
+- package-ecosystem: pip
+  directory: /
+  schedule:
+    interval: quarterly
+  allow:
+  - dependency-type: direct
+  labels: []
+  ignore:
+  - dependency-name: '*'
+    update-types: [version-update:semver-patch]
+  - dependency-name: pytest-cov  # Latest version needs a new "subprocess" configuration.

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TB-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "extend_can_keep_a_successful_prefix_after_a_later_invalid_row": true
+  },
+  "resource_profile": "business"
+}

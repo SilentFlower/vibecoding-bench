@@ -1,0 +1,372 @@
+# Contributing
+
+* <a class="github-button" href="https://github.com/fgmacedo/python-statemachine" data-icon="octicon-star" aria-label="Star fgmacedo/python-statemachine on GitHub">Star this project</a>
+* <a class="github-button" href="https://github.com/fgmacedo/python-statemachine/issues" data-icon="octicon-issue-opened" aria-label="Issue fgmacedo/python-statemachine on GitHub">Open an Issue</a>
+* <a class="github-button" href="https://github.com/fgmacedo/python-statemachine/fork" data-icon="octicon-repo-forked" aria-label="Fork fgmacedo/python-statemachine on GitHub">Fork</a>
+
+Contributions are welcome, and they are greatly appreciated! Every little bit helps, and credit
+will always be given.
+
+You can contribute in many ways:
+
+## Types of Contributions
+
+### Report Bugs
+
+Report bugs at [https://github.com/fgmacedo/python-statemachine/issues](https://github.com/fgmacedo/python-statemachine/issues).
+
+If you are reporting a bug, please include:
+
+* Your operating system name and version.
+* Any details about your local setup that might be helpful in troubleshooting.
+* Detailed steps to reproduce the bug.
+
+### Fix Bugs
+
+Look through the GitHub issues for bugs. Anything tagged with "bug"
+and "help wanted" is open to whoever wants to implement it.
+
+### Implement Features
+
+Look through the GitHub issues for features. Anything tagged with "enhancement"
+and "help wanted" is open to whoever wants to implement it.
+
+### Write Documentation
+
+Python State Machine could always use more documentation, whether as part of the
+official Python State Machine docs, in docstrings, or even on the web in blog posts,
+articles, and such.
+
+### Add a translation
+
+
+Extract a `Portable Object Template` (`POT`) file:
+
+```shell
+pybabel extract statemachine -o statemachine/locale/statemachine.pot
+```
+
+Then, copy the template as a `.po` file into the target locale folder. For example, if you're adding support for Brazilian Portuguese language, the code is `pt_BR`, and the file path should be `statemachine/locale/pt_BR/LC_MESSAGES/statemachine.po`:
+
+```shell
+cp statemachine/locale/statemachine.pot statemachine/locale/pt_BR/LC_MESSAGES/statemachine.po
+```
+
+Then open the `statemachine.po` and translate.
+
+After translation, to get the new language working locally, you need to compile the `.po` files into `.mo`  (binary format). Run:
+
+```shell
+pybabel compile -d statemachine/locale/ -D statemachine
+```
+
+
+On Linux (Debian based), you can test changing the `LANGUAGE` environment variable.
+
+```shell
+# If the last line is `Can't guess when in Won.` something went wrong.
+LANGUAGE=pt_BR python tests/examples/guess_the_number_machine.py
+```
+
+Then open a [pull request](https://github.com/fgmacedo/python-statemachine/pulls) with your translation file.
+
+### Submit Feedback
+
+The best way to send feedback is to file an issue at https://github.com/fgmacedo/python-statemachine/issues.
+
+If you are proposing a feature:
+
+* Explain in detail how it would work.
+* Keep the scope as narrow as possible, to make it easier to implement.
+* Remember that this is a volunteer-driven project, and that contributions
+  are welcome :)
+
+## Get Started!
+
+Ready to contribute? Here's how to set up `python-statemachine` for local development.
+
+1. Install dependencies.
+   1. [graphviz](https://graphviz.org/download/#linux)
+   1. [uv](https://docs.astral.sh/uv/getting-started/installation/)
+
+1. Fork the `python-statemachine` repository on GitHub.
+
+1. Clone the forked repository to your local machine by running::
+
+        git clone https://github.com/YOUR-USERNAME/python-statemachine.git.
+
+
+1. Run `uv sync` once to install all the development dependencies and create a virtual environment::
+
+        uv sync --all-extras
+
+2. Install the pre-commit validations:
+
+        pre-commit install
+
+3. Create a branch for local development, starting from an up-to-date `main`:
+
+        git switch main
+        git pull --ff-only origin main
+        git switch -c <name-of-your-bugfix-or-feature>
+
+4. Make changes to the code.
+
+5. Run tests to ensure they pass by running:
+
+        uv run pytest
+
+6. Update the documentation as needed.
+
+    Build the documentation:
+
+        uv run sphinx-build docs docs/_build/html
+
+
+    Now you can serve the local documentation using a webserver, like the built-in included
+    with python:
+
+        python -m http.server --directory docs/_build/html
+
+    And access your browser at http://localhost:8000/
+
+    If you're specially writting documentation, I strongly recommend using `sphinx-autobuild`
+    as it improves the workflow watching for file changes and with live reloading:
+
+        uv run sphinx-autobuild docs docs/_build/html --re-ignore "auto_examples/.*"
+
+    Sometimes you need a full fresh of the files being build for docs, you can safely remove
+    all automatically generated files to get a clean state by running:
+
+        rm -rf docs/_build/ docs/auto_examples
+
+1. Commit your changes and push them to your forked repository:
+
+        git add -A .
+        git commit -s -m "Your detailed description of your changes."
+        git push origin name-of-your-bugfix-or-feature
+
+1. Create a pull request on the original repository, targeting the `main` branch, for your
+changes to be reviewed and potentially merged. Be sure to follow the project's code of conduct
+and contributing guidelines.
+
+1. Use `exit` to leave the virtual environment.
+
+## Pull Request Guidelines
+
+Before you submit a pull request, check that it meets these guidelines:
+
+1. The pull request should include tests.
+2. If the pull request adds functionality, the docs should be updated. Put
+   your new functionality into a function with a docstring, and add the
+   feature to the list in the next release notes.
+3. Consider adding yourself to the contributor's list.
+4. The pull request should work for all supported Python versions.
+
+## UML cases based on PSSM
+
+`tests/uml/pssm/` runs cases generated from the test suite of the OMG Precise Semantics of
+UML State Machines (PSSM) 1.0 specification, on both engines. Each case is a native YAML
+statechart plus the stimulus and the traces the suite expects. Cases the library cannot
+pass yet are listed in `tests/uml/pssm/conftest.py`, each with a reason code; since
+`xfail_strict` is on, a change that makes one of them pass must remove it from that list.
+The same file lists in `LOWERED` the cases that pass only because the converter lowers a
+construct the library cannot spell yet; when that construct gets a native spelling, the
+converter stops lowering it and those cases are reclassified.
+
+The cases are generated by `tests/uml/pssm/convert.py` and must not be edited by hand. The
+OMG XMI is never committed: to regenerate the cases, download it, point `PSSM_XMI` at it
+and run the converter, as described in
+[tests/uml/pssm/README.md](https://github.com/fgmacedo/python-statemachine/blob/main/tests/uml/pssm/README.md).
+The `pssm-drift` CI job downloads the XMI and fails if the committed cases differ from the
+converter output.
+
+## Releasing a New Version
+
+This project follows [trunk based development](https://trunkbaseddevelopment.com/): `main` is
+the only long-lived branch and every release is a tag on it. Pushing a `vX.Y.Z` tag triggers
+the GitHub Actions workflow that publishes to PyPI.
+
+### Prerequisites
+
+- You must be on the `main` branch with a clean working tree, up to date with `origin/main`:
+
+  ```shell
+  git switch main
+  git pull --ff-only origin main
+  ```
+
+- All changes intended for the release must already be merged into `main`.
+
+### Step-by-step release process
+
+The following steps use version `X.Y.Z` as a placeholder. Replace it with the actual version
+number (e.g., `2.6.0`).
+
+#### 1. Bump the version number
+
+Update the version string in **both** files:
+
+- `pyproject.toml` — the `version` field under `[project]`
+- `statemachine/__init__.py` — the `__version__` variable
+
+Then refresh the lock file, which records the project's own version:
+
+```shell
+uv lock
+```
+
+#### 2. Update translations
+
+Extract new translatable strings, merge them into all existing `.po` files, translate the
+new entries, and compile:
+
+```shell
+uv run pybabel extract statemachine -o statemachine/locale/statemachine.pot
+uv run pybabel update -i statemachine/locale/statemachine.pot -d statemachine/locale/ -D statemachine
+# Edit each .po file to translate new empty msgstr entries
+uv run pybabel compile -d statemachine/locale/ -D statemachine
+```
+
+The `en` catalog keeps empty `msgstr` entries: English falls back to the source strings.
+When a translation needs the placeholders in a different order, number them (`'{0}'`,
+`'{2}'`, `'{1}'`) instead of reordering bare `{}`, which would swap the values.
+
+```{note}
+The `.pot` and `.mo` files are git-ignored. Only the `.po` source files are committed.
+The compiled `.mo` files may cause test failures if your system locale matches a translated
+language (error messages will appear translated instead of in English). Delete them after
+verifying translations work: `rm -f statemachine/locale/*/LC_MESSAGES/statemachine.mo`
+```
+
+#### 3. Write release notes
+
+Create `docs/releases/X.Y.Z.md` documenting all changes since the previous release, if
+the pull requests did not already start it. Include
+sections for new features, bugfixes, performance improvements, and miscellaneous changes.
+Reference GitHub issues/PRs where applicable.
+
+Add the new file to the toctree in `docs/releases/index.md` (at the top of the appropriate
+major version section).
+
+Update any related documentation pages (e.g., if a bugfix adds a new behavior that users
+should know about).
+
+Replace the `*Not released yet*` line under the title with the release date (e.g.
+`*October 13, 2026*`).
+
+#### 4. Run linters and tests
+
+```shell
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy statemachine/
+uv run pytest -n auto
+```
+
+All checks must pass before committing.
+
+#### 5. Commit
+
+Stage all changed files and commit. The pre-commit hooks will run ruff, mypy, and pytest
+automatically. If a hook rewrites a file (e.g. `fix end of files` on the `.po` files), stage
+it and commit again.
+
+```shell
+git add <files>
+git commit -s -m "chore: prepare release X.Y.Z"
+```
+
+#### 6. Tag the release
+
+Create an annotated `vX.Y.Z` tag and move the `latest` tag to the same commit:
+
+```shell
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git tag -f latest
+```
+
+#### 7. Push
+
+```shell
+git push origin main vX.Y.Z
+git push -f origin latest
+```
+
+Force-pushing is needed only to move the `latest` tag.
+
+#### 8. Verify the release
+
+The tag push triggers the `release` GitHub Actions workflow (`.github/workflows/release.yml`),
+which will:
+
+1. Check out the tag
+2. Run the full test suite
+3. Build the sdist and wheel with `uv build`
+4. Publish to PyPI using trusted publishing
+
+Monitor the workflow run at `https://github.com/fgmacedo/python-statemachine/actions` to
+confirm the release was published successfully.
+
+#### 9. Publish the GitHub release
+
+Create the GitHub release from the freshly pushed tag using the release notes file as the
+body. Two adjustments are needed when going from MyST/Sphinx markdown to GitHub-flavored
+markdown:
+
+- Convert MyST directives (`` ```{note} ``, `` ```{warning} ``, etc.) to GitHub's
+  [alert syntax](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts)
+  (`> [!NOTE]`, `> [!WARNING]`) or to plain blockquotes.
+- Rewrite intra-docs links. Relative links like `[3.1.0 release notes](3.1.0.md)` resolve
+  on ReadTheDocs but not on github.com. Replace them with absolute URLs against the
+  matching tag, e.g.
+  `https://github.com/fgmacedo/python-statemachine/blob/vX.Y.Z/docs/releases/X.Y.Z.md`.
+  Avoid linking to `https://python-statemachine.readthedocs.io/en/vX.Y.Z/` immediately
+  after publishing because the ReadTheDocs build for the new tag may still be in progress.
+
+Then create the release. Use the converted notes as the body:
+
+```shell
+gh release create vX.Y.Z \
+  --title "vX.Y.Z" \
+  --notes-file /tmp/release-X.Y.Z-notes.md \
+  --verify-tag
+```
+
+Confirm the rendered release at
+`https://github.com/fgmacedo/python-statemachine/releases/tag/vX.Y.Z`.
+
+### Hotfix releases
+
+Use a hotfix release when `main` already has unreleased changes that must not ship yet, but a
+fix needs to reach users of the last release. If `main` is releasable as is, just cut a
+regular release from it.
+
+1. Land the fix on `main` first, through a regular pull request with tests.
+
+1. Create the release branch from the released tag (or reuse it if it already exists):
+
+        git switch -c release/X.Y.x vX.Y.Z
+
+1. Cherry-pick the fix commits from `main`, keeping a reference to their origin:
+
+        git cherry-pick -x <sha>
+
+1. On the release branch, bump the patch version and write the release notes, then commit
+   `chore: prepare release X.Y.Z` exactly as in the regular process.
+
+1. Tag and push. Pushing the branch runs the `Python checks` workflow before you tag; move
+   `latest` only if this is the highest version released so far:
+
+        git push -u origin release/X.Y.x
+        git tag -a vX.Y.Z -m "vX.Y.Z"
+        git push origin vX.Y.Z
+        git tag -f latest && git push -f origin latest
+
+1. Publish the GitHub release as in the regular process.
+
+1. Cherry-pick the `chore: prepare release X.Y.Z` commit back into `main` so the version and
+   release notes stay in sync. A conflict only happens if `main` was already bumped; keep
+   `main`'s version and take the release notes.
+
+The release branch can be deleted once the tag exists; the tag keeps the commits reachable.

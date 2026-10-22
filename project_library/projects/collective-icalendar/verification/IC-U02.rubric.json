@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IC-U02",
+  "source_commit": "3ecf079acba0e592ea6a40c456514984c8657852",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "TEXT serialization escapes comma,semicolon,backslash and newline using the calendar grammar,uses UTF-8 bytes and CRLF content lines,and the parsed summary restores the original Unicode text. Use the property encoder rather than hand-concatenating raw content lines. This preserves this property control,not arbitrary original file formatting or byte-for-byte roundtrip.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

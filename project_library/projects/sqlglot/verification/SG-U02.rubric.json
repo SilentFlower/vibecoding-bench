@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SG-U02",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "At this exact commit parse_one returns an exp.Block containing both statements;parse returns a two-element list. Do not assume parse_one discards the second statement. A single-statement boundary must explicitly validate the parsed statement count and allowed statement kinds before execution.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

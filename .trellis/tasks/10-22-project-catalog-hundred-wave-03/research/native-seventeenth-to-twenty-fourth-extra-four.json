@@ -1,0 +1,141 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "python-liquid",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/python-liquid/result.json",
+      "result_sha256": "8c2fe1fb6dfaa76839c3c80d692fa1ceead4d831037900fb4dd84b5bfca0ddc8",
+      "main_collected": 3598,
+      "counts": {
+        "passed": 3526,
+        "failed": 0,
+        "error": 0,
+        "skipped": 72,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 165,
+      "collection_skip_count": 0,
+      "xml_testcases": 3598,
+      "xml_skipped": 72,
+      "runner_sha256": "3e719ee08e402118d8612c1beecc0bbc705d3b90ff230eaaef6cc9ab10a847e3",
+      "contract_sha256": "a33b21096f582a521aae251e1ceb76f348ddd3db842123e061a8b17493eb11f5",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    },
+    {
+      "project": "webcolors",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/webcolors/result.json",
+      "result_sha256": "374fd7edce0fb5d2058a95612d5acfdbe6482d03b344bceca07a851be4aa1a24",
+      "main_collected": 475,
+      "counts": {
+        "passed": 475,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 475,
+      "xml_skipped": 0,
+      "runner_sha256": "3e719ee08e402118d8612c1beecc0bbc705d3b90ff230eaaef6cc9ab10a847e3",
+      "contract_sha256": "0007a03933b74c138e8b8a9a4119734a9fd1c5e7c82e684f07d4b5ebcc2ea536",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    },
+    {
+      "project": "funcy",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/funcy/result.json",
+      "result_sha256": "60f54d7dff6d60323e94d62e6291a6275b6bea22e4b100d37f78b0760f435353",
+      "main_collected": 260,
+      "counts": {
+        "passed": 260,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 260,
+      "xml_skipped": 0,
+      "runner_sha256": "3e719ee08e402118d8612c1beecc0bbc705d3b90ff230eaaef6cc9ab10a847e3",
+      "contract_sha256": "03a6926be03de91b0e196e28a222aea74bb8459cc20d901ec509621c1beda11a",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    },
+    {
+      "project": "collective-icalendar",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/collective-icalendar/result.json",
+      "result_sha256": "cca92c070497050a97db769b645e7d8d35eb4919effa7b5edb1911bd04744f41",
+      "main_collected": 21960,
+      "counts": {
+        "passed": 21321,
+        "failed": 0,
+        "error": 0,
+        "skipped": 42,
+        "xfailed": 597,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 21960,
+      "xml_skipped": 639,
+      "runner_sha256": "3e719ee08e402118d8612c1beecc0bbc705d3b90ff230eaaef6cc9ab10a847e3",
+      "contract_sha256": "bbfdd18a0bf6b8668ce81c9576b2d2a4726da5aae512079c6bc51ee624836b9a",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+name: release to test.pypi.org
+
+"on":
+  push:
+    tags:
+      # To publish a test release to test.pypi.org,
+      # create and push a tag as follows:
+      #     git tag -a 0.21.3.rc1 -m "Tag 0.21.3.rc1 for release to test.pypi.org"
+      #     git push --tags
+      # Go to https://github.com/jab/bidict/actions?query=workflow%3A%22Release+to+Test+PyPI%22
+      # and watch for a new run of this workflow to publish to test.pypi.org.
+      # IMPORTANT: Run the following to clean up after:
+      #     git tag -d 0.21.3.rc1
+      #     git push origin :0.21.3.rc1
+      - "[0-9]+.[0-9]+.[0-9]+.rc[0-9]+"
+  workflow_dispatch:
+
+jobs:
+  main:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - name: install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
+      - name: build distributions
+        # This uv is the flake's, which is also the build backend: uv build uses its own
+        # built-in uv_build whenever that uv satisfies pyproject.toml's [build-system]
+        # requires, and only fetches uv_build from PyPI otherwise. Either way, that floor
+        # is what keeps a too-old backend from writing the wheel's RECORD (#406).
+        run: nix develop .#build --command uv build
+      - name: check distributions
+        run: nix develop .#build --command ./check_dist
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
+        with:
+          user: __token__
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          repository_url: https://test.pypi.org/legacy/
+          verbose: true
+
+permissions:
+  contents: read

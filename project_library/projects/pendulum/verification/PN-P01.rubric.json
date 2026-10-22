@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PN-P01",
+  "source_commit": "e06dacedc4cdea90fa1286b3965d180ab94cf251",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Ordinary date parsing yields a midnight UTC DateTime;exact=True preserves Date,and the exact time string yields Time. Define expected field types before parsing,require explicit timezone/offset where an instant is needed,and reject or explicitly resolve missing components instead of inventing midnight/UTC semantics. Preserve raw text and normalized typed values and test invalid/ambiguous input. Successful parsing alone does not establish a complete event instant.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

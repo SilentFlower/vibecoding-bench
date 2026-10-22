@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "pendulum",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/pendulum/result.json",
+      "result_sha256": "d1944b518d35e227194b801921a652a7ae6cb9f74f0a2c0879a67380a3a141bc",
+      "main_collected": 1874,
+      "counts": {
+        "passed": 1871,
+        "failed": 0,
+        "error": 0,
+        "skipped": 3,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 1874,
+      "xml_skipped": 3,
+      "runner_sha256": "4acca1633aea0ca25b4b8ced785d1b234c769e0d7223c4395cec519ed1391f14",
+      "contract_sha256": "5d3ed8026621d61a288b1617f1a159e0c0e9223fc9c7d3a347bf3d28a5c9bcd1",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 768,
+        "pids_limit": 128
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    }
+  ]
+}

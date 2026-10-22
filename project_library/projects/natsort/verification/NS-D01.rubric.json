@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "NS-D01",
+  "source_commit": "e9a3a2a307580a1f2be8c57bba50fba45789ada0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use consumed controls to distinguish equal natural keys plus stable input order from nondeterministic sorting. An explicit deterministic tie-break/PRESORT can be proposed only with its actual behavior and identity implications. Missing evidence supports insufficient_information;do not claim identifiers are interchangeable or random sorting.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

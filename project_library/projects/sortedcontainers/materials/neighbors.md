@@ -1,0 +1,1 @@
+On SortedList([1,3,3,5]),compute strict predecessor/successor of3 using bisect_left/right,and floor/ceiling of4 using its insertion point. Inspect probes0 and6 and an empty list. Advise correct side selection and explicit edge handling;unconditionally indexing -1 is not a valid no-predecessor policy. No implementation.

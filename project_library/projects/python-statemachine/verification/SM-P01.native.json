@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SM-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "async_construction_requires_activation_before_initial_configuration_is_ready": true
+  },
+  "resource_profile": "business"
+}

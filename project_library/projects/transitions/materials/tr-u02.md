@@ -1,0 +1,1 @@
+Register review:a->b with a Boolean guard,then review:a->c unconditionally;disable auto transitions. Compare separate initial models with guard True and False. Explain ordering and fallback. No edits.

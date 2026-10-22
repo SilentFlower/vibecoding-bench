@@ -1,0 +1,91 @@
+[build-system]
+requires = ["setuptools>=62.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wrapt"
+dynamic = ["version"]
+description = "Module for decorators, wrappers and monkey patching."
+readme = "RELEASE.rst"
+license = "BSD-2-Clause"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Graham Dumpleton", email = "Graham.Dumpleton@gmail.com"}
+]
+requires-python = ">=3.9"
+keywords = ["wrapper", "proxy", "decorator"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+
+[project.urls]
+Homepage = "https://github.com/GrahamDumpleton/wrapt"
+"Bug Tracker" = "https://github.com/GrahamDumpleton/wrapt/issues/"
+Changelog = "https://wrapt.readthedocs.io/en/latest/changes.html"
+Documentation = "https://wrapt.readthedocs.io/"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "setuptools",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+zip-safe = false
+# Listed explicitly rather than discovered because "wrapt-stubs" (the PEP 561
+# stub-only companion package) has a hyphen in its directory name and no
+# __init__.py, which setuptools' `find` does not pick up by default.
+packages = ["wrapt", "wrapt-stubs"]
+
+# Use "*" rather than "wrapt-stubs" because the pyproject.toml validator only
+# accepts keys that are valid Python module names or "*"; hyphenated PEP 561
+# stub package names are rejected. Since only the wrapt-stubs package contains
+# .pyi files, matching all packages has the same practical effect.
+[tool.setuptools.package-data]
+"*" = ["*.pyi"]
+
+[tool.setuptools.dynamic]
+version = {attr = "wrapt.__version__"}
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "setuptools",
+]
+
+# Black configuration
+[tool.black]
+line-length = 88
+target-version = ['py39']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.mypy_cache
+  | \.pytest_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+# isort configuration (compatible with Black)
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["wrapt"]

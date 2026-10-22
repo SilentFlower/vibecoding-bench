@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "LG-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "lazy_values_skip_global_level_but_run_before_sink_filters": true
+  },
+  "resource_profile": "business"
+}

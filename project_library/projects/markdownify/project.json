@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "markdownify",
+  "title": "Markdownify文档迁移工作场景",
+  "category": "内容转换与导出合同",
+  "description": "标签与表头语义、图表和代码块保留、导出一致性及配置诊断。",
+  "seed_digest": "34251fa06be2b1d654495eca70f3af818c608bd285132f7039ed3963f3a8d50f",
+  "environment": "markdownify-py312",
+  "source": {
+    "repository": "https://github.com/matthewwithanm/python-markdownify",
+    "commit": "bc98c9e134ec55b2853716ab859754f061cb7054",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "MD-S01",
+      "title": "内容与表格语义",
+      "goal": "保留真实内容角色",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MD-U01",
+            "MD-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MD-U01",
+          "kind": "understand",
+          "goal": "区分移除标签格式与移除内容",
+          "prompt": "Explain every supplied tag-policy result from the pinned implementation. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/tag-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MD-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/MD-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "MD-U02",
+          "kind": "understand",
+          "goal": "保留没有表头的商品首行",
+          "prompt": "Explain both complete table conversions and their semantic difference. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/table-header.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MD-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/MD-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MD-S02",
+      "title": "图表与代码块迁移",
+      "goal": "明确资源及格式策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MD-C01",
+            "MD-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MD-C01",
+          "kind": "consult",
+          "goal": "选择标题中的图表保留策略",
+          "prompt": "Advise the exact image-parent controls and asset responsibilities. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/inline-images.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MD-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/MD-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "MD-C02",
+          "kind": "consult",
+          "goal": "保持代码块语言与边界空白",
+          "prompt": "Advise actual callback fallback and whitespace policy using all supplied controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/pre-language.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MD-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/MD-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MD-S03",
+      "title": "可重复导出",
+      "goal": "核命令和库的实际默认",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MD-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MD-P01",
+          "kind": "plan",
+          "goal": "规划命令行和库导出的可重复性",
+          "prompt": "Plan exact export parity from the supplied library/CLI controls. No code change.",
+          "requires": [],
+          "materials": [
+            "materials/export-parity.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MD-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/MD-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MD-S04",
+      "title": "配置生效诊断",
+      "goal": "取得完整生命周期证据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MD-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "MD-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MD-D01",
+          "kind": "diagnose",
+          "goal": "诊断复用转换器的配置不生效",
+          "prompt": "A reused document converter appears to ignore an option change. Request its complete construction,conversion and option sequence plus a fresh-instance control before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MD-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-cache-reproduction",
+              "when": "Complete converter construction,option changes,call order and a clean fresh-instance control have not been supplied or declared unavailable,and are reasonably requested.",
+              "materials": [
+                "disclosure/cache-reproduction.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "LG-D01",
+  "source_commit": "bce5dfd3b435b1d1658507d7e095ad7a9919bf1c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use only actually consumed configuration and output evidence. Request missing setup/order/exception before choosing a cause. With a complete delivered reproduction,trace configure/remove and sequential add behavior,identify the actual surviving and removed handlers,and advise caller-owned preparation/recovery rather than assume transactional rollback or patch the library. Missing material supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

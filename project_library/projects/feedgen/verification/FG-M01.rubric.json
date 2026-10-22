@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "FG-M01",
+  "source_commit": "97260abb1793eb164c458c10b493690beb413f6d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair the actual dictionary/Element shadowing root cause so all supported nonempty string link attributes,including Unicode and string zero length,survive independently and in order. Preserve missing/empty omission,input dictionaries,RSS projection and all other behavior. Only the authorized implementation and public test file may change;public tests must fail on original and pass after the repair.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized file that fail on the pinned original and pass after the repair; cite the actual implementation and tests. Preserve all original tests and controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

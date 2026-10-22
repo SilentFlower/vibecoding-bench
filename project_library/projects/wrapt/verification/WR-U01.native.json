@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "WR-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "decorator_binding_separates_instance_and_preserves_the_visible_signature": true
+  },
+  "resource_profile": "business"
+}

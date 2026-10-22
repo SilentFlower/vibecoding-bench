@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FU-P01",
+  "source_commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "tries3 is three total attempts;the control succeeds on the third with three effect markers. A retry does not roll back prior effects. Plan stable operation identity,deduplication or transactional publication at the actual effect owner,explicit retryable error classification,finite budgets and retained attempts. Do not equate a response failure with an unapplied operation or claim this decorator itself provides exactly-once effects.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

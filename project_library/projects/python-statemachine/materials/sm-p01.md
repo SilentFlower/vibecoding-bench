@@ -1,0 +1,1 @@
+A StateChart has pending initial,done final,finish=pending.to(done),and async on_finish returning42. Inside a running event loop,inspect configuration_values immediately after construction,after await activate_initial_state(),and after await finish(). Plan UI/service readiness and error handling;no implementation.

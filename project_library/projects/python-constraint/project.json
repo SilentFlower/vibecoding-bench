@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "python-constraint",
+  "title": "Python Constraint有限域排班工作场景",
+  "category": "约束建模与结果解释",
+  "description": "合法解、结果投影、启发式返回、域生成器、持续时间模型和漏解诊断。",
+  "seed_digest": "415bec431162ba232ef94eb7fc86e123ee28fc489f16a017a56b00e8f4555f60",
+  "environment": "python-constraint-py312",
+  "source": {
+    "repository": "https://github.com/python-constraint/python-constraint",
+    "commit": "d91ba03d1fd6acc30d64fd9d513dc0523f697b5b",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PC-S01",
+      "title": "求解与结果表示",
+      "goal": "核有限解和投影",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PC-U01",
+            "PC-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PC-U01",
+          "kind": "understand",
+          "goal": "解释小型排班的完整解集合",
+          "prompt": "Explain the complete legal pairs and what their order does not guarantee. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/finite-schedule.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PC-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/PC-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PC-U02",
+          "kind": "understand",
+          "goal": "核对单列结果的真实投影行为",
+          "prompt": "Explain both ordered-list controls and the exact one-name branch. No patch.",
+          "requires": [],
+          "materials": [
+            "materials/ordered-projection.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PC-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/PC-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PC-S02",
+      "title": "求解器与模型输入",
+      "goal": "明确算法结果和域所有权",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PC-C01",
+            "PC-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PC-C01",
+          "kind": "consult",
+          "goal": "区分启发式未找到和模型无解",
+          "prompt": "Advise the actual solver-result contract using both complete controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/heuristic-result.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PC-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/PC-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PC-C02",
+          "kind": "consult",
+          "goal": "为多变量提供可复用的域",
+          "prompt": "Advise the generator/list controls and partial-construction boundary. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/reusable-domain.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PC-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/PC-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PC-S03",
+      "title": "持续时间排班方案",
+      "goal": "以有限枚举验不重叠语义",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PC-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PC-P01",
+          "kind": "plan",
+          "goal": "规划带持续时间的容量一排班",
+          "prompt": "Plan the supplied half-open nonoverlap model and independent acceptance. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/nonoverlap-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PC-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/PC-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PC-S04",
+      "title": "有限模型漏解诊断",
+      "goal": "取得完整建模和反例",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PC-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "PC-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PC-D01",
+          "kind": "diagnose",
+          "goal": "先核有限模型再定位漏解",
+          "prompt": "A weighted finite-domain model reports no solutions despite an expected assignment. Request exact domains,constraints/coefficient order,solver/calls and independent enumeration before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PC-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-weighted-reproduction",
+              "when": "Complete domains,constraints and coefficient order,solver/calls and independent finite enumeration have not been supplied or declared unavailable,and are reasonably requested.",
+              "materials": [
+                "disclosure/weighted-reproduction.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

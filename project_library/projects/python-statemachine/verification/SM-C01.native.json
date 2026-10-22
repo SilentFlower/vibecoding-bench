@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SM-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "statechart_and_compatibility_statemachine_have_distinct_unknown_event_defaults": true
+  },
+  "resource_profile": "business"
+}

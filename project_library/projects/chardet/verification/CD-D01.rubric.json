@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CD-D01",
+  "source_commit": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use only actually consumed byte/chunk/lifecycle evidence. Request missing complete controls,trace the exact version state/initial-prefix behavior when established,and propose a tested caller-level buffering/decoding policy within scope. Missing evidence supports insufficient_information. No source patch or universal chunk-independence guarantee is authorized.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

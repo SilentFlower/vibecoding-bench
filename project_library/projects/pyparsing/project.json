@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "pyparsing",
+  "title": "Pyparsing文本导入工作场景",
+  "category": "输入验收、语法组合与坐标",
+  "description": "完整输入、重复结果、备选规则、动作组合、源码映射和模式诊断六项任务。",
+  "seed_digest": "1ea4850513f7ad99f106e8d072c7a40bcfad1447d2d00b9441695e53fc1c1b9d",
+  "environment": "pyparsing-py312",
+  "source": {
+    "repository": "https://github.com/pyparsing/pyparsing",
+    "commit": "810199f89bf916590426e1c5cb3d612584f11a2f",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PP-S01",
+      "title": "记录和结果验收",
+      "goal": "分清完整输入与命名投影",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PP-U01",
+            "PP-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PP-U01",
+          "kind": "understand",
+          "goal": "区分数量前缀匹配与完整记录验收",
+          "prompt": "Explain the complete prefix/full-input controls and actual tokens/errors. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/full-input.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PP-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/PP-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PP-U02",
+          "kind": "understand",
+          "goal": "追踪重复命名结果的不同投影",
+          "prompt": "Explain both token lists and named dictionaries from the complete repeated-value controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/named-results.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PP-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/PP-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PP-S02",
+      "title": "规则与动作组合",
+      "goal": "显式选择备选和转换链",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PP-C01",
+            "PP-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PP-C01",
+          "kind": "consult",
+          "goal": "选择有序备选或最长规则",
+          "prompt": "Advise command grammar choice semantics using all complete success/failure controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/alternatives.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PP-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/PP-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PP-C02",
+          "kind": "consult",
+          "goal": "保持单位转换的解析动作链",
+          "prompt": "Advise actual copy/set/add parse-action ownership and types from every supplied control. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/action-composition.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PP-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/PP-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PP-S03",
+      "title": "编辑器位置映射",
+      "goal": "持有原文和坐标体系",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PP-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PP-P01",
+          "kind": "plan",
+          "goal": "规划含制表符与中文的源码位置映射",
+          "prompt": "Plan original-source coordinate mapping using the actual Located controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/source-map-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PP-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/PP-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PP-S04",
+      "title": "语法初始化诊断",
+      "goal": "先核模式和异常证据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PP-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "PP-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PP-D01",
+          "kind": "diagnose",
+          "goal": "先核全局初始化再定位语法组合错误",
+          "prompt": "A grammar works alone but initialization fails when another parser component is loaded. Request complete grammar/mode setup order,the exact exception and clean controls before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PP-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-mode-reproduction",
+              "when": "The complete grammar/mode initialization order,exception and isolated controls have not been supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/memoization-order.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

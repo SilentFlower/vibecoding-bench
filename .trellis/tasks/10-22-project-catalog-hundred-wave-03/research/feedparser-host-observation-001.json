@@ -1,0 +1,27 @@
+{
+  "FP-U01": {
+    "candidate_import": true,
+    "bozo_status_and_recovered_entries_require_separate_acceptance": true
+  },
+  "FP-U02": {
+    "candidate_import": true,
+    "parsed_dates_are_utc_and_legacy_updated_fallback_is_not_a_real_key": true
+  },
+  "FP-C01": {
+    "candidate_import": true,
+    "html_sanitization_changes_markup_and_requires_a_downstream_rendering_policy": true
+  },
+  "FP-C02": {
+    "candidate_import": true,
+    "relative_html_uris_need_explicit_local_source_provenance": true
+  },
+  "FP-P01": {
+    "error": "KeyError:'tags'"
+  },
+  "FP-D01": {
+    "candidate_import": true,
+    "bozo": false,
+    "modified_stored": false,
+    "raw_source_modified": "2026-10-22T09:00:00+02:00"
+  }
+}

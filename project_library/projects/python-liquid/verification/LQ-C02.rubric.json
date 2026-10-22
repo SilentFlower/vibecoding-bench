@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "LQ-C02",
+  "source_commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default Undefined silently yields AB;StrictUndefined raises UndefinedError when the missing value is consumed. Validate required report data and choose explicit optional fallbacks/error reporting before publication. Distinguish strict variable handling from tag/filter tolerance and do not claim defaults validate completeness.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

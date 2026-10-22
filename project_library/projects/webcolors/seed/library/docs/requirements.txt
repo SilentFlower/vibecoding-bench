@@ -1,0 +1,9 @@
+# These dependencies are not "extras" defined in the pyproject.toml,
+# because they're not something you actually want to install alongside
+# the main package.
+furo
+sphinx
+sphinx-copybutton
+sphinx-inline-tabs
+sphinx-notfound-page
+sphinxext-opengraph

@@ -1,0 +1,431 @@
+{
+  "baseline_digest": "117ca1c28f77d44d94b34409a96e83058319bdf038bf191c6c141206f49a8da7",
+  "nodes": [
+    {
+      "id": "tests/test_advanced.py::test_chomp",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_advanced.py::test_code_with_tricky_content",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_advanced.py::test_ignore_comments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_advanced.py::test_ignore_comments_with_other_tags",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_advanced.py::test_nested",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_advanced.py::test_special_tags",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_args.py::test_convert",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_args.py::test_do_not_convert",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_args.py::test_do_not_strip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_args.py::test_strip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_args.py::test_strip_document",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_args.py::test_strip_pre",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_basic.py::test_single_tag",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_basic.py::test_soup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_basic.py::test_whitespace",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_a",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_a_in_code",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_a_no_autolinks",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_a_shortcut",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_a_spaces",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_a_with_title",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_b",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_b_spaces",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_blockquote",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_blockquote_nested",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_blockquote_with_nested_paragraph",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_blockquote_with_paragraph",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_br",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_code",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_del",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_div_section_article",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_dl",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_em",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_figcaption",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_h1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_h2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_head",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_header_with_space",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_hn",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_hn_atx_closed_headings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_hn_atx_headings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_hn_chained",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_hn_nested_img",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_hn_nested_simple_tag",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_hn_nested_tag_heading_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_hn_newlines",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_hr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_i",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_img",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_kbd",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_lang",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_lang_callback",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_p",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_pre",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_q",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_s",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_samp",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_script",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_spaces",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_strong",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_strong_em_symbol",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_sub",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_sup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversions.py::test_video",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_custom_converter.py::test_custom_conversion_functions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_custom_converter.py::test_soup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_escaping.py::test_asterisks",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_escaping.py::test_hexadecimal_entities",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_escaping.py::test_misc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_escaping.py::test_named_entities",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_escaping.py::test_single_escaping_entities",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_escaping.py::test_underscore",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_escaping.py::test_xml_entities",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_bullets",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_inline_ul",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_li_text",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_nested_ols",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_nested_uls",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_ol",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_ul",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tables.py::test_table_infer_header",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "markdownify",
+  "python": "3.12.15",
+  "schema": 1
+}

@@ -1,0 +1,1 @@
+Compare Jaccard(qval=None,external=False) and the same with as_set=True on tea tea book versus tea book. Also compare tea book with book tea. Advise whether frequency and order are part of the business matching contract. Do not call either score semantic equivalence. No implementation.

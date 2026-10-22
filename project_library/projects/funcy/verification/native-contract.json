@@ -1,0 +1,1316 @@
+{
+  "baseline_digest": "3dd7d4bb0372e3484b54ac9035390b477bd9abf3b68e4ef49b8d75fcb6955d55",
+  "nodes": [
+    {
+      "id": "tests/test_calc.py::test_cache[int]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_cache[timedelta]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_cache_expiration_ignores_wall_clock_jumps[-1000]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_cache_expiration_ignores_wall_clock_jumps[1000]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_cache_expiration_preserves_refilled_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_cache_invalidate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_cache_mixed_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_cache_timedout",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_lookuper_caches_empty_table[make_lookuper]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_lookuper_caches_empty_table[silent_lookuper]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_lookuper_retries_failed_initialization[KeyboardInterrupt-False-make_lookuper]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_lookuper_retries_failed_initialization[KeyboardInterrupt-False-silent_lookuper]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_lookuper_retries_failed_initialization[KeyboardInterrupt-True-make_lookuper]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_lookuper_retries_failed_initialization[KeyboardInterrupt-True-silent_lookuper]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_lookuper_retries_failed_initialization[ValueError-False-make_lookuper]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_lookuper_retries_failed_initialization[ValueError-False-silent_lookuper]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_lookuper_retries_failed_initialization[ValueError-True-make_lookuper]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_lookuper_retries_failed_initialization[ValueError-True-silent_lookuper]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_make_lookuper",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_make_lookuper_nested",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_memoize",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_memoize_args_kwargs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_memoize_direct_key_func",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_memoize_key_func",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_memoize_kwargs_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_memoize_memory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_memoize_skip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_reused_memory_decorator[cache]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_reused_memory_decorator[memoize]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_silent_lookuper",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_calc.py::test_silnent_lookuper_nested",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_all",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_all_extended",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_any",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_bytes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_compact",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_counter_mapping_operations",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_del_in",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_empty_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_empty_quirks",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_empty_text[0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_empty_text[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_empty_text[bytes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_empty_text[text]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_flip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_get[get_in]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_get[get_lax]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_get_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_get_list[get_in]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_get_list[get_lax]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_has_path",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_has_path_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_invoke",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_is_distinct",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_iteritems",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_itervalues",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_join",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_join_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_join_with",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_lwhere",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_merge",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_merge_with",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_omit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_one",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_pluck",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_pluck_attr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_project",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_select",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_select_extended",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_select_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_select_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_set_in",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_set_in_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_some",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_split_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_split_keys_extended",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_split_keys_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_update_in",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_walk",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_walk_extended",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_walk_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_walk_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_walk_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_walk_values_defaultdict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_where",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_zip_dicts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_zip_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colls.py::test_zipdict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debug.py::test_log_calls",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debug.py::test_log_calls_keyword",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debug.py::test_log_calls_raise",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debug.py::test_log_durations",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debug.py::test_log_durations_ex",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debug.py::test_log_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debug.py::test_log_errors_manager",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debug.py::test_log_iter_dirations",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debug.py::test_print_calls",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debug.py::test_print_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debug.py::test_print_errors_manager",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debug.py::test_print_errors_recursion",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_debug.py::test_tap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_decorators.py::test_chain_arg_access",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_decorators.py::test_decorator_access_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_decorators.py::test_decorator_bound_method_posonly",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_decorators.py::test_decorator_introspection",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_decorators.py::test_decorator_kw_only_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_decorators.py::test_decorator_no_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_decorators.py::test_decorator_with_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_decorators.py::test_decorator_with_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_decorators.py::test_decorator_with_method_descriptor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_decorators.py::test_double_decorator_defaults",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_decorators.py::test_meta_attribtes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_collecting",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_fallback",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_ignore",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_limit_error_rate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_limit_error_rate_fractional_timeout[0.5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_limit_error_rate_fractional_timeout[timeout1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_allows_reentrant_calls[once-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_allows_reentrant_calls[once-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_allows_reentrant_calls[once_per_args-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_per",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_per_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_per_args_all_kinds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_per_bound_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_per_unhashable_arguments[<lambda>-once]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_per_unhashable_arguments[<lambda>-once_per_args]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_per_unhashable_arguments[dict-once]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_per_unhashable_arguments[dict-once_per_args]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_per_unhashable_arguments[list-once]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_per_unhashable_arguments[list-once_per_args]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_per_unhashable_arguments[set-once]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_once_per_unhashable_arguments[set-once_per_args]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_post_processing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_raiser",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_reraise",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_retry",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_retry_filter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_retry_many_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_retry_timeout",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_silent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_suppress",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_throttle[int]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_throttle[timedelta]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_throttle_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_throttle_ignores_wall_clock_jumps[-3600]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_throttle_ignores_wall_clock_jumps[3600]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_flow.py::test_wrap_with",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcmakers.py::test_callable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcmakers.py::test_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcmakers.py::test_int",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcmakers.py::test_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcmakers.py::test_slice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcmakers.py::test_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcolls.py::test_all_fn",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcolls.py::test_any_fn",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcolls.py::test_extended_fns",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcolls.py::test_none_fn",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcolls.py::test_one_fn",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcolls.py::test_some_fn",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_autocurry",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_autocurry_builtin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_autocurry_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_autocurry_docstring",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_autocurry_hard",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_autocurry_kwargs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_autocurry_kwonly",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_autocurry_named",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_autocurry_posonly",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_caller",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_complement",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_compose",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_constantly",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_curry",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_curry_bound_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_curry_funcy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_func_partial",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_iffy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_juxt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_partial",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_rcompose",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_rcurry",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_funcs.py::test_rpartial",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_interface.py::test_docs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_cached_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_cached_property_doc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_cached_readonly[0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_cached_readonly[7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_cached_readonly[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_cached_readonly[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_cached_readonly[value4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_lazy_object",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_monkey",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_monkey_module",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_monkey_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_monkey_with_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_wrap_prop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_wrap_prop_delete[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_wrap_prop_delete[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_objects.py::test_wrap_prop_delete_cached_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_butlast",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_cat",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_chunks",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_chunks_step_gt_n",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_concat",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_count_by",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_count_by_is_defaultdict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_count_reps",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_distinct",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_drop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_filter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_first",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_flatten",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_flatten_follow",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_group_by",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_group_by_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_group_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_ilen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_interleave",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_iterate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_iterpose",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_keep",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_last",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_lmap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_lsplit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_lzip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_lzip_strict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_mapcat",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_nth",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_pairwise",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_partition",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_partition_by",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_partition_step_gt_n",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_partition_zero",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_reductions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_remove",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_repeatedly",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_second",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_shuffled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_split",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_split_at",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_split_by",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_sums",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_take",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_takewhile",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_with_next",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_with_prev",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_seqs.py::test_without",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strings.py::test_cut_prefix",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strings.py::test_cut_suffix",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strings.py::test_re_all",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strings.py::test_re_find",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_strings.py::test_str_join",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::test_tree_leaves",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::test_tree_nodes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_types.py::test_is_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_types.py::test_iterable",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ff25ba88c3f21377d4fcb8973c2c082eefab59c318a2e552996438f52e2f9a47",
+      "version": "7.4.3"
+    }
+  ],
+  "project": "funcy",
+  "python": "3.12.15",
+  "schema": 1
+}

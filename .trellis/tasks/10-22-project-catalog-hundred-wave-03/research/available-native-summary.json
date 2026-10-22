@@ -1,0 +1,1612 @@
+{
+  "status": "available_29_native_verified",
+  "required_projects": 30,
+  "verified_projects": 29,
+  "source_blocked": [
+    "sqlglot"
+  ],
+  "scenarios": 116,
+  "tasks": 175,
+  "business_cases": 158,
+  "primary_native_main": 84320,
+  "primary_native_counts": {
+    "passed": 76033,
+    "skipped": 6537,
+    "xfailed": 1750,
+    "xpassed": 0,
+    "failed": 0,
+    "error": 0,
+    "unexecuted": 0
+  },
+  "subtests_separate": 2403,
+  "items": [
+    {
+      "project": "arrow",
+      "source_commit": "2224255c4acc594d734cef0bbc83360452a67983",
+      "git_source_files": 50,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "arrow",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/arrow/result.json",
+        "result_sha256": "f17aed86d153326a2cf029e4decebb3d31e5f68c718b063990baf26e7f56bd9c",
+        "main_collected": 1904,
+        "counts": {
+          "passed": 1904,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 1904,
+        "xml_skipped": 0,
+        "runner_sha256": "fb830e46bde90d788f9fcc075596dec686bb94db702176ee4f1aa9feaa8bfee4",
+        "contract_sha256": "1c79997ef5e30a908af8d5033b4ccffbb0feb7e1159613cb1686302cf71c5c19",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/arrow-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "bidict",
+      "source_commit": "299fedc89f1d70d5d41cf7922564b376d3e2d435",
+      "git_source_files": 88,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "bidict",
+        "attempt": 2,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-002/bidict/result.json",
+        "result_sha256": "bb2c5da3c4c2a1084b06186d3fb6ce77a52f8e0f0cbedf2d30088179887cbbd1",
+        "main_collected": 1236,
+        "counts": {
+          "passed": 1236,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 8,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 1236,
+        "xml_skipped": 0,
+        "runner_sha256": "3f550fa246911e822dfa0c529938b9ffa38bcd771f1ccb66e18788c331449fd3",
+        "contract_sha256": "e49c342d8cf7adf2623b99831413043a2499d2d55a42c10d6c7a00e3b24544b2",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 768,
+          "pids_limit": 128
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/bidict-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "chardet",
+      "source_commit": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+      "git_source_files": 505,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "chardet",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/chardet/result.json",
+        "result_sha256": "e15e3769b014cd918dc0323bbed9ce980c3c9ca8618e3045f2fde155324127fd",
+        "main_collected": 764,
+        "counts": {
+          "passed": 754,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 10,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 764,
+        "xml_skipped": 10,
+        "runner_sha256": "fc5bf6e1d6e85fbd8cc7d88c3deaf2d1844fb313dbfc10160b380d881de25d33",
+        "contract_sha256": "b593a1d6df8c03bdc558c5c9763cca813e0508dff74bc53095cade52079c4d96",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/chardet-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "charset-normalizer",
+      "source_commit": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+      "git_source_files": 100,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "charset-normalizer",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/charset-normalizer/result.json",
+        "result_sha256": "f6ce25c331ed1d7f75db39641200cef53c9e1e0d547d14180f81ce682c77f567",
+        "main_collected": 620,
+        "counts": {
+          "passed": 620,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 16,
+        "collection_skip_count": 0,
+        "xml_testcases": 620,
+        "xml_skipped": 0,
+        "runner_sha256": "fb830e46bde90d788f9fcc075596dec686bb94db702176ee4f1aa9feaa8bfee4",
+        "contract_sha256": "7a2d0779204f7b77e5e11372298865e5b03b1783535095615dceeb1b3e761be2",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 300,
+          "memory_mb": 2048,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/charset-normalizer-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "collective-icalendar",
+      "source_commit": "3ecf079acba0e592ea6a40c456514984c8657852",
+      "git_source_files": 783,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "collective-icalendar",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/collective-icalendar/result.json",
+        "result_sha256": "cca92c070497050a97db769b645e7d8d35eb4919effa7b5edb1911bd04744f41",
+        "main_collected": 21960,
+        "counts": {
+          "passed": 21321,
+          "failed": 0,
+          "error": 0,
+          "skipped": 42,
+          "xfailed": 597,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 21960,
+        "xml_skipped": 639,
+        "runner_sha256": "3e719ee08e402118d8612c1beecc0bbc705d3b90ff230eaaef6cc9ab10a847e3",
+        "contract_sha256": "bbfdd18a0bf6b8668ce81c9576b2d2a4726da5aae512079c6bc51ee624836b9a",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/collective-icalendar-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "feedgen",
+      "source_commit": "97260abb1793eb164c458c10b493690beb413f6d",
+      "git_source_files": 55,
+      "scenarios": 5,
+      "tasks": 7,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1,
+        "modify": 1
+      },
+      "business_cases": 11,
+      "native_baseline": {
+        "project": "feedgen",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/feedgen/result.json",
+        "result_sha256": "551b75bcd33ffeff65a1953f27f12c967cee66fc4ca640f28d857e4b191e075a",
+        "main_collected": 56,
+        "counts": {
+          "passed": 56,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 56,
+        "xml_skipped": 0,
+        "runner_sha256": "539679710de2ccd340b385928bd7e33526a15318638737ccf637f027372025e4",
+        "contract_sha256": "132b3a570542eab7a670eaf8bbf6476e7a76440d52ebe2540f7088cd8609b1cd",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/feedgen-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "feedparser",
+      "source_commit": "a22c5521cbb109871f1a2318948581901bd47e26",
+      "git_source_files": 2362,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "feedparser",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/feedparser/result.json",
+        "result_sha256": "f6f856a34f4b0d68c98900e5258cb1714a2f43782393f6e80c82f4d24e8503cd",
+        "main_collected": 4305,
+        "counts": {
+          "passed": 4305,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 4305,
+        "xml_skipped": 0,
+        "runner_sha256": "4142098c7cd0e2c9f184a12de1d6209ce9ac61c318ef469e21c6fe362556b479",
+        "contract_sha256": "f23189f397f757037fb6f8bdba757b4a04eab50fb7996d4a732b9bb6e7faed78",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/feedparser-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "funcy",
+      "source_commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+      "git_source_files": 69,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "funcy",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/funcy/result.json",
+        "result_sha256": "60f54d7dff6d60323e94d62e6291a6275b6bea22e4b100d37f78b0760f435353",
+        "main_collected": 260,
+        "counts": {
+          "passed": 260,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 260,
+        "xml_skipped": 0,
+        "runner_sha256": "3e719ee08e402118d8612c1beecc0bbc705d3b90ff230eaaef6cc9ab10a847e3",
+        "contract_sha256": "03a6926be03de91b0e196e28a222aea74bb8459cc20d901ec509621c1beda11a",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/funcy-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "html5lib",
+      "source_commit": "fd4f032bc090d44fb11a84b352dad7cbee0a4745",
+      "git_source_files": 222,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "html5lib",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/html5lib/result.json",
+        "result_sha256": "e2a2e05bad73ab50d2ce9a442a6e6084a6d19b86dba66017918d608858ef9129",
+        "main_collected": 30618,
+        "counts": {
+          "passed": 23563,
+          "failed": 0,
+          "error": 0,
+          "skipped": 6038,
+          "xfailed": 1017,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 30618,
+        "xml_skipped": 7055,
+        "runner_sha256": "3f550fa246911e822dfa0c529938b9ffa38bcd771f1ccb66e18788c331449fd3",
+        "contract_sha256": "81c06e182e1a8091adecd0c04e7f0ac53530261bdd20b119229c0ae095dc925a",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/html5lib-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "humanize",
+      "source_commit": "785e5dcc0d0308ad0dff3f6cc0faa7085ad0375b",
+      "git_source_files": 89,
+      "scenarios": 4,
+      "tasks": 7,
+      "kinds": {
+        "understand": 3,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 6,
+      "native_baseline": {
+        "project": "humanize",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/humanize/result.json",
+        "result_sha256": "f3c7cda6138398f6375eea0982cdfe52b2049e9e2a2e23ecf6a541a1e496c9fa",
+        "main_collected": 856,
+        "counts": {
+          "passed": 856,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 856,
+        "xml_skipped": 0,
+        "runner_sha256": "d2baee592699a0bb040f17fdebac1776f3cf4ecc6e41acfc0893f9cd78c2cd72",
+        "contract_sha256": "dbc5cac6ab8717831a53613842c871d3464081c227d9286f84803f082da98532",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/humanize-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "injector",
+      "source_commit": "5daed12510fafc0bf73b6ef18d2884f78cd5e210",
+      "git_source_files": 33,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "injector",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/injector/result.json",
+        "result_sha256": "0028cd5c03628d6d11ef665ad549e2a783b16928a085343ecb466fa71138671f",
+        "main_collected": 145,
+        "counts": {
+          "passed": 145,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 11,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 145,
+        "xml_skipped": 0,
+        "runner_sha256": "fb830e46bde90d788f9fcc075596dec686bb94db702176ee4f1aa9feaa8bfee4",
+        "contract_sha256": "4a4094f33730f0886b69525864e43caae71c13d2049b7bc80a39d774fd799453",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/injector-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "loguru",
+      "source_commit": "bce5dfd3b435b1d1658507d7e095ad7a9919bf1c",
+      "git_source_files": 313,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "loguru",
+        "attempt": 6,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-006/loguru/result.json",
+        "result_sha256": "d1142bc39260a04850ac52be8e2cfbf3dbe5beaddd392bbb996a658393bdc3ff",
+        "main_collected": 1725,
+        "counts": {
+          "passed": 1679,
+          "failed": 0,
+          "error": 0,
+          "skipped": 46,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 1725,
+        "xml_skipped": 46,
+        "runner_sha256": "834a3705c301b60167179f0083deeb0618d71e578d0dd7399a98320c182f81e9",
+        "contract_sha256": "786f05b6805aadf116f3307073ca26fe2a523a27a5fec1be139ac91694a21dbe",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 600,
+          "memory_mb": 768,
+          "pids_limit": 128
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/loguru-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "markdownify",
+      "source_commit": "bc98c9e134ec55b2853716ab859754f061cb7054",
+      "git_source_files": 24,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "markdownify",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/markdownify/result.json",
+        "result_sha256": "e3e77adc8e64e557175b3b2db60d8ced5230a76226d84718a414cbbea67d793d",
+        "main_collected": 83,
+        "counts": {
+          "passed": 83,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 83,
+        "xml_skipped": 0,
+        "runner_sha256": "834a3705c301b60167179f0083deeb0618d71e578d0dd7399a98320c182f81e9",
+        "contract_sha256": "41f98e236739ea9883a79ebee862b5ae086c4183df0120f933f7a9805853b531",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/markdownify-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "natsort",
+      "source_commit": "e9a3a2a307580a1f2be8c57bba50fba45789ada0",
+      "git_source_files": 61,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "natsort",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/natsort/result.json",
+        "result_sha256": "dc785b29eb249bc674b1e85faf4657a8702d0ea58b89e6d1fd83116f5ec1aeb3",
+        "main_collected": 363,
+        "counts": {
+          "passed": 362,
+          "failed": 0,
+          "error": 0,
+          "skipped": 1,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 363,
+        "xml_skipped": 1,
+        "runner_sha256": "d2baee592699a0bb040f17fdebac1776f3cf4ecc6e41acfc0893f9cd78c2cd72",
+        "contract_sha256": "4ed69bb9a70f92f20a86e197b3850929c351c85f81dd22dc713c366a5fdf11c4",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/additional-native/attempt-002/natsort/result.json",
+          "sha256": "ee930e0ff5358baf6a56a22716f8444412711c305f3d110f80b4013e2986c551",
+          "library_digest": "681a145a6182a2e4a661a35856e882d8737f3e4431489fdf6d7797f64a9c2980",
+          "collected": 15,
+          "passed": 15,
+          "scope": "固定原版额外官方集合；不是可修改候选回归"
+        }
+      ],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/natsort-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "pendulum",
+      "source_commit": "e06dacedc4cdea90fa1286b3965d180ab94cf251",
+      "git_source_files": 290,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "pendulum",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/pendulum/result.json",
+        "result_sha256": "d1944b518d35e227194b801921a652a7ae6cb9f74f0a2c0879a67380a3a141bc",
+        "main_collected": 1874,
+        "counts": {
+          "passed": 1871,
+          "failed": 0,
+          "error": 0,
+          "skipped": 3,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 1874,
+        "xml_skipped": 3,
+        "runner_sha256": "4acca1633aea0ca25b4b8ced785d1b234c769e0d7223c4395cec519ed1391f14",
+        "contract_sha256": "5d3ed8026621d61a288b1617f1a159e0c0e9223fc9c7d3a347bf3d28a5c9bcd1",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 768,
+          "pids_limit": 128
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/additional-native/attempt-002/pendulum/result.json",
+          "sha256": "2cf3be7ace33022adffe0d7c9a3fd398b9b7c397fb4dab2d4748a53ad805adf4",
+          "library_digest": "082faee2a01b1c084e3f03971bdd2e9a000c155ed3ebe38b1db97c287a86c5df",
+          "collected": 1874,
+          "passed": 1871,
+          "scope": "固定原版额外官方集合；不是可修改候选回归"
+        }
+      ],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pendulum-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "portion",
+      "source_commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+      "git_source_files": 26,
+      "scenarios": 3,
+      "tasks": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "portion",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/portion/result.json",
+        "result_sha256": "464226b13e4d5a42fa8224b288c46d88b99bbeba142fae7de91f6d02d93e1ad9",
+        "main_collected": 241,
+        "counts": {
+          "passed": 230,
+          "failed": 0,
+          "error": 0,
+          "skipped": 11,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 241,
+        "xml_skipped": 11,
+        "runner_sha256": "4142098c7cd0e2c9f184a12de1d6209ce9ac61c318ef469e21c6fe362556b479",
+        "contract_sha256": "c7b426ffb555759e70d0b6c17e7182aff584f86d0e4c2168121a544f6582c236",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/portion-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "pyparsing",
+      "source_commit": "810199f89bf916590426e1c5cb3d612584f11a2f",
+      "git_source_files": 293,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "pyparsing",
+        "attempt": 2,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-002/pyparsing/result.json",
+        "result_sha256": "901cff3d7ca3f6c50f5fda58b264b49614537672ec1ae003897cc67fa453c14b",
+        "main_collected": 2175,
+        "counts": {
+          "passed": 2175,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 2089,
+        "collection_skip_count": 0,
+        "xml_testcases": 2175,
+        "xml_skipped": 0,
+        "runner_sha256": "834a3705c301b60167179f0083deeb0618d71e578d0dd7399a98320c182f81e9",
+        "contract_sha256": "6720c50640ee7b3575dc969902a2d9517b4870a9b8fcdadc68cf94c6609b92db",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 300,
+          "memory_mb": 768,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pyparsing-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "pypika",
+      "source_commit": "465fb9ae12f7727d28785d087b64e6226da5714e",
+      "git_source_files": 97,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "pypika",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/pypika/result.json",
+        "result_sha256": "9aa6943173249ca8000bdcc5e125bcc4b56ea48a00c9970d15698430260b0975",
+        "main_collected": 1099,
+        "counts": {
+          "passed": 1099,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 90,
+        "collection_skip_count": 0,
+        "xml_testcases": 1099,
+        "xml_skipped": 0,
+        "runner_sha256": "fb830e46bde90d788f9fcc075596dec686bb94db702176ee4f1aa9feaa8bfee4",
+        "contract_sha256": "99d7ecf201fae298068a7872e94685a2dc320f55334beb9ead91abffb8de9f90",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pypika-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "pyrsistent",
+      "source_commit": "0c0b7aec8cd25b1d2d8ba07b10acdefd0f38f2c7",
+      "git_source_files": 71,
+      "scenarios": 3,
+      "tasks": 5,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "pyrsistent",
+        "attempt": 5,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-005/pyrsistent/result.json",
+        "result_sha256": "1bdcd12caa91147e1eccfeffa021a024f64d601b968bec0c4c73bcceb36ddce1",
+        "main_collected": 638,
+        "counts": {
+          "passed": 637,
+          "failed": 0,
+          "error": 0,
+          "skipped": 1,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 638,
+        "xml_skipped": 1,
+        "runner_sha256": "fb4d87610fda41602c4c0c00fc3550fb23060f6eb5b05a52db6ec9c924c77692",
+        "contract_sha256": "cc8031d1a1538e8727d4e74cee3cd6f1cc7a30009b30219cde0541705c294ac2",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成",
+        "native_build": {
+          "command": [
+            "/work/python/bin/python",
+            "setup.py",
+            "build_ext",
+            "--inplace",
+            "--force"
+          ],
+          "returncode": 0,
+          "elapsed_sec": 1.0697265509952558,
+          "inputs": {
+            "setup.py": "2fb616a34abf9a5c2d0d372e0c0c83995d3d6b1ccfd9ddc3b87575f87844b3a0",
+            "setup.cfg": "20aeffedf3390e2a3eb2bbcfaa38c681d5f8f3d7fcfad8b1c3382018d9c52bbb",
+            "pvectorcmodule.c": "9b2ae5a48474dd1380aa60c2d1f0e6a0534af43637970310454551cb27f1422b",
+            "_pyrsistent_version.py": "500b93622285e35c936be946f8b0fd51402b857738699e9b26cffab06ab606e5"
+          },
+          "extension": "pvectorc.cpython-312-x86_64-linux-gnu.so",
+          "extension_sha256": "72ad3fc525ef4cc71a307b5bda953b28c3c77d096464b5ae72b6d7f40a938c10",
+          "implementation_installed": false,
+          "force_rebuilt_from_candidate": true
+        }
+      },
+      "additional_original_native": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/additional-native/attempt-001/pyrsistent/result.json",
+          "sha256": "3fa88bbe980c0748b3d4b927e8d6a167cf810fea76f060d35f6de29157c84056",
+          "library_digest": "343b991e0a096303d88d2aca598b2718b54b788a6e5814f017cdee13d0923e77",
+          "collected": 80,
+          "passed": 80,
+          "scope": "固定原版额外官方集合；不是可修改候选回归"
+        }
+      ],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pyrsistent-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "python-constraint",
+      "source_commit": "d91ba03d1fd6acc30d64fd9d513dc0523f697b5b",
+      "git_source_files": 85,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "python-constraint",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/python-constraint/result.json",
+        "result_sha256": "95705d0f411f5501a3f8a0c11d709eaf59a7255163fbac51f31ce67f068a799e",
+        "main_collected": 52,
+        "counts": {
+          "passed": 52,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 52,
+        "xml_skipped": 0,
+        "runner_sha256": "4142098c7cd0e2c9f184a12de1d6209ce9ac61c318ef469e21c6fe362556b479",
+        "contract_sha256": "15a0223c0685bd55b6094e78e30c2daea8dd9c8206159c363f188b3cf3c25175",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 360,
+          "memory_mb": 768,
+          "pids_limit": 128
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成",
+        "native_build": {
+          "command": [
+            "/work/python/bin/python",
+            "cythonize_build.py"
+          ],
+          "returncode": 0,
+          "elapsed_sec": 64.8954730629921,
+          "inputs": {
+            "cythonize_build.py": "4b5c71b8bcb5535d759c59de4b18e3e7a3832b8554cb62c2622c2291d3c71f2e",
+            "constraint/__init__.py": "18dac9019ef73789e97c80838b00534f476f788fbee5a26ef844a8d82ac78fbb",
+            "constraint/constraints.py": "3e2d172a9830fca0047bea6dd6a688538ca987f614d2ec7c44f2c2f5772a5882",
+            "constraint/domain.py": "eff13f9df7d5594a967cf76359def5cca20b43e51acd99e977a785615e8c30f4",
+            "constraint/parser.py": "6084fdb2a1f18e1e70a01a7342e05ecb213107a1bee9091300b81a4e3ef100c2",
+            "constraint/problem.py": "97cb0341842dd02c04ff6f0f00182b94e1eea85ee406c1e669b36479bd2a23ec",
+            "constraint/solvers.py": "2301a91b43b41f30ef8548d7b612fee1983550b7a74911172e6e817ba6c6962e"
+          },
+          "extension": "constraint/constraints.cpython-312-x86_64-linux-gnu.so",
+          "extension_sha256": "7773e6dd69ed52e43a45f74400bf8080d7b680afc21958a6776a432f4e378839",
+          "implementation_installed": false,
+          "force_rebuilt_from_candidate": true,
+          "extensions": {
+            "constraint/constraints.cpython-312-x86_64-linux-gnu.so": "7773e6dd69ed52e43a45f74400bf8080d7b680afc21958a6776a432f4e378839",
+            "constraint/domain.cpython-312-x86_64-linux-gnu.so": "9f3ca121437cecf87465f6df600ed9670cb5793d4910a7fb6389f717170718a7",
+            "constraint/problem.cpython-312-x86_64-linux-gnu.so": "17082949284610c84ce31e3666a4b5f91b3a1eab21d1b269d1ac8f31ca51f725",
+            "constraint/solvers.cpython-312-x86_64-linux-gnu.so": "2060916e647da87e953361a9f9ee32d00f2a8e71686e50b94da7aede7fa2763c",
+            "constraint/parser.cpython-312-x86_64-linux-gnu.so": "70f56a5cfdb835903cc30c4e3b7db3ea1aa83676edf5048ff5dab2ec7e959b2c"
+          }
+        }
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-constraint-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "python-liquid",
+      "source_commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+      "git_source_files": 406,
+      "scenarios": 4,
+      "tasks": 7,
+      "kinds": {
+        "understand": 3,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 6,
+      "native_baseline": {
+        "project": "python-liquid",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/python-liquid/result.json",
+        "result_sha256": "8c2fe1fb6dfaa76839c3c80d692fa1ceead4d831037900fb4dd84b5bfca0ddc8",
+        "main_collected": 3598,
+        "counts": {
+          "passed": 3526,
+          "failed": 0,
+          "error": 0,
+          "skipped": 72,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 165,
+        "collection_skip_count": 0,
+        "xml_testcases": 3598,
+        "xml_skipped": 72,
+        "runner_sha256": "3e719ee08e402118d8612c1beecc0bbc705d3b90ff230eaaef6cc9ab10a847e3",
+        "contract_sha256": "a33b21096f582a521aae251e1ceb76f348ddd3db842123e061a8b17493eb11f5",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-liquid-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "python-statemachine",
+      "source_commit": "ec5d8173f740b37941818df13727db9d64ef498d",
+      "git_source_files": 718,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "python-statemachine",
+        "attempt": 5,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-005/python-statemachine/result.json",
+        "result_sha256": "12da9690cc9e0db05bbb5d670f9369f604da0abe38268feb8f0505835358ca86",
+        "main_collected": 3125,
+        "counts": {
+          "passed": 2973,
+          "failed": 0,
+          "error": 0,
+          "skipped": 26,
+          "xfailed": 126,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 49,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 3125,
+        "xml_skipped": 152,
+        "runner_sha256": "b3e8963ecf3ddc022b4b23d3d0791ee2ff864037fb4e91f04a360ef309daf4a9",
+        "contract_sha256": "01a223e8cf6a505b896536a120990d55ef76e42cece663126ed7a554664bcc3f",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 600,
+          "memory_mb": 768,
+          "pids_limit": 128
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-statemachine-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "sortedcontainers",
+      "source_commit": "3ac358631f58c1347f1d6d2d92784117db0f38ed",
+      "git_source_files": 258,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "sortedcontainers",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/sortedcontainers/result.json",
+        "result_sha256": "41a96f435d2b59303799474b563d4b78e4d16eac231fd52fc548518e38c03f6f",
+        "main_collected": 366,
+        "counts": {
+          "passed": 366,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 70,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 366,
+        "xml_skipped": 0,
+        "runner_sha256": "539679710de2ccd340b385928bd7e33526a15318638737ccf637f027372025e4",
+        "contract_sha256": "e16e84d5ab02195e8c9fac3152d18f22aab25b58af094dc3f4ea31eb1ddbe3a8",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sortedcontainers-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "tablib",
+      "source_commit": "966876c76a6378557c1951badc1665b4d1375875",
+      "git_source_files": 77,
+      "scenarios": 5,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 1,
+        "plan": 1,
+        "modify": 1,
+        "diagnose": 1
+      },
+      "business_cases": 10,
+      "native_baseline": {
+        "project": "tablib",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/tablib/result.json",
+        "result_sha256": "b49860949de032f01d89515f8ef746bacc602d5550e2892a60a4afd92467ae48",
+        "main_collected": 183,
+        "counts": {
+          "passed": 183,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 183,
+        "xml_skipped": 0,
+        "runner_sha256": "d2baee592699a0bb040f17fdebac1776f3cf4ecc6e41acfc0893f9cd78c2cd72",
+        "contract_sha256": "4d4ff4844cc6441f17b716e102fc378f50de27be1467556ed0bc2687f5e8d891",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/tablib-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "textdistance",
+      "source_commit": "d6a68d61088a40eef5c88191ccf79323dbf34850",
+      "git_source_files": 72,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "textdistance",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/textdistance/result.json",
+        "result_sha256": "85f6d2103fd4255d3e8a5f0edd2aebadb01e87f3dbb2d69017fa8755263cbb5a",
+        "main_collected": 430,
+        "counts": {
+          "passed": 430,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 430,
+        "xml_skipped": 0,
+        "runner_sha256": "fc5bf6e1d6e85fbd8cc7d88c3deaf2d1844fb313dbfc10160b380d881de25d33",
+        "contract_sha256": "ad182b1c2e37a90fc8a906269de87c5a09ad1c9230952f84e379c4b2b65c1459",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/textdistance-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "transitions",
+      "source_commit": "bd42b38f3627e6bca7274fb4d9af2e105f75da7c",
+      "git_source_files": 82,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "transitions",
+        "attempt": 4,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-004/transitions/result.json",
+        "result_sha256": "f4b3d54073b7d66f7e473283a007d77ba5642a2103c40d0d958475836ce17502",
+        "main_collected": 3214,
+        "counts": {
+          "passed": 2923,
+          "failed": 0,
+          "error": 0,
+          "skipped": 291,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 3214,
+        "xml_skipped": 291,
+        "runner_sha256": "5668ef850d7ec7886d4bafb0612a9676f47504e4229ba5c2ed3c72a23ba66ed2",
+        "contract_sha256": "2ed7fb4072b005b68bcc090be0b60e050ebb9740c4d01c35b7e208368d1fffe0",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 360,
+          "memory_mb": 768,
+          "pids_limit": 128
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/transitions-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "webcolors",
+      "source_commit": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+      "git_source_files": 39,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "webcolors",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/webcolors/result.json",
+        "result_sha256": "374fd7edce0fb5d2058a95612d5acfdbe6482d03b344bceca07a851be4aa1a24",
+        "main_collected": 475,
+        "counts": {
+          "passed": 475,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 475,
+        "xml_skipped": 0,
+        "runner_sha256": "3e719ee08e402118d8612c1beecc0bbc705d3b90ff230eaaef6cc9ab10a847e3",
+        "contract_sha256": "0007a03933b74c138e8b8a9a4119734a9fd1c5e7c82e684f07d4b5ebcc2ea536",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/webcolors-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "wrapt",
+      "source_commit": "6b4e844950213118b19e613248d2bc9469eb731e",
+      "git_source_files": 223,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "wrapt",
+        "attempt": 2,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-002/wrapt/result.json",
+        "result_sha256": "db2f5275652bfc1e93e5afce311f8ebddca70fa4e9186eb29fad89159e9b90a3",
+        "main_collected": 1418,
+        "counts": {
+          "passed": 1412,
+          "failed": 0,
+          "error": 0,
+          "skipped": 6,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 43,
+        "collection_skip_count": 0,
+        "xml_testcases": 1418,
+        "xml_skipped": 6,
+        "runner_sha256": "fa81331076a0898262b83f8c7d35554064794d17fd219439546d7ed99997bb84",
+        "contract_sha256": "bd964e9459c23edf25611d05b943090f515a5e5500bb4222d8ea1536472f07d9",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 360,
+          "memory_mb": 768,
+          "pids_limit": 128
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成",
+        "native_build": {
+          "command": [
+            "/work/python/bin/python",
+            "setup.py",
+            "build_ext",
+            "--inplace",
+            "--force"
+          ],
+          "returncode": 0,
+          "elapsed_sec": 2.929706091003027,
+          "inputs": {
+            "setup.py": "40c416e6f9560559ada491066c1696bfff6cc40bcb3710b200caedb7db1bce6d",
+            "pyproject.toml": "4dfaebafcfc4a9f2d4eeacb1ca9dda2c00786ab304231df77c2c0dc03fb6727f",
+            "src/wrapt/_wrappers.c": "aba424d1af4b8a49edae0217e3c35b635233586269c155c2a2eeec995b4654ba",
+            "src/wrapt/__init__.py": "ab6b1fa49f41d558419d51032e5968f1b6c5d43867fe08b588fc9fb20690cb07"
+          },
+          "extension": "src/wrapt/_wrappers.cpython-312-x86_64-linux-gnu.so",
+          "extension_sha256": "91dd89764118374564d301e1313bff1e5720105321738ccf9d619b250459622c",
+          "implementation_installed": false,
+          "force_rebuilt_from_candidate": true
+        }
+      },
+      "additional_original_native": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/additional-native/attempt-001/wrapt/result.json",
+          "sha256": "bec7938722b50adaef5532822512c5e6aa5425756adc1c73631b62797738a8e5",
+          "library_digest": "0fe5b5a17e325db0cae6595e2ce750cf594685f4c4b34cc5eaad8ee0e840708d",
+          "collected": 1418,
+          "passed": 1410,
+          "scope": "固定原版额外官方集合；不是可修改候选回归"
+        }
+      ],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/wrapt-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    },
+    {
+      "project": "wtforms",
+      "source_commit": "af18fd6a7595d374aa707ff97b73df0dcc462ec2",
+      "git_source_files": 153,
+      "scenarios": 4,
+      "tasks": 6,
+      "kinds": {
+        "understand": 2,
+        "consult": 2,
+        "plan": 1,
+        "diagnose": 1
+      },
+      "business_cases": 5,
+      "native_baseline": {
+        "project": "wtforms",
+        "attempt": 1,
+        "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/wtforms/result.json",
+        "result_sha256": "af41836cd551e8a787f94bc80b39baa4b54353f2dd612f7d98ff3baed19d8132",
+        "main_collected": 537,
+        "counts": {
+          "passed": 537,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "strict_doctest_nodes": 0,
+        "subtest_count": 0,
+        "collection_skip_count": 0,
+        "xml_testcases": 537,
+        "xml_skipped": 0,
+        "runner_sha256": "4142098c7cd0e2c9f184a12de1d6209ce9ac61c318ef469e21c6fe362556b479",
+        "contract_sha256": "4f08826f512984df3449a694a371c2ca5332739eaffd8f3f7a0f5b9870788857",
+        "business": {
+          "timeout_sec": 30,
+          "memory_mb": 256,
+          "pids_limit": 64
+        },
+        "regression": {
+          "timeout_sec": 180,
+          "memory_mb": 512,
+          "pids_limit": 64
+        },
+        "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+      },
+      "additional_original_native": [],
+      "admission_path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/wtforms-admission.json",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+    }
+  ],
+  "real_model_calls": 0,
+  "production_touched": false,
+  "scope": "本轮固定29仓来源及当前镜像完整原生/业务的汇总；SQLGlot子模块缺失，非本阶段全部完成或正式目录全部准入声明"
+}

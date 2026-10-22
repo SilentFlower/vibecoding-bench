@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "wtforms",
+  "title": "WTForms商品表单工作场景",
+  "category": "输入、验证与对象边界",
+  "description": "库存零值、勾选提交、多值适配、可选规则、对象填充和规则复用诊断。",
+  "seed_digest": "412d439d4afa704928603efef3c1adb7ecae4c1a2afc9292b247efb50d1341ff",
+  "environment": "wtforms-py312",
+  "source": {
+    "repository": "https://github.com/pallets-eco/wtforms",
+    "commit": "af18fd6a7595d374aa707ff97b73df0dcc462ec2",
+    "license_files": [
+      "seed/library/LICENSE.rst"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "WF-S01",
+      "title": "提交与初始值",
+      "goal": "区分零值和缺少勾选",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "WF-U01",
+            "WF-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WF-U01",
+          "kind": "understand",
+          "goal": "区分库存零值和必填输入",
+          "prompt": "Explain every supplied converted-data/raw-input control. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/required-zero.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WF-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/WF-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "WF-U02",
+          "kind": "understand",
+          "goal": "区分初始勾选状态与空提交",
+          "prompt": "Explain both complete checkbox input-source controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/checkbox.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WF-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/WF-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "WF-S02",
+      "title": "输入适配与规则来源",
+      "goal": "明确协议和校验边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "WF-C01",
+            "WF-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WF-C01",
+          "kind": "consult",
+          "goal": "明确表单提交适配协议",
+          "prompt": "Advise the actual multidict protocol and prefill distinction. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/input-adapter.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WF-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/WF-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "WF-C02",
+          "kind": "consult",
+          "goal": "选择可选字段的来源验证策略",
+          "prompt": "Advise actual Optional behavior from both complete controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/optional-source.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WF-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/WF-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "WF-S03",
+      "title": "对象填充方案",
+      "goal": "明确暂存与失败策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "WF-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WF-P01",
+          "kind": "plan",
+          "goal": "规划对象填充的失败边界",
+          "prompt": "Plan validation/staging/publication from the complete partial-write control. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/populate-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WF-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/WF-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "WF-S04",
+      "title": "额外规则诊断",
+      "goal": "取得列表复用证据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "WF-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "WF-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WF-D01",
+          "kind": "diagnose",
+          "goal": "诊断额外规则被重复执行",
+          "prompt": "Extra field rules unexpectedly run more often after reuse. Request complete field/hooks,caller lists,reuse order and call observations before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WF-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-shared-rules",
+              "when": "Complete field/hooks,caller-owned rule lists,reuse order and call observations have not been supplied or declared unavailable,and are reasonably requested.",
+              "materials": [
+                "disclosure/shared-rules.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

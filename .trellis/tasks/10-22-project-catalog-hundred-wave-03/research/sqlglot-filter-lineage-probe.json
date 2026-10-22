@@ -1,0 +1,11 @@
+{
+  "scope": "固定公开原版的宿主只读事实观察，不冒充当前账号镜像或私有集合验证",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "source_module_sha256": "e4eb3d7799f756c95f8d714e59618c9171239db79ec9750781bcc5cbbcf4416a",
+  "names": [
+    "quantity",
+    "orders.quantity"
+  ],
+  "filter_column_absent": true,
+  "status": "passed"
+}

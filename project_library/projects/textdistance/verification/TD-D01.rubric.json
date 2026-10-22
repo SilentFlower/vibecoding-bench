@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TD-D01",
+  "source_commit": "d6a68d61088a40eef5c88191ccf79323dbf34850",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use only actually consumed metric/call/exception evidence. Request missing controls,trace the relevant helper/object interface when established,and distinguish a compatible caller alternative from a source enhancement. Missing evidence supports insufficient_information. Do not invent attributes,patch source or run unbounded combinatorial work.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

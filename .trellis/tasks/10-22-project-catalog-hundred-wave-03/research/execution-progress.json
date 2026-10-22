@@ -1,0 +1,344 @@
+{
+  "purpose": "阶段内实际进度快照；auto-loop状态仍以runner为准",
+  "updated_at": "2026-10-22T07:27:35.646502+00:00",
+  "run_id": "auto-20261021191233",
+  "runner_status": "running",
+  "outstanding_action": "run_implement",
+  "stage_required_projects": 30,
+  "completed_current_stage_projects": 30,
+  "completed_project_keys": [
+    "pypika",
+    "arrow",
+    "charset-normalizer",
+    "injector",
+    "loguru",
+    "pyparsing",
+    "markdownify",
+    "pyrsistent",
+    "feedgen",
+    "sortedcontainers",
+    "wtforms",
+    "python-constraint",
+    "feedparser",
+    "portion",
+    "textdistance",
+    "humanize",
+    "bidict",
+    "tablib",
+    "chardet",
+    "natsort",
+    "transitions",
+    "html5lib",
+    "pendulum",
+    "python-liquid",
+    "python-statemachine",
+    "webcolors",
+    "wrapt",
+    "funcy",
+    "collective-icalendar",
+    "sqlglot"
+  ],
+  "remaining_current_stage_projects": 0,
+  "remaining_without_draft_projects": 0,
+  "current_runtime_native_frozen_projects": [
+    "pypika",
+    "arrow",
+    "charset-normalizer",
+    "injector",
+    "loguru",
+    "pyparsing",
+    "markdownify",
+    "pyrsistent",
+    "feedgen",
+    "sortedcontainers",
+    "wtforms",
+    "python-constraint",
+    "feedparser",
+    "portion",
+    "textdistance",
+    "humanize",
+    "bidict",
+    "tablib",
+    "chardet",
+    "natsort",
+    "transitions",
+    "html5lib",
+    "pendulum",
+    "python-liquid",
+    "python-statemachine",
+    "webcolors",
+    "wrapt",
+    "funcy",
+    "collective-icalendar",
+    "sqlglot"
+  ],
+  "formal_totals": {
+    "projects": 100,
+    "scenarios": 426,
+    "tasks": 726,
+    "version": "real-project-scenarios-v37-en"
+  },
+  "draft_totals": {
+    "projects": 30,
+    "scenarios": 121,
+    "tasks": 183
+  },
+  "draft_projects": [
+    {
+      "project": "pypika",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "arrow",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "charset-normalizer",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "injector",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "loguru",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "pyparsing",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "markdownify",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "pyrsistent",
+      "scenarios": 3,
+      "tasks": 5,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "feedgen",
+      "scenarios": 5,
+      "tasks": 7,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "sortedcontainers",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "wtforms",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "python-constraint",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "feedparser",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "portion",
+      "scenarios": 3,
+      "tasks": 5,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "textdistance",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "humanize",
+      "scenarios": 4,
+      "tasks": 7,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "bidict",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "tablib",
+      "scenarios": 5,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "chardet",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "natsort",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "transitions",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "html5lib",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "pendulum",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "python-liquid",
+      "scenarios": 4,
+      "tasks": 7,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "python-statemachine",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "webcolors",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "wrapt",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "funcy",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "collective-icalendar",
+      "scenarios": 4,
+      "tasks": 6,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    },
+    {
+      "project": "sqlglot",
+      "scenarios": 5,
+      "tasks": 8,
+      "native_draft_verified": true,
+      "admission_stage": "formal_registered_local_verified",
+      "formal_registered": true
+    }
+  ],
+  "blocked_sources": [],
+  "unverified_external_tests": [
+    {
+      "project": "sqlglot",
+      "submodule": {
+        "path": "sqlglot-integration-tests",
+        "commit": "8cbf013a7b0bd1871abce4ebb543560d0e554799",
+        "repository": "git@github.com:fivetran/sqlglot-integration-tests.git",
+        "status": "unavailable_optional_private_tests_unverified"
+      },
+      "scope_evidence": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sqlglot-public-source-scope.json"
+    }
+  ],
+  "real_model_calls": 0,
+  "pushed": false,
+  "deployed": false
+}

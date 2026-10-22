@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SC-C02",
+  "source_commit": "3ac358631f58c1347f1d6d2d92784117db0f38ed",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The stored cache remains based on1,2 while object iteration now shows ranks3,2;bisect_key_right(2) still returns2. A fresh index recomputes keys and orders B,A. The existing contract requires stable keys while stored;remove using the old valid state before mutation/reinsert,or rebuild from a known-valid source. This is not evidence of promised automatic refresh.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

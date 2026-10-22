@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FG-C02",
+  "source_commit": "97260abb1793eb164c458c10b493690beb413f6d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both partial calls leave the original URL/title unchanged because source only writes when both are supplied. The complete call changes Atom title to Edited and link href to new. Reapply the full intended pair and retain any other provenance separately;the current API does not expose full Atom source fields or merge arbitrary partial metadata.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

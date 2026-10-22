@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PT-C02",
+  "source_commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The bounded islice zero-step control yields9,9,9;the iterator itself does not advance or terminate. Positive1 yields9,10,11;reverse with-1 yields11,10,9. Validate step/direction,finite limits and callable progress at the application boundary and test termination. Do not fully consume zero-step or claim built-in rejection.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

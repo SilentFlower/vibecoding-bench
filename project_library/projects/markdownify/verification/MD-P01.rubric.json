@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MD-P01",
+  "source_commit": "bc98c9e134ec55b2853716ab859754f061cb7054",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Library defaults autolinks=True/default_title=False yield <https://example.test>. CLI defaults store_true autolinks=False/store_false default_title=True yield a full link with href title. Existing --autolinks --default-title aligns those two choices;the misleadingly named latter flag disables default_title. CLI print adds one final newline. Pin invocation,parser/options,source and newline normalization and test exact output before migrating;no API patch is authorized.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

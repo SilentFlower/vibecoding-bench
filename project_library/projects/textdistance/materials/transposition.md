@@ -1,0 +1,1 @@
+Compare Levenshtein(external=False) and DamerauLevenshtein(external=False) on guide/guied. Explain the exact operations/cost and the choice of distance model for document-name typos. Business probes disable external backends so the actual candidate implementation is observed;the complete original regression separately includes all registered external libraries. No edits.

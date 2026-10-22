@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IJ-C02",
+  "source_commit": "5daed12510fafc0bf73b6ef18d2884f78cd5e210",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use multibind,not ordinary bind,for reserved generic list/dict keys. The list aggregate preserves alpha,beta contributions and a caller append does not alter a later outer list. Dictionary limit is2 and offset0 because later key contributions overwrite earlier values. An explicitly supplied Service member remains the same mutable object and its shared name is visible later;the fresh outer list is not a deep copy. Own duplicate-key and member lifetime policy explicitly.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

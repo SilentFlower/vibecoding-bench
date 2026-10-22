@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SM-P01",
+  "source_commit": "ec5d8173f740b37941818df13727db9d64ef498d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Construction inside the loop initially exposes empty configuration;explicit activation yields pending;awaited finish returns42 and reaches done. Publish readiness only after awaited activation when reading initial state,await event completion,and retain errors before advertising success. The first event can activate implicitly,but that does not make immediate post-construction reads ready. Define separate durable publication and concurrency ownership;this local lifecycle is not persistence or cross-process locking.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

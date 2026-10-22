@@ -1,0 +1,1 @@
+parse("2026-01-01T12:00:00+02:00",tz="America/New_York") returns12:00+02:00. Calling in_timezone("America/New_York") on it yields05:00-05:00 with the same timestamp. Parser construction selects parsed.tzinfo before the tz option. No wrapper,local timezone or missing offset is involved.

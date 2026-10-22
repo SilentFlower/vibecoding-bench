@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WF-P01",
+  "source_commit": "af18fd6a7595d374aa707ff97b73df0dcc462ec2",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Form validation succeeds but populate_obj writes fields sequentially;the second setter raises after first becomes new,while second stays original. Validate business state and target operations,stage an independent result where appropriate,and define explicit publication/recovery and error handling. Form validation is not a guarantee that object setters succeed or that populate_obj rolls back atomically.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

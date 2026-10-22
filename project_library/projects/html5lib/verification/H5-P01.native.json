@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "H5-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "normalized_serialization_is_stable_for_the_control_and_not_source_preservation": true
+  },
+  "resource_profile": "business"
+}

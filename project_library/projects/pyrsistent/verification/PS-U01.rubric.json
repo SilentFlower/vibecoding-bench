@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PS-U01",
+  "source_commit": "0c0b7aec8cd25b1d2d8ba07b10acdefd0f38f2c7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "pmap preserves the original mutable list object,so shallow items becomes tea,book. freeze before mutation recursively converts that built-in list and deep items stays tea. Outer persistent containers do not by themselves freeze values;freeze only handles supported types and is not a universal deep-copy or immutable-custom-object guarantee.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

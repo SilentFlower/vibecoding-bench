@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WF-C02",
+  "source_commit": "af18fd6a7595d374aa707ff97b73df0dcc462ec2",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both values are integer-1,but initial raw_dataNone makes Optional stop validation so the prefilled form succeeds;submitted raw[-1 as string] proceeds to NumberRange and fails. Use separate explicit domain/object validation or deliberately chosen source policy when all values must be checked. Preserve the current Optional input contract rather than assume it validates every data source.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

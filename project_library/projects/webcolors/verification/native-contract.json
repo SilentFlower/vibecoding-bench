@@ -1,0 +1,2391 @@
+{
+  "baseline_digest": "6dd5e9561c70f49b3d3add38a6d351e282df3aedd0f01b09305557c65dc789e3",
+  "nodes": [
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Aqua]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Black]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Blue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Fuchsia]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Gray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Green]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Lime]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Maroon]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Olive]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Purple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Red]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Silver]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Teal]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[White]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_html4_definition_conformance[Yellow]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[aliceblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[antiquewhite]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[aqua]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[aquamarine]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[azure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[beige]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[bisque]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[black]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[blanchedalmond]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[blue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[blueviolet]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[brown]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[burlywood]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[cadetblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[chartreuse]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[chocolate]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[coral]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[cornflowerblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[cornsilk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[crimson]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[cyan]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkcyan]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkgoldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkgreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkgrey]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkkhaki]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkmagenta]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkolivegreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkorange]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkorchid]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkred]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darksalmon]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkseagreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkslateblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkslategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkslategrey]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkturquoise]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[darkviolet]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[deeppink]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[deepskyblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[dimgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[dimgrey]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[dodgerblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[firebrick]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[floralwhite]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[forestgreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[fuchsia]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[gainsboro]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[ghostwhite]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[gold]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[goldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[gray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[green]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[greenyellow]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[grey]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[honeydew]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[hotpink]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[indianred]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[indigo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[ivory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[khaki]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lavender]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lavenderblush]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lawngreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lemonchiffon]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightcoral]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightcyan]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightgoldenrodyellow]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightgreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightgrey]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightpink]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightsalmon]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightseagreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightskyblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightslategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightslategrey]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightsteelblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lightyellow]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[lime]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[limegreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[linen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[magenta]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[maroon]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[mediumaquamarine]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[mediumblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[mediumorchid]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[mediumpurple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[mediumseagreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[mediumslateblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[mediumspringgreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[mediumturquoise]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[mediumvioletred]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[midnightblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[mintcream]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[mistyrose]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[moccasin]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[navajowhite]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[oldlace]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[olive]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[olivedrab]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[orange]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[orangered]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[orchid]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[palegoldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[palegreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[paleturquoise]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[palevioletred]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[papayawhip]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[peachpuff]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[peru]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[pink]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[plum]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[powderblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[purple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[red]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[rosybrown]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[royalblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[saddlebrown]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[salmon]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[sandybrown]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[seagreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[seashell]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[sienna]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[silver]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[skyblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[slateblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[slategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[slategrey]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[snow]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[springgreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[steelblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[tan]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[teal]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[thistle]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[tomato]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[turquoise]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[violet]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[wheat]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[white]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[whitesmoke]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[yellow]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conformance.py::test_svg_definition_conformance[yellowgreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_name[goldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_name[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_name[white-six-digit]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_name[white-three-digit]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_name_supported_spec[css21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_name_supported_spec[css2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_name_supported_spec[css3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_name_supported_spec[css4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_name_supported_spec[html4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_name_unnamed_in_any",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_name_unnamed_in_spec",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_name_unspported_spec[css1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_name_unspported_spec[css5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_name_unspported_spec[html5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_rgb[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_rgb[white-six-digit]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_rgb[white-three-digit]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_rgb_percent[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_rgb_percent[white-six-digit]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_hex_to_rgb_percent[white-three-digit]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_hex[goldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_hex[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_hex[white]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_hex_supported_spec[css21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_hex_supported_spec[css2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_hex_supported_spec[css3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_hex_supported_spec[css4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_hex_supported_spec[html4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_hex_unnamed[breen-css3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_hex_unnamed[glue-css21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_hex_unnamed[goldenrod-html4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_hex_usupported_spec[css1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_hex_usupported_spec[css5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_hex_usupported_spec[html5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_rgb[goldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_rgb[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_rgb[white]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_rgb_percent[goldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_rgb_percent[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_name_to_rgb_percent[white]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_names_invalid[CSS0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_names_invalid[HTML12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_names_invalid[random]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_names_valid[css21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_names_valid[css2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_names_valid[css3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_names_valid[html4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_hex[goldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_hex[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_hex[white]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_name[goldenrod-percentrgb]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_name[goldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_name[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_name[white]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_name_supported_spec[css21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_name_supported_spec[css2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_name_supported_spec[css3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_name_supported_spec[css4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_name_supported_spec[html4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_name_unnamed_in_any",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_name_unnamed_in_spec",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_name_unsupported_spec[css1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_name_unsupported_spec[css5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_name_unsupported_spec[html5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_rgb[triplet0-int_triplet0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_rgb[triplet1-int_triplet1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_percent_to_rgb[triplet2-int_triplet2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_hex[goldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_hex[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_hex[white]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_name[goldenrod-integerrgb]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_name[goldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_name[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_name[white]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_name_supported_spec[css21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_name_supported_spec[css2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_name_supported_spec[css3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_name_supported_spec[css4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_name_supported_spec[html4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_name_unnamed_in_any",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_name_unnamed_in_spec",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_name_unsupported_spec[css1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_name_unsupported_spec[css5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_name_unsupported_spec[html5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_rgb_percent[goldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_rgb_percent[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_rgb_to_rgb_percent[white]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_hex[darkgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_hex[darkslategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_hex[dimgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_hex[gray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_hex[lightgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_hex[lightslategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_hex[slategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_int[darkgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_int[darkslategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_int[dimgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_int[gray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_int[lightgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_int[lightslategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_int[slategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_percent[darkgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_percent[darkslategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_percent[dimgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_percent[gray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_percent[lightgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_percent[lightslategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_conversion.py::test_spelling_variants_percent[slategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color[chucknorris]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color[junk1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color[junk2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color[junk3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color[system-color]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_error[empty]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_error[non-unicode]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_error[transparent]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_hex[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_hex[six-digit-black]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_hex[six-digit-white]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_hex[three-digit-black]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_hex[three-digit-white]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[aliceblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[antiquewhite]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[aqua]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[aquamarine]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[azure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[beige]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[bisque]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[black]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[blanchedalmond]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[blue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[blueviolet]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[brown]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[burlywood]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[cadetblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[chartreuse]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[chocolate]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[coral]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[cornflowerblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[cornsilk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[crimson]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[cyan]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkcyan]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkgoldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkgreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkgrey]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkkhaki]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkmagenta]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkolivegreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkorange]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkorchid]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkred]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darksalmon]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkseagreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkslateblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkslategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkslategrey]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkturquoise]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[darkviolet]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[deeppink]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[deepskyblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[dimgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[dimgrey]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[dodgerblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[firebrick]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[floralwhite]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[forestgreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[fuchsia]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[gainsboro]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[ghostwhite]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[gold]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[goldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[gray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[green]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[greenyellow]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[grey]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[honeydew]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[hotpink]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[indianred]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[indigo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[ivory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[khaki]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lavender]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lavenderblush]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lawngreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lemonchiffon]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightcoral]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightcyan]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightgoldenrodyellow]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightgray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightgreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightgrey]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightpink]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightsalmon]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightseagreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightskyblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightslategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightslategrey]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightsteelblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lightyellow]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[lime]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[limegreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[linen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[magenta]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[maroon]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[mediumaquamarine]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[mediumblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[mediumorchid]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[mediumpurple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[mediumseagreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[mediumslateblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[mediumspringgreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[mediumturquoise]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[mediumvioletred]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[midnightblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[mintcream]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[mistyrose]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[moccasin]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[navajowhite]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[oldlace]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[olive]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[olivedrab]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[orange]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[orangered]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[orchid]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[palegoldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[palegreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[paleturquoise]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[palevioletred]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[papayawhip]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[peachpuff]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[peru]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[pink]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[plum]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[powderblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[purple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[red]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[rosybrown]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[royalblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[saddlebrown]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[salmon]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[sandybrown]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[seagreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[seashell]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[sienna]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[silver]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[skyblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[slateblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[slategray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[slategrey]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[snow]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[springgreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[steelblue]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[tan]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[teal]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[thistle]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[tomato]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[turquoise]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[violet]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[wheat]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[white]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[whitesmoke]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[yellow]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_legacy_color_names[yellowgreen]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_simple_color[goldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_simple_color[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_simple_color[white]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_simple_color_error[four-digit]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_simple_color_error[not-hex]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_simple_color_error[not-unicode]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_simple_color_error[three-digit]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_simple_color_error[too-long-no-hash]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_parse_simple_color_error[too-long]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_serialize_simple_color[black]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_serialize_simple_color[goldenrod-html5tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_serialize_simple_color[goldenrod-integerrgb]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_serialize_simple_color[goldenrod]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_html5.py::test_serialize_simple_color[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_hex[lowercase]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_hex[three-digit-lowercase]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_hex[three-digit-uppercase]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_hex[uppercase]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_hex_format[no-hash]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_hex_format[not-hex]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_hex_format[too-long]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_hex_format[too-short]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_integer_rgb[clipped-to-max]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_integer_rgb[clipped-to-min]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_integer_rgb[max]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_integer_rgb[middle]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_integer_rgb[min]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_integer_rgb[negative-zero]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_integer_triplet[black]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_integer_triplet[clipped]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_integer_triplet[navy]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_integer_triplet[negative-zero]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_integer_triplet[white]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_percent_rgb[clipped-to-max]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_percent_rgb[clipped-to-min]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_percent_rgb[floating-point]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_percent_rgb[max]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_percent_rgb[min]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_percent_rgb[negative-zero]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_percent_rgb[not-special]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_percent_triplet[clipped]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_percent_triplet[gray]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_percent_triplet[green]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_normalization.py::test_normalize_percent_triplet[negative-zero]",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "webcolors",
+  "python": "3.12.15",
+  "schema": 1
+}

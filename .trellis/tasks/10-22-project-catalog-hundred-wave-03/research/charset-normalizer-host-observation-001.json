@@ -1,0 +1,41 @@
+{
+  "scope": "宿主业务诊断；不替代镜像原生准入",
+  "rows": [
+    {
+      "task": "CN-U01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"bom_detection_preserves_raw_but_normalizes_decoded_output\": false}\n",
+      "stderr": ""
+    },
+    {
+      "task": "CN-U02",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"equivalent_decodings_are_grouped_without_proving_the_origin\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "CN-C01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"restricted_no_match_does_not_prove_binary_input\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "CN-C02",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"output_reencoding_replaces_unrepresentable_characters\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "CN-P01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"normalized_output_rewrites_the_declared_encoding_without_replacing_raw\": true}\n",
+      "stderr": ""
+    },
+    {
+      "task": "CN-D01",
+      "returncode": 0,
+      "stdout": "{\"candidate_import\": true, \"error\": \"ZeroDivisionError\", \"before_level\": 0, \"after_level\": 5, \"explain_handler_added\": true, \"original_handlers_retained\": true}\n",
+      "stderr": "2026-10-22 10:10:14,913 | Level 5 | Trying to detect encoding from a tiny portion of (5) byte(s).\n"
+    }
+  ]
+}

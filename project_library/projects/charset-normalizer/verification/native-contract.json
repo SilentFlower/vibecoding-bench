@@ -1,0 +1,3288 @@
+{
+  "baseline_digest": "91f628169ecd899d7423b4efae2fcba632e8e147d000601d5e65c67f8cd8cafa",
+  "nodes": [
+    {
+      "id": "tests/test_base_detection.py::test_alphabets_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_ansi_escape_falls_back_to_unicode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_ascii_information_separators[False-\\x1e{\"name\":\"Alice\"}\\n\\x1e{\"name\":\"Bob\"}\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_ascii_information_separators[False-name\\x1cAlice\\x1cBob\\x1cCarol]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_ascii_information_separators[False-name\\x1dAlice\\x1dBob\\x1dCarol]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_ascii_information_separators[False-name\\x1eAlice\\x1eBob\\x1eCarol]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_ascii_information_separators[False-name\\x1fAlice\\x1fBob\\x1fCarol]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_ascii_information_separators[True-\\x1e{\"name\":\"Alice\"}\\n\\x1e{\"name\":\"Bob\"}\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_ascii_information_separators[True-name\\x1cAlice\\x1cBob\\x1cCarol]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_ascii_information_separators[True-name\\x1dAlice\\x1dBob\\x1dCarol]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_ascii_information_separators[True-name\\x1eAlice\\x1eBob\\x1eCarol]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_ascii_information_separators[True-name\\x1fAlice\\x1fBob\\x1fCarol]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_bool_matches",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_content_with_bom_or_sig[+/v/YPdwV--utf_7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_content_with_bom_or_sig[\\x841\\x953\\xce\\xd2\\xc3\\xbb\\xd3\\xd0\\xc2\\xf1\\xd4\\xb9\\xa3\\xac\\xb4\\xe8\\xed\\xc8\\xb5\\xc4\\xd6\\xbb\\xca\\xc7\\xd2\\xbb\\xd0\\xa9\\xca\\xb1\\xbc\\xe4\\xa1\\xa3-gb18030]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_content_with_bom_or_sig[\\xef\\xbb\\xbf\\xe6\\x88\\x91\\xe6\\xb2\\xa1\\xe6\\x9c\\x89\\xe5\\x9f\\x8b\\xe6\\x80\\xa8\\xef\\xbc\\x8c\\xe7\\xa3\\x8b\\xe7\\xa0\\xa3\\xe7\\x9a\\x84\\xe5\\x8f\\xaa\\xe6\\x98\\xaf\\xe4\\xb8\\x80\\xe4\\xba\\x9b\\xe6\\x97\\xb6\\xe9\\x97\\xb4\\xe3\\x80\\x82-utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_content_with_bom_or_sig[\\xff\\xfe\\x00\\x00\\x11b\\x00\\x00\\xa1l\\x00\\x00\\tg\\x00\\x00\\xcbW\\x00\\x00(`\\x00\\x00\\x0c\\xff\\x00\\x00\\xcbx\\x00\\x00#x\\x00\\x00\\x84v\\x00\\x00\\xeaS\\x00\\x00/f\\x00\\x00\\x00N\\x00\\x00\\x9bN\\x00\\x00\\xf6e\\x00\\x00\\xf4\\x95\\x00\\x00\\x020\\x00\\x00-utf_32]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_direct_cmp_charset_match",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_doc_example_short_cp1251",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_empty_but_with_bom_or_sig[+/v8--utf_7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_empty_but_with_bom_or_sig[\\x841\\x953-gb18030]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_empty_but_with_bom_or_sig[\\xef\\xbb\\xbf-utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_empty_but_with_bom_or_sig[\\xfe\\xff-utf_16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_empty_but_with_bom_or_sig[\\xff\\xfe\\x00\\x00-utf_32]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_match_equality_with_arbitrary_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_matches_sort_lazily",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_mb_cutting_chk",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_md_triggered_but_with_bom_or_sig[\\xff\\xfe\\x00\\x00\\xb6%\\x00\\x00h\\x00\\x00\\x00e\\x00\\x00\\x00l\\x00\\x00\\x00l\\x00\\x00\\x00o\\x00\\x00\\x00-utf_32]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_md_triggered_but_with_bom_or_sig[\\xff\\xfe\\xb6%h\\x00e\\x00l\\x00l\\x00o\\x00-utf_16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_ascii_content[81f4ab054b39cb0e12701e734077d84264308f5fc79494fc5f159fa2ebc07b73c8cc0e98e009664a20986706f90146e8eefcb929ce1f74a8eab21369fdc70198]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_ascii_content[AbAdZ pOoooOlDl mmlDoDkA lldDkeEkddA mpAlkDF]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_ascii_content[g4UsPJdfzNkGW2jwmKDGDilKGKYtpF2X.mx3MaTWL1tL7CNn5U7DeCcodKX7S3lwwJPKNjBT8etY]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_ascii_content[{\"token\": \"g4UsPJdfzNkGW2jwmKDGDilKGKYtpF2X.mx3MaTWL1tL7CNn5U7DeCcodKX7S3lwwJPKNjBT8etY\"}]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_ascii_content[{}]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_utf8_content[(\\xc2\\xb0 \\xcd\\x9c\\xca\\x96 \\xc2\\xb0), creepy face, smiley \\xf0\\x9f\\x98\\x80]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_utf8_content[<?xml ?><c>Financi\\xc3\\xabn</c>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_utf8_content[B\\xd1\\x81\\xd0\\xb5\\xd0\\xba\\xd0\\xb8 \\xd1\\x87\\xd0\\xbe\\xd0\\xb2\\xd0\\xb5\\xd0\\xba \\xd0\\xb8\\xd0\\xbc\\xd0\\xb0 \\xd0\\xbf\\xd1\\x80\\xd0\\xb0\\xd0\\xb2\\xd0\\xbe \\xd0\\xbd\\xd0\\xb0 \\xd0\\xbe\\xd0\\xb1\\xd1\\x80\\xd0\\xb0\\xd0\\xb7\\xd0\\xbe\\xd0\\xb2\\xd0\\xb0\\xd0\\xbd\\xd0\\xb8\\xd0\\xb5. O\\xd0\\xb1\\xd1\\x80\\xd0\\xb0\\xd0\\xb7\\xd0\\xbe\\xd0\\xb2\\xd0\\xb0\\xd0\\xbd\\xd0\\xb8\\xd0\\xb5\\xd1\\x82\\xd0\\xbe \\xd1\\x82\\xd1\\x80\\xd1\\x8f\\xd0\\xb1\\xd0\\xb2\\xd0\\xb0 \\xd0\\xb4\\xd0\\xb0 \\xd0\\xb1\\xd1\\x8a\\xd0\\xb4\\xd0\\xb5 \\xd0\\xb1\\xd0\\xb5\\xd0\\xb7\\xd0\\xbf\\xd0\\xbb\\xd0\\xb0\\xd1\\x82\\xd0\\xbd\\xd0\\xbe, \\xd0\\xbf\\xd0\\xbe\\xd0\\xbd\\xd0\\xb5 \\xd1\\x89\\xd0\\xbe \\xd1\\x81\\xd0\\xb5 \\xd0\\xbe\\xd1\\x82\\xd0\\xbd\\xd0\\xb0\\xd1\\x81\\xd1\\x8f \\xd0\\xb4\\xd0\\xbe \\xd0\\xbd\\xd0\\xb0\\xd1\\x87\\xd0\\xb0\\xd0\\xbb\\xd0\\xbd\\xd0\\xbe\\xd1\\x82\\xd0\\xbe \\xd0\\xb8 \\xd0\\xbe\\xd1\\x81\\xd0\\xbd\\xd0\\xbe\\xd0\\xb2\\xd0\\xbd\\xd0\\xbe\\xd1\\x82\\xd0\\xbe \\xd0\\xbe\\xd0\\xb1\\xd1\\x80\\xd0\\xb0\\xd0\\xb7\\xd0\\xbe\\xd0\\xb2\\xd0\\xb0\\xd0\\xbd\\xd0\\xb8\\xd0\\xb5.]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_utf8_content[B\\xd1\\x81\\xd0\\xb5\\xd0\\xba\\xd0\\xb8 \\xd1\\x87\\xd0\\xbe\\xd0\\xb2\\xd0\\xb5\\xd0\\xba \\xd0\\xb8\\xd0\\xbc\\xd0\\xb0 \\xd0\\xbf\\xd1\\x80\\xd0\\xb0\\xd0\\xb2\\xd0\\xbe \\xd0\\xbd\\xd0\\xb0 \\xd0\\xbe\\xd0\\xb1\\xd1\\x80\\xd0\\xb0\\xd0\\xb7\\xd0\\xbe\\xd0\\xb2\\xd0\\xb0\\xd0\\xbd\\xd0\\xb8\\xd0\\xb5.]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_utf8_content[Qu'est ce que une \\xc3\\xa9toile?]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_utf8_content[[\"Financi\\xc3\\xabn\", \"La France\"]]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_utf8_content[\\xc8\\x8d\\x1b]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_utf8_content[\\xe6\\x88\\x91\\xe6\\xb2\\xa1\\xe6\\x9c\\x89\\xe5\\x9f\\x8b\\xe6\\x80\\xa8\\xef\\xbc\\x8c\\xe7\\xa3\\x8b\\xe7\\xa0\\xa3\\xe7\\x9a\\x84\\xe5\\x8f\\xaa\\xe6\\x98\\xaf\\xe4\\xb8\\x80\\xe4\\xba\\x9b\\xe6\\x97\\xb6\\xe9\\x97\\xb4\\xe3\\x80\\x82]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_utf8_content[\\xf0\\x9f\\x98\\x80]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_obviously_utf8_content[h\\xc3\\xa9llo world!\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_stateful_multibyte_sampling[iso2022-jp]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_stateful_multibyte_sampling[iso2022-kr]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_utf7_sig_content_is_stripped[+testing]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_utf7_sig_content_is_stripped[-testing]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_utf7_sig_content_is_stripped[.testing]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base_detection.py::test_utf8_sig_overrides_misleading_declaration",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_force_replace_without_replace",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_multiple_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_multiple_file_normalize",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_multiple_file_normalize_with_alternatives",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_non_existent_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_replace_without_normalize",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_simple_no_input",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_simple_yes_input",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_single_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_single_file_normalize",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_single_verbose_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_version_output_success",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_with_alternative",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_with_minimal_and_alt",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::TestCommandLineInterface::test_with_minimal_output",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_module_exit_status[arguments0-0-cp1252-charset_normalizer.cli]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_module_exit_status[arguments0-0-cp1252-charset_normalizer]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_module_exit_status[arguments1-1-Use --replace in addition of --normalize only.-charset_normalizer.cli]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_module_exit_status[arguments1-1-Use --replace in addition of --normalize only.-charset_normalizer]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_module_exit_status[arguments2-1-Use --force in addition of --replace only.-charset_normalizer.cli]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_module_exit_status[arguments2-1-Use --force in addition of --replace only.-charset_normalizer]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_module_exit_status[arguments3-1---threshold VALUE should be between 0. AND 1.-charset_normalizer.cli]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_module_exit_status[arguments3-1---threshold VALUE should be between 0. AND 1.-charset_normalizer]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_module_exit_status[arguments4-2-unrecognized arguments-charset_normalizer.cli]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_module_exit_status[arguments4-2-unrecognized arguments-charset_normalizer]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_module_exit_status[arguments5-2-sample.cp1252.txt-charset_normalizer.cli]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_module_exit_status[arguments5-2-sample.cp1252.txt-charset_normalizer]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli_json.py::test_minimal_output_remains_plain_text[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli_json.py::test_minimal_output_remains_plain_text[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli_json.py::test_multiple_alternatives_json_shape",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli_json.py::test_multiple_files_json_shape[0-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli_json.py::test_multiple_files_json_shape[0-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli_json.py::test_multiple_files_json_shape[1-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli_json.py::test_multiple_files_json_shape[1-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli_json.py::test_multiple_files_json_shape[2-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli_json.py::test_multiple_files_json_shape[2-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli_json.py::test_no_match_json_shape[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli_json.py::test_no_match_json_shape[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli_json.py::test_single_match_json_shape[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli_json.py::test_single_match_json_shape[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_alternative_language_above_threshold",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_characters_popularity_compare_with_duplicates",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_filter_alt_coherence_matches[matches0-expected_return0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_filter_alt_coherence_matches[matches1-expected_return1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_filter_alt_coherence_matches[matches2-expected_return2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_filter_alt_coherence_matches[matches3-expected_return3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_filter_alt_coherence_matches[matches4-expected_return4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_filter_alt_coherence_matches[matches5-expected_return5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_filter_alt_coherence_matches[matches6-expected_return6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_filter_alt_coherence_matches[matches7-expected_return7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_filter_alt_coherence_matches[matches8-expected_return8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_infer_language_from_cp[cp273-expected_languages4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_infer_language_from_cp[cp424-expected_languages3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_infer_language_from_cp[cp737-expected_languages2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_infer_language_from_cp[cp862-expected_languages1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_infer_language_from_cp[cp864-expected_languages0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_infer_language_from_cp[iso2022_jp-expected_languages8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_infer_language_from_cp[johab-expected_languages5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_infer_language_from_cp[mac_greek-expected_languages7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_infer_language_from_cp[shift_jis-expected_languages6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_target_features[Arabic-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_target_features[English-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_target_features[French-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_target_features[Hebrew-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_target_features[Turkish-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_coherence_detection.py::test_target_features[Vietnamese-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_detect_legacy.py::TestDetectLegacy::test_detect_dict_keys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_detect_legacy.py::TestDetectLegacy::test_detect_dict_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_detect_legacy.py::TestDetectLegacy::test_detect_dict_value_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_detect_legacy.py::TestDetectLegacy::test_latin1_uses_chardet_spelling",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_detect_legacy.py::TestDetectLegacy::test_should_rename_legacy_preserves_other_encoding_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_detect_legacy.py::TestDetectLegacy::test_small_payload_confidence_altered",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_detect_legacy.py::TestDetectLegacy::test_utf8_json_with_cjk_text",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_detect_legacy.py::TestDetectLegacy::test_utf8_sig_not_striped",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edge_case.py::test_issue_gh498",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edge_case.py::test_issue_gh509",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edge_case.py::test_issue_gh520",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edge_case.py::test_regression_gh771_fallback_entry_on_undecodable_payload",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edge_case.py::test_unicode_edge_case",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-arabic-1.txt-cp1256-Arabic]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-arabic.txt-utf_8-Arabic]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-bulgarian.txt-utf_8-Bulgarian]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-chinese.txt-big5-Chinese]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-english.bom.txt-utf_8-English]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-french-1.txt-cp1252-French]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-french.txt-utf_8-French]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-greek-2.txt-cp1253-Greek]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-greek.txt-cp1253-Greek]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-hebrew-2.txt-cp1255-Hebrew]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-hebrew-3.txt-cp1255-Hebrew]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-korean.txt-cp949-Korean]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-polish.txt-utf_8-Polish]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-russian-2.txt-utf_8-Russian]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-russian-3.txt-utf_8-Russian]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-russian.txt-mac_cyrillic-Russian]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-spanish.txt-utf_8-Spanish]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_full_detection.py::test_elementary_detection[sample-turkish.txt-cp1254-Turkish]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_isbinary.py::test_isbinary[GIF89a\\x01\\x00\\x01\\x00\\x00\\x00\\x00,-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_isbinary.py::test_isbinary[\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff\\x00_/\\xff-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_isbinary.py::test_isbinary[\\x1e{\"name\":\"Alice\"}\\n\\x1e{\"name\":\"Bob\"}\\n-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_isbinary.py::test_isbinary[raw2-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_isbinary.py::test_isbinary[sample-arabic.txt-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_isbinary.py::test_isbinary[sample-polish.txt-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_large_gb18030_signature_is_stripped[-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_large_gb18030_signature_is_stripped[0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_large_gb18030_signature_is_stripped[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_large_payload_ascii_basic_entry",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_large_payload_u8_sig_basic_entry",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_lazy_decoding_strips_only_signature[-gb18030]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_lazy_decoding_strips_only_signature[-utf_16_be]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_lazy_decoding_strips_only_signature[-utf_16_le]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_lazy_decoding_strips_only_signature[-utf_32_be]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_lazy_decoding_strips_only_signature[-utf_32_le]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_lazy_decoding_strips_only_signature[-utf_7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_lazy_decoding_strips_only_signature[-utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_lazy_decoding_strips_only_signature[\\ufeff-gb18030]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_lazy_decoding_strips_only_signature[\\ufeff-utf_16_be]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_lazy_decoding_strips_only_signature[\\ufeff-utf_16_le]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_lazy_decoding_strips_only_signature[\\ufeff-utf_32_be]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_lazy_decoding_strips_only_signature[\\ufeff-utf_32_le]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_lazy_decoding_strips_only_signature[\\ufeff-utf_7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_lazy_decoding_strips_only_signature[\\ufeff-utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_large_payload.py::test_misleading_large_sequence",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_logging.py::TestLogBehaviorClass::test_explain_false_handler_set_behavior",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_logging.py::TestLogBehaviorClass::test_explain_true_behavior",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_logging.py::TestLogBehaviorClass::test_set_stream_handler",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_logging.py::TestLogBehaviorClass::test_set_stream_handler_format",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[101]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[102]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[103]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[104]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[105]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[106]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[107]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[108]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[109]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[110]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[111]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[112]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[113]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[114]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[115]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[116]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[117]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[118]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[119]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[120]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[121]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[122]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[123]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[124]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[125]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[126]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[127]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[24]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[25]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[26]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[27]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[28]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[29]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[31]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[32]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[33]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[34]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[35]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[36]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[37]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[38]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[39]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[41]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[42]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[43]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[44]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[45]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[46]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[47]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[48]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[49]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[51]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[52]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[53]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[54]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[55]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[56]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[57]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[58]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[59]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[60]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[61]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[62]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[63]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[64]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[65]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[66]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[67]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[68]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[69]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[70]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[71]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[72]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[73]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[74]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[75]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[76]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[77]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[78]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[79]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[80]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[81]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[82]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[83]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[84]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[85]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[86]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[87]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[88]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[89]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[90]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[91]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[92]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[93]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[94]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[95]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[96]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[97]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[98]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[99]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_character_properties[9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_information_separators[\\x1c]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_information_separators[\\x1d]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_information_separators[\\x1e]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_information_separators[\\x1f]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_unprintable_controls[\\x00]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_unprintable_controls[\\x01]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_unprintable_controls[\\x1b]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_ascii_unprintable_controls[\\x7f]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_compatible_successive_ranges[Alphabetic Presentation Forms-Hebrew]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_compatible_successive_ranges[Basic Latin-Hiragana]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_compatible_successive_ranges[Basic Latin-IPA Extensions]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_compatible_successive_ranges[Basic Latin-Kana Extended-A]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_compatible_successive_ranges[Basic Latin-Spacing Modifier Letters]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_compatible_successive_ranges[CJK Unified Ideographs-Bopomofo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_compatible_successive_ranges[CJK Unified Ideographs-Kanbun]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_compatible_successive_ranges[Halfwidth and Fullwidth Forms-Hangul Syllables]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_compatible_successive_ranges[IPA Extensions-Phonetic Extensions]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_decisive_mess_patterns[\\uff85\\uff93\\uff89\\uff94\\u7615\\u9f74\\u9ef5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_decisive_mess_patterns[niezale\\xbfn\\xb9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_decisive_mess_patterns[niezale\\xe6n\\xb9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_decisive_mess_patterns[plain\\x1bANSI escape]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_legitimate_nearby_patterns[R\\xb2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_legitimate_nearby_patterns[\\u65e5\\u672c\\u8a9e\\uff85\\uff93\\uff89\\uff94]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_legitimate_nearby_patterns[\\xbfD\\xf3nde?]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_legitimate_nearby_patterns[encyclop\\xe6dia]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_mess_detection[<i>Parce que \\xd3a, c'est la v\\xd5ritable histoire de la rencontre avec votre Tante Robin.</i>-0.01-0.5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_mess_detection[Cehennemin Sava\\u25a0\\xfe\\xb2s\\xb2'da kim?-0.1-0.5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_mess_detection[RadoZ \\u062a\\u0640\\u0640\\u0640\\u0639\\u0640\\u0640\\u0640\\u0640\\u062f\\u064a\\u0640\\u0640\\u0644 \\u0627\\u0644\\u0640\\u0640\\u0640\\u062a\\u0640\\u0640\\u0640\\u0640\\u0648\\u0642\\u0640\\u0640\\u064a\\u0640\\u0640\\u0640\\u0640\\u062a \\u0645\\u0640\\u0640\\u0640\\u0646 \\u0642\\u0640\\u0640\\u0628\\u0640\\u0640\\u0644-0.0-0.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_mess_detection[\\u0627\\u0644\\u0639\\u0642\\u0644\\u064a\\u0629 , \\u0627\\u0644\\u062a\\u0646\\u0648\\u064a\\u0645 \\u0627\\u0644\\u0645\\u063a\\u0646\\u0627\\u0637\\u064a\\u0633\\u064a \\u0648 / \\u0623\\u0648 \\u0627\\u0644\\u0627\\u0642\\u062a\\u0631\\u0627\\u062d-0.0-0.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_mess_detection[\\u5178\\u8087\\u4e4e\\u5e9a\\u8fb0\\u5e74\\u5341\\u4e8c\\u6708\\u5eff\\u4e00\\uff0c\\u53ca\\u5df1\\u4e11\\u5e74\\u4e8c\\u6708\\u5341\\u4e5d\\uff0c\\u6536\\u5404\\u65b9\\u8a9e\\u8a00\\u4e8c\\u767e\\u4e94\\u5341\\uff0c\\u5408\\u903e\\u4e03\\u767e\\u842c\\u76ee\\uff1b\\u4e8c\\u5341\\u5927\\u5377\\u4f54\\u516b\\u6210\\uff0c\\u55ae\\u82f1\\u6587\\u5377\\u4ea6\\u904e\\u4e8c\\u767e\\u842c\\u3002\\u6089\\u6587\\u4e43\\u5929\\u4e0b\\u6709\\u5fd7\\u5171\\u7b46\\u800c\\u6210\\uff1b\\u6709\\u610f\\u52a9\\u4e4b\\uff0c\\u5e7e\\u7db2\\u8def\\u3001\\u96a8\\u7e82\\u4f5c\\uff0c\\u5927\\u5178\\u8301\\u7109\\u3002-0.0-0.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_mess_detection[\\xb4\\xc1\\xa5\\xbd\\xb3\\xf8\\xa7i --  \\xb1i\\xae\\xcc\\xba\\xfb, \\xb3\\xaf\\xb7\\xd8\\xa9v-0.5-1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_mess_detection[\\xc7\\xe1\\xda\\u015e\\xe1\\xed\\xc9 , \\xc7\\xe1\\xca\\xe4\\xe6\\xed\\xe3 \\xc7\\xe1\\xe3\\xdb\\xe4\\xc7\\xd8\\xed\\xd3\\xed \\xe6 / \\xc3\\xe6 \\xc7\\xe1\\xc7\\u015e\\xca\\xd1\\xc7\\xcd-0.8-2.5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_mess_detection[\\xd8\\u0122\\xd8\\u0160\\xd8\\u0123\\xd8\\xa7\\xd8\\u0136\\u0172\\x84 \\u0172\\x84\\u0172\\x88 \\xd8\\u0122\\u0172\\x86 \\xd8\\xa7\\u0172\\x84\\u0172\\x86\\xd8\\xa7\\xd8\\u0123 \\u0172\\x8a\\u0172\\x88\\u0172\\x85 \\u0172\\x85\\xd8\\xa7 \\xd8\\u0123\\u0172\\x88\\u0172\\x81\\u0172\\x8a\\xd8\\u0160\\xd8\\u0123\\xd8\\xa7\\xd8\\u0136\\u0172\\x84\\u0172\\x88\\u0172\\x86\\xd8\\x8c \\xd8\\u014a\\xd8\\u0111\\u0172\\x86\\xd8\\xa7 \\u0172\\x86\\xd8\\u0123\\u0172\\x85\\xd8\\u0111 \\xd8\\u0111\\u0172\\x86 (\\u0172\\x81\\xd8\\u0105\\u0172\\x88\\xd8\\u014a\\u0172\\x88) \\u0172\\x88\\xd8\\xa7\\u0172\\x84\\xd8\\u016a\\xd8\\xa7\\xd8\\u0160\\u0172\\x85-0.8-3.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_mess_detection[\\xefstanbul, T\\u25a0rkiye'nin en kalabal\\xbbk, iktisadi ve k\\u25a0lt\\u25a0rel a\\xd3\\xbbdan en \\u2014nemli-0.1-0.5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_mess_detection[hishamkoc@yahoo.com \\u0e38\\u0e0a\\u0e38\\u0e11\\u0e38\\u0e0c\\u0e39\\x85\\u0e39\\x80\\u0e39\\x80\\u0e38\\u0e09 \\u0e39\\x87\\u0e39\\x80\\u0e38\\u0e14\\u0e39\\x80\\u0e39\\x80\\u0e39\\x80\\u0e38\\u0e07\\u0e39\\x85 \\u0e38\\u0e07\\u0e39\\x84\\u0e39\\x80\\u0e39\\x82\\u0e39\\x80\\u0e39\\x80\\u0e39\\x80\\u0e39\\x80\\u0e39\\x84\\u0e38\\u0e07\\u0e39\\x81RadoZ \\u0e38\\u0e0a\\u0e39\\x80\\u0e39\\x80\\u0e39\\x80\\u0e38\\u0e19\\u0e39\\x80\\u0e39\\x80\\u0e39\\x80\\u0e39\\x80\\u0e38\\u0e0f\\u0e39\\x8a\\u0e39\\x80\\u0e39\\x80\\u0e39\\x84 \\u0e38\\u0e07\\u0e39\\x84\\u0e39\\x80\\u0e39\\x80\\u0e39\\x80\\u0e38\\u0e0a\\u0e39\\x80\\u0e39\\x80\\u0e39\\x80\\u0e39\\x80\\u0e39\\x88\\u0e39\\x82\\u0e39\\x80\\u0e39\\x80\\u0e39\\x8a\\u0e39\\x80\\u0e39\\x80\\u0e39\\x80\\u0e39\\x80\\u0e38\\u0e0a \\u0e39\\x85\\u0e39\\x80\\u0e39\\x80\\u0e39\\x80\\u0e39\\x86 \\u0e39\\x82\\u0e39\\x80\\u0e39\\x80\\u0e38\\u0e08\\u0e39\\x80\\u0e39\\x80\\u0e39\\x84-0.5-2.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_semantic_character_information[\\u30a2-is_katakana]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_semantic_character_information[\\uff85-is_halfwidth_katakana]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_semantic_character_information[\\xb2-is_superscript]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_semantic_character_information[\\xbf-is_sentence_open_punctuation]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_semantic_character_information[\\xe6-is_ligature]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_transparent_successive_ranges[Combining Diacritical Marks]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_transparent_successive_ranges[Emoticons]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_transparent_successive_ranges[Miscellaneous Symbols and Pictographs]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mess_detection.py::test_transparent_successive_ranges[Variation Selectors]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_detect_most_common_body_encoding[# coding: utf-8-utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_detect_most_common_body_encoding[<?xml version=\"1.0\" encoding=\"EUC-JP\"?>-euc_jp]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_detect_most_common_body_encoding[<?xml version=\"1.0\" encoding=\"JohaB\"?>-johab]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_detect_most_common_body_encoding[<?xml version=\"1.0\" encoding=\"US-ASCII\"?>-ascii]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_detect_most_common_body_encoding[<?xml version=\"1.0\" encoding=\"UTF-8\"?>-utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_detect_most_common_body_encoding[<?xml version=\"1.0\" encoding=\"ibm037\"?>-cp037]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_detect_most_common_body_encoding[<html><head><meta charset=\"WINDOWS-1256\"></head></html>-cp1256]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_detect_most_common_body_encoding[<html><head><meta charset=\"utf-57\"></head></html>-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_detect_most_common_body_encoding[<html><head><meta charset=\"utf-8\"></head></html>-utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_detect_most_common_body_encoding[<html><head><meta charset=WINDOWS-1252></head></html>-cp1252]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_detect_most_common_body_encoding[<meta charset=\"not-an-encoding\"><meta charset=\"utf-8\">-utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_failed_output_encoding_does_not_change_cache[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_failed_output_encoding_does_not_change_cache[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_preemptive_mark_replacement[# coding: utf-8-# coding: utf-8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_preemptive_mark_replacement[<?xml version=\"1.0\" encoding=\"EUC-JP\"?>-<?xml version=\"1.0\" encoding=\"utf-8\"?>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_preemptive_mark_replacement[<?xml version=\"1.0\" encoding=\"JohaB\"?>-<?xml version=\"1.0\" encoding=\"utf-8\"?>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_preemptive_mark_replacement[<?xml version=\"1.0\" encoding=\"US-ASCII\"?>-<?xml version=\"1.0\" encoding=\"utf-8\"?>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_preemptive_mark_replacement[<?xml version=\"1.0\" encoding=\"UTF-8\"?>-<?xml version=\"1.0\" encoding=\"UTF-8\"?>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_preemptive_mark_replacement[<html><head><meta charset=\"WINDOWS-1256\"></head></html>-<html><head><meta charset=\"utf-8\"></head></html>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_preemptive_mark_replacement[<html><head><meta charset=\"utf-57\"></head></html>-<html><head><meta charset=\"utf-57\"></head></html>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_preemptive_mark_replacement[<html><head><meta charset=\"utf-8\"></head></html>-<html><head><meta charset=\"utf-8\"></head></html>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_preemptive_mark_replacement[<html><head><meta charset=WINDOWS-1252></head></html>-<html><head><meta charset=utf-8></head></html>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_transcoded_utf8_xml_is_parseable[bytearray-latin_1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_transcoded_utf8_xml_is_parseable[bytearray-utf_16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_transcoded_utf8_xml_is_parseable[bytes-latin_1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_transcoded_utf8_xml_is_parseable[bytes-utf_16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_declaration_follows_output_encoding[latin_1-# coding: {}\\ntext = \"caf\\xe9\"\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_declaration_follows_output_encoding[latin_1-<?xml version=\"1.0\" encoding=\"{}\"?><doc>caf\\xe9</doc>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_declaration_follows_output_encoding[latin_1-<html><head><meta charset=\"{}\"></head><body>caf\\xe9</body></html>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_declaration_follows_output_encoding[utf_16-# coding: {}\\ntext = \"caf\\xe9\"\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_declaration_follows_output_encoding[utf_16-<?xml version=\"1.0\" encoding=\"{}\"?><doc>caf\\xe9</doc>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_declaration_follows_output_encoding[utf_16-<html><head><meta charset=\"{}\"></head><body>caf\\xe9</body></html>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[UTF-8-UTF-8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[UTF-8-utf8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[UTF-8-utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[u8-UTF-8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[u8-utf8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[u8-utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[utf8-UTF-8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[utf8-utf8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[utf8-utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[utf_8-UTF-8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[utf_8-utf8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[utf_8-utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[utf_8_sig-UTF-8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[utf_8_sig-utf8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preemptive_detection.py::test_utf8_output_preserves_utf8_declaration[utf_8_sig-utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_thread_safety.py::TestThreadSafety::test_concurrent_detection",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_thread_safety.py::TestThreadSafety::test_concurrent_detection_repeated",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_cp_similarity[cp1026-cp1140-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_cp_similarity[cp1140-cp1026-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_cp_similarity[cp1251-mac_turkish-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_cp_similarity[latin_1-cp1251-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_cp_similarity[latin_1-cp1252-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_cp_similarity[latin_1-iso8859_4-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[ascii]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[big5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[big5hkscs]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp037]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp1006]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp1026]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp1125]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp1140]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp1250]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp1251]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp1252]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp1253]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp1254]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp1255]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp1256]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp1257]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp1258]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp273]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp424]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp437]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp500]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp720]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp737]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp775]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp850]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp852]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp855]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp856]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp857]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp858]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp860]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp861]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp862]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp863]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp864]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp865]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp866]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp869]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp874]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp875]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp932]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp949]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[cp950]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[euc_jis_2004]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[euc_jisx0213]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[euc_jp]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[euc_kr]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[gb18030]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[gb2312]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[gbk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[hp_roman8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[hz]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso2022_jp]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso2022_jp_1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso2022_jp_2004]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso2022_jp_2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso2022_jp_3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso2022_jp_ext]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso2022_kr]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso8859_10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso8859_11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso8859_13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso8859_14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso8859_15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso8859_16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso8859_2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso8859_3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso8859_4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso8859_5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso8859_6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso8859_7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso8859_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[iso8859_9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[johab]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[koi8_r0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[koi8_r1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[koi8_t]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[koi8_u]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[kz1048]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[latin_1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[mac_cyrillic]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[mac_greek]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[mac_iceland]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[mac_latin2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[mac_roman]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[mac_turkish]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[ptcp154]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[shift_jis]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[shift_jis_2004]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[shift_jisx0213]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[tis_620]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[utf_16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[utf_16_be]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[utf_16_le]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[utf_32]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[utf_32_be]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[utf_32_le]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[utf_7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_every_supported_encoding_decodes_with_errors_ignore[utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[ascii]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[big5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[big5hkscs]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp037]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp1006]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp1026]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp1125]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp1140]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp1250]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp1251]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp1252]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp1253]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp1254]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp1255]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp1256]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp1257]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp1258]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp273]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp424]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp437]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp500]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp720]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp737]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp775]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp850]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp852]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp855]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp856]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp857]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp858]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp860]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp861]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp862]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp863]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp864]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp865]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp866]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp869]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp874]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp875]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp932]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp949]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[cp950]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[euc_jis_2004]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[euc_jisx0213]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[euc_jp]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[euc_kr]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[gb18030]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[gb2312]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[gbk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[hp_roman8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[hz]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso2022_jp]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso2022_jp_1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso2022_jp_2004]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso2022_jp_2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso2022_jp_3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso2022_jp_ext]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso2022_kr]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso8859_10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso8859_11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso8859_13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso8859_14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso8859_15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso8859_16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso8859_2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso8859_3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso8859_4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso8859_5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso8859_6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso8859_7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso8859_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[iso8859_9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[johab]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[koi8_r0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[koi8_r1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[koi8_t]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[koi8_u]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[kz1048]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[latin_1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[mac_cyrillic]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[mac_greek]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[mac_iceland]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[mac_latin2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[mac_roman]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[mac_turkish]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[ptcp154]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[shift_jis]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[shift_jis_2004]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[shift_jisx0213]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[tis_620]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[utf_16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[utf_16_be]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[utf_16_le]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[utf_32]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[utf_32_be]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[utf_32_le]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[utf_7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_iana_name_resolves_every_supported_encoding[utf_8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[&-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\u03a9-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\u0401-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\u20ac-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\xc0-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\xd1-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\xd6-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\xd9-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\xdd-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\xe0-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\xe7-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\xe8-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\xe9-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\xea-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\xf8-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[\\xfc-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_is_accentuated[a-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "7be7a1e2218dc59a19d1ad131e4abe21172a295087efc72898938248782e8766",
+      "version": "9.0.3"
+    }
+  ],
+  "project": "charset-normalizer",
+  "python": "3.12.15",
+  "schema": 1,
+  "subtests": [
+    {
+      "context": {
+        "kwargs": {},
+        "msg": "encoding key present"
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_detect_dict_keys",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": "language key present"
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_detect_dict_keys",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": "confidence key present"
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_detect_dict_keys",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": "encoding is equal to utf_32"
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_detect_dict_value",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": "encoding instance of str"
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_detect_dict_value_type",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": "language instance of str"
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_detect_dict_value_type",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": "confidence instance of float"
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_detect_dict_value_type",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "encoding": "ascii"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_should_rename_legacy_preserves_other_encoding_names",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "encoding": "utf_8"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_should_rename_legacy_preserves_other_encoding_names",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "encoding": "utf_8_sig"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_should_rename_legacy_preserves_other_encoding_names",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "encoding": "cp1252"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_should_rename_legacy_preserves_other_encoding_names",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "encoding": "iso8859_2"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_should_rename_legacy_preserves_other_encoding_names",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": "Unicode should yield 1. confidence even on small bytes string"
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_small_payload_confidence_altered",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": "ShiftJis should not yield 1. confidence on small bytes string"
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_small_payload_confidence_altered",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": "ShiftJis should yield 1. confidence on sufficient bytes string"
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_small_payload_confidence_altered",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {},
+        "msg": "Verify that UTF-8-SIG is returned when using legacy detect"
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_detect_legacy.py::TestDetectLegacy::test_utf8_sig_not_striped",
+      "when": "call"
+    }
+  ]
+}

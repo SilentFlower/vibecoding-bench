@@ -1,0 +1,1 @@
+Use a synthetic in-memory SQLite table items(id INTEGER,name TEXT,active INTEGER,price INTEGER,deleted_at TEXT). Rows in insertion order are (1,Tea,0,20,NULL),(2,Book,1,20,2026-10-20),(3,Pen,1,5,NULL),(4,O'Reilly,1,30,NULL). The Python string for the fourth name is "O'Reilly". Use the supplied PyPika source; no external database or file edits.

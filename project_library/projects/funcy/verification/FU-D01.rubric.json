@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FU-D01",
+  "source_commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use consumed cache/reference evidence to distinguish reused mutable return objects from recomputation or key collisions. Missing controls support insufficient_information. Propose a separately tested ownership/copy policy without clearing private cache state or altering package semantics.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

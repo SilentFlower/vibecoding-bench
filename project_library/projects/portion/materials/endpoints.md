@@ -1,0 +1,1 @@
+Compare closedopen(9,10)|openclosed(10,11) with closedopen(9,10)|closedopen(10,11). Inspect membership of10 and len() for both;also inspect len(closed(0,100)). Explain set connectivity and what len actually counts. No edits.

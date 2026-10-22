@@ -1,0 +1,448 @@
+{
+  "status": "passed",
+  "python_files": 110,
+  "method": "ast.parse完整读取源码；原创共享实现git diff --check通过，上游原始字节不做重排",
+  "implementation_whitespace_exit": 0,
+  "files": [
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/arrow-native-observe.py",
+      "sha256": "5b55c8e2d764b35a82e4c2eed10d0b0f3885b0b1827df978148d969b08dca5a7"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/audit_available_evidence.py",
+      "sha256": "76556355388b0d62810373d3e2cdc68069bd47dafab56ac01e07fb43b85121fa"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/audit_full_evidence.py",
+      "sha256": "f22f24cfccb73bef5014fd3ae1cea7988b596ecc0ec20e91cf0af87fe4be7721"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/audit_mock.py",
+      "sha256": "bbb0b390b26f5b8bf52776e07bfd37ffeead9eddd5e32b58899244ed06dc6006"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/bidict-native-observe.py",
+      "sha256": "33911a054b304f8f66374cc086e0f3a9dd961ca9d67e7e1c49d335862a0341f5"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_arrow_draft.py",
+      "sha256": "548b8497c30015d65194f916bccfb539aec2313f73deeac9f1a4c59da1572531"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_bidict_draft.py",
+      "sha256": "a9fd2604b3a5d44151595af234a0c1358bee8582301a611f4ab5ebe398acc63b"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_chardet_draft.py",
+      "sha256": "d9d04dfa9336372eb9c111ec8a194f9938a7b5d0b5fb1e3c5385f5c328edf843"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_charset_normalizer_draft.py",
+      "sha256": "87a74565346eb81e5751608666ddc4fd4846998ad8f8ddb02079997004e222c0"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_collective-icalendar_draft.py",
+      "sha256": "4483ef7ef06481beb4e838afcafc593b6f7887e3e2db016177c3b69bb6b04fb8"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_feedgen_draft.py",
+      "sha256": "af3620dedf11263fa407150a3e0c99cc6ef9bcb97cba8970e996c161dec5e671"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_feedparser_draft.py",
+      "sha256": "bd3fe5e0026adcecdeb711744d1f598555321e5f2d910c3e6aeee3a8802c20c9"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_funcy_draft.py",
+      "sha256": "570f4b01fe15a77c6768011a64e4e593a7201a48d2631ed14f94209a4149aaf5"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_html5lib_draft.py",
+      "sha256": "127bc55c832b3d32a17fea48acf91e1078907633453dbc1c19b9e5d483188502"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_humanize_draft.py",
+      "sha256": "df417616de4c1eee24d0dc22afb4297a761014bb1dbe77a1bb2088f48d0492a7"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_injector_draft.py",
+      "sha256": "1a8da9c447d08dc20648ecfd1c4a16194863d80346452caf85155bc1fb540963"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_loguru_draft.py",
+      "sha256": "a965e75baddc687b130cd3d03fb6c272bab84da4738e086dd4517561ea3f9d67"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_markdownify_draft.py",
+      "sha256": "5a72d6b879cd5d29ece6e4b8194eb71e3ce23135d9ba4a97d2693b744ec35bfc"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_natsort_draft.py",
+      "sha256": "19f2ec2e11afa3e0eee4b9a370fd76f1b0bf7724c9b594c8e142411d3af9640d"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_pendulum_draft.py",
+      "sha256": "02c4f74db7dcb89e65ddae75682e3383767aebf705d643231465711b0fe5bbfa"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_portion_draft.py",
+      "sha256": "8f9037d856faa36bc6d89115c70c14f53a1e552f918541cb553daf5a029aae5f"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_pyparsing_draft.py",
+      "sha256": "96299aea178d1b39eb2a4f23fe566a084df52d6572b4a90bb80cfcf0c283cffb"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_pypika_draft.py",
+      "sha256": "76411537f76a3bc64e3eea9c2eba4a9746be81c887ba936886f94a678e95b74f"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_pyrsistent_draft.py",
+      "sha256": "b687f4271112d4d5cacc24f97dc69b7aeacb55756dba002a05b8ea0da09e2714"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_python-liquid_draft.py",
+      "sha256": "32e3e7b1a3ddb1ca8ea65ed92032d1bab4f9990e22211c7e0c6d0b46a7f6255c"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_python-statemachine_draft.py",
+      "sha256": "4a61d924f48a91dcc3186e3e1fa2e4922a99bff079ff38aed9205a35954ebd4a"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_python_constraint_draft.py",
+      "sha256": "0d7cd27309980b4ca41a8cc58e5f7fbc5139e317abafbd61d17d0b9cfdd463f8"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_sortedcontainers_draft.py",
+      "sha256": "2ac164e448b1db82146d88d3ef01860bc9486efb1a44dbc338818665ff5d9ebc"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_sqlglot_draft.py",
+      "sha256": "86fe3a30a76e987e363146b7e345f2471ad0e44bb26c91c78fdefbebf964e075"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_tablib_draft.py",
+      "sha256": "8c4758f2b8b081562fc5dbf5b92601db7ab274d754d10eb8ac2486ff83a20922"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_textdistance_draft.py",
+      "sha256": "8c7c13fb130018fb5992f0f2d8d1ff2142976fbf91cbd5d1af6d4ee67600382d"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_transitions_draft.py",
+      "sha256": "85c9fbd9cf24b005c465bd30936a9dec1d170c48a00f971efc0f8363caaa9d32"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_webcolors_draft.py",
+      "sha256": "56607cd7b0605f4f8060af59dd42cdd68fec425844f462c94c0765a4ab109ac9"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_wrapt_draft.py",
+      "sha256": "19eede8afc04052c3af2667fab4fc66b76866f71151d6dac5bd6acf42cf123d3"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_wtforms_draft.py",
+      "sha256": "19b3cd980ece5bbd1f9cc839c0edbb8a48b8807917a707bfa311d4869ef4f27f"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/calibrate_additional_sources.py",
+      "sha256": "33c39f315e9357d1fc65fb2618392b2d1b857c9ef622eabb4d3ba753bdf132b1"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/calibrate_starting_sources.py",
+      "sha256": "cdc06b451339c9b63ce1ae325f418bedc522f692404f71f65a72dd13d9d8f43f"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/capture_full_static_checks.py",
+      "sha256": "9cde09465a36be159d8dd79efc28d6d081bd5af83fedaeaa4e2c536eba57729c"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/chardet-native-observe.py",
+      "sha256": "c53bd45a6c38c01bb2a97d650464bb725d89588d3eb66598367373b7fd0e8351"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/charset-normalizer-native-observe.py",
+      "sha256": "7de509f340d7fa40f6a5a512d351b238dbb3584bbf2c65aa50b266ddbf683528"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/collective-icalendar-native-observe.py",
+      "sha256": "8fe8c82a65d7e2849e76f5a9fa70cb12faa2788139451ccd44a88e6300f0a04b"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/download_fixed_dependencies.py",
+      "sha256": "712e8a6ab8336a2d829eb298b727ac9b8229d7546ed609ab117d0a8f420616a6"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/draft_content.py",
+      "sha256": "d5a89135e9bce2e051d927270aa733458e423d2dce9f00eb98a3f1d5307fa626"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/feedgen-native-observe.py",
+      "sha256": "df95c8877f5cf35c5b43c3a396284b808e2442134d23032a46c898e6c682d8b8"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/feedgen-public-test-observe.py",
+      "sha256": "3ce3d76551d0ba91b17e1c3213f5bead598e961be8ecf73564e87985b6c6f3a1"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/feedgen-public-tests.py",
+      "sha256": "5a1e807166a792212a9570aa1e54073c77ffd37c7ec25de293def4214d4dfe0e"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/feedparser-native-observe.py",
+      "sha256": "e1102d21b1d8cb813d1078cc31e2f279305191bd4803665cf42cacaeb4ed1eb0"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/finalize_mock_admission.py",
+      "sha256": "bdcb66d4750c89d15dd968a64bde9d16d627f81fc0ff67a097cb6fdc59854ccc"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/freeze_native_baselines.py",
+      "sha256": "5f2318655177eb65a9cc00f7aaf0ee59d57f0dc3d3779c47474bde7d6120e526"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/funcy-native-observe.py",
+      "sha256": "37ff6cd171ba72d2f0ddecc650497cb917d4e684c7224a0d9f8cf4cd63343513"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/html5lib-native-observe.py",
+      "sha256": "6e45c6c695fb567b5101612e0ab24958039de1c41dd6710f283e500f39516898"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/humanize-native-observe.py",
+      "sha256": "f1eb72a143ec82f84e077f337a687c2d74acd2f7a31c5bbe8d7a60eea2dd2b18"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/injector-native-observe.py",
+      "sha256": "56e2286e4f3ab7d07c763c1170e71d7f3ea36ab4074908731446b3dc05d31533"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/loguru-native-observe.py",
+      "sha256": "13d667fd159e30072d1daaa7371a6f2399fed7d2da304a5e58830b81f4eef612"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/loguru-rotation-all-reopening-probe.py",
+      "sha256": "5a49ce3268de047d11d9f9db65cd58a48379cc18c314c33308fd2e41045a0586"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/loguru-rotation-clock-probe.py",
+      "sha256": "7e8e3b3cbb6e78a81218e7f1c040a82bdce23f1a3a2defd4647c9d0a6e6a1295"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/loguru-rotation-monotonic-probe.py",
+      "sha256": "4a461f2ee399b028eaa6d26ff4b00afab9f7522ea61ad07094380831d8b1dec7"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/loguru-rotation-suite-probe.py",
+      "sha256": "4ec497de1b0be07ffaaedd7943933f421fcfbf8a154ef30d6a9fa2d470b57dcb"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/markdownify-native-observe.py",
+      "sha256": "3856d9d1f9cb95324f36a552efbec1318005e5f52e4cabb7c7594e37baef34aa"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/natsort-doctest-original.py",
+      "sha256": "62bb1faa7a873a272644c9fab76056522b3760ac4919fd8e06d594340a052d54"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/natsort-native-observe.py",
+      "sha256": "036267408acbd71b30527fa655aac62d1d0bbb6957d29dc77ad86b6ae43aa6be"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pendulum-native-observe.py",
+      "sha256": "8978c6fd7f41cbaa792bb0a5d9b9e494e6055254ee016ce9159ebe248c8931a6"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pendulum-python-original.py",
+      "sha256": "17fd0e94b2619925511cc0d5ad10a56797ffc6d50020b72d6aa9b36767499d46"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/portion-native-observe.py",
+      "sha256": "a45afe6b0cf3d6bee713cea7f2185207db0d1da970f4170493831ece1d4e3213"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/prepare_feedgen_reference.py",
+      "sha256": "8febe67c743d0526de27c46fda2648f32bc884c0b7eb1466a9ed8405b9dcbb3b"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/prepare_fixed_sources.py",
+      "sha256": "761623e9a24873ee6923170806f1cb67721314f801111daf300a633b24dc0600"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/prepare_gettext_artifacts.py",
+      "sha256": "90f228fd25ac533032ae561e196c2c428ebe87efd7569a8f5dfb62a594a47a6d"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/prepare_graphviz_artifacts.py",
+      "sha256": "24f5fe718f29c35c4fbf40f7de1294cf16663841e1d2569b3300e565b53bd23b"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/prepare_graphviz_launcher.py",
+      "sha256": "7d1beb79a23fae15fb1b47d48dcf89485870243812e72574d4361a1c5f42911b"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/prepare_sqlglot_references.py",
+      "sha256": "d88dec89ac8d70c47d13054232953e3d942aabfb0d16d157315fffa32e631250"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/prepare_tablib_reference.py",
+      "sha256": "7d803e5a6aa2575d45ad5d358995e9239af73fd0a54a7d97f77091bc9c45af94"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/preserve_graphviz_sources.py",
+      "sha256": "6d12a6fb5ac9eaf9f71a4f11cb5c4e77cab2405c66763e6c197f012464ad7578"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/preserve_pendulum_crates.py",
+      "sha256": "58fd08aade5bcb3de654b452ca712abad3f85d6aa69e2144fd72172a212dd11e"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/preserve_pendulum_runtime.py",
+      "sha256": "17f7636d09df55d6de7d2c4cfb5f270f05ef1b64e9f9e46490587b1abd7c0c57"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/preserve_sqlglot_subtests.py",
+      "sha256": "a781aa330679b822698e803165224319fdef77a7618fe6833cbc7e968ab69046"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/preserve_stage3_generated.py",
+      "sha256": "bfbed2c5c6e2a3e85792884a3809bf7d116efe7d77ab1cbdac3609f04222166b"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/preserve_wtforms_runtime.py",
+      "sha256": "414a12d03d9c5e0aa1bf9c494d525d8142516fc0c53e6cc08eb3c4577449fe76"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/promote_verified_batch.py",
+      "sha256": "0a94a4100dae817aafcedce344e8534e4bcae6484e4691ac3532e48176d83bd1"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pyparsing-native-observe.py",
+      "sha256": "ba11c5a935464ffeff5ea2965ae6e68154209c566d39e2e34e8881aec4969d88"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pypika-native-observe.py",
+      "sha256": "f6b99c6cc6584304d608ce3d3c1a0817e744aeda127a65eb5da6f7fdfaebbabc"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pyrsistent-doctest-original.py",
+      "sha256": "c9c81e900984fc8a6dc0db7832cf93bfc88cc273df2e0beec14739de7756c583"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pyrsistent-native-observe.py",
+      "sha256": "674ab0e5debd9e4cc1e178bb639360efc0a53959147b9202274ee28c95c9eae0"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-constraint-native-observe.py",
+      "sha256": "952556e32ad09842640585717d63e809bb9a56716f9ebe9c461b61e8618db1e7"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-liquid-native-observe.py",
+      "sha256": "39621d872629e87bd4e08eda4b106ab1c54584362625ab59178451a740d31203"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-statemachine-native-observe.py",
+      "sha256": "dbbf2bab7e9e0a1c4779e745e1877c543c5fb4563ceb336c6022b040b79adf66"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/refresh_execution_progress.py",
+      "sha256": "c289705e9036dbc34c0856b18f1c359a610cf588aad3b59d6e9552206fd67948"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/run_focused_checks.py",
+      "sha256": "17f84118fd837e9ff508afe8dcdbc36d9d3d64343d8b85754a33743a63a5cc83"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/run_mock_recipe.py",
+      "sha256": "4f14715163c739f16eb88ce5b473960f857c0627a55c75549f388ea7c1c77e77"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sortedcontainers-native-observe.py",
+      "sha256": "3b7a85a4ca97ccd01938940e798d2afdb1e437103dfd41e0e507723d6e3f9f0f"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sqlglot-native-observe.py",
+      "sha256": "801ec792a88d0d8f683b7fc8f49e3dba482d327014cf875ea1951f914b6c393e"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sqlglot-public-test-observe.py",
+      "sha256": "89bd0d78708e7fb36ca6d39e3575ff72b4fe62ad21b48ecb2063399a1eb6739d"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sqlglot-public-tests.py",
+      "sha256": "6f23bfd383f8d24e5ca55d28a540c215f28c71dd622bca7610d18c45ca8bd014"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sqlglot_subtest_audit.py",
+      "sha256": "2c07f23db62641b8a4f19d4c38ae08eb2277c16e84676ccc087dd0e5c35b4261"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/summarize_available_verification.py",
+      "sha256": "ad8378ec9cbb3dcaa10eaf0a9536631ac99592deeeecbde806f09521795b5c7b"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/summarize_full_verification.py",
+      "sha256": "11b65606363f811dd33a23c41fa492336528d27416b50de8c5dc3046fbec7f6f"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/tablib-native-observe.py",
+      "sha256": "72b159007592812cd4b90ed4fc96d5339ab1fbe03f4c06f208fe980542ee038e"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/tablib-public-test-observe.py",
+      "sha256": "f666f60470064595f619cb2e3e9de7f4a6f94c2b60cdbf32d86b64db14150e67"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/tablib-public-tests.py",
+      "sha256": "8e423db5ee37eef928902e6e7cdf6203e7deef1566a4439b75590a54b13f3ff0"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/test_sqlglot_subtest_audit.py",
+      "sha256": "cabd6a241e83c94fb85d8caa96c44dcc1975200333ae49c467a57478b83226ab"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/textdistance-native-observe.py",
+      "sha256": "20dd7d1c31dd278aeb91f63318069c3fe3f71ddb4831526fb6fd3c371ee20939"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/transitions-native-observe.py",
+      "sha256": "09a48f556aad4dca0c7a830c27e2ca4ed47f63cfa86fa49e07d5d3902f9eff13"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/verify_delivery.py",
+      "sha256": "6c85afbb8813c4e001d3c5ea0dffab77d8bf670b440b7141966001dd6dca97da"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/verify_draft_native.py",
+      "sha256": "f53522c3f5ea7110f23d43b420e40abe7cef706bc5fd9966901a491b85074413"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/webcolors-native-observe.py",
+      "sha256": "6d5cfdd215c1a396e4c1a2b0fef1830608f4aea9afe5afc8f42fe31ceb894cd2"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/wrapt-native-observe.py",
+      "sha256": "66e42acad46f65107f0d58d45c0fc5b21ffb026a5804fd3dd730e3b521988ef1"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/wrapt-python-original.py",
+      "sha256": "e90e50abbbfceec16a3ee921bf6d3b7e8459d68cdbad21fccb57af8487756c8a"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/write_native_admission.py",
+      "sha256": "c8b8cb620df23048de4a49a7631dffff2f8a90859917bf2d57699c1c7e655d33"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/wtforms-native-observe.py",
+      "sha256": "7ffbc7a07d9e82a96f38b68ad86d5fb5f92c099573006890ffe84b64284686d7"
+    },
+    {
+      "path": "orchestrator/project_native_regression.py",
+      "sha256": "b921fcda4178ea5a0c0c562c281a51aebc2f826a9e8d3a02147481ccd6c04473"
+    },
+    {
+      "path": "orchestrator/test_project_native_regression.py",
+      "sha256": "286e597cbc8051e09a212dece8d9c44839028894631c5ed3acf23dccf2c95e10"
+    }
+  ]
+}

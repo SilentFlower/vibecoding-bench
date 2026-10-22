@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PT-P01",
+  "source_commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Free is[11,13)|[14,17). It is disjoint from busy and together with busy clipped to[9,17) exactly covers the work window. Boundary11 is free,13 is busy,and17 is outside the window. Keep this endpoint policy explicit;add source dates,zones,units and duration rules before applying to real schedules. No real allocation or calendar change is authorized.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

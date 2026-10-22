@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "HU-U02",
+  "source_commit": "785e5dcc0d0308ad0dff3f6cc0faa7085ad0375b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both signed inputs render 1 minute and 30 seconds because this is an absolute distance display. Suppressing days renders49 hours and33.12 seconds;0.1 seconds at minutes resolution renders0 minutes. Preserve original signed numeric duration separately; display text does not preserve sign or sub-resolution data.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

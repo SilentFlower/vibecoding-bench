@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WC-U01",
+  "source_commit": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "orange is rejected in html4 but resolves to #ffa500 in css21;GRAY resolves to #808080 because names are lowercased. Pin an explicit supported name specification for theme imports;do not assume all browser color syntax or all named colors belong to each set.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

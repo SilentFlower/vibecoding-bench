@@ -1,0 +1,1 @@
+A local Atom feed has one entry with content type=html containing the escaped markup <a href="doc">One</a>. Parse BytesIO with response_headers={"content-location":"https://example.test/base/"};compare default and resolve_relative_uris=False. Advise source/base provenance for archived HTML links;resolving a string does not download its target. No edits.

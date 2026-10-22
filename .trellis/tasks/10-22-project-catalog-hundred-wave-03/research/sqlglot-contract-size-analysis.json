@@ -1,0 +1,11 @@
+{
+  "status": "draft_validation_failed_retained",
+  "actual_contract_bytes": 6603663,
+  "platform_json_limit": 4194304,
+  "archive": ".deploy/project-catalog-hundred/stage-03/dependency-preparation/sqlglot-contract-size-001",
+  "files": {
+    "native_regression.py": "ec2c3ab66d4b05b035365daeea71e18c50f4ad248e64b42b8490a220ddde8f7c",
+    "native-contract.json": "f3fceb799b463d9e44ec97fc972d0fefff50803543e3b20235987687d2cd759d"
+  },
+  "action": "仅SQLGlot使用完整子项数量与SHA256冻结表示，随包保留压缩完整原件，重新执行全套校准；不改变平台JSON上限或采样子项"
+}

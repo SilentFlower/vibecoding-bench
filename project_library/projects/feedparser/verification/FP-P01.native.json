@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FP-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "json_feed_raw_storage_and_legacy_accessors_need_an_explicit_normalization_layer": true
+  },
+  "resource_profile": "business"
+}

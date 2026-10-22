@@ -1,0 +1,1265 @@
+{
+  "status": "all_30_local_verified_pending_check_all",
+  "scope": "完整三十仓本地正式准入及产品链与交付；正式Check-All、规范同步和本地提交由后续runner动作独立记录",
+  "required_stage_projects": 30,
+  "verified_stage_projects": 30,
+  "unmet_stage_requirements": [],
+  "full_stage_implementation_complete": true,
+  "formal": {
+    "version": "real-project-scenarios-v37-en",
+    "digest": "2905c1d0c58758830db4eead47cbd8a200367283a0ba5fa9b90579279541a297",
+    "projects": 100,
+    "scenarios": 426,
+    "tasks": 726
+  },
+  "stage_totals": {
+    "projects": 30,
+    "scenarios": 121,
+    "tasks": 183,
+    "modify_tasks": 3,
+    "business_cases": 170,
+    "primary_native_main": 85820,
+    "subtests_separate": 24183
+  },
+  "task_kinds": {
+    "understand": 63,
+    "consult": 59,
+    "plan": 30,
+    "diagnose": 28,
+    "modify": 3
+  },
+  "primary_native_counts": {
+    "passed": 77533,
+    "failed": 0,
+    "error": 0,
+    "skipped": 6537,
+    "xfailed": 1750,
+    "xpassed": 0,
+    "unexecuted": 0
+  },
+  "additional_original_native": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/additional-native/attempt-002/natsort/result.json",
+      "sha256": "ee930e0ff5358baf6a56a22716f8444412711c305f3d110f80b4013e2986c551",
+      "library_digest": "681a145a6182a2e4a661a35856e882d8737f3e4431489fdf6d7797f64a9c2980",
+      "collected": 15,
+      "passed": 15,
+      "scope": "固定原版额外官方集合；不是可修改候选回归"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/additional-native/attempt-002/pendulum/result.json",
+      "sha256": "2cf3be7ace33022adffe0d7c9a3fd398b9b7c397fb4dab2d4748a53ad805adf4",
+      "library_digest": "082faee2a01b1c084e3f03971bdd2e9a000c155ed3ebe38b1db97c287a86c5df",
+      "collected": 1874,
+      "passed": 1871,
+      "scope": "固定原版额外官方集合；不是可修改候选回归"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/additional-native/attempt-001/pyrsistent/result.json",
+      "sha256": "3fa88bbe980c0748b3d4b927e8d6a167cf810fea76f060d35f6de29157c84056",
+      "library_digest": "343b991e0a096303d88d2aca598b2718b54b788a6e5814f017cdee13d0923e77",
+      "collected": 80,
+      "passed": 80,
+      "scope": "固定原版额外官方集合；不是可修改候选回归"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/additional-native/attempt-001/wrapt/result.json",
+      "sha256": "bec7938722b50adaef5532822512c5e6aa5425756adc1c73631b62797738a8e5",
+      "library_digest": "0fe5b5a17e325db0cae6595e2ce750cf594685f4c4b34cc5eaad8ee0e840708d",
+      "collected": 1418,
+      "passed": 1410,
+      "scope": "固定原版额外官方集合；不是可修改候选回归"
+    }
+  ],
+  "mock_totals": {
+    "batches": 15,
+    "paths": 567,
+    "tasks": 183,
+    "task_entries_summed_across_batches": 189,
+    "control_replay_paths": 18,
+    "code_acceptances": 9,
+    "modify_targets": 3,
+    "unavailable_paths": 29,
+    "disclosure_deliveries": 58,
+    "browser_checks": 8960,
+    "screenshots": 494
+  },
+  "new_task_mock_paths": 549,
+  "mock_batches": [
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-001",
+      "new_projects": [
+        "arrow",
+        "pypika"
+      ],
+      "control_projects": [],
+      "summary": {
+        "stage_selected_counts": [
+          12,
+          12,
+          12
+        ],
+        "selected_paths": 36,
+        "unique_tasks": 12,
+        "stored_task_rows": 36,
+        "unselected_task_rows": 0,
+        "instances": 6,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 4,
+          "consult": 4,
+          "plan": 2,
+          "diagnose": 2
+        },
+        "readonly_paths": 36,
+        "selected_modify_paths": 0,
+        "code_acceptances": 0,
+        "unique_modify_targets": 0,
+        "unavailable_paths": 2,
+        "disclosure_deliveries": 4,
+        "runs": 80,
+        "frozen_manifests_verified": 2,
+        "frozen_objects_verified": 143,
+        "private_review_observations": 40,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 2,
+        "answer_dependencies": 0,
+        "evidence_files": 1679
+      },
+      "browser_checks": 571,
+      "screenshots": 32,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-001/run-001/evidence/result.json",
+          "sha256": "b73e2564a2ebc835f464ee228928a1d9e02812e71890fbee0dc63c6cc3fd92cc"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-001/run-001/cleanup.json",
+          "sha256": "cc8e2b1db771a0738b75674a10e304fd4c99872ef4358c2b93bfd82dbaa92362"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-001-audit.json",
+          "sha256": "0b35ae50c01d52319eb48934832f01aa15702a6cc22e3f051ceb42c341c5dfc0"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-001/browser/run-001/diagnostics/result.json",
+          "sha256": "d10f3f583be0a0327f0abfe88c52af89bc7a010aeabb3baae69c0c08413558c4"
+        }
+      ]
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-002",
+      "new_projects": [
+        "charset-normalizer",
+        "injector"
+      ],
+      "control_projects": [],
+      "summary": {
+        "stage_selected_counts": [
+          12,
+          12,
+          12
+        ],
+        "selected_paths": 36,
+        "unique_tasks": 12,
+        "stored_task_rows": 36,
+        "unselected_task_rows": 0,
+        "instances": 6,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 4,
+          "consult": 4,
+          "plan": 2,
+          "diagnose": 2
+        },
+        "readonly_paths": 36,
+        "selected_modify_paths": 0,
+        "code_acceptances": 0,
+        "unique_modify_targets": 0,
+        "unavailable_paths": 2,
+        "disclosure_deliveries": 4,
+        "runs": 80,
+        "frozen_manifests_verified": 2,
+        "frozen_objects_verified": 126,
+        "private_review_observations": 40,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 2,
+        "answer_dependencies": 0,
+        "evidence_files": 1663
+      },
+      "browser_checks": 571,
+      "screenshots": 32,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-002/run-001/evidence/result.json",
+          "sha256": "185030d7960ced54b397080362e603c489082afcca396d661e8395a3edc2c1a5"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-002/run-001/cleanup.json",
+          "sha256": "88537df90aabf3ee29234d470572d6a2321d12152632509d359bcbb4147a25f8"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-002-audit.json",
+          "sha256": "9b736123b1928d1b856124b5f452f8ff6b8cd780b683433b9b7030c07964c505"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-002/browser/run-001/diagnostics/result.json",
+          "sha256": "635c83b05ab9069421da62035b66aeef854450e480f6bda97aa98b5222450622"
+        }
+      ]
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-003",
+      "new_projects": [
+        "markdownify",
+        "pyparsing"
+      ],
+      "control_projects": [],
+      "summary": {
+        "stage_selected_counts": [
+          12,
+          12,
+          12
+        ],
+        "selected_paths": 36,
+        "unique_tasks": 12,
+        "stored_task_rows": 36,
+        "unselected_task_rows": 0,
+        "instances": 6,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 4,
+          "consult": 4,
+          "plan": 2,
+          "diagnose": 2
+        },
+        "readonly_paths": 36,
+        "selected_modify_paths": 0,
+        "code_acceptances": 0,
+        "unique_modify_targets": 0,
+        "unavailable_paths": 2,
+        "disclosure_deliveries": 4,
+        "runs": 80,
+        "frozen_manifests_verified": 2,
+        "frozen_objects_verified": 309,
+        "private_review_observations": 40,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 2,
+        "answer_dependencies": 0,
+        "evidence_files": 1845
+      },
+      "browser_checks": 571,
+      "screenshots": 32,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-003/run-001/evidence/result.json",
+          "sha256": "ae068138a476b8806c180c5dff694dd78d1d3845b0efc3b3197937d0ba231fd1"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-003/run-001/cleanup.json",
+          "sha256": "4a868445cf3a14188ce8a2f18b45a65012b46bb9c406123bbaa193b4a0dd9ca4"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-003-audit.json",
+          "sha256": "1841ac4ce584e37571969c14714e76e276f41d4d8ddedfc481aee6c429f1ed46"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-003/browser/run-001/diagnostics/result.json",
+          "sha256": "cee23688157b42c326dd4205d4aa2ee8588d1fd5d44a1281315c2d2d1d6fc362"
+        }
+      ]
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-004",
+      "new_projects": [
+        "loguru",
+        "pyrsistent"
+      ],
+      "control_projects": [],
+      "summary": {
+        "stage_selected_counts": [
+          11,
+          11,
+          11
+        ],
+        "selected_paths": 33,
+        "unique_tasks": 11,
+        "stored_task_rows": 33,
+        "unselected_task_rows": 0,
+        "instances": 6,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 4,
+          "consult": 4,
+          "plan": 2,
+          "diagnose": 1
+        },
+        "readonly_paths": 33,
+        "selected_modify_paths": 0,
+        "code_acceptances": 0,
+        "unique_modify_targets": 0,
+        "unavailable_paths": 1,
+        "disclosure_deliveries": 2,
+        "runs": 70,
+        "frozen_manifests_verified": 2,
+        "frozen_objects_verified": 382,
+        "private_review_observations": 35,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 2,
+        "answer_dependencies": 0,
+        "evidence_files": 1735
+      },
+      "browser_checks": 524,
+      "screenshots": 32,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-004/run-001/evidence/result.json",
+          "sha256": "090a31ff5df40b9ef7ff0166033481b423acdb5ff95e02091c4963200faeaa3a"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-004/run-001/cleanup.json",
+          "sha256": "c212c9acefc074f8ceba7bd881fe5ee5f3a0c59591eb0c40b5807981abbd6451"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-004-audit.json",
+          "sha256": "03c7820d70c36601e925f866c38417bdd9529e356190dc3bd944b756b2032d1e"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-004/browser/run-001/diagnostics/result.json",
+          "sha256": "70ca40b8c0da80bdd77be1e27d728e7b8c715da58176be1c836f3ad700d4e197"
+        }
+      ]
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-005",
+      "new_projects": [
+        "feedgen",
+        "sortedcontainers"
+      ],
+      "control_projects": [],
+      "summary": {
+        "stage_selected_counts": [
+          13,
+          13,
+          13
+        ],
+        "selected_paths": 39,
+        "unique_tasks": 13,
+        "stored_task_rows": 39,
+        "unselected_task_rows": 0,
+        "instances": 6,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 4,
+          "consult": 4,
+          "plan": 2,
+          "diagnose": 2,
+          "modify": 1
+        },
+        "readonly_paths": 36,
+        "selected_modify_paths": 3,
+        "code_acceptances": 3,
+        "unique_modify_targets": 1,
+        "unavailable_paths": 2,
+        "disclosure_deliveries": 4,
+        "runs": 86,
+        "frozen_manifests_verified": 3,
+        "frozen_objects_verified": 314,
+        "private_review_observations": 43,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 2,
+        "answer_dependencies": 0,
+        "evidence_files": 1970
+      },
+      "browser_checks": 614,
+      "screenshots": 32,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-005/run-001/evidence/result.json",
+          "sha256": "aa0d72c623f54f9d63238ac95404c719feb557349fd756c57430908932358377"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-005/run-001/cleanup.json",
+          "sha256": "a98340f78855ac7662973cb552987c3c8dbbc1ca0de1e21fb60e2b66def0bd00"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-005-audit.json",
+          "sha256": "04aa49b475c6ac7004c30b0ca0d182a838b72bc116866f06fe5c367e80eceb48"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-005/browser/run-001/diagnostics/result.json",
+          "sha256": "9ad65cbfd085b0c28d33518c477bf0d55ec209242ae5d1cd3fee22314d87b6c9"
+        }
+      ]
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-006",
+      "new_projects": [
+        "python-constraint",
+        "wtforms"
+      ],
+      "control_projects": [],
+      "summary": {
+        "stage_selected_counts": [
+          12,
+          12,
+          12
+        ],
+        "selected_paths": 36,
+        "unique_tasks": 12,
+        "stored_task_rows": 36,
+        "unselected_task_rows": 0,
+        "instances": 6,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 4,
+          "consult": 4,
+          "plan": 2,
+          "diagnose": 2
+        },
+        "readonly_paths": 36,
+        "selected_modify_paths": 0,
+        "code_acceptances": 0,
+        "unique_modify_targets": 0,
+        "unavailable_paths": 2,
+        "disclosure_deliveries": 4,
+        "runs": 80,
+        "frozen_manifests_verified": 2,
+        "frozen_objects_verified": 255,
+        "private_review_observations": 40,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 2,
+        "answer_dependencies": 0,
+        "evidence_files": 1791
+      },
+      "browser_checks": 571,
+      "screenshots": 32,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-006/run-001/evidence/result.json",
+          "sha256": "36d3252fe10093e82e35bd34fc5fd48daf2d0cfd596704519fc79682e269838c"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-006/run-001/cleanup.json",
+          "sha256": "58f2bbaee6ba90f404cd15d51cc2e4716aae208c9ffd245335e4298d6913b4df"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-006-audit.json",
+          "sha256": "993b433e64e08c8a7f1479c759f9a8fcee2dd2fb5b5f15d6dfdc5f8abea638eb"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-006/browser/run-001/diagnostics/result.json",
+          "sha256": "d435e7ec2174a12344910f4384f6b8afa42fd5b2d878b8b237b646037c2d852c"
+        }
+      ]
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-007",
+      "new_projects": [
+        "feedparser",
+        "portion"
+      ],
+      "control_projects": [],
+      "summary": {
+        "stage_selected_counts": [
+          11,
+          11,
+          11
+        ],
+        "selected_paths": 33,
+        "unique_tasks": 11,
+        "stored_task_rows": 33,
+        "unselected_task_rows": 0,
+        "instances": 6,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 4,
+          "consult": 4,
+          "plan": 2,
+          "diagnose": 1
+        },
+        "readonly_paths": 33,
+        "selected_modify_paths": 0,
+        "code_acceptances": 0,
+        "unique_modify_targets": 0,
+        "unavailable_paths": 1,
+        "disclosure_deliveries": 2,
+        "runs": 70,
+        "frozen_manifests_verified": 2,
+        "frozen_objects_verified": 2381,
+        "private_review_observations": 35,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 3,
+        "answer_dependencies": 0,
+        "evidence_files": 3731
+      },
+      "browser_checks": 524,
+      "screenshots": 32,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-007/run-001/evidence/result.json",
+          "sha256": "445a6ffa0e23259794a0d141e72694a95272f15ca160587b296d039e6c652e14"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-007/run-001/cleanup.json",
+          "sha256": "abcfac8ed16cb038188f286559c1572572d75a3b885c2fde074d637bff81c738"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-007-audit.json",
+          "sha256": "68aacc5a9f9810c29561ce81577d6f47d420ead9d74becaebf94c0aa8e3ba9b8"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-007/browser/run-001/diagnostics/result.json",
+          "sha256": "97121419488fd81812a6c8f9cb6ac68f737aea0b0b1026ac2300f045488dc21e"
+        }
+      ]
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-008-retry-003",
+      "new_projects": [
+        "chardet",
+        "textdistance"
+      ],
+      "control_projects": [],
+      "summary": {
+        "stage_selected_counts": [
+          12,
+          12,
+          12
+        ],
+        "selected_paths": 36,
+        "unique_tasks": 12,
+        "stored_task_rows": 36,
+        "unselected_task_rows": 0,
+        "instances": 6,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 4,
+          "consult": 4,
+          "plan": 2,
+          "diagnose": 2
+        },
+        "readonly_paths": 36,
+        "selected_modify_paths": 0,
+        "code_acceptances": 0,
+        "unique_modify_targets": 0,
+        "unavailable_paths": 2,
+        "disclosure_deliveries": 4,
+        "runs": 80,
+        "frozen_manifests_verified": 2,
+        "frozen_objects_verified": 565,
+        "private_review_observations": 40,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 3,
+        "answer_dependencies": 0,
+        "evidence_files": 2101
+      },
+      "browser_checks": 571,
+      "screenshots": 32,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-008-retry-003/run-001/evidence/result.json",
+          "sha256": "71eb3d003ee667285d69590af8c8f3df53dc696f9565d49469af8fd4dbfc42d7"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-008-retry-003/run-001/cleanup.json",
+          "sha256": "521aeaeac1f4f54a88062ff6ab8cc4159b1e9452d7ce2355884ff6e84161d40a"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-008-retry-003-audit.json",
+          "sha256": "93f9f5d0ba4f70679835a0be14ed6ea3dd5fc32734e8f49c913cb643c5e96af6"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-008-retry-003/browser/run-001/diagnostics/result.json",
+          "sha256": "03c864e1c76edc19dc537b07d48373d35f4455c5e5aab6d902f0b7aa7d3661fd"
+        }
+      ]
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-009",
+      "new_projects": [
+        "bidict",
+        "humanize"
+      ],
+      "control_projects": [],
+      "summary": {
+        "stage_selected_counts": [
+          13,
+          13,
+          13
+        ],
+        "selected_paths": 39,
+        "unique_tasks": 13,
+        "stored_task_rows": 39,
+        "unselected_task_rows": 0,
+        "instances": 6,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 5,
+          "consult": 4,
+          "plan": 2,
+          "diagnose": 2
+        },
+        "readonly_paths": 39,
+        "selected_modify_paths": 0,
+        "code_acceptances": 0,
+        "unique_modify_targets": 0,
+        "unavailable_paths": 2,
+        "disclosure_deliveries": 4,
+        "runs": 86,
+        "frozen_manifests_verified": 2,
+        "frozen_objects_verified": 212,
+        "private_review_observations": 43,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 2,
+        "answer_dependencies": 0,
+        "evidence_files": 1858
+      },
+      "browser_checks": 614,
+      "screenshots": 32,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-009/run-001/evidence/result.json",
+          "sha256": "492d12d14f096810bd6621ab695d1d4fa5290d97535da22633be1104bd2eb0ff"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-009/run-001/cleanup.json",
+          "sha256": "9abfc66f8fe1b42307396e1bbe6e64f284c97d8a82697ab1e4bf3526f8e8aee1"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-009-audit.json",
+          "sha256": "fef4f38b78d13f887b02505024b2ea44f8687e1000c9069cd704f31e56fac438"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-009/browser/run-001/diagnostics/result.json",
+          "sha256": "1ef0c1bbbc534650d7d44d35d7d28cdb9b0436ceaad09a7b40193af0e3acd309"
+        }
+      ]
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-010",
+      "new_projects": [
+        "natsort",
+        "tablib"
+      ],
+      "control_projects": [],
+      "summary": {
+        "stage_selected_counts": [
+          12,
+          12,
+          12
+        ],
+        "selected_paths": 36,
+        "unique_tasks": 12,
+        "stored_task_rows": 36,
+        "unselected_task_rows": 0,
+        "instances": 6,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 4,
+          "consult": 3,
+          "plan": 2,
+          "diagnose": 2,
+          "modify": 1
+        },
+        "readonly_paths": 33,
+        "selected_modify_paths": 3,
+        "code_acceptances": 3,
+        "unique_modify_targets": 1,
+        "unavailable_paths": 2,
+        "disclosure_deliveries": 4,
+        "runs": 80,
+        "frozen_manifests_verified": 3,
+        "frozen_objects_verified": 139,
+        "private_review_observations": 40,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 2,
+        "answer_dependencies": 0,
+        "evidence_files": 1687
+      },
+      "browser_checks": 571,
+      "screenshots": 32,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-010/run-001/evidence/result.json",
+          "sha256": "7721685c0f0cfb4b715fcd9a1cae4795b717aac290751c94970bc8bd54420c61"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-010/run-001/cleanup.json",
+          "sha256": "5a85210076ab8e71e486a56d6b85b7a3a483e9a515f40b0e57b869d9b7630ee5"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-010-audit.json",
+          "sha256": "5a867eb8144dbbe4239444ea748081e528fc92c0c8128293bc17c18ffc25fbd2"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-010/browser/run-001/diagnostics/result.json",
+          "sha256": "95b44250e6207d446bf7173d5a880332f9bede743ffd25cf81e065110cff5628"
+        }
+      ]
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-011",
+      "new_projects": [
+        "html5lib",
+        "python-liquid"
+      ],
+      "control_projects": [],
+      "summary": {
+        "stage_selected_counts": [
+          13,
+          13,
+          13
+        ],
+        "selected_paths": 39,
+        "unique_tasks": 13,
+        "stored_task_rows": 39,
+        "unselected_task_rows": 0,
+        "instances": 6,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 5,
+          "consult": 4,
+          "plan": 2,
+          "diagnose": 2
+        },
+        "readonly_paths": 39,
+        "selected_modify_paths": 0,
+        "code_acceptances": 0,
+        "unique_modify_targets": 0,
+        "unavailable_paths": 2,
+        "disclosure_deliveries": 4,
+        "runs": 86,
+        "frozen_manifests_verified": 2,
+        "frozen_objects_verified": 604,
+        "private_review_observations": 43,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 2,
+        "answer_dependencies": 0,
+        "evidence_files": 2250
+      },
+      "browser_checks": 614,
+      "screenshots": 32,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-011/run-001/evidence/result.json",
+          "sha256": "0d5584a50d9775605b62cb418fd349170b20ff9a21de7fad0a4516c2d84a3c34"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-011/run-001/cleanup.json",
+          "sha256": "15b7f2e7bc2e4c5357cb49b7812c8b395b6b0298151b9ad48ad486c0c8d469a8"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-011-audit.json",
+          "sha256": "8c090a14ef8148017f6fc4e721a639dacf39c007f9c78e365f40f06894fecd09"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-011/browser/run-001/diagnostics/result.json",
+          "sha256": "5a07e4f9dc460ff124222df1340715469e59d13ed2be4cf1fe37b62b70f488c5"
+        }
+      ]
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-012",
+      "new_projects": [
+        "funcy",
+        "webcolors"
+      ],
+      "control_projects": [],
+      "summary": {
+        "stage_selected_counts": [
+          12,
+          12,
+          12
+        ],
+        "selected_paths": 36,
+        "unique_tasks": 12,
+        "stored_task_rows": 36,
+        "unselected_task_rows": 0,
+        "instances": 6,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 4,
+          "consult": 4,
+          "plan": 2,
+          "diagnose": 2
+        },
+        "readonly_paths": 36,
+        "selected_modify_paths": 0,
+        "code_acceptances": 0,
+        "unique_modify_targets": 0,
+        "unavailable_paths": 2,
+        "disclosure_deliveries": 4,
+        "runs": 80,
+        "frozen_manifests_verified": 2,
+        "frozen_objects_verified": 110,
+        "private_review_observations": 40,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 3,
+        "answer_dependencies": 0,
+        "evidence_files": 1646
+      },
+      "browser_checks": 571,
+      "screenshots": 32,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-012/run-001/evidence/result.json",
+          "sha256": "edfd95b7da75c51c68cb687a3eb81d1e777647f34df27a902bdff42a2b9f3a08"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-012/run-001/cleanup.json",
+          "sha256": "4f8838f9947aea602586792bd04fca402f8efe5084d409b1c295fe3781700072"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-012-audit.json",
+          "sha256": "32ccf80c73105ebfdab1072ba30d8909548a4cf500c8f3a6f62b2c53487d234a"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-012/browser/run-001/diagnostics/result.json",
+          "sha256": "1da4b4993230b37c9ea7d20637f1d4324bad43befadb098d40afbe0011971647"
+        }
+      ]
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-013-retry-002",
+      "new_projects": [
+        "python-statemachine",
+        "transitions"
+      ],
+      "control_projects": [],
+      "summary": {
+        "stage_selected_counts": [
+          12,
+          12,
+          12
+        ],
+        "selected_paths": 36,
+        "unique_tasks": 12,
+        "stored_task_rows": 36,
+        "unselected_task_rows": 0,
+        "instances": 6,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 4,
+          "consult": 4,
+          "plan": 2,
+          "diagnose": 2
+        },
+        "readonly_paths": 36,
+        "selected_modify_paths": 0,
+        "code_acceptances": 0,
+        "unique_modify_targets": 0,
+        "unavailable_paths": 2,
+        "disclosure_deliveries": 4,
+        "runs": 80,
+        "frozen_manifests_verified": 2,
+        "frozen_objects_verified": 775,
+        "private_review_observations": 40,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 2,
+        "answer_dependencies": 0,
+        "evidence_files": 2312
+      },
+      "browser_checks": 571,
+      "screenshots": 32,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-013-retry-002/run-001/evidence/result.json",
+          "sha256": "d86e96fe95cd849e77b4dfdb73ffce60e943d2fc249de06439c44d35f95335ad"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-013-retry-002/run-001/cleanup.json",
+          "sha256": "9d2f3ff373284737872887d25afa15e9af9e7a977ee1c6554d75e8de0373809d"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-013-retry-002-audit.json",
+          "sha256": "60181b5e3b7870ef3759b2d2350ba44b9725f10ab373319b395fbfa0d9e658e9"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-013-retry-002/browser/run-001/diagnostics/result.json",
+          "sha256": "78304bbf52a9503591a72c2939c39288714929de9ecffd25e81f16e1c1da867e"
+        }
+      ]
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-014-final-three",
+      "new_projects": [
+        "collective-icalendar",
+        "pendulum",
+        "wrapt"
+      ],
+      "control_projects": [],
+      "summary": {
+        "stage_selected_counts": [
+          18,
+          18,
+          18
+        ],
+        "selected_paths": 54,
+        "unique_tasks": 18,
+        "stored_task_rows": 54,
+        "unselected_task_rows": 0,
+        "instances": 9,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 6,
+          "consult": 6,
+          "plan": 3,
+          "diagnose": 3
+        },
+        "readonly_paths": 54,
+        "selected_modify_paths": 0,
+        "code_acceptances": 0,
+        "unique_modify_targets": 0,
+        "unavailable_paths": 3,
+        "disclosure_deliveries": 6,
+        "runs": 120,
+        "frozen_manifests_verified": 3,
+        "frozen_objects_verified": 1201,
+        "private_review_observations": 60,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 2,
+        "answer_dependencies": 0,
+        "evidence_files": 3503
+      },
+      "browser_checks": 845,
+      "screenshots": 46,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-014-final-three/run-001/evidence/result.json",
+          "sha256": "c25498a254da2cc675d1fa21e25c72baffa1ee3f2538c77b066f7dd4192cb359"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-014-final-three/run-001/cleanup.json",
+          "sha256": "c0a1a98baabba33b8431fdd360448b0d478b540abfa3e452115d136cf88a3b72"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-014-final-three-audit.json",
+          "sha256": "37fbbd088037a5718e9b83d728999d4ac6221ce8a69397230d5fe04b410b7f2b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-014-final-three/browser/run-001/diagnostics/result.json",
+          "sha256": "935ba99308670b173e3fc2b6890c8ec23048a994f039643722ff2c5cde436f15"
+        }
+      ]
+    },
+    {
+      "bundle": ".deploy/project-catalog-hundred/stage-03/mock-batch-015-retry-002-sqlglot",
+      "new_projects": [
+        "sqlglot"
+      ],
+      "control_projects": [
+        "arrow"
+      ],
+      "summary": {
+        "stage_selected_counts": [
+          14,
+          14,
+          14
+        ],
+        "selected_paths": 42,
+        "unique_tasks": 14,
+        "stored_task_rows": 42,
+        "unselected_task_rows": 0,
+        "instances": 6,
+        "batches": 3,
+        "unique_task_kinds": {
+          "understand": 5,
+          "consult": 4,
+          "plan": 2,
+          "diagnose": 2,
+          "modify": 1
+        },
+        "readonly_paths": 39,
+        "selected_modify_paths": 3,
+        "code_acceptances": 3,
+        "unique_modify_targets": 1,
+        "unavailable_paths": 2,
+        "disclosure_deliveries": 4,
+        "runs": 92,
+        "frozen_manifests_verified": 3,
+        "frozen_objects_verified": 409,
+        "private_review_observations": 46,
+        "maximum_work_intervals": 2,
+        "sampled_maximum_holders": 2,
+        "source_accounting_maximum": 3,
+        "answer_dependencies": 0,
+        "evidence_files": 2177
+      },
+      "browser_checks": 657,
+      "screenshots": 32,
+      "evidence": [
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-015-retry-002-sqlglot/run-001/evidence/result.json",
+          "sha256": "0193f246d6900556cd3322dc00c4a949c6ddb9d34a00f1d4b02ec0626c4ebaae"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-015-retry-002-sqlglot/run-001/cleanup.json",
+          "sha256": "eac2fbcb87c700c3b204ccc0c71ec2f7a3f1c4c4fae17cf6f17d26dcbcdafab7"
+        },
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-015-retry-002-sqlglot-audit.json",
+          "sha256": "8aa0529d0c9fed2dc7e4fefffbf6ceb59a3e9df5ba16f700e0738c4e5d89a8f8"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-015-retry-002-sqlglot/browser/run-001/diagnostics/result.json",
+          "sha256": "0edc9497a4cb951936994e9df5c90cd08dc065ca9ed3dd5636fce5bbae7b4f0e"
+        }
+      ]
+    }
+  ],
+  "admissions": [
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/arrow-admission.json",
+      "sha256": "4650c537c69b54212de090043006047313dbfd7c62cb323c463f419ecd3c4b66"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/bidict-admission.json",
+      "sha256": "80c0a3e4f5e3a9a8ae7eb0d99eb6516e30cb1368e74208c28b6dde3b14ea0e1d"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/chardet-admission.json",
+      "sha256": "de5bd13c1670794d92784cbeee674e96d594b11902206e770ebaaa8b04e15eaa"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/charset-normalizer-admission.json",
+      "sha256": "60cf047368ad2b2e1b5fc0c9a812b1b146026ec3375a83049599e712856781c6"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/collective-icalendar-admission.json",
+      "sha256": "194f8bdb5f594651c14fee4d361d15ecf7ecc077e03a993425e5839d24793179"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/feedgen-admission.json",
+      "sha256": "9db10afb201281bf581919e6cd495b6a58086121819911d27370f4135452c8e5"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/feedparser-admission.json",
+      "sha256": "9fe9dd92e6a85ea829b11b82dacdb43dafe6a27b799cd9fad3b1323cc1e950c2"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/funcy-admission.json",
+      "sha256": "41b2aa084f22bbd18dad9c544eb8a190116eed8008379c127826e3c52183ae94"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/html5lib-admission.json",
+      "sha256": "6b32fa4291a019f874c7b9dc5840c334804bfb877e1490719f50ee664912e91a"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/humanize-admission.json",
+      "sha256": "f54cbd04ea650a9c31672dae8e7b62d17014faab98098395e2c6f65e5da102da"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/injector-admission.json",
+      "sha256": "f75fc4fb242442f67862446b73afcddc5006930da14077813e68af2bc0602aa9"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/loguru-admission.json",
+      "sha256": "687d9ccfdf5772b0fd6083f15c982e87315a948eed22b8a7b700f7c6836edf05"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/markdownify-admission.json",
+      "sha256": "bb16d77f4e1412e87c51972617115a7ab98cb666ad80d807c924fecdbbded674"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/natsort-admission.json",
+      "sha256": "7b6e5432d05767dbd0a0a8832f802ff7b0bf164f83083a36dd712bcb8d7b8075"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pendulum-admission.json",
+      "sha256": "9f77d8bba1f9eb04331bdb954161261b528047cb25246c14c5b703c083961099"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/portion-admission.json",
+      "sha256": "ba250e7a8d0e0140ee7deb2f09238fa8bde81c8e3cc573cc09977009b615d120"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pyparsing-admission.json",
+      "sha256": "24274a066a89539bcccde53d5c1abec2d147ad46e7a147f2a3dc69b3eff43474"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pypika-admission.json",
+      "sha256": "d5c29bcb1abae45140e6ce08e3294439d00fdf5c19798089456271b9bc772688"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pyrsistent-admission.json",
+      "sha256": "01837621863dce950b5619e1f07c69cc660b548ef272c70c1967be842fa9f180"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-constraint-admission.json",
+      "sha256": "edf534f916c0c847ba823fdd358c4db85f2188948d15c3ebf2469fdd95b5bbf4"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-liquid-admission.json",
+      "sha256": "e377e46c69dbac3fa180072a8860e9d70282d729021f6469d91389d6691a0c83"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-statemachine-admission.json",
+      "sha256": "32482d499001558ac64ad1b0c46d9108ed5f112ea50380a5dc663bcf60cdb02a"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sortedcontainers-admission.json",
+      "sha256": "63625bb90e15b8634b0a1df5ce6f67b8cf7759c6e0d73b03fe00363f9b70860a"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sqlglot-admission.json",
+      "sha256": "ef302d0691302492499586af73751038dd44ace51ac670c5ba793abc61552184"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/tablib-admission.json",
+      "sha256": "1d01ce5279be8f59251c3a6a90f21ed0a9d1f2e54f563e50effc783b1b5f5657"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/textdistance-admission.json",
+      "sha256": "be96667b797d93377f31e26c71aff5f3b9dd0cec0b7112b59c404af776fa187b"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/transitions-admission.json",
+      "sha256": "c1105a6a2ac4a11a0b451a6ae833aaa8eec5a1f741d1750adc3c8bfef5042ec8"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/webcolors-admission.json",
+      "sha256": "6e371172d0c097aa2d22652ea3d17df60f567c690701f7eee59813fd8b9e8f1a"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/wrapt-admission.json",
+      "sha256": "f11758233ac8ae28b48de39dd1973f9684c216ea3bf73f583929ac6ac2d0301b"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/wtforms-admission.json",
+      "sha256": "ea3bbdfa2883812eb234670c13d4a313bda1df9450ff763ef0c93782a56eda5c"
+    }
+  ],
+  "sqlglot_product_full_regressions": {
+    "scope": "三组入口的重复执行证据，不增加任务或原生基线分母",
+    "database": {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-015-retry-002-sqlglot/run-001/evidence/private-synthetic.sqlite",
+      "sha256": "a11005dee200c99bb7a25790e5a7c4f3faa4df2eb936635f6205fbf0b0460249"
+    },
+    "items": [
+      {
+        "evaluation_job_id": 14,
+        "status": "passed",
+        "main_collected": 1500,
+        "subtests_separate": 21780,
+        "subtest_contract": {
+          "count": 21780,
+          "format": "sqlglot-subtests-v1",
+          "sha256": "6d7faa76dd32a3eff3b0839c1f2e0e556e6cf1c8ed853cee1b94b9db84e3f0d3"
+        }
+      },
+      {
+        "evaluation_job_id": 29,
+        "status": "passed",
+        "main_collected": 1500,
+        "subtests_separate": 21780,
+        "subtest_contract": {
+          "count": 21780,
+          "format": "sqlglot-subtests-v1",
+          "sha256": "6d7faa76dd32a3eff3b0839c1f2e0e556e6cf1c8ed853cee1b94b9db84e3f0d3"
+        }
+      },
+      {
+        "evaluation_job_id": 39,
+        "status": "passed",
+        "main_collected": 1500,
+        "subtests_separate": 21780,
+        "subtest_contract": {
+          "count": 21780,
+          "format": "sqlglot-subtests-v1",
+          "sha256": "6d7faa76dd32a3eff3b0839c1f2e0e556e6cf1c8ed853cee1b94b9db84e3f0d3"
+        }
+      }
+    ]
+  },
+  "source_evidence_audit": {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/full-evidence-audit.json",
+    "sha256": "4a4fe9a51aec97128436a7576a1577b375185753a71d1241d07412331c6508c4"
+  },
+  "task_matrix": {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/full-task-matrix-audit.json",
+    "sha256": "de5376a6fd7b93330c7f06850c8b981dfd6978bf6ac161bea358893181fa7249"
+  },
+  "static_checks": {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/full-static-checks.json",
+    "sha256": "3947fce64663378ebe4d193867291735d9c26c0df45089f977c68b228d4735ed"
+  },
+  "focused_checks": {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/focused-checks-sqlglot.json",
+    "sha256": "12623c749799fbb408ac87a748d0e6fe3f5085896c2cd5c3542dbe0f2ab97e0b"
+  },
+  "audit_adapter_tests": {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sqlglot-audit-adapter-tests.json",
+    "sha256": "f115734987c015cfd8c946c61a88fa9cba30a128034096c0bd990abd141247e5"
+  },
+  "mock_audit_recipe": {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-audit-recipe-provenance.json",
+    "sha256": "7d9a8e7b1567cbb84e45bd44c773c2bfab137c6d366842d0b4736ae8ea4180c9"
+  },
+  "historical_partial_summary": {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/available-verification-summary.json",
+    "sha256": "c9fd7b70327c68ab19dd48818a22066c9ead542e18ec41ceddcf0eed8e7e3d1a"
+  },
+  "unverified_external_tests": [
+    {
+      "path": "sqlglot-integration-tests",
+      "commit": "8cbf013a7b0bd1871abce4ebb543560d0e554799",
+      "repository": "git@github.com:fivetran/sqlglot-integration-tests.git",
+      "status": "unavailable_optional_private_tests_unverified"
+    }
+  ],
+  "public_scope_approval": {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sqlglot-public-source-scope.json",
+    "sha256": "b07da83b8a2057a576faaf92ca5c5759c31dfaae67cbc7c043c16b35f82ec04a"
+  },
+  "delivery": {
+    "path": ".deploy/project-catalog-hundred/stage-03/delivery-attempt-012/result.json",
+    "sha256": "a62eddeb2b15d239e62902ae2994b321687429d00388a5751b019a08b3c00d15"
+  },
+  "delivery_files": 32188,
+  "old_files_unchanged": 22622,
+  "raw_checkout_bytes_equal": false,
+  "production_source_restoration": [
+    "project_library/projects/python-dateutil/seed/library/NEWS",
+    "project_library/projects/python-dateutil/seed/library/docs/make.bat"
+  ],
+  "git_export_status": "passed",
+  "docker_copy_status": "passed",
+  "primary_head": "6ca422ab76eb967381b508602246924234065953",
+  "check_all_status": "pending_runner_action",
+  "stage_local_commit": "pending_runner_action",
+  "real_model_status": "not_run",
+  "real_model_calls": 0,
+  "real_oauth_calls": 0,
+  "pushed": false,
+  "deployed": false,
+  "summary_script": {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/summarize_full_verification.py",
+    "sha256": "11b65606363f811dd33a23c41fa492336528d27416b50de8c5dc3046fbec7f6f"
+  },
+  "pool_direction_gap": {
+    "scope": "内容深化方向，独立于本轮百项目接入目标",
+    "scene_direction": [
+      600,
+      800
+    ],
+    "scene_gap_to_600": 174,
+    "scene_gap_to_800": 374,
+    "task_direction": 2000,
+    "task_gap": 1274
+  }
+}

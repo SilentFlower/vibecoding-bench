@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TB-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "xlsx_escape_is_an_explicit_lossy_formula_export_policy": true
+  },
+  "resource_profile": "business"
+}

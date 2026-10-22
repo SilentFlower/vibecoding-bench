@@ -1,0 +1,9 @@
+{
+  "status": "failed_not_admitted",
+  "browser_result": ".deploy/project-catalog-hundred/stage-03/mock-batch-008/browser/run-001/diagnostics/result.json",
+  "failed_check": "TD-U01 review Run为failed",
+  "review_run": "7d4f6f3f80d9",
+  "actual_error": "database is locked",
+  "action": "完整保留本轮原件和清理，使用相同项目字节重跑所有产品路径；不降低页面或产品期望",
+  "formal_registered": false
+}

@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "python-statemachine",
+      "attempt": 5,
+      "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-005/python-statemachine/result.json",
+      "result_sha256": "12da9690cc9e0db05bbb5d670f9369f604da0abe38268feb8f0505835358ca86",
+      "main_collected": 3125,
+      "counts": {
+        "passed": 2973,
+        "failed": 0,
+        "error": 0,
+        "skipped": 26,
+        "xfailed": 126,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 49,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 3125,
+      "xml_skipped": 152,
+      "runner_sha256": "b3e8963ecf3ddc022b4b23d3d0791ee2ff864037fb4e91f04a360ef309daf4a9",
+      "contract_sha256": "01a223e8cf6a505b896536a120990d55ef76e42cece663126ed7a554664bcc3f",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 600,
+        "memory_mb": 768,
+        "pids_limit": 128
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    }
+  ]
+}

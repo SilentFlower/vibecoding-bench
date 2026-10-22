@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PS-C02",
+  "source_commit": "0c0b7aec8cd25b1d2d8ba07b10acdefd0f38f2c7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The strict create control raises AttributeError for currency. ignore_extra=True creates a record serializing only count3;it leaves the input dictionary unchanged but drops currency from the record rather than preserving or validating it. Select reject,explicitly model,or deliberately ignore based on the schema contract and test round trips.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

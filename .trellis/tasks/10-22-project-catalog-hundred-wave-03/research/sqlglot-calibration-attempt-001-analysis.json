@@ -1,0 +1,9 @@
+{
+  "status": "failed_retained",
+  "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/sqlglot/result.json",
+  "result_sha256": "5a0acd1d4754c509f63d5e2ced65d93e0ff405afee0d5cdfb9d84b668cffb87e",
+  "runner_timeout_sec": 270,
+  "last_observed_test": "tests.test_parser.TestParser.test_max_nodes",
+  "oom_killed": false,
+  "action": "保留完整集合；在既有环境允许4096MiB上限内，以3072MiB/360秒重测资源边界；不提高平台限制或修改测试"
+}

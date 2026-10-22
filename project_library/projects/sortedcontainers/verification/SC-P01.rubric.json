@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SC-P01",
+  "source_commit": "3ac358631f58c1347f1d6d2d92784117db0f38ed",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Rank-only continuation after first page1,2 uses right(1),skipping the remaining rank1 record3 and returning4. Composite(rank,id) continuation after(1,2) returns3,4. Require a stable unique tie-breaker,bind the cursor to its sort definition and explicitly choose snapshot/version or documented update semantics. The container supplies searches,not persistent cursor isolation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

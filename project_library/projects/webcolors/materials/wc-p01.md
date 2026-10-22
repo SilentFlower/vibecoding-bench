@@ -1,0 +1,1 @@
+Convert ("30%","50%","70%") to integer RGB and back to percentages. Compare aqua/cyan to hex and reverse #00ffff to a name. Plan theme storage,display and audit fields with explicit precision/alias policy. No implementation.

@@ -1,0 +1,12 @@
+{
+  "project": "funcy",
+  "source_commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+  "upstream_files_changed": false,
+  "supplemental_files": {
+    "CC-BY-SA-3.0.html": "1bdb6d210afa2aa72799154e4df733283baeb014c29bc70588192ff81603be96",
+    "Django-1.4-LICENSE.txt": "1c287b5fb3643c89d41f1b5fd1e8c4167616006a92a8f35ba6a0ec97cae0866b",
+    "THIRD_PARTY_NOTICES.txt": "9287488d14ca9788c03cb718101ac58755d2797eab7dc2b0954ae81ec7027f41"
+  },
+  "source_verification": ".deploy/github-100-research/resume-main/funcy/third-party-license-verification.json",
+  "cc_provenance": ".deploy/project-catalog-hundred/stage-03/dependency-preparation/funcy-licenses/provenance.json"
+}

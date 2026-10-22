@@ -1,0 +1,162 @@
+{
+  "project": "pyrsistent",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "0c0b7aec8cd25b1d2d8ba07b10acdefd0f38f2c7",
+  "source_file_count": 71,
+  "license_files": [
+    "seed/library/LICENSE.mit"
+  ],
+  "scenarios": 3,
+  "unique_tasks": 5,
+  "modify_tasks": 0,
+  "non_modify_tasks": 5,
+  "native_baseline": {
+    "project": "pyrsistent",
+    "attempt": 5,
+    "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-005/pyrsistent/result.json",
+    "result_sha256": "1bdcd12caa91147e1eccfeffa021a024f64d601b968bec0c4c73bcceb36ddce1",
+    "main_collected": 638,
+    "counts": {
+      "passed": 637,
+      "failed": 0,
+      "error": 0,
+      "skipped": 1,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "subtest_count": 0,
+    "collection_skip_count": 0,
+    "xml_testcases": 638,
+    "xml_skipped": 1,
+    "runner_sha256": "fb4d87610fda41602c4c0c00fc3550fb23060f6eb5b05a52db6ec9c924c77692",
+    "contract_sha256": "cc8031d1a1538e8727d4e74cee3cd6f1cc7a30009b30219cde0541705c294ac2",
+    "business": {
+      "timeout_sec": 30,
+      "memory_mb": 256,
+      "pids_limit": 64
+    },
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成",
+    "native_build": {
+      "command": [
+        "/work/python/bin/python",
+        "setup.py",
+        "build_ext",
+        "--inplace",
+        "--force"
+      ],
+      "returncode": 0,
+      "elapsed_sec": 1.0697265509952558,
+      "inputs": {
+        "setup.py": "2fb616a34abf9a5c2d0d372e0c0c83995d3d6b1ccfd9ddc3b87575f87844b3a0",
+        "setup.cfg": "20aeffedf3390e2a3eb2bbcfaa38c681d5f8f3d7fcfad8b1c3382018d9c52bbb",
+        "pvectorcmodule.c": "9b2ae5a48474dd1380aa60c2d1f0e6a0534af43637970310454551cb27f1422b",
+        "_pyrsistent_version.py": "500b93622285e35c936be946f8b0fd51402b857738699e9b26cffab06ab606e5"
+      },
+      "extension": "pvectorc.cpython-312-x86_64-linux-gnu.so",
+      "extension_sha256": "72ad3fc525ef4cc71a307b5bda953b28c3c77d096464b5ae72b6d7f40a938c10",
+      "implementation_installed": false,
+      "force_rebuilt_from_candidate": true
+    }
+  },
+  "verified_unique_native_cases": 5,
+  "native_evidence": [
+    {
+      "case": "original-PS-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pyrsistent/attempt-001/original-PS-C01.json",
+      "sha256": "2d846c1854932179a1bd4f9b3cc1af09d0226d6d861cb6cd443e0a3e71af4927",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PS-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pyrsistent/attempt-001/original-PS-C02.json",
+      "sha256": "89c8b97119acf24feb6c5975ebe8e92b5fdaa63e95a92ec51e042b9035270cb7",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PS-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pyrsistent/attempt-001/original-PS-P01.json",
+      "sha256": "e439439fc3d3aa10d7eabd7470d514ae5b26f36677c7f2b43bf603f8f1a8ac7a",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PS-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pyrsistent/attempt-001/original-PS-U01.json",
+      "sha256": "cdd7752d93ad9ddcaea47d36420dc9690ac333280b7215be488d2bc42cf2af85",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PS-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pyrsistent/attempt-001/original-PS-U02.json",
+      "sha256": "820dfcfa56027ac5238fa7925b72e870dbc810807fba6fde772b542a3e5ebb10",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-03/business/pyrsistent/attempt-001/summary.json",
+      "sha256": "3aa8a967451965a884a5e8607076b01ff33de6eb71aaab3cd27397ea90174b7a",
+      "passed": true
+    }
+  ],
+  "additional_original_native": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/additional-native/attempt-001/pyrsistent/result.json",
+      "sha256": "3fa88bbe980c0748b3d4b927e8d6a167cf810fea76f060d35f6de29157c84056",
+      "library_digest": "343b991e0a096303d88d2aca598b2718b54b788a6e5814f017cdee13d0923e77",
+      "collected": 80,
+      "passed": 80,
+      "scope": "固定原版额外官方集合；不是可修改候选回归"
+    }
+  ],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v28-en",
+  "formal_digest": "ee4a12a42645f23acded2cb8c7229d2a02f9dcc641243ded8b69d541c28d8956",
+  "full_delivery_files": 23890,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-004/run-001/evidence/result.json",
+      "sha256": "090a31ff5df40b9ef7ff0166033481b423acdb5ff95e02091c4963200faeaa3a"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-004/run-001/cleanup.json",
+      "sha256": "c212c9acefc074f8ceba7bd881fe5ee5f3a0c59591eb0c40b5807981abbd6451"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-004-audit.json",
+      "sha256": "03c7820d70c36601e925f866c38417bdd9529e356190dc3bd944b756b2032d1e"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-004/browser/run-001/diagnostics/result.json",
+      "sha256": "70ca40b8c0da80bdd77be1e27d728e7b8c715da58176be1c836f3ad700d4e197"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/delivery-first-eight.json",
+      "sha256": "bb43ead9949565a4925e9273bbb1d60739a1c0b9e752cb2dc3149fdd3926e527"
+    }
+  ]
+}

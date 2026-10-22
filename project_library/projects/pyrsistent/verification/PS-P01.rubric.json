@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PS-P01",
+  "source_commit": "0c0b7aec8cd25b1d2d8ba07b10acdefd0f38f2c7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Setting low10 alone against high5 fails the cross-field invariant. Updating low10/high20 together succeeds. The evolver holds low10 temporarily,but persistent() fails until high20 is set;then it publishes the same valid range,while original stays0..5. Collect a complete logical edit,validate/publish a persistent value,retain prior state on validation failure and define application error handling. Do not claim the mutable staging object supplies a database transaction or thread-safety.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

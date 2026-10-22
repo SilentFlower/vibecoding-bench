@@ -1,0 +1,1 @@
+Configure send_event=True on Machine with go:a->b and an after callback record(event). Trigger model.go(ticket="T-1"). Inspect event.event.name,transition source/dest,state.name and kwargs. Advise callback signatures and correlation handling. No edits.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MD-D01",
+  "source_commit": "bc98c9e134ec55b2853716ab859754f061cb7054",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Diagnose only from actually consumed converter/options/sequence evidence. Ask for missing complete controls;when provided,trace the relevant option lookup and cached conversion behavior in the pinned source and propose an explicit per-profile converter lifetime. Missing controls support insufficient_information. Do not invent a parser cause or patch source.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

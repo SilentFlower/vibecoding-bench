@@ -1,0 +1,879 @@
+<script src="_static/nhpup_1.1.js"></script>
+<style>
+#pup {
+  position:absolute;
+  z-index:200; /* aaaalways on top*/
+  padding: 3px 7px 5px;
+  margin-left: 5px;
+  margin-top: 15px;
+  border-radius: 3px;
+  background-color: #343131;
+  color: #b3b3b3;
+  font-size: 0.95em;
+  white-space: nowrap;
+}
+.descriptions {display: none}
+.rst-content code.xref {line-height: 20px}
+
+#pup strong, #pup b {color: #ddd}
+#pup em {color: #3591CC; font-weight: bold; margin-right: 2px}
+#pup b em {margin-right: 0}
+#pup em span {color: #b3b3b3; opacity: 0.7; font-style: normal;
+              display:inline-block; padding:0 1px 0 3px}
+#pup code {background: transparent; border: none; font-size: 90%; padding: 0 3px;}
+</style>
+
+<script>
+    function defer(method) {
+        if (window.jQuery)
+            jQuery(method);
+        else
+            setTimeout(function() { defer(method) }, 50);
+    }
+    defer(function () {
+        // Strip parentheses
+        $('table .py-func .pre').each(function () {
+            var text = $(this).text();
+            if (text.substr(-2) === '()') $(this).text(text.substr(0, text.length-2));
+        })
+
+        $('a[href="#colls"]').attr('title', 'dicts-more')
+        $('h2 a[href*=extended_fns]').attr('title', 'extended-fns')
+        nhpup.initialize()
+        $('.descriptions div').each(function () {
+            var name = this.getAttribute('name');
+            getFuncRefs(name).on('mouseover', nhpup.popup(this.innerHTML, {width: ''}))
+                             .removeAttr('title');
+        })
+    })
+
+    function getFuncRefs(name) {
+        var linkEls = name.match(/^log_/)
+            ? $('a[title="log_#"], a[title="print_#"]'.replace(/#/g, name.replace(/^log_/, '')))
+            : $('a[title="#"], a[title="i#"], a[title="l#"]'.replace(/#/g, name));
+
+        // var linkEls = $('a[title="#"], a[title="i#"], a[title="l#"]'.replace(/#/g, name));
+        // var printName = name.replace(/^log_/, 'print_');
+        // if (printName !== name) linkEls = linkEls.add('a[title="#"]'.replace(/#/g, printName));
+
+        var texts = {};
+        ['', 'i', 'l'].forEach(function (prefix) {
+            texts[prefix + name] = true;
+            texts[prefix + name + '()'] = true;
+        })
+
+        var nonLinkEls = $('.py-func .pre:contains("' + name + '")')
+                            .filter(function (){return texts[this.innerText]})
+                            .parent()
+                            .filter(function (){return this.parentNode.tagName != 'A'})
+
+        return linkEls.add(nonLinkEls)
+    }
+</script>
+
+<div class="descriptions">
+
+<!-- Seqs Create -->
+<div name="count">
+    <b>count<em>(start=0, step=1)</em></b><br><br>
+    Makes infinite iterator of values:<br>
+    <code>start, start + step, start + 2*step, ...</code>
+</div>
+<div name="cycle">
+    <b>cycle<em>(seq)</em></b><br><br>
+    Cycles passed sequence indefinitely<br>
+     yielding its elements one by one.
+</div>
+<div name="repeat">
+    <b>repeat<em>(item<span>[, </span>n<span>]</span>)</em></b><br><br>
+    Makes an iterator yielding <em>item</em> for <em>n</em> times<br>
+     or indefinitely if <em>n</em> is omitted.
+</div>
+<div name="repeatedly">
+    <b>repeatedly<em>(f<span>[, </span>n<span>]</span>)</em></b><br><br>
+    Takes a function of no args, presumably with side effects,<br>
+     and returns an infinite (or length <em>n</em>) iterator of calls to it.
+</div>
+<div name="iterate">
+    <b>iterate<em>(f, x)</em></b><br><br>
+    Returns an infinite iterator of <code>x, f(x), f(f(x)), ...</code>
+</div>
+<div name="re_all">
+    <b>re_all<em>(regex, s, flags=0)</em></b><br><br>
+    Lists all matches of <em>regex</em> in <em>s</em>.
+</div>
+<div name="re_iter">
+    <b>re_iter<em>(regex, s, flags=0)</em></b><br><br>
+    Iterates over matches of <em>regex</em> in <em>s</em>.
+</div>
+
+<!-- Seqs Access -->
+<div name="first">
+    <b>first<em>(seq)</em></b><br><br>
+    Returns the first item in the sequence.<br>
+    Returns <code>None</code> if the sequence is empty.
+</div>
+<div name="second">
+    <b>second<em>(seq)</em></b><br><br>
+    Returns second item in the sequence.<br>
+    Returns <code>None</code> if there are less than two items in it.
+</div>
+<div name="last">
+    <b>last<em>(seq)</em></b><br><br>
+    Returns the last item in the sequence.<br>
+    Returns <code>None</code> if the sequence is empty.
+</div>
+<div name="nth">
+    <b>nth<em>(n, seq)</em></b><br><br>
+    Returns nth item in the sequence<br> or <code>None</code> if no such item exists.
+</div>
+<div name="some">
+    <b>some<em>(<span>[</span>pred<span>, ]</span>seq)</em></b><br><br>
+    Finds first item in <em>seq</em> passing <em>pred</em><br> or first that is true if <em>pred</em> is omitted.
+</div>
+
+<!-- Seqs Slice -->
+<div name="take">
+    <b>take<em>(n, seq)</em></b><br><br>
+    Returns a list of first <em>n</em> items in the sequence,<br>
+     or all items if there are fewer than <em>n</em>.
+</div>
+<div name="drop">
+    <b>drop<em>(n, seq)</em></b><br><br>
+    Skips first <em>n</em> items in the sequence,<br>
+    yields the rest.
+</div>
+<div name="rest">
+    <b>rest<em>(seq)</em></b><br><br>
+    Skips first item in the sequence, yields the rest.
+</div>
+<div name="butlast">
+    <b>butlast<em>(seq)</em></b><br><br>
+    Yields all elements of the sequence but last.
+</div>
+<div name="takewhile">
+    <b>takewhile<em>(<span>[</span>pred<span>, ]</span>seq)</em></b><br><br>
+    Yields <em>seq</em> items as long as they pass <em>pred</em>.
+</div>
+<div name="dropwhile">
+    <b>dropwhile<em>(<span>[</span>pred<span>, ]</span>seq)</em></b><br><br>
+    Skips elements of <em>seq</em> while <em>pred</em> passes<br>
+     and then yields the rest.
+</div>
+<div name="split_at">
+    <b>split_at<em>(n, seq)</em><br>lsplit_at<em>(n, seq)</em></b><br><br>
+    Splits the sequence at given position,<br>
+     returning a tuple of its start and tail.
+</div>
+<div name="split_by">
+    <b>split_by<em>(pred, seq)</em><br>lsplit_by<em>(pred, seq)</em></b><br><br>
+    Splits the start of the sequence,<br>
+     consisting of items passing <em>pred</em>,<br>
+     from the rest of it.
+</div>
+
+<!-- Seqs Transform -->
+<div name="map">
+    <b>map<em>(f, *seqs)</em><br>lmap<em>(f, *seqs)</em></b><br><br>
+    Extended versions of <b>map()</b> and <b>list(map())</b>
+</div>
+<div name="mapcat">
+    <b>mapcat<em>(f, *seqs)</em><br>lmapcat<em>(f, *seqs)</em></b><br><br>
+    Maps given sequence(s) and concatenates the results.
+</div>
+<div name="keep">
+    <b>keep<em>(<span>[</span>f<span>, ]</span>*seqs)</em><br>lkeep<em>(<span>[</span>f<span>, ]</span>*seqs)</em></b><br><br>
+    Maps <em>seq</em> with <em>f</em> and filters out falsy results.<br>
+    Simply removes falsy values in one argument version.
+</div>
+<div name="pluck" width="300">
+    <b>pluck<em>(key, mappings)</em><br>lpluck<em>(key, mappings)</em></b><br><br>
+    Yields or lists values for <em>key</em> in each mapping.
+</div>
+<div name="pluck_attr">
+    <b>pluck_attr<em>(attr, objects)</em><br>lpluck_attr<em>(attr, objects)</em></b><br><br>
+    Yields or lists values of <em>attr</em> of each object.
+</div>
+<div name="invoke">
+    <b>invoke<em>(objects, name, *args, **kwargs)</em><br>
+       linvoke<em>(objects, name, *args, **kwargs)</em></b><br><br>
+    Yields or lists results of the given method call<br>
+     for each object in <em>objects</em>.
+</div>
+<div name="wrap_prop">
+    <b>@wrap_prop<em>(ctx)</em></b><br><br>
+    Wrap a property accessors with <em>ctx</em>.
+</div>
+
+
+<!-- Seqs Filter -->
+<div name="filter">
+    <b>filter<em>(pred, seq)</em><br>lfilter<em>(pred, seq)</em></b><br><br>
+    Extended versions of <b>filter()</b> and <b>list(filter())</b>.
+</div>
+<div name="remove">
+    <b>remove<em>(pred, seq)</em><br>lremove<em>(pred, seq)</em></b><br><br>
+    Removes items from <em>seq</em> passing given predicate.
+</div>
+<div name="distinct">
+    <b>distinct<em>(seq, key=identity)</em><br>ldistinct<em>(seq, key=identity)</em></b><br><br>
+    Removes items having same <em>key</em> from <em>seq</em>.<br>
+     Preserves order.
+</div>
+<div name="where">
+    <b>where<em>(mappings, **cond)</em><br>lwhere<em>(mappings, **cond)</em></b><br><br>
+    Selects <em>mappings</em> containing all pairs in <em>cond</em>.
+</div>
+<div name="without">
+    <b>without<em>(seq, *items)</em><br>lwithout<em>(seq, *items)</em></b><br><br>
+    Returns sequence without <em>items</em>,<br>
+     preserves order.
+</div>
+
+<!-- Seqs Join -->
+<div name="cat">
+    <b>cat<em>(seqs)</em><br>lcat<em>(seqs)</em></b><br><br>
+    Concatenates passed sequences.
+</div>
+<div name="concat">
+    <b>concat<em>(*seqs)</em><br>lconcat<em>(*seqs)</em></b><br><br>
+    Concatenates several sequences.
+</div>
+<div name="flatten">
+    <b>flatten<em>(seq, follow=is_seqcont)</em><br>
+       lflatten<em>(seq, follow=is_seqcont)</em></b><br><br>
+    Flattens arbitrary nested sequence,<br>
+    dives into when <code>follow(item)</code> is truthy.
+</div>
+<div name="interleave">
+    <b>interleave<em>(*seqs)</em></b><br><br>
+    Yields first item of each sequence,<br>
+    then second one and so on.
+</div>
+<div name="interpose">
+    <b>interpose<em>(sep, seq)</em></b><br><br>
+    Yields items of <em>seq</em> separated by <em>sep</em>.
+</div>
+<div name="zip">
+    <b>lzip<em>(*seqs)</em></b><br><br>
+       List version of <b>zip()</b>
+</div>
+
+<!-- Seqs Partition -->
+<div name="chunks">
+    <b>chunks<em>(n, <span>[</span>step<span>, ]</span>seq)</em><br>
+      lchunks<em>(n, <span>[</span>step<span>, ]</span>seq)</em></b><br><br>
+    Chunks <em>seq</em> into parts of length <em>n</em> or less.<br>
+    Skips <em>step</em> items between chunks.
+</div>
+<div name="partition">
+    <b>partition<em>(n, <span>[</span>step<span>, ]</span>seq)</em><br>
+      lpartition<em>(n, <span>[</span>step<span>, ]</span>seq)</em></b><br><br>
+    Partitions <em>seq</em> into parts of length <em>n</em>. <br>
+    Skips <em>step</em> items between parts.<br>
+    Non-fitting tail is ignored.
+</div>
+<div name="partition_by">
+    <b>partition_by<em>(f, seq)</em><br>
+      lpartition_by<em>(f, seq)</em></b><br><br>
+    Partition <em>seq</em> into continuous chunks<br>
+     with constant value of <em>f</em>.
+</div>
+
+<!-- Seqs Group -->
+<div name="split">
+    <b>split<em>(pred, seq)</em><br>
+      lsplit<em>(pred, seq)</em></b><br><br>
+     Splits <em>seq</em> items which pass <em>pred</em><br>
+      from the ones that don't.
+</div>
+<div name="count_by">
+    <b>count_by<em>(f, seq)</em></b><br><br>
+    Counts numbers of occurrences of values of <em>f</em><br>
+     on elements of <em>seq</em>.
+</div>
+<div name="count_reps">
+    <b>count_reps<em>(seq)</em></b><br><br>
+    Counts repetitions of each value in <em>seq</em>.
+</div>
+<div name="group_by">
+    <b>group_by<em>(f, seq)</em></b><br><br>
+     Groups items of <em>seq</em> by <code>f(item)</code>.
+</div>
+<div name="group_by_keys">
+    <b>group_by_keys<em>(get_keys, seq)</em></b><br><br>
+    Groups elements of <em>seq</em> by multiple keys.
+</div>
+<div name="group_values">
+    <b>group_values<em>(seq)</em></b><br><br>
+    Groups values of <code>(key, value)</code> pairs by keys.
+</div>
+
+<!-- Seqs Aggregate -->
+<div name="ilen">
+    <b>ilen<em>(seq)</em></b><br><br>
+    Consumes the given iterator and returns its length.
+</div>
+<div name="reductions">
+    <b>reductions<em>(f, seq<span>[, </span>acc<span>]</span>)</em><br>
+      lreductions<em>(f, seq<span>[, </span>acc<span>]</span>)</em></b><br><br>
+    Constructs intermediate reductions of <em>seq</em> by <em>f</em>.
+</div>
+<div name="sums">
+    <b>sums<em>(seq<span>[, </span>acc<span>]</span>)</em><br>
+      lsums<em>(seq<span>[, </span>acc<span>]</span>)</em></b><br><br>
+    Returns a sequence of partial sums of <em>seq</em>.
+</div>
+<div name="all">
+    <b>all<em>(<span>[</span>pred<span>, ]</span>seq)</em></b><br><br>
+    Checks if all items in <em>seq</em> pass <em>pred</em>.
+</div>
+<div name="any">
+    <b>any<em>(<span>[</span>pred<span>, ]</span>seq)</em></b><br><br>
+    Checks if any item in <em>seq</em> passes <em>pred</em>.
+</div>
+<div name="none">
+    <b>none<em>(<span>[</span>pred<span>, ]</span>seq)</em></b><br><br>
+    Checks if none of the items in <em>seq</em> pass <em>pred</em>.
+</div>
+<div name="one">
+    <b>one<em>(<span>[</span>pred<span>, ]</span>seq)</em></b><br><br>
+    Checks if exactly one item in <em>seq</em> passes <em>pred</em>.
+</div>
+
+<!-- Seqs Iterate -->
+<div name="pairwise">
+    <b>pairwise<em>(seq)</em></b><br><br>
+    Yields all pairs of neighboring items in <em>seq</em>.
+</div>
+<div name="with_prev">
+    <b>with_prev<em>(seq, fill=None)</em></b><br><br>
+    Yields each item from <em>seq</em> with the one preceding it.
+</div>
+<div name="with_next">
+    <b>with_next<em>(seq, fill=None)</em></b><br><br>
+    Yields each item from <em>seq</em> with the next one.
+</div>
+<div name="zip_values">
+    <b>zip_values<em>(*dicts)</em></b><br><br>
+    Yields tuples of corresponding values of given <em>dicts</em>.
+</div>
+<div name="zip_dicts">
+    <b>zip_dicts<em>(*dicts)</em></b><br><br>
+    Yields tuples like <code>(key, val1, val2, ...)</code><br>
+    for each common key in all given <em>dicts</em>.
+</div>
+<div name="tree_leaves">
+    <b>tree_leaves<em>(root, follow=is_seqcont, children=iter)</em><br>
+      ltree_leaves<em>(root, follow=is_seqcont, children=iter)</em></b><br><br>
+    Lists or iterates over tree leaves.
+</div>
+<div name="tree_nodes">
+    <b>tree_nodes<em>(root, follow=is_seqcont, children=iter)</em><br>
+      ltree_nodes<em>(root, follow=is_seqcont, children=iter)</em></b><br><br>
+    Lists or iterates over tree nodes.
+</div>
+
+
+<!-- Colls Join -->
+<div name="merge">
+    <b>merge<em>(*colls)</em></b><br><br>
+    Merges several collections of same type into one:<br>
+    dicts, sets, lists, tuples, iterators or strings<br>
+    For dicts later values take precedence.
+</div>
+<div name="merge_with">
+    <b>merge_with<em>(f, *dicts)</em></b><br><br>
+    Merges several <em>dicts</em> combining values with given function.
+</div>
+<div name="join">
+    <b>join<em>(colls)</em></b><br><br>
+    Joins several collections of same type into one.<br>
+    Same as <b>merge()</b> but accepts sequence of collections.
+</div>
+<div name="join_with">
+    <b>join_with<em>(f, *dicts)</em></b><br><br>
+    Joins several <em>dicts</em> combining values with given function.
+</div>
+
+<!-- Colls Transform -->
+<div name="walk">
+    <b>walk<em>(f, coll)</em></b><br><br>
+    Maps <em>coll</em> with <em>f</em>, but preserves collection type.
+</div>
+<div name="walk_keys">
+    <b>walk_keys<em>(f, coll)</em></b><br><br>
+    Walks keys of <em>coll</em>, mapping them with <em>f</em>.<br>
+    Works with dicts and collections of pairs.
+</div>
+<div name="walk_values">
+    <b>walk_values<em>(f, coll)</em></b><br><br>
+    Walks values of <em>coll</em>, mapping them with <em>f</em>.<br>
+    Works with dicts and collections of pairs.
+</div>
+
+<!-- Colls Filter -->
+<div name="select">
+    <b>select<em>(pred, coll)</em></b><br><br>
+    Filters elements of <em>coll</em> by <em>pred</em><br>
+    constructing a collection of same type.
+</div>
+<div name="select_keys">
+    <b>select_keys<em>(pred, coll)</em></b><br><br>
+    Select part of <em>coll</em> with keys passing <em>pred</em>.<br>
+    Works with dicts and collections of pairs.
+</div>
+<div name="select_values">
+    <b>select_values<em>(pred, coll)</em></b><br><br>
+    Select part of <em>coll</em> with values passing <em>pred</em>.<br>
+    Works with dicts and collections of pairs.
+</div>
+<div name="split_keys">
+    <b>split_keys<em>(pred, coll)</em></b><br><br>
+    Splits <em>coll</em> part with keys passing <em>pred</em><br>
+    from the one with remaining pairs.
+</div>
+<div name="compact">
+    <b>compact<em>(coll)</em></b><br><br>
+    Removes falsy values from given collection.
+</div>
+
+<!-- Colls Dicts -->
+<div name="dicts-more">
+    All collections functions work with dicts.<br>
+    These are targeted specifically at them.
+</div>
+<div name="flip">
+    <b>flip<em>(mapping)</em></b><br><br>
+    Flip passed dict swapping its keys and values.
+</div>
+<div name="zipdict">
+    <b>zipdict<em>(keys, vals)</em></b><br><br>
+    Creates a dict with <em>keys</em> mapped to the corresponding <em>vals</em>.
+</div>
+<div name="itervalues">
+    <b>itervalues<em>(coll)</em></b><br><br>
+    Yields values of the given collection.
+</div>
+<div name="iteritems">
+    <b>iteritems<em>(coll)</em></b><br><br>
+    Yields <code>(key, value)</code> pairs of the given collection.
+</div>
+<div name="project">
+    <b>project<em>(mapping, keys)</em></b><br><br>
+    Leaves only given keys in <em>mapping</em>.
+</div>
+<div name="omit">
+    <b>omit<em>(mapping, keys)</em></b><br><br>
+    Removes given keys from <em>mapping</em>.
+</div>
+
+<!-- Colls Misc -->
+<div name="empty">
+    <b>empty<em>(coll)</em></b><br><br>
+    Returns an empty collection of the same type as <em>coll</em>.
+</div>
+<div name="get_in">
+    <b>get_in<em>(coll, path, default=None)</em></b><br><br>
+    Returns a value at <em>path</em> in the given nested collection.
+</div>
+<div name="get_lax">
+    <b>get_lax<em>(coll, path, default=None)</em></b><br><br>
+    Returns a value at <em>path</em> in the given nested collection.<br>
+    Ignores <code>TypeError</code>s.
+</div>
+<div name="set_in">
+    <b>set_in<em>(coll, path, value)</em></b><br><br>
+    Creates a copy of <em>coll</em> with the <em>value</em> set at <em>path</em>.
+</div>
+<div name="update_in">
+    <b>update_in<em>(coll, path, update, default=None)</em></b><br><br>
+    Creates a copy of <em>coll</em> with a value updated at <em>path</em>.
+</div>
+<div name="del_in">
+    <b>del_in<em>(coll, path)</em></b><br><br>
+    Creates a copy of <em>coll</em> with <em>path</em> removed.
+</div>
+<div name="has_path">
+    <b>has_path<em>(coll, path)</em></b><br><br>
+    Tests whether <em>path</em> exists in a nested <em>coll</em>.
+</div>
+
+
+<div name="extended-fns">
+    Most of functions in this section support extended semantics.
+</div>
+
+<!-- Funcs Create -->
+<div name="identity">
+    <b>identity<em>(x)</em></b><br><br>
+    Returns its argument.
+</div>
+<div name="constantly">
+    <b>constantly<em>(x)</em></b><br><br>
+    Creates a function accepting any args, but always returning <em>x</em>.
+</div>
+<div name="func_partial">
+    <b>func_partial<em>(func, *args, **kwargs)</em></b><br><br>
+    Like <b>partial()</b> but returns a real function.
+</div>
+<div name="partial">
+    <b>partial<em>(func, *args, **kwargs)</em></b><br><br>
+    Returns partial application of <em>func</em>.
+</div>
+<div name="rpartial">
+    <b>rpartial<em>(func, *args)</em></b><br><br>
+    Partially applies last arguments to <em>func</em>.
+</div>
+<div name="iffy">
+    <b>iffy<em>(<span>[</span>pred<span>, ]</span>action<span>[, </span>default=identity<span>]</span>)</em></b><br><br>
+    Creates a function, which conditionally applies <em>action</em> or <em>default</em>.
+</div>
+<div name="caller">
+    <b>caller<em>(*args, **kwargs)</em></b><br><br>
+    Creates a function calling its argument with passed arguments.
+</div>
+<div name="re_finder">
+    <b>re_finder<em>(regex, flags=0)</em></b><br><br>
+    Creates a function finding <em>regex</em> in passed string.
+</div>
+<div name="re_tester">
+    <b>re_tester<em>(regex, flags=0)</em></b><br><br>
+    Creates a predicate testing passed strings with <em>regex</em>.
+</div>
+
+<!-- Funcs Transform -->
+<div name="complement">
+    <b>complement<em>(pred)</em></b><br><br>
+    Constructs a complementary predicate.
+</div>
+<div name="autocurry">
+    <b>autocurry<em>(func)</em></b><br><br>
+    Creates a version of <em>func</em> returning its partial applications<br>
+    until sufficient arguments are passed.
+</div>
+<div name="curry">
+    <b>curry<em>(func<span>[, </span>n<span>]</span>)</em></b><br><br>
+    Curries <em>func</em> into a chain of one argument functions.<br>
+    Arguments are passed from left to right.
+</div>
+<div name="rcurry">
+    <b>rcurry<em>(func<span>[, </span>n<span>]</span>)</em></b><br><br>
+    Curries <em>func</em> from right to left.
+</div>
+
+<!-- Funcs Join -->
+<div name="compose">
+    <b>compose<em>(*fs)</em></b><br><br>
+    Composes passed functions.
+</div>
+<div name="rcompose">
+    <b>rcompose<em>(*fs)</em></b><br><br>
+    Composes <em>fs</em>, calling them from left to right.
+</div>
+<div name="juxt">
+    <b>juxt<em>(*fs)</em><br>ljuxt<em>(*fs)</em></b><br><br>
+    Constructs a juxtaposition of the given functions.<br>
+    Result returns a list or an iterator of results of <em>fs</em>.
+</div>
+<div name="all_fn">
+    <b>all_fn<em>(*fs)</em></b><br><br>
+    Constructs a predicate,<br> which holds when all <em>fs</em> hold.
+</div>
+<div name="any_fn">
+    <b>any_fn<em>(*fs)</em></b><br><br>
+    Constructs a predicate,<br> which holds when any of <em>fs</em> holds.
+</div>
+<div name="none_fn">
+    <b>none_fn<em>(*fs)</em></b><br><br>
+    Constructs a predicate,<br> which holds when none of <em>fs</em> hold.
+</div>
+<div name="one_fn">
+    <b>one_fn<em>(*fs)</em></b><br><br>
+    Constructs a predicate,<br> which holds when exactly one of <em>fs</em> holds.
+</div>
+<div name="some_fn">
+    <b>some_fn<em>(*fs)</em></b><br><br>
+    Constructs a function, which calls <em>fs</em> one by one<br>
+    and returns first truthy result.
+</div>
+
+
+<!-- Content tests -->
+<div name="is_distinct">
+    <b>is_distinct<em>(*fs)</em></b><br><br>
+    Checks if all elements in the collection are different.
+</div>
+
+<!-- Type test -->
+<div name="isa">
+    <b>isa<em>(*types)</em></b><br><br>
+    Creates a function checking if its argument<br>
+    is of any of given <em>types</em>.
+</div>
+<div name="is_iter">
+    <b>is_iter<em>(value)</em></b><br><br>
+    Checks whether <em>value</em> is an iterator.
+</div>
+<div name="is_mapping">
+    <b>is_mapping<em>(value)</em></b><br><br>
+    Checks whether <em>value</em> is a mapping.
+</div>
+<div name="is_set">
+    <b>is_set<em>(value)</em></b><br><br>
+    Checks whether <em>value</em> is a set.
+</div>
+<div name="is_list">
+    <b>is_list<em>(value)</em></b><br><br>
+    Checks whether <em>value</em> is a list.
+</div>
+<div name="is_tuple">
+    <b>is_tuple<em>(value)</em></b><br><br>
+    Checks whether <em>value</em> is a tuple.
+</div>
+<div name="is_seq">
+    <b>is_seq<em>(value)</em></b><br><br>
+    Checks whether <em>value</em> is a <code>Sequence</code>.
+</div>
+<div name="is_mapping">
+    <b>is_mapping<em>(value)</em></b><br><br>
+    Checks whether <em>value</em> is a mapping.
+</div>
+<div name="is_seqcoll">
+    <b>is_seqcoll<em>(value)</em></b><br><br>
+    Checks whether <em>value</em> is a list or a tuple,<br>
+    which are both sequences and collections.
+</div>
+<div name="is_seqcont">
+    <b>is_seqcont<em>(value)</em></b><br><br>
+    Checks whether <em>value</em> is a list, a tuple or an iterator,<br>
+    which are both sequences and containers.
+</div>
+<div name="iterable">
+    <b>iterable<em>(value)</em></b><br><br>
+    Checks whether <em>value</em> is iterable.
+</div>
+
+<!-- Decorators -->
+<div name="funcy.decorator">
+    <b>@decorator</b><br><br>
+    Transforms a flat wrapper into a decorator.
+</div>
+<div name="funcy.wraps">
+    <b>@wraps</b><br><br>
+    An utility to pass function metadata<br>
+    from wrapped function to a wrapper.
+</div>
+<div name="funcy.unwrap">
+    <b>unwrap<em>(func)</em></b><br><br>
+    Get the object wrapped by <em>func</em>.
+</div>
+
+<!-- Control flow -->
+<div name="once">
+    <b>@once</b><br><br>
+    Let function execute only once.<br>
+    Noop all subsequent calls.
+</div>
+<div name="once_per">
+    <b>@once_per<em>(*argnames)</em></b><br><br>
+    Call function only once for every combination<br>
+    of the given arguments.
+</div>
+<div name="once_per_args">
+    <b>@once_per_args</b><br><br>
+    Call function only once for every combination<br>
+    of values of its arguments.
+</div>
+<div name="collecting">
+    <b>@collecting</b><br><br>
+    Transforms a generator into list returning function.
+</div>
+<div name="joining">
+    <b>@joining<em>(sep)</em></b><br><br>
+    Joins decorated function results with <em>sep</em>.
+</div>
+<div name="post_processing">
+    <b>@post_processing<em>(func)</em></b><br><br>
+    Post processes decorated function result with <em>func</em>.
+</div>
+<div name="throttle">
+    <b>@throttle<em>(period)</em></b><br><br>
+    Only runs a decorated function once per <em>period</em>.
+</div>
+<div name="wrap_with">
+    <b>@wrap_with<em>(ctx)</em></b><br><br>
+    Turn context manager into a decorator.
+</div>
+<div name="nullcontext">
+    <b>nullcontext<em>(enter_result=None)</em></b><br><br>
+    A noop context manager.
+</div>
+
+
+<!-- Error handling -->
+<div name="retry">
+    <b>@retry<em>(tries, errors=Exception, timeout=0, filter_errors=None)</em></b><br><br>
+    Tries decorated function up to <em>tries</em> times.<br>
+    Retries only on specified <em>errors</em>.<br>
+</div>
+<div name="silent">
+    <b>@silent</b><br><br>
+    Alters function to ignore all exceptions.
+</div>
+<div name="ignore">
+    <b>@ignore<em>(errors, default=None)</em></b><br><br>
+    Alters function to ignore <em>errors</em>,<br>
+    returning <em>default</em> instead.
+</div>
+<div name="suppress">
+    <b>suppress<em>(*errors)</em></b><br><br>
+    The context manager suppressing <em>errors</em> in its block.
+</div>
+<div name="limit_error_rate">
+    <b>@limit_error_rate<em>(fails, timeout, ...)</em></b><br><br>
+    If function fails to complete <em>fails</em> times in a row,<br>
+    calls to it will be blocked for <em>timeout</em> seconds.
+</div>
+<div name="fallback">
+    <b>fallback<em>(*approaches)</em></b><br><br>
+    Tries several approaches until one works.<br>
+    Each approach has a form of <code>(callable, errors)</code>.
+</div>
+<div name="raiser">
+    <b>raiser<em>(exception=Exception, *args, **kwargs)</em></b><br><br>
+    Constructs function that raises the given exception<br>
+    with given arguments on any invocation.
+</div>
+<div name="reraise">
+    <b>@reraise<em>(errors, into)</em></b><br><br>
+    Intercepts <em>errors</em> and reraises them as <em>into</em> exception.
+</div>
+
+<!-- Debugging -->
+<div name="tap">
+    <b>tap<em>(x, label=None)</em></b><br><br>
+    Prints <em>x</em> and then returns it.
+</div>
+<div name="log_calls">
+    <b>@log_calls<em>(print_func, errors=True, stack=True)</em><br>
+       @print_calls<em>(errors=True, stack=True)</em></b><br><br>
+    Logs or prints all function calls,<br>
+    including arguments, results and raised exceptions.
+</div>
+<div name="log_enters">
+    <b>@log_enters<em>(print_func)</em><br>
+       @print_enters</b><br><br>
+    Logs or prints on each enter to a function.
+</div>
+<div name="log_exits">
+    <b>@log_exits<em>(print_func, errors=True, stack=True)</em><br>
+       @print_exits<em>(errors=True, stack=True)</em></b><br><br>
+    Logs or prints on each exit from a function.
+</div>
+<div name="log_errors">
+    <b>@log_errors<em>(print_func, label=None, stack=True)</em><br>
+       @print_errors<em>(label=None, stack=True)</em></b><br><br>
+    Logs or prints all errors within a function or block.
+</div>
+<div name="log_durations">
+    <b>@log_durations<em>(print_func, label=None)</em><br>
+       @print_durations<em>(label=None)</em></b><br><br>
+    Times each function call or block execution.
+</div>
+<div name="log_iter_durations">
+    <b>log_iter_durations<em>(seq, print_func, label=None)</em><br>
+       print_iter_durations<em>(seq, label=None)</em></b><br><br>
+    Times processing of each item in <em>seq</em>.
+</div>
+
+<!-- Caching -->
+<div name="memoize">
+    <b>@memoize<em>(*, key_func=None)</em></b><br><br>
+    Memoizes a decorated function results.
+</div>
+<div name="cache">
+    <b>@cache<em>(timeout, *, key_func=None)</em></b><br><br>
+    Caches a function results for <em>timeout</em> seconds.
+</div>
+<div name="cached_property">
+    <b>@cached_property</b><br><br>
+    Creates a property caching its result.
+</div>
+<div name="cached_readonly">
+    <b>@cached_readonly</b><br><br>
+    Creates a read-only property caching its result.
+</div>
+<div name="make_lookuper">
+    <b>@make_lookuper</b><br><br>
+    Creates a cached function with prefilled memory.
+</div>
+<div name="silent_lookuper">
+    <b>@silent_lookuper</b><br><br>
+    Creates a cached function with prefilled memory.<br>
+    Ignores memory misses, returning <code>None</code>.
+</div>
+
+<!-- Regexes -->
+<div name="re_find">
+    <b>re_find<em>(regex, s, flags=0)</em></b><br><br>
+    Matches <em>regex</em> against the given string,<br>
+    returns the match in the simplest possible form.
+</div>
+<div name="re_test">
+    <b>re_test<em>(regex, s, flags=0)</em></b><br><br>
+    Tests whether <em>regex</em> matches against <em>s</em>.
+</div>
+
+<!-- Strings -->
+<div name="cut_prefix">
+    <b>cut_prefix<em>(s, prefix)</em></b><br><br>
+    Cuts prefix from given string if it's present.
+</div>
+<div name="cut_suffix">
+    <b>cut_suffix<em>(s, suffix)</em></b><br><br>
+    Cuts suffix from given string if it's present.
+</div>
+<div name="str_join">
+    <b>str_join<em>(<span>[</span>sep=""<span>, ]</span>seq)</em></b><br><br>
+    Joins the given sequence with <em>sep</em>.<br>
+    Forces stringification of <em>seq</em> items.
+</div>
+
+<!-- Objects  -->
+<div name="monkey">
+    <b>@monkey<em>(cls_or_module, name=None)</em></b><br><br>
+    Monkey-patches class or module.
+</div>
+<div name="LazyObject">
+    class <b>LazyObject<em>(init)</em></b><br><br>
+    Creates an object setting itself up on first use.
+</div>
+
+<!-- Primitives -->
+<div name="isnone">
+    <b>isnone<em>(x)</em></b><br><br>
+    Checks if <em>x</em> is <em>None</em>.
+</div>
+<div name="notnone">
+    <b>notnone<em>(x)</em></b><br><br>
+    Checks if <em>x</em> is not <em>None</em>.
+</div>
+<div name="inc">
+    <b>inc<em>(x)</em></b><br><br>
+    Increments its argument by 1.
+</div>
+<div name="dec">
+    <b>dec<em>(x)</em></b><br><br>
+    Decrements its argument by 1.
+</div>
+<div name="even">
+    <b>even<em>(x)</em></b><br><br>
+    Checks if <em>x</em> is even.
+</div>
+<div name="odd">
+    <b>odd<em>(x)</em></b><br><br>
+    Checks if <em>x</em> is odd.
+</div>
+
+</div>

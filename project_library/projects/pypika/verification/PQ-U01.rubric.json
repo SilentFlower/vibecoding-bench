@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PQ-U01",
+  "source_commit": "465fb9ae12f7727d28785d087b64e6226da5714e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Python and evaluates the truth of the first criterion and returns the second here: IDs1,2,4. Parenthesized & builds both SQL predicates and returns2,4. Distinguish Python evaluation from SQL Boolean composition and preserve the supplied counterexample rows; equivalent correct explanations are valid.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

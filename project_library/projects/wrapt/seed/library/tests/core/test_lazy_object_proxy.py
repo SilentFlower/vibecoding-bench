@@ -1,0 +1,212 @@
+import os
+import sys
+import unittest
+from pathlib import Path
+
+import wrapt
+
+
+class TestLazyObjectProxy(unittest.TestCase):
+
+    def test_lazy_object_proxy(self):
+        status = {"created": 0}
+
+        def factory():
+            status["created"] += 1
+            return 42
+
+        proxy = wrapt.LazyObjectProxy(factory)
+
+        self.assertEqual(status["created"], 0)
+        self.assertEqual(proxy.__wrapped__, 42)
+        self.assertEqual(int(proxy), 42)
+        self.assertEqual(status["created"], 1)
+        self.assertEqual(int(proxy), 42)
+        self.assertEqual(status["created"], 1)
+
+    def test_descriptor_optional_owner(self):
+        def method(instance):
+            return instance
+
+        instance = object()
+
+        for descriptor in (method, property(method)):
+            with self.subTest(descriptor=descriptor):
+                proxy = wrapt.LazyObjectProxy(
+                    lambda: descriptor, interface=type(descriptor)
+                )
+
+                self.assertEqual(proxy.__get__(instance), descriptor.__get__(instance))
+                self.assertEqual(
+                    proxy.__get__(instance, None), descriptor.__get__(instance, None)
+                )
+                self.assertEqual(
+                    proxy.__get__(None, object), descriptor.__get__(None, object)
+                )
+
+    def test_descriptor_optional_owner_required_by_wrapped(self):
+        # A descriptor implemented in Python can require the owner argument,
+        # as Python always supplies it on attribute lookup. When the owner
+        # is omitted in a manual call through the proxy, it is None which
+        # must be passed to the wrapped descriptor.
+
+        class Descriptor:
+            def __get__(self, instance, owner):
+                return (instance, owner)
+
+        instance = object()
+
+        proxy = wrapt.LazyObjectProxy(Descriptor, interface=Descriptor)
+
+        self.assertEqual(proxy.__get__(instance), (instance, None))
+        self.assertEqual(proxy.__get__(instance, None), (instance, None))
+        self.assertEqual(proxy.__get__(instance, object), (instance, object))
+        self.assertEqual(proxy.__get__(None, object), (None, object))
+
+    def test_lazy_import(self):
+        if "sched" in sys.modules:
+            del sys.modules["sched"]
+
+        sched_mod = wrapt.lazy_import("sched")
+
+        self.assertFalse("sched" in sys.modules)
+
+        self.assertIsNotNone(sched_mod.scheduler)
+
+        self.assertTrue("sched" in sys.modules)
+
+    def test_lazy_import_attribute(self):
+        if "sched" in sys.modules:
+            del sys.modules["sched"]
+
+        scheduler = wrapt.lazy_import("sched", "scheduler")
+
+        self.assertFalse("sched" in sys.modules)
+
+        import sched
+
+        self.assertIsNotNone(scheduler.__wrapped__)
+        self.assertIs(scheduler.__wrapped__, sched.scheduler)
+
+        self.assertTrue("sched" in sys.modules)
+
+    def test_lazy_import_dotted(self):
+        if "http.client" in sys.modules:
+            del sys.modules["http.client"]
+
+        client_mod = wrapt.lazy_import("http.client")
+
+        self.assertFalse("http.client" in sys.modules)
+
+        self.assertIsNotNone(client_mod.HTTPConnection)
+
+        self.assertTrue("http.client" in sys.modules)
+
+    def test_lazy_import_callable(self):
+        dumps = wrapt.lazy_import("json", "dumps")
+
+        self.assertTrue(callable(dumps))
+
+        result = dumps({"key": "value"})
+
+        self.assertEqual(result, '{"key": "value"}')
+
+    def test_lazy_import_iterable(self):
+        from collections.abc import Iterable
+
+        if "string" in sys.modules:
+            del sys.modules["string"]
+
+        digits0 = wrapt.lazy_import("string", "digits")
+
+        self.assertFalse(hasattr(type(digits0), "__iter__"))
+
+        self.assertTrue(callable(digits0))
+
+        # XXX Iteration does not seem to test for __iter__ being a method
+        # on the type, so this test is not sufficient to raise the TypeError.
+        # I was at some point seeing expected failures here, but not now and
+        # I don't know why.
+
+        # if "string" in sys.modules:
+        #     del sys.modules["string"]
+
+        # digits1 = wrapt.lazy_import("string", "digits")
+
+        # with self.assertRaises(TypeError):
+        #     for char in digits1:
+        #         pass
+
+        if "string" in sys.modules:
+            del sys.modules["string"]
+
+        digits2 = wrapt.lazy_import("string", "digits", interface=Iterable)
+
+        self.assertTrue(hasattr(type(digits2), "__iter__"))
+
+        self.assertFalse(callable(digits2))
+
+        for char in digits2:
+            self.assertIn(char, "0123456789")
+
+        self.assertEqual("".join(digits2), "0123456789")
+
+    def test_pathlike_interface_is_lazy(self):
+        for interface in (os.PathLike, Path):
+            with self.subTest(interface=interface):
+                status = {"created": 0}
+
+                def factory():
+                    status["created"] += 1
+                    return Path("example.txt")
+
+                proxy = wrapt.LazyObjectProxy(factory, interface=interface)
+                self.assertEqual(status["created"], 0)
+                self.assertTrue(hasattr(type(proxy), "__fspath__"))
+                self.assertEqual(os.fspath(proxy), "example.txt")
+                self.assertEqual(status["created"], 1)
+                self.assertEqual(os.fspath(proxy), "example.txt")
+                self.assertEqual(status["created"], 1)
+
+    def test_lazy_class_is_not_descriptor(self):
+        # Only instances of the class are descriptors, not the class itself,
+        # so a lazy proxy whose factory returns the class must not act as a
+        # descriptor when stored in a class body.
+
+        class Descriptor:
+            def __get__(self, instance, owner=None):
+                return 42
+
+            def __set_name__(self, owner, name):
+                pass
+
+        proxy = wrapt.LazyObjectProxy(lambda: Descriptor)
+
+        self.assertIs(proxy.__wrapped__, Descriptor)
+
+        class Owner:
+            attr = proxy
+
+        self.assertIs(Owner().attr, proxy)
+
+    def test_lazy_instance_attributes_are_not_special_methods(self):
+        # Special methods are only ever looked up on the type of an object,
+        # never on the instance itself, so instance attributes which shadow
+        # the dunder names must not result in the proxy being reported as
+        # iterable when the factory returns an instance carrying them.
+
+        import collections.abc
+
+        class Wrapped:
+            pass
+
+        def factory():
+            instance = Wrapped()
+            instance.__iter__ = lambda: iter([1, 2, 3])
+            return instance
+
+        proxy = wrapt.LazyObjectProxy(factory)
+
+        self.assertIs(proxy.__wrapped__.__class__, Wrapped)
+
+        self.assertNotIsInstance(proxy, collections.abc.Iterable)

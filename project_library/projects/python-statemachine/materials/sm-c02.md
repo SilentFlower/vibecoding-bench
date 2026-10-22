@@ -1,0 +1,1 @@
+Use the supplied one-event StateMachine with domain model SimpleNamespace(status="new",events=[]),state_field="status". Compare attempting machine.events=[] with appending to machine.model.events. Advise naming/ownership for an audit list. No edits.

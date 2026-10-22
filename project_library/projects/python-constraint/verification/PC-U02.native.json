@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PC-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "single_name_order_does_not_project_the_solution_in_this_revision": true
+  },
+  "resource_profile": "business"
+}

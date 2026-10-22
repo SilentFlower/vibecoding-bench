@@ -1,0 +1,1 @@
+Inspect only list(islice(iterate(closedopen(9,12),step=0),3));do not fully consume that iterator. Compare step1 and reverse=True,step=-1 on closed(9,11). Advise finite limits,progress/direction and caller validation before scheduling repeated work;do not assume the library rejects zero step or guarantees termination. No edits.

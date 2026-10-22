@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "LG-U01",
+  "source_commit": "bce5dfd3b435b1d1658507d7e095ad7a9919bf1c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "For the supplied keys,global extra is overlaid by context,then bind,then captured call kwargs. inside has origincall/stableglobal/requestA/bound_onlyyes;the context record has origincontext/stableglobal/requestA;outside has originglobal/stableglobal. Exiting contextualize restores the prior context. Bound logger wrappers share the core;do not infer isolated sink sets or deep immutable payload snapshots.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

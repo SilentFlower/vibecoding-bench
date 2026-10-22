@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PC-U01",
+  "source_commit": "d91ba03d1fd6acc30d64fd9d513dc0523f697b5b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The exact tea/review set is(9,10),(9,11),(10,11). Explicit callable variable order assigns argument meaning. An arbitrary solution or enumeration order is not an objective ranking or proof of optimality;the supplied small finite model is the full scope.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,1 @@
+Use Arrow(2026,1,31,9),which defaults to UTC. Compare shift(months=1),replace(month=2),and the invalid singular shift(month=1),then inspect the unchanged original. Explain relative arithmetic,absolute validation and the API spelling; no edits or current-clock input.

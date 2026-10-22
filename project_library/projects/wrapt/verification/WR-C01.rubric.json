@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WR-C01",
+  "source_commit": "6b4e844950213118b19e613248d2bc9469eb731e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Legacy ObjectProxy exposes __iter__,so Iterable detection is True even around an int;BaseObjectProxy does not expose that compatibility method and detection is False. Both integer-wrapped controls fail actual list consumption with TypeError. BaseObjectProxy or a reviewed explicit protocol proxy avoids this legacy false-positive surface;do not assume an advertised method proves the wrapped value supports its operation or that iter() creation alone completes consumption.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

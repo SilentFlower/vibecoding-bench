@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "bidict",
+  "title": "Bidict标识映射工作场景",
+  "category": "双射、冲突与发布边界",
+  "description": "严格插入、实时反向视图、有损替换、稳定快照、批量回滚及顺序比较诊断。",
+  "seed_digest": "b58a3350687c270e4e71765a609655ffa78fa5908a8699bdf637e34272715abd",
+  "environment": "bidict-py312",
+  "source": {
+    "repository": "https://github.com/jab/bidict",
+    "commit": "299fedc89f1d70d5d41cf7922564b376d3e2d435",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "BI-S01",
+      "title": "双射读写语义",
+      "goal": "保持两侧唯一性",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BI-U01",
+            "BI-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BI-U01",
+          "kind": "understand",
+          "goal": "区分赋值与严格插入",
+          "prompt": "Start bidict(a=1). Assign b[\"a\"]=2; then separately try b.put(\"a\",3) and b[\"b\"]=2 on that state. Explain exceptions and retained associations. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/bi-u01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BI-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/BI-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BI-U02",
+          "kind": "understand",
+          "goal": "理解反向标识视图的实时性",
+          "prompt": "Start b=bidict(a=1); inv=b.inverse; set inv[2]=\"b\"; delete b[\"a\"]. Explain both maps and inv.inverse identity. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/bi-u02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BI-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/BI-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BI-S02",
+      "title": "冲突与快照策略",
+      "goal": "明确丢弃和报告边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BI-C01",
+            "BI-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BI-C01",
+          "kind": "consult",
+          "goal": "选择有损冲突处理策略",
+          "prompt": "On bidict(a=1,b=2), first put(\"a\",2,on_dup=OnDup(key=DROP_OLD,val=DROP_NEW)); then forceput(\"a\",2). Advise a safe import policy and enumerate displaced associations. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/bi-c01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BI-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/BI-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BI-C02",
+          "kind": "consult",
+          "goal": "选择稳定导出快照",
+          "prompt": "Start b=bidict(a=1); take b.copy() and frozenbidict(b); then set b[\"b\"]=2. Advise mutable working copies versus immutable/hashable scalar snapshots for a report. State the shallow-object limitation. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/bi-c02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BI-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/BI-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BI-S03",
+      "title": "批量导入方案",
+      "goal": "区分映射回滚与外部副作用",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BI-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BI-P01",
+          "kind": "plan",
+          "goal": "规划双射批量导入的事务边界",
+          "prompt": "Start b=bidict(a=1,b=2). A generator logs each yield to events and yields (\"c\",3),(\"d\",2). Call b.putall(generator). Plan retry/publication and external-effect handling based on the actual failure/rollback contract. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/bi-p01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BI-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/BI-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BI-S04",
+      "title": "顺序变化诊断",
+      "goal": "核对实际比较表达式",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BI-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "BI-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BI-D01",
+          "kind": "diagnose",
+          "goal": "诊断有序映射比较未发现顺序变化",
+          "prompt": "A report says two OrderedBidict objects compare equal despite different display order. Request complete item sequences, comparison expression, type/version and the intended order-sensitive control. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BI-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "ordered-comparison",
+              "when": "Complete sequences, exact comparison, object type/version and order-sensitive control have not been supplied or declared unavailable and are reasonably requested.",
+              "materials": [
+                "disclosure/order.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

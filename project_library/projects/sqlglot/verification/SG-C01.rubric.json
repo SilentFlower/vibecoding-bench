@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SG-C01",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The pinned AST is Intersect with a Union left operand;raw SQLite output returns an empty result although PostgreSQL precedence requires row1. Direct parenthesized SELECT operands generated here are rejected by SQLite. The supplied explicit derived-query form executes and returns[(1,)]. Preserve that verified grouping boundary and compare actual result sets;do not claim arbitrary dialect conversion is semantics-preserving or authorize a parser rewrite.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

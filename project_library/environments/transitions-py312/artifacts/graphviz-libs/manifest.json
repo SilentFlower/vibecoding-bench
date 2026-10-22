@@ -1,0 +1,357 @@
+{
+  "schema": 1,
+  "libraries": [
+    {
+      "path": "artifacts/graphviz-libs/libgvplugin_visio.so.6",
+      "sha256": "4b61b3b82b23bcbf74b012731a887319f77ca5343abe43a833dab3c20de8c3ff"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgvplugin_pango.so.6",
+      "sha256": "4bef684d12ab3c5069e6248f866d1c78fd7af1783fdf6bb72aff7293cf5b2a26"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgvplugin_xlib.so.6",
+      "sha256": "73fb40a5bfd9a45990dd313319b81ec6a0fa5ccc3d8af0bf24eccfb8a308ec61"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgvplugin_dot_layout.so.6",
+      "sha256": "1e0a576c7f524e5ec6a655e3e1c5f1011b6ae752756490dddab277fa6ec03bf7"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgvplugin_webp.so.6",
+      "sha256": "8474ed01961c69e56496ca141e746d79a5742c5f6482f4ca1fa98e028a556f1d"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgvplugin_neato_layout.so.6",
+      "sha256": "dbf6f1456e703ad7cb81620299e72fcf4ae410671b910862b774d8f076edd691"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgvplugin_gd.so.6",
+      "sha256": "db9c0ee530a113c2c8bb4942037654f12735e0c0aed6ce4b9abe56083a0118ec"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgvplugin_core.so.6",
+      "sha256": "f264d85af162d5031e09bd38bb2422a802452584a8deb584c4c2802c9eac02f8"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgvc.so.6",
+      "sha256": "2ebc7854f30fec383b77b1b20f4ec41ac5bd081ddf9076cf2497a6405904a5cf"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libcgraph.so.6",
+      "sha256": "71fc31f55bf32d5542b7fedc177cf9481b1ee03956293fed81f09c727fb11fd7"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libltdl.so.7",
+      "sha256": "eefec20eb69408b2c76922cf95ee307f89d8ce1d33890689631cb0086fecc17e"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libcdt.so.5",
+      "sha256": "0677ad1c0bd5b1d9cacd71d8b93387db6de200eeeab8e7e96ec3d539a352cdcb"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libpathplan.so.4",
+      "sha256": "975b713b20bf8bae64b050d276f64e5cfd54ca1b46390b92579bd36db8f7d769"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libexpat.so.1",
+      "sha256": "453732cb225bc46f9337066d782118d24194bccee4c85b59eccf7e8714b5e62f"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libstdc++.so.6",
+      "sha256": "e7848e32af4932840ba775169041759a2a8dd5a008af360e5c55bce506eebcf4"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgcc_s.so.1",
+      "sha256": "2bd1552c47799ef67e701e81d4383061fd76059868e446e63560f0dd0d5ec14e"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libpangocairo-1.0.so.0",
+      "sha256": "53e7d5a5bea4b8ec0b49866c515a70ec06a4d69d3b0d16208ffbf679f5d74b53"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libcairo.so.2",
+      "sha256": "207b61c5a21fbbae4b6a33617d33df7d4fec063370e8ac0fa26ed6d437e588ba"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libpangoft2-1.0.so.0",
+      "sha256": "e03bdc7262cf07cb96aca77b077caf75e3939d1e1932f7a618831e513af05c02"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libpango-1.0.so.0",
+      "sha256": "01746c3514fc0bdeb45a350392c40746ca499bd54c126f8a7abf97da39510f3e"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgobject-2.0.so.0",
+      "sha256": "59c621c45fadf0024cacd9e6982f540c26d1a0922c14d0c1dbe408129afe2385"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libglib-2.0.so.0",
+      "sha256": "1708487c60fb32855e9d4aec503f0c32dcb74c6834a839e015ccbd27a606a879"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libharfbuzz.so.0",
+      "sha256": "1b55afd639cdf32fef66721032a29ee02b9c5af5527845cf53d185bc5413df1a"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libfontconfig.so.1",
+      "sha256": "eba9fe8895df08cb98d6a294825132a52b65b53f4f1bce26bb3f6ee6ac6b16ec"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libpixman-1.so.0",
+      "sha256": "cbbdbb3a14ee65123419a6bafcca3f66faad1255efd05ef818da66da1baf9eee"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libfreetype.so.6",
+      "sha256": "5c691e2297772f84647dc07392a1a5d682ff4a190b057df34cd26bd2c4a27179"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libpng16.so.16",
+      "sha256": "8a6b5ae14e223d7c01bf09988ea9631c38fd5c898df6d330c343654b76414897"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libxcb-shm.so.0",
+      "sha256": "ce4b516a319766fcacecacc213dfc2de46a6ca7a5aa5a9066fd1bfe604db0257"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libxcb.so.1",
+      "sha256": "35e218293d7c1f65b765337b92c6425f3495e80f5973058d8847fa08258cb97e"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libxcb-render.so.0",
+      "sha256": "e2b5e78b21258f8fce20c6ea7435c843a5b635087411d496da5cf82430d3f1d4"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libXrender.so.1",
+      "sha256": "5cd723d723504af24d297cf9bc87156c0e023f4becbee2ce8432555cbaa73836"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libX11.so.6",
+      "sha256": "688d7edc1a02a0e7993722d57a42821b22435e249071554625a5ec4784787d3d"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libXext.so.6",
+      "sha256": "32471a718f4cfef053aae4b84154ebb34ad16996d5db5dd6254e41e5fb36079e"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgio-2.0.so.0",
+      "sha256": "5eb29a8a41206d23ea321159267e2799e5426975fb4501a062f90efc4450444d"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libfribidi.so.0",
+      "sha256": "4b2fa738995e433a57f724ea2bc32549b3b883c0ffb15244d32e3d39f82d46ad"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libthai.so.0",
+      "sha256": "6a0a7928dfa5ddde72412007f723840a9fb8492be104d3f84c668ad71b442dc8"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libffi.so.8",
+      "sha256": "983e72b7e964f3db43fe8a3dc8b338e731fade6ca38df6867aebb58186aaeb68"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libpcre2-8.so.0",
+      "sha256": "092bc945140e65c691c7c717d71083111f46813f31a76dd848bf82e91450778b"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgraphite2.so.3",
+      "sha256": "6d94ea3f501329d3f68636c31351b1e46670af4a3acdaf0e3f43004b9d53ff41"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libbrotlidec.so.1",
+      "sha256": "928b2613f2d3d73f78bc05c81d79c04cef7e196564f733c0ffdf893602d83aaa"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libXau.so.6",
+      "sha256": "833aa73cf8f645330907d5923fcbf380e0895ab2551d522b41b0308747a51e27"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libXdmcp.so.6",
+      "sha256": "911ecd1cf42f310e788652f2719803bb4632e077b6e292af31b876c836bba264"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgmodule-2.0.so.0",
+      "sha256": "99144134d198f50b484b257fdc7c82a4035ff6c6753575e31457d5494bf23965"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libmount.so.1",
+      "sha256": "70c1da7f7a3d802c498f4938449bfc7a51877c46b16572d1a396901c032758bc"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libselinux.so.1",
+      "sha256": "0207e4908ea384e186c75925b0e56996a3eccecd48c99252aeb757d0d3451c93"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libdatrie.so.1",
+      "sha256": "cc5825727da9ca869263a95783d7d0a3ab69e3108b1460b84258826a37bcc76a"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libbrotlicommon.so.1",
+      "sha256": "d0dd623a89c3cd7c085757e41c940a39916a571a9b22b50bd736accd3f3aec53"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libbsd.so.0",
+      "sha256": "c34693b27401e6e74d7ac32184c79bfb0cca936d3b1be990d435124a6a5686f5"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libblkid.so.1",
+      "sha256": "cc3d6ca965cab25eacb8d7d98f0b13be7c94a19583983fb864ba10163e5536b0"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libmd.so.0",
+      "sha256": "9e8462f7650da0b39ecfe1680fa87fe393f0710b324250931ab36fa0135b14cc"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libwebp.so.7",
+      "sha256": "4fedb320592cad963eab7f598d3acf3fa9054a2ccffac95bc97085b134ffdc3e"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgts-0.7.so.5",
+      "sha256": "61ec319da51be1fc1cce9cf0ab8723a297fe559bd27e19e1db08aa0a78b07898"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgd.so.3",
+      "sha256": "9d6ba06c2a717d2938b2ce8d39c50da7ef198ef9b7445ed4444e94db36a3c15a"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libjpeg.so.62",
+      "sha256": "dad87949ccad2be7e40a02986306087fdcfb35ccaadd59aea923a3f96d290eec"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libXpm.so.4",
+      "sha256": "99c08ff6fd5904ea39a10bdb946dd7f2a86e80a5ff64dd2b135d14669beb2ddd"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libtiff.so.6",
+      "sha256": "4cadf3729e353ef2eb5a2bb3bac9c5d1acdba859cb50c28036d79b0e878966c5"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libheif.so.1",
+      "sha256": "7a436c824a91b2deee3f080eeadcf307bf7e3c0f8e671c09272dc916a856a51b"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libavif.so.15",
+      "sha256": "8f05fa7f666a6c4d5ccdae7098e4f0592e8d78823ed48e2528169ccafdf503cf"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libzstd.so.1",
+      "sha256": "37412b7ac11063c25a375bdff6f4fdb340362f926cd9c3a55962e8a9c9bc702e"
+    },
+    {
+      "path": "artifacts/graphviz-libs/liblzma.so.5",
+      "sha256": "5de60ec1bf90cd3d699188eb9ebb333c22b531394e0b030b55048edbd729ed17"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libLerc.so.4",
+      "sha256": "6b465f547b06f1b3ac7aef08d4f2233f1417417c3e4e5a5f80f8dec806b0e2c7"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libjbig.so.0",
+      "sha256": "92f86d0ba0b9c6e342d61abe8edec5810d0d9cedad41e28a61fa1ecdbc040710"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libdeflate.so.0",
+      "sha256": "7a20781883ba5f05bdf0a259b026109142b9d9af9169e489af608b51c4e233d5"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libx265.so.199",
+      "sha256": "40d78df44817cd89c2ebd891eda7810b8d4bce99f1e7e5c6813ff89884b57235"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libde265.so.0",
+      "sha256": "3c30e18763b4b1971fae80bb8063b41fa5bb108aa373f8c28b49cb6d8a27ed9c"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libdav1d.so.6",
+      "sha256": "5c14fcb11d700445ad113c8dccee7094c35821b9a23fd768f8280f74e1f9568c"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libaom.so.3",
+      "sha256": "a5a58f563f5038dcdac85fb2d3b556016b07736d4d8a4f1106fd8fcfcf5b61c1"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libgav1.so.1",
+      "sha256": "f5f01233f3f71c05dbd33faefad11f267d942cc97c8080e9ac1f735558bae85a"
+    },
+    {
+      "path": "artifacts/graphviz-libs/librav1e.so.0",
+      "sha256": "ea5a8ed4c9d680ad7225a715225fd5ba8d383d1cb4f68518da923a8f70e14930"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libSvtAv1Enc.so.1",
+      "sha256": "8b5b42015e42a27044123f5f1e6a2cc2c00dfaafa44d6bcbf384d08fa3ef9c72"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libyuv.so.0",
+      "sha256": "ad2b96fab5a97f84c677d090dd788fa273ed8d8bc6e2110f42e66ec7c681df29"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libnuma.so.1",
+      "sha256": "bb2bb9250f348587ea3b7594a0a22055312134e55d065434d1f7e22e99ebf1d5"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_synchronization.so.20220623",
+      "sha256": "b1979e7492d01908f06ca37432fecc7984f340c58cd56fac19b288c248d73f12"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_graphcycles_internal.so.20220623",
+      "sha256": "be4a4c5a7b7ed32f573c364f0d0dadd7ebabd59748f1f2c82f3b3e00f531b285"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_stacktrace.so.20220623",
+      "sha256": "b2c53107b05584a485d5fe1911a536b151dc80090d2bd7fc320d293503663a35"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_symbolize.so.20220623",
+      "sha256": "09b3abc4b4104e576ccd7d0d0f13af5e8ba5738f9f9a881e28a5ad7e701ab4a9"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_time.so.20220623",
+      "sha256": "857d69aa402fcbfb7bc30992aa44d1ff467de7edf244cc78097d05554c89439e"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_malloc_internal.so.20220623",
+      "sha256": "89e01d4a3c63b4aaddc8e4dd40f84887457534b40d6631a249ef59f0ad30a28d"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_base.so.20220623",
+      "sha256": "21007d8a364522eda092640994b3ff214a81aea11dfae6ee8b3a5733ef311680"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_spinlock_wait.so.20220623",
+      "sha256": "816dbd30a67f705b9bb3afbbc7f0d435121a9bf32c8151a08cd187ab8a891c7a"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_raw_logging_internal.so.20220623",
+      "sha256": "61f3e4c804196f3ce0574de9140e7667837b9b7e554c9125d2d8192928a72719"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_debugging_internal.so.20220623",
+      "sha256": "57f6f60b7af04349031e2c9b04b2bcf98ff72b13411178ff5451ba85f0e1c8f8"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_demangle_internal.so.20220623",
+      "sha256": "583dfc889362f2b22ba9f86db39bc49248fa0957c102ff794016f4e52d2b4a06"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_strings.so.20220623",
+      "sha256": "f4763cad79d55ee5292c3114c7c72f889dcb71c88ab47175abe21ba91146ac7e"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_time_zone.so.20220623",
+      "sha256": "6a551009b1c47379328e87a75eb758b04c12746df0159ab3b2cc321dbc3050ae"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_int128.so.20220623",
+      "sha256": "6059d38da70a9df7a65842305f977445d60e083226fa4620ccdfa6fac50faea2"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_strings_internal.so.20220623",
+      "sha256": "a18dc62c6aed0663ca2a409507f3cfec3b894473590ad017a6e616459ba25408"
+    },
+    {
+      "path": "artifacts/graphviz-libs/libabsl_throw_delegate.so.20220623",
+      "sha256": "2731cb61a4894aec8171f5a43e6b119cf284825eb1ceb061ef4d38cebdbf8b72"
+    }
+  ]
+}

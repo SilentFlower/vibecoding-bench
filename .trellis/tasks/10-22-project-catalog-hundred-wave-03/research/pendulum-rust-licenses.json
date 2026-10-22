@@ -1,0 +1,238 @@
+{
+  "cargo_lock_sha256": "2461c2eb5524976d9767745c92f22958e7a28e07cf0324b4d1b1c8d283c1ec32",
+  "packages": [
+    {
+      "name": "heck",
+      "version": "0.5.0",
+      "crate_sha256": "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea",
+      "declared_license": "MIT OR Apache-2.0",
+      "licenses": [
+        {
+          "path": "seed/app/rust-licenses/heck-0.5.0/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "seed/app/rust-licenses/heck-0.5.0/LICENSE-MIT",
+          "sha256": "7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0"
+        }
+      ]
+    },
+    {
+      "name": "libc",
+      "version": "0.2.190",
+      "crate_sha256": "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78",
+      "declared_license": "MIT OR Apache-2.0",
+      "licenses": [
+        {
+          "path": "seed/app/rust-licenses/libc-0.2.190/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "seed/app/rust-licenses/libc-0.2.190/LICENSE-MIT",
+          "sha256": "123a331b5dbf04c30097fa43b8f858bc85df671fe776de498d01f3d6b7c1f69e"
+        }
+      ]
+    },
+    {
+      "name": "once_cell",
+      "version": "1.21.4",
+      "crate_sha256": "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50",
+      "declared_license": "MIT OR Apache-2.0",
+      "licenses": [
+        {
+          "path": "seed/app/rust-licenses/once_cell-1.21.4/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "seed/app/rust-licenses/once_cell-1.21.4/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "portable-atomic",
+      "version": "1.15.0",
+      "crate_sha256": "05c8b63e8d9609db387f0324918f81d68fe27748f084ef092fb35954d0539a85",
+      "declared_license": "Apache-2.0 OR MIT",
+      "licenses": [
+        {
+          "path": "seed/app/rust-licenses/portable-atomic-1.15.0/LICENSE-APACHE",
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+        },
+        {
+          "path": "seed/app/rust-licenses/portable-atomic-1.15.0/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "proc-macro2",
+      "version": "1.0.107",
+      "crate_sha256": "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9",
+      "declared_license": "MIT OR Apache-2.0",
+      "licenses": [
+        {
+          "path": "seed/app/rust-licenses/proc-macro2-1.0.107/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "seed/app/rust-licenses/proc-macro2-1.0.107/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "pyo3",
+      "version": "0.29.3",
+      "crate_sha256": "700d18fa267b73b9b521fd7e13580e2f446916f176cacee1ab63fcc8191f1655",
+      "declared_license": "MIT OR Apache-2.0",
+      "licenses": [
+        {
+          "path": "seed/app/rust-licenses/pyo3-0.29.3/LICENSE-APACHE",
+          "sha256": "32c76dbe0e73d79100d5ece77c158399f2e2541bc5c78548a4ba45c1cb53c5c9"
+        },
+        {
+          "path": "seed/app/rust-licenses/pyo3-0.29.3/LICENSE-MIT",
+          "sha256": "afcbe3b2e6b37172b5a9ca869ee4c0b8cdc09316e5d4384864154482c33e5af6"
+        },
+        {
+          "path": "seed/app/rust-licenses/pyo3-0.29.3/pyo3-runtime/LICENSE-APACHE",
+          "sha256": "32c76dbe0e73d79100d5ece77c158399f2e2541bc5c78548a4ba45c1cb53c5c9"
+        },
+        {
+          "path": "seed/app/rust-licenses/pyo3-0.29.3/pyo3-runtime/LICENSE-MIT",
+          "sha256": "afcbe3b2e6b37172b5a9ca869ee4c0b8cdc09316e5d4384864154482c33e5af6"
+        }
+      ]
+    },
+    {
+      "name": "pyo3-build-config",
+      "version": "0.29.3",
+      "crate_sha256": "7b3fc0c4d08f6bb10e71fe39dfb9e2f59c6eb6854e22ec8092f50c69a4499adb",
+      "declared_license": "MIT OR Apache-2.0",
+      "licenses": [
+        {
+          "path": "seed/app/rust-licenses/pyo3-build-config-0.29.3/LICENSE-APACHE",
+          "sha256": "32c76dbe0e73d79100d5ece77c158399f2e2541bc5c78548a4ba45c1cb53c5c9"
+        },
+        {
+          "path": "seed/app/rust-licenses/pyo3-build-config-0.29.3/LICENSE-MIT",
+          "sha256": "afcbe3b2e6b37172b5a9ca869ee4c0b8cdc09316e5d4384864154482c33e5af6"
+        }
+      ]
+    },
+    {
+      "name": "pyo3-ffi",
+      "version": "0.29.3",
+      "crate_sha256": "dfc0b8e19df29aad7086cf977bb0c2a2f143e30567eb113e9cf72b62ca698330",
+      "declared_license": "MIT OR Apache-2.0",
+      "licenses": [
+        {
+          "path": "seed/app/rust-licenses/pyo3-ffi-0.29.3/LICENSE-APACHE",
+          "sha256": "32c76dbe0e73d79100d5ece77c158399f2e2541bc5c78548a4ba45c1cb53c5c9"
+        },
+        {
+          "path": "seed/app/rust-licenses/pyo3-ffi-0.29.3/LICENSE-MIT",
+          "sha256": "afcbe3b2e6b37172b5a9ca869ee4c0b8cdc09316e5d4384864154482c33e5af6"
+        }
+      ]
+    },
+    {
+      "name": "pyo3-macros",
+      "version": "0.29.3",
+      "crate_sha256": "6100e8a4b5eba53afaa5ed078364851a0b2499c553a44c31026b929049b49dc6",
+      "declared_license": "MIT OR Apache-2.0",
+      "licenses": [
+        {
+          "path": "seed/app/rust-licenses/pyo3-macros-0.29.3/LICENSE-APACHE",
+          "sha256": "32c76dbe0e73d79100d5ece77c158399f2e2541bc5c78548a4ba45c1cb53c5c9"
+        },
+        {
+          "path": "seed/app/rust-licenses/pyo3-macros-0.29.3/LICENSE-MIT",
+          "sha256": "afcbe3b2e6b37172b5a9ca869ee4c0b8cdc09316e5d4384864154482c33e5af6"
+        }
+      ]
+    },
+    {
+      "name": "pyo3-macros-backend",
+      "version": "0.29.3",
+      "crate_sha256": "6143877a16e82b5a727b7127ff4cd86858a24a28d745d72f43e6f227c7b1bdb3",
+      "declared_license": "MIT OR Apache-2.0",
+      "licenses": [
+        {
+          "path": "seed/app/rust-licenses/pyo3-macros-backend-0.29.3/LICENSE-APACHE",
+          "sha256": "32c76dbe0e73d79100d5ece77c158399f2e2541bc5c78548a4ba45c1cb53c5c9"
+        },
+        {
+          "path": "seed/app/rust-licenses/pyo3-macros-backend-0.29.3/LICENSE-MIT",
+          "sha256": "afcbe3b2e6b37172b5a9ca869ee4c0b8cdc09316e5d4384864154482c33e5af6"
+        }
+      ]
+    },
+    {
+      "name": "quote",
+      "version": "1.0.47",
+      "crate_sha256": "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001",
+      "declared_license": "MIT OR Apache-2.0",
+      "licenses": [
+        {
+          "path": "seed/app/rust-licenses/quote-1.0.47/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "seed/app/rust-licenses/quote-1.0.47/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "syn",
+      "version": "2.0.119",
+      "crate_sha256": "872831b642d1a07999a962a351ed35b955ea2cfc8f3862091e2a240a84f17297",
+      "declared_license": "MIT OR Apache-2.0",
+      "licenses": [
+        {
+          "path": "seed/app/rust-licenses/syn-2.0.119/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "seed/app/rust-licenses/syn-2.0.119/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "target-lexicon",
+      "version": "0.13.5",
+      "crate_sha256": "adb6935a6f5c20170eeceb1a3835a49e12e19d792f6dd344ccc76a985ca5a6ca",
+      "declared_license": "Apache-2.0 WITH LLVM-exception",
+      "licenses": [
+        {
+          "path": "seed/app/rust-licenses/target-lexicon-0.13.5/LICENSE",
+          "sha256": "268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5"
+        }
+      ]
+    },
+    {
+      "name": "unicode-ident",
+      "version": "1.0.26",
+      "crate_sha256": "d245f478577f809a851594d02313b640fb437e0bb33866753cff937863096954",
+      "declared_license": "(MIT OR Apache-2.0) AND Unicode-3.0",
+      "licenses": [
+        {
+          "path": "seed/app/rust-licenses/unicode-ident-1.0.26/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "seed/app/rust-licenses/unicode-ident-1.0.26/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        },
+        {
+          "path": "seed/app/rust-licenses/unicode-ident-1.0.26/LICENSE-UNICODE",
+          "sha256": "f7db81051789b729fea528a63ec4c938fdcb93d9d61d97dc8cc2e9df6d47f2a1"
+        }
+      ]
+    }
+  ],
+  "scope": "精确锁定依赖的完整发布源码及随附许可；不声称已记录历史编译器或本轮重构建"
+}

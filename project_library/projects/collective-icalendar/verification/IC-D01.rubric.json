@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IC-D01",
+  "source_commit": "3ecf079acba0e592ea6a40c456514984c8657852",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use consumed property-setter evidence to distinguish a representation change from loss of the computed end. Missing controls support insufficient_information. Do not restore mutually competing end representations or patch serialization without an explicit new contract.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

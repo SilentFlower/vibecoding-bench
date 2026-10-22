@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PQ-D01",
+  "source_commit": "465fb9ae12f7727d28785d087b64e6226da5714e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use only actually consumed evidence. Request missing complete reproduction before selecting a cause. If complete evidence is delivered,trace builder/QueryBuilder copy behavior and the original versus captured-return SQL/IDs;advise retaining the returned query without a library patch. If evidence is unavailable,insufficient_information is a legitimate result;do not assert the observed cause from an unconsumed private reproduction.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

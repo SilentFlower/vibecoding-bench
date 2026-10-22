@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TD-C02",
+  "source_commit": "d6a68d61088a40eef5c88191ccf79323dbf34850",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "ab/abc gives Hamming1 but truncateTrue0 because the unmatched suffix is ignored. ab/xab gives positional Hamming3 versus Levenshtein1 insertion. Choose fixed-position versus edit alignment and explicit length policy;do not use a truncated zero as proof the complete strings match.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

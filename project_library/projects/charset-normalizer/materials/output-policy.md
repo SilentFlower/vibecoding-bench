@@ -1,0 +1,1 @@
+Use the UTF-8 bytes of Café — € with cp_isolation=["utf_8"]. Compare str(best),best.output("ascii") and str(best).encode("ascii","strict"). The source docstring says output errors are ignored;inspect actual code and output rather than assume that wording is correct. The destination policy must explicitly choose rejection or accepted character loss. No implementation.

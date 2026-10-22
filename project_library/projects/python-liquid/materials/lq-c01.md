@@ -1,0 +1,1 @@
+Compare Environment() with Environment(autoescape=True) when rendering {{ x }} and plain context x="<b>A&B</b>". Advise a browser-output policy without displaying or executing the value. No implementation.

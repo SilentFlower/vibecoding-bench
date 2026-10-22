@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PT-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "range_get_fills_gaps_without_mutating_the_original_mapping": true
+  },
+  "resource_profile": "business"
+}

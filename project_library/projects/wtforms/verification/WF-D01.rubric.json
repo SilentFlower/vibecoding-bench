@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WF-D01",
+  "source_commit": "af18fd6a7595d374aa707ff97b73df0dcc462ec2",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use only actually consumed declarations,rule ownership/reuse and call observations. Ask for missing complete controls;when established,trace actual list construction and mutation and propose an explicit per-call ownership workaround. Missing evidence supports insufficient_information. Do not invent a cause or turn diagnosis into an unrequested library patch.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

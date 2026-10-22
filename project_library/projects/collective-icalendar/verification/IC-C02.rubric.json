@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IC-C02",
+  "source_commit": "3ecf079acba0e592ea6a40c456514984c8657852",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Naive input produces a floating DTSTART without Z/TZID and decodes without tzinfo. Berlin uses TZID=Europe/Berlin and this date resolves to+02:00;UTC uses trailing Z and zero offset. These09:00 wall values do not all identify the same instant. Choose the intended representation,retain zone definitions/context and ambiguity policy,and do not infer a viewer or server timezone for floating values.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

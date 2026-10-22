@@ -26,8 +26,11 @@ from __future__ import annotations
 import argparse
 import ast
 from collections import Counter
-from contextlib import ExitStack
+from collections.abc import Iterator
+from concurrent.futures import ProcessPoolExecutor
+from contextlib import ExitStack, contextmanager
 import doctest
+import gzip
 import hashlib
 import importlib
 import importlib.metadata
@@ -316,6 +319,157 @@ SUITES = {
     'ftfy': {'package': 'ftfy', 'implementation_dir': 'ftfy', 'overlay': True,
         'distribution': ('ftfy', '6.3.1'), 'console_scripts': True,
         'args': ['-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'pypika': {'package': 'pypika', 'overlay': True, 'doctests': 0, 'subtests': True,
+        'test_roots': ['pypika/tests'], 'distribution': ('PyPika', '0.51.1'),
+        'args': ['pypika/tests', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'arrow': {'package': 'arrow', 'overlay': True, 'doctests': 0,
+        'distribution': ('arrow', '1.4.0'),
+        'args': ['tests', '--cov-report=xml:/work/coverage.xml', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-cov', 'pytest_cov.plugin'), ('pytest-mock', 'pytest_mock')],
+        'env': {'COVERAGE_FILE': '/work/.coverage'}},
+    'charset-normalizer': {'package': 'charset_normalizer', 'implementation_dir': 'src/charset_normalizer',
+        'import_root': 'src', 'overlay': True, 'doctests': 0, 'subtests': True,
+        'distribution': ('charset-normalizer', '3.5.2'), 'console_scripts': True,
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'injector': {'package': 'injector', 'overlay': True,
+        'distribution': ('injector', '0.24.0'),
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-cov', 'pytest_cov.plugin')], 'env': {'COVERAGE_FILE': '/work/.coverage'}},
+    'loguru': {'package': 'loguru', 'overlay': True, 'doctests': 0,
+        'distribution': ('loguru', '0.7.3'),
+        'args': ['--cov=loguru/', '--cov-report=', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-cov', 'pytest_cov.plugin'), ('pytest-mypy-plugins', 'pytest_mypy_plugins.collect')],
+        'env': {'COVERAGE_FILE': '/work/.coverage'}},
+    'pyparsing': {'package': 'pyparsing', 'overlay': True, 'doctests': 0, 'subtests': True,
+        'distribution': ('pyparsing', '3.3.3'),
+        'args': ['tests', 'examples/tiny/tests', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [],
+        'env': {'MPLBACKEND': 'Agg', 'MPLCONFIGDIR': '/work/matplotlib',
+            'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'}},
+    'markdownify': {'package': 'markdownify', 'overlay': True, 'doctests': 0,
+        'distribution': ('markdownify', '1.2.3'), 'console_scripts': True,
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'pyrsistent': {'package': 'pyrsistent', 'overlay': True, 'doctests': 0,
+        'distribution': ('pyrsistent', '0.21.0'), 'build_ext': True, 'native_modules': ['pvectorc'],
+        'extra_implementation_files': ['pvectorcmodule.c', '_pyrsistent_version.py'],
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('hypothesis', '_hypothesis_pytestplugin')],
+        'env': {'HYPOTHESIS_STORAGE_DIRECTORY': '/work/hypothesis'}},
+    'feedgen': {'package': 'feedgen', 'overlay': True, 'doctests': 0,
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'sortedcontainers': {'package': 'sortedcontainers', 'implementation_dir': 'src/sortedcontainers',
+        'import_root': 'src', 'overlay': True,
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-cov', 'pytest_cov.plugin')], 'env': {'PY_IGNORE_IMPORTMISMATCH': '1'}},
+    'python-constraint': {'package': 'constraint', 'overlay': True, 'doctests': 0,
+        'build_ext': True, 'native_modules': ['constraint.' + name
+            for name in ('constraints', 'domain', 'problem', 'solvers', 'parser')],
+        'distribution': ('python-constraint2', '2.7.3'),
+        'args': ['tests', '--no-cov', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-cov', 'pytest_cov.plugin'), ('pytest-benchmark', 'pytest_benchmark.plugin')],
+        'env': {'COVERAGE_FILE': '/work/.coverage'}},
+    'wtforms': {'package': 'wtforms', 'implementation_dir': 'src/wtforms', 'import_root': 'src',
+        'overlay': True, 'doctests': 0, 'distribution': ('WTForms', '3.3.0b3'),
+        'args': ['-W', "ignore:'cgi' is deprecated:DeprecationWarning", '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [], 'env': {}},
+    'feedparser': {'package': 'feedparser', 'implementation_dir': 'feedparser', 'overlay': True, 'doctests': 0,
+        'distribution': ('feedparser', '6.0.14'),
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-randomly', 'pytest_randomly')], 'env': {}},
+    'portion': {'package': 'portion', 'overlay': True, 'doctests': 0,
+        'distribution': ('portion', '2.7.0-pre1'),
+        'args': ['--cov=portion', '--cov-report=', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-cov', 'pytest_cov.plugin'), ('pytest-benchmark', 'pytest_benchmark.plugin')],
+        'env': {'COVERAGE_FILE': '/work/.coverage'}},
+    'textdistance': {'package': 'textdistance', 'overlay': True, 'doctests': 0,
+        'distribution': ('textdistance', '4.6.3'),
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('hypothesis', '_hypothesis_pytestplugin')],
+        'env': {'HYPOTHESIS_STORAGE_DIRECTORY': '/work/hypothesis', 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'}},
+    'chardet': {'package': 'chardet', 'overlay': True, 'doctests': 0,
+        'distribution': ('chardet', '5.2.0'), 'console_scripts': {'chardetect': 'chardet.cli.chardetect:main'},
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'humanize': {'package': 'humanize', 'implementation_dir': 'src/humanize', 'import_root': 'src',
+        'overlay': True, 'doctests': 0, 'distribution': ('humanize', '0.1.dev1'),
+        'executables': [('msgfmt', 'artifacts/gettext-bin/msgfmt', '4f024c278fb67bfccbeaa3565a59da34c50196b506cfb2163d878e0ef0bcca5c'),
+            ('msgmerge', 'artifacts/gettext-bin/msgmerge', 'c3f92a10cc2e5c7f6e410d6646d87a4f6f5df0a3b3ea2d0783657f44f77d8daf'),
+            ('xgettext', 'artifacts/gettext-bin/xgettext', 'c10198ef6c1f08107aa35ab6a18ef8c6513e14800bb88df6038f4202b4430e07')],
+        'system_libraries': ('artifacts/gettext-libs/libraries.json',
+            '0ff4d68d938682abbb7c22824cb84accdfa2f6247af08d53d2b13ea103f0008f'),
+        'args': ['--cov=humanize', '--cov=tests', '--cov-report=', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-cov', 'pytest_cov.plugin'), ('pytest-benchmark', 'pytest_benchmark.plugin'),
+            ('pytest-codspeed', 'pytest_codspeed.plugin')], 'env': {'COVERAGE_FILE': '/work/.coverage'}},
+    'bidict': {'package': 'bidict', 'overlay': True, 'distribution': ('bidict', '0.24.2.dev0'), 'metadata_fields': True,
+        'fixture_aliases': [('docs/changelog.rst', '../CHANGELOG.rst'),
+            ('docs/code-of-conduct.rst', '../CODE_OF_CONDUCT.rst'), ('docs/contributors-guide.rst', '../CONTRIBUTING.rst')],
+        'args': ['--numprocesses=2', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-sphinx', 'pytest_sphinx'), ('hypothesis', '_hypothesis_pytestplugin'),
+            ('pytest-xdist', 'xdist.plugin'), ('pytest-xdist', 'xdist.looponfail')],
+        'env': {'HYPOTHESIS_STORAGE_DIRECTORY': '/work/hypothesis'}},
+    'tablib': {'package': 'tablib', 'implementation_dir': 'src/tablib', 'import_root': 'src',
+        'overlay': True, 'doctests': 0, 'distribution': ('tablib', '0.1.dev1+g966876c76'),
+        'args': ['tests', '--cov-report=', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-cov', 'pytest_cov.plugin')], 'env': {'COVERAGE_FILE': '/work/.coverage',
+            'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'}},
+    'natsort': {'package': 'natsort', 'overlay': True, 'doctests': 0,
+        'distribution': ('natsort', '8.4.1.dev72+ge9a3a2a30'), 'console_scripts': True,
+        'args': ['tests', '--hypothesis-profile=slow-tests', '--cov=natsort', '--cov-report=', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('hypothesis', '_hypothesis_pytestplugin'), ('pytest-cov', 'pytest_cov.plugin'),
+            ('pytest-mock', 'pytest_mock')], 'env': {'HYPOTHESIS_STORAGE_DIRECTORY': '/work/hypothesis'}},
+    'html5lib': {'package': 'html5lib', 'overlay': True, 'doctests': 0, 'test_roots': ['html5lib/tests'],
+        'distribution': ('html5lib', '1.2.dev0'),
+        'args': ['html5lib/tests', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-expect', 'pytest_expect.expect')], 'env': {}},
+    'python-liquid': {'package': 'liquid', 'overlay': True, 'doctests': 0, 'subtests': True,
+        'distribution': ('python-liquid', '2.3.5'),
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('hypothesis', '_hypothesis_pytestplugin'), ('pytest-cov', 'pytest_cov.plugin'),
+            ('pytest-mock', 'pytest_mock'), ('pytest-timeout', 'pytest_timeout')],
+        'env': {'HYPOTHESIS_STORAGE_DIRECTORY': '/work/hypothesis', 'COVERAGE_FILE': '/work/.coverage'}},
+    'webcolors': {'package': 'webcolors', 'implementation_dir': 'src/webcolors', 'import_root': 'src',
+        'overlay': True, 'doctests': 0, 'distribution': ('webcolors', '26.10.0a0'),
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'funcy': {'package': 'funcy', 'overlay': True, 'doctests': 0,
+        'args': ['tests', '-W', 'error', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'collective-icalendar': {'package': 'icalendar', 'implementation_dir': 'src/icalendar', 'import_root': 'src',
+        'overlay': True, 'doctests': 0, 'test_roots': ['src/icalendar/tests'],
+        'distribution': ('icalendar', '0.1.dev1'), 'console_scripts': True,
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('hypothesis', '_hypothesis_pytestplugin')],
+        'env': {'HYPOTHESIS_STORAGE_DIRECTORY': '/work/hypothesis'}},
+    'wrapt': {'package': 'wrapt', 'implementation_dir': 'src/wrapt', 'import_root': 'src',
+        'overlay': True, 'doctests': 0, 'subtests': True, 'build_ext': True,
+        'distribution': ('wrapt', '2.5.2rc1'), 'native_modules': ['wrapt._wrappers'],
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [],
+        'env': {'WRAPT_DISABLE_EXTENSIONS': '', 'MYPY_CACHE_DIR': '/work/mypy'}},
+    'transitions': {'package': 'transitions', 'overlay': True, 'doctests': 0,
+        'distribution': ('transitions', '0.9.4'),
+        'executables': [('dot', 'artifacts/graphviz-bin/dot', '3cbf7364530b024e0e42ae53c49e307fb5ccbb9198d343a4c7d8720632fe123a')],
+        'system_libraries': ('artifacts/graphviz-libs/manifest.json', 'd76bf1806c5549f1d145f76208da7c16a9c67545de1b6b9e8beb51e4147297f4'),
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [],
+        'env': {'GVBINDIR': '/offline/artifacts/graphviz-libs'}},
+    'python-statemachine': {'package': 'statemachine', 'overlay': True,
+        'distribution': ('python-statemachine', '3.2.2'),
+        'skipped_doctests': ['docs/releases/2.0.0.md::2.0.0.md'],
+        'executables': [('dot', 'artifacts/graphviz-bin/dot', '3cbf7364530b024e0e42ae53c49e307fb5ccbb9198d343a4c7d8720632fe123a')],
+        'system_libraries': ('artifacts/graphviz-libs/manifest.json', 'd76bf1806c5549f1d145f76208da7c16a9c67545de1b6b9e8beb51e4147297f4'),
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-cov', 'pytest_cov.plugin'), ('pytest-mock', 'pytest_mock'),
+            ('pytest-benchmark', 'pytest_benchmark.plugin'), ('pytest-asyncio', 'pytest_asyncio.plugin'),
+            ('pytest-django', 'pytest_django.plugin'), ('pytest-timeout', 'pytest_timeout')],
+        'env': {'GVBINDIR': '/offline/artifacts/graphviz-libs', 'COVERAGE_FILE': '/work/.coverage'}},
+    'pendulum': {'package': 'pendulum', 'implementation_dir': 'src/pendulum', 'import_root': 'src',
+        'overlay': False, 'doctests': 0, 'requires_executable_tree': True,
+        'distribution': ('pendulum', '3.3.0'), 'native_modules': ['pendulum._pendulum'],
+        'fixture_aliases': [('tests/fixtures/tz/symlink/etc/localtime', '../usr/share/zoneinfo/Europe/Paris'),
+            ('tests/fixtures/tz/timezone_dir/etc/localtime', '../usr/share/zoneinfo/Europe/Paris')],
+        'fixture_symlink_semantics': True,
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-benchmark', 'pytest_benchmark.plugin'), ('time-machine', 'time_machine')],
+        'env': {'PENDULUM_EXTENSIONS': '1'}},
+    'sqlglot': {'package': 'sqlglot', 'overlay': True, 'framework': 'unittest',
+        'discover': '.', 'subtests': True, 'distribution': ('sqlglot', '0.0.1.dev1'),
+        'process_pool_workers': 2, 'subtest_contract': 'sqlglot-subtests-v1', 'plugins': [],
+        'env': {'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1', 'MKL_NUM_THREADS': '1'}},
 }
 _STATE: dict = {}
 
@@ -453,8 +607,22 @@ def _overlay(baseline: Path, candidate: Path, destination: Path, suite: dict) ->
             output.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, output)
             restored += 1
+    extra_inputs = {}
+    for relative in suite.get('extra_implementation_files', []):
+        path = Path(relative)
+        source = candidate / path
+        if (path.is_absolute() or '..' in path.parts or relative not in original
+                or source.is_symlink() or not source.is_file()
+                or any((candidate / parent).is_symlink() for parent in path.parents)
+                or not source.resolve().is_relative_to(candidate.resolve())):
+            raise CandidateViolation('候选额外原生实现路径缺失或沿链接越界：' + relative)
+        if _pytest_controls(source) != _pytest_controls(baseline / path):
+            raise CandidateViolation('候选额外实现改写pytest控制：' + relative)
+        shutil.copyfile(source, destination / path)
+        extra_inputs[relative] = hashlib.sha256(source.read_bytes()).hexdigest()
     return {'mode': 'implementation-overlay', 'restored_controls': restored,
-        'implementation_digest': _digest(candidate_files)}
+        'implementation_digest': _digest(candidate_files),
+        **({'extra_implementation_files': extra_inputs} if extra_inputs else {})}
 
 
 def _documents(baseline: Path, package: str) -> dict:
@@ -695,18 +863,40 @@ def pytest_sessionstart(session) -> None:
     state = _state()
     control = state['control']
     try:
-        modules = set(control['documents']) | {control['package']}
+        modules = set(control['documents']) | {control['package']} | set(control.get('native_modules', []))
         for name in modules:
             module = importlib.import_module(name)
             origin = Path(module.__file__).resolve()
             if not origin.is_relative_to(Path(control['project']).resolve()):
                 raise ValueError('原生回归导入了另一份安装代码：' + str(origin))
+            if name in control.get('native_modules', []):
+                suffix = sysconfig.get_config_var('EXT_SUFFIX')
+                if not isinstance(suffix, str) or origin.name != name.rsplit('.', 1)[-1] + suffix:
+                    raise ValueError('固定原生模块必须来自本次构建的二进制扩展：' + name)
             state['imports'][name] = {'path': str(origin), 'sha256': hashlib.sha256(origin.read_bytes()).hexdigest()}
             for qualified, text in control['documents'].get(name, {}).items():
                 target = module
                 for part in qualified.split('.') if qualified else []:
                     target = getattr(target, part)
                 _restore_document(target, text)
+        if control['package'] == 'pyrsistent':
+            module = importlib.import_module('pyrsistent')
+            extension = importlib.import_module('pvectorc')
+            suffix = sysconfig.get_config_var('EXT_SUFFIX')
+            if (not isinstance(suffix, str) or Path(extension.__file__).name != 'pvectorc' + suffix
+                    or module.pvector is not extension.pvector):
+                raise ValueError('Pyrsistent默认向量必须绑定本次真实C扩展')
+        if control['package'] == 'wrapt' and control.get('native_modules'):
+            module = importlib.import_module('wrapt')
+            extension = importlib.import_module('wrapt._wrappers')
+            if module.BaseObjectProxy is not extension.ObjectProxy:
+                raise ValueError('Wrapt默认代理必须绑定本次真实C扩展')
+        if control['package'] == 'pendulum' and control.get('native_modules'):
+            helpers = importlib.import_module('pendulum.helpers')
+            parsing = importlib.import_module('pendulum.parsing')
+            extension = importlib.import_module('pendulum._pendulum')
+            if helpers.is_leap is not extension.is_leap or parsing.parse_iso8601 is not extension.parse_iso8601:
+                raise ValueError('Pendulum完整扩展集合必须实际绑定固定Rust原件')
     except Exception as error:
         state['errors'].append('candidate_import_or_doctest_restore:' + type(error).__name__ + ':' + str(error)[:1000])
         raise
@@ -721,6 +911,9 @@ def _restore_document(target, text: str) -> None:
     """
     if isinstance(target, MethodType):
         target = target.__func__
+    # Cython等扩展的文档可能只读；原样文本无需重写，变化仍走恢复或拒绝路径。
+    if getattr(target, '__doc__', None) == text:
+        return
     descriptor = vars(target).get('__doc__') if isinstance(target, type) else None
     if (type(descriptor).__module__ == 'toolz.functoolz'
             and type(descriptor).__name__ == 'InstanceProperty'):
@@ -880,6 +1073,53 @@ def _subtest_results(reports: list[dict], node_ids: list[str]) -> list[dict]:
     return sorted(result, key=lambda item: (item['parent_nodeid'], item['ordinal']))
 
 
+def _subtest_contract(subtests: list[dict], format: str | None = None) -> list[dict] | dict:
+    """冻结全部子项内容及重复次数，大集合使用完整摘要满足既有JSON上限。
+
+    :param subtests: 已规范化的全部真实子项，不能采样或丢弃失败项。
+    :param format: 已审核套件的私有表示，未指定时保持原列表。
+    :return: 原完整列表，或已声明规范化后的全量数量及SHA256。
+    """
+    if format is None:
+        return subtests
+    if format not in ('sha256-v1', 'sqlglot-subtests-v1'):
+        raise ValueError('未知原生子测试冻结表示')
+    records = subtests
+    if format == 'sqlglot-subtests-v1':
+        records = []
+        for item in subtests:
+            row = {key: value for key, value in item.items() if key != 'ordinal'}
+            row['context'] = dict(row['context'])
+            message = row['context']['msg']
+            # 原测试遍历无序单位集合；唯一不稳定的PointClass默认repr只保留实际类身份。
+            if (row['parent_nodeid'] == 'tests.test_expressions.TestExprs.test_convert'
+                    and isinstance(message, str) and re.fullmatch(
+                        r'<tests\.test_expressions\.TestExprs\.test_convert\.<locals>\.PointClass object at 0x[0-9a-fA-F]+>', message)):
+                row['context']['msg'] = '<tests.test_expressions.TestExprs.test_convert.<locals>.PointClass object at $ADDRESS>'
+            records.append(row)
+        # 保留全部记录及重复次数，不能通过转成集合去掉重复子项。
+        records.sort(key=lambda row: json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(',', ':')))
+    return {'format': format, 'count': len(records), 'sha256': _digest(records)}
+
+
+def _subtest_evidence(directory: Path, subtests: list[dict]) -> dict:
+    """把完整子项写入私有证据，标准输出仅返回有界元数据。
+
+    :param directory: 本轮独立证据目录。
+    :param subtests: 全部原始观察，保持顺序和原表示。
+    :return: 压缩文件身份、完整数量及原始内容摘要。
+    """
+    path = directory / 'subtests.json.gz'
+    if path.exists():
+        raise ValueError('原生子测试原件已存在，拒绝覆盖')
+    raw = json.dumps(subtests, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')
+    compressed = gzip.compress(raw, mtime=0)
+    path.write_bytes(compressed)
+    return {'file': path.name, 'sha256': hashlib.sha256(compressed).hexdigest(),
+        'count': len(subtests), 'bytes': len(compressed), 'expanded_bytes': len(raw),
+        'observed_order_sha256': hashlib.sha256(raw).hexdigest()}
+
+
 def _tail(path: Path, limit: int) -> str:
     """只返回有界日志尾部。@param path 日志。@param limit 字节。@return 文本。"""
     with path.open('rb') as stream:
@@ -891,7 +1131,8 @@ def _record_candidate_imports(state: dict) -> None:
     """核原生运行后全部候选子模块实际来源。@param state 本轮控制状态。@return None。"""
     control = state['control']
     for name, module in sorted(sys.modules.copy().items()):
-        if name == control['package'] or name.startswith(control['package'] + '.'):
+        if (name == control['package'] or name.startswith(control['package'] + '.')
+                or name in control.get('native_modules', [])):
             origin = Path(module.__file__).resolve()
             if not origin.is_relative_to(Path(control['project']).resolve()):
                 raise ValueError('原生运行导入了非候选实现：' + str(origin))
@@ -984,6 +1225,29 @@ def _simplejson_mode(project: Path, mode: str) -> bool:
     raise ValueError('未知Simplejson原生执行模式')
 
 
+@contextmanager
+def _process_pool_workers(workers: int) -> Iterator[None]:
+    """仅限制原生测试未指定的进程池并发，保留全部任务和显式参数。
+
+    :param workers: 已审核套件的默认进程数。
+    :return: 退出时恢复原构造器的私有进程上下文。
+    """
+    if type(workers) is not int or workers < 1:
+        raise ValueError('原生进程池默认并发必须为正整数')
+    original = ProcessPoolExecutor.__init__
+
+    def initialize(pool, max_workers=None, *args, **kwargs) -> None:
+        """转发原构造参数。@param pool 原进程池。@param max_workers 显式或默认并发。@param args 原参数。@param kwargs 原参数。@return None。"""
+        original(pool, workers if max_workers is None else max_workers, *args, **kwargs)
+
+    # SQLGlot原测试默认按宿主全部CPU创建spawn进程；限制并发仍执行每个原生任务。
+    ProcessPoolExecutor.__init__ = initialize
+    try:
+        yield
+    finally:
+        ProcessPoolExecutor.__init__ = original
+
+
 def _unittest_worker(control_path: Path) -> int:
     """沿上游unittest发现入口执行真实用例，保留逐项结果和导入来源。
 
@@ -993,7 +1257,10 @@ def _unittest_worker(control_path: Path) -> int:
     os.environ['BENCH_NATIVE_CONTROL'] = str(control_path)
     state = _state()
     control = state['control']
+    pool_context = ExitStack()
     try:
+        if 'process_pool_workers' in control:
+            pool_context.enter_context(_process_pool_workers(control['process_pool_workers']))
         pytest_sessionstart(None)
         identities = {}
         official_entry = control.get('unittest_entry')
@@ -1151,6 +1418,8 @@ def _unittest_worker(control_path: Path) -> int:
     except Exception as error:
         state['errors'].append(type(error).__name__ + ':' + str(error)[:2048])
         state['exit_code'] = 1
+    finally:
+        pool_context.close()
     _save(Path(control['evidence']) / 'unittest-master.json', {key: value for key, value in state.items() if key != 'control'})
     return state['exit_code']
 
@@ -1246,7 +1515,7 @@ def _fixture_aliases(baseline: Path, project: Path, suite: dict) -> list[dict]:
     :param baseline: 只读原版，链接blob已明确存成普通文件。
     :param project: 本轮受控测试树。
     :param suite: 已审核的相对别名和原Git目标文本。
-    :return: 逐别名实际目标及SHA；不创建链接或修改原版。
+    :return: 逐别名实际目标及SHA；仅明确需要链接语义的套件在独占测试树内恢复原链接。
     """
     result = []
     for relative, text in suite.get('fixture_aliases', []):
@@ -1261,10 +1530,17 @@ def _fixture_aliases(baseline: Path, project: Path, suite: dict) -> list[dict]:
         for path in (target, project / alias):
             if any(parent.is_symlink() for parent in path.parents if parent.is_relative_to(project)):
                 raise ValueError('上游别名父目录不能含链接')
-        shutil.copyfile(target, project / alias)
+        materialization = 'private-regular-file-copy'
+        if suite.get('fixture_symlink_semantics'):
+            # 本地时区测试依赖is_symlink和目标名称；普通复制无法保留这一上游行为。
+            (project / alias).unlink()
+            (project / alias).symlink_to(text)
+            materialization = 'private-controlled-relative-symlink'
+        else:
+            shutil.copyfile(target, project / alias)
         result.append({'path': relative, 'git_target': text,
             'resolved_target': str(target.resolve().relative_to(project.resolve())),
-            'target_sha256': hashlib.sha256(target.read_bytes()).hexdigest(), 'materialization': 'private-regular-file-copy'})
+            'target_sha256': hashlib.sha256(target.read_bytes()).hexdigest(), 'materialization': materialization})
     return result
 
 
@@ -1278,13 +1554,30 @@ def _build_native_extension(project: Path, suite: dict, environment: dict, evide
     :param timeout: 计入原生总时限的剩余秒数。
     :return: 构建命令、源码和实际扩展的摘要。
     """
-    if suite['package'] != 'simplejson' or not project.resolve().is_relative_to(_WORK_ROOT.resolve()):
+    configurations = {
+        'simplejson': {'extension': 'simplejson/_speedups',
+            'inputs': ['setup.py', 'simplejson/_speedups.c', 'simplejson/_speedups_scan.h'],
+            'environment': {'REQUIRE_SPEEDUPS': '1', 'DISABLE_SPEEDUPS': '0'}},
+        'pyrsistent': {'extension': 'pvectorc',
+            'inputs': ['setup.py', 'setup.cfg', 'pvectorcmodule.c', '_pyrsistent_version.py'],
+            'environment': {}},
+        'constraint': {'extension': 'constraint/constraints',
+            'extensions': ['constraint/' + name for name in ('constraints', 'domain', 'problem', 'solvers', 'parser')],
+            'inputs': ['cythonize_build.py', *sorted(str(path.relative_to(project))
+                for path in (project / 'constraint').glob('*.py'))],
+            'command': [sys.executable, 'cythonize_build.py'], 'environment': {}},
+        'wrapt': {'extension': 'src/wrapt/_wrappers',
+            'inputs': ['setup.py', 'pyproject.toml', 'src/wrapt/_wrappers.c', 'src/wrapt/__init__.py'],
+            'environment': {'WRAPT_INSTALL_EXTENSIONS': 'true', 'WRAPT_EXTENSIONS': 'true'}},
+    }
+    if suite['package'] not in configurations or not project.resolve().is_relative_to(_WORK_ROOT.resolve()):
         raise ValueError('原生扩展仅允许已审核套件及现有/work可执行临时树')
-    command = [sys.executable, 'setup.py', 'build_ext', '--inplace', '--force']
+    configuration = configurations[suite['package']]
+    command = configuration.get('command', [sys.executable, 'setup.py', 'build_ext', '--inplace', '--force'])
     started = time.monotonic()
     with (evidence / 'build-stdout.log').open('wb') as out, (evidence / 'build-stderr.log').open('wb') as err:
         process = subprocess.Popen(command, cwd=project,
-            env={**environment, 'REQUIRE_SPEEDUPS': '1', 'DISABLE_SPEEDUPS': '0'},
+            env={**environment, **configuration['environment']},
             stdout=out, stderr=err, start_new_session=True)
         try:
             returncode = process.wait(timeout=timeout)
@@ -1300,15 +1593,23 @@ def _build_native_extension(project: Path, suite: dict, environment: dict, evide
     suffix = sysconfig.get_config_var('EXT_SUFFIX')
     if not isinstance(suffix, str) or not suffix or '/' in suffix:
         raise ValueError('当前解释器扩展后缀无效')
-    extension = project / 'simplejson' / ('_speedups' + suffix)
+    extension = project / (configuration['extension'] + suffix)
     if not extension.is_file() or extension.is_symlink():
         raise ValueError('实际候选扩展构建未生成匹配当前解释器的文件')
-    inputs = ['setup.py', 'simplejson/_speedups.c', 'simplejson/_speedups_scan.h']
-    return {'command': command, 'returncode': returncode, 'elapsed_sec': time.monotonic() - started,
+    inputs = configuration['inputs']
+    result = {'command': command, 'returncode': returncode, 'elapsed_sec': time.monotonic() - started,
         'inputs': {name: hashlib.sha256((project / name).read_bytes()).hexdigest() for name in inputs},
         'extension': str(extension.relative_to(project)),
         'extension_sha256': hashlib.sha256(extension.read_bytes()).hexdigest(),
         'implementation_installed': False, 'force_rebuilt_from_candidate': True}
+    if configuration.get('extensions'):
+        result['extensions'] = {}
+        for relative in configuration['extensions']:
+            path = project / (relative + suffix)
+            if path.is_symlink() or not path.is_file():
+                raise ValueError('固定多模块扩展缺少本次实际产物：' + relative)
+            result['extensions'][str(path.relative_to(project))] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return result
 
 
 def _system_libraries(specification: tuple[str, str]) -> list[dict]:
@@ -1322,7 +1623,8 @@ def _system_libraries(specification: tuple[str, str]) -> list[dict]:
     def checked(name: str, expected: str) -> tuple[Path, bytes]:
         """核本次只读制品路径及摘要。@param name 路径。@param expected SHA。@return 文件及字节。"""
         path = Path(name)
-        if (path.is_absolute() or '..' in path.parts or path.parts[:2] != ('artifacts', 'tk-libs')
+        if (path.is_absolute() or '..' in path.parts or path.parts[:2] not in (
+                ('artifacts', 'tk-libs'), ('artifacts', 'gettext-libs'), ('artifacts', 'graphviz-libs'))
                 or len(path.parts) != 3 or not re.fullmatch(r'[0-9a-f]{64}', expected)):
             raise ValueError('离线系统库路径或摘要无效')
         source = _OFFLINE_ROOT / path
@@ -1342,6 +1644,8 @@ def _system_libraries(specification: tuple[str, str]) -> list[dict]:
         raise ValueError('离线系统库清单无效')
     result, seen = [], set()
     for item in manifest['libraries']:
+        if Path(item['path']).parent != Path(relative).parent:
+            raise ValueError('离线系统库与清单目录不一致')
         source, _ = checked(item['path'], item['sha256'])
         if (not re.fullmatch(r'lib[A-Za-z0-9_.+-]+\.so(?:\.[0-9]+)*', source.name)
                 or source.name in seen):
@@ -1383,7 +1687,7 @@ def _run(options) -> dict:
         raise ValueError('回归证据目录非空，拒绝覆盖原始当轮')
     evidence.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='bench-native-regression-',
-            dir=_WORK_ROOT if suite.get('build_ext') else None) as directory, ExitStack() as runtime_cleanup:
+            dir=_WORK_ROOT if suite.get('build_ext') or suite.get('requires_executable_tree') else None) as directory, ExitStack() as runtime_cleanup:
         scratch = Path(directory)
         project, control_root = scratch / 'project', scratch / 'control'
         control_root.mkdir()
@@ -1404,6 +1708,8 @@ def _run(options) -> dict:
         if suite.get('subtests'):
             control['subtests'] = True
         if framework == 'unittest':
+            if 'process_pool_workers' in suite:
+                control['process_pool_workers'] = suite['process_pool_workers']
             if suite.get('unittest_entry'):
                 control['unittest_entry'] = suite['unittest_entry']
             else:
@@ -1418,6 +1724,8 @@ def _run(options) -> dict:
             control['parameter_ids'] = suite['parameter_ids']
         if suite.get('duplicate_ids'):
             control['duplicate_ids'] = True
+        if suite.get('native_modules'):
+            control['native_modules'] = suite['native_modules']
         control_path = control_root / 'control.json'
         _save(control_path, control)
         shutil.copyfile(Path(__file__), control_root / '_bench_native_regression_control.py')
@@ -1440,6 +1748,8 @@ def _run(options) -> dict:
                 console_scripts=(suite['console_scripts'] if isinstance(suite.get('console_scripts'), dict)
                     else project_metadata['scripts'] if suite.get('console_scripts') else None),
                 metadata_fields=metadata_fields)
+        if 'process_pool_workers' in suite:
+            source_binding['process_pool_default_workers'] = suite['process_pool_workers']
         environment = dict(os.environ)
         for key in ['PYTEST_ADDOPTS', 'PYTEST_PLUGINS', 'PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP']:
             environment.pop(key, None)
@@ -1448,7 +1758,7 @@ def _run(options) -> dict:
             HOME=str(home), XDG_CONFIG_HOME=str(home / '.config'), BENCH_NATIVE_CONTROL=str(control_path), **suite['env'])
         if suite.get('system_libraries'):
             libraries = _system_libraries(suite['system_libraries'])
-            environment['LD_LIBRARY_PATH'] = str(_OFFLINE_ROOT / 'artifacts/tk-libs')
+            environment['LD_LIBRARY_PATH'] = str(_OFFLINE_ROOT / Path(suite['system_libraries'][0]).parent)
             source_binding['system_libraries'] = libraries
         started = time.monotonic()
         build = (_build_native_extension(project, suite, environment, evidence, options.timeout_sec)
@@ -1535,6 +1845,8 @@ def _run(options) -> dict:
         # 内容schema要求节点恰为三个字段；模式和原始ID另存，不能扩张既有节点合同。
         nodes = [{'id': item['id'], 'kind': item['kind'], 'outcome': outcomes[item['id']]} for item in collection]
         subtests = _subtest_results(reports, node_ids) if suite.get('subtests') else None
+        subtest_contract = (_subtest_contract(subtests, suite.get('subtest_contract'))
+            if subtests is not None else None)
         collection_errors = [error for state in states for error in state['errors']]
         # 新套件在当前镜像校准真实集合，候选随后必须逐节点匹配；不把历史数量写成准入结果。
         expected_counts = {name: suite[name] for name in ['passed', 'skipped', 'xfailed'] if name in suite}
@@ -1559,7 +1871,7 @@ def _run(options) -> dict:
         if subtests is not None:
             valid = (valid and bool(subtests)
                 and all(item['outcome'] in ('passed', 'skipped', 'xfailed') for item in subtests)
-                and (contract is None or subtests == contract['subtests']))
+                and (contract is None or subtest_contract == contract['subtests']))
         frozen = {'schema': SCHEMA, 'project': options.project, 'baseline_digest': baseline_digest,
             'python': sys.version.split()[0], 'plugins': plugins, 'nodes': nodes}
         if framework in ('unittest', 'nose2'):
@@ -1593,7 +1905,7 @@ def _run(options) -> dict:
                 and all(state.get('duplicate_identities') == duplicate_identities for state in workers)
                 and (contract is None or duplicate_identities == contract.get('duplicate_identities')))
         if subtests is not None:
-            frozen['subtests'] = subtests
+            frozen['subtests'] = subtest_contract
         if options.freeze_baseline_contract and valid:
             if options.freeze_baseline_contract.exists():
                 raise ValueError('冻结 contract 已存在，拒绝覆盖')
@@ -1618,8 +1930,14 @@ def _run(options) -> dict:
             'stderr': _tail(stderr, 4096), 'stdout_tail': _tail(stdout, 8192),
             'scope': '冻结原生集合回归，不代表模型完成或独立业务目标已满足'}
         if subtests is not None:
-            report.update(subtests=subtests, subtest_count=len(subtests),
-                subtests_match_contract=subtests == contract['subtests'] if contract else None)
+            report.update(subtest_count=len(subtests),
+                subtests_match_contract=subtest_contract == contract['subtests'] if contract else None)
+            if suite.get('subtest_contract'):
+                report['subtest_contract'] = subtest_contract
+                # 产品日志和结果包均有大小上限；完整原件另存，避免轮转掉准备完成标记。
+                report['subtests_evidence'] = _subtest_evidence(evidence, subtests)
+            else:
+                report['subtests'] = subtests
         if suite.get('supplementary'):
             report.update(supplementary=supplements,
                 supplementary_example_count=sum(len(item['examples']) for item in supplements),

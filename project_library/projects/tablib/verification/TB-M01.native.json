@@ -1,0 +1,22 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TB-M01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "mapping_rows_follow_header_names_without_mutating_input": true,
+    "json_and_yaml_share_the_repaired_mapping_alignment": true,
+    "invalid_mapping_schemas_are_rejected_before_replacing_existing_data": true,
+    "empty_list_and_positional_list_compatibility_are_preserved": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

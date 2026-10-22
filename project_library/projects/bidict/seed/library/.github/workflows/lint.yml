@@ -1,0 +1,68 @@
+name: lint
+
+"on":
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - dev
+      - deps
+  pull_request:
+    branches:
+      - main
+
+# A push to a pull request supersedes any run still in progress for an earlier push, so cancel
+# that run rather than make the new one wait for it. Each run for any other event gets a group
+# of its own, so always runs to completion.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PREK_HOME: ~/.cache/prek
+
+jobs:
+  main:
+    name: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: check out code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+      - name: install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
+      - name: cache prek hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ env.PREK_HOME }}
+          key: prek|${{ runner.os }}|${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: lint changed files
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == 'pull_request' ]]; then
+            from_ref='${{ github.event.pull_request.base.sha }}'
+            to_ref='${{ github.event.pull_request.head.sha }}'
+          elif [[ "$GITHUB_EVENT_NAME" == 'push' ]]; then
+            from_ref='${{ github.event.before }}'
+            to_ref='${{ github.sha }}'
+            if [[ "$from_ref" == '0000000000000000000000000000000000000000' ]] || ! git cat-file -e "$from_ref^{commit}" 2>/dev/null; then
+              # New branch, or from_ref no longer reachable (e.g. after a force-push):
+              from_ref="$(git merge-base "origin/${{ github.event.repository.default_branch }}" "$to_ref")"
+            fi
+          else
+            to_ref='${{ github.sha }}'
+            from_ref="$(git merge-base "origin/${{ github.event.repository.default_branch }}" "$to_ref")"
+            if [[ -z "$(git diff --name-only "$from_ref" "$to_ref")" ]]; then
+              # No files changed between from_ref and to_ref -> run on all files:
+              nix develop .#lint --command prek run --all-files --show-diff-on-failure --verbose
+              exit 0
+            fi
+          fi
+          nix develop .#lint --command prek run \
+            --from-ref "$from_ref" \
+            --to-ref "$to_ref" \
+            --show-diff-on-failure \
+            --verbose
+
+permissions:
+  contents: read

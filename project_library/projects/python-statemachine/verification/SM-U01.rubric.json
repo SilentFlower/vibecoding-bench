@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SM-U01",
+  "source_commit": "ec5d8173f740b37941818df13727db9d64ef498d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The active values are new then ok,and the supplied model.status is updated to ok;state IDs pending/done differ from their declared values. The machine uses the selected domain model field and same model identity. This is an in-memory assignment,not proof a database or audit record was persisted.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

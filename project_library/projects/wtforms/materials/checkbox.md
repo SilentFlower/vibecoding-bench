@@ -1,0 +1,1 @@
+CheckboxForm has enabled=BooleanField(). The original synthetic object has enabled=True. Compare CheckboxForm(obj=obj) with CheckboxForm(formdata=empty_multi_value_input,obj=obj),including raw_data and data. Explain initial display versus an unchecked submission. No edits.

@@ -1,0 +1,1 @@
+One event loop runs task A:activate("de_DE");signal ready;await switched;read decimal_separator(). Task B:await ready;deactivate();signal switched;read decimal_separator(). Both run on one thread. Plan safe per-report language handling based on actual state storage. No library or application edits.

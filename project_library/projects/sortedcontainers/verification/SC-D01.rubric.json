@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SC-D01",
+  "source_commit": "3ac358631f58c1347f1d6d2d92784117db0f38ed",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use only actually consumed initial values,operation,exception and state observations. Request missing complete controls,then trace the actual index update order when established and advise caller-owned validation/recovery from known-valid data. Do not assume failed operations are transactional or authorize a source patch. Missing evidence supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

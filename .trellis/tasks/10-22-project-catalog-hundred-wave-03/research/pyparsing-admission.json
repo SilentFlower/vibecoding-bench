@@ -1,0 +1,132 @@
+{
+  "project": "pyparsing",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "810199f89bf916590426e1c5cb3d612584f11a2f",
+  "source_file_count": 293,
+  "license_files": [
+    "seed/library/LICENSE"
+  ],
+  "scenarios": 4,
+  "unique_tasks": 6,
+  "modify_tasks": 0,
+  "non_modify_tasks": 6,
+  "native_baseline": {
+    "project": "pyparsing",
+    "attempt": 2,
+    "result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-002/pyparsing/result.json",
+    "result_sha256": "901cff3d7ca3f6c50f5fda58b264b49614537672ec1ae003897cc67fa453c14b",
+    "main_collected": 2175,
+    "counts": {
+      "passed": 2175,
+      "failed": 0,
+      "error": 0,
+      "skipped": 0,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "subtest_count": 2089,
+    "collection_skip_count": 0,
+    "xml_testcases": 2175,
+    "xml_skipped": 0,
+    "runner_sha256": "834a3705c301b60167179f0083deeb0618d71e578d0dd7399a98320c182f81e9",
+    "contract_sha256": "6720c50640ee7b3575dc969902a2d9517b4870a9b8fcdadc68cf94c6609b92db",
+    "business": {
+      "timeout_sec": 30,
+      "memory_mb": 256,
+      "pids_limit": 64
+    },
+    "regression": {
+      "timeout_sec": 300,
+      "memory_mb": 768,
+      "pids_limit": 64
+    },
+    "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+  },
+  "verified_unique_native_cases": 5,
+  "native_evidence": [
+    {
+      "case": "original-PP-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pyparsing/attempt-001/original-PP-C01.json",
+      "sha256": "0f5db73dd19e48fbddbc64b5030494a339e591699bf71c19d8495673501f276f",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PP-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pyparsing/attempt-001/original-PP-C02.json",
+      "sha256": "0d389eb1b1a16ae04358c8458af4e3119b711b39a5950a09b1f1986fb5d10dc1",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PP-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pyparsing/attempt-001/original-PP-P01.json",
+      "sha256": "46cca9e8de7306600af3bf70cab42cc0954aeb9964c92255e136dd8439dc4673",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PP-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pyparsing/attempt-001/original-PP-U01.json",
+      "sha256": "93ada0e4df031f9239d4463862a2adfda6b2d4682757c89447aab63d0964bd48",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PP-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-03/business/pyparsing/attempt-001/original-PP-U02.json",
+      "sha256": "166cf30be0008618301e76d7b4e17b83c4cedd0525789a513dfd703e12ccffe4",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-03/business/pyparsing/attempt-001/summary.json",
+      "sha256": "3aa8a967451965a884a5e8607076b01ff33de6eb71aaab3cd27397ea90174b7a",
+      "passed": true
+    }
+  ],
+  "additional_original_native": [],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v27-en",
+  "formal_digest": "81f805d2fb92b504770c831b77cd72eaafa6b982c94b0f50fd0b27b19dfb67ce",
+  "full_delivery_files": 23422,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-003/run-001/evidence/result.json",
+      "sha256": "ae068138a476b8806c180c5dff694dd78d1d3845b0efc3b3197937d0ba231fd1"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-003/run-001/cleanup.json",
+      "sha256": "4a868445cf3a14188ce8a2f18b45a65012b46bb9c406123bbaa193b4a0dd9ca4"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/mock-batch-003-audit.json",
+      "sha256": "1841ac4ce584e37571969c14714e76e276f41d4d8ddedfc481aee6c429f1ed46"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-03/mock-batch-003/browser/run-001/diagnostics/result.json",
+      "sha256": "cee23688157b42c326dd4205d4aa2ee8588d1fd5d44a1281315c2d2d1d6fc362"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/delivery-first-six.json",
+      "sha256": "1eba225e1d21360cad21861ebf8a60dd0e5d02ea66f54bf46a69a118937f57bf"
+    }
+  ]
+}

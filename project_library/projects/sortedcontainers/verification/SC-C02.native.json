@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SC-C02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "mutating_a_stored_sort_key_does_not_refresh_the_cached_index": true
+  },
+  "resource_profile": "business"
+}

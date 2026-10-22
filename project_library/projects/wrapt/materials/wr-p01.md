@@ -1,0 +1,1 @@
+On a local namespace calculate(x)=x+1,install an inner wrapper multiplying the result by2 and outer wrapper adding3 using wrap_function_wrapper. Save both returned handles;remove inner then outer with unwrap_object. Inspect calculate(2) after each step. Plan plugin lifecycle and failure handling without patching real modules.

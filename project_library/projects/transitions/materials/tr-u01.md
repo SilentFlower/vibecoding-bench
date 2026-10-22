@@ -1,0 +1,1 @@
+Use Machine(model,states=[state a with on_enter/on_exit log callbacks],initial="a",auto_transitions=False). Compare initialization,an internal a->None event and a reflexive a->a event,each with an after callback. Explain the logs;no edits.

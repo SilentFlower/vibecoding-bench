@@ -1,0 +1,52 @@
+{
+  "tests": [
+    {
+      "name": "left padded",
+      "template": "{{ \" \t\r\n  hello\" | strip }}",
+      "result": "hello",
+      "tags": [
+        "strip filter"
+      ]
+    },
+    {
+      "name": "right padded",
+      "template": "{{ \"hello \t\r\n  \" | strip }}",
+      "result": "hello",
+      "tags": [
+        "strip filter"
+      ]
+    },
+    {
+      "name": "left and right padded",
+      "template": "{{ \" \t\r\n  hello  \t\r\n \" | strip }}",
+      "result": "hello",
+      "tags": [
+        "strip filter"
+      ]
+    },
+    {
+      "name": "not a string",
+      "template": "{{ 5 | strip }}",
+      "result": "5",
+      "tags": [
+        "strip filter"
+      ]
+    },
+    {
+      "name": "unexpected argument",
+      "template": "{{ \"hello\" | strip: 5 }}",
+      "invalid": true,
+      "tags": [
+        "strip filter"
+      ]
+    },
+    {
+      "name": "undefined left value",
+      "template": "{{ nosuchthing | strip }}",
+      "result": "",
+      "tags": [
+        "strip filter"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+Third-party attribution for the unmodified pinned Funcy source
+
+Funcy is copyright 2012-2026 Alexander Schepanovski under the BSD 3-Clause
+terms retained in library/LICENSE. This notice does not replace third-party terms.
+
+library/funcy/objects.py identifies cached_property as borrowed from Django.
+The exact copied Django commit is not recorded upstream. Django 1.4 BSD terms
+are preserved in Django-1.4-LICENSE.txt as the reviewed historical license.
+
+library/funcy/seqs.py identifies the ilen algorithm with a source link:
+https://stackoverflow.com/a/15112059/753382
+Original answer by zuo, published 2013-02-27, under CC BY-SA 3.0 for that answer
+version. Original contribution and any adaptations remain subject to those terms:
+https://creativecommons.org/licenses/by-sa/3.0/
+The complete CC BY-SA 3.0 legal code is preserved in CC-BY-SA-3.0.html.
+The pinned upstream file is preserved byte-for-byte; this pack makes no new
+changes to that source. Attribution does not imply endorsement.
+
+library/docs/_static/nhpup_1.1.js retains Nicolas Hoening's original MIT notice
+and full terms in that file. No source notice has been removed or relicensed.

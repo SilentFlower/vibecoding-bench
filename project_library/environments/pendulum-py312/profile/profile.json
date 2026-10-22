@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "id": "pendulum-py312",
+  "adapter": "python-native",
+  "platform": "linux-amd64",
+  "python": "3.12.15",
+  "requirements": [
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==9.1.1",
+    "py-cpuinfo2==10.1.1",
+    "pytest-benchmark==5.3.0",
+    "python-dateutil==2.9.0.post0",
+    "six==1.17.0",
+    "time-machine==3.5.1",
+    "tzdata==2026.5"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 180,
+    "memory_mb": 768,
+    "pids_limit": 128
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+      "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+      "size": 386536
+    },
+    {
+      "path": "artifacts/py_cpuinfo2-10.1.1-py3-none-any.whl",
+      "digest": "adc53396bfb206e6498d078ec2ab407f85799ecd819584ac36a8f80a2d4d762d",
+      "size": 23791
+    },
+    {
+      "path": "artifacts/pytest_benchmark-5.3.0-py3-none-any.whl",
+      "digest": "920ab1dfcffa718d49aa15ba144c7e357bda59216a0dc308016cc1c7236f719d",
+      "size": 48401
+    },
+    {
+      "path": "artifacts/python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+      "digest": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
+      "size": 229892
+    },
+    {
+      "path": "artifacts/six-1.17.0-py2.py3-none-any.whl",
+      "digest": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+      "size": 11050
+    },
+    {
+      "path": "artifacts/time_machine-3.5.1-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+      "digest": "075cc8ff3bf229d96bc7adb8b26be6b1021ee0a5213efe4f57898cda3a3bd766",
+      "size": 59941
+    },
+    {
+      "path": "artifacts/tzdata-2026.5-py2.py3-none-any.whl",
+      "digest": "b683bd1b6659ddcd810ff02ad09ba821d4bf1065072805063eb35c49617905ac",
+      "size": 347996
+    },
+    {
+      "path": "artifacts/pendulum-rust-dependencies.tar",
+      "digest": "602d19042d6d78600a20549181665b1160149e5c846ec99b213b7553b7c4cb87",
+      "size": 3102720
+    }
+  ],
+  "source_commit": "e06dacedc4cdea90fa1286b3965d180ab94cf251",
+  "verification_status": "verified_target_runtime"
+}

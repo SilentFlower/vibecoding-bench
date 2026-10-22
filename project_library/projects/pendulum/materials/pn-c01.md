@@ -1,0 +1,1 @@
+From UTC2026-01-01 12:00,compare in_timezone("America/New_York") with set(tz="America/New_York"). Inspect wall hour and integer timestamp. Advise an event-import interpretation contract. No implementation.

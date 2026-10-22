@@ -1,0 +1,232 @@
+{
+  "schema": 2,
+  "project_key": "sortedcontainers",
+  "title": "Sorted Containers本地索引工作场景",
+  "category": "有序状态与业务查询",
+  "description": "重复项、实时视图、邻居查询、键缓存、分页及失败状态诊断。",
+  "seed_digest": "71c8cd0768d90d3e4b9c0c168a04e6b318b062a7d3a594b4ece88ca9c3bcb4ca",
+  "environment": "sortedcontainers-py312",
+  "source": {
+    "repository": "https://github.com/grantjenks/python-sortedcontainers",
+    "commit": "3ac358631f58c1347f1d6d2d92784117db0f38ed",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/app/THIRD_PARTY_LICENSES.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "SC-S01",
+      "title": "集合与映射语义",
+      "goal": "明确数量与实时视图",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SC-U01",
+            "SC-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SC-U01",
+          "kind": "understand",
+          "goal": "保留有序订货明细的重复项",
+          "prompt": "Explain actual multiplicity in both complete controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/multiplicity.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SC-U02",
+          "kind": "understand",
+          "goal": "追踪实时视图和排名切片删除",
+          "prompt": "Explain all final view/snapshot/mapping states. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/views.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SC-S02",
+      "title": "有序索引查询和更新",
+      "goal": "明确二分与键稳定",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SC-C01",
+            "SC-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SC-C01",
+          "kind": "consult",
+          "goal": "选择邻近排期的二分边界",
+          "prompt": "Advise strict/non-strict neighbor lookup and every edge control. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/neighbors.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SC-C02",
+          "kind": "consult",
+          "goal": "规划对象排序键的更新归属",
+          "prompt": "Advise the actual mutated-key and fresh-index controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/key-stability.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SC-S03",
+      "title": "分页设计",
+      "goal": "保留相同排序键记录",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SC-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SC-P01",
+          "kind": "plan",
+          "goal": "规划同优先级记录的连续分页",
+          "prompt": "Plan continuation with a stable tie-breaker and declared update policy. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/cursor-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SC-S04",
+      "title": "写入失败诊断",
+      "goal": "核完整失败和状态",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SC-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "SC-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SC-D01",
+          "kind": "diagnose",
+          "goal": "诊断写入失败后的成员与顺序差异",
+          "prompt": "After catching an insertion error,a sorted collection reports inconsistent membership and iteration. Request full initial types,operation,exception and state controls before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SC-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-failed-insert",
+              "when": "Complete initial values/types,operation,exception and state controls have not been supplied or declared unavailable,and are reasonably requested.",
+              "materials": [
+                "disclosure/failed-insert.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

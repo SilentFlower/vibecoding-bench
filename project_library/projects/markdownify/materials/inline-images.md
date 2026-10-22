@@ -1,0 +1,1 @@
+Using heading_style="ATX",convert <h2><img src="chart.png" alt="Revenue"></h2> with defaults and keep_inline_images_in=["h2"]. Compare the paragraph control <p><img src="chart.png" alt="Revenue"></p>. Advise preserving a migration image where required without claiming image downloads or asset-copying happen automatically. No edits.

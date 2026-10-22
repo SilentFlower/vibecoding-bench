@@ -1,0 +1,1 @@
+Exact code:@memoize def make(x):return[x]. a=make(1);a.append("changed");b=make(1). a is b is True and b==[1,"changed"]. The callback counter remains1. No custom key_func,threads or invalidation are involved. The source stores and returns the same value object in memory[key].

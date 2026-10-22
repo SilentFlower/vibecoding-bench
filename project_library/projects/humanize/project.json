@@ -1,0 +1,254 @@
+{
+  "schema": 2,
+  "project_key": "humanize",
+  "title": "Humanize报表展示工作场景",
+  "category": "单位、时态与语言上下文",
+  "description": "明确容量和时长显示、相对时态、数字本地化、精度损失及协程语言状态。",
+  "seed_digest": "c97ba33c9fa8039e5c098a636a517cbf99a9a6f3f48c2d5c90d37dc5e5f02c3c",
+  "environment": "humanize-py312",
+  "source": {
+    "repository": "https://github.com/python-humanize/humanize",
+    "commit": "785e5dcc0d0308ad0dff3f6cc0faa7085ad0375b",
+    "license_files": [
+      "seed/library/LICENCE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "HU-S01",
+      "title": "容量展示与精度",
+      "goal": "确定单位并保留机器数值",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "HU-U01",
+            "HU-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "HU-U01",
+          "kind": "understand",
+          "goal": "解释容量展示的三种单位",
+          "prompt": "Compare naturalsize(1000), naturalsize(1000,binary=True), naturalsize(1024,binary=True) and naturalsize(1024,gnu=True). Explain bases, suffixes and the GNU precedence. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/hu-u01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/HU-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/HU-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "HU-C02",
+          "kind": "consult",
+          "goal": "避免用容量展示反推账单数据",
+          "prompt": "Compare naturalsize(999999) and naturalsize(1000000), then naturalsize(0.9). Advise whether to store/compare these display strings for precise usage or billing. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/hu-c02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/HU-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/HU-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "HU-S02",
+      "title": "可复现时间报告",
+      "goal": "区分距离和时态",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "HU-U02",
+            "HU-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "HU-U02",
+          "kind": "understand",
+          "goal": "解释持续时长展示丢失的信息",
+          "prompt": "Compare precisedelta(-90) and precisedelta(90); also render timedelta(hours=49,seconds=33.12) with suppress=[\"days\"] and 0.1 with minimum_unit=\"minutes\". Explain what can be recovered from the display. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/hu-u02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/HU-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/HU-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "HU-U03",
+          "kind": "understand",
+          "goal": "解释相对时间的输入类型与时态",
+          "prompt": "Fix when=datetime(2026,1,1,12). Compare naturaltime(60,future=True,when=when), naturaltime(timedelta(seconds=60),future=True,when=when) and naturaltime(when+timedelta(seconds=60),when=when). Explain tense and reproducibility. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/hu-u03.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/HU-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/HU-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "HU-S03",
+      "title": "报表本地化",
+      "goal": "隔离校验与语言状态",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "HU-C01",
+            "HU-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "HU-C01",
+          "kind": "consult",
+          "goal": "明确本地化数字与输入校验边界",
+          "prompt": "Activate de_DE and compare intcomma(1234.5,2) with intcomma(\"1.234,50\",2). Deactivate and render intcomma(\"not a number\"). Advise a report ingestion contract without implementing it.",
+          "requires": [],
+          "materials": [
+            "materials/hu-c01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/HU-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/HU-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "HU-P01",
+          "kind": "plan",
+          "goal": "规划协程中的语言上下文隔离",
+          "prompt": "One event loop runs task A:activate(\"de_DE\");signal ready;await switched;read decimal_separator(). Task B:await ready;deactivate();signal switched;read decimal_separator(). Both run on one thread. Plan safe per-report language handling based on actual state storage. No library or application edits.",
+          "requires": [],
+          "materials": [
+            "materials/hu-p01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/HU-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/HU-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "HU-S04",
+      "title": "翻译目录诊断",
+      "goal": "核对初始化和缓存证据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "HU-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "HU-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "HU-D01",
+          "kind": "diagnose",
+          "goal": "诊断切换翻译目录未生效",
+          "prompt": "A language catalog path change appears ineffective. Request the exact locale, activation order, paths, object identity and a fresh-process control before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/HU-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "catalog-cache-order",
+              "when": "Exact activation sequence, locale, paths, identity and fresh-process controls have not been supplied or declared unavailable and are reasonably requested.",
+              "materials": [
+                "disclosure/cache.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

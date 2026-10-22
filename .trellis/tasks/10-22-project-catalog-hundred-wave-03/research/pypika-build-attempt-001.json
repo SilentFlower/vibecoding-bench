@@ -1,0 +1,10 @@
+{
+  "status": "failed",
+  "command": [
+    ".deploy/project-iteration-repairs/venv/bin/python",
+    ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/build_pypika_draft.py"
+  ],
+  "error": "ValueError: 场景文件必须位于 disclosure 目录",
+  "scope": "序列化前验证拒绝分支引用materials/items.md；未生成manifest/未注册正式内容",
+  "correction": "同一表材料按disclosure专用路径显式披露，原始数据、源码及业务期望不变"
+}

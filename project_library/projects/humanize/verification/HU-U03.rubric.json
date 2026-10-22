@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "HU-U03",
+  "source_commit": "785e5dcc0d0308ad0dff3f6cc0faa7085ad0375b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "They render a minute from now, a minute ago, and a minute from now. Numeric future flag selects tense, while datetime/timedelta derive tense from the represented date and ignore that flag. Pass one explicit reference instant for the report and retain the original timestamps; do not rely on repeated implicit now calls.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

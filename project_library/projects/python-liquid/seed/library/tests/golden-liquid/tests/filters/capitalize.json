@@ -1,0 +1,44 @@
+{
+  "tests": [
+    {
+      "name": "lower case string",
+      "template": "{{ \"hello\" | capitalize }}",
+      "result": "Hello",
+      "tags": [
+        "capitalize filter"
+      ]
+    },
+    {
+      "name": "multi-word string",
+      "template": "{{ \"hello world\" | capitalize }}",
+      "result": "Hello world",
+      "tags": [
+        "capitalize filter"
+      ]
+    },
+    {
+      "name": "already capitalized string",
+      "template": "{{ \"Hello\" | capitalize }}",
+      "result": "Hello",
+      "tags": [
+        "capitalize filter"
+      ]
+    },
+    {
+      "name": "unexpected argument",
+      "template": "{{ \"hello\" | capitalize: 2 }}",
+      "invalid": true,
+      "tags": [
+        "capitalize filter"
+      ]
+    },
+    {
+      "name": "undefined left value",
+      "template": "{{ nosuchthing | capitalize }}",
+      "result": "",
+      "tags": [
+        "capitalize filter"
+      ]
+    }
+  ]
+}

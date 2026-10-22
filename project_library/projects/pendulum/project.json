@@ -1,0 +1,263 @@
+{
+  "schema": 2,
+  "project_key": "pendulum",
+  "title": "Pendulum事件时间工作场景",
+  "category": "月份、时区与数据类型",
+  "description": "月份裁剪、日历单位、时区解释、夏令时选择、带类型接入方案及显式偏移诊断。",
+  "seed_digest": "359750aaf4864d63a64c0a4be199fb4187fbd7ef3c09ee60ee4efbcfa50b201b",
+  "environment": "pendulum-py312",
+  "source": {
+    "repository": "https://github.com/python-pendulum/pendulum",
+    "commit": "e06dacedc4cdea90fa1286b3965d180ab94cf251",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/app/babel-2.18-LICENSE.txt",
+      "seed/app/babel-2.18-LICENSE.unicode.txt",
+      "seed/app/rust-licenses/heck-0.5.0/LICENSE-APACHE",
+      "seed/app/rust-licenses/heck-0.5.0/LICENSE-MIT",
+      "seed/app/rust-licenses/libc-0.2.190/LICENSE-APACHE",
+      "seed/app/rust-licenses/libc-0.2.190/LICENSE-MIT",
+      "seed/app/rust-licenses/once_cell-1.21.4/LICENSE-APACHE",
+      "seed/app/rust-licenses/once_cell-1.21.4/LICENSE-MIT",
+      "seed/app/rust-licenses/portable-atomic-1.15.0/LICENSE-APACHE",
+      "seed/app/rust-licenses/portable-atomic-1.15.0/LICENSE-MIT",
+      "seed/app/rust-licenses/proc-macro2-1.0.107/LICENSE-APACHE",
+      "seed/app/rust-licenses/proc-macro2-1.0.107/LICENSE-MIT",
+      "seed/app/rust-licenses/pyo3-0.29.3/LICENSE-APACHE",
+      "seed/app/rust-licenses/pyo3-0.29.3/LICENSE-MIT",
+      "seed/app/rust-licenses/pyo3-0.29.3/pyo3-runtime/LICENSE-APACHE",
+      "seed/app/rust-licenses/pyo3-0.29.3/pyo3-runtime/LICENSE-MIT",
+      "seed/app/rust-licenses/pyo3-build-config-0.29.3/LICENSE-APACHE",
+      "seed/app/rust-licenses/pyo3-build-config-0.29.3/LICENSE-MIT",
+      "seed/app/rust-licenses/pyo3-ffi-0.29.3/LICENSE-APACHE",
+      "seed/app/rust-licenses/pyo3-ffi-0.29.3/LICENSE-MIT",
+      "seed/app/rust-licenses/pyo3-macros-0.29.3/LICENSE-APACHE",
+      "seed/app/rust-licenses/pyo3-macros-0.29.3/LICENSE-MIT",
+      "seed/app/rust-licenses/pyo3-macros-backend-0.29.3/LICENSE-APACHE",
+      "seed/app/rust-licenses/pyo3-macros-backend-0.29.3/LICENSE-MIT",
+      "seed/app/rust-licenses/quote-1.0.47/LICENSE-APACHE",
+      "seed/app/rust-licenses/quote-1.0.47/LICENSE-MIT",
+      "seed/app/rust-licenses/syn-2.0.119/LICENSE-APACHE",
+      "seed/app/rust-licenses/syn-2.0.119/LICENSE-MIT",
+      "seed/app/rust-licenses/target-lexicon-0.13.5/LICENSE",
+      "seed/app/rust-licenses/unicode-ident-1.0.26/LICENSE-APACHE",
+      "seed/app/rust-licenses/unicode-ident-1.0.26/LICENSE-MIT",
+      "seed/app/rust-licenses/unicode-ident-1.0.26/LICENSE-UNICODE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PN-S01",
+      "title": "日历算术解释",
+      "goal": "保留月份与时间单位",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PN-U01",
+            "PN-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PN-U01",
+          "kind": "understand",
+          "goal": "解释月份裁剪与连续加法",
+          "prompt": "Start datetime(2025,1,31,tz=\"UTC\"). Compare add(months=1),then another month,with add(months=2) from the original. Explain the retained anchor and immutability. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/pn-u01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PN-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/PN-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PN-U02",
+          "kind": "understand",
+          "goal": "区分日历月和近似秒数",
+          "prompt": "Create duration(months=1),inspect total_seconds(),and compare adding its months versus adding its total_seconds() to UTC January31,2025. Explain the resulting dates and elapsed duration. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/pn-u02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PN-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/PN-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PN-S02",
+      "title": "事件时间咨询",
+      "goal": "明确转换和本地时间策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PN-C01",
+            "PN-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PN-C01",
+          "kind": "consult",
+          "goal": "选择时区转换或墙钟重新解释",
+          "prompt": "From UTC2026-01-01 12:00,compare in_timezone(\"America/New_York\") with set(tz=\"America/New_York\"). Inspect wall hour and integer timestamp. Advise an event-import interpretation contract. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/pn-c01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PN-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/PN-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PN-C02",
+          "kind": "consult",
+          "goal": "明确夏令时重叠和不存在时间策略",
+          "prompt": "Compare Europe/Paris2026-10-25 02:30 with fold0 and fold1 by timestamps. Construct Europe/Paris2026-03-29 02:30 with raise_on_unknown_times=True. Advise scheduling input and retained evidence. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/pn-c02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PN-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/PN-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PN-S03",
+      "title": "带类型接入方案",
+      "goal": "区分日期、本地时间和瞬间",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PN-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PN-P01",
+          "kind": "plan",
+          "goal": "规划带日期类型的事件数据接入",
+          "prompt": "Compare parse(\"2026-10-22\") with exact=True and parse(\"12:30:00\",exact=True). Inspect returned types and default timezone/time imputation. Plan separate date,local-time and instant fields plus validation/publication errors. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/pn-p01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PN-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/PN-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PN-S04",
+      "title": "解析时区诊断",
+      "goal": "核显式偏移与输出转换",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PN-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "PN-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PN-D01",
+          "kind": "diagnose",
+          "goal": "诊断解析时区参数未转换结果",
+          "prompt": "A parse(...,tz=...) call appears to ignore the requested output zone. Request the full input string,explicit offset,options,returned timezone/timestamp and an in_timezone control before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PN-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "explicit-offset-precedence",
+              "when": "Exact input/offset/options and returned zone/timestamp/conversion controls have not been supplied or declared unavailable and are reasonably requested.",
+              "materials": [
+                "disclosure/explicit-offset.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

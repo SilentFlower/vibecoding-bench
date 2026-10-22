@@ -1,0 +1,296 @@
+{
+  "baseline_digest": "f0cda7019d0ace49363dd54ed03d3e22d5985ada8e32b26707b9a9aef458455d",
+  "nodes": [
+    {
+      "id": "tests/test_entry.py::TestSequenceFunctions::test_TestEntryItems",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_entry.py::TestSequenceFunctions::test_categoryHasDomain",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_entry.py::TestSequenceFunctions::test_checkEntryContent",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_entry.py::TestSequenceFunctions::test_checkEntryNumbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_entry.py::TestSequenceFunctions::test_checkItemNumbers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_entry.py::TestSequenceFunctions::test_content_cdata_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_entry.py::TestSequenceFunctions::test_loadExtension",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_entry.py::TestSequenceFunctions::test_removeEntryByEntry",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_entry.py::TestSequenceFunctions::test_removeEntryByIndex",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_entry.py::TestSequenceFunctions::test_setEntries",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_entry.py::TestSequenceFunctions::test_summary_html_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_dc.py::TestExtensionDc::test_elements",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_dc.py::TestExtensionDc::test_entryLoadExtension",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_box",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_elev",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_elev_fails_nonnumeric",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_featurename",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_featuretypetag",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_floor",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_floor_fails_nonint",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_geom_from_geointerface_fail_other_geom",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_geom_from_geointerface_fail_requires_geo_interface",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_geom_from_geointerface_line",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_geom_from_geointerface_point",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_geom_from_geointerface_poly",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_geom_from_geointerface_warn_poly_interior",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_line",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_point",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_polygon",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_radius",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_radius_fails_nonnumeric",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_geo.py::TestExtensionGeo::test_relationshiptag",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_media.py::TestExtensionMedia::test_media_content",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_media.py::TestExtensionMedia::test_media_thumbnail",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_podcast.py::TestExtensionPodcast::test_category",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_podcast.py::TestExtensionPodcast::test_category_new",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_podcast.py::TestExtensionPodcast::test_podcastEntryItems",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_podcast.py::TestExtensionPodcast::test_podcastItems",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_syndication.py::TestExtensionSyndication::test_update_base",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_syndication.py::TestExtensionSyndication::test_update_frequency",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_syndication.py::TestExtensionSyndication::test_update_period",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_extensions/test_torrent.py::TestExtensionTorrent::test_podcastEntryItems",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_feed.py::TestSequenceFunctions::test_atomFeedFile",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_feed.py::TestSequenceFunctions::test_atomFeedString",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_feed.py::TestSequenceFunctions::test_baseFeed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_feed.py::TestSequenceFunctions::test_extensionAlreadyLoaded",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_feed.py::TestSequenceFunctions::test_loadDcExtension",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_feed.py::TestSequenceFunctions::test_loadPodcastExtension",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_feed.py::TestSequenceFunctions::test_registerCustomExtension",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_feed.py::TestSequenceFunctions::test_rel_values_for_atom",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_feed.py::TestSequenceFunctions::test_rel_values_for_rss",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_feed.py::TestSequenceFunctions::test_rssFeedFile",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_feed.py::TestSequenceFunctions::test_rssFeedString",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::TestSequenceFunctions::test_feed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::TestSequenceFunctions::test_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_main.py::TestSequenceFunctions::test_usage",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "feedgen",
+  "python": "3.12.15",
+  "schema": 1
+}

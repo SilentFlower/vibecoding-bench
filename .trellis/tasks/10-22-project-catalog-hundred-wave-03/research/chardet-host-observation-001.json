@@ -1,0 +1,35 @@
+{
+  "CD-U01": {
+    "candidate_import": true,
+    "ascii_confidence_does_not_identify_the_original_encoding": true
+  },
+  "CD-U02": {
+    "candidate_import": true,
+    "early_detector_done_does_not_validate_the_complete_byte_stream": true
+  },
+  "CD-C01": {
+    "candidate_import": true,
+    "detector_reuse_requires_reset_between_independent_documents": true
+  },
+  "CD-C02": {
+    "candidate_import": true,
+    "a_detected_encoding_label_may_not_name_a_python_codec": true
+  },
+  "CD-P01": {
+    "candidate_import": true,
+    "identical_decodings_can_leave_source_encoding_ambiguous": true
+  },
+  "CD-D01": {
+    "candidate_import": true,
+    "whole": {
+      "encoding": "UTF-8-SIG",
+      "confidence": 1.0,
+      "language": ""
+    },
+    "one_byte_chunks": {
+      "encoding": "utf-8",
+      "confidence": 0.7525,
+      "language": ""
+    }
+  }
+}

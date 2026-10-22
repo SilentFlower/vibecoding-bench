@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "WR-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "identity_handles_remove_only_the_owned_wrapper_and_preserve_other_layers": true
+  },
+  "resource_profile": "business"
+}

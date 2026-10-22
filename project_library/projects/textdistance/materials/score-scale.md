@@ -1,0 +1,1 @@
+For Levenshtein(external=False),compare raw distance and normalized_similarity on ab/abc and ab/ac. Trace maximum length and normalized_distance. Explain why equal edit counts need not give equal normalized scores. No edits.

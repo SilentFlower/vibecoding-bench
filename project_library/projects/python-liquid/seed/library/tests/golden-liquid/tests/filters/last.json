@@ -1,0 +1,95 @@
+{
+  "tests": [
+    {
+      "name": "range literal last filter left value",
+      "template": "{{ (1..3) | last }}",
+      "result": "3",
+      "tags": [
+        "last filter"
+      ]
+    },
+    {
+      "name": "array of strings",
+      "template": "{{ arr | last }}",
+      "data": {
+        "arr": [
+          "a",
+          "b"
+        ]
+      },
+      "result": "b",
+      "tags": [
+        "last filter"
+      ]
+    },
+    {
+      "name": "array of things",
+      "template": "{{ arr | last }}",
+      "data": {
+        "arr": [
+          "a",
+          "b",
+          1,
+          [],
+          {}
+        ]
+      },
+      "result": "{}",
+      "tags": [
+        "last filter"
+      ]
+    },
+    {
+      "name": "empty array",
+      "template": "{{ arr | last }}",
+      "data": {
+        "arr": []
+      },
+      "result": "",
+      "tags": [
+        "last filter"
+      ]
+    },
+    {
+      "name": "left value not an array",
+      "template": "{{ arr | last }}",
+      "data": {
+        "arr": 12
+      },
+      "result": "",
+      "tags": [
+        "last filter"
+      ]
+    },
+    {
+      "name": "left value is undefined",
+      "template": "{{ nosuchthing | last }}",
+      "result": "",
+      "tags": [
+        "last filter"
+      ]
+    },
+    {
+      "name": "last of a string",
+      "template": "{{ 'hello' | last }}",
+      "result": "o",
+      "tags": [
+        "last filter"
+      ]
+    },
+    {
+      "name": "last of a hash",
+      "template": "{{ a | last }}",
+      "data": {
+        "a": {
+          "b": 1,
+          "c": 2
+        }
+      },
+      "result": "",
+      "tags": [
+        "last filter"
+      ]
+    }
+  ]
+}

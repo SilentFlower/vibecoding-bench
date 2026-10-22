@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PP-P01",
+  "source_commit": "810199f89bf916590426e1c5cb3d612584f11a2f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default parsing expands the leading tab,so the numeric span is11..13 in that expanded string. parse_with_tabs preserves raw Python character coordinates4..6,and slicing the supplied original gives12;the UTF-8 prefix is8 bytes,so character4 is not byte4. Own raw/expanded normalization,character/byte conversion and exclusive-end mapping explicitly. Test tabs,Unicode and end boundaries and preserve source provenance before displaying or applying edits.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

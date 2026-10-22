@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WC-P01",
+  "source_commit": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The integer result is76,128,178 (ties use Python round);reverse percentages are29.80%,50%,69.80%. aqua and cyan map to the same #00ffff,whose canonical reverse name is cyan. Store the chosen normalized color value plus original text/representation and explicit spec/version when audit or spelling matters;percentage conversion quantizes and reverse lookup cannot preserve alias identity. Define alpha handling separately because these RGB triplets have no alpha channel.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

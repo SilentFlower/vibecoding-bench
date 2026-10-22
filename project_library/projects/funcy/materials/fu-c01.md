@@ -1,0 +1,1 @@
+For rows [{"id":2,"value":"first"},{"id":1,"value":"x"},{"id":2,"value":"last"}],use distinct(rows,key=operator.itemgetter("id")). Advise first/last/conflict semantics and output order. No implementation.

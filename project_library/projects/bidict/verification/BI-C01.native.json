@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BI-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "forceput_can_displace_two_associations_and_shrink_cardinality": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,87 @@
+{
+  "tests": [
+    {
+      "name": "array with a nil",
+      "template": "{{ a | compact | join: '#' }}",
+      "data": {
+        "a": [
+          "b",
+          "a",
+          null,
+          "A"
+        ]
+      },
+      "result": "b#a#A",
+      "tags": [
+        "compact filter",
+        "join filter"
+      ]
+    },
+    {
+      "name": "empty array",
+      "template": "{{ a | compact | join: '#' }}",
+      "data": {
+        "a": []
+      },
+      "result": "",
+      "tags": [
+        "compact filter",
+        "join filter"
+      ]
+    },
+    {
+      "name": "too many arguments",
+      "template": "{{ a | compact: 'foo', 'bar' }}",
+      "invalid": true,
+      "tags": [
+        "compact filter"
+      ]
+    },
+    {
+      "name": "left value is not an array",
+      "template": "{{ a | compact | first }}",
+      "data": {
+        "a": 123
+      },
+      "result": "123",
+      "tags": [
+        "compact filter",
+        "first filter"
+      ]
+    },
+    {
+      "name": "left value is undefined",
+      "template": "{{ nosuchthing | compact }}",
+      "result": "",
+      "tags": [
+        "compact filter"
+      ]
+    },
+    {
+      "name": "array of objects with key property",
+      "template": "{% assign x = a | compact: 'title' %}{% for obj in x %}{% for i in obj %}({{ i[0] }},{{ i[1] }}){% endfor %}{% endfor %}",
+      "data": {
+        "a": [
+          {
+            "title": "foo",
+            "name": "a"
+          },
+          {
+            "title": null,
+            "name": "b"
+          },
+          {
+            "title": "bar",
+            "name": "c"
+          }
+        ]
+      },
+      "result": "(title,foo)(name,a)(title,bar)(name,c)",
+      "tags": [
+        "assign tag",
+        "compact filter",
+        "for tag"
+      ]
+    }
+  ]
+}

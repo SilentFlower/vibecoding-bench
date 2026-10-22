@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FU-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "retry_repeats_prior_side_effects_and_counts_total_attempts": true
+  },
+  "resource_profile": "business"
+}

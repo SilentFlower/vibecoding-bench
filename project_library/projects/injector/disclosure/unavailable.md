@@ -1,0 +1,1 @@
+The binding setup,scope declarations,resolution/rebinding order,object identity and dependency/service values cannot be supplied. No complete reproduction establishes a stale dependency,service cache or configuration source.

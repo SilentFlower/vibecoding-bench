@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CN-U02",
+  "source_commit": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The actual two isolated code pages decode the bytes to the same café text and are grouped into one result with a submatch. could_be_from_charset retains cp1252 and latin_1;the leading encoding is not proof of a unique originating page. Preserve ambiguity/provenance and distinguish plausible decoding from a calibrated probability or supplier-format guarantee.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

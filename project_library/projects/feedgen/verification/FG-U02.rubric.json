@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FG-U02",
+  "source_commit": "97260abb1793eb164c458c10b493690beb413f6d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "RSS selects the last alternate b and last enclosure two with length0/audio/ogg. Atom retains all four href values in insertion order. Formats have different multiplicity;do not claim all RSS attachments survive or assume the separately authorized Atom attribute repair is present.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

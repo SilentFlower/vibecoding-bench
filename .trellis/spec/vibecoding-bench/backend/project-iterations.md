@@ -167,7 +167,7 @@ control 镜像的项目库、`images/v3/Dockerfile.dockerignore` 放行项、`de
 ### 1. Scope / Trigger
 
 - 修改 `project_scenario_content.py`、`project_scenarios.py`、`project_evaluation.py`、`project_scenario_usage.py`、`project_review_runtime.py`、`project_native_regression.py`、原生验证器、场景 API／页面或正式内容时适用。账号角色、租约、唯一凭据所有者仍遵守 account-runtime-v3；旧线性模式按前节版本读取。
-- 当前源码内容为 `real-project-scenarios-v24-en`：保留原10项目／45场景／107任务，第一阶段新增30仓／126场景／244任务，第二阶段新增30仓／134场景／192任务，合计70项目／305场景／543任务，其中509个非修改任务、34个修改任务。第二阶段新增184个非修改任务、8个修改任务；数值来自实际manifest，不是未来阶段的固定配额。本地内容通过不代表已部署。任务类型固定 `understand/consult/diagnose/plan/modify`，不要求每项目20步。内容就绪、本地模拟机制、真实模型完成及生产部署分别计数。
+- 当前源码内容为 `real-project-scenarios-v37-en`：保留原10项目／45场景／107任务，三个阶段分别新增30仓／126场景／244任务、30仓／134场景／192任务、30仓／121场景／183任务，合计100项目／426场景／726任务，其中689个非修改任务、37个修改任务。第三阶段新增180个非修改任务、3个修改任务；数值来自实际manifest，不是未来阶段的固定配额。本地内容通过不代表已部署。任务类型固定 `understand/consult/diagnose/plan/modify`，不要求每项目20步。内容就绪、本地模拟机制、真实模型完成及生产部署分别计数。
 
 ### 2. Signatures
 
@@ -189,6 +189,12 @@ _bind_source(project: Path, import_root: Path, cleanup: ExitStack, *, console: b
              console_scripts: dict[str, str] | None = None,
              metadata_fields: dict[str, str] | None = None) -> dict
 _subtest_results(reports: list[dict], node_ids: list[str]) -> list[dict]
+_subtest_contract(subtests: list[dict], format: str | None = None) -> list[dict] | dict
+_subtest_evidence(directory: Path, subtests: list[dict]) -> dict
+_process_pool_workers(workers: int) -> Iterator[None]
+_fixture_aliases(baseline: Path, project: Path, suite: dict) -> list[dict]
+_build_native_extension(project: Path, suite: dict, environment: dict, evidence: Path, timeout: int) -> dict
+_system_libraries(specification: tuple[str, str]) -> list[dict]
 source_snapshot_ignore(directory: str, names: list[str]) -> set[str]  # deploy/v3/manage.py
 _public_source_directory_digest(root: Path) -> str  # deploy/v3/manage.py
 restore_upstream_checkout_bytes(root: Path) -> list[str]  # deploy/v3/manage.py
@@ -254,9 +260,17 @@ restore_upstream_checkout_bytes(root: Path) -> list[str]  # deploy/v3/manage.py
 
 私有分发可从固定pyproject读取脚本／链接／描述；legacy Babel则显式冻结真实入口字典，不猜测不存在的`project`表。命令排他创建于独占venv，候选实现仍来自受控`.pth`；Summary／Author-email仅允许非空单行白名单值，Project-URL保留原声明顺序。Tk共享库仅从已核离线制品逐SHA读取，版权随制品保存，不改系统安装。Dateutil保留warnings-as-errors，通过实际pytest-cov登记no_cover；时区仅取冻结离线tzdata。业务与回归预算分别实测，Packaging的1024MiB／600秒回归不扩展其256MiB业务或账号容量；旧四十仓冻结私有runner不原地更新。
 
+**第三阶段原生扩展与只读夹具**：Pyrsistent、Python-Constraint和Wrapt只在本次`/work`受控树从实际候选C／Python源码强制构建；setup、配置、测试和构建脚本从固定baseline恢复。`extra_implementation_files`仅允许原版已有的精确路径，拒绝缺失、链接、越界及pytest控制注入。`native_modules`逐个核当前解释器EXT_SUFFIX、实际路径和SHA，不能以同名Python模块冒充扩展；另核Pyrsistent／Wrapt默认对象确实绑定C实现。Cython只读docstring与原文相同时不重复赋值，变化仍须恢复或拒绝。Pendulum的固定Rust原件明确`rebuilt_in_current_run=false`，本轮分别核Rust绑定与完整Python模式，不声称重建Rust或允许未重建的源码修改。
+
+`_system_libraries`只接受固定清单SHA及`artifacts/tk-libs`、`artifacts/gettext-libs`、`artifacts/graphviz-libs`内同一目录的普通成员，逐成员SHA校验，拒绝跨目录混用和链接；LD_LIBRARY_PATH来自实际已核清单父目录。Graphviz工具、插件、对应版权及完整源码原件随环境封存。仅Pendulum的两条固定时区fixture启用`fixture_symlink_semantics`：核原Git目标文本、内部普通目标及SHA后，在独占私有测试树恢复相对链接；正式seed及只读baseline保持原link blob文本，其他别名仍复制普通文件。不得创建外部目标或链接父目录。
+
 **dotenv CLI与第二批套件**：dotenv固定 `package=dotenv,implementation_dir=src/dotenv,import_root=src`；TOMLKit／sqlite-utils／Tenacity导入根为`.`。sqlite-utils显式启用已冻结Hypothesis分发的 `_hypothesis_pytestplugin`，不依赖关闭autoload后消失的隐式插件。Typer与dotenv的子进程绑定只写`/work`下本次独占venv的纯路径`.pth`，purelib须位于该venv，系统或外部共享解释器拒绝。dotenv额外以排他创建生成该venv `bin/dotenv`，固定目标 `dotenv.__main__:cli`、0755；已有入口或链接拒绝覆盖。路径文件及新入口注册退出清理，直接CLI测试实际导入受控src；不能用安装发行包或仅`python -m`代替原生可执行入口。
 
 **真实子测试合同**：仅显式`subtests=True`的套件冻结子项；pytest取真实`SubtestReport.context._to_json()`，unittest取原生addSubTest／addSkip回调。条目为`parent_nodeid,ordinal,when,context,outcome`，context恰为`msg`（null或字符串）及`kwargs`（字符串键／序列化字符串值）。同父节点按实际出现ordinal保留重复context，不折叠；仅允许已收集主节点的call阶段。schema1合同新增可选subtests，旧suite保持原行为；启用套件的候选合同缺少／为空须拒绝，候选完整子项与冻结集合逐项相等，失败／xpass不能被父项passed遮蔽。unittest子项跳过可能省略父项addSuccess，须保留父项已执行与各子项skip；子项失败仍使父项失败。主节点、子项、收集skip和JUnit元素分别对账，不能用suite汇总tests属性替代。Tenacity真实185主项／15子项、XML185元素及汇总200是独立口径，不重复计数。
+
+**大集合子项表示**：`subtest_contract`未指定时继续冻结及输出原完整列表。显式`sha256-v1`保存完整有序记录的数量及SHA；仅SQLGlot使用`sqlglot-subtests-v1`，保留完整父项、阶段、上下文、结果和重复次数，只移除观察ordinal并排序多重集。唯一地址规范化限`tests.test_expressions.TestExprs.test_convert`中完整匹配的PointClass默认repr；SQL十六进制字面、其他msg及kwargs不得改写。摘要头为`format,count,sha256`，全部实际子项仍先经过既有校验及合法结果检查，再逐SHA匹配，不能采样、去重或忽略失败。
+
+原始观察全部写入私有`subtests.json.gz`，元数据为`file,sha256,count,bytes,expanded_bytes,observed_order_sha256`；拒绝覆盖。校准时将完整原件及SHA封存进项目verification，运行结果只返回摘要头和原件元数据，保持4MiB合同及2MiB产品输出上限，不把完整大列表塞进stdout。独立审计须同时核冻结控制器、完整基线原件、数量、父项及全量摘要，旧列表比较不变；从已核源码字节加载控制器，避免冻结输入中的pyc读写。SQLGlot原生发现和loader不改，只将缺省或显式None的ProcessPoolExecutor默认并发设为2，显式非None参数保持并在finally恢复构造器；完整原测试仍全部执行。其业务512MiB／30秒、回归3072MiB／360秒是当前镜像实测值，不增加账号资源或平台上限。
 
 **上游文件表示与运行取证**：来源清单同时记录Git blob及mode；内容快照禁止真实symlink时，上游文档link blob可按原目标文本字节存普通文件，明确表示差异并保留完整许可／文档原件，不能伪称原类型未变。普通上游执行位在源码Git／Docker交付保持；既有快照只按路径／字节／大小封存并统一物化0644，不承诺模式保真。TOMLKit固定测试子模块独立来源／许可、完整展开，不能用空目录或Python3.12 TOML1.0解析器否决TOML1.1语料。私有评审挂载检查先将runtime私有根按data相对路径映射到host_data，再与Docker Mounts.Source双向比较父子重叠，不能跨命名空间直接比路径。source.created_at／released_at包含启动配置及释放后取证收账，不能当精确holder占用区间；实际工作窗口、进程清理、holder采样和源码门禁分别报告，缺逐holder事件不得声称完整时序已重建。
 
@@ -283,6 +297,9 @@ Dynaconf的76份和Flask的一份固定公开.env原件沿既有精确路径／S
 | nose2函数用例遗漏／框架漂移、包内测试被改、补充doctest或收集skip合同缺失／变化 | 拒绝；必须沿原入口完整校准，不能靠换发现器或少跑节点通过。 |
 | 固定工具SHA不符、源码别名目标越界、公开夹具多文件／改字节／换链接 | 拒绝；不借精确原件例外放入其他工具、配置或构建产物。 |
 | 官方双模式缺一轮／扩展来源或接线不符；重复doctest身份或冻结原始XPASS变化 | 拒绝；不能折叠次数、缺失节点或让新XPASS借原版例外进入。 |
+| 额外C实现缺失／链接／越界，原生模块实为Python文件，离线库跨目录或SHA不符 | 拒绝；只允许固定构建控制、真实本次扩展及精确只读库清单。 |
+| Pendulum固定时区别名变化、内部目标缺失或沿链接越界 | 拒绝；只在私有测试树恢复已核相对链接，正式快照不创建链接。 |
+| 大集合子项缺失、摘要／数量／重复次数／结果不符，完整私有见证或控制器被改写 | 拒绝；不得用摘要表示规避全量检查或提高JSON／日志上限。 |
 | Dateutil已核CRLF检出／未知修改或链接 | 前者只在交付副本恢复已核blob，后者拒绝且预检失败不写任何文件；不能通用换行归一化或改上游属性。 |
 | 评审实际模型不一致／格式或身份错误 | 评审error，最多一次错误重评，不算业务失败；合法uncertain直接blocked。 |
 | 次数或累计预算先到上限 | exhausted／最终failed或评测blocked，独立任务继续，真实后继依赖受阻。 |
@@ -302,6 +319,8 @@ Dynaconf的76份和Flask的一份固定公开.env原件沿既有精确路径／S
 - 错误用法：Tenacity的200汇总当200主节点，或source收账三重叠直接当三个holder。正确做法是185主项＋15真实子项分别核合同，并按实际工作、严格清理和门禁证据说明并发口径及事件留存限制。
 - 正常与边界：第一阶段30仓新增244唯一任务，其中9修改；15批mock会重复覆盖入口与分支，重复路径和代码接受次数不增加任务数。完整Git／Docker导出11374文件一致，原3069文件字节及执行位保持；证据见本阶段`research/delivery-first-thirty.json`，不代表真实模型或生产上线。
 - 正常与边界：第二阶段30仓新增192唯一任务、8修改，15批mock覆盖562路径／22次接受，仍只计192任务／8唯一修改。完整原生98,924主执行分别为98,459通过、400 skip、64 xfail及1原始XPASS，doctest已含、subtest和收集skip另列。正式22,623文件在Git导出沿生产恢复后与Docker COPY一致，旧11,373文件保持；原始Git检出两份Dateutil CRLF差异明确记录，不代表真实模型或部署完成。
+- 正常与边界：第三阶段30仓新增183唯一任务、3修改，15组mock为567路径，其中18条是既有Arrow控制重跑，新增任务路径549条；9次代码接受仍只计3个修改目标。完整原生85820主项为77533通过、6537原skip、1750原xfail，24183子项另列。32188文件经同生产恢复及Docker COPY核字节／权限一致，旧22622文件保持；8960项页面检查和494截图只证明本地模拟机制。
+- 错误用法：把SQLGlot的摘要头三个字段当成三个子项，或删除重复context压缩合同。正确做法：1500主项与21780子项分别核实，完整原始观察私有归档，按固定规则对全部记录计算SHA；三组产品链真实回归均须匹配同一合同。
 - 错误用法：Dpath以unittest发现得到少量类用例便报完整通过，或将PETL的12个收集skip混入923主项。正确做法是实际nose2完整79项；PETL分别记录923主项与12收集skip，JUnit为935元素。数值只适用于冻结提交与当前环境。
 
 ### 6. Tests Required
@@ -310,11 +329,12 @@ Dynaconf的76份和Flask的一份固定公开.env原件沿既有精确路径／S
 - 语言修正：穷举正式首问、分支、材料说明、rubric 与运行时提示，核对英文语义及原授权／验收约束；比较修正前后的中文 `summary(include_steps=True)` 完全相等，新旧内容分别 install／复开仍按各自摘要读取。seed、固定业务输入、原生检查和 wheel 字节保持不变；Unicode 测试夹具与证据原文不作为必须翻译的正式指令。
 - 状态／恢复／父链：`test_project_scenarios.py` 覆盖实际消费认领、澄清不加attempt、3次上限、工作高水位／崩溃预留、review三层预算、候选与review严格释放、完整输出quota／重启只续验收、迟到结果、文件交付进review包、局部轮换／分支激活、代码依赖恢复与不兼容／相同字节回退分支、实际模型漂移不扣业务修正。
 - 协议／用量／私有运行：`test_project_evaluation.py` 覆盖严格单JSON／错误身份／重复项／未知证据／程序失败不能被pass覆盖、合法uncertain、显式candidate证据许可及缓存字段去重／未知；`test_project_review_runtime.py` 覆盖owner刷新身份、创建／停净／缺失／孤儿、清理失败保留holder及资源份额；`test_project_native_verifier.py` 覆盖准备阶段error、业务exit80为failed、清理前不放slot、合法等价程序提取。
-- 原生内容：`python3 scripts/validate-project-library.py` 仅静态摘要／当前70-305-543；`scripts/validate-project-scenarios.py --project <key> --task <key> --image <隔离账号镜像>` 真实业务，按需 `--candidate/--answer/--entry/--branch/--expect failed`；`--regression-only` 或 `--with-regression` 使用独立回归资源。保留适用工程目标的原版失败／参考通过／错误候选拒绝、原生完整集合与skip/xfail证据，不用宿主旧基线替代。
+- 原生内容：`python3 scripts/validate-project-library.py` 仅静态摘要／当前100-426-726；`scripts/validate-project-scenarios.py --project <key> --task <key> --image <隔离账号镜像>` 真实业务，按需 `--candidate/--answer/--entry/--branch/--expect failed`；`--regression-only` 或 `--with-regression` 使用独立回归资源。保留适用工程目标的原版失败／参考通过／错误候选拒绝、原生完整集合与skip/xfail证据，不用宿主旧基线替代。
 - 套件适配：`test_project_native_regression.NativeRegressionTests` 断言 src 叠加恢复原测试／配置、新 pytest hook 拒绝、旧默认不变、父链接与非法路径／模块拒绝、安装库错导入拒绝。目标镜像实际冻结并执行全部节点，再对每个参考候选跑完整适用回归；首批新增原版集合为228／911／81，数字是首批实测记录，不作为后续套件的通用硬编码。
 - 第二批适配：同测试类核dotenv受控src／0755入口与退出清理、拒覆盖／系统venv；子测试保留重复context和失败、未知父节点／非call／未序列化值拒绝。当前镜像四仓完整集合为288、1203、1513（1497通过／16冻结skip）、185主项＋15子项，逐参考完整核对；数值是实测，不能硬抄为未来版本通用分母。Git／Docker导出另核来源全集／双SHA、原执行位和link blob表示，私有mount比较核host路径双向重叠。
 - 第一阶段适配：同测试类31项覆盖单文件、包内冻结测试、真实unittest／nose2、重复／跳过／失败子项、补充doctest、动态文档描述符、收集skip、离线工具及元数据清理／拒绝边界。当时136项`test_project_*.py`与28项`deploy/v3/test_manage.py`通过；后者核真实上游夹具及未知文件／改字节／链接拒绝。逐仓30原生合同、268业务／回归收据和15批实际产品链审计独立保存；不把本地单测替代镜像内完整原生与业务验收。
 - 第二阶段适配：当前原生适配39项、`test_project_*.py`144项、部署30项分别通过。核官方C／Python模式、参数身份、元数据顺序／命令绑定与清理、目录收集skip、重复doctest和唯一原版XPASS拒绝边界；部署核公开.env精确列表及已核CRLF恢复、幂等、模式不变、未知修改／父链接拒绝和预检不部分写入。三十仓204业务／候选路径与15批产品链独立保存；Git证据明确恢复前后口径，沿同生产函数后再核完整Docker交付。
+- 第三阶段适配：同类48项包含候选C源码、只读docstring、真实扩展后缀、受控私有链接、库目录绑定、进程池默认值／恢复和大集合完整性拒绝边界；153项项目单测（含该48项）、30项部署测试及最终目录单项回归分别留证。六项审计适配测试基于真实SQLGlot产品结果，拒绝错误数量／SHA／匹配证明、原件／控制器篡改和链接，并核冻结输入文件全集及字节不被写入。完整30仓主集合、170业务控制和15组真实产品链原件独立保存，不以单测代替原生或产品验收。
 - 内容评审协议：逐任务及必要披露／无材料路径构造真实 `review_package` 并执行 `parse_review`，核证据标识与候选文件存在性；隐藏具体事实只有实际消费后可用于相应结论。模拟对账同时统计唯一码、路径、披露消费、业务尝试和接受父链，不能把分支或补充材料当作独立任务。
 - Git 交付：`git check-attr text`核对冻结数据`unset`、普通代码保持原规则；`git check-ignore`核精确上游例外与本地工具文件仍忽略。被通用规则忽略的其他上游原件，仅在固定Git来源、逐文件SHA／执行位证明后列出精确force-add路径，不宽泛放开目录。用`git checkout-index`导出拟提交内容并按上文同生产函数精确恢复，分别留存恢复前后事实；核文件全集、逐文件字节／执行位及catalog摘要，再沿正式快照过滤器与Docker忽略文件实际COPY核相同集合；工作区摘要不能替代导出证据。
 - 真实调度与UI：`deploy/v3/run_local_verification.py --manifest <隔离清单> --project-scenarios-only --scenario-capacity 1`，另测容量2；需要UI与失败恢复时加现有 `--scenario-browser`／`--scenario-failures`。核原Scheduler／driver／SQLite、holder容量、私有挂载与AT-only、超时半成品、仅续验收及页面状态／预算／用量对账；模拟CLI证据明确real_model_calls=0。旧project-iterations／project-scheduling、quota／window及普通题库适用回归继续保留。
@@ -325,7 +345,7 @@ Dynaconf的76份和Flask的一份固定公开.env原件沿既有精确路径／S
 ### 1. Scope / Trigger
 
 - 选项目、研究 GitHub 仓库、编写场景与任务、扩充／替换项目库时适用。历史 100×20 工程路线研究作为来源保留；当前内容池方向为约 100 项目、600～800 场景／2,000 独立任务，每项目数量由真实场景决定，旧生成内容保持退役。
-- 本节定义研究与准入流程；legacy `app.py` 协议与新场景原生适配分别按前述版本契约执行。已有三仓接入实现与本地证据不代表全部 100 仓已完成新场景或生产上线。
+- 本节定义研究与准入流程；legacy `app.py` 协议与新场景原生适配分别按前述版本契约执行。正式接入以逐仓真实准入与当前目录为准，历史研究完成、本地内容可用、模型完成及生产上线分别记录。
 - 研究可以复用记录模板与取证工具；源码分析、改进需求和验收目标必须逐仓形成。一个仓库、它的 fork、不同目录副本或改名版本不能计为多个独立项目。
 
 ### 2. Signatures
@@ -346,6 +366,8 @@ Dynaconf的76份和Flask的一份固定公开.env原件沿既有精确路径／S
 5. **发现真实改进**：结合上游 issue、文档承诺、实际使用路径和源码缺口。缺陷要在固定提交上复现；新增能力要确认公开入口尚不提供目标能力。记录已有替代方式，区分缺陷、增强提案、已存在功能和待决定的兼容行为。
 6. **形成真实场景任务**：逐项记录用户问题、原版现状、交付目标、材料分支、授权范围、兼容边界、正常／反例验收及真实依赖。理解、咨询、诊断、方案和修改按需要选择；任务数可变，不用追问、重试或实现／测试拆分凑数。已有二十项工程路线保留为候选来源，逐项判断是否适合新任务。
 7. **独立验收后接入**：控制端持有冻结用例，确认运行时加载候选源码，实际调用原生 API／CLI／UI 并观察文件／数据库等业务效果；累计回归此前已接受能力。依赖提前按固定版本准备，验收期间离线使用；候选不可通过删除自身 tests 或自报成功放行。
+
+**可选私有外部测试的范围**：固定主仓包含不可取得的可选私有测试Gitlink时，先核原生loader是否条件加载，并保存父提交、子模块路径／提交、不可取得证据及完整公开主仓。只有用户明确确认以公开主仓为本轮交付范围后，才按该范围建立准入；私有内容、许可及测试必须明确未验证，不计通过，不修改原loader、设置跳过开关或替换固定项目。可取得的公共测试子模块仍完整导出；不能把这一例外推广到必要源码、许可或测试缺失。
 
 **步骤计数**：一个步骤是一次完整用户可见改进，包含实现、测试、文档及失败修复。同一缺陷的测试矩阵、改代码／写测试／更新文档、失败重试不拆成多个步骤。相关症状可合并，例如 sqlite-utils 两种部分 upsert 问题归为一个保留省略字段的交付。工程修改按接受作业保留检查点；问答通过只记任务结果。只记录真实 answer／code 依赖，不为数量目标强造依赖。
 

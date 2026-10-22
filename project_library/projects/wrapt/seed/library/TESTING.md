@@ -1,0 +1,263 @@
+# Testing Guide
+
+This document explains how to run tests for the wrapt project and the conventions used for Python version-specific test files.
+
+## Test Directory Structure
+
+The `tests/core/` directory contains all test files for the wrapt project. Test files follow these conventions:
+
+- **Standard test files**: `test_*.py` - These run on all supported Python versions
+- **Python version-specific test files**: `test_*_pyXX.py` - These only run on specific Python versions or later
+
+## Python Version-Specific Test Files
+
+The project uses a special naming convention to ensure certain tests only run on appropriate Python versions. This is handled automatically by the `tests/conftest.py` configuration.
+
+### Naming Convention
+
+Test files can include version suffixes to indicate minimum Python version requirements:
+
+- `test_name_py310.py` - Runs only on Python 3.10 and later
+- `test_name_py312.py` - Runs only on Python 3.12 and later
+
+There are currently no version-specific test files in the codebase, as all
+tests run on the oldest supported Python version, but the mechanism remains
+available for tests which need features from a newer Python version.
+
+### How It Works
+
+The `tests/conftest.py` file contains a `pytest_pycollect_makemodule` hook that:
+
+1. Parses the filename for version patterns using regex: `_py(\d)(\d*)`
+2. Compares the detected version requirement with the current Python version
+3. Returns a dummy collector (skips the test) if the current version is too old
+4. Allows normal test collection if the version requirement is met
+
+## Running Tests
+
+The project provides several ways to run tests using the `just` command runner.
+
+### Available Test Commands
+
+#### Run All Tests
+```bash
+just test
+```
+This runs the complete test suite across all supported Python versions (3.9-3.14). For each version, it tests three scenarios:
+1. Without C extensions
+2. With C extensions
+3. With C extensions disabled at runtime
+
+#### Test Specific Python Version
+```bash
+just test-version 3.13
+```
+Replace `3.13` with any supported Python version (3.9, 3.10, 3.11, 3.12, 3.13, 3.14).
+
+#### Legacy Test Runner (using tox)
+```bash
+just test-tox
+```
+Runs tests using the traditional tox configuration.
+
+#### Simple Test Run (backward compatibility)
+```bash
+just test-pip
+```
+Runs tests using pip-installed pytest in the main virtual environment.
+
+#### Type Checking with mypy
+```bash
+just test-mypy
+```
+Runs mypy type checking across all supported Python versions (3.9-3.14).
+
+```bash
+just test-mypy-version 3.13
+```
+Runs mypy type checking for a specific Python version. Replace `3.13` with any supported version.
+
+#### Checking Type Stubs with stubtest
+```bash
+just test-stubtest
+```
+Runs `stubtest` to compare the `wrapt-stubs` package against the installed wrapt runtime. Intentional stub-vs-runtime divergences are listed in `tests/stubtest_allowlist.txt`; new entries should be accompanied by a comment there explaining why the divergence is deliberate.
+
+#### Free Threading Stress Tests
+```bash
+just test-stress
+```
+Runs the stress scenarios under `tests/stress/` against the free-threaded Python builds (3.13t, 3.14t, 3.15t), the only builds where the races being hunted are physically possible.
+
+```bash
+just test-stress-version 3.14t
+```
+Runs the stress scenarios for a specific Python version. Running against a GIL build is permitted and acts as a sanity check that the scenarios themselves are sound.
+
+The stress scenarios are deliberately not part of the main pytest suite or the `just test` matrix. They hammer a single shared proxy from many threads looking for interpreter crashes, so they are probabilistic rather than deterministic: a crash proves a bug, while a clean run only gives confidence proportional to how long it ran. Each `stress_*.py` file is a self-contained script, runnable on its own as a reproducer, and is executed in its own subprocess by `tests/stress/runner.py` since a crash would otherwise take out the test runner itself. The `stress_*.py` naming (rather than `test_*.py`) keeps pytest from ever collecting them.
+
+A scenario exits 0 if it survives, 77 if skipped (for example when the C extension is not available, or the scenario is gated off), and any other outcome, including death by signal, is a failure.
+
+Environment variables:
+
+- `WRAPT_STRESS_SECONDS` - Duration each scenario runs for (default 5)
+- `WRAPT_STRESS_THREADS` - Number of threads hammering the shared object (default 8)
+- `WRAPT_STRESS_UNSAFE=1` - Also run scenarios which are expected to crash because they exercise known hazards not yet fixed
+
+### Test Variants
+
+Each `test-version` run includes three important test scenarios:
+
+1. **Without C Extensions** (`WRAPT_INSTALL_EXTENSIONS=false`)
+   - Tests the pure Python implementation
+   - Ensures the fallback code works correctly
+
+2. **With C Extensions** (`WRAPT_INSTALL_EXTENSIONS=true`)
+   - Tests the optimized C implementation
+   - Verifies performance-critical paths
+
+3. **C Extensions Disabled at Runtime** (`WRAPT_DISABLE_EXTENSIONS=true`)
+   - Tests the ability to disable C extensions after installation
+   - Useful for debugging and compatibility testing
+
+### Environment Variables
+
+- `WRAPT_INSTALL_EXTENSIONS=true/false` - Controls whether C extensions are built during installation
+- `WRAPT_DISABLE_EXTENSIONS=true/false` - Controls whether C extensions are used at runtime
+
+## Mypy Type Checking Tests
+
+The project includes custom pytest handlers for testing mypy type checking behavior. These tests ensure that the wrapt library's type annotations work correctly and produce expected mypy error messages. Note that `mypy` must exist in your `PATH` else the tests related to type checking will be skipped.
+
+### Test File Convention
+
+Mypy tests follow a specific naming pattern in the `tests/mypy/` directory:
+
+- **Test files**: `mypy_*.py` - Python files containing code to be type-checked
+- **Expected output files**: `mypy_*.out` - Files containing the expected mypy output
+
+### How Mypy Tests Work
+
+The custom test handler in `conftest.py` automatically discovers pairs of `mypy_*.py` and `mypy_*.out` files and:
+
+1. Runs `mypy --strict --show-error-codes --python-version X.Y` on the `.py` file
+2. Compares the actual output with the expected output in the `.out` file
+3. Fails the test if the outputs don't match
+
+These tests only run on Python 3.10+ to ensure consistent mypy behavior, and are skipped on PyPy.
+
+The expected `.out` files are generated with the mypy version pinned by the `mypy_version` variable in the `Justfile`. Running the tests with a different mypy version may produce differing output and false failures, so always use the `Justfile` recipes, or install the pinned mypy version, when working with these tests.
+
+### Creating New Mypy Tests
+
+To create a new mypy test case:
+
+1. **Create the test file**: Write a Python file with the code you want to type-check:
+   ```bash
+   # Create tests/mypy/mypy_your_test_name.py
+   ```
+
+2. **Review output from test**: Review the test output to ensure it contains the expected error messages and type information:
+   ```bash
+   just view-mypy-test mypy_your_test_name
+   ```
+
+3. **Save the expected output**: Run mypy to capture the expected output, by running:
+   ```bash
+   just save-mypy-test mypy_your_test_name
+   ```
+
+4. **Verify the output**: Check the output from running the test against expected output, by running: 
+   ```bash
+   just verify-mypy-test mypy_your_test_name
+   ```
+
+5. **Run the test**: The test will automatically be discovered and run with pytest:
+   ```bash
+   uv run pytest tests/ -k mypy_your_test_name
+   ```
+
+### Example
+
+The existing `mypy_function_wrapper.py` test demonstrates type checking for `FunctionWrapper`:
+
+```python
+from wrapt import FunctionWrapper
+
+def f(a: bool, b: str) -> int:
+    return 1
+
+def standard_wrapper(wrapped, instance, *args, **kwargs):
+    pass
+
+f1 = FunctionWrapper(f, standard_wrapper)
+reveal_type(f1)  # Should reveal the original function's type
+
+result1a: int = f1(True, "test")     # Valid usage
+result1b: str = f1(1, None)         # Invalid usage - should error
+```
+
+The corresponding `mypy_function_wrapper.out` file contains the expected mypy output, including:
+- Type revelation notes
+- Assignment errors
+- Argument type errors
+- Error codes for each issue
+
+This approach ensures that the wrapt library's type annotations behave consistently and provide helpful error messages to users.
+
+## Development Workflow
+
+### Testing During Development
+
+For quick testing during development, you can:
+
+1. Run all tests against all Python versions:
+   ```bash
+   just test
+   ```
+
+2. Test a specific Python version you're working with:
+   ```bash
+   just test-version 3.11
+   ```
+
+3. Run legacy tests if needed:
+   ```bash
+   just test-tox
+   ```
+
+4. Run type checking across all Python versions:
+   ```bash
+   just test-mypy
+   ```
+
+5. Run type checking for a specific Python version:
+   ```bash
+   just test-mypy-version 3.11
+   ```
+
+### Adding New Tests
+
+When adding new test files:
+
+1. **Standard unit tests**: Use the `test_*.py` naming convention for general tests
+2. **Version-specific tests**: Use the `test_*_pyXX.py` convention if your test requires features from a specific Python version
+3. **Mypy type tests**: Use the `mypy_*.py` naming convention for type checking tests (see the Mypy Type Checking Tests section above)
+4. **Free threading stress scenarios**: Use the `stress_*.py` naming convention under `tests/stress/` for probabilistic crash-hunting scripts run via `just test-stress` (see the Free Threading Stress Tests section above)
+5. The version detection is automatic - no additional configuration needed
+
+### Test Dependencies
+
+Test dependencies are managed in `pyproject.toml`. The main requirements are:
+- `pytest` - For running unit tests
+
+Neither `tox` nor `mypy` needs to be installed or available in your `PATH`. The `Justfile` recipes run `mypy` via `uv run --with mypy==<pinned version>` (or install it into a temporary virtual environment), and run `tox` via `uvx --with tox-uv tox`, so the only tools required on `PATH` are `just` and `uv`.
+
+## Continuous Integration
+
+The project uses GitHub Actions for automated testing. Tests are triggered on:
+- Release tags
+- Pull requests
+- Workflow dispatch
+
+The CI system runs the full test suite across all supported Python versions and platforms.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CN-U01",
+  "source_commit": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The pinned short Café € BOM sample is misidentified as shift_jis_2004 with bomFalse and different decoded text,while raw remains original. The longer control yields UTF-8,bomTrue,correct text and output UTF-8 without its source BOM. BOM priority does not override chaos/selection policy. For the supplied trusted UTF-8-sig source contract,the strict decoder gives the intended text;do not claim generic detection proves original encoding or output byte identity.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

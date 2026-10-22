@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PT-U02",
+  "source_commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Last assignment wins on overlap:9open,10meeting,11open. find(open) is[9,10)|[11,12). Equal values share one possibly disconnected key,so len(d)==2 counts stored value groups,not three physical segments or duration.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

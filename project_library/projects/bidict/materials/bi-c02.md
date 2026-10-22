@@ -1,0 +1,1 @@
+Start b=bidict(a=1); take b.copy() and frozenbidict(b); then set b["b"]=2. Advise mutable working copies versus immutable/hashable scalar snapshots for a report. State the shallow-object limitation. No edits.

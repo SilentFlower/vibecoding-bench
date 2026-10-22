@@ -1,0 +1,1 @@
+DictLoader provides p="{{ x }}{% assign x = 'inner' %}". Compare templates that assign x="outer",then include "p" or render "p",then output |{{ x }}. No other globals or named arguments are supplied. No edits.

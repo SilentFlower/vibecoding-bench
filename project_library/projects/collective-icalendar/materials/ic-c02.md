@@ -1,0 +1,1 @@
+Serialize/reparse DTSTART for2026-10-22 09:00 as naive datetime,Europe/Berlin aware datetime and UTC aware datetime. Compare content-line forms and decoded offsets. Advise cross-user scheduling input. No edits.

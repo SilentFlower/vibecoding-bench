@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CN-P01",
+  "source_commit": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "raw retains the original cp1252 bytes and str retains their windows-1252 declaration;UTF-8 output rewrites that declaration to utf-8 and re-encodes café. Preserve original and derived artifacts separately with explicit hashes/format provenance,validate the chosen output header/content and parse/compare required XML semantics before use. Do not claim output alone validates XML,preserves original signatures or provides byte-identical archival data.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

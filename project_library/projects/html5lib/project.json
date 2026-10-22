@@ -1,0 +1,232 @@
+{
+  "schema": 2,
+  "project_key": "html5lib",
+  "title": "HTML5lib富文本工作场景",
+  "category": "HTML恢复、查询与输出边界",
+  "description": "表格恢复、片段上下文、安全边界、命名空间、规范化方案及严格模式诊断。",
+  "seed_digest": "381e30163c93e08905c77c0ac6592e68bb59749d227e659683cbde366e41efe0",
+  "environment": "html5lib-py312",
+  "source": {
+    "repository": "https://github.com/html5lib/html5lib-python",
+    "commit": "fd4f032bc090d44fb11a84b352dad7cbee0a4745",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/html5lib/tests/testdata/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "H5-S01",
+      "title": "恢复与片段解释",
+      "goal": "以实际树为准",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "H5-U01",
+            "H5-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "H5-U01",
+          "kind": "understand",
+          "goal": "解释表格恢复后的真实树",
+          "prompt": "Parse <table>outside<tr><td>A</td></tr></table> with default etree builder and serialize with omit_optional_tags=False. Explain outside text position and tbody insertion. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/h5-u01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/H5-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/H5-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "H5-U02",
+          "kind": "understand",
+          "goal": "解释片段的容器上下文",
+          "prompt": "parseFragment(\"<tr><td>A</td></tr>\") separately with container=\"div\",\"table\",\"tbody\";serialize with omit_optional_tags=False. Explain a table-fragment ingestion contract. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/h5-u02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/H5-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/H5-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "H5-S02",
+      "title": "提取和渲染策略",
+      "goal": "明确命名空间及安全边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "H5-C01",
+            "H5-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "H5-C01",
+          "kind": "consult",
+          "goal": "明确富文本解析的安全边界",
+          "prompt": "Parse and default-serialize the fragment <script>alert(1)</script><p onclick=\"go()\">A</p> without displaying/executing it. Advise a separate rendering policy for supplied untrusted rich text. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/h5-c01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/H5-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/H5-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "H5-C02",
+          "kind": "consult",
+          "goal": "选择元素查询和文本实体策略",
+          "prompt": "Parse <p>Café&nbsp;€</p>;compare .find(\".//p\") with a query using XHTML namespace. Compare namespaceHTMLElements=False. Advise an extraction representation preserving raw evidence. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/h5-c02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/H5-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/H5-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "H5-S03",
+      "title": "规范化输出方案",
+      "goal": "保留源文与语义证据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "H5-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "H5-P01",
+          "kind": "plan",
+          "goal": "规划HTML规范化报告与原文保存",
+          "prompt": "Use source <p class='x'>A&nbsp;B</p>. Parse and serialize with omit_optional_tags=False,quote_attr_values=\"always\";reparse and serialize once more. Plan meaningful normalization/roundtrip checks while retaining original input. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/h5-p01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/H5-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/H5-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "H5-S04",
+      "title": "严格解析诊断",
+      "goal": "取得首个实际错误",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "H5-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "H5-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "H5-D01",
+          "kind": "diagnose",
+          "goal": "诊断严格模式为何提前拒绝",
+          "prompt": "A strict HTMLParser raises before extracting a paragraph. Request exact input,strict flag,exception and non-strict errors/output before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/H5-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "strict-error-control",
+              "when": "Exact input/mode/error and recovery controls have not been supplied or declared unavailable and are reasonably requested.",
+              "materials": [
+                "disclosure/strict.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

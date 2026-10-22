@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IC-P01",
+  "source_commit": "3ecf079acba0e592ea6a40c456514984c8657852",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "walk returns the one stored VEVENT component,not three expanded occurrences;RRULE COUNT remains[3]. Select and validate an explicit recurrence-expansion strategy with bounded time windows/counts,timezone/DST rules,RDATE/EXDATE,RECURRENCE-ID overrides and stable UID plus recurrence identity. Keep source components and exceptions separately;do not duplicate the master component three times or claim walk already expands it.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

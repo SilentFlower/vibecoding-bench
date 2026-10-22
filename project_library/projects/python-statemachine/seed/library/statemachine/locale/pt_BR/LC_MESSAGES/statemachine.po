@@ -1,0 +1,221 @@
+# This file is distributed under the same license as the  project.
+# Fernando Macedo <fgmacedo@gmail.com>, 2024.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version:  3.1.1\n"
+"Report-Msgid-Bugs-To: fgmacedo@gmail.com\n"
+"POT-Creation-Date: 2026-10-13 21:26-0300\n"
+"PO-Revision-Date: 2024-06-07 17:41-0300\n"
+"Last-Translator: Fernando Macedo <fgmacedo@gmail.com>\n"
+"Language: pt_BR\n"
+"Language-Team: pt_BR <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: statemachine/callbacks.py:409 statemachine/callbacks.py:414
+#, python-brace-format
+msgid "Did not found name '{}' from model or statemachine"
+msgstr "Nome '{}' não encontrado no modelo ou na máquina de estados"
+
+#: statemachine/configuration.py:128
+msgid ""
+"There's no current state set. In async code, did you activate the initial"
+" state? (e.g., `await sm.activate_initial_state()`)"
+msgstr ""
+"Nenhum estado atual definido. Em código assíncrono, você ativou o estado "
+"inicial? (ex.: `await sm.activate_initial_state()`)"
+
+#: statemachine/dispatcher.py:127
+#, python-brace-format
+msgid "Failed to parse boolean expression '{}'"
+msgstr "Falha ao interpretar a expressão booleana '{}'"
+
+#: statemachine/event.py:56
+#, python-brace-format
+msgid ""
+"Event {id!r} cannot be both delayed and internal: the internal queue runs"
+" within the current macrostep, which takes no time. Drop 'internal' to "
+"deliver it later on the external queue, or drop 'delay' to run it now."
+msgstr ""
+"O evento {id!r} não pode ser atrasado e interno ao mesmo tempo: a fila "
+"interna roda dentro do macrostep atual, que não leva tempo. Remova "
+"'internal' para entregá-lo depois pela fila externa, ou remova 'delay' "
+"para executá-lo agora."
+
+#: statemachine/event.py:108
+#, python-brace-format
+msgid ""
+"Event() received a non-string 'id' ({cls_name}). To combine multiple "
+"transitions under one event, use the | operator: t1 | t2."
+msgstr ""
+"Event() recebeu um 'id' que não é uma string ({cls_name}). Para combinar "
+"múltiplas transições em um único evento, use o operador |: t1 | t2."
+
+#: statemachine/event.py:147
+#, python-brace-format
+msgid "Cannot add callback '{}' to an event with no transitions."
+msgstr "Não é possível adicionar callback '{}' a um evento sem transições."
+
+#: statemachine/event.py:182
+#, python-brace-format
+msgid "Event {} cannot be called without a SM instance"
+msgstr "O evento {} não pode ser chamado sem uma instância de SM"
+
+#: statemachine/exceptions.py:25
+#, python-brace-format
+msgid "{!r} is not a valid state value."
+msgstr "{!r} não é um valor de estado válido."
+
+#: statemachine/exceptions.py:40
+#, python-brace-format
+msgid "Can't {} when in {}."
+msgstr "Não é possível {} quando em {}."
+
+#: statemachine/factory.py:91
+#, python-brace-format
+msgid ""
+"There should be one and only one initial state. Your currently have "
+"these: {0}"
+msgstr ""
+"Deve haver um e apenas um estado inicial. Atualmente, você possui estes: "
+"{0}"
+
+#: statemachine/factory.py:249
+#, python-brace-format
+msgid "is declared in both the '{}' and the '{}' state bodies"
+msgstr "está declarado nos corpos dos estados '{}' e '{}'"
+
+#: statemachine/factory.py:253
+#, python-brace-format
+msgid "in the '{}' state body clashes with the event '{}'"
+msgstr "no corpo do estado '{}' conflita com o evento '{}'"
+
+#: statemachine/factory.py:257
+#, python-brace-format
+msgid "is declared in both the '{}' state body and the '{}' class body"
+msgstr "está declarado no corpo do estado '{}' e no corpo da classe '{}'"
+
+#: statemachine/factory.py:261
+#, python-brace-format
+msgid "in the '{}' state body clashes with the '{}' attribute of '{}'"
+msgstr "no corpo do estado '{}' conflita com o atributo '{}' de '{}'"
+
+#: statemachine/factory.py:267
+#, python-brace-format
+msgid ""
+"Callback '{}' {}. Nested state bodies share the class namespace. Rename "
+"one of them."
+msgstr ""
+"Callback '{}' {}. Corpos de estados aninhados compartilham o namespace da"
+" classe. Renomeie um deles."
+
+#: statemachine/factory.py:291
+#, python-brace-format
+msgid ""
+"There should be one and only one initial state. You currently have these:"
+" {!r}"
+msgstr ""
+"Deve haver um e apenas um estado inicial. Atualmente, você possui estes: "
+"{!r}"
+
+#: statemachine/factory.py:306
+#, python-brace-format
+msgid "Cannot declare transitions from final state. Invalid state(s): {}"
+msgstr ""
+"Não é possível declarar transições a partir de um estado final. Estado(s)"
+" inválido(s): {}"
+
+#: statemachine/factory.py:318
+#, python-brace-format
+msgid ""
+"All non-final states should have at least one outgoing transition. These "
+"states have no outgoing transition: {!r}"
+msgstr ""
+"Todos os estados não finais devem ter pelo menos uma transição de saída. "
+"Estes estados não possuem transição de saída: {!r}"
+
+#: statemachine/factory.py:332
+#, python-brace-format
+msgid ""
+"All non-final states should have at least one path to a final state. "
+"These states have no path to a final state: {!r}"
+msgstr ""
+"Todos os estados não finais devem ter pelo menos um caminho para um "
+"estado final. Estes estados não possuem caminho para um estado final: "
+"{!r}"
+
+#: statemachine/factory.py:345
+#, python-brace-format
+msgid ""
+"There are unreachable states. The statemachine graph should have a single"
+" component. Disconnected states: {}"
+msgstr ""
+"Há estados inacessíveis. O grafo da máquina de estados deve ter um único "
+"componente. Estados desconectados: {}"
+
+#: statemachine/factory.py:382
+#, python-brace-format
+msgid ""
+"Invalid entry in 'listeners': {!r}. Expected a class, callable, or "
+"listener instance."
+msgstr ""
+"Entrada inválida em 'listeners': {!r}. Esperado uma classe, callable ou "
+"instância de listener."
+
+#: statemachine/factory.py:481
+#, python-brace-format
+msgid "An event in the '{}' has no id."
+msgstr "Um evento em '{}' não possui id."
+
+#: statemachine/mixins.py:28
+#, python-brace-format
+msgid "{!r} is not a valid state machine name."
+msgstr "{!r} não é um nome de máquina de estados válido."
+
+#: statemachine/state.py:273
+msgid "'donedata' can only be specified on final states."
+msgstr "'donedata' só pode ser especificado em estados finais."
+
+#: statemachine/statemachine.py:168
+msgid "There are no states or transitions."
+msgstr "Não há estados ou transições."
+
+#: statemachine/statemachine.py:242
+#, python-brace-format
+msgid "State overriding is not allowed. Trying to add '{}' to {}"
+msgstr "Sobrescrever estados não é permitido. Tentando adicionar '{}' a {}"
+
+#: statemachine/transition.py:74
+#, python-brace-format
+msgid ""
+"Not a valid internal transition from source {source!r}, target {target!r}"
+" should be self or a descendant."
+msgstr ""
+"Transição interna inválida da origem {source!r}, o destino {target!r} "
+"deve ser o próprio estado ou um descendente."
+
+#: statemachine/transition_mixin.py:19
+#, python-brace-format
+msgid "{} only supports the decorator syntax to register callbacks."
+msgstr "{} suporta apenas a sintaxe de decorator para registrar callbacks."
+
+#: statemachine/engines/async_.py:50
+msgid ""
+"The task running the processing loop was cancelled while it processed "
+"this event."
+msgstr ""
+"A tarefa que executava o loop de processamento foi cancelada enquanto "
+"processava este evento."
+
+#~ msgid "There are no states."
+#~ msgstr "Não há estados."
+
+#~ msgid "There are no events."
+#~ msgstr "Não há eventos."
+
+#~ msgid "Only RTC is supported on async engine"
+#~ msgstr "Apenas RTC é suportado no motor assíncrono"

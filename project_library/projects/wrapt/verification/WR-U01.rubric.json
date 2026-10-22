@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WR-U01",
+  "source_commit": "6b4e844950213118b19e613248d2bc9469eb731e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Results are5 and6;instance is the service in both calls and args are(3,) and(4,),without an extra self. The bound signature remains(x:int,y:int=2)->int and __wrapped__ identifies calculate. Call the already bound wrapped target with args/kwargs;do not pass instance again or replace the visible signature with generic *args solely for tracing.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

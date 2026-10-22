@@ -1,0 +1,235 @@
+{
+  "schema": 2,
+  "project_key": "funcy",
+  "title": "Funcy本地数据管道工作场景",
+  "category": "惰性、去重与副作用",
+  "description": "惰性执行、有效假值、保序去重、分流缓存、重试方案及可变缓存结果诊断。",
+  "seed_digest": "b9943ce14cdc2a224cc36feefb14e2a48f42afcf6bb243c4089dd3068a76d2f7",
+  "environment": "funcy-py312",
+  "source": {
+    "repository": "https://github.com/Suor/funcy",
+    "commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/docs/_static/nhpup_1.1.js",
+      "seed/app/Django-1.4-LICENSE.txt",
+      "seed/app/CC-BY-SA-3.0.html",
+      "seed/app/THIRD_PARTY_NOTICES.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "FU-S01",
+      "title": "数据消费与清理",
+      "goal": "明确执行时点和有效值",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FU-U01",
+            "FU-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FU-U01",
+          "kind": "understand",
+          "goal": "解释惰性管道的执行时点",
+          "prompt": "A convert callback records its argument and doubles it. Create funcy.map(convert,[1,2,3]),inspect calls,consume one item,then the rest and repeat consumption. Compare funcy.lmap(convert,[4,5]). Explain evaluation and one-shot behavior. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/fu-u01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FU-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/FU-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "FU-U02",
+          "kind": "understand",
+          "goal": "避免空值清理删除有效零值",
+          "prompt": "Compare list(funcy.keep([None,0,False,\"\",2,\"ok\"])) with funcy.filter(lambda value:value is not None,[None,0,False,\"\"]). Explain a quantity/flag cleanup contract. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/fu-u02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FU-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/FU-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FU-S02",
+      "title": "流处理策略",
+      "goal": "明确重复身份与内存边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FU-C01",
+            "FU-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FU-C01",
+          "kind": "consult",
+          "goal": "选择记录去重的保留策略",
+          "prompt": "For rows [{\"id\":2,\"value\":\"first\"},{\"id\":1,\"value\":\"x\"},{\"id\":2,\"value\":\"last\"}],use distinct(rows,key=operator.itemgetter(\"id\")). Advise first/last/conflict semantics and output order. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/fu-c01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FU-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/FU-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "FU-C02",
+          "kind": "consult",
+          "goal": "评估惰性分流的缓存边界",
+          "prompt": "A generator logs and yields0,1,2,3. Split with funcy.split(lambda value:value%2==0,source). Exhaust the passed iterator first,inspect the source log,then consume the failed iterator. Advise a long-stream consumption strategy. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/fu-c02.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FU-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/FU-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FU-S03",
+      "title": "重试业务方案",
+      "goal": "界定副作用与去重",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FU-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FU-P01",
+          "kind": "plan",
+          "goal": "规划重试的业务副作用边界",
+          "prompt": "A local @retry(3,errors=ValueError,timeout=0) callback appends an effect marker before raising ValueError on its first two calls and succeeding on its third. Inspect markers and plan an idempotent request/retry contract. Do not call services or implement anything.",
+          "requires": [],
+          "materials": [
+            "materials/fu-p01.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FU-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/FU-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FU-S04",
+      "title": "缓存结果诊断",
+      "goal": "取得完整引用与修改证据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FU-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "FU-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FU-D01",
+          "kind": "diagnose",
+          "goal": "诊断缓存列表被下游修改",
+          "prompt": "A memoized report function seems to return contaminated data. Request the decorator,complete calls,returned object identity and any mutation before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FU-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "mutable-memoized-result",
+              "when": "Exact decorator,calls,identity and mutation controls have not been supplied or declared unavailable and are reasonably requested.",
+              "materials": [
+                "disclosure/memoized-list.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

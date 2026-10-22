@@ -1,0 +1,22 @@
+{
+  "PS-U01": {
+    "candidate_import": true,
+    "persistent_outer_map_does_not_freeze_mutable_values": true
+  },
+  "PS-U02": {
+    "candidate_import": true,
+    "evolver_is_mutable_and_published_snapshots_are_independent": true
+  },
+  "PS-C01": {
+    "candidate_import": true,
+    "field_type_checks_do_not_imply_conversion": true
+  },
+  "PS-C02": {
+    "candidate_import": true,
+    "ignoring_extra_fields_is_explicit_and_drops_unmodeled_input": true
+  },
+  "PS-P01": {
+    "candidate_import": true,
+    "cross_field_invariants_validate_complete_published_records": true
+  }
+}

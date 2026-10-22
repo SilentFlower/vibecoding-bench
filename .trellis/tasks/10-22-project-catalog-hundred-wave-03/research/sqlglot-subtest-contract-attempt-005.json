@@ -1,0 +1,26 @@
+{
+  "status": "passed",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "contract": {
+    "path": ".deploy/project-catalog-hundred/stage-03/drafts/projects/sqlglot/verification/native-contract.json",
+    "sha256": "56de21a58645fd6a0d5629406ee7c35c44aaac2f4be5680c5f2f7d137e041db1",
+    "bytes": 212244
+  },
+  "subtests": {
+    "format": "sqlglot-subtests-v1",
+    "count": 21780,
+    "sha256": "6d7faa76dd32a3eff3b0839c1f2e0e556e6cf1c8ed853cee1b94b9db84e3f0d3"
+  },
+  "complete_private_archive": {
+    "path": ".deploy/project-catalog-hundred/stage-03/drafts/projects/sqlglot/verification/native-subtests-attempt-005.json.gz",
+    "sha256": "b091e1f0eeda683ddd4dbecce5b345d8b6c892351c10d62f2d07ca4e076f9e4d",
+    "bytes": 306247,
+    "expanded_bytes": 4676624,
+    "observed_order_sha256": "a964f233e0a67ac2cf600ba11f8abd7ec8a16e71194389859f640830fd569885"
+  },
+  "actual_result": {
+    "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-005/sqlglot/result.json",
+    "sha256": "c475e13eb29799341f4ce56b96765608c8b3d76c11558993eb03eca8e9b0d55e"
+  },
+  "scope": "完整逐主项合同及全部真实子项数量、上下文、重复次数和结果冻结；原始观察顺序保存在私有压缩原件，不改变4MiB JSON上限"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SM-U02",
+  "source_commit": "ec5d8173f740b37941818df13727db9d64ef498d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The false condition leaves pending and StateMachine raises TransitionNotAllowed because no transition is enabled. A validator returning False does not veto:it must raise to signal failure,so this control reaches done. Use guards for Boolean enablement and validators for explicit validation exceptions;do not assume their return protocols match.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

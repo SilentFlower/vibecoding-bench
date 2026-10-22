@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "WC-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "integer_rgb_normalization_clips_invalid_channels_instead_of_rejecting": true
+  },
+  "resource_profile": "business"
+}

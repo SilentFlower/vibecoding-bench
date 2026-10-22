@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "WR-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "proxy_identity_attribute_delegation_and_local_namespace_are_distinct": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IJ-U01",
+  "source_commit": "5daed12510fafc0bf73b6ef18d2884f78cd5e210",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default NoScope produces distinct Service objects with alpha. Repeated CachedService resolution in the same first Injector reuses one alpha object;the separate beta Injector owns a different beta singleton. Distinguish provider/scope lifetime and explicit instance binding from a global process-wide singleton promise.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

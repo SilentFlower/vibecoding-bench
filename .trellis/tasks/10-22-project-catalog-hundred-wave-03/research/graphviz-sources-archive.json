@@ -1,0 +1,8 @@
+{
+  "status": "passed",
+  "source_files": 47,
+  "archive_sha256": "74caef257eeecaf080b1663eaa3a22e43ac31e85b62e421b5ae105ca29fe8750",
+  "archive_bytes": 103823360,
+  "member_hashes_verified": true,
+  "reason": "保持完整来源原件并将单环境制品数降到既有256上限内，不改变平台限制"
+}

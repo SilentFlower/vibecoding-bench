@@ -1,0 +1,2172 @@
+{
+  "baseline_digest": "57e418fd3a16d7f3fed879f5ceed33d00317d07e328730408435a41f496db3d5",
+  "nodes": [
+    {
+      "id": "tests/test_common.py::test_empty[alg0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_empty[alg9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_no_common_chars[alg9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_by_one[alg9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_monotonic[alg9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_range[alg9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_normalization_same[alg9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_common.py::test_unequal_distance[alg9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_arith_ncd.py::test_arith_output",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_arith_ncd.py::test_make_probs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_arith_ncd.py::test_similarity[test-nani-2.1666666666666665]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_arith_ncd.py::test_similarity[test-test-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_bwtrle_ncd.py::test_similarity[test-nani-0.8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_bwtrle_ncd.py::test_similarity[test-test-0.6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_bz2_ncd.py::test_similarity[test-nani-0.16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_bz2_ncd.py::test_similarity[test-test-0.08]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_is_normalized[alg0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_is_normalized[alg1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_is_normalized[alg2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_is_normalized[alg3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_is_normalized[alg4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_is_normalized[alg5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_is_normalized[alg6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_monotonicity[alg0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_monotonicity[alg1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_monotonicity[alg2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_monotonicity[alg3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_monotonicity[alg4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_monotonicity[alg5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_monotonicity[alg6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_normalized_by_one[alg0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_normalized_by_one[alg1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_normalized_by_one[alg2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_normalized_by_one[alg3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_normalized_by_one[alg4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_normalized_by_one[alg5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_normalized_by_one[alg6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_simmetry[alg0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_simmetry[alg1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_simmetry[alg2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_simmetry[alg3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_simmetry[alg4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_simmetry[alg5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_common.py::test_simmetry[alg6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_entropy_ncd.py::test_distributivity_compressor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_entropy_ncd.py::test_idempotency_compressor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_entropy_ncd.py::test_monotonicity_compressor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_entropy_ncd.py::test_normalization_range",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_entropy_ncd.py::test_similarity[aaa-bbb-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_entropy_ncd.py::test_similarity[test-nani-0.6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_entropy_ncd.py::test_similarity[test-test-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_entropy_ncd.py::test_simmetry_compressor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_sqrt_ncd.py::test_distributivity_compressor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_sqrt_ncd.py::test_idempotency_compressor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_sqrt_ncd.py::test_monotonicity_compressor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_sqrt_ncd.py::test_normalization_range",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_sqrt_ncd.py::test_similarity[test-nani-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_sqrt_ncd.py::test_similarity[test-test-0.41421356237309503]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compression/test_sqrt_ncd.py::test_simmetry_compressor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[ATCG-TAGC-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[Niall-Neil-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[ab-ac-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[ab-ba-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[ab-bc-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[ab-bca-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[ab-cde-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[abcd-bdac-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[aluminum-Catalan-7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[cat-hat-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[test-qwy-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[test-tesst-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[test-testit-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[test-tet-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[test-text-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_restricted[test-tset-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[ATCG-TAGC-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[Niall-Neil-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[ab-ac-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[ab-ba-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[ab-bc-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[ab-bca-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[ab-cde-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[abcd-bdac-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[aluminum-Catalan-7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[cat-hat-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[test-qwy-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[test-tesst-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[test-testit-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[test-tet-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[test-text-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_damerau_levenshtein.py::test_distance_unrestricted[test-tset-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_editex.py::test_distance[--0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_editex.py::test_distance[-MARTHA-12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_editex.py::test_distance[-neilsen-14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_editex.py::test_distance[ALIE-ALI-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_editex.py::test_distance[ab-a-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_editex.py::test_distance[ab-c-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_editex.py::test_distance[nelson--12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_editex.py::test_distance_with_params[MARTHA-MARHTA-params0-12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_editex.py::test_distance_with_params[MARTHA-MARHTA-params1-24]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_editex.py::test_distance_with_params[MARTHA-MARHTA-params2-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_editex.py::test_distance_with_params[MARTHA-MARHTA-params3-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_editex.py::test_distance_with_params[MARTHA-MARHTA-params4-5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_gotoh.py::test_distance_ident[GATTACA-GCATGCU-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_gotoh.py::test_distance_ident_with_gap_05[AGACTAGTTAC-CGAGACGT-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_gotoh.py::test_distance_ident_with_gap_05[AGACTAGTTAC-TGACGSTGC-1.5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_gotoh.py::test_distance_ident_with_gap_05[GATTACA-GCATGCU-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_gotoh.py::test_distance_ident_with_gap_5[AGACTAGTTAC-CGAGACGT--15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_hamming.py::test_distance[test-qwe-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_hamming.py::test_distance[test-tesst-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_hamming.py::test_distance[test-testit-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_hamming.py::test_distance[test-tet-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_hamming.py::test_distance[test-text-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_hamming.py::test_distance[test-tset-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro.py::test_distance[ATCG-TAGC-0.8333333333333334]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro.py::test_distance[DIXON-DICKSONX-0.7666666666666666]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro.py::test_distance[DWAYNE-DUANE-0.822222222]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro.py::test_distance[MARTHA-MARHTA-0.944444444]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro.py::test_distance[Sint-Pietersplein 6, 9000 Gent-Test 10, 1010 Brussel-0.5182539682539683]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro.py::test_distance[fly-ant-0.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro.py::test_distance[frog-fog-0.9166666666666666]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro.py::test_distance[hello-haloa-0.7333333333333334]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro_winkler.py::test_distance[DIXON-DICKSONX-0.8133333333333332]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro_winkler.py::test_distance[DWAYNE-DUANE-0.84]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro_winkler.py::test_distance[MARTHA-MARHTA-0.9611111111111111]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro_winkler.py::test_distance[duck donald-duck daisy-0.867272727272]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro_winkler.py::test_distance[elephant-hippo-0.44166666666666665]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro_winkler.py::test_distance[fly-ant-0.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_jaro_winkler.py::test_distance[frog-fog-0.925]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_levenshtein.py::test_distance[test-qwe-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_levenshtein.py::test_distance[test-tesst-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_levenshtein.py::test_distance[test-testit-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_levenshtein.py::test_distance[test-tet-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_levenshtein.py::test_distance[test-text-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_levenshtein.py::test_distance[test-tset-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_matrix.py::test_distance[--1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_matrix.py::test_distance[-a-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_matrix.py::test_distance[A-A-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_matrix.py::test_distance[A-C--3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_matrix.py::test_distance[A-G--1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_matrix.py::test_distance[C-T-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_matrix.py::test_distance[G-G-7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_matrix.py::test_distance[T-A--4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_matrix.py::test_distance[T-C-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_matrix.py::test_distance[abcd-abcd-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_mlipns.py::test_distance[--1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_mlipns.py::test_distance[-a-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_mlipns.py::test_distance[Tomato-Tamato-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_mlipns.py::test_distance[a--0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_mlipns.py::test_distance[a-a-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_mlipns.py::test_distance[ab-a-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_mlipns.py::test_distance[abc-abc-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_mlipns.py::test_distance[abc-abcde-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_mlipns.py::test_distance[abcg-abcdefg-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_mlipns.py::test_distance[abcg-abcdeg-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_mlipns.py::test_distance[ato-Tam-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_needleman_wunsch.py::test_distance_ident[GATTACA-GCATGCU-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_needleman_wunsch.py::test_distance_ident_with_gap_5[AGACTAGTTAC-CGAGACGT--15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_needleman_wunsch.py::test_distance_ident_with_gap_5[AGACTAGTTAC-TGACGSTGC--7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_needleman_wunsch.py::test_distance_ident_with_gap_5[CGATATCAG-TGACGSTGC--5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_needleman_wunsch.py::test_distance_matrix[AGACTAGTTAC-CGAGACGT-16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_smith_waterman.py::test_distance_ident[GATTACA-GCATGCU-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_smith_waterman.py::test_distance_ident_with_gap_5[AGACTAGTTAC-CGAGACGT-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_smith_waterman.py::test_distance_ident_with_gap_5[AGACTAGTTAC-TGACGSTGC-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_smith_waterman.py::test_distance_ident_with_gap_5[CGATATCAG-TGACGSTGC-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_smith_waterman.py::test_distance_matrix[AGACTAGTTAC-CGAGACGT-26]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_strcmp95.py::test_distance[DIXON-DICKSONX-0.839333333]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_strcmp95.py::test_distance[DWAYNE-DUANE-0.873]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_strcmp95.py::test_distance[MARTHA-MARHTA-0.9611111111111111]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_edit/test_strcmp95.py::test_distance[TEST-TEXT-0.9066666666666666]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_compare[DamerauLevenshtein]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_compare[Hamming]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_compare[JaroWinkler]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_compare[Jaro]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_compare[Levenshtein]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_list_of_numbers[DamerauLevenshtein]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_list_of_numbers[Hamming]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_list_of_numbers[JaroWinkler]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_list_of_numbers[Jaro]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_list_of_numbers[Levenshtein]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[1-DamerauLevenshtein]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[1-Hamming]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[1-JaroWinkler]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[1-Jaro]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[1-Levenshtein]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[2-DamerauLevenshtein]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[2-Hamming]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[2-JaroWinkler]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[2-Jaro]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[2-Levenshtein]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[3-DamerauLevenshtein]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[3-Hamming]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[3-JaroWinkler]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[3-Jaro]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[3-Levenshtein]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[None-DamerauLevenshtein]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[None-Hamming]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[None-JaroWinkler]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[None-Jaro]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_external.py::test_qval[None-Levenshtein]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[--0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[-neilsen-14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[ATCG-TAGC-6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[Niall-Neil-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[ab-a-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[ab-c-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[aluminum-Catalan-12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[cat-hat-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[neal-niall-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[neal-nihl-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[neilsen-nelson-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[nelson--12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[nelson-neilsen-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[niall-neal-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[niall-nihal-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[nihal-niall-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_distance[nihl-neal-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_local[--0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_local[-neilsen-14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_local[ab-a-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_local[ab-c-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_local[neal-niall-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_local[neal-nihl-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_local[neilsen-nelson-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_local[nelson--12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_local[nelson-neilsen-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_local[niall-neal-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_local[niall-nihal-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_local[nihal-niall-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_phonetic/test_editex.py::test_local[nihl-neal-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsseq.py::test_distance[DIXON-DICKSONX-DION]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsseq.py::test_distance[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsseq.py::test_distance[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsseq.py::test_distance[ab-cd-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsseq.py::test_distance[abcd-abcd-abcd]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsseq.py::test_distance[random exponential-layer activation-ratia]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsseq.py::test_distance[test-text-tet]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsseq.py::test_distance[thisisatest-testing123testing-tsitest]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsseq.py::test_distance_multiseq[seqs0-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsseq.py::test_distance_multiseq[seqs1-a]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsseq.py::test_distance_multiseq[seqs2-tet]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsstr.py::test_distance[MYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTEST-TEST-TEST]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsstr.py::test_distance[TEST-MYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTESTMYTEST-TEST]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsstr.py::test_distance[ab-abcd-ab]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsstr.py::test_distance[abcd-ab-ab]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsstr.py::test_distance[abcd-bc-bc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsstr.py::test_distance[abcd-cd-cd0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsstr.py::test_distance[abcd-cd-cd1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsstr.py::test_distance[abcd-ef-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsstr.py::test_distance[bc-abcd-bc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_sequence/test_lcsstr.py::test_distance[ef-abcd-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_bag.py::test_distance[qwe-erty-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_bag.py::test_distance[qwe-ewq-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_bag.py::test_distance[qwe-qwe-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_bag.py::test_distance[qwe-rtys-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_cosine.py::test_distance[nelson-neilsen-0.7715167498104595]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_cosine.py::test_distance[test-text-0.75]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_jaccard.py::test_compare_with_tversky",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_jaccard.py::test_compare_with_tversky_as_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_jaccard.py::test_distance[decide-resize-0.3333333333333333]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_jaccard.py::test_distance[nelson-neilsen-0.625]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_jaccard.py::test_distance[test-text-0.6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_monge_elkan.py::test_similarity[left0-right0-0.805]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_monge_elkan.py::test_similarity[left1-right1-0.7866666666666667]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_overlap.py::test_distance[nelson-neilsen-0.8333333333333334]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_overlap.py::test_distance[test-text-0.75]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_overlap.py::test_distance[testme-textthis-0.6666666666666666]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_sorensen.py::test_compare_with_tversky",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_sorensen.py::test_compare_with_tversky_as_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_token/test_sorensen.py::test_distance[test-text-0.75]",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "hypothesis",
+      "module": "_hypothesis_pytestplugin",
+      "module_sha256": "5b8df643a5394e86bfe608b710ff2534ac74f7192f4f81faa091356ad426f182",
+      "version": "6.170.5"
+    }
+  ],
+  "project": "textdistance",
+  "python": "3.12.15",
+  "schema": 1
+}

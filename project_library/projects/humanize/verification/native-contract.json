@@ -1,0 +1,4314 @@
+{
+  "baseline_digest": "d0720b8a99c51cb00decbb8f558ee196c620b9778abf0fbfd546c753617e1301",
+  "nodes": [
+    {
+      "id": "tests/test_benchmarks.py::test_apnumber",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_benchmarks.py::test_clamp",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_benchmarks.py::test_fractional",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_benchmarks.py::test_intcomma",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_benchmarks.py::test_intword",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_benchmarks.py::test_metric",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_benchmarks.py::test_natural_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_benchmarks.py::test_naturaldate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_benchmarks.py::test_naturalday",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_benchmarks.py::test_naturaldelta",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_benchmarks.py::test_naturalsize",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_benchmarks.py::test_naturaltime",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_benchmarks.py::test_ordinal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_benchmarks.py::test_precisedelta",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_benchmarks.py::test_scientific",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args0-300 Bytes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args1-1.0 kB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args10-1.0 RB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args11-1.0 QB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args12-31.0 kB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args13-32.0 MB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args14-33.0 GB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args15-34.0 TB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args16-35.0 PB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args17-36.0 EB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args18-37.0 ZB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args19-38.0 YB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args2-1.0 kB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args20-39.0 RB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args21-40.0 QB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args22-300 Bytes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args23-31.0 KiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args24-32.0 MiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args25-33.0 GiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args26-34.0 TiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args27-35.0 PiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args28-36.0 EiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args29-37.0 ZiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args3-1.0 MB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args30-38.0 YiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args31-39.0 RiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args32-40.0 QiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args33-30.3 KiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args34-30.5 MiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args35-30.7 GiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args36-30.9 TiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args37-31.1 PiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args38-31.2 EiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args39-31.3 ZiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args4-1.0 GB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args40-31.4 YiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args41-31.5 RiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args42-31.6 QiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args43-30.3K]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args44-30.5M]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args45-30.7G]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args46-30.9T]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args47-31.1P]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args48-31.2E]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args49-31.3Z]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args5-1.0 TB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args50-31.4Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args51-31.5R]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args52-31.6Q]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args53-300B]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args54-2.9K]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args55-2.9M]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args56-1.0K]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args57-1 Byte]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args58-1 Byte]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args59-1 Byte]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args6-1.0 PB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args60-3.14 MB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args61-2.930K]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args62-3G]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args63-2.423 RiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args64-1 Bytes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args65-1.1 kB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args66-1.1 MB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args67-1B]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args68-1.1K]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args69-1.1M]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args7-1.0 EB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args70-1.0 MB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args71-1.0 GB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args72-1.0 TB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args73-1.0 MiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args74-1.0 GiB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args75-1.0M]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args8-1.0 ZB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_filesize.py::test_naturalsize[test_args9-1.0 YB]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::TestActivate::test_default_locale_path_null__spec__",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::TestActivate::test_default_locale_path_undefined__spec__",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::TestActivate::test_en_locale",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::TestActivate::test_none_locale",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_default_locale_path_defined__spec__",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_default_locale_path_none__spec__",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_default_locale_path_undefined__file__",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_i18n",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intcomma",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[es_ES-1000000-1.0 mill\\xf3n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[es_ES-1000000000-1.0 mil millones]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[es_ES-1000000000000-1.0 bill\\xf3n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[es_ES-1200000000-1.2 miles de millones]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[es_ES-3500000-3.5 millones]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[es_ES-6700000000000-6.7 billones]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR--1_000_000--1,0 million]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR--1_000_000_000--1,0 milliard]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR--1_300_000_000_000_000--1,3 billiards]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR--6_000_000_000_000--6,0 billions]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR--8_100_000_000_000_000_000_000_000_000_000_000--8,1 quintilliards]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-1000000000000000000000000000000000000-1000,0 quintilliards]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-1100000000000000000000000000000000000-1100,0 quintilliards]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-12_400-12,4 milles]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-12_490-12,5 milles]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-1_000-1,0 mille]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-1_000_000-1,0 million]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-1_000_000_000-1,0 milliard]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-1_000_000_000_000-1,0 billion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-1_000_000_000_000_000-1,0 billiard]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-1_200_000-1,2 millions]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-1_290_000-1,3 millions]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-1_300_000_000_000_000-1,3 billiards]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-2100000000000000000000000000000000000-2100,0 quintilliards]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-2_000_000_000-2,0 milliards]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-3_500_000_000_000_000_000_000-3,5 trilliards]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-6_000_000_000_000-6,0 billions]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-8_100_000_000_000_000_000_000_000_000_000_000-8,1 quintilliards]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-999_999_999-1,0 milliard]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-999_999_999_999-1,0 billion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[fr_FR-999_999_999_999_999-1,0 billiard]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[it_IT-1000000-1,0 milione]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[it_IT-1000000000-1,0 miliardo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[it_IT-1200000-1,2 milioni]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[it_IT-3500000000-3,5 miliardi]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[lv-1000-1,0 t\\u016bkstotis]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[lv-1000000-1,0 miljons]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[lv-11000-11,0 t\\u016bksto\\u0161i]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[lv-11000000-11,0 miljoni]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[lv-1200-1,2 t\\u016bksto\\u0161i]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[lv-2000-2,0 t\\u016bksto\\u0161i]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[lv-2000000-2,0 miljoni]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[lv-21000-21,0 t\\u016bkstotis]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[lv-21000000-21,0 miljons]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[si_LK-1000000-1.0 \\u0db8\\u0dd2\\u0dbd\\u0dd2\\u0dba\\u0db1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[si_LK-1200000-1.2 \\u0db8\\u0dd2\\u0dbd\\u0dd2\\u0dba\\u0db1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_i18n[si_LK-3500000000-3.5 \\u0db6\\u0dd2\\u0dbd\\u0dd2\\u0dba\\u0db1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[ar]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[bn_BD]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[ca_ES]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[da_DK]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[de_DE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[el_GR]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[eo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[es_ES]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[eu]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[fa_IR]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[fi_FI]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[fr_FR]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[he_IL]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[hu_HU]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[id_ID]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[it_IT]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[ja_JP]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[ko_KR]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[lv]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[nb]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[nl_NL]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[pl_PL]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[pt_BR]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[pt_PT]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[ru_RU]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[si_LK]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[sk_SK]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[sl_SI]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[sv_SE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[tlh]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[tr_TR]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[uk_UA]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[uz]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[vi_VN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[zh_CN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_intword_unit_has_no_format_placeholder[zh_HK]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_langauge_codes[ar-5 \\u062e\\u0627\\u0645\\u0633]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_langauge_codes[ar_SA-5 \\u062e\\u0627\\u0645\\u0633]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_langauge_codes[fr-5e]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_langauge_codes[fr_FR-5e]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_langauge_codes[pt-5\\xba]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_langauge_codes[pt_BR-5\\xba]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_langauge_codes[pt_PT-5\\xba]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_naturaldelta",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_naturalsize_i18n[fr_FR--42000--42.0 Ko]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_naturalsize_i18n[fr_FR-1-1 octet]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_naturalsize_i18n[fr_FR-42-42 octets]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_naturalsize_i18n[fr_FR-42000-42.0 Ko]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_naturalsize_i18n[fr_FR-42000000-42.0 Mo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_naturalsize_i18n[fr_FR-42000000000-42.0 Go]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_naturalsize_i18n[si_LK-1-\\u0db6\\u0dba\\u0dd2\\u0da7\\u0dca 1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_naturalsize_i18n[si_LK-42-\\u0db6\\u0dba\\u0dd2\\u0da7\\u0dca 42]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_naturalsize_i18n_binary",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_ordinal_genders[es_ES-1-male-1\\xba]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_ordinal_genders[es_ES-5-female-5\\xaa]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_ordinal_genders[fr_FR-1-female-1\\xe8re]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_ordinal_genders[fr_FR-1-male-1er]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_ordinal_genders[fr_FR-2-male-2e]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_ordinal_genders[it_IT-3-male-3\\xba]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_ordinal_genders[it_IT-8-female-8\\xaa]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_update_translations[de_DE-eins]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_i18n.py::test_update_translations[fr_FR-un]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_natural_list[test_args0-1, 2 and 3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_natural_list[test_args1-one, two and three]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_natural_list[test_args10-one]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_natural_list[test_args11-one and two]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_natural_list[test_args12-one, two and three]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_natural_list[test_args13-1, 2 and 3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_natural_list[test_args2-one and two]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_natural_list[test_args3-one]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_natural_list[test_args4-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_natural_list[test_args5-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_natural_list[test_args6-1, 2 and 3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_natural_list[test_args7-1 and two]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_natural_list[test_args8-one, two and three]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lists.py::test_natural_list[test_args9-one and two]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_apnumber[-inf--Inf0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_apnumber[-inf--Inf1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_apnumber[0-zero]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_apnumber[1-one]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_apnumber[10-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_apnumber[2-two]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_apnumber[4-four]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_apnumber[5-five]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_apnumber[7-seven]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_apnumber[9-nine]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_apnumber[None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_apnumber[inf-+Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_apnumber[nan-NaN0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_apnumber[nan-NaN1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_clamp[test_args0-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_clamp[test_args1-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_clamp[test_args10--Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_clamp[test_args2-0%]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_clamp[test_args3-<1%]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_clamp[test_args4->99%]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_clamp[test_args5-under 1%]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_clamp[test_args6-above 99%]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_clamp[test_args7-under 1.0 million]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_clamp[test_args8-NaN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_clamp[test_args9-+Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[-0.5--1/2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[-1.3--1 3/10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[-2.5--2 1/2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[-2.9999999--3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[-inf--Inf0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[-inf--Inf1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[0-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[0.0-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[0.3-3/10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[0.333-333/1000]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[0.3333333333333333-1/3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[0.8333333333333334-5/6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[0.9999999-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[1-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[1.3333333333333333-1 1/3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[1.5-1 1/2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[2.0-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[2.9999999-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[7-7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[8.9-8 9/10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[inf-+Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[nan-NaN0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[nan-NaN1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_fractional[ten-ten]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args0-100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args1-1,000]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args10-1,000,000]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args11-1,234,567.1234567]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args12-1,234,567]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args13-1,234,567.1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args14-1,234,567.1234567000]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args15-1,234,567.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args16-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args17-14,308.4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args18-14,308.4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args19-14,308.4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args2-10,123]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args20-14,308.40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args21-14,308.400]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args22-1,234.5454545]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args23-1,234.5454545]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args24-1,235]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args25-1,234.5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args26-1,234.55]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args27-1,234.545]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args28-1,234.5454545000]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args29-NaN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args3-10,311]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args30-+Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args31--Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args32-NaN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args33--Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args4-1,000,000]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args5-1,234,567.25]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args6-100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args7-1,000]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args8-10,123]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma[test_args9-10,311]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma_large_integer[-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intcomma_large_integer[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args0-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args1-100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args10-1.0 billion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args11-1.0 billion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args12--1.0 billion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args13-2.0 billion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args14-1.0 trillion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args15-1.0 trillion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args16-6.0 trillion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args17--6.0 trillion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args18-1.0 quadrillion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args19-1.0 quadrillion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args2--100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args20-1.3 quadrillion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args21--1.3 quadrillion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args22-3.5 sextillion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args23-8.1 decillion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args24--8.1 decillion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args25-1000.0 decillion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args26-1100.0 decillion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args27-2100.0 decillion]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args28-2.0 googol]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args29-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args3-1.0 thousand]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args30-1.23 million]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args31-1.0 googol]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args32-10.0 googol]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args33-NaN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args34-+Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args35--Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args36-NaN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args37--Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args38-1 million]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args39-1.2 million]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args4-12.4 thousand]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args40-1.23 million]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args41-1.235 million]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args42-1 million]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args43-999 thousand]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args5-12.5 thousand]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args6-1.0 million]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args7--1.0 million]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args8-1.2 million]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword[test_args9-1.3 million]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword_powers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_intword_rounding_rollover",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[-1500, 'V']--1.50 kV]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[-9999]--10.0 k]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[-inf]--Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[0.00012]-120 \\u03bc]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[0.0009999, 'V']-1.00 mV]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[0.0012]-1.20 m]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[0.012]-12.0 m]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[0.1, '\\xb0']-100m\\xb0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[0.12]-120 m]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[0.1]-100 m]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[0]-0.00]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1, '', 0]-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1, '', 1]-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1, '', 2]-1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1, '', 3]-1.00]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1, 'Hz']-1.00 Hz]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1, '\\xb0']-1.00\\xb0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1.0, 'W']-1.00 W]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1.23456]-1.23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1.234e+28, 'A']-12.3 RA]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1.234e-28, 'A']-123 qA]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1.235e+29, 'A']-124 RA]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1.5123, '', 0]-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[10, '', 0]-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[10, '', 1]-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[10, '', 2]-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[10, '', 3]-10.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[10.5123, '', 0]-11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[10.5123, '', 1]-11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[10.5123, '', 2]-11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[10.5123, '', 3]-10.5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[100, '', 0]-100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[100, '', 1]-100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[100, '', 2]-100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[100, '', 3]-100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1000, '', 0]-1 k]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1000, '', 1]-1 k]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1000, '', 2]-1.0 k]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1000, '', 3]-1.00 k]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[100]-100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[12.3456]-12.3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[123.456]-123]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1234.56]-1.23 k]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[12345, '', 6]-12.3450 k]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1e+25, 'm']-10.0 Ym]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1e+26, 'm']-100 Ym]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1e+27, 'A']-1.00 RA]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1e+50]-1.00 x 10\\u2075\\u2070]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1e-23]-10.0 y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1e-24]-1.00 y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1e-25]-100 r]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1e-26]-10.0 r]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[1e-50]-1.00 x 10\\u207b\\u2075\\u2070]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[2.56e-30, 'V']-2.56 qV]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[2.596e+32, 'F']-260 QF]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[200000]-200 k]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[3, 'C']-3.00 C]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[3, 'W', 5]-3.0000 W]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[9.999, '', 2]-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[9.99999]-10.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[999.4]-999]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[999.9, 'V']-1.00 kV]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[999.99, 'V']-1.00 kV]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[999999, 'V']-1.00 MV]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[99999]-100 k]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[9999]-10.0 k]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[inf]-+Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[nan, 'm']-NaN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_metric[[nan]-NaN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[-inf--Inf0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[-inf--Inf1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[1-1st]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[101-101st]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[102-102nd]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[103-103rd]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[11-11th]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[111-111th]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[12-12th]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[13-13th]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[2-2nd]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[3-3rd]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[4-4th]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[inf-+Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[nan-NaN0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[nan-NaN1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_ordinal[something else-something else]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args0-1.00 x 10\\xb3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args1--1.00 x 10\\xb3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args10-3.0 x 10\\u207b\\xb9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args11-1 x 10\\xb3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args12-3 x 10\\u207b\\xb9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args13-1.00 x 10\\xb2\\u2070]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args14-2.00 x 10\\u207b\\xb2\\u2070]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args15--3.00 x 10\\xb2\\u2070]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args16--4.00 x 10\\u207b\\xb2\\u2070]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args17-NaN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args18-+Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args19--Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args2-5.50 x 10\\u2070]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args20-NaN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args21--Inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args3-5.78 x 10\\u2079]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args4-1.00 x 10\\xb3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args5-9.90 x 10\\xb9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args6-3.00 x 10\\u207b\\xb9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args7-foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args8-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_number.py::test_scientific[test_args9-1.0 x 10\\xb3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_date_and_delta",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[Not a date at all.-Not a date at all.]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input0-today]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input1-tomorrow]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input10-Mar 02 2009]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input11-Apr 02 2009]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input12-May 02 2009]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input13-Jun 02 2009]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input14-Jul 02 2009]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input15-Aug 02 2009]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input16-Sep 02 2009]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input17-Oct 02]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input18-Nov 02]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input19-Dec 02]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input2-yesterday]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input20-Jan 02]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input21-today]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input22-Mar 02]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input23-Apr 02]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input24-May 02]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input25-Jun 02]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input26-Jul 02]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input27-Aug 02 2010]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input28-Sep 02 2010]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input29-Oct 02 2010]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input3-Mar 05]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input30-Nov 02 2010]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input31-Dec 02 2010]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input32-Jan 02 2011]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input33-Feb 02 2011]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input4-Jun 27 1982]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input7-290149024-2-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input8-120390192341-2-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate[test_input9-Feb 02 2009]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldate_tz_aware",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturalday[test_args0-today]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturalday[test_args1-tomorrow]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturalday[test_args2-yesterday]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturalday[test_args3-Mar 05]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturalday[test_args4-02/26/1984]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturalday[test_args5-1982.06.27]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturalday[test_args6-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturalday[test_args7-Not a date at all.]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturalday[test_args8-290149024-2-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturalday[test_args9-120390192341-2-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[0-a moment]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[1-a second]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[23.5-23 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[30-30 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[NaN-NaN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input10-an hour]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input11-an hour]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input12-2 hours]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input13-2 hours]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input14-4 hours]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input15-a day]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input16-a day]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input17-1 year, 4 months]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input18-2 years]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input19-a second]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input20-30 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input21-a year]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input22-2 years]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input23-27 years]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input24-1 year, 1 month]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input25-2 years]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input26-1 year, 4 days]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input27-a month]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input28-2 months]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input29-9 days]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input30-a year]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input31-1,141 years]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input32-2 years]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input33-2 years]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input34-3 years]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input35-3 years]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input36-3 years]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input38-2,739,726 years]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input4-a moment]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input5-a minute]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input6-2 minutes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input7-2 minutes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input8-2 minutes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta[test_input9-59 minutes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_default[0.001-a moment]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_default[0.004-a moment]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_default[1e-06-a moment]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_default[2-2 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_default[31557600.000004-a year]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_default[3600.004-an hour]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_default[4-4 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_default[4e-06-a moment]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_default[86400.004-a day]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[microseconds-0.004-4 milliseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[microseconds-0.101943-101 milliseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[microseconds-1.337-a second]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[microseconds-1e-06-1 microsecond]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[microseconds-2-2 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[microseconds-31557600.000004-a year]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[microseconds-3600.004-an hour]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[microseconds-4-4 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[microseconds-4e-06-4 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[microseconds-86400.004-a day]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[milliseconds-0.001-1 millisecond]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[milliseconds-0.004-4 milliseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[milliseconds-0.101943-101 milliseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[milliseconds-1.337-a second]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[milliseconds-2-2 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[milliseconds-31557600.000004-a year]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[milliseconds-3600.004-an hour]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[milliseconds-4-4 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[milliseconds-4e-06-0 milliseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[seconds-0.001-a moment]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[seconds-0.004-a moment]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[seconds-0.101943-a moment]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[seconds-1.337-a second]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[seconds-1e-06-a moment]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[seconds-2-2 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[seconds-31557600.000004-a year]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[seconds-3600.004-an hour]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[seconds-4-4 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[seconds-4e-06-a moment]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_minimum_unit_explicit[seconds-86400.004-a day]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_nomonths[test_input0-7 days]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_nomonths[test_input1-31 days]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_nomonths[test_input2-230 days]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_nomonths[test_input3-1 year, 35 days]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_non_finite[-inf--inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_non_finite[inf-inf]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_non_finite[nan-nan]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaldelta_too_large_value_raises",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[22.5-22 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[23.5-24 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[23.9-24 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[30-30 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[NaN-NaN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input0-now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input1-a second ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input10-a day ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input11-1 year, 4 months ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input12-2 years ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input13-a second from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input14-30 seconds from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input15-a minute from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input16-2 minutes from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input17-2 minutes from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input18-an hour from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input19-2 hours from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input2-30 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input20-23 hours from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input21-a day from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input22-a day from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input23-1 year, 4 months from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input24-2 years from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input25-27 years from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input26-1 year, 1 month ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input27-27 years from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input28-1 year, 1 month ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input3-a minute ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input33-2 years ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input34-1 year, 4 days ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input4-2 minutes ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input5-2 minutes ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input6-an hour ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input7-2 hours ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input8-23 hours ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime[test_input9-a day ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_default[0.001-now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_default[0.004-now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_default[1e-06-now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_default[2-2 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_default[31557600.000004-a year ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_default[3600.004-an hour ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_default[4-4 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_default[4e-06-now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_default[86400.004-a day ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[microseconds-0.004-4 milliseconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[microseconds-0.101943-101 milliseconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[microseconds-1.337-a second ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[microseconds-1e-06-1 microsecond ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[microseconds-2-2 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[microseconds-31557600.000004-a year ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[microseconds-3600.004-an hour ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[microseconds-4-4 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[microseconds-4e-06-4 microseconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[microseconds-86400.004-a day ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[milliseconds-0.001-1 millisecond ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[milliseconds-0.004-4 milliseconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[milliseconds-0.101943-101 milliseconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[milliseconds-1.337-a second ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[milliseconds-2-2 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[milliseconds-31557600.000004-a year ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[milliseconds-3600.004-an hour ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[milliseconds-4-4 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[milliseconds-4e-06-0 milliseconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[seconds-0.001-now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[seconds-0.004-now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[seconds-0.101943-now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[seconds-1.337-a second ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[seconds-1e-06-now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[seconds-2-2 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[seconds-31557600.000004-a year ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[seconds-3600.004-an hour ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[seconds-4-4 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[seconds-4e-06-now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_minimum_unit_explicit[seconds-86400.004-a day ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[22.5-22 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[23.5-24 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[30-30 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[NaN-NaN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input0-now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input1-a second ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input10-17 days ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input11-47 days ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input12-1 year, 135 days ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input13-2 years ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input14-a second from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input15-30 seconds from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input16-a minute from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input17-2 minutes from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input18-2 minutes from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input19-an hour from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input2-30 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input20-2 hours from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input21-23 hours from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input22-a day from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input23-a day from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input24-1 year, 135 days from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input25-2 years from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input26-27 years from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input27-1 year, 35 days ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input28-27 years from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input29-1 year, 35 days ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input3-a minute ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input33-2 years ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input34-1 year, 4 days ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input4-2 minutes ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input5-2 minutes ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input6-an hour ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input7-2 hours ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input8-a day ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_nomonths[test_input9-a day ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input0-now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input1-a second ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input10-a day ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input11-1 year, 4 months ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input12-2 years ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input13-a second from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input14-30 seconds from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input15-a minute from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input16-2 minutes from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input17-2 minutes from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input18-an hour from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input19-2 hours from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input2-30 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input20-23 hours from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input21-a day from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input22-a day from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input23-1 year, 4 months from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input24-2 years from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input25-27 years from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input26-1 year, 1 month ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input27-2 years ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input28-1 year, 4 days ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input3-a minute ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input4-2 minutes ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input5-2 minutes ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input6-an hour ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input7-2 hours ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input8-23 hours ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone[test_input9-a day ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input0-now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input1-a second ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input10-a day ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input11-1 year, 4 months ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input12-2 years ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input13-a second from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input14-30 seconds from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input15-a minute from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input16-2 minutes from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input17-2 minutes from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input18-an hour from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input19-2 hours from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input2-30 seconds ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input20-23 hours from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input21-a day from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input22-a day from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input23-1 year, 4 months from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input24-2 years from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input25-27 years from now]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input26-1 year, 1 month ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input27-2 years ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input28-1 year, 4 days ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input3-a minute ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input4-2 minutes ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input5-2 minutes ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input6-an hour ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input7-2 hours ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input8-23 hours ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_naturaltime_timezone_when[test_input9-a day ago]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_bogus_call",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[0.01-seconds-%0.3f-0.010 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[31-minutes-%0.0f-1 minute]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[31-minutes-%d-0 minutes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[32399-minutes-%0.0f-9 hours]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[3630.99-minutes-%.0f-1 hour]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[3631-minutes-%.0f-1 hour and 1 minute]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[86398.663-seconds-%.1f-23 hours, 59 minutes and 58.7 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[86399.999-seconds-%.4f-23 hours, 59 minutes and 59.9990 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[89.99-minutes-%.0f-1 minute]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[89.99-minutes-%d-1 minute]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[90-minutes-%.0f-2 minutes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[90-minutes-%d-1 minute]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[91500-hours-%0.0f-1 day and 1 hour]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val0-milliseconds-%0.4f-1.0010 milliseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val1-milliseconds-%0.4f-2.0020 milliseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val10-days-%d-1 month and 1 day]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val11-days-%.0f-1 month and 1 day]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val12-days-%d-2 months and 1 day]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val13-days-%d-3 months]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val14-months-%0.2f-3.93 months]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val15-years-%0.1f-0.5 years]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val2-milliseconds-%0.2f-2 milliseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val29-minutes-%0.0f-1 month]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val3-seconds-%0.2f-1.23 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val30-hours-%0.0f-2 months, 30 days and 12 hours]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val31-days-%0.2f-10.25 days]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val32-days-%0.1f-30.6 days]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val33-microseconds-%0.0f-1 millisecond]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val34-milliseconds-%0.0f-1 second]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val35-seconds-%0.0f-1 minute]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val36-minutes-%0.0f-1 hour]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val37-months-%0.0f-1 year]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val4-seconds-%0.2f-4 hours and 3.20 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val5-seconds-%0.2f-5 days, 4 hours and 30 minutes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val6-hours-%0.2f-5 days and 4.50 hours]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val7-days-%0.2f-5.19 days]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val8-days-%d-1 month]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_custom_format[val9-days-%.0f-1 month]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val0-microseconds-1 millisecond and 1 microsecond]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val1-microseconds-2 milliseconds and 2 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val10-seconds-1 month and 1 day]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val11-seconds-2 months and 1 day]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val12-seconds-3 months]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val13-days-1 month]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val14-days-1 month and 1 day]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val15-days-2 months and 1 day]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val16-days-3 months]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val2-microseconds-1 second and 2 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val3-microseconds-4 hours, 3 seconds and 2 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val4-microseconds-5 days, 4 hours, 3 seconds and 2 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val5-microseconds-1 year, 5 days, 4 hours, 3 seconds and 2 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val6-microseconds-1 year, 5 days and 2 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val7-microseconds-1 year, 5 days and 2 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val8-minutes-0 minutes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_multiple_units[val9-seconds-1 month]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[1-seconds-1 second]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[120-seconds-2 minutes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[172800-seconds-2 days]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[2-seconds-2 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[31536000-seconds-1 year]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[3600-seconds-1 hour]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[60-seconds-1 minute]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[61905168000-seconds-1,963 years]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[63072000-seconds-2 years]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[7200-seconds-2 hours]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[86400-seconds-1 day]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[val0-microseconds-1 microsecond]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[val1-microseconds-2 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[val2-microseconds-1 millisecond]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[val3-microseconds-2 milliseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_one_unit_enough[val4-seconds-1 second]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_suppress_units[val0-microseconds-suppress0-1 millisecond and 200 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_suppress_units[val1-microseconds-suppress1-1200 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_suppress_units[val10-microseconds-suppress10-240.50 minutes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_suppress_units[val2-microseconds-suppress2-1.20 milliseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_suppress_units[val3-microseconds-suppress3-1000 milliseconds and 200 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_suppress_units[val4-microseconds-suppress4-1 second and 200000 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_suppress_units[val5-microseconds-suppress5-1.20 seconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_suppress_units[val6-microseconds-suppress6-4 hours, 30 seconds and 0.20 milliseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_suppress_units[val7-microseconds-suppress7-4 hours, 30000 milliseconds and 200 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_suppress_units[val8-microseconds-suppress8-4 hours and 30000200 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_precisedelta_suppress_units[val9-microseconds-suppress9-240 minutes, 30 seconds and 200 microseconds]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_rounding_by_fmt[%.0f-1.01-1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_rounding_by_fmt[%.0f-1.5-2.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_rounding_by_fmt[%.2f-1.011-1.01]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_rounding_by_fmt[%10.0f-1.01-1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_rounding_by_fmt[%d-1.999999999999999-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_rounding_by_fmt[%d-2.0-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_rounding_by_fmt[%i-1.01-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_time.py::test_time_unit",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "pytest-cov",
+      "module": "pytest_cov.plugin",
+      "module_sha256": "7cc8a14b8cc8effa886c40fdfa058459d89686d62c53fea6721750e722a60f40",
+      "version": "7.1.0"
+    },
+    {
+      "distribution": "pytest-benchmark",
+      "module": "pytest_benchmark.plugin",
+      "module_sha256": "9185f4049d310155e2dd3100f03fec8f35dab99eca5e0224f2f7d9cc7d015744",
+      "version": "5.3.0"
+    },
+    {
+      "distribution": "pytest-codspeed",
+      "module": "pytest_codspeed.plugin",
+      "module_sha256": "2dd8a817540c7a8566e1662352d091a938bfbea0866ba378c8f7127b420b33f8",
+      "version": "5.0.3"
+    }
+  ],
+  "project": "humanize",
+  "python": "3.12.15",
+  "schema": 1
+}

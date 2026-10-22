@@ -1,0 +1,1 @@
+Compare Problem(MinConflictsSolver(steps=0)) and default Problem(),each with x domain[1]. Inspect getSolution() on both. Advise the meaning of a heuristic None result versus a proof that a finite model is unsatisfiable;include the actual solver/step policy when reporting results. No edits.

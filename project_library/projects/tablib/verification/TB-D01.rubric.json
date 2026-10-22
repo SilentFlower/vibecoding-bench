@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TB-D01",
+  "source_commit": "966876c76a6378557c1951badc1665b4d1375875",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use supplied dynamic-column index evidence to locate existing insert/append behavior. Distinguish the requested dict alignment repair from this separate computed-column defect. Missing evidence supports insufficient_information;do not modify another target or fabricate a corrected public API.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

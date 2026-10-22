@@ -1,0 +1,51 @@
+{
+  "recorded_at": "2026-10-22T06:31:27.803014+00:00",
+  "scope": "已实现范围的既有回归；不是R1/R8全部三十仓验收或Check-All通过声明",
+  "checks": [
+    {
+      "cwd": ".",
+      "argv": [
+        ".deploy/project-iteration-repairs/venv/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "orchestrator",
+        "-p",
+        "test_project_*.py",
+        "-q"
+      ],
+      "exit_code": 0,
+      "status": "passed",
+      "elapsed_sec": 127.577732,
+      "stdout": ".deploy/project-catalog-hundred/stage-03/focused-checks-002/1-stdout.log",
+      "stderr": ".deploy/project-catalog-hundred/stage-03/focused-checks-002/1-stderr.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "b9e0d5f95e77a4fadc1ac58c674effc6785f9b57a24a63bb1fae56a44bc1504c"
+    },
+    {
+      "cwd": "deploy/v3",
+      "argv": [
+        "python3",
+        "-m",
+        "unittest",
+        "test_manage",
+        "-q"
+      ],
+      "exit_code": 0,
+      "status": "passed",
+      "elapsed_sec": 1.369086,
+      "stdout": ".deploy/project-catalog-hundred/stage-03/focused-checks-002/2-stdout.log",
+      "stderr": ".deploy/project-catalog-hundred/stage-03/focused-checks-002/2-stderr.log",
+      "stdout_sha256": "422d078e335c2222e57dacc50134244bdc0e36ff36c055335972fa4ae6f76aec",
+      "stderr_sha256": "ff0ffb06b182e0ffb553228f3b987c9f1e5384ad85e1e5b0dae5e0c84460ac7b"
+    }
+  ],
+  "source_sha256": {
+    "orchestrator/project_native_regression.py": "b921fcda4178ea5a0c0c562c281a51aebc2f826a9e8d3a02147481ccd6c04473",
+    "orchestrator/test_project_native_regression.py": "286e597cbc8051e09a212dece8d9c44839028894631c5ed3acf23dccf2c95e10",
+    "deploy/v3/manage.py": "091148e2cea09b714b1f8607f8a75f0a9fd8439bc965e6d8487bc80e98bc85f2",
+    "deploy/v3/test_manage.py": "0393188d64dd4e04d48d71d35342b7c708681776a358b42f1a63adffe06222ed",
+    "images/v3/Dockerfile.dockerignore": "905abdaa050e3cb02aac34f460d4cde75b39a599db0a60c44da5bfab96326d99"
+  }
+}

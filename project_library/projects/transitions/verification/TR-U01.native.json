@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TR-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "initial_internal_and_reflexive_callbacks_have_different_lifecycles": true
+  },
+  "resource_profile": "business"
+}

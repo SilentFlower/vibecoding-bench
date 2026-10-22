@@ -1,0 +1,26 @@
+{
+  "status": "passed",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "contract": {
+    "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-003/sqlglot/evidence/native-contract.json",
+    "sha256": "7720a2de07989c4c062d59dd3c667245d0011d6e1b3fc255692137f63d2f7601",
+    "bytes": 212234
+  },
+  "subtests": {
+    "format": "sha256-v1",
+    "count": 21780,
+    "sha256": "66e9cf271bc023043d35d7508a0d982a9042dc49662259faa55b857a57851e82"
+  },
+  "complete_private_archive": {
+    "path": ".deploy/project-catalog-hundred/stage-03/drafts/projects/sqlglot/verification/native-subtests.json.gz",
+    "sha256": "769d5915af407cd9b8687a15bdbc1f1154b12a01167b5612dd819a7d799234ad",
+    "bytes": 305824,
+    "expanded_bytes": 4676624
+  },
+  "actual_result": {
+    "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-003/sqlglot/result.json",
+    "sha256": "76292fb7c84a5912ab01fd0220c4f6f6d63b9fa52afced0b9dbdadafe7b38afd"
+  },
+  "scope": "完整逐主项合同及全部真实子项数量、上下文、顺序和结果冻结；压缩原件保持私有，不改变4MiB JSON上限",
+  "historical_scope": "规范化上游无序集合及默认对象地址之前的真实成功原件，当前合同另验"
+}

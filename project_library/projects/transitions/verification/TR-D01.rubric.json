@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TR-D01",
+  "source_commit": "bd42b38f3627e6bca7274fb4d9af2e105f75da7c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use consumed model-binding evidence to distinguish an existing method name collision from a guard failure or missing transition. Missing evidence supports insufficient_information;do not overwrite a business method or silently rename a published event.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

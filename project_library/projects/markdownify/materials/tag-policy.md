@@ -1,0 +1,1 @@
+Convert <p>Hello <strong>paid <em>today</em></strong></p> with strip=["strong"]. Separately compare default conversion of <script>window.secret=7</script> with strip=["script"]. Explain what strip actually removes and what remains. A document migration must deliberately own whether an element and its content are omitted. Do not edit or describe strip as subtree removal.

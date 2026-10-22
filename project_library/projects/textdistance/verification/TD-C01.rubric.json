@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TD-C01",
+  "source_commit": "d6a68d61088a40eef5c88191ccf79323dbf34850",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default Counter-based word Jaccard preserves multiplicity,so tea tea book versus tea book yields2/3. as_setTrue yields1. Reordering tea book does not change its word bag,also yielding1. Choose frequency/set/order meaning explicitly;token overlap is not semantic identity.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

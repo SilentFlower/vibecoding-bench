@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PN-U02",
+  "source_commit": "e06dacedc4cdea90fa1286b3965d180ab94cf251",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The duration scalar reports30 days of seconds. Applying one calendar month reaches February28,an actual28-day interval;adding the30-day seconds reaches March2. A calendar month is context dependent,so do not serialize it as that scalar and expect identical calendar arithmetic. Preserve typed units and the required arithmetic contract.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

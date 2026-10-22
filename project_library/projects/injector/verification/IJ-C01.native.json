@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "IJ-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "auto_binding_can_construct_default_values_instead_of_configuration": true
+  },
+  "resource_profile": "business"
+}

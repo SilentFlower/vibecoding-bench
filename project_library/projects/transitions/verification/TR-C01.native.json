@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TR-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "queued_trigger_true_does_not_prove_a_guarded_transition_happened": true
+  },
+  "resource_profile": "business"
+}

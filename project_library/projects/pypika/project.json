@@ -1,0 +1,236 @@
+{
+  "schema": 2,
+  "project_key": "pypika",
+  "title": "PyPika商品查询工作场景",
+  "category": "SQL条件、参数与构造归属",
+  "description": "商品条件、空值、参数绑定、标识方言、导出快照和过滤诊断六项独立任务。",
+  "seed_digest": "20d3039dec1be8f5e8fdc444a524edca01a0483b69caf6f87dd375f5a49b96f6",
+  "environment": "pypika-py312",
+  "source": {
+    "repository": "https://github.com/kayak/pypika",
+    "commit": "465fb9ae12f7727d28785d087b64e6226da5714e",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PQ-S01",
+      "title": "商品筛选语义",
+      "goal": "核真实条件与空值结果",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PQ-U01",
+            "PQ-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PQ-U01",
+          "kind": "understand",
+          "goal": "解释商品筛选条件为何丢失",
+          "prompt": "Explain the complete Python and versus parenthesized & controls and actual selected IDs. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/items.md",
+            "materials/predicates.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PQ-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/PQ-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PQ-U02",
+          "kind": "understand",
+          "goal": "追踪空值条件与未删除商品结果",
+          "prompt": "Explain the complete None equality versus isnull controls with actual SQL/SQLite results. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/items.md",
+            "materials/predicates.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PQ-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/PQ-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PQ-S02",
+      "title": "查询参数与标识",
+      "goal": "分清值绑定、字段与方言",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PQ-C01",
+            "PQ-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PQ-C01",
+          "kind": "consult",
+          "goal": "为含引号的商品名选择参数绑定",
+          "prompt": "Advise and explain the existing NamedParameter/SQLite controls,including the supplied counterexample value. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/items.md",
+            "materials/binding.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PQ-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/PQ-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PQ-C02",
+          "kind": "consult",
+          "goal": "处理方法重名列与数据库方言引用",
+          "prompt": "Advise identifier lookup,allowed-column ownership and actual dialect quoting from the complete controls. No edits or database connection.",
+          "requires": [],
+          "materials": [
+            "materials/identifiers.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PQ-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/PQ-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PQ-S03",
+      "title": "查询导出归属",
+      "goal": "保存相互独立的SQL和参数",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PQ-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PQ-P01",
+          "kind": "plan",
+          "goal": "规划独立查询导出的参数快照",
+          "prompt": "Plan reproducible independent SQL/parameter exports from the shared-collector controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/items.md",
+            "materials/export-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PQ-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/PQ-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PQ-S04",
+      "title": "过滤调用诊断",
+      "goal": "先核完整调用与返回值",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PQ-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "PQ-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PQ-D01",
+          "kind": "diagnose",
+          "goal": "先核完整构造过程再解释过滤未生效",
+          "prompt": "A product query still returns inactive items after a where call. Request the complete construction/calling code,returned-object usage,generated SQL and synthetic rows/results before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PQ-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-query-reproduction",
+              "when": "The complete construction code,returned-object usage,SQL and synthetic rows/results have not been delivered or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/discarded-return.md",
+                "disclosure/items.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

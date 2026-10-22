@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PP-C02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "parse_action_replacement_and_append_require_deliberate_rule_copies": true
+  },
+  "resource_profile": "business"
+}

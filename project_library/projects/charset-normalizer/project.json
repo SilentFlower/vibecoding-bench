@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "charset-normalizer",
+  "title": "Charset Normalizer字节导入工作场景",
+  "category": "编码证据、转换与日志归属",
+  "description": "BOM反例、等价候选、无匹配、字符替换、XML归一化和日志诊断六项任务。",
+  "seed_digest": "ad58669eb0d4c1fe2afae747173dcc9ca923ece6b0f997dd32cec0f0f4748f44",
+  "environment": "charset-normalizer-py312",
+  "source": {
+    "repository": "https://github.com/jawah/charset_normalizer",
+    "commit": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CN-S01",
+      "title": "字节识别证据",
+      "goal": "保留原件与编码歧义",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CN-U01",
+            "CN-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CN-U01",
+          "kind": "understand",
+          "goal": "核BOM线索与短样本误猜边界",
+          "prompt": "Explain the actual complete short/long BOM controls,raw/decoded/output distinctions and known-format decoding boundary. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/bom-controls.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CN-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/CN-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CN-U02",
+          "kind": "understand",
+          "goal": "区分合组候选与原始代码页证明",
+          "prompt": "Explain the complete equivalent-decoding result and what it establishes about the supplier encoding. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/equivalent-code-pages.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CN-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/CN-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CN-S02",
+      "title": "导入和输出决策",
+      "goal": "显式选择编码与丢失策略",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CN-C01",
+            "CN-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CN-C01",
+          "kind": "consult",
+          "goal": "正确处理限定编码后的无候选",
+          "prompt": "Advise no-match handling from the complete restricted and known-format controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/isolation.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CN-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/CN-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CN-C02",
+          "kind": "consult",
+          "goal": "明确目标编码的替换或拒绝策略",
+          "prompt": "Advise the destination loss policy using the actual output and strict-encoding controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/output-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CN-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/CN-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CN-S03",
+      "title": "XML归一化归属",
+      "goal": "分别验原件和派生物",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CN-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CN-P01",
+          "kind": "plan",
+          "goal": "规划XML原件与归一化派生物",
+          "prompt": "Plan encoding provenance and semantic acceptance from the complete XML normalization controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/xml-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CN-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/CN-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CN-S04",
+      "title": "日志状态诊断",
+      "goal": "核完整失败与配置证据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CN-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "CN-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CN-D01",
+          "kind": "diagnose",
+          "goal": "先核失败与日志证据再解释详细日志遗留",
+          "prompt": "Detailed detector logs persist after a failed import attempt. Request the complete input/type,arguments,exception and logger/handler snapshots before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CN-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete-logging-reproduction",
+              "when": "The complete input/type,arguments,exception and before/after logger configuration have not been supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/logging-state.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

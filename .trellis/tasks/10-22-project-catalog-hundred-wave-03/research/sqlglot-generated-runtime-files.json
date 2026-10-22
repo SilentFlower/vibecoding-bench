@@ -1,0 +1,24 @@
+{
+  "project": "sqlglot",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "files": [
+    {
+      "path": "sqlglot/_version.py",
+      "sha256": "3a95c6007951b6233241138e7128aa6013ad73f85e6e2b151531e6e26650877c",
+      "size": 541,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    }
+  ],
+  "file_count": 1,
+  "origin": {
+    "metadata": ".deploy/github-100-research/resume-app/sqlglot/venv/lib/python3.12/site-packages/sqlglot-0.0.1.dev1.dist-info/METADATA",
+    "metadata_sha256": "67ec92fdcea1c1280b111ea9b3fcd64f411db22f50c23a4482540a6d033cc658",
+    "version": "0.0.1.dev1",
+    "pyproject_sha256": "ad29ac5fbe3393567134cee2e060480f146206d01536ce63c55df0027793309a"
+  },
+  "rebuilt_in_current_run": false,
+  "scope": "原固定源码历史实际构建原件，逐元数据/输入和SHA保留；不是Git文件或本轮重新构建声明"
+}

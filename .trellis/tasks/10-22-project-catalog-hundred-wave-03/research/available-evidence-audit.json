@@ -1,0 +1,449 @@
+{
+  "status": "available_29_evidence_verified",
+  "scope": "固定源码对象／导出字节／执行位、已声明许可、离线材料、原生主集合与业务正反例原件；不代替页面、整批Check-All或第30仓准入",
+  "required_projects": 30,
+  "verified_projects": 29,
+  "source_blocked": [
+    "sqlglot"
+  ],
+  "git_files": 7644,
+  "business_cases": 158,
+  "items": [
+    {
+      "project": "pypika",
+      "source_commit": "465fb9ae12f7727d28785d087b64e6226da5714e",
+      "git_files": 97,
+      "generated_files": 0,
+      "offline_artifacts": 6,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/pypika.json",
+        "sha256": "11951463f7e04a5094d49c54754513af527acf2d07e2ea8b4434293ecee8eb90"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/pypika/result.json",
+      "baseline_result_sha256": "9aa6943173249ca8000bdcc5e125bcc4b56ea48a00c9970d15698430260b0975",
+      "status": "passed"
+    },
+    {
+      "project": "arrow",
+      "source_commit": "2224255c4acc594d734cef0bbc83360452a67983",
+      "git_files": 50,
+      "generated_files": 0,
+      "offline_artifacts": 16,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/arrow.json",
+        "sha256": "2e30c3df2a1174a4a1d08d70531064bfc9cda07cc88d8ebd3d0fa642cce8b663"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/arrow/result.json",
+      "baseline_result_sha256": "f17aed86d153326a2cf029e4decebb3d31e5f68c718b063990baf26e7f56bd9c",
+      "status": "passed"
+    },
+    {
+      "project": "charset-normalizer",
+      "source_commit": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+      "git_files": 100,
+      "generated_files": 0,
+      "offline_artifacts": 5,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/charset-normalizer.json",
+        "sha256": "ba4cbbd73a6bc15a2b7e67ee93c8c16ce0f0b056acd0a546aeea0fcf2143c50e"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/charset-normalizer/result.json",
+      "baseline_result_sha256": "f6ce25c331ed1d7f75db39641200cef53c9e1e0d547d14180f81ce682c77f567",
+      "status": "passed"
+    },
+    {
+      "project": "injector",
+      "source_commit": "5daed12510fafc0bf73b6ef18d2884f78cd5e210",
+      "git_files": 33,
+      "generated_files": 0,
+      "offline_artifacts": 8,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/injector.json",
+        "sha256": "b59b8f04681bc6858e67ecd87b97e2287db3867dfbd8ae3c4830e91695ed73a1"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/injector/result.json",
+      "baseline_result_sha256": "0028cd5c03628d6d11ef665ad549e2a783b16928a085343ecb466fa71138671f",
+      "status": "passed"
+    },
+    {
+      "project": "loguru",
+      "source_commit": "bce5dfd3b435b1d1658507d7e095ad7a9919bf1c",
+      "git_files": 313,
+      "generated_files": 0,
+      "offline_artifacts": 29,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/loguru.json",
+        "sha256": "46e161db90e1498b8c12e769607c13d6239d0d2955cee361fe3e4efbd4102107"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-006/loguru/result.json",
+      "baseline_result_sha256": "d1142bc39260a04850ac52be8e2cfbf3dbe5beaddd392bbb996a658393bdc3ff",
+      "status": "passed"
+    },
+    {
+      "project": "pyparsing",
+      "source_commit": "810199f89bf916590426e1c5cb3d612584f11a2f",
+      "git_files": 293,
+      "generated_files": 0,
+      "offline_artifacts": 17,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/pyparsing.json",
+        "sha256": "7f21a8b20c7ffc5c088e916738333973be1e0b1e0cc51a2a6b565bcd7eaca30f"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-002/pyparsing/result.json",
+      "baseline_result_sha256": "901cff3d7ca3f6c50f5fda58b264b49614537672ec1ae003897cc67fa453c14b",
+      "status": "passed"
+    },
+    {
+      "project": "markdownify",
+      "source_commit": "bc98c9e134ec55b2853716ab859754f061cb7054",
+      "git_files": 24,
+      "generated_files": 0,
+      "offline_artifacts": 9,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/markdownify.json",
+        "sha256": "07bff8b3933640bd25d73825b927ba4dec37bbde8310da6a2b318f367284e4f5"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/markdownify/result.json",
+      "baseline_result_sha256": "e3e77adc8e64e557175b3b2db60d8ced5230a76226d84718a414cbbea67d793d",
+      "status": "passed"
+    },
+    {
+      "project": "pyrsistent",
+      "source_commit": "0c0b7aec8cd25b1d2d8ba07b10acdefd0f38f2c7",
+      "git_files": 71,
+      "generated_files": 0,
+      "offline_artifacts": 10,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/pyrsistent.json",
+        "sha256": "ca35bcc070aaf0d30dd68e4adbd1cc85aab460b89e99648ef9f83cd4be803067"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-005/pyrsistent/result.json",
+      "baseline_result_sha256": "1bdcd12caa91147e1eccfeffa021a024f64d601b968bec0c4c73bcceb36ddce1",
+      "status": "passed"
+    },
+    {
+      "project": "feedgen",
+      "source_commit": "97260abb1793eb164c458c10b493690beb413f6d",
+      "git_files": 55,
+      "generated_files": 0,
+      "offline_artifacts": 8,
+      "business_cases": 11,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/feedgen.json",
+        "sha256": "c3a29234f820ba43e3391607b54656a92c905899f15e2a6ebfa7ee1f65ecb18a"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/feedgen/result.json",
+      "baseline_result_sha256": "551b75bcd33ffeff65a1953f27f12c967cee66fc4ca640f28d857e4b191e075a",
+      "status": "passed"
+    },
+    {
+      "project": "sortedcontainers",
+      "source_commit": "3ac358631f58c1347f1d6d2d92784117db0f38ed",
+      "git_files": 258,
+      "generated_files": 0,
+      "offline_artifacts": 7,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/sortedcontainers.json",
+        "sha256": "19fb0b941d9c56d6e7711504cd32b829602199f763130ee5a1bda113ed714088"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/sortedcontainers/result.json",
+      "baseline_result_sha256": "41a96f435d2b59303799474b563d4b78e4d16eac231fd52fc548518e38c03f6f",
+      "status": "passed"
+    },
+    {
+      "project": "wtforms",
+      "source_commit": "af18fd6a7595d374aa707ff97b73df0dcc462ec2",
+      "git_files": 153,
+      "generated_files": 34,
+      "offline_artifacts": 11,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/wtforms.json",
+        "sha256": "d7eeeb2c18c9c1433c502476a6fac7273f357253af819e15b2ce98e319ad7596"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/wtforms/result.json",
+      "baseline_result_sha256": "af41836cd551e8a787f94bc80b39baa4b54353f2dd612f7d98ff3baed19d8132",
+      "status": "passed"
+    },
+    {
+      "project": "python-constraint",
+      "source_commit": "d91ba03d1fd6acc30d64fd9d513dc0523f697b5b",
+      "git_files": 85,
+      "generated_files": 0,
+      "offline_artifacts": 13,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/python-constraint.json",
+        "sha256": "1d275d5b49fb9eeaae6b6d353038265f1a708f827c13fcd3fea0360d28a5b1a0"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/python-constraint/result.json",
+      "baseline_result_sha256": "95705d0f411f5501a3f8a0c11d709eaf59a7255163fbac51f31ce67f068a799e",
+      "status": "passed"
+    },
+    {
+      "project": "feedparser",
+      "source_commit": "a22c5521cbb109871f1a2318948581901bd47e26",
+      "git_files": 2362,
+      "generated_files": 0,
+      "offline_artifacts": 15,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/feedparser.json",
+        "sha256": "c2060a4f23067a832111bcdfad03f31bd6a454b9f1fc93fa3c3e28fecc995b90"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/feedparser/result.json",
+      "baseline_result_sha256": "f6f856a34f4b0d68c98900e5258cb1714a2f43782393f6e80c82f4d24e8503cd",
+      "status": "passed"
+    },
+    {
+      "project": "portion",
+      "source_commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+      "git_files": 26,
+      "generated_files": 0,
+      "offline_artifacts": 10,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/portion.json",
+        "sha256": "5e9fe5c0150c6caad2634ffaf34a16732eb9bea7bfc4cc8377a6324f760d2a6b"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/portion/result.json",
+      "baseline_result_sha256": "464226b13e4d5a42fa8224b288c46d88b99bbeba142fae7de91f6d02d93e1ad9",
+      "status": "passed"
+    },
+    {
+      "project": "textdistance",
+      "source_commit": "d6a68d61088a40eef5c88191ccf79323dbf34850",
+      "git_files": 72,
+      "generated_files": 0,
+      "offline_artifacts": 13,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/textdistance.json",
+        "sha256": "f4f7ff11c0df883e35b63444a2e1aaf4ff827a5825c3794168ac094b3f2fc41b"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/textdistance/result.json",
+      "baseline_result_sha256": "85f6d2103fd4255d3e8a5f0edd2aebadb01e87f3dbb2d69017fa8755263cbb5a",
+      "status": "passed"
+    },
+    {
+      "project": "humanize",
+      "source_commit": "785e5dcc0d0308ad0dff3f6cc0faa7085ad0375b",
+      "git_files": 89,
+      "generated_files": 37,
+      "offline_artifacts": 29,
+      "business_cases": 6,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/humanize.json",
+        "sha256": "afe425462ac550a0237acf4a32ea88b0083f00fb4125e60c9fdab5b6848be0e1"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/humanize/result.json",
+      "baseline_result_sha256": "f3c7cda6138398f6375eea0982cdfe52b2049e9e2a2e23ecf6a541a1e496c9fa",
+      "status": "passed"
+    },
+    {
+      "project": "bidict",
+      "source_commit": "299fedc89f1d70d5d41cf7922564b376d3e2d435",
+      "git_files": 88,
+      "generated_files": 0,
+      "offline_artifacts": 14,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/bidict.json",
+        "sha256": "b4e79f10670d22f2a914245f32743d4cf2413b574f98c5f848325d3d86ea32b9"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-002/bidict/result.json",
+      "baseline_result_sha256": "bb2c5da3c4c2a1084b06186d3fb6ce77a52f8e0f0cbedf2d30088179887cbbd1",
+      "status": "passed"
+    },
+    {
+      "project": "tablib",
+      "source_commit": "966876c76a6378557c1951badc1665b4d1375875",
+      "git_files": 77,
+      "generated_files": 1,
+      "offline_artifacts": 19,
+      "business_cases": 10,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/tablib.json",
+        "sha256": "805033033777998cfc72b25f8489eb6a6e7c3fdb76277acbfa30b472138e2165"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/tablib/result.json",
+      "baseline_result_sha256": "b49860949de032f01d89515f8ef746bacc602d5550e2892a60a4afd92467ae48",
+      "status": "passed"
+    },
+    {
+      "project": "chardet",
+      "source_commit": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+      "git_files": 505,
+      "generated_files": 0,
+      "offline_artifacts": 5,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/chardet.json",
+        "sha256": "70418bb9944f38ad08bb143fe5ef62b51cc9ddfa4c4551c9f5c37dde8f1a401b"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/chardet/result.json",
+      "baseline_result_sha256": "e15e3769b014cd918dc0323bbed9ce980c3c9ca8618e3045f2fde155324127fd",
+      "status": "passed"
+    },
+    {
+      "project": "natsort",
+      "source_commit": "e9a3a2a307580a1f2be8c57bba50fba45789ada0",
+      "git_files": 61,
+      "generated_files": 1,
+      "offline_artifacts": 10,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/natsort.json",
+        "sha256": "9770483332c14a9b3549a83d0cbdf1999468db91a87b6becf49c393f3b55e634"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/natsort/result.json",
+      "baseline_result_sha256": "dc785b29eb249bc674b1e85faf4657a8702d0ea58b89e6d1fd83116f5ec1aeb3",
+      "status": "passed"
+    },
+    {
+      "project": "transitions",
+      "source_commit": "bd42b38f3627e6bca7274fb4d9af2e105f75da7c",
+      "git_files": 82,
+      "generated_files": 0,
+      "offline_artifacts": 170,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/transitions.json",
+        "sha256": "149ab6c5fe5f43c7f323441d06ad29c9f9e55af7935d25e0ff6813d462ff4e98"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-004/transitions/result.json",
+      "baseline_result_sha256": "f4b3d54073b7d66f7e473283a007d77ba5642a2103c40d0d958475836ce17502",
+      "status": "passed"
+    },
+    {
+      "project": "html5lib",
+      "source_commit": "fd4f032bc090d44fb11a84b352dad7cbee0a4745",
+      "git_files": 222,
+      "generated_files": 0,
+      "offline_artifacts": 14,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/html5lib.json",
+        "sha256": "023b0e3d4f18a02887605276d17dad1e38eda6b60806266331e284631a7704d1"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/html5lib/result.json",
+      "baseline_result_sha256": "e2a2e05bad73ab50d2ce9a442a6e6084a6d19b86dba66017918d608858ef9129",
+      "status": "passed"
+    },
+    {
+      "project": "pendulum",
+      "source_commit": "e06dacedc4cdea90fa1286b3965d180ab94cf251",
+      "git_files": 290,
+      "generated_files": 1,
+      "offline_artifacts": 12,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/pendulum.json",
+        "sha256": "fc7c905ce00371cb0f632135e7b5cd8f97931aefd7fafcf74b52195f3540b7c5"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/pendulum/result.json",
+      "baseline_result_sha256": "d1944b518d35e227194b801921a652a7ae6cb9f74f0a2c0879a67380a3a141bc",
+      "status": "passed"
+    },
+    {
+      "project": "python-liquid",
+      "source_commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+      "git_files": 406,
+      "generated_files": 0,
+      "offline_artifacts": 19,
+      "business_cases": 6,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/python-liquid.json",
+        "sha256": "1082388b41cd49ae9ec25f34952f3dadee8b87bec193fabbae90a417b115655f"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/python-liquid/result.json",
+      "baseline_result_sha256": "8c2fe1fb6dfaa76839c3c80d692fa1ceead4d831037900fb4dd84b5bfca0ddc8",
+      "status": "passed"
+    },
+    {
+      "project": "python-statemachine",
+      "source_commit": "ec5d8173f740b37941818df13727db9d64ef498d",
+      "git_files": 718,
+      "generated_files": 0,
+      "offline_artifacts": 213,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/python-statemachine.json",
+        "sha256": "a10179d0ba700f619cff2905765d49f8eeac68f7d49d542081c42484550fd371"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-005/python-statemachine/result.json",
+      "baseline_result_sha256": "12da9690cc9e0db05bbb5d670f9369f604da0abe38268feb8f0505835358ca86",
+      "status": "passed"
+    },
+    {
+      "project": "webcolors",
+      "source_commit": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+      "git_files": 39,
+      "generated_files": 0,
+      "offline_artifacts": 6,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/webcolors.json",
+        "sha256": "c3a9cb44e2b9c215f6f22857c0cb94299c227f2c407b43fe922b0fe705d8c9ee"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/webcolors/result.json",
+      "baseline_result_sha256": "374fd7edce0fb5d2058a95612d5acfdbe6482d03b344bceca07a851be4aa1a24",
+      "status": "passed"
+    },
+    {
+      "project": "wrapt",
+      "source_commit": "6b4e844950213118b19e613248d2bc9469eb731e",
+      "git_files": 223,
+      "generated_files": 0,
+      "offline_artifacts": 13,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/wrapt.json",
+        "sha256": "078dfb5ce9fec091d000fb8ad647b9838f88e305bc2cef2cc5ef6783049166be"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-002/wrapt/result.json",
+      "baseline_result_sha256": "db2f5275652bfc1e93e5afce311f8ebddca70fa4e9186eb29fad89159e9b90a3",
+      "status": "passed"
+    },
+    {
+      "project": "funcy",
+      "source_commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+      "git_files": 69,
+      "generated_files": 0,
+      "offline_artifacts": 6,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/funcy.json",
+        "sha256": "8f9174b406c5c48d3aa569e1438491bb221f4329f820c30ae2a0eb9e3402f247"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/funcy/result.json",
+      "baseline_result_sha256": "60f54d7dff6d60323e94d62e6291a6275b6bea22e4b100d37f78b0760f435353",
+      "status": "passed"
+    },
+    {
+      "project": "collective-icalendar",
+      "source_commit": "3ecf079acba0e592ea6a40c456514984c8657852",
+      "git_files": 783,
+      "generated_files": 1,
+      "offline_artifacts": 13,
+      "business_cases": 5,
+      "source_proof": {
+        "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/collective-icalendar.json",
+        "sha256": "1ca2581bffcb7af120f1616665e2dfc8054a10e1f12097be7032652cbe9dd29b"
+      },
+      "baseline_result": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/collective-icalendar/result.json",
+      "baseline_result_sha256": "cca92c070497050a97db769b645e7d8d35eb4919effa7b5edb1911bd04744f41",
+      "status": "passed"
+    }
+  ],
+  "audit_script_sha256": "76556355388b0d62810373d3e2cdc68069bd47dafab56ac01e07fb43b85121fa"
+}
