@@ -13,15 +13,9 @@
   "createdAt": "2026-10-22",
   "completedAt": "2026-10-21",
   "closeout": {
-    "status": "blocked",
-    "closedAt": null,
-    "blockers": [
-      {
-        "code": "delivery-recovery-required",
-        "owner": "trellis-push",
-        "message": "任务目录存在未闭合的交付差异，请先由 trellis-push 恢复"
-      }
-    ]
+    "status": "closed",
+    "closedAt": "2026-10-22T08:49:45Z",
+    "blockers": []
   },
   "branch": null,
   "base_branch": "main",

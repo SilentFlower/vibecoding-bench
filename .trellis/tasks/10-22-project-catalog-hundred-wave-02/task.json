@@ -13,18 +13,9 @@
   "createdAt": "2026-10-22",
   "completedAt": "2026-10-22",
   "closeout": {
-    "status": "blocked",
-    "closedAt": null,
-    "blockers": [
-      {
-        "code": "decision-review-required",
-        "owner": "decision_log.py",
-        "message": "当前 AI 决策摘要尚未获得 accepted review",
-        "detail": {
-          "decisionDigest": "18992685ce9664a1d71b464df287cdd8b2e633dd4963ac808f17c44b6365afee"
-        }
-      }
-    ]
+    "status": "closed",
+    "closedAt": "2026-10-22T08:49:45Z",
+    "blockers": []
   },
   "branch": null,
   "base_branch": "main",
