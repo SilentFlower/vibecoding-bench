@@ -1,0 +1,1 @@
+{"read_only": true, "production_writes": 0, "references": {"runs": {"2.1.293": 94}, "app_settings": {"2.1.293": 1}, "configured_default": {"2.1.293": 1}, "release_default": {"2.1.293": 1}, "controlled_records": {"2.1.293": 4, "2.1.70": 1, "1.0.24": 1, "2.1.139": 1}}, "controlled_records_inspected": 32, "uncertain_records": 0, "policy": "未知引用和旧安装协议版本保留，不凭安装日期删除"}
