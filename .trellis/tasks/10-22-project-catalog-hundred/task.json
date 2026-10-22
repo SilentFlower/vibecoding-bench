@@ -3,7 +3,7 @@
   "name": "project-catalog-hundred",
   "title": "将剩余90个研究项目转为正式真实场景内容包",
   "description": "以当前10项目45场景107任务为已交付基线，将research/github-projects中剩余90个固定真实项目逐批转为相同标准的正式场景内容包，直至100个研究项目全部接入；保留原研究口径，逐仓实际准入，不以20步研究或项目名称充数。",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "vibecoding-bench",
@@ -11,11 +11,20 @@
   "creator": "silentflower",
   "assignee": "silentflower",
   "createdAt": "2026-10-22",
-  "completedAt": null,
+  "completedAt": "2026-10-22",
   "closeout": {
-    "status": "pending",
+    "status": "blocked",
     "closedAt": null,
-    "blockers": []
+    "blockers": [
+      {
+        "code": "decision-review-required",
+        "owner": "decision_log.py",
+        "message": "当前 AI 决策摘要尚未获得 accepted review",
+        "detail": {
+          "decisionDigest": "5dd90d8bb87900b1676b39e257e5c7b652e4a9f51543c99fac775e8804d03945"
+        }
+      }
+    ]
   },
   "branch": null,
   "base_branch": "main",
@@ -3164,10 +3173,12 @@
     }
   },
   "progress": {
-    "updatedAt": "2026-10-22T05:29:59Z",
-    "completedSteps": [],
-    "partialStep": "auto-loop blocked: blocked-dependency",
-    "nextStep": "auto-loop 已阻断；确认后运行 python3 ./.trellis/scripts/auto_loop.py retry-blocked --run-id auto-20261021191233 --task .trellis/tasks/10-22-project-catalog-hundred",
-    "notes": "run_id=auto-20261021191233; task=.trellis/tasks/10-22-project-catalog-hundred; status=completed_with_blocked; reason=blocked-dependency; summary=显式前置任务未完成"
+    "updatedAt": "2026-10-22T08:11:09Z",
+    "completedSteps": [
+      "auto-loop: 本地提交完成 .:6e55e4e"
+    ],
+    "partialStep": null,
+    "nextStep": "auto-loop 已完成本地提交与确定性 Close；如有 blocker，按 close_result 处理",
+    "notes": "run_id=auto-20261021191233; task=.trellis/tasks/10-22-project-catalog-hundred; commit=6e55e4e04307273c414fc820bba99c3e55d31b5e; commits=.:6e55e4e04307273c414fc820bba99c3e55d31b5e; status=completed"
   }
 }
